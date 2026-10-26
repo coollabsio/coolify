@@ -8,6 +8,7 @@ use App\Models\CloudProviderToken;
 use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
@@ -63,6 +64,10 @@ class ServerTransferExporter
         'is_sentinel_debug_enabled',
         // Exported as cloudflare_tunnel_integration_token_uuid.
         'cloudflare_tunnel_integration_token_id',
+        // The last patch check of the source; the target runs its own.
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
     ];
 
     /**
@@ -164,6 +169,7 @@ class ServerTransferExporter
             'private_keys' => $dependencies['private_keys']->map(fn (PrivateKey $key) => $this->exportPrivateKey($key))->values()->all(),
             'github_apps' => $dependencies['github_apps']->map(fn (GithubApp $app) => $this->exportGithubApp($app))->values()->all(),
             'gitlab_apps' => $dependencies['gitlab_apps']->map(fn (GitlabApp $app) => $this->exportGitlabApp($app))->values()->all(),
+            'gitea_apps' => $dependencies['gitea_apps']->map(fn (GiteaApp $app) => $this->exportGiteaApp($app))->values()->all(),
             's3_storages' => $dependencies['s3_storages']->map(fn (S3Storage $storage) => $this->exportS3Storage($storage))->values()->all(),
             'cloud_provider_tokens' => $dependencies['cloud_provider_tokens']->map(fn (CloudProviderToken $token) => $this->exportCloudProviderToken($token))->values()->all(),
             'integration_tokens' => $integrationTokens->map(fn (IntegrationToken $token) => $this->exportIntegrationToken($token))->values()->all(),
@@ -192,6 +198,7 @@ class ServerTransferExporter
      *     private_keys: Collection<int, PrivateKey>,
      *     github_apps: Collection<int, GithubApp>,
      *     gitlab_apps: Collection<int, GitlabApp>,
+     *     gitea_apps: Collection<int, GiteaApp>,
      *     s3_storages: Collection<int, S3Storage>,
      *     cloud_provider_tokens: Collection<int, CloudProviderToken>
      * }
@@ -202,6 +209,7 @@ class ServerTransferExporter
         $privateKeys = collect([$server->privateKey])->filter();
         $githubApps = collect();
         $gitlabApps = collect();
+        $giteaApps = collect();
         $s3Ids = collect();
 
         // System-wide GitHub Apps are instance-owned; do not copy them. The application source and the runner
@@ -236,6 +244,17 @@ class ServerTransferExporter
                     $gitlabApps->push($gl);
                     if ($gl->private_key_id) {
                         $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gl->private_key_id, $teamId, 'private key'));
+                    }
+                }
+            }
+
+            if ($application->source_type === GiteaApp::class && $application->source_id !== null) {
+                $gt = $this->findGitSource(GiteaApp::class, $application->source_id, $teamId);
+                // System-wide Gitea Apps are instance-owned; re-link by UUID on import.
+                if ($gt && ! $gt->is_system_wide) {
+                    $giteaApps->push($gt);
+                    if ($gt->private_key_id) {
+                        $privateKeys->push($this->findTeamRecord(PrivateKey::class, $gt->private_key_id, $teamId, 'private key'));
                     }
                 }
             }
@@ -309,6 +328,7 @@ class ServerTransferExporter
             'private_keys' => $privateKeys->unique('id')->values(),
             'github_apps' => $githubApps->unique('id')->values(),
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
+            'gitea_apps' => $giteaApps->unique('id')->values(),
             's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
@@ -336,9 +356,9 @@ class ServerTransferExporter
     /**
      * System-wide git sources are returned as they are (they are only linked by UUID, never exported).
      *
-     * @param  class-string<GithubApp|GitlabApp>  $modelClass
+     * @param  class-string<GithubApp|GitlabApp|GiteaApp>  $modelClass
      */
-    private function findGitSource(string $modelClass, int|string $id, int $teamId): GithubApp|GitlabApp|null
+    private function findGitSource(string $modelClass, int|string $id, int $teamId): GithubApp|GitlabApp|GiteaApp|null
     {
         $source = $modelClass::find($id);
         if ($source && ! $source->is_system_wide && (int) $source->team_id !== $teamId) {
@@ -395,6 +415,18 @@ class ServerTransferExporter
             $warnings[] = 'Some applications use a system-wide GitLab App, which is not exported. On import, Coolify will re-link to a matching system-wide GitLab App on the target instance (by UUID) if one exists.';
         }
 
+        $usesSystemWideGitea = $applications->contains(function (Application $app) {
+            if ($app->source_type !== GiteaApp::class || $app->source_id === null) {
+                return false;
+            }
+            $gt = GiteaApp::find($app->source_id);
+
+            return $gt?->is_system_wide === true;
+        });
+        if ($usesSystemWideGitea) {
+            $warnings[] = 'Some applications use a system-wide Gitea App, which is not exported. On import, Coolify will re-link to a matching system-wide Gitea App on the target instance (by UUID) if one exists.';
+        }
+
         if ($dependencies['s3_storages']->isNotEmpty()) {
             $warnings[] = 'S3 storage credentials were exported. Confirm endpoint access from the target instance and that bucket policies still apply.';
         }
@@ -417,7 +449,8 @@ class ServerTransferExporter
     private function collectManagedDnsRecords(Server $server, Collection $applications, Collection $services): array
     {
         // Keyed by "morph type:id". Soft-deleted previews are covered, but their references are not exported.
-        $resourceKeys = [];
+        // The server itself owns the DNS record of its Cloudflare tunnel.
+        $resourceKeys = [$server->getMorphClass().':'.$server->id => ['kind' => 'server', 'uuid' => $server->uuid]];
         foreach ($applications as $application) {
             $resourceKeys[$application->getMorphClass().':'.$application->id] = ['kind' => 'application', 'uuid' => $application->uuid];
             foreach (ApplicationPreview::withTrashed()->where('application_id', $application->id)->get() as $preview) {
@@ -429,10 +462,6 @@ class ServerTransferExporter
                 $resourceKeys[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['kind' => 'service_application', 'uuid' => $serviceApplication->uuid];
             }
         }
-        if ($resourceKeys === []) {
-            return ['records' => collect(), 'resource_keys' => [], 'warnings' => []];
-        }
-
         $records = ManagedDnsRecord::query()
             ->whereHas('references', function ($query) use ($resourceKeys) {
                 $query->where(function ($query) use ($resourceKeys) {
@@ -501,7 +530,7 @@ class ServerTransferExporter
     /**
      * Manual steps after the transfer. {target_url} stands for the URL of the target instance.
      *
-     * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>}  $dependencies
+     * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>, gitea_apps: Collection<int, GiteaApp>}  $dependencies
      * @param  Collection<int, Application>  $applications
      * @return list<string>
      */
@@ -527,10 +556,16 @@ class ServerTransferExporter
         foreach ($dependencies['gitlab_apps'] as $gitlabApp) {
             $steps[] = "In GitLab, open Settings > Webhooks of every project that uses GitLab App {$gitlabApp->name}, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.";
         }
+        foreach ($dependencies['gitea_apps'] as $giteaApp) {
+            $steps[] = "In Gitea, open the OAuth2 application of Gitea App {$giteaApp->name} and set the redirect URI to {target_url}/webhooks/source/gitea/redirect. "
+                .'Then set the webhook URL of every repository that uses it to {target_url}/webhooks/source/gitea/events.';
+        }
         if ($runnerConfig) {
             $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
                 .'Enabling them stops runners that another Coolify instance started on this server.';
         }
+        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, '
+            .'then remove the old public key from ~/.ssh/authorized_keys on the server.';
 
         return $steps;
     }
@@ -898,6 +933,8 @@ class ServerTransferExporter
             $source = ['type' => 'github_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
         } elseif ($application->source_type === GitlabApp::class && $application->source) {
             $source = ['type' => 'gitlab_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
+        } elseif ($application->source_type === GiteaApp::class && $application->source) {
+            $source = ['type' => 'gitea_app', 'uuid' => $application->source->uuid, 'system_wide' => (bool) $application->source->is_system_wide];
         }
 
         return [
@@ -1409,6 +1446,33 @@ class ServerTransferExporter
             'deploy_key_id' => $app->deploy_key_id,
             'private_key_uuid' => $app->privateKey?->uuid,
             'webhook_url_hint' => '/webhooks/source/gitlab/events',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exportGiteaApp(GiteaApp $app): array
+    {
+        return [
+            'uuid' => $app->uuid,
+            'name' => $app->name,
+            'organization' => $app->organization,
+            'api_url' => $app->api_url,
+            'html_url' => $app->html_url,
+            'custom_port' => $app->custom_port,
+            'custom_user' => $app->custom_user,
+            'is_system_wide' => false,
+            'is_public' => (bool) $app->is_public,
+            'client_id' => $app->client_id,
+            'client_secret' => $app->client_secret,
+            'access_token' => $app->access_token,
+            'refresh_token' => $app->refresh_token,
+            'expires_at' => $app->expires_at,
+            'redirect_uri' => $app->redirect_uri,
+            'webhook_secret' => $app->webhook_secret,
+            'private_key_uuid' => $app->privateKey?->uuid,
+            'webhook_url_hint' => '/webhooks/source/gitea/events',
         ];
     }
 

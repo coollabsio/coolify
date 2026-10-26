@@ -1650,7 +1650,20 @@ test('get_logs returns structured next_tools when application is not running', f
     expect($body['data']['ok'])->toBeFalse();
     expect($body['data']['reason'])->toBe('not_running');
     expect($body['data']['next_tools'])->not->toBeEmpty();
-    expect(collect($body['data']['next_tools'])->pluck('tool'))->toContain('list_deployments', 'list_unhealthy_resources');
+    expect(collect($body['data']['next_tools'])->pluck('tool'))->toContain('list_deployments', 'list_unhealthy_resources')
+        ->not->toContain('control');
+});
+
+test('get_application suggests only tools that the token can see', function () {
+    $this->application->update(['status' => 'running:healthy']);
+
+    $readTools = collect(mcpReadJson(mcpReadCall('get_application', ['uuid' => $this->application->uuid]))['_actions'])->pluck('tool');
+    $sensitiveTools = collect(mcpReadJson(mcpSensitiveReadCall('get_application', ['uuid' => $this->application->uuid]))['_actions'])->pluck('tool');
+
+    expect($readTools)->toContain('get_application', 'list_deployments')
+        ->not->toContain('get_logs', 'control')
+        ->and($sensitiveTools)->toContain('get_logs')
+        ->not->toContain('control');
 });
 
 test('get_logs returns structured choices when service has multiple containers', function () {
@@ -1711,6 +1724,18 @@ test('coolify_help topic returns recipe steps and marks tools the token cannot u
     expect($steps['list_projects']['available'])->toBeTrue()
         ->and($steps['create_application']['available'])->toBeFalse()
         ->and($steps['create_application']['action'])->toBe('public');
+});
+
+test('coolify_help marks recipe steps unavailable when the token lacks the action ability', function () {
+    $body = mcpReadJson(mcpReadCall('coolify_help', ['topic' => 'backup_database']));
+    $steps = collect($body['data']['steps'])->mapWithKeys(fn (array $step) => [$step['tool'].':'.($step['action'] ?? '') => $step['available']]);
+
+    expect($steps->all())->toBe([
+        'manage_s3_storage:create' => false,
+        'manage_s3_storage:validate' => false,
+        'manage_backup:create' => false,
+        'list_backup_executions:' => true,
+    ]);
 });
 
 test('coolify_help search filters tools and rejects unknown topics', function () {

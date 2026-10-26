@@ -131,3 +131,12 @@ test('a parent entry opens its submenu in place on mobile and desktop', function
             ->not->toMatch('#<a title="Monitoring"#');
     }
 });
+
+test('the projects entry links to the projects page and is active on project pages', function () {
+    loginNavbarUser('member');
+
+    expect(renderNavbarAt('/project/abc'))
+        ->toContain('href="'.route('project.index').'"')
+        ->toMatch('#title="Projects"[^>]*menu-item-active#s')
+        ->not->toMatch('#title="Dashboard"[^>]*menu-item-active#s');
+});

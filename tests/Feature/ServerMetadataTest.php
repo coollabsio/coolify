@@ -203,9 +203,9 @@ it('calls gatherServerMetadata during ValidateAndInstall when docker version is 
 
     // Call the action on the mounted instance: a Livewire request round trip
     // would rehydrate the server from the database and drop the mock.
-    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->instance()
-        ->validateDockerVersion();
+    $component = Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])->instance();
+    $component->uptime = '1 day';
+    $component->validateDockerVersion();
 });
 
 it('does not call gatherServerMetadata when docker version validation fails', function () {
@@ -216,7 +216,61 @@ it('does not call gatherServerMetadata when docker version validation fails', fu
 
     // Call the action on the mounted instance: a Livewire request round trip
     // would rehydrate the server from the database and drop the mock.
-    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->instance()
-        ->validateDockerVersion();
+    $component = Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])->instance();
+    $component->uptime = '1 day';
+    $component->validateDockerVersion();
+});
+
+it('stores detected NVIDIA GPUs and the container toolkit when gathering server metadata', function (array $gpuLines, array $toolkitLines, array $expectedGpus, bool $expectedToolkit) {
+    $this->server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    Process::fake([
+        '*' => Process::result(output: implode("\n", [
+            '---PRETTY_NAME---',
+            'Ubuntu 24.04 LTS',
+            '---CPUS---',
+            '8',
+            '---DOCKER---',
+            '29.4.3-ce',
+            '---COMPOSE---',
+            'v2.32.4',
+            '---GPUS---',
+            ...$gpuLines,
+            '---NVIDIA_TOOLKIT---',
+            ...$toolkitLines,
+        ]), exitCode: 0),
+    ]);
+
+    $this->server->gatherServerMetadata();
+    $server = $this->server->fresh();
+
+    expect($server->detectedGpus())->toBe($expectedGpus)
+        ->and($server->server_metadata['nvidia_container_toolkit'])->toBe($expectedToolkit)
+        ->and($server->server_metadata['cpus'])->toBe(8);
+})->with([
+    'two gpus' => [
+        ['0, GPU-1a2b, 81559, NVIDIA H100 80GB HBM3', '1, GPU-3c4d, 24564, NVIDIA GeForce RTX 4090, Founders'],
+        ['/usr/bin/nvidia-container-runtime-hook', '/usr/bin/nvidia-ctk'],
+        [
+            ['index' => '0', 'uuid' => 'GPU-1a2b', 'memory_mb' => 81559, 'name' => 'NVIDIA H100 80GB HBM3'],
+            ['index' => '1', 'uuid' => 'GPU-3c4d', 'memory_mb' => 24564, 'name' => 'NVIDIA GeForce RTX 4090, Founders'],
+        ],
+        true,
+    ],
+    'driver installed without a working gpu' => [
+        ['NVIDIA-SMI has failed because it could not communicate with the NVIDIA driver.'],
+        [],
+        [],
+        false,
+    ],
+    'no nvidia-smi' => [[], [], [], false],
+]);
+
+it('returns null detected GPUs when GPUs were never checked', function () {
+    $this->server->update(['server_metadata' => ['os' => 'Ubuntu 24.04 LTS']]);
+
+    expect($this->server->fresh()->detectedGpus())->toBeNull();
 });

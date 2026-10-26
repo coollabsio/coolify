@@ -305,7 +305,7 @@ class Change extends Component
             $this->authorize('view', $this->github_app);
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
-            $this->applications = $this->github_app->applications;
+            $this->applications = $this->github_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
             $settings = instanceSettings();
 
             // Sync data from model to properties

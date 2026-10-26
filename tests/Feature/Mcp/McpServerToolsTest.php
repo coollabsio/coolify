@@ -184,7 +184,7 @@ test('server group write actions reject read-only tokens', function (string $too
     $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), $tool, $arguments + ['confirm' => true]);
 
     expect(mcpSrvIsError($response))->toBeTrue()
-        ->and(mcpSrvText($response))->toMatch('/Missing required permissions: write|Tool \[\w+\] not found/');
+        ->and(mcpSrvText($response))->toMatch('/Missing required permissions: (write|deploy)|Tool \[\w+\] not found/');
 })->with([
     'manage_server create' => ['manage_server', ['action' => 'create', 'data' => ['ip' => '203.0.113.50']]],
     'manage_proxy restart' => ['manage_proxy', ['action' => 'restart', 'uuid' => 'x']],
@@ -215,7 +215,7 @@ test('server group write actions reject member tokens', function (string $tool, 
 ]);
 
 test('server group destructive actions need confirm=true', function (string $tool, array $arguments) {
-    $response = mcpSrvCall(mcpSrvToken($this->user), $tool, $arguments);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy', 'delete']), $tool, $arguments);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('requires confirm=true');
@@ -292,7 +292,7 @@ test('manage_server updates, validates, and deletes its own server', function ()
 // ---------------------------------------------------------------- manage_proxy
 
 test('manage_proxy reads and updates the proxy of its own server and queues a restart', function () {
-    $token = mcpSrvToken($this->user);
+    $token = mcpSrvToken($this->user, ['read', 'write', 'deploy']);
 
     $get = mcpSrvCall($token, 'manage_proxy', ['action' => 'get', 'uuid' => $this->server->uuid]);
     expect(mcpSrvIsError($get))->toBeFalse(mcpSrvText($get))
@@ -308,7 +308,7 @@ test('manage_proxy reads and updates the proxy of its own server and queues a re
 });
 
 test('manage_proxy cannot read or change the proxy of another team', function (string $action, array $data) {
-    $response = mcpSrvCall(mcpSrvToken($this->user), 'manage_proxy', ['action' => $action, 'uuid' => $this->otherServer->uuid, 'confirm' => true, 'data' => $data]);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), 'manage_proxy', ['action' => $action, 'uuid' => $this->otherServer->uuid, 'confirm' => true, 'data' => $data]);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and((bool) $this->otherServer->settings()->first()->generate_exact_labels)->toBeFalse();
@@ -323,7 +323,7 @@ test('manage_proxy cannot read or change the proxy of another team', function (s
 // ---------------------------------------------------------------- docker_cleanup
 
 test('docker_cleanup reads, updates, lists, and runs cleanup on its own server', function () {
-    $token = mcpSrvToken($this->user);
+    $token = mcpSrvToken($this->user, ['read', 'write', 'deploy']);
 
     $get = mcpSrvCall($token, 'docker_cleanup', ['action' => 'get', 'uuid' => $this->server->uuid]);
     expect(mcpSrvIsError($get))->toBeFalse(mcpSrvText($get))
@@ -344,7 +344,7 @@ test('docker_cleanup reads, updates, lists, and runs cleanup on its own server',
 test('docker_cleanup cannot touch a server of another team', function (string $action, array $data) {
     $before = (int) $this->otherServer->settings()->first()->docker_cleanup_threshold;
 
-    $response = mcpSrvCall(mcpSrvToken($this->user), 'docker_cleanup', ['action' => $action, 'uuid' => $this->otherServer->uuid, 'confirm' => true, 'data' => $data]);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), 'docker_cleanup', ['action' => $action, 'uuid' => $this->otherServer->uuid, 'confirm' => true, 'data' => $data]);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and((int) $this->otherServer->settings()->first()->docker_cleanup_threshold)->toBe($before);
@@ -428,7 +428,7 @@ test('manage_registry list needs read:sensitive', function () {
 test('manage_registry logs in on its own server without echoing the password', function () {
     mcpSrvMakeFunctional($this->server);
 
-    $response = mcpSrvCall(mcpSrvToken($this->user), 'manage_registry', ['action' => 'create', 'uuid' => $this->server->uuid, 'data' => [
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), 'manage_registry', ['action' => 'create', 'uuid' => $this->server->uuid, 'data' => [
         'registry' => 'ghcr.io', 'username' => 'octocat', 'password' => 'REGISTRY_PASSWORD_VALUE',
     ]]);
 
@@ -729,6 +729,26 @@ test('cloud_provider provisioning rejects a private key of another team', functi
         ->and(Server::count())->toBe($serverCount);
     Http::assertNothingSent();
 });
+
+test('cloud_provider provisioning a Hostinger VPS with a post-install script or extra SSH keys needs deploy', function (array $extra) {
+    Http::fake();
+    $cloudToken = CloudProviderToken::create(['team_id' => $this->team->id, 'provider' => 'hostinger', 'token' => 'OWN_TOKEN_VALUE', 'name' => 'Mine']);
+    $serverCount = Server::count();
+
+    $response = mcpSrvCall(mcpSrvToken($this->user), 'cloud_provider', ['action' => 'provision_server', 'resource' => 'hostinger', 'confirm' => true, 'data' => [
+        'cloud_provider_token_uuid' => $cloudToken->uuid, 'private_key_uuid' => $this->key->uuid,
+        'item_id' => 'hostingercom-vps-kvm1-usd-1m', 'data_center_id' => 19, 'template_id' => 1130,
+        ...$extra,
+    ]]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toContain('Missing required permissions: deploy')
+        ->and(Server::count())->toBe($serverCount);
+    Http::assertNothingSent();
+})->with([
+    'post-install script' => [['post_install_script_id' => 73]],
+    'extra SSH keys' => [['public_key_ids' => [42]]],
+]);
 
 // ---------------------------------------------------------------- manage_notifications
 

@@ -44,6 +44,8 @@
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
     // Prefer a rich HTML button title when callers pass <x-slot:button-title> (ComponentSlot).
     $resolvedButtonTitle = $buttonTitle instanceof ComponentSlot ? $buttonTitle : $buttonTitle;
+    // Show a loading state on the trigger button while the submit action runs (needs Livewire updates, so not with wire:ignore).
+    $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -179,31 +181,31 @@
                 @endif
             @elseif ($isErrorButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError @click="modalOpen=true">
+                    <x-forms.button class="w-full" isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError @click="modalOpen=true">
+                    <x-forms.button isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif($isHighlightedButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @else
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif

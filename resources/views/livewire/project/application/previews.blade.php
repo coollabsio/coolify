@@ -44,7 +44,7 @@
                                                 {{ data_get($pull_request, 'title') }}
                                             </h4>
                                             <a target="_blank"
-                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-warning"
+                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-brand-light"
                                                 href="{{ data_get($pull_request, 'html_url') }}">
                                                 Open on GitHub
                                                 <x-external-link />
@@ -127,7 +127,7 @@
 
     <x-application.settings-section id="preview-deployments-section" title="Preview deployments"
         helper="Manage domains, deployments, logs, and lifecycle actions for configured previews." flush>
-        @forelse (data_get($application, 'previews') as $previewName => $preview)
+        @forelse (data_get($application, 'previews') as $preview)
             @php
                 $previewStatus = str(data_get($preview, 'status'));
                 $previewIsStopped = $previewStatus->startsWith('exited');
@@ -304,7 +304,7 @@
                             class="application-settings-section-body is-flush mt-3 overflow-visible">
                             <div class="data-table-header grid-cols-1"><span>Docker tag</span></div>
                             <div class="p-3">
-                                <x-forms.input id="previewDockerTags.{{ $previewName }}" canGate="update"
+                                <x-forms.input id="previewDockerTags.{{ $preview->id }}" canGate="update"
                                     :canResource="$application"
                                     wire:change="save_preview('{{ $preview->id }}')" />
                             </div>

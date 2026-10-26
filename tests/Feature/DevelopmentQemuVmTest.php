@@ -145,6 +145,21 @@ it('seeds one predefined root qemu server', function () {
         ->and(Server::query()->where('uuid', 'like', 'development-qemu-%')->count())->toBe(1);
 });
 
+it('seeds a new qemu server with the caddy proxy', function () {
+    $server = SeedDevelopmentQemuServer::run('debian-root');
+
+    expect($server->proxyType())->toBe('CADDY')
+        ->and($server->proxy->get('status'))->toBe('exited');
+});
+
+it('keeps the proxy of an existing server when it seeds a qemu vm for it', function () {
+    $this->seed(ServerSeeder::class);
+
+    $server = SeedDevelopmentQemuServer::run('ubuntu-root', true, true);
+
+    expect($server->proxyType())->toBe('TRAEFIK');
+});
+
 it('uses a qemu vm as the localhost sentinel without changing its identity', function () {
     $this->seed(ServerSeeder::class);
 
@@ -690,3 +705,115 @@ function useDevelopmentQemuInstance(string $instance, int $slot, string $storage
         'storage_path' => $storagePath,
     ]]);
 }
+
+function fakeQemuHostWithGpu(string $domainState = 'running', string $domainXml = '<domain></domain>'): void
+{
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(output: 'exists'),
+        '* domstate *' => Process::result(output: "{$domainState}\n"),
+        '* dumpxml *' => Process::result(output: $domainXml),
+        'lspci *' => Process::result(output: implode("\n", [
+            '0000:01:00.0 "0300" "10de" "2584" -ra1 -p00 "1043" "8976"',
+            '0000:01:00.1 "0403" "10de" "2291" -ra1 -p00 "1043" "8976"',
+        ])."\n"),
+        '*' => Process::result(),
+    ]);
+}
+
+it('creates a vm with every function of the host nvidia gpu and more memory', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-gpu-create-test-'.uniqid();
+    config(['development-qemu.storage_path' => $storagePath, 'development-qemu.memory' => 1024, 'development-qemu.gpu_memory' => 4096]);
+    File::ensureDirectoryExists($storagePath);
+    File::put("{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2", 'prepared image');
+    fakeQemuHostWithGpu();
+
+    StartDevelopmentQemuVm::run('ubuntu-root', true, true);
+
+    Process::assertRan(fn ($process) => $process->command === 'systemctl stop nvidia-persistenced');
+    Process::assertRan(fn ($process) => str_starts_with($process->command, 'virt-install ')
+        && str_contains($process->command, '--memory 4096 ')
+        && str_contains($process->command, "--hostdev 'pci_0000_01_00_0' --hostdev 'pci_0000_01_00_1'"));
+});
+
+it('stops an existing vm to attach the host gpu and starts it with the gpu memory', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-attach-test-'.uniqid(), 'development-qemu.gpu_memory' => 4096]);
+    $hostdevAttached = false;
+    $ran = [];
+    Process::fake(function ($process) use (&$hostdevAttached, &$ran) {
+        $ran[] = $process->command;
+        $hostdevAttached = $hostdevAttached || str_starts_with($process->command, 'virt-xml ');
+
+        return match (true) {
+            str_contains($process->command, ' net-dumpxml ') => Process::result(output: '<network></network>'),
+            str_contains($process->command, ' network inspect ') => Process::result(output: "172.18.0.0/16\n"),
+            str_contains($process->command, ' dominfo ') => Process::result(output: 'exists'),
+            str_contains($process->command, ' domstate ') => Process::result(output: $hostdevAttached ? "shut off\n" : "running\n"),
+            str_contains($process->command, ' dumpxml ') => Process::result(output: $hostdevAttached ? "<domain><hostdev mode='subsystem'/></domain>" : '<domain></domain>'),
+            str_starts_with($process->command, 'lspci ') => Process::result(output: "0000:01:00.0 \"0300\" \"10de\" \"2584\"\n0000:01:00.1 \"0403\" \"10de\" \"2291\"\n"),
+            default => Process::result(),
+        };
+    });
+
+    StartDevelopmentQemuVm::run('ubuntu-root', false, true);
+
+    $commands = collect($ran);
+    $shutdown = $commands->search("virsh shutdown 'coolify-dev-ubuntu-root'");
+    $attach = $commands->search("virt-xml 'coolify-dev-ubuntu-root' --add-device --hostdev 'pci_0000_01_00_0'");
+    expect($shutdown)->not->toBeFalse()
+        ->and($attach)->toBeGreaterThan($shutdown)
+        ->and($commands)->toContain("virt-xml 'coolify-dev-ubuntu-root' --add-device --hostdev 'pci_0000_01_00_1'")
+        ->and($commands->search("virsh setmem 'coolify-dev-ubuntu-root' 4096M --config"))->toBeGreaterThan($attach)
+        ->and($commands->search("virsh start 'coolify-dev-ubuntu-root'"))->toBeGreaterThan($commands->search('systemctl stop nvidia-persistenced'));
+    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install '));
+});
+
+it('keeps the gpu memory of a gpu vm that starts without the gpu option', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-restart-test-'.uniqid(), 'development-qemu.memory' => 1024, 'development-qemu.gpu_memory' => 4096]);
+    fakeQemuHostWithGpu('shut off', "<domain><hostdev mode='subsystem'/></domain>");
+
+    StartDevelopmentQemuVm::run('ubuntu-root');
+
+    Process::assertRan("virsh setmem 'coolify-dev-ubuntu-root' 4096M --config");
+    Process::assertRan('systemctl stop nvidia-persistenced');
+    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-xml '));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '1024M'));
+});
+
+it('fails before it changes the vm when the host has no nvidia gpu', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-no-gpu-test-'.uniqid()]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(output: 'exists'),
+        '* domstate *' => Process::result(output: "shut off\n"),
+        '*' => Process::result(),
+    ]);
+
+    expect(fn () => StartDevelopmentQemuVm::run('ubuntu-root', false, true))
+        ->toThrow(RuntimeException::class, 'No NVIDIA GPU found');
+    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-xml ') || str_contains($process->command, 'virsh start'));
+});
+
+it('allows gpu passthrough only for one ubuntu root profile', function (array $profiles) {
+    Process::fake();
+
+    expect(Artisan::call('dev:qemu', ['profiles' => $profiles, '--gpu' => true]))->toBe(Command::FAILURE);
+
+    Process::assertNothingRan();
+})->with([
+    'non-root' => [['ubuntu-non-root']],
+    'other distribution' => [['debian-root']],
+    'two profiles' => [['ubuntu-root', 'debian-root']],
+]);
+
+it('seeds a gpu vm through the container so it installs the driver', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-seed-test-'.uniqid()]);
+    SeedDevelopmentQemuServer::mock()->shouldNotReceive('handle');
+    fakeQemuHostWithGpu('shut off', "<domain><hostdev mode='subsystem'/></domain>");
+
+    ManageDevelopmentQemuVm::run('ubuntu-root', true, false, true);
+
+    Process::assertRan("docker exec 'coolify' php artisan dev:qemu:seed 'ubuntu-root' --as-localhost --gpu");
+});

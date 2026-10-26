@@ -248,3 +248,17 @@ test('the target does not own a record it cannot adopt and the import still succ
     ])],
     'the provider cannot be reached' => [fn (ManagedDnsRecord $record) => Http::fake(fn () => throw new ConnectionException('Connection refused'))],
 ]);
+
+test('the DNS record of the Cloudflare tunnel moves with the server', function () {
+    $this->server->settings->forceFill(['is_cloudflare_tunnel' => true, 'cloudflare_tunnel_id' => 'tun-1', 'cloudflare_tunnel_integration_token_id' => $this->cloudflareToken->id])->saveQuietly();
+    $record = dnsTransferRecord($this, 'ssh.example.com', [$this->server]);
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    removeDnsTransferSource($this);
+    $this->importer->import($bundle, teamId: $this->team->id);
+
+    $imported = ManagedDnsRecord::where('name', 'ssh.example.com')->firstOrFail();
+    $server = Server::where('uuid', $this->server->uuid)->firstOrFail();
+    expect($imported->uuid)->toBe($record->uuid)
+        ->and($imported->references()->where('resource_type', $server->getMorphClass())->where('resource_id', $server->id)->exists())->toBeTrue();
+});

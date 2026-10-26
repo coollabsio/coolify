@@ -1,6 +1,5 @@
 @php
     $configuredCount = collect($domainRows)->where('is_suggested', false)->count();
-    $suggestedCount = collect($domainRows)->where('is_suggested', true)->count();
     $hasRows = count($domainRows) > 0;
     $hasDnsChecksInProgress = collect($domainRows)->contains(fn ($row) => $row['dns_status'] === 'checking');
     $serviceAppCount = count($serviceApps);
@@ -69,36 +68,20 @@
     @endcannot
 
     {{-- Toolbar --}}
-    <div class="flex flex-wrap items-center gap-2">
-        <div class="min-w-0 flex-1">
-            <h2 id="domains-section">Domains</h2>
-            <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                {{ $configuredCount }} domain{{ $configuredCount === 1 ? '' : 's' }} across {{ $domainGroups->count() }} service{{ $domainGroups->count() === 1 ? '' : 's' }}
-                @if ($suggestedCount > 0)
-                    · {{ $suggestedCount }} not added
-                @endif
-            </p>
-        </div>
+    <div id="domains-section" class="flex flex-wrap items-center gap-2">
+        @if ($domainGroups->isNotEmpty())
+            <div class="relative w-full sm:w-64">
+                <x-reicon name="search"
+                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                <input type="search" x-model="domainSearch" aria-label="Search services or domains"
+                    class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
+            </div>
+        @endif
         <div class="ml-auto flex flex-wrap items-center gap-2">
-            @if ($domainGroups->isNotEmpty())
-                <div class="relative w-full sm:w-64">
-                    <x-reicon name="search"
-                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-                    <input type="search" x-model="domainSearch" aria-label="Search services or domains"
-                        class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
-                </div>
-            @endif
             @can('update', $service)
-                @if ($configuredCount > 0)
-                    <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled"
-                        wire:target="checkAllDns,checkDomainDns">
-                        <x-reicon name="refresh" class="size-3.5" />
-                        Check all DNS
-                    </x-forms.button>
-                @endif
                 @if ($serviceAppCount > 0)
                     <div class="relative shrink-0">
-                        @include('livewire.project.shared.cloudflare-autoconfigure')
+                        @include('livewire.project.shared.cloudflare-autoconfigure', ['showCheckAllDns' => $configuredCount > 0])
                     </div>
                     <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                         canGate="update" :canResource="$service">
@@ -190,7 +173,7 @@
                                 <label for="service-force-https-{{ $appId }}-trigger" class="mb-0! whitespace-nowrap text-[12px]!">Redirect HTTP to HTTPS</label>
                                 <x-helper helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL." />
                                 <x-forms.listbox canGate="update" :canResource="$service" id="forceHttpsRedirects.{{ $appId }}"
-                                    htmlId="service-force-https-{{ $appId }}" preserveValue
+                                    htmlId="service-force-https-{{ $appId }}" preserveValue portal
                                     onChange="updateForceHttps"
                                     :onChangeArgs="[(int) $appId]"
                                     :options="[
@@ -199,6 +182,18 @@
                                     ]" :disabled="! auth()->user()->can('update', $service)" />
                             </div>
                         @endif
+                        <div class="flex w-full items-center gap-2 sm:w-auto service-domains-https">
+                            <label for="service-permanent-redirect-{{ $appId }}-trigger" class="mb-0! whitespace-nowrap text-[12px]!">Redirect type</label>
+                            <x-helper helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect." />
+                            <x-forms.listbox canGate="update" :canResource="$service" id="permanentRedirects.{{ $appId }}"
+                                htmlId="service-permanent-redirect-{{ $appId }}" preserveValue portal
+                                onChange="updatePermanentRedirect"
+                                :onChangeArgs="[(int) $appId]"
+                                :options="[
+                                    ['value' => false, 'label' => 'Temporary'],
+                                    ['value' => true, 'label' => 'Permanent'],
+                                ]" :disabled="! auth()->user()->can('update', $service)" />
+                        </div>
                     </div>
 
                     <div wire:key="service-domain-rows-{{ $appId }}">

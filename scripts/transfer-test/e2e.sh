@@ -30,6 +30,8 @@ for profile in "${TRANSFER_PROFILES[@]}"; do
   check 'A shows the take-back modal' test "$(tinker "$A" "$login_php echo (int) str_contains(Livewire\\Livewire::test(App\\Livewire\\Server\\Show::class, ['server_uuid'=>'$S'])->html(), 'Take back a transferred server?');" | tail -1)" = 1
   r="$(api POST "$A_PORT" "/servers/$S/migrate" "$TA" "$(jq -nc --arg u "http://localhost:$B_PORT" --arg t "$TB" '{target_url:$u,target_token:$t}')")"
   check 'second transfer refused by the prechecks' grep -q 'already transferred' <<<"$r"
+  r="$(api DELETE "$A_PORT" "/servers/$S?delete_from_provider=true" "$TA")"
+  check 'A refuses to delete the cloud server of the archive' grep -q 'managed by another Coolify instance' <<<"$r"
 
   echo '-- target B'
   b="$(api GET "$B_PORT" "/servers/$S/transfer" "$TB")"
@@ -62,6 +64,31 @@ for profile in "${TRANSFER_PROFILES[@]}"; do
   for _ in $(seq 1 40); do sleep 5; ds="$(tinker "$B" "echo App\\Models\\ApplicationDeploymentQueue::where('application_id', App\\Models\\Application::where('uuid','$app')->value('id'))->latest('id')->value('status');" | tail -1)"; [[ "$ds" == finished || "$ds" == failed ]] && break; done
   check "redeploy from B ($ds)" test "$ds" = finished
   check 'app answers after the redeploy' bash -c "for i in {1..10}; do curl -sf -m5 -H 'Host: $app.$ip.sslip.io' http://$ip/ >/dev/null && exit 0; sleep 3; done; exit 1"
+
+  [[ "$profile" == ubuntu-non-root ]] || continue
+  echo '-- operations from B over the non-root SSH user'
+  uuid_on_b() { tinker "$B" "echo App\\Models\\$1::where('name','$2')->value('uuid');" | tail -1; }
+  pg="$(uuid_on_b StandalonePostgresql postgres)"
+  rd="$(uuid_on_b StandaloneRedis redis)"
+  sv="$(uuid_on_b Service uptime-kuma)"
+  nginx="$(uuid_on_b Application nginx-dockerfile)"
+  for u in "$pg" "$rd"; do api POST "$B_PORT" "/databases/$u/restart" "$TB" >/dev/null; done
+  api POST "$B_PORT" "/services/$sv/restart" "$TB" >/dev/null
+  sleep 20
+  stable_workloads "$profile" >/dev/null
+  running_after="$(workloads "$profile")"
+  for u in "$pg" "$rd" "$sv"; do check "restarted from B: $u runs" grep -q "$u" <<<"$running_after"; done
+  tinker "$B" "App\\Jobs\\DatabaseBackupJob::dispatchSync(App\\Models\\StandalonePostgresql::where('uuid','$pg')->first()->scheduledBackups()->firstOrFail());" >/dev/null
+  r="$(tinker "$B" "echo App\\Models\\StandalonePostgresql::where('uuid','$pg')->first()->scheduledBackups()->first()->executions()->latest('id')->value('status');" | tail -1)"
+  check "database backup from B ($r)" test "$r" = success
+  task="$(api POST "$B_PORT" "/applications/$nginx/scheduled-tasks" "$TB" '{"name":"from-b","command":"echo from-b","frequency":"0 0 * * *"}' | jq -r .uuid)"
+  api POST "$B_PORT" "/applications/$nginx/scheduled-tasks/$task/execute" "$TB" >/dev/null
+  for _ in $(seq 1 20); do
+    sleep 3
+    r="$(api GET "$B_PORT" "/applications/$nginx/scheduled-tasks/$task/executions" "$TB" | jq -r '.[0].status // empty')"
+    [[ "$r" == success || "$r" == failed ]] && break
+  done
+  check "scheduled task from B ($r)" test "$r" = success
 done
 
 echo "=== $FAILS failure(s)"

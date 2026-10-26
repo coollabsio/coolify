@@ -36,6 +36,7 @@ class PrepareFileDownloadJob implements ShouldQueue
         public bool $isDir,
         public string $downloadName,
         public int $s3StorageId,
+        public bool $useHelper = false,
     ) {}
 
     public static function cacheKey(string $downloadId): string
@@ -60,7 +61,7 @@ class PrepareFileDownloadJob implements ShouldQueue
             if ($this->container === null) {
                 instant_remote_process([FileDownloadStorageService::buildHostFileUploadCommand($this->path, $upload['url'], $upload['headers'])], $server, timeout: 3600);
             } else {
-                (new ContainerFilesystemService($server, $this->container))->uploadToS3($this->path, $this->isDir, $upload['url'], $upload['headers']);
+                (new ContainerFilesystemService($server, $this->container, $this->useHelper))->uploadToS3($this->path, $this->isDir, $upload['url'], $upload['headers']);
             }
 
             $this->store(['status' => 'ready', 'url' => $downloads->downloadUrl($storage, $key)]);

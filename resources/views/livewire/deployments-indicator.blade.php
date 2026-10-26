@@ -28,7 +28,7 @@
                         href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
                         class="flex items-start gap-3 rounded-lg border border-transparent p-3 transition-colors hover:border-neutral-200 hover:bg-neutral-50 hover:no-underline dark:border-coolgray-300 dark:hover:border-coolgray-400 dark:hover:bg-raised">
                         <div
-                            class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-coollabs dark:border-coolgray-300 dark:bg-raised dark:text-warning">
+                            class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-coollabs dark:border-coolgray-300 dark:bg-raised dark:text-brand-light">
                             @if ($deployment->status === 'in_progress')
                                 <svg class="size-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
                                     viewBox="0 0 24 24" aria-hidden="true">
@@ -73,7 +73,7 @@
         <button type="button" x-on:click="expanded = !expanded" title="{{ $deploymentLabel }}"
             aria-label="Active deployments" :aria-expanded="expanded.toString()"
             :class="expanded && 'bg-neutral-100 dark:bg-white/[0.06]'"
-            class="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-coollabs transition-colors hover:bg-neutral-100 dark:text-warning dark:hover:bg-white/[0.06]">
+            class="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-coollabs transition-colors hover:bg-neutral-100 dark:text-brand-light dark:hover:bg-white/[0.06]">
             <svg class="size-3.5 shrink-0 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                 aria-hidden="true">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

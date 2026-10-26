@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Update the SHA256SUMS block in docker/coolify-helper/Dockerfile.
+# Change the ARG versions in the Dockerfile first, then run this script.
+# It downloads every file, compares it with the upstream checksum file where one exists, and writes the new block.
+
+set -euo pipefail
+
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+DOCKERFILE="$ROOT_DIR/docker/coolify-helper/Dockerfile"
+GH=https://github.com
+
+arg() {
+    sed -n "s/^ARG $1=//p" "$DOCKERFILE"
+}
+
+DOCKER_VERSION=$(arg DOCKER_VERSION)
+DOCKER_COMPOSE_VERSION=$(arg DOCKER_COMPOSE_VERSION)
+DOCKER_BUILDX_VERSION=$(arg DOCKER_BUILDX_VERSION)
+PACK_VERSION=$(arg PACK_VERSION)
+NIXPACKS_VERSION=$(arg NIXPACKS_VERSION)
+RAILPACK_VERSION=$(arg RAILPACK_VERSION)
+MISE_VERSION=$(arg MISE_VERSION)
+
+railpack_mise=$(curl -fsSL "https://raw.githubusercontent.com/railwayapp/railpack/v${RAILPACK_VERSION}/core/mise/version.txt")
+if [[ $railpack_mise != "$MISE_VERSION" ]]; then
+    echo "MISE_VERSION is $MISE_VERSION, but Railpack $RAILPACK_VERSION pins mise $railpack_mise." >&2
+    exit 1
+fi
+
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+lines=()
+
+# add <name> <url> [upstream checksum file URL]
+add() {
+    local name=$1 url=$2 sums_url=${3:-} sum upstream
+    curl -fsSL --proto '=https' --tlsv1.2 --retry 3 -o "$WORK_DIR/$name" "$url"
+    sum=$(sha256sum "$WORK_DIR/$name" | cut -d' ' -f1)
+
+    if [[ -n $sums_url ]]; then
+        upstream=$(curl -fsSL "$sums_url" | grep -F "${url##*/}" | awk '{print $1}' | head -1)
+        if [[ $upstream != "$sum" ]]; then
+            echo "Checksum mismatch for $url (upstream: ${upstream:-not found}, downloaded: $sum)." >&2
+            exit 1
+        fi
+        echo "verified  $name"
+    else
+        echo "no upstream checksum  $name"
+    fi
+
+    lines+=("$sum  $name")
+}
+
+for arch in amd64 arm64; do
+    case $arch in
+        amd64) DOCKER_ARCH=x86_64; PACK_SUFFIX=""; NIXPACKS_ARCH=x86_64; RAILPACK_ARCH=x86_64; MISE_ARCH=x64 ;;
+        arm64) DOCKER_ARCH=aarch64; PACK_SUFFIX="-arm64"; NIXPACKS_ARCH=aarch64; RAILPACK_ARCH=arm64; MISE_ARCH=arm64 ;;
+    esac
+
+    add "docker-$arch.tgz" \
+        "https://download.docker.com/linux/static/stable/$DOCKER_ARCH/docker-$DOCKER_VERSION.tgz"
+    add "docker-compose-$arch" \
+        "$GH/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-linux-$DOCKER_ARCH" \
+        "$GH/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/checksums.txt"
+    add "docker-buildx-$arch" \
+        "$GH/docker/buildx/releases/download/v$DOCKER_BUILDX_VERSION/buildx-v$DOCKER_BUILDX_VERSION.linux-$arch" \
+        "$GH/docker/buildx/releases/download/v$DOCKER_BUILDX_VERSION/checksums.txt"
+    add "pack-$arch.tgz" \
+        "$GH/buildpacks/pack/releases/download/v$PACK_VERSION/pack-v$PACK_VERSION-linux$PACK_SUFFIX.tgz" \
+        "$GH/buildpacks/pack/releases/download/v$PACK_VERSION/pack-v$PACK_VERSION-linux$PACK_SUFFIX.tgz.sha256"
+    add "nixpacks-$arch.tgz" \
+        "$GH/railwayapp/nixpacks/releases/download/v$NIXPACKS_VERSION/nixpacks-v$NIXPACKS_VERSION-$NIXPACKS_ARCH-unknown-linux-musl.tar.gz"
+    add "railpack-$arch.tgz" \
+        "$GH/railwayapp/railpack/releases/download/v$RAILPACK_VERSION/railpack-v$RAILPACK_VERSION-$RAILPACK_ARCH-unknown-linux-musl.tar.gz" \
+        "$GH/railwayapp/railpack/releases/download/v$RAILPACK_VERSION/checksums.txt"
+    add "mise-$arch" \
+        "$GH/jdx/mise/releases/download/v$MISE_VERSION/mise-v$MISE_VERSION-linux-$MISE_ARCH-musl" \
+        "$GH/jdx/mise/releases/download/v$MISE_VERSION/SHASUMS256.txt"
+done
+
+block=$(printf '%s\n' "${lines[@]}" | sort -k2)
+BLOCK="$block" perl -0pi -e 's/(COPY <<.EOF. \/tmp\/SHA256SUMS\n).*?(\nEOF\n)/$1$ENV{BLOCK}$2/s' "$DOCKERFILE"
+
+echo "Updated SHA256SUMS in $DOCKERFILE"

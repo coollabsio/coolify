@@ -17,6 +17,9 @@ services:
   minio:
     image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z # Released on 15 October 2026
     command: server /data --address ":9000" --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     volumes:
       - huly-files:/data      
     healthcheck:
@@ -52,8 +55,8 @@ services:
       - TRANSACTOR_URL=ws://transactor:3333
       - ENDPOINT_URL=ws://transactor:3333
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
       - FRONT_URL=http://front:8080
       - INIT_WORKSPACE=demo-tracker
       - MODEL_ENABLED=*
@@ -76,8 +79,8 @@ services:
       - COLLABORATOR_URL=ws://collaborator:3078
       - COLLABORATOR_API_URL=http://collaborator:3078
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
       - TITLE=Huly Self Hosted
       - DEFAULT_LANGUAGE=en
       - LAST_NAME_FIRST=true
@@ -92,8 +95,8 @@ services:
       - UPLOAD_URL=/files
       - MONGO_URL=mongodb://mongodb:27017
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
   transactor:
     image: hardcoreeng/transactor:v0.6.246
     environment:
@@ -106,8 +109,8 @@ services:
       - METRICS_CONSOLE=false
       - METRICS_FILE=metrics.txt
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
       - REKONI_URL=http://rekoni:4004
       - FRONT_URL=http://localhost:8087
       - SERVER_PROVIDER=ws

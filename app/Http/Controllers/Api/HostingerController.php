@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\RateLimitException;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -18,6 +19,8 @@ use OpenApi\Attributes as OA;
 
 class HostingerController extends Controller
 {
+    use RequiresDeployAbility;
+
     #[OA\Get(
         path: '/hostinger/data-centers',
         operationId: 'get-hostinger-data-centers',
@@ -122,7 +125,7 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 201, description: 'Hostinger VPS purchased and linked to a Coolify server.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'The token needs the deploy ability to set post_install_script_id or public_key_ids.'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a post-install script or extra SSH keys.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
@@ -184,7 +187,10 @@ class HostingerController extends Controller
         }
 
         if ($request->filled('post_install_script_id') || $request->array('public_key_ids')) {
-            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A post-install script or extra SSH keys run as root on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
         }
 
         $team = Team::find($teamId);

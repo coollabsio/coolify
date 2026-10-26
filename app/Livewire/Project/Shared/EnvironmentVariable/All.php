@@ -72,6 +72,8 @@ class All extends Component
     /** @var array<int, int>|null */
     private ?array $previewVariableIdsWithProductionValues = null;
 
+    private ?bool $canViewComposeContent = null;
+
     protected $listeners = [
         'saveKey' => 'submit',
         'refreshEnvs',
@@ -917,10 +919,24 @@ class All extends Component
     /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
     private function composeInfoFor(string $key): ?array
     {
-        return dockerComposeEnvironmentVariableInfo(
+        $composeInfo = dockerComposeEnvironmentVariableInfo(
             $this->resource->docker_compose_raw ?? $this->resource->docker_compose,
             $key
         );
+
+        if ($composeInfo !== null && ! $this->canViewComposeContent()) {
+            $composeInfo['default'] = null;
+        }
+
+        return $composeInfo;
+    }
+
+    /**
+     * Compose defaults are compose content, which only users who can update the resource may see.
+     */
+    private function canViewComposeContent(): bool
+    {
+        return $this->canViewComposeContent ??= auth()->user()?->can('update', $this->resource) ?? false;
     }
 
     private function composeEnvironmentAssignments(): Collection

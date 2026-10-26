@@ -118,3 +118,34 @@ test('database proxy resolves the database container on every connection', funct
         ->toContain('proxy_pass $upstream;')
         ->not->toContain("proxy_pass {$database->uuid}:5432;");
 });
+
+test('database proxy runs Docker Compose only with the compose file that Coolify wrote', function () {
+    Server::flushIdentityMap();
+    InstanceSettings::forceCreate(['id' => 0]);
+    config(['constants.ssh.mux_enabled' => false]);
+
+    $commands = [];
+    Process::fake(function ($process) use (&$commands) {
+        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+
+        return Process::result(output: '');
+    });
+
+    $team = Team::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = create_standalone_postgresql($environment->id, $destination);
+    $database->update(['is_public' => true, 'public_port' => 15432]);
+
+    StartDatabaseProxy::run($database->fresh());
+
+    $proxyDir = database_proxy_dir($database->uuid);
+    preg_match_all('/docker compose [^\n]*/', implode("\n", $commands), $matches);
+    expect($matches[0])->toHaveCount(2);
+    foreach ($matches[0] as $composeCommand) {
+        expect($composeCommand)->toContain("--project-directory {$proxyDir} -f {$proxyDir}/docker-compose.yaml ");
+    }
+});

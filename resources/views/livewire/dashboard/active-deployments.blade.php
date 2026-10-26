@@ -28,14 +28,14 @@
     @if ($hasAnyDeployments)
         {{-- Container breakpoints: the table needs room, which the dashboard column may not have. --}}
         <section class="@container mb-0! min-w-0">
-            <x-section-heading title="Deployments" />
+            <x-section-heading :title="$hasRecentDeployments ? 'Recent deployments' : 'Deployments'" class="py-1.5" />
 
             <div class="flex min-w-0 flex-col gap-4">
                 @if ($hasActiveDeployments)
                     <div
                         class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
-                            <h3 class="text-[12px]! leading-4! font-semibold! text-black dark:text-fg">
+                            <h3 class="text-[11px]! leading-4! font-medium! text-neutral-500! dark:text-fg-faint!">
                                 Active
                             </h3>
                             <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
@@ -62,7 +62,7 @@
 
                             <a wire:key="dashboard-active-deployment-{{ $deployment->deployment_uuid }}"
                                 href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
-                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 @2xl:grid @2xl:items-center @2xl:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
+                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-coollabs/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs focus-visible:ring-offset-0 @2xl:grid @2xl:items-center @2xl:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-brand/10 dark:focus-visible:ring-brand-light">
                                 <div class="min-w-0">
                                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                         {{ $deployment->application_name }}
@@ -103,15 +103,6 @@
                 @if ($hasRecentDeployments)
                     <div
                         class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
-                        <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
-                            <h3 class="text-[12px]! leading-4! font-semibold! text-black dark:text-fg">
-                                Recent
-                            </h3>
-                            <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                                Latest completed deployments
-                            </p>
-                        </div>
-
                         <div
                             class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 @2xl:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <span>Application</span>
@@ -131,7 +122,7 @@
 
                             <a wire:key="dashboard-recent-deployment-{{ $deployment->deployment_uuid }}"
                                 href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
-                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 @2xl:grid @2xl:items-center @2xl:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
+                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-coollabs/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs focus-visible:ring-offset-0 @2xl:grid @2xl:items-center @2xl:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-brand/10 dark:focus-visible:ring-brand-light">
                                 <div class="min-w-0">
                                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                         {{ $deployment->application_name }}

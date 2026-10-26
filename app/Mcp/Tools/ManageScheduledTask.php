@@ -11,7 +11,7 @@ class ManageScheduledTask extends RestActionTool
 {
     protected string $name = 'manage_scheduled_task';
 
-    protected string $description = 'Create, update, delete, or run now a scheduled task of an application or service of the authenticated team. Requires write ability. Same validation and permissions as the REST API.';
+    protected string $description = 'Create, update, delete, or run now a scheduled task of an application or service of the authenticated team. Requires write ability; run now and an enabled task also require deploy. Same validation and permissions as the REST API.';
 
     protected function actions(): array
     {
@@ -19,11 +19,11 @@ class ManageScheduledTask extends RestActionTool
             'create' => ['method' => 'POST', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks',
                 'service' => 'services/{uuid}/scheduled-tasks',
-            ], 'ability' => 'write', 'description' => 'create a scheduled task (data: name, command, frequency, container, timeout, enabled)'],
+            ], 'ability' => 'write', 'description' => 'create a scheduled task (data: name, command, frequency, container, timeout, enabled; an enabled task needs deploy ability)'],
             'update' => ['method' => 'PATCH', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}',
-            ], 'ability' => 'write', 'description' => 'update a scheduled task (data: any of name, command, frequency, container, timeout, enabled)'],
+            ], 'ability' => 'write', 'description' => 'update a scheduled task (data: any of name, command, frequency, container, timeout, enabled; an enabled task needs deploy ability)'],
             'delete' => ['method' => 'DELETE', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}',
@@ -31,7 +31,7 @@ class ManageScheduledTask extends RestActionTool
             'execute' => ['method' => 'POST', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}/execute',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}/execute',
-            ], 'ability' => 'write', 'confirm' => true, 'description' => 'run the task command now'],
+            ], 'ability' => 'deploy', 'confirm' => true, 'description' => 'run the task command now'],
         ];
     }
 

@@ -5,7 +5,7 @@ use App\Services\FleetMetricsAggregator;
 function row(array $overrides = []): array
 {
     return array_merge([
-        'uuid' => 'u', 'name' => 'srv', 'online' => true,
+        'uuid' => 'u', 'name' => 'srv', 'online' => true, 'reporting' => true,
         'cpu' => 10.0, 'memUsed' => 1_000, 'memTotal' => 10_000,
         'diskUsed' => 1_000, 'diskTotal' => 10_000, 'diskPercent' => 10.0,
         'load1' => 0.5, 'netRx' => 100.0, 'netTx' => 50.0, 'containers' => 2,
@@ -51,13 +51,25 @@ it('sums network rates and reports busiest and average load', function () {
 it('ignores offline rows and counts servers needing attention', function () {
     $kpis = FleetMetricsAggregator::fleetKpis([
         row(['cpu' => 95.0]),                 // over cpu error cutoff
-        row(['online' => false, 'cpu' => 99.0]),
+        row(['online' => false, 'reporting' => false, 'cpu' => 99.0]),
     ]);
 
     expect($kpis['serversOnline'])->toBe(1);
     expect($kpis['serversTotal'])->toBe(2);
     expect($kpis['needsAttention'])->toBe(1);
     expect($kpis['cpuAvg'])->toBe(95.0); // offline row excluded from the mean
+});
+
+it('counts an online server without metrics as online but leaves it out of the values', function () {
+    $kpis = FleetMetricsAggregator::fleetKpis([
+        row(['cpu' => 20.0]),
+        row(['reporting' => false, 'cpu' => 99.0]),
+    ]);
+
+    expect($kpis['serversOnline'])->toBe(2);
+    expect($kpis['serversReporting'])->toBe(1);
+    expect($kpis['needsAttention'])->toBe(0);
+    expect($kpis['cpuAvg'])->toBe(20.0);
 });
 
 it('returns zeroed kpis for no rows', function () {

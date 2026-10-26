@@ -81,6 +81,7 @@ class StandaloneMariadb extends BaseModel
         'health_check_retries' => 'integer',
         'health_check_start_period' => 'integer',
         'mariadb_password' => 'encrypted',
+        'mariadb_root_password' => 'encrypted',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',

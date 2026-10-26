@@ -14,12 +14,12 @@
             <x-slot:actions>
                 <div class="inline-flex w-fit rounded-[10px] bg-neutral-100 p-1 dark:bg-white/[0.05]">
                     <button type="button" wire:click="loadManagedContainers" wire:loading.attr="disabled" wire:target="loadManagedContainers,loadUnmanagedContainers"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'managed' ? 'bg-white text-neutral-950 shadow-sm dark:bg-warning/15 dark:text-warning' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
+                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'managed' ? 'bg-white text-neutral-950 shadow-sm dark:bg-brand/15 dark:text-brand-light' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
                         <x-loading-on-button wire:loading wire:target="loadManagedContainers" />
                         Managed
                     </button>
                     <button type="button" wire:click="loadUnmanagedContainers" wire:loading.attr="disabled" wire:target="loadManagedContainers,loadUnmanagedContainers"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'unmanaged' ? 'bg-white text-neutral-950 shadow-sm dark:bg-warning/15 dark:text-warning' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
+                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'unmanaged' ? 'bg-white text-neutral-950 shadow-sm dark:bg-brand/15 dark:text-brand-light' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
                         <x-loading-on-button wire:loading wire:target="loadUnmanagedContainers" />
                         Unmanaged
                     </button>

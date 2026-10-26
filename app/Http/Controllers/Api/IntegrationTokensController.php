@@ -64,9 +64,11 @@ class IntegrationTokensController extends Controller
         } elseif (($body['provider'] ?? null) === 'infisical') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         } elseif (($body['provider'] ?? null) === 'vault') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         $validator = customApiValidator($body, $rules);

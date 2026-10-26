@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Index extends Component
@@ -68,18 +69,24 @@ class Index extends Component
         ]);
     }
 
-    public function mount()
+    #[On('deploymentSelected')]
+    public function setSelectedDeployment(string $deploymentUuid): void
     {
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $this->selectedDeploymentUuid = $deploymentUuid;
+    }
+
+    public function mount(string $project_uuid, string $environment_uuid, string $application_uuid)
+    {
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', $project_uuid)->first();
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
+        $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
         if (! $environment) {
             abort(404);
         }
         $environment->load(['applications']);
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
+        $application = $environment->applications->where('uuid', $application_uuid)->first();
         if (! $application) {
             return redirect()->route('dashboard');
         }

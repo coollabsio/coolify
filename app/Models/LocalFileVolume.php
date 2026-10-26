@@ -107,6 +107,11 @@ class LocalFileVolume extends BaseModel
             if ($fileVolume->is_host_file) {
                 return;
             }
+            // A token with only the write permission can save a Compose file. A mount outside the resource
+            // directory is written when the resource is deployed or started, not when it is saved.
+            if ($fileVolume->isOutsideResourceDirectory()) {
+                return;
+            }
 
             ServerStorageSaveJob::dispatch($fileVolume)->afterCommit();
         });

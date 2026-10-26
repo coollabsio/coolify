@@ -65,7 +65,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     protected function rules(): array

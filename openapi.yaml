@@ -155,7 +155,7 @@ paths:
       tags:
         - Applications
       summary: 'Delete Preview Deployment'
-      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
+      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record. Needs a token with the write and deploy permissions.'
       operationId: delete-preview-deployment-by-pull-request-id
       parameters:
         -
@@ -189,6 +189,8 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
       security:
         -
           bearerAuth: []
@@ -511,16 +513,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -535,6 +537,10 @@ paths:
                 dockerfile_location:
                   type: string
                   description: 'The Dockerfile location in the repository.'
+                dockerfile_target_build:
+                  type: string
+                  nullable: true
+                  description: 'The Docker build target (stage) in the Dockerfile.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
@@ -583,6 +589,10 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -595,6 +605,11 @@ paths:
                   minimum: 1
                   maximum: 3600
                   description: 'Container stop grace period in seconds.'
+                rolling_update_drain_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 300
+                  description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'
                 docker_images_to_keep:
                   type: integer
                   minimum: 0
@@ -606,10 +621,17 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                 traefik_certificate_resolver:
                   type: string
                   nullable: true
                   description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
+                is_container_label_readonly_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -721,6 +743,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -930,16 +954,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -954,6 +978,10 @@ paths:
                 dockerfile_location:
                   type: string
                   description: 'The Dockerfile location in the repository'
+                dockerfile_target_build:
+                  type: string
+                  nullable: true
+                  description: 'The Docker build target (stage) in the Dockerfile.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
@@ -1002,6 +1030,10 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1014,6 +1046,11 @@ paths:
                   minimum: 1
                   maximum: 3600
                   description: 'Container stop grace period in seconds.'
+                rolling_update_drain_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 300
+                  description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'
                 docker_images_to_keep:
                   type: integer
                   minimum: 0
@@ -1025,10 +1062,17 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                 traefik_certificate_resolver:
                   type: string
                   nullable: true
                   description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
+                is_container_label_readonly_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1140,6 +1184,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -1349,16 +1395,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -1373,6 +1419,10 @@ paths:
                 dockerfile_location:
                   type: string
                   description: 'The Dockerfile location in the repository.'
+                dockerfile_target_build:
+                  type: string
+                  nullable: true
+                  description: 'The Docker build target (stage) in the Dockerfile.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
@@ -1421,6 +1471,10 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1433,6 +1487,11 @@ paths:
                   minimum: 1
                   maximum: 3600
                   description: 'Container stop grace period in seconds.'
+                rolling_update_drain_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 300
+                  description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'
                 docker_images_to_keep:
                   type: integer
                   minimum: 0
@@ -1444,10 +1503,17 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                 traefik_certificate_resolver:
                   type: string
                   nullable: true
                   description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
+                is_container_label_readonly_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1559,6 +1625,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -1725,16 +1793,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -1781,6 +1849,10 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -1793,6 +1865,11 @@ paths:
                   minimum: 1
                   maximum: 3600
                   description: 'Container stop grace period in seconds.'
+                rolling_update_drain_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 300
+                  description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'
                 docker_images_to_keep:
                   type: integer
                   minimum: 0
@@ -1804,10 +1881,17 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                 traefik_certificate_resolver:
                   type: string
                   nullable: true
                   description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
+                is_container_label_readonly_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -1915,6 +1999,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -2071,16 +2157,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -2127,6 +2213,10 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2139,6 +2229,11 @@ paths:
                   minimum: 1
                   maximum: 3600
                   description: 'Container stop grace period in seconds.'
+                rolling_update_drain_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 300
+                  description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'
                 docker_images_to_keep:
                   type: integer
                   minimum: 0
@@ -2150,10 +2245,17 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                 traefik_certificate_resolver:
                   type: string
                   nullable: true
                   description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
+                is_container_label_readonly_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2261,6 +2363,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '409':
@@ -2311,7 +2415,7 @@ paths:
       tags:
         - Applications
       summary: Delete
-      description: 'Delete application by UUID.'
+      description: 'Delete application by UUID. Needs a token with the write and deploy permissions.'
       operationId: delete-application-by-uuid
       parameters:
         -
@@ -2368,6 +2472,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
       security:
         -
           bearerAuth: []
@@ -2552,16 +2658,16 @@ paths:
                   description: 'Pre deployment command container.'
                 manual_webhook_secret_github:
                   type: string
-                  description: 'Manual webhook secret for Github.'
+                  description: 'Manual webhook secret for Github. Needs the deploy ability.'
                 manual_webhook_secret_gitlab:
                   type: string
-                  description: 'Manual webhook secret for Gitlab.'
+                  description: 'Manual webhook secret for Gitlab. Needs the deploy ability.'
                 manual_webhook_secret_bitbucket:
                   type: string
-                  description: 'Manual webhook secret for Bitbucket.'
+                  description: 'Manual webhook secret for Bitbucket. Needs the deploy ability.'
                 manual_webhook_secret_gitea:
                   type: string
-                  description: 'Manual webhook secret for Gitea.'
+                  description: 'Manual webhook secret for Gitea. Needs the deploy ability.'
                 redirect:
                   type: string
                   nullable: true
@@ -2576,6 +2682,10 @@ paths:
                 dockerfile_location:
                   type: string
                   description: 'The Dockerfile location in the repository.'
+                dockerfile_target_build:
+                  type: string
+                  nullable: true
+                  description: 'The Docker build target (stage) in the Dockerfile.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
@@ -2642,6 +2752,10 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
@@ -2654,6 +2768,11 @@ paths:
                   minimum: 1
                   maximum: 3600
                   description: 'Container stop grace period in seconds.'
+                rolling_update_drain_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 300
+                  description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'
                 docker_images_to_keep:
                   type: integer
                   minimum: 0
@@ -2665,10 +2784,17 @@ paths:
                 is_stripprefix_enabled:
                   type: boolean
                   description: 'Enable path prefix stripping.'
+                is_permanent_redirect_enabled:
+                  type: boolean
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
                 traefik_certificate_resolver:
                   type: string
                   nullable: true
                   description: 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'
+                is_container_label_readonly_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'
                 is_raw_compose_deployment_enabled:
                   type: boolean
                   description: 'Deploy the raw Docker Compose definition.'
@@ -2737,6 +2863,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
         '404':
@@ -3418,7 +3546,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'File content (file only, optional).'
+                  description: 'File content (file only, optional). Needs the deploy ability when set.'
                 is_directory:
                   type: boolean
                   description: 'Whether this is a directory mount (file only, default false).'
@@ -3441,7 +3569,7 @@ paths:
         '404':
           $ref: '#/components/responses/404'
         '403':
-          description: 'The token needs the deploy permission for a mount outside the resource directory.'
+          description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -3702,7 +3830,7 @@ paths:
                   description: 'Optional name for the cloned application.'
                   type: [string, 'null']
                 clone_volumes:
-                  description: 'Whether to clone volume data.'
+                  description: 'Whether to clone volume data. Needs the deploy ability.'
                   type: boolean
                   default: false
               type: object
@@ -3720,6 +3848,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to clone volume data.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -3732,7 +3862,7 @@ paths:
       tags:
         - Applications
       summary: 'List Rollback Images'
-      description: 'List available Docker images for rolling back an application. Returns an empty list when the server is unavailable or remote inspection is not possible.'
+      description: 'List available Docker images for rolling back an application: images on the server (`local`) and, when a Docker registry image name is set, images of recent successful deployments in the registry (`registry`). Returns an empty list when the server is unavailable or remote inspection is not possible.'
       operationId: list-application-rollback-images
       parameters:
         -
@@ -3750,7 +3880,7 @@ paths:
               schema:
                 properties:
                   current: { type: [string, 'null'] }
-                  images: { type: array, items: { properties: { tag: { type: string }, created_at: { type: string }, is_current: { type: boolean } }, type: object } }
+                  images: { type: array, items: { properties: { tag: { type: string }, created_at: { type: string }, is_current: { type: boolean }, source: { type: string, enum: [local, registry] } }, type: object } }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -4368,6 +4498,7 @@ paths:
       tags:
         - Databases
       summary: 'Import database backup'
+      description: 'Restore a backup into the database. Every import source requires the deploy ability.'
       operationId: create-database-import
       parameters:
         -
@@ -4386,6 +4517,8 @@ paths:
       responses:
         '202':
           description: 'Import queued'
+        '403':
+          description: 'The token needs the deploy ability.'
         '409':
           description: 'Another start, restart or import of this database is already in progress.'
         '422':
@@ -4514,6 +4647,10 @@ paths:
                   type: boolean
                   description: 'Whether to save backups to S3'
                   default: false
+                disable_local_backup:
+                  type: boolean
+                  description: 'Delete the local backup file after the upload to S3. Only allowed when save_s3 is true.'
+                  default: false
                 s3_storage_uuid:
                   type: string
                   description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true.'
@@ -4530,7 +4667,7 @@ paths:
                   default: false
                 backup_now:
                   type: boolean
-                  description: 'Whether to trigger backup immediately after creation'
+                  description: 'Whether to trigger backup immediately after creation. Needs a token with the deploy permission.'
                 database_backup_retention_amount_locally:
                   type: integer
                   description: 'Number of backups to retain locally'
@@ -4574,6 +4711,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to use backup_now.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -4617,7 +4756,7 @@ paths:
       tags:
         - Databases
       summary: Delete
-      description: 'Delete database by UUID.'
+      description: 'Delete database by UUID. Needs a token with the write and deploy permissions.'
       operationId: delete-database-by-uuid
       parameters:
         -
@@ -4674,6 +4813,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
       security:
         -
           bearerAuth: []
@@ -4709,10 +4850,10 @@ paths:
                   description: 'Docker Image of the database'
                 is_public:
                   type: boolean
-                  description: 'Is the database public?'
+                  description: 'Is the database public? Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'
                 public_port:
                   type: integer
-                  description: 'Public port of the database'
+                  description: 'Public port of the database (1024-65535)'
                 public_port_timeout:
                   type: integer
                   description: 'Public port timeout in seconds (default: 3600)'
@@ -4851,6 +4992,12 @@ paths:
                 redact_all_env_values_in_logs:
                   type: boolean
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Restart the database to apply it.'
+                is_log_drain_enabled:
+                  type: boolean
+                  description: 'Send the database logs to the log drain of the server. Log drain must be enabled on the server. Restart the database to apply it.'
               type: object
       responses:
         '200':
@@ -4859,6 +5006,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to change is_public or to use instant_deploy.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -4947,6 +5096,9 @@ paths:
                 save_s3:
                   type: boolean
                   description: 'Whether data is saved in s3 or not'
+                disable_local_backup:
+                  type: boolean
+                  description: 'Delete the local backup file after the upload to S3. Only allowed when save_s3 is true. Turning save_s3 off also turns this off.'
                 s3_storage_uuid:
                   type: string
                   description: 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay.'
@@ -4956,7 +5108,7 @@ paths:
                   description: 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'
                 backup_now:
                   type: boolean
-                  description: 'Whether to take a backup now or not'
+                  description: 'Whether to take a backup now or not. Needs a token with the deploy permission.'
                 enabled:
                   type: boolean
                   description: 'Whether the backup is enabled or not'
@@ -5004,6 +5156,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to use backup_now.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -6585,7 +6739,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'File content (file only, optional).'
+                  description: 'File content (file only, optional). Needs the deploy ability when set.'
                 is_directory:
                   type: boolean
                   description: 'Whether this is a directory mount (file only, default false).'
@@ -6608,7 +6762,7 @@ paths:
         '404':
           $ref: '#/components/responses/404'
         '403':
-          description: 'The token needs the deploy permission for a mount outside the resource directory.'
+          description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -6867,6 +7021,7 @@ paths:
                 name:
                   type: [string, 'null']
                 clone_volumes:
+                  description: 'Whether to clone volume data. Needs the deploy ability.'
                   type: boolean
                   default: false
               type: object
@@ -6877,6 +7032,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to clone volume data.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -7154,7 +7311,7 @@ paths:
       tags:
         - Destinations
       summary: 'Create destination'
-      description: 'Create a Docker network destination on a server owned by the authenticated team.'
+      description: "Create a Docker network destination on a server owned by the authenticated team. The network must be new: Docker's built-in networks (bridge, host, none) and networks that already exist on a standalone server are rejected, because Coolify connects the proxy to the destination network."
       operationId: create-server-destination
       parameters:
         -
@@ -7176,6 +7333,7 @@ paths:
                   type: string
                   maxLength: 255
                 network:
+                  description: 'Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.'
                   type: string
                   pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
                   maxLength: 255
@@ -7197,7 +7355,7 @@ paths:
         '409':
           description: 'A destination with this network already exists.'
         '422':
-          $ref: '#/components/responses/422'
+          description: 'Validation failed, the network is reserved or already exists on the server, or the server could not be checked.'
       security:
         -
           bearerAuth: []
@@ -7427,12 +7585,15 @@ paths:
       tags:
         - DigitalOcean
       summary: 'Create a server on DigitalOcean'
+      description: 'Create a DigitalOcean droplet and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.'
       operationId: create-digitalocean-server
       responses:
         '201':
           description: 'DigitalOcean droplet created and linked to a Coolify server.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'
         '422':
           description: 'Validation failed.'
         '429':
@@ -8226,7 +8387,7 @@ paths:
       tags:
         - Hetzner
       summary: 'Create Hetzner Server'
-      description: 'Create a new server on Hetzner and register it in Coolify.'
+      description: 'Create a new server on Hetzner and register it in Coolify. A cloud-init script or extra SSH key IDs need a token with the deploy permission.'
       operationId: create-hetzner-server
       requestBody:
         description: 'Hetzner server creation parameters'
@@ -8284,7 +8445,7 @@ paths:
                 hetzner_ssh_key_ids:
                   type: array
                   items: { type: integer }
-                  description: 'Additional Hetzner SSH key IDs'
+                  description: 'Additional Hetzner SSH key IDs. Needs a token with the deploy permission.'
                 hetzner_firewall_ids:
                   type: array
                   items: { type: integer }
@@ -8295,7 +8456,7 @@ paths:
                   description: 'Existing Hetzner network IDs to attach during server creation'
                 cloud_init_script:
                   type: string
-                  description: 'Cloud-init YAML script (optional)'
+                  description: 'Cloud-init YAML script (optional). Needs a token with the deploy permission.'
                 instant_validate:
                   type: boolean
                   example: false
@@ -8316,6 +8477,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -8437,7 +8600,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: 'The token needs the deploy ability to set post_install_script_id or public_key_ids.'
+          description: 'The token needs the deploy permission for a post-install script or extra SSH keys.'
         '422':
           description: 'Validation failed.'
         '429':
@@ -9623,7 +9786,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9637,6 +9800,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9728,7 +9893,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9742,6 +9907,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9861,7 +10028,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9875,6 +10042,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -9966,7 +10135,7 @@ paths:
                   maximum: 36000
                 enabled:
                   type: boolean
-                  description: 'The flag to indicate if the scheduled task is enabled.'
+                  description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
                   default: true
               type: object
       responses:
@@ -9980,6 +10149,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the deploy ability for an enabled task.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -10028,7 +10199,7 @@ paths:
       tags:
         - 'Scheduled Tasks'
       summary: 'Execute Task'
-      description: 'Queue immediate execution of a scheduled task for an application.'
+      description: 'Queue immediate execution of a scheduled task for an application. Requires the deploy ability.'
       operationId: execute-scheduled-task-by-application-uuid
       parameters:
         -
@@ -10050,6 +10221,8 @@ paths:
           description: 'Scheduled task execution queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -10060,7 +10233,7 @@ paths:
       tags:
         - 'Scheduled Tasks'
       summary: 'Execute Task'
-      description: 'Queue immediate execution of a scheduled task for a service.'
+      description: 'Queue immediate execution of a scheduled task for a service. Requires the deploy ability.'
       operationId: execute-scheduled-task-by-service-uuid
       parameters:
         -
@@ -10082,6 +10255,8 @@ paths:
           description: 'Scheduled task execution queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -10441,7 +10616,7 @@ paths:
       tags:
         - Servers
       summary: 'Update Docker cleanup settings'
-      description: 'Update Docker cleanup settings for a server owned by the authenticated team.'
+      description: 'Update Docker cleanup settings for a server owned by the authenticated team. Turning on `delete_unused_volumes` needs a token with the `deploy` permission.'
       operationId: update-server-docker-cleanup
       parameters:
         -
@@ -10491,6 +10666,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'Turning on `delete_unused_volumes` needs the deploy permission.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10503,7 +10680,7 @@ paths:
       tags:
         - Servers
       summary: 'Run Docker cleanup'
-      description: 'Dispatch a manual Docker cleanup job for a server owned by the authenticated team.'
+      description: 'Dispatch a manual Docker cleanup job for a server owned by the authenticated team. Needs a token with the write and deploy permissions.'
       operationId: run-server-docker-cleanup
       parameters:
         -
@@ -10537,6 +10714,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10616,7 +10795,7 @@ paths:
       tags:
         - Servers
       summary: 'Log in to a registry on a server'
-      description: 'Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login.'
+      description: 'Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login. Needs a token with the write and deploy permissions.'
       operationId: login-server-registry
       parameters:
         -
@@ -10660,6 +10839,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10800,7 +10981,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team.'
+      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -10851,6 +11032,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10884,6 +11067,7 @@ paths:
                   status: { type: [string, 'null'], example: running }
                   redirect_enabled: { type: boolean, example: true }
                   redirect_url: { type: [string, 'null'], example: 'https://example.com' }
+                  proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean, example: false }
                   traefik_certificate_resolver: { description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.', type: [string, 'null'], example: letsencrypt }
                   configuration: { description: 'Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.', type: [string, 'null'] }
@@ -10901,7 +11085,7 @@ paths:
       tags:
         - Servers
       summary: 'Update server proxy'
-      description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.'
+      description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server. Changing proxy_type needs a token with the `write` and `deploy` permissions.'
       operationId: update-server-proxy
       parameters:
         -
@@ -10922,13 +11106,16 @@ paths:
                 redirect_url:
                   description: 'Public http(s) redirect URL, or null to clear.'
                   type: [string, 'null']
+                proxy_error_page:
+                  description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'
+                  type: [string, 'null']
                 generate_exact_labels:
                   type: boolean
                 traefik_certificate_resolver:
                   description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'
                   type: [string, 'null']
                 proxy_type:
-                  description: 'Proxy type (case-insensitive).'
+                  description: 'Proxy type (case-insensitive). Changing it starts the new proxy on the server and needs the deploy permission.'
                   type: string
                   enum: [traefik, caddy, nginx, none]
               type: object
@@ -10943,6 +11130,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   traefik_certificate_resolver: { type: [string, 'null'] }
                   configuration: { type: [string, 'null'] }
@@ -10951,6 +11139,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the deploy permission to change the proxy type.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -10963,7 +11153,7 @@ paths:
       tags:
         - Servers
       summary: 'Save server proxy configuration'
-      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
+      description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).'
       operationId: save-server-proxy-configuration
       parameters:
         -
@@ -10997,6 +11187,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   configuration: { type: [string, 'null'] }
                 type: object
@@ -11016,7 +11207,7 @@ paths:
       tags:
         - Servers
       summary: 'Restart server proxy'
-      description: 'Queue a proxy restart for a team-owned server.'
+      description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.'
       operationId: restart-server-proxy
       parameters:
         -
@@ -11097,7 +11288,7 @@ paths:
       tags:
         - Servers
       summary: 'Update Sentinel settings'
-      description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel.'
+      description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel. Needs a token with the write and deploy permissions.'
       operationId: update-server-sentinel
       parameters:
         -
@@ -11164,6 +11355,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -11303,7 +11496,7 @@ paths:
       tags:
         - Servers
       summary: 'Import server transfer bundle'
-      description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it.'
+      description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it. Needs a token with the write and deploy permissions.'
       operationId: import-server-transfer-bundle
       requestBody:
         required: true
@@ -11332,6 +11525,8 @@ paths:
           description: Imported
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '422':
           description: 'Validation failed'
       security:
@@ -11408,7 +11603,7 @@ paths:
                 name:
                   type: string
                   example: 'My Server'
-                  description: 'The name of the server.'
+                  description: 'The name of the server. Must not contain control characters such as new lines.'
                 description:
                   type: string
                   example: 'My Server Description'
@@ -11503,7 +11698,7 @@ paths:
       tags:
         - Servers
       summary: Delete
-      description: 'Delete server by UUID.'
+      description: 'Delete server by UUID. With force or delete_from_provider, needs a token with the write and deploy permissions.'
       operationId: delete-server-by-uuid
       parameters:
         -
@@ -11516,7 +11711,7 @@ paths:
         -
           name: force
           in: query
-          description: 'Also delete all resources on the server.'
+          description: 'Also delete all resources on the server. Needs the deploy permission.'
           required: false
           schema:
             type: boolean
@@ -11524,12 +11719,14 @@ paths:
         -
           name: delete_from_provider
           in: query
-          description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.'
+          description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone. Needs the deploy permission.'
           required: false
           schema:
             type: boolean
             default: false
       responses:
+        '403':
+          description: 'The token needs the deploy permission to delete the resources or the cloud server.'
         '200':
           description: 'Server deleted.'
           content:
@@ -11553,7 +11750,7 @@ paths:
       tags:
         - Servers
       summary: Update
-      description: 'Update Server.'
+      description: 'Update Server. Changing proxy_type needs a token with the write and deploy permissions.'
       operationId: update-server-by-uuid
       parameters:
         -
@@ -11572,7 +11769,7 @@ paths:
               properties:
                 name:
                   type: string
-                  description: 'The name of the server.'
+                  description: 'The name of the server. Must not contain control characters such as new lines.'
                 description:
                   type: string
                   description: 'The description of the server.'
@@ -11602,7 +11799,7 @@ paths:
                 proxy_type:
                   type: string
                   enum: [traefik, caddy, none]
-                  description: 'The proxy type.'
+                  description: 'The proxy type. Changing it starts the new proxy on the server and needs the deploy permission.'
                 concurrent_builds:
                   type: integer
                   description: 'Number of concurrent builds.'
@@ -11624,8 +11821,21 @@ paths:
                 connection_timeout:
                   type: integer
                   description: 'SSH connection timeout in seconds (1-300). Default: 10.'
+                wildcard_domain:
+                  type: string
+                  nullable: true
+                  description: 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'
+                server_timezone:
+                  type: string
+                  description: 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'
+                backup_compression_cpu_percentage:
+                  type: integer
+                  enum: [25, 50, 75, 100]
+                  description: 'Maximum CPU percentage that backup compression can use. Default: 25.'
               type: object
       responses:
+        '403':
+          description: 'The token needs the deploy permission to change the proxy type.'
         '201':
           description: 'Server updated.'
           content:
@@ -11712,7 +11922,7 @@ paths:
       tags:
         - Servers
       summary: Validate
-      description: 'Validate server by UUID.'
+      description: 'Validate server by UUID. With install=true, needs a token with the write and deploy permissions.'
       operationId: validate-server-by-uuid
       parameters:
         -
@@ -11729,11 +11939,13 @@ paths:
             schema:
               properties:
                 install:
-                  description: 'Install missing prerequisites and Docker. This can restart the Docker daemon.'
+                  description: 'Install missing prerequisites and Docker, then start the proxy. This can restart the Docker daemon. Needs the deploy permission.'
                   type: boolean
                   default: false
               type: object
       responses:
+        '403':
+          description: 'The token needs the deploy permission to install the server.'
         '201':
           description: 'Server validation started.'
           content:
@@ -11880,6 +12092,13 @@ paths:
                   type: [boolean, 'null']
                 is_force_https_enabled:
                   type: [boolean, 'null']
+                is_permanent_redirect_enabled:
+                  description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'
+                  type: [boolean, 'null']
+                redirect:
+                  description: 'How to handle www and non-www domains. "www" redirects non-www to www, "non-www" redirects www to non-www. Both need a www and a non-www domain in url.'
+                  type: string
+                  enum: [both, www, non-www]
                 max_restart_count:
                   description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'
                   type: [integer, 'null']
@@ -12186,6 +12405,7 @@ paths:
       tags:
         - 'Service databases'
       summary: 'Import service database backup'
+      description: 'Restore a backup into the service database. Every import source requires the deploy ability.'
       operationId: create-service-database-import
       parameters:
         -
@@ -12211,6 +12431,8 @@ paths:
       responses:
         '202':
           description: 'Import queued'
+        '403':
+          description: 'The token needs the deploy ability.'
         '409':
           description: 'Another start, restart or import of this database is already in progress.'
         '422':
@@ -12362,6 +12584,7 @@ paths:
                 is_log_drain_enabled:
                   type: boolean
                 is_public:
+                  description: 'Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'
                   type: boolean
                 public_port:
                   type: [integer, 'null']
@@ -12383,6 +12606,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission to change is_public.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -12743,7 +12968,7 @@ paths:
       tags:
         - Services
       summary: Delete
-      description: 'Delete service by UUID.'
+      description: 'Delete service by UUID. Needs a token with the write and deploy permissions.'
       operationId: delete-service-by-uuid
       parameters:
         -
@@ -12785,14 +13010,6 @@ paths:
           schema:
             type: boolean
             default: true
-        -
-          name: delete_from_coolify_only
-          in: query
-          description: 'Remove only Coolify metadata without deleting Docker resources.'
-          required: false
-          schema:
-            type: boolean
-            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'
@@ -12808,6 +13025,10 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -12864,6 +13085,10 @@ paths:
                   type: boolean
                   default: true
                   description: 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'
+                include_coolify_default_variables:
+                  type: boolean
+                  default: true
+                  description: 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'
               type: object
       responses:
         '200':
@@ -13488,7 +13713,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'File content (file only, optional).'
+                  description: 'File content (file only, optional). Needs the deploy ability when set.'
                 is_directory:
                   type: boolean
                   description: 'Whether this is a directory mount (file only, default false).'
@@ -13511,7 +13736,7 @@ paths:
         '404':
           $ref: '#/components/responses/404'
         '403':
-          description: 'The token needs the deploy permission for a mount outside the resource directory.'
+          description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -13770,6 +13995,7 @@ paths:
                 name:
                   type: [string, 'null']
                 clone_volumes:
+                  description: 'Whether to clone volume data. Needs the deploy ability.'
                   type: boolean
                   default: false
               type: object
@@ -13780,6 +14006,8 @@ paths:
           $ref: '#/components/responses/400'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to clone volume data.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -14585,7 +14813,7 @@ paths:
       tags:
         - Applications
       summary: 'Set application storage backup schedule'
-      description: 'Create or replace the backup schedule for an application persistent volume or directory storage.'
+      description: 'Create or replace the backup schedule for an application persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.'
       operationId: set-application-storage-backup-schedule
       parameters:
         -
@@ -14626,7 +14854,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: Forbidden.
+          description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -14672,7 +14900,7 @@ paths:
       tags:
         - Databases
       summary: 'Set database storage backup schedule'
-      description: 'Create or replace the backup schedule for a database persistent volume or directory storage.'
+      description: 'Create or replace the backup schedule for a database persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.'
       operationId: set-database-storage-backup-schedule
       parameters:
         -
@@ -14713,7 +14941,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: Forbidden.
+          description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -14759,7 +14987,7 @@ paths:
       tags:
         - Services
       summary: 'Set service storage backup schedule'
-      description: 'Create or replace the backup schedule for a service persistent volume or directory storage.'
+      description: 'Create or replace the backup schedule for a service persistent volume or directory storage. A schedule with stop_during_backup needs a token with the deploy permission.'
       operationId: set-service-storage-backup-schedule
       parameters:
         -
@@ -14800,7 +15028,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: Forbidden.
+          description: 'Forbidden, or the token needs the deploy permission for stop_during_backup.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -14846,7 +15074,7 @@ paths:
       tags:
         - Applications
       summary: 'Run application storage backup'
-      description: 'Queue an immediate volume backup for an application storage that has a schedule.'
+      description: 'Queue an immediate volume backup for an application storage that has a schedule. Needs a token with the write and deploy permissions.'
       operationId: run-application-storage-backup
       parameters:
         -
@@ -14866,6 +15094,8 @@ paths:
           description: 'Storage backup queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -14876,7 +15106,7 @@ paths:
       tags:
         - Databases
       summary: 'Run database storage backup'
-      description: 'Queue an immediate volume backup for a database storage that has a schedule.'
+      description: 'Queue an immediate volume backup for a database storage that has a schedule. Needs a token with the write and deploy permissions.'
       operationId: run-database-storage-backup
       parameters:
         -
@@ -14896,6 +15126,8 @@ paths:
           description: 'Storage backup queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -14906,7 +15138,7 @@ paths:
       tags:
         - Services
       summary: 'Run service storage backup'
-      description: 'Queue an immediate volume backup for a service storage that has a schedule.'
+      description: 'Queue an immediate volume backup for a service storage that has a schedule. Needs a token with the write and deploy permissions.'
       operationId: run-service-storage-backup
       parameters:
         -
@@ -14926,6 +15158,8 @@ paths:
           description: 'Storage backup queued.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the write and deploy permissions.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -15004,13 +15238,15 @@ paths:
       tags:
         - Vultr
       summary: 'Create Vultr Server'
-      description: 'Create a Vultr instance and link it as a Coolify server.'
+      description: 'Create a Vultr instance and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.'
       operationId: create-vultr-server
       responses:
         '201':
           description: 'Vultr server created.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'
         '422':
           description: 'Validation failed.'
         '429':
@@ -15239,6 +15475,7 @@ components:
           type: boolean
           default: false
         stop_during_backup:
+          description: 'Stop the resource containers during the backup. Needs a token with the deploy permission.'
           type: boolean
           default: false
         s3_storage_uuid:
@@ -15827,6 +16064,9 @@ components:
           description: 'Traefik certificate resolver override. Null uses the server setting, "none" uses no resolver.'
         is_stripprefix_enabled:
           type: boolean
+        is_permanent_redirect_enabled:
+          type: boolean
+          description: 'Use permanent (301/308) instead of temporary (302/307) proxy redirects.'
         connect_to_docker_network:
           type: boolean
         custom_internal_name:
@@ -15870,6 +16110,9 @@ components:
         stop_grace_period:
           type: integer
           nullable: true
+        rolling_update_drain_seconds:
+          type: integer
+          description: 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off.'
       type: object
     Environment:
       description: 'Environment model'

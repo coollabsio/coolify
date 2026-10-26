@@ -5,6 +5,7 @@ namespace App\Livewire\Server\PrivateKey;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -30,7 +31,10 @@ class Show extends Component
 
     private function loadPrivateKeys(): void
     {
-        $this->privateKeys = PrivateKey::where('team_id', $this->server->team_id)->get()->where('is_git_related', false);
+        $this->privateKeys = PrivateKey::where('team_id', $this->server->team_id)->get()
+            ->where('is_git_related', false)
+            ->sortBy(fn (PrivateKey $privateKey) => $privateKey->id !== $this->server->private_key_id)
+            ->values();
     }
 
     public function setPrivateKey($privateKeyId)
@@ -41,8 +45,18 @@ class Show extends Component
 
             return;
         }
+        $this->authorize('update', $this->server);
+        if ($this->server->isTransferredAway()) {
+            $this->dispatch('error', 'The private key of a transferred server cannot be changed.');
+
+            return;
+        }
         try {
-            $this->authorize('update', $this->server);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
+        } catch (ThrottleRequestsException $e) {
+            return handleError($e, $this);
+        }
+        try {
             DB::transaction(function () use ($ownedPrivateKey) {
                 $this->server->privateKey()->associate($ownedPrivateKey);
                 $this->server->save();
@@ -51,6 +65,7 @@ class Show extends Component
                     throw new \Exception($error);
                 }
             });
+            $this->loadPrivateKeys();
             $this->dispatch('success', 'Private key updated successfully.');
             $this->dispatch('refreshServerShow');
         } catch (\Exception $e) {
@@ -91,6 +106,8 @@ class Show extends Component
     public function checkConnection()
     {
         try {
+            $this->authorize('update', $this->server);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if ($uptime) {
                 $this->dispatch('success', 'Server is reachable.');

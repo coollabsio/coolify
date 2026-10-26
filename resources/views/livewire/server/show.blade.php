@@ -222,11 +222,11 @@
                             <x-forms.input canGate="update" :canResource="$server" type="password" id="ip"
                                 label="IP address or domain"
                                 helper="Enter a hostname or IP address without http:// or https://."
-                                required :disabled="$isValidating" />
+                                required :disabled="$isValidating || $server->isTransferredAway()" />
                             <x-forms.input canGate="update" :canResource="$server" id="user" label="SSH user"
-                                required :disabled="$isValidating" />
+                                required :disabled="$isValidating || $server->isTransferredAway()" />
                             <x-forms.input canGate="update" :canResource="$server" type="number" id="port"
-                                label="SSH port" required :disabled="$isValidating" />
+                                label="SSH port" required :disabled="$isValidating || $server->isTransferredAway()" />
                         </div>
 
                         <div class="mt-4 grid gap-4 lg:grid-cols-3">
@@ -294,7 +294,7 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </x-forms.button>
                                 @endif
-                                @if ($server->cloudProviderToken)
+                                @if ($server->cloudProviderToken && ! $server->isTransferredAway())
                                     @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
                                         <x-forms.button type="button" wire:click.prevent="startHetznerServer" isHighlighted
                                             canGate="update" :canResource="$server">
@@ -313,14 +313,12 @@
                                     @endif
                                 @endif
                             @endif
-                            @if ($server->server_metadata)
-                                <x-forms.button type="button" wire:click="refreshServerMetadata"
-                                    :disabled="! $server->isFunctional()"
-                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Refresh details
-                                </x-forms.button>
-                            @endif
+                            <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                :disabled="! $server->isFunctional()"
+                                :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                {{ $server->server_metadata ? 'Refresh details' : 'Fetch server details' }}
+                            </x-forms.button>
                         </x-slot:actions>
 
                         <div class="flex items-start gap-3">
@@ -346,15 +344,6 @@
 
                         @if ($server->server_metadata)
                             @include('livewire.server.partials.server-details', ['server' => $server])
-                        @else
-                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata"
-                                    :disabled="! $server->isFunctional()"
-                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Fetch server details
-                                </x-forms.button>
-                            </div>
                         @endif
                     </x-application.settings-section>
 

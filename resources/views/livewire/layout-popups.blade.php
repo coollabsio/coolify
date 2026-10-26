@@ -111,11 +111,11 @@
                                     </h2>
                                     <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                                         This will cause unusual problems on the UI. Open the
-                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-brand-light dark:decoration-brand-light/30 dark:hover:text-brand-light/90"
                                             href="https://coolify.io/docs/knowledge-base/server/firewall"
                                             target="_blank" rel="noopener noreferrer">required ports</a>
                                         or get help on
-                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-brand-light dark:decoration-brand-light/30 dark:hover:text-brand-light/90"
                                             href="https://coollabs.io/discord" target="_blank"
                                             rel="noopener noreferrer">Discord</a>.
                                     </p>
@@ -165,7 +165,7 @@
                                 <p x-show="!reminders.sponsorship.compact" x-transition.opacity
                                     class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                                     Coolify is profitable thanks to <span
-                                        class="font-semibold text-coollabs dark:text-warning">you</span>. Your support
+                                        class="font-semibold text-coollabs dark:text-brand-light">you</span>. Your support
                                     helps us build more features and keep improving the project.
                                 </p>
                             </div>
@@ -266,7 +266,7 @@
                                     Enable at least one notification channel so you receive important alerts.
                                     Visit
                                     <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
-                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90">notifications</a>
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-brand-light dark:decoration-brand-light/30 dark:hover:text-brand-light/90">notifications</a>
                                     to get started.
                                 </p>
                             </div>

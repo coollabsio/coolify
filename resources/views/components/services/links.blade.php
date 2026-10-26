@@ -2,13 +2,9 @@
     $linkItemClasses = 'listbox-option justify-start! gap-2.5!';
 @endphp
 
-<div @class([
-    'relative' => !$compact,
-    'static' => $compact,
-    'w-full' => $fullWidth,
-]) x-data="{ open: false }"
+<div @class(['relative', 'w-full' => $fullWidth]) x-data="{ open: false }"
     x-effect="$dispatch('resource-actions-toggled', { open })" @keydown.escape.window="open = false">
-    <button type="button" @click="open = !open" @click.outside="open = false" title="Open service links"
+    <button type="button" x-ref="trigger" @click="open = !open" @click.outside="open = false" title="Open service links"
         @class([
             'app-tab shrink-0 gap-1' => !$fullWidth && !$compact,
             'button w-full justify-between' => $fullWidth,
@@ -25,10 +21,12 @@
         </span>
     </button>
     <div x-show="open" x-cloak x-transition.origin.top.right role="menu"
+        @if ($compact) x-anchor.bottom-start.fixed.offset.4="$refs.trigger" @endif
         @class([
-            'listbox-panel top-full! mt-1! max-h-80! overflow-y-auto!',
+            'listbox-panel max-h-80! overflow-y-auto!',
+            'top-full! mt-1!' => !$compact,
             'left-0! right-0! w-full! min-w-0! max-w-none!' => $fullWidth,
-            'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => $compact,
+            'w-max! min-w-60! max-w-[min(28rem,calc(100vw-2rem))]!' => $compact,
             'right-0! left-auto! min-w-60! max-w-96!' => !$fullWidth && !$compact,
         ])>
         @forelse ($links as $link)

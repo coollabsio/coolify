@@ -133,3 +133,19 @@ it('shows the Traefik dashboard link without proxy actions to members who cannot
         ->assertSee('Traefik Dashboard')
         ->assertDontSee('Refresh Proxy Status');
 });
+
+it('shows the current proxy status after a background status update', function () {
+    [$server] = makeNavbarServer(isFunctional: true);
+    $server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value, 'status' => 'starting']])->save();
+
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
+        ->assertSet('proxyStatus', 'starting');
+
+    // Sentinel or the server check job marks the proxy as running without a UI broadcast.
+    $server->proxy->set('status', 'running');
+    $server->save();
+
+    $component->call('refreshAgentStatus')
+        ->assertSet('proxyStatus', 'running')
+        ->assertDontSee('Starting');
+});

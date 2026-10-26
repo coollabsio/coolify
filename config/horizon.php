@@ -47,16 +47,18 @@ $selfHostedSupervisor = $workerOptions + [
 | webhooks, Stripe events, and server limit checks, so other jobs cannot
 | delay them.
 */
-$cloudSupervisors = [];
-
-foreach ([
+$cloudQueues = [
     'deployments' => ['HORIZON_DEPLOYMENTS_PROCESSES', 60],
     'crons' => ['HORIZON_CRONS_PROCESSES', 60],
     'high' => ['HORIZON_HIGH_PROCESSES', 60],
     'default' => ['HORIZON_DEFAULT_PROCESSES', 40],
     'maintenance' => ['HORIZON_MAINTENANCE_PROCESSES', 60],
     'webhooks' => ['HORIZON_WEBHOOKS_PROCESSES', 10],
-] as $queue => [$processesEnv, $defaultProcesses]) {
+];
+
+$cloudSupervisors = [];
+
+foreach ($cloudQueues as $queue => [$processesEnv, $defaultProcesses]) {
     $processes = filter_var(env($processesEnv), FILTER_VALIDATE_INT, [
         'options' => ['min_range' => 1, 'default' => $defaultProcesses],
     ]);
@@ -271,6 +273,9 @@ return [
 
     'environments' => [
         'production' => $isCloud ? $cloudSupervisors : ['s6' => $selfHostedSupervisor],
-        'local' => ['s6' => $selfHostedSupervisor],
+        // Local Cloud mode runs every Cloud queue in the one dev supervisor.
+        'local' => ['s6' => $isCloud
+            ? ['queue' => env('HORIZON_QUEUES', 'high,default,'.implode(',', array_diff(array_keys($cloudQueues), ['high', 'default'])))] + $selfHostedSupervisor
+            : $selfHostedSupervisor],
     ],
 ];

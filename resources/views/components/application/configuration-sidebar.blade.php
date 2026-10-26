@@ -193,25 +193,14 @@
             'project.application.configuration' => array_values(array_filter([
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'access-section', 'label' => 'Access'],
-                ['id' => 'build-pipeline-section', 'label' => 'Build pipeline'],
-                $isComposeApp ? null : ['id' => 'container-image-section', 'label' => 'Container image'],
-                $isComposeApp ? null : ['id' => 'networking-section', 'label' => 'Networking'],
-                $isComposeApp ? null : ['id' => 'runtime-section', 'label' => 'Runtime'],
-                $isComposeApp ? null : ['id' => 'security-section', 'label' => 'Security'],
-                ['id' => 'deployment-lifecycle-section', 'label' => 'Deployment lifecycle'],
-                $isComposeApp ? null : ['id' => 'container-labels-section', 'label' => 'Container labels'],
+                ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
+                $isComposeApp ? null : ['id' => 'container-section', 'label' => 'Container'],
             ])),
-            'project.application.advanced' => array_values(array_filter([
-                ['id' => 'advanced-build-section', 'label' => 'Build'],
+            'project.application.advanced' => [
+                ['id' => 'advanced-build-section', 'label' => 'Build & deploy'],
                 ['id' => 'advanced-container-section', 'label' => 'Container'],
-                $application->git_based() ? ['id' => 'advanced-deployment-section', 'label' => 'Deployment'] : null,
-                $application->git_based() ? ['id' => 'advanced-git-section', 'label' => 'Git'] : null,
-                $isComposeApp ? ['id' => 'advanced-compose-section', 'label' => 'Docker compose'] : null,
                 ['id' => 'advanced-proxy-section', 'label' => 'Proxy'],
-                ['id' => 'advanced-operations-section', 'label' => 'Operations'],
-                ['id' => 'advanced-logs-section', 'label' => 'Logs'],
-                $isComposeApp ? null : ['id' => 'advanced-gpu-section', 'label' => 'GPU'],
-            ])),
+            ],
             'project.application.webhooks' => [
                 ['id' => 'deploy-webhook-section', 'label' => 'Deploy webhook'],
                 ['id' => 'manual-git-webhooks-section', 'label' => 'Manual Git webhooks'],
@@ -225,25 +214,10 @@
             ])),
             'project.application.healthcheck' => [
                 ['id' => 'healthcheck-configuration-section', 'label' => 'Configuration'],
-                [
-                    'id' => $application->health_check_type === 'cmd'
-                        ? 'healthcheck-command-section'
-                        : 'healthcheck-request-section',
-                    'label' => $application->health_check_type === 'cmd' ? 'Command' : 'HTTP request',
-                ],
                 ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
             ],
-            'project.application.rollback' => [
-                ['id' => 'rollback-retention-section', 'label' => 'Image retention'],
-                ['id' => 'rollback-images-section', 'label' => 'Available images'],
-            ],
-            'project.application.resource-limits' => [
-                ['id' => 'cpu-limits-section', 'label' => 'CPU'],
-                ['id' => 'memory-limits-section', 'label' => 'Memory'],
-            ],
             'project.application.resource-operations' => [
-                ['id' => 'clone-destination-section', 'label' => 'Clone destination'],
-                ['id' => 'clone-environment-section', 'label' => 'Clone environment'],
+                ['id' => 'clone-resource-section', 'label' => 'Clone resource'],
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
             ],
         ];
@@ -253,11 +227,11 @@
     @endphp
 
 @php
-    // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
+    // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
     registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
 @endphp
 
-{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
+{{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.
      navOnly renders only the sidebar copy, as the parent menu of a deeper page (e.g. a backup). --}}
 @foreach ($navOnly ? ['main-nav'] : ['page', 'main-nav'] as $placement)
 @if ($placement === 'main-nav')
@@ -265,19 +239,15 @@
 <div class="nav-context-menu">
 @else
 <aside @class([
-    'application-settings-navigation in-main-nav min-w-0 xl:self-start',
+    'application-settings-navigation in-main-nav min-w-0',
     'is-flush' => $flush,
 ]) data-settings-search-items="{{ json_encode($settingsSearchItems) }}">
 @endif
                 <nav aria-label="Configuration sections"
-                    @class([
-                        'grid gap-0.5',
-                        'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
-                        'grid-cols-1' => $placement === 'main-nav',
-                    ])>
+                    class="grid grid-cols-1 gap-0.5">
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
-                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
+                            <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
                                 aria-hidden="true"></div>
                         @endunless
                         @foreach ($groupItems as $menuItem)
@@ -306,7 +276,7 @@
                                 {{-- Sub-sections belong to the current page only; collapse them for
                                      every other item so the sidebar stays short. --}}
                                 @if ($menuItem['active'] && filled($sections))
-                                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                                    <div class="nav-children flex flex-col gap-0.5 py-1"
                                         x-data="{ activeSection: '' }">
                                         @foreach ($sections as $section)
                                             <button type="button" class="menu-subitem"

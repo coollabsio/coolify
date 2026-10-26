@@ -96,6 +96,8 @@ test('claim writes the owner marker with its claim id on the host', function () 
 });
 
 test('claim changes nothing when the owner marker cannot be written', function () {
+    // The new Sentinel token restarts Sentinel; this test is about the marker.
+    Queue::fake();
     Process::fake(['*' => Process::result(errorOutput: 'Permission denied', exitCode: 1)]);
     $sentinelUrlBefore = $this->server->settings->sentinel_custom_url;
 
@@ -107,18 +109,20 @@ test('claim changes nothing when the owner marker cannot be written', function (
         ->and($this->server->settings->sentinel_custom_url)->toBe($sentinelUrlBefore);
 });
 
-test('a server is released when its owner marker names the claim of another instance', function () {
+test('a server is released when its owner marker names a newer claim of another instance', function () {
     app(ServerTransferClaimer::class)->claim($this->server);
 
     $released = app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server->fresh(), json_encode([
         'claim_id' => 'claim-of-instance-b',
-        'instance_url' => 'https://coolify-b.test',
+        'instance_url' => 'https://8.8.8.8',
+        'claimed_at' => now()->addMinute()->toIso8601String(),
     ]));
 
     $this->server->refresh();
     expect($released)->toBeTrue()
         ->and($this->server->isTransferredAway())->toBeTrue()
-        ->and(data_get($this->server->server_metadata, 'transfer.target_instance_url'))->toBe('https://coolify-b.test')
+        ->and(data_get($this->server->server_metadata, 'transfer.target_instance_url'))->toBe('https://8.8.8.8')
+        ->and(data_get($this->server->server_metadata, 'transfer.claimed_by_marker'))->toBeTrue()
         ->and((bool) $this->server->settings->force_disabled)->toBeTrue()
         ->and((bool) $this->server->settings->is_sentinel_enabled)->toBeFalse();
 });
@@ -287,4 +291,68 @@ test('a GitHub webhook does not queue a runner for a transferred server', functi
     $send()->assertSee('No runner configuration matches the job labels.');
     expect(GithubRunnerExecution::count())->toBe(0);
     Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
+});
+
+test('an owner marker that is not newer than the own claim, or has no http(s) URL, does not release the server', function (array $marker) {
+    app(ServerTransferClaimer::class)->claim($this->server);
+    $marker = ['claim_id' => 'forged-claim', 'instance_url' => 'https://8.8.8.8', 'claimed_at' => now()->addMinute()->toIso8601String(), ...$marker];
+
+    $released = app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server->fresh(), json_encode($marker));
+
+    $this->server->refresh();
+    expect($released)->toBeFalse()
+        ->and($this->server->isTransferredAway())->toBeFalse()
+        ->and((bool) $this->server->settings->force_disabled)->toBeFalse()
+        ->and(data_get($this->server->server_metadata, 'transfer.owner_marker_conflict.claim_id'))->toBe('forged-claim');
+})->with([
+    'older claim' => [['claimed_at' => now()->subDay()->toIso8601String()]],
+    'no claim time' => [['claimed_at' => null]],
+    'javascript URL' => [['instance_url' => 'javascript:alert(1)']],
+    'no URL' => [['instance_url' => null]],
+]);
+
+test('a newer owner marker of a self-hosted target with a plain http URL releases the server, and the URL stays untrusted', function () {
+    app(ServerTransferClaimer::class)->claim($this->server);
+    $marker = ['claim_id' => 'target-claim', 'instance_url' => 'http://10.0.0.5:8000', 'claimed_at' => now()->addMinute()->toIso8601String()];
+
+    $released = app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server->fresh(), json_encode($marker));
+
+    $this->server->refresh();
+    expect($released)->toBeTrue()
+        ->and($this->server->isTransferredAway())->toBeTrue()
+        ->and(data_get($this->server->server_metadata, 'transfer.target_instance_url'))->toBe('http://10.0.0.5:8000')
+        ->and(data_get($this->server->server_metadata, 'transfer.claimed_by_marker'))->toBeTrue();
+});
+
+test('claim gives Sentinel a new token', function () {
+    $tokenBefore = $this->server->settings->sentinel_token;
+
+    app(ServerTransferClaimer::class)->claim($this->server);
+
+    expect($this->server->fresh()->settings->sentinel_token)->not->toBe($tokenBefore)->not->toBeEmpty();
+});
+
+test('applications that use the server only as an additional destination keep their DNS records and survive the archive', function () {
+    Http::fake();
+    Queue::fake();
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id, 'ip' => '10.77.0.11']);
+    $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create(['destination_id' => $otherDestination->id, 'destination_type' => $otherDestination->getMorphClass()]);
+    $application->additional_servers()->attach($this->server->id, ['standalone_docker_id' => $destination->id]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare']);
+    $record = ManagedDnsRecord::factory()->owned()->create(['dns_provider_zone_id' => DnsProviderZone::factory()->create(['integration_token_id' => $token->id])->id]);
+    $record->addReference($application);
+    $claimer = app(ServerTransferClaimer::class);
+
+    $claimer->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+    expect($record->fresh()->owned)->toBeTrue()
+        ->and(data_get($this->server->fresh()->server_metadata, 'transfer.parked_dns_record_ids'))->toBe([]);
+
+    $claimer->deleteArchive($this->server->fresh());
+
+    expect(Application::find($application->id))->not->toBeNull()
+        ->and($application->additional_servers()->count())->toBe(0)
+        ->and($record->fresh()->owned)->toBeTrue()
+        ->and(Server::withTrashed()->find($this->server->id))->toBeNull();
 });

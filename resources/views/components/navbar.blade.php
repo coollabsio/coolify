@@ -1,12 +1,16 @@
 @props(['desktop' => false])
 
-<nav class="sidebar-nav flex min-h-0 flex-col flex-1 bg-white border-r border-neutral-200 dark:border-white/[0.06] dark:bg-panel pt-2"
+<nav @class([
+    'sidebar-nav flex min-h-0 flex-col flex-1 border-r border-black/[0.06] dark:border-white/[0.04] pt-2',
+    'bg-neutral-50 dark:bg-app' => $desktop,
+    'bg-white dark:bg-panel' => ! $desktop,
+])
     :class="collapsed ? 'px-2 lg:px-3 sidebar-collapsed' : 'px-2 lg:px-3'"
     @mouseover="
         if (!collapsed) return;
         const el = $event.target.closest('.menu-item, .menu-subitem');
         if (!el) { tooltip.show = false; return; }
-        const text = el.getAttribute('title') || el.getAttribute('aria-label') || '';
+        const text = el.getAttribute('title') || el.getAttribute('aria-label') || el.querySelector('.menu-item-label')?.textContent.trim() || '';
         if (!text) return;
         const rect = el.getBoundingClientRect();
         tooltip.text = text;
@@ -20,7 +24,7 @@
         // Label of the open submenu ('' = main menu). It starts on the submenu of the current page
         // ([data-active-submenu], read in init). Back opens the main menu.
         submenu: '',
-        // Depth of the open resource menu on wide screens (-1 = main menu or submenu). It starts on the
+        // Depth of the open resource menu (-1 = main menu or submenu). It starts on the
         // deepest menu of the current page; Back opens the menu one depth lower.
         navLevel: -1,
         // Direction of the last menu swap ('forward' or 'back'); it selects the enter animation of every menu.
@@ -31,47 +35,53 @@
             const ua = navigator.userAgent || '';
             return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
         })(),
+        // Shows the menu of the current page: its deepest resource menu, or the submenu that holds it.
+        showCurrentPageMenu() {
+            this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
+            this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+        },
         init() {
-                this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
-                this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+                this.showCurrentPageMenu();
                 if (@js($desktop)) {
                     // The open resource menu depth is kept across page loads: a page that opens a deeper menu
                     // (e.g. a backup) plays the forward swap, and a page that opens a lower one plays the back swap.
                     const previousLevel = sessionStorage.getItem('navLevel');
-                    if (previousLevel !== null && window.matchMedia('(min-width: 80rem)').matches) {
+                    if (previousLevel !== null && window.matchMedia('(min-width: 64rem)').matches) {
                         const levelChange = this.navLevel - Number(previousLevel);
                         this.navSwap = levelChange > 0 ? 'forward' : (levelChange < 0 ? 'back' : '');
                     }
                     sessionStorage.setItem('navLevel', this.navLevel);
                     this.$watch('navLevel', level => sessionStorage.setItem('navLevel', level));
-                }
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                    const userSettings = localStorage.getItem('theme');
-                    if (userSettings !== 'system') { return; }
-                    document.documentElement.classList.toggle('dark', e.matches);
-                    document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
-                });
-                this.queryTheme();
-            },
-            queryTheme() {
-                const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const userSettings = localStorage.getItem('theme') || 'dark';
-                localStorage.setItem('theme', userSettings);
-                let isDark = false;
-                if (userSettings === 'dark' || userSettings === 'custom') {
-                    document.documentElement.classList.add('dark');
-                    isDark = true;
-                } else if (userSettings === 'light') {
-                    document.documentElement.classList.remove('dark');
-                } else if (darkModePreference) {
-                    document.documentElement.classList.add('dark');
-                    isDark = true;
                 } else {
-                    document.documentElement.classList.remove('dark');
+                    // The resource menus teleport into the desktop sidebar. The mobile drawer moves them into
+                    // its own slots when it opens, and gives them back when the desktop sidebar shows.
+                    const moveResourceMenus = toDrawer => this.$root.querySelectorAll('[data-mobile-nav-context]').forEach(drawerSlot => {
+                        const desktopSlot = document.getElementById('main-nav-context-' + drawerSlot.dataset.mobileNavContext);
+                        if (desktopSlot) {
+                            toDrawer ? drawerSlot.append(...desktopSlot.childNodes) : desktopSlot.append(...drawerSlot.childNodes);
+                        }
+                    });
+                    this.desktopQuery = window.matchMedia('(min-width: 64rem)');
+                    this.onDesktopChange = event => event.matches && moveResourceMenus(false);
+                    this.desktopQuery.addEventListener('change', this.onDesktopChange);
+                    // A closed drawer forgets where Back went: it opens again on the menu of the current page.
+                    this.$watch('open', isOpen => {
+                        if (isOpen) {
+                            moveResourceMenus(true);
+                        } else {
+                            this.navSwap = '';
+                            this.showCurrentPageMenu();
+                        }
+                    });
                 }
-                document.documentElement.dataset.theme = userSettings === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
-            }
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                    if (localStorage.getItem('theme') === 'system') { window.applyStoredTheme(); }
+                });
+                window.applyStoredTheme();
+            },
+        destroy() {
+            this.desktopQuery?.removeEventListener('change', this.onDesktopChange);
+        },
     }">
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
@@ -83,12 +93,12 @@
                 :title="hasPageSearch
                     ? 'Search this page and everything (Press / or ' + modKeyLabel + 'K, then Tab to switch)'
                     : 'Search (Press / or ' + modKeyLabel + 'K)'"
-                class="menu-item menu-search justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
+                class="menu-item menu-search justify-between !rounded-lg !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
                 <span class="flex items-center gap-2.5 min-w-0">
                     <x-reicon name="search" class="menu-item-icon" />
                     <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search</span>
                 </span>
-                <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
+                <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-lg border border-transparent dark:border-white/5"
                     :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
             </button>
         </div>
@@ -102,8 +112,8 @@
                 // An entry with children opens a submenu in place of the main menu (back button + its pages).
                 $navSections = collect([
                     'Workspace' => [
-                        // The dashboard lists projects and links to all of them, so project pages count as Dashboard.
-                        ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'projects', 'projects/*', 'project/*', 'canvas')],
+                        ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'canvas')],
+                        ['label' => 'Projects', 'icon' => 'projects', 'href' => route('project.index'), 'active' => request()->is('projects', 'projects/*', 'project/*')],
                         ['label' => 'Monitoring', 'icon' => 'graph', 'visible' => $teamWide, 'children' => [
                             ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics')],
                             ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics')],
@@ -173,31 +183,32 @@
                     ->all());
                 $activeSubmenu = $navSections->flatten(1)->first(fn (array $item): bool => isset($item['children']) && $item['active']);
                 // Resource menus by depth, registered by registerMainNavContext() (e.g. from
-                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth};
-                // only the desktop sidebar has the slots.
-                $navContext = $desktop ? request()->attributes->get('mainNavContext', []) : [];
+                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth}
+                // (the desktop sidebar); the mobile drawer moves it into its own slot while it shows (see init).
+                $navContext = request()->attributes->get('mainNavContext', []);
             @endphp
-            {{-- Wide screens on a resource page: the deepest resource menu replaces the main menu. Back shows the
+            {{-- On a resource page the deepest resource menu replaces the main menu. Back shows the
                  menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
             @foreach ($navContext as $depth => $navMenu)
                 @php
                     $previousDepth = collect($navContext)->keys()->filter(fn (int $key): bool => $key < $depth)->last() ?? -1;
                 @endphp
                 <li x-show="navLevel === {{ $depth }}" data-nav-level="{{ $depth }}" @unless ($loop->last) x-cloak @endunless
-                    class="hidden xl:contents">
+                    class="contents">
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="navLevel = {{ $previousDepth }}; navSwap = 'back'"
                                 title="{{ $navMenu['backTitle'] }}" aria-label="{{ $navMenu['backTitle'] }}"
                                 class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
-                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-fg-dim" />
+                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-coollabs dark:text-fg-dim" />
                                 </span>
                                 <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
                                     :class="collapsed && 'lg:hidden'">{{ $navMenu['label'] }}</span>
                             </button>
                         </li>
-                        <li id="main-nav-context-{{ $depth }}" class="nav-context min-w-0"></li>
+                        <li @if ($desktop) id="main-nav-context-{{ $depth }}" @else data-mobile-nav-context="{{ $depth }}" @endif
+                            class="nav-context min-w-0"></li>
                     </ul>
                 </li>
             @endforeach
@@ -207,16 +218,16 @@
                 $renderedSubmenus = $navSections->flatten(1)->filter(fn (array $item): bool => isset($item['children']));
             @endphp
             @foreach ($renderedSubmenus as $submenuItem)
-                <li x-show="submenu === @js($submenuItem['label'])"
-                    @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @else x-cloak @endif
-                    @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+                <li x-show="navLevel === -1 && submenu === @js($submenuItem['label'])"
+                    @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @endif
+                    @if (! $submenuItem['active'] || $navContext) x-cloak @endif class="contents">
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="submenu = ''; navSwap = 'back'" title="Back to the main menu" aria-label="Back to the main menu"
                                 class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 {{-- As wide as a menu icon (with its tile), so the chevron lines up with the icons below. --}}
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
-                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-fg-dim" />
+                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-coollabs dark:text-fg-dim" />
                                 </span>
                                 <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
                                     :class="collapsed && 'lg:hidden'">{{ $submenuItem['label'] }}</span>
@@ -251,16 +262,15 @@
                     </ul>
                 </li>
             @endforeach
-            <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+            <li x-show="navLevel === -1 && !submenu" @if ($activeSubmenu || $navContext) x-cloak @endif class="contents">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
             @foreach ($navSections as $sectionLabel => $sectionItems)
-                @if ($loop->first)
-                    <li class="nav-section" :class="collapsed && 'lg:hidden'">{{ $sectionLabel }}</li>
-                @else
+                {{-- The first section needs no title. --}}
+                @unless ($loop->first)
                     <li class="nav-section mt-3" aria-hidden="true"
                         :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
                         {{ $sectionLabel }}</li>
-                @endif
+                @endunless
                 @foreach ($sectionItems as $item)
                     <li>
                         {{-- A parent entry is a button, not a link: wire:navigate would start a page load on mouse down. --}}
@@ -270,7 +280,7 @@
                                 :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <x-reicon :name="$item['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label flex-1 text-left" :class="collapsed && 'lg:hidden'">{{ $item['label'] }}</span>
-                                <x-reicon name="chevron-down" class="size-3 -rotate-90 text-fg-faint" ::class="collapsed && 'lg:hidden'" />
+                                <x-reicon name="chevron-down" class="nav-chevron size-3 -rotate-90 text-coollabs dark:text-fg-faint" ::class="collapsed && 'lg:hidden'" />
                             </button>
                         @else
                             <a title="{{ $item['label'] }}" href="{{ $item['href'] }}"
@@ -290,12 +300,11 @@
         @endif
         @if (auth()->id() === 0 && (isCloud() || isDev()))
             {{-- Part of the main menu: hidden while a submenu or a resource menu shows. --}}
-            <li x-show="!submenu" @if ($activeSubmenu ?? null) x-cloak @endif @class(['xl:hidden' => $navContext ?? []])
-                :class="{ 'xl:hidden': navLevel !== -1 }">
+            <li x-show="navLevel === -1 && !submenu" @if (($activeSubmenu ?? null) || ($navContext ?? [])) x-cloak @endif>
                 <a title="Admin" {{ wireNavigate() }}
-                    class="{{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    class="nav-admin {{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">
-                    <x-reicon name="fire" class="menu-item-icon text-pink-500" />
+                    <x-reicon name="fire" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Admin</span>
                 </a>
             </li>
@@ -323,7 +332,7 @@
     </ul>
     {{-- Sidebar footer (desktop only; mobile uses a temporary slide-over). It stays visible;
          only the menu above it scrolls on short or zoomed-in screens. --}}
-    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3">
+    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-neutral-50 px-2 py-2 dark:bg-transparent lg:-mx-3 lg:flex lg:px-3">
         <div class="flex items-center gap-1" :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
             <x-top-user-menu sidebar />
             <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"

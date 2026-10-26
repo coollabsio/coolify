@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
@@ -83,6 +84,31 @@ function fakeMultiS3Deletes(): Collection
  */
 function runMultiS3BackupJob(array $failingStorages): array
 {
+    $backup = createMultiS3Backup();
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands->push($command);
+
+        return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
+    });
+
+    $job = Mockery::mock(DatabaseBackupJob::class.'[upload_to_s3]', [$backup])->shouldAllowMockingProtectedMethods();
+    $job->shouldReceive('upload_to_s3')->andReturnUsing(function (S3Storage $storage) use ($failingStorages) {
+        if (in_array($storage->name, $failingStorages, true)) {
+            throw new RuntimeException('access denied');
+        }
+    });
+    $job->handle();
+
+    return [ScheduledDatabaseBackupExecution::query()->sole(), $commands];
+}
+
+/**
+ * Creates an S3-only Postgres backup schedule with the destinations "First" and "Second".
+ */
+function createMultiS3Backup(): ScheduledDatabaseBackup
+{
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
@@ -107,23 +133,8 @@ function runMultiS3BackupJob(array $failingStorages): array
         'team_id' => $team->id,
     ])->save();
     $backup->syncS3Storages([$first->id, $second->id]);
-    $commands = collect();
-    Process::fake(function ($process) use ($commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-        $commands->push($command);
 
-        return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
-    });
-
-    $job = Mockery::mock(DatabaseBackupJob::class.'[upload_to_s3]', [$backup->fresh()])->shouldAllowMockingProtectedMethods();
-    $job->shouldReceive('upload_to_s3')->andReturnUsing(function (S3Storage $storage) use ($failingStorages) {
-        if (in_array($storage->name, $failingStorages, true)) {
-            throw new RuntimeException('access denied');
-        }
-    });
-    $job->handle();
-
-    return [ScheduledDatabaseBackupExecution::query()->sole(), $commands];
+    return $backup->fresh();
 }
 
 it('applies S3 retention to each destination separately', function () {
@@ -300,6 +311,26 @@ describe('backup job', function () {
         'successful upload' => [[]],
         'failed upload' => [['First']],
     ]);
+
+    it('signs each upload with the region of its destination', function () {
+        $backup = createMultiS3Backup();
+        S3Storage::query()->update(['endpoint' => 'https://8.8.8.8']);
+        S3Storage::query()->where('name', 'First')->update(['region' => 'ru-central-1']);
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('files')->andReturn([]);
+        $sshDisk = Storage::disk('ssh-keys');
+        Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+        Storage::shouldReceive('build')->andReturn($disk);
+        Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'du -b') ? '128' : ''));
+
+        (new DatabaseBackupJob($backup))->handle();
+
+        expect(ScheduledDatabaseBackupExecution::query()->sole()->s3_uploaded)->toBeTrue();
+        Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
+            && str_contains($process->command, 'temporary/first-bucket/'));
+        Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=us-east-1'")
+            && str_contains($process->command, 'temporary/second-bucket/'));
+    });
 
     it('keeps the local file and names the failed destination when one upload fails', function () {
         [$execution, $commands] = runMultiS3BackupJob(['Second']);

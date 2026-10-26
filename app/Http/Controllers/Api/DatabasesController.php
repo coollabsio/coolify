@@ -43,6 +43,7 @@ class DatabasesController extends Controller
 {
     use Concerns\HandlesDatabaseImportsApi;
     use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployAbility;
     use Concerns\RequiresDeployForOutsideHostPaths;
 
     #[OA\Post(
@@ -74,6 +75,7 @@ class DatabasesController extends Controller
         path: '/databases/{uuid}/imports',
         operationId: 'create-database-import',
         summary: 'Import database backup',
+        description: 'Restore a backup into the database. Every import source requires the deploy ability.',
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')),
         security: [['bearerAuth' => []]],
         tags: ['Databases'],
@@ -82,6 +84,7 @@ class DatabasesController extends Controller
         ],
         responses: [
             new OA\Response(response: 202, description: 'Import queued'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability.'),
             new OA\Response(response: 409, description: 'Another start, restart or import of this database is already in progress.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -207,6 +210,25 @@ class DatabasesController extends Controller
         return $backup->unsetRelation('s3Storages')->unsetRelation('s3');
     }
 
+    /**
+     * Build the create response; the connection URLs contain credentials, so they need sensitive read access.
+     *
+     * @return array{uuid: string, internal_db_url?: string, external_db_url?: string}
+     */
+    private function createdDatabasePayload(Request $request, $database): array
+    {
+        $payload = ['uuid' => $database->uuid];
+        if ($request->attributes->get('can_read_sensitive', false) !== true) {
+            return $payload;
+        }
+        $payload['internal_db_url'] = $database->internal_db_url;
+        if ($database->is_public && $database->public_port) {
+            $payload['external_db_url'] = $database->external_db_url;
+        }
+
+        return $payload;
+    }
+
     private function removeSensitiveData($database, bool $loadNestedServerSecrets = false)
     {
         $database->makeHidden([
@@ -234,7 +256,19 @@ class DatabasesController extends Controller
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        return serializeApiResponse($database);
+        $payload = serializeApiResponse($database);
+
+        // A locked password variable is never shown again, also not inside the connection URLs.
+        if (request()->attributes->get('can_read_sensitive', false) === true
+            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
+            foreach (['internal_db_url', 'external_db_url'] as $key) {
+                if ($payload->has($key)) {
+                    $payload->put($key, null);
+                }
+            }
+        }
+
+        return $payload;
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void
@@ -441,7 +475,7 @@ class DatabasesController extends Controller
         $this->authorize('view', $database);
 
         $messageSecrets = [];
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->get()
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with(['executions', 's3', 's3Storages'])->where('database_id', $database->id)->where('database_type', $database->getMorphClass())->get()
             ->map(function (ScheduledDatabaseBackup $backup) use ($database, &$messageSecrets): ScheduledDatabaseBackup {
                 $backup->executions->each(function (ScheduledDatabaseBackupExecution $execution) use ($database, &$messageSecrets): void {
                     $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
@@ -546,8 +580,8 @@ class DatabasesController extends Controller
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
-                        'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
-                        'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'is_public' => ['type' => 'boolean', 'description' => 'Is the database public? Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'],
+                        'public_port' => ['type' => 'integer', 'description' => 'Public port of the database (1024-65535)'],
                         'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
@@ -591,6 +625,8 @@ class DatabasesController extends Controller
                         'health_check_retries' => ['type' => 'integer', 'description' => 'Healthcheck retries count.', 'minimum' => 1, 'default' => 5],
                         'health_check_start_period' => ['type' => 'integer', 'description' => 'Healthcheck start period in seconds.', 'minimum' => 0, 'default' => 5],
                         'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values, database passwords, and remote secrets are redacted. Requires team admin permissions.'],
+                        'include_coolify_default_variables' => ['type' => 'boolean', 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Restart the database to apply it.'],
+                        'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Send the database logs to the log drain of the server. Log drain must be enabled on the server. Restart the database to apply it.'],
                     ],
                 ),
             )
@@ -607,6 +643,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy permission to change is_public or to use instant_deploy.',
             ),
             new OA\Response(
                 response: 404,
@@ -636,7 +676,7 @@ class DatabasesController extends Controller
             'description' => 'string|nullable',
             'image' => 'string',
             'is_public' => 'boolean',
-            'public_port' => 'numeric|nullable',
+            'public_port' => 'numeric|nullable|between:1024,65535',
             'public_port_timeout' => 'integer|nullable|min:1',
             'limits_memory' => 'string',
             'limits_memory_swap' => 'string',
@@ -647,6 +687,8 @@ class DatabasesController extends Controller
             'limits_cpu_shares' => 'numeric',
             'instant_deploy' => 'boolean',
             'redact_all_env_values_in_logs' => 'boolean',
+            'include_coolify_default_variables' => 'boolean',
+            'is_log_drain_enabled' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -658,6 +700,8 @@ class DatabasesController extends Controller
         $uuid = $request->uuid;
         $instantDeploy = $request->boolean('instant_deploy');
         $redactAllEnvValuesInLogs = $request->has('redact_all_env_values_in_logs') ? $request->boolean('redact_all_env_values_in_logs') : null;
+        $isLogDrainEnabled = $request->has('is_log_drain_enabled') ? $request->boolean('is_log_drain_enabled') : null;
+        $includeCoolifyDefaultVariables = $request->has('include_coolify_default_variables') ? $request->boolean('include_coolify_default_variables') : null;
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
@@ -671,8 +715,22 @@ class DatabasesController extends Controller
             $this->authorize('manage', $database);
         }
 
-        if ($redactAllEnvValuesInLogs !== null) {
+        if ($redactAllEnvValuesInLogs !== null || $includeCoolifyDefaultVariables !== null) {
             $this->authorize('manageEnvironment', $database);
+        }
+
+        if ($isLogDrainEnabled && ! $database->destination->server->isLogDrainEnabled()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_log_drain_enabled' => ['Log drain is not enabled on the server. Enable it on the server first.']],
+            ], 422);
+        }
+
+        if ($request->has('is_public') && (bool) $request->is_public !== (bool) $database->is_public) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Making a database public or private starts or stops its proxy on the server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
         }
 
         if ($request->is_public && $request->public_port) {
@@ -921,6 +979,12 @@ class DatabasesController extends Controller
         if ($redactAllEnvValuesInLogs !== null) {
             $database->redact_all_env_values_in_logs = $redactAllEnvValuesInLogs;
         }
+        if ($isLogDrainEnabled !== null) {
+            $database->is_log_drain_enabled = $isLogDrainEnabled;
+        }
+        if ($includeCoolifyDefaultVariables !== null) {
+            $database->include_coolify_default_variables = $includeCoolifyDefaultVariables;
+        }
         $database->update($request->only($allowedFields));
         // The Redis password is stored in the REDIS_PASSWORD variable, not in a column.
         if ($database instanceof StandaloneRedis && filled($request->redis_password)) {
@@ -947,12 +1011,22 @@ class DatabasesController extends Controller
             'changed_fields' => [
                 ...array_values(array_intersect($allowedFields, array_keys($request->all()))),
                 ...($redactAllEnvValuesInLogs === null ? [] : ['redact_all_env_values_in_logs']),
+                ...($isLogDrainEnabled === null ? [] : ['is_log_drain_enabled']),
+                ...($includeCoolifyDefaultVariables === null ? [] : ['include_coolify_default_variables']),
             ],
         ]);
 
         return response()->json([
             'message' => 'Database updated.',
         ]);
+    }
+
+    private function disableLocalBackupWithoutS3Response(): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['disable_local_backup' => ['Local backups can only be disabled when save_s3 is true.']],
+        ], 422);
     }
 
     #[OA\Post(
@@ -987,11 +1061,12 @@ class DatabasesController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'Backup frequency (cron expression or: every_minute, hourly, daily, weekly, monthly, yearly)'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled', 'default' => true],
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether to save backups to S3', 'default' => false],
+                        'disable_local_backup' => ['type' => 'boolean', 'description' => 'Delete the local backup file after the upload to S3. Only allowed when save_s3 is true.', 'default' => false],
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination. Either field is required if save_s3 is true.'],
                         's3_storage_uuids' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
-                        'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation'],
+                        'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation. Needs a token with the deploy permission.'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Number of backups to retain locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Number of days to retain backups locally'],
                         'database_backup_retention_max_storage_locally' => ['type' => 'number', 'description' => 'Max storage (GB) for local backups'],
@@ -1025,6 +1100,10 @@ class DatabasesController extends Controller
                 ref: '#/components/responses/400',
             ),
             new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy permission to use backup_now.',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
@@ -1036,7 +1115,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 's3_storage_uuids', 'timeout', 'missing_backup_notification_days'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 's3_storage_uuids', 'timeout', 'missing_backup_notification_days', 'disable_local_backup'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1053,6 +1132,7 @@ class DatabasesController extends Controller
             'frequency' => 'required|string',
             'enabled' => 'boolean',
             'save_s3' => 'boolean',
+            'disable_local_backup' => 'boolean',
             'dump_all' => 'boolean',
             'backup_now' => 'boolean|nullable',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
@@ -1088,6 +1168,13 @@ class DatabasesController extends Controller
 
         $this->authorize('manageBackups', $database);
 
+        if ($request->backup_now) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A backup that runs now copies the database on the server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         if (! $database->isBackupSolutionAvailable()) {
             return response()->json([
                 'message' => 'Scheduled backups are not supported for this database type.',
@@ -1112,6 +1199,9 @@ class DatabasesController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid or s3_storage_uuids field is required when save_s3 is true.']],
             ], 422);
+        }
+        if ($request->boolean('disable_local_backup') && ! $request->boolean('save_s3')) {
+            return $this->disableLocalBackupWithoutS3Response();
         }
 
         // Check for extra fields
@@ -1231,9 +1321,10 @@ class DatabasesController extends Controller
                     type: 'object',
                     properties: [
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether data is saved in s3 or not'],
+                        'disable_local_backup' => ['type' => 'boolean', 'description' => 'Delete the local backup file after the upload to S3. Only allowed when save_s3 is true. Turning save_s3 off also turns this off.'],
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'Primary S3 storage UUID. Sent without s3_storage_uuids, it selects this storage as the only destination; when it is already a destination, it becomes the primary destination and the other destinations stay.'],
                         's3_storage_uuids' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'UUIDs of every S3 storage the backup is uploaded to. Replaces the current destinations. When s3_storage_uuid is also sent, it must be in this list and becomes the primary destination; otherwise the first entry is the primary destination.'],
-                        'backup_now' => ['type' => 'boolean', 'description' => 'Whether to take a backup now or not'],
+                        'backup_now' => ['type' => 'boolean', 'description' => 'Whether to take a backup now or not. Needs a token with the deploy permission.'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled or not'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Whether all databases are dumped or not'],
@@ -1264,6 +1355,10 @@ class DatabasesController extends Controller
                 ref: '#/components/responses/400',
             ),
             new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy permission to use backup_now.',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
@@ -1275,7 +1370,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 's3_storage_uuids', 'timeout', 'missing_backup_notification_days'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 's3_storage_uuids', 'timeout', 'missing_backup_notification_days', 'disable_local_backup'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1288,6 +1383,7 @@ class DatabasesController extends Controller
         }
         $validator = customApiValidator($request->all(), [
             'save_s3' => 'boolean',
+            'disable_local_backup' => 'boolean',
             'backup_now' => 'boolean|nullable',
             'enabled' => 'boolean',
             'dump_all' => 'boolean',
@@ -1330,6 +1426,13 @@ class DatabasesController extends Controller
 
         $this->authorize('update', $database);
 
+        if ($request->backup_now) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A backup that runs now copies the database on the server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         // Validate frequency is a valid cron expression
         if ($request->filled('frequency')) {
             $isValid = validate_cron_expression($request->frequency);
@@ -1346,7 +1449,7 @@ class DatabasesController extends Controller
             return $s3Storages;
         }
 
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
         if (! $backupConfig) {
@@ -1373,10 +1476,17 @@ class DatabasesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        if ($request->boolean('disable_local_backup') && ! $saveToS3) {
+            return $this->disableLocalBackupWithoutS3Response();
+        }
 
         $backupData = Arr::except($request->only($backupConfigFields), ['s3_storage_uuid', 's3_storage_uuids']);
         if ($s3Storages !== null) {
             $backupData['s3_storage_id'] = $s3Storages->first()?->id;
+        }
+        // Without S3 the backup must stay on the server, as in the UI.
+        if (! $saveToS3) {
+            $backupData['disable_local_backup'] = false;
         }
 
         // Validate databases_to_backup input
@@ -2238,13 +2348,7 @@ class DatabasesController extends Controller
                 $this->attachTagsToResource($database, $tagNames, $teamId);
             }
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2310,13 +2414,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2382,13 +2480,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2451,13 +2543,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2553,13 +2639,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2602,13 +2682,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2673,13 +2747,7 @@ class DatabasesController extends Controller
             }
 
             $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
+            $payload = $this->createdDatabasePayload($request, $database);
 
             auditLog('api.database.created', [
                 'team_id' => $teamId,
@@ -2852,7 +2920,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete',
-        description: 'Delete database by UUID.',
+        description: 'Delete database by UUID. Needs a token with the write and deploy permissions.',
         path: '/databases/{uuid}',
         operationId: 'delete-database-by-uuid',
         security: [
@@ -2902,6 +2970,7 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
         ]
     )]
     public function delete_by_uuid(Request $request)
@@ -3023,7 +3092,7 @@ class DatabasesController extends Controller
         $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3159,7 +3228,7 @@ class DatabasesController extends Controller
         $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -3277,7 +3346,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -4442,7 +4511,7 @@ class DatabasesController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional). Needs the deploy ability when set.'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
                         ],
@@ -4460,7 +4529,7 @@ class DatabasesController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
-            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory.'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -4655,6 +4724,13 @@ class DatabasesController extends Controller
                     'message' => 'Validation failed.',
                     'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
+            }
+
+            if ($request->filled('content')) {
+                $forbidden = $this->deployAbilityForbiddenResponse($request, 'Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
+                if ($forbidden) {
+                    return $forbidden;
+                }
             }
 
             $storage = LocalFileVolume::create([
@@ -5143,7 +5219,7 @@ class DatabasesController extends Controller
                 properties: [
                     new OA\Property(property: 'destination_uuid', type: 'string'),
                     new OA\Property(property: 'name', type: 'string', nullable: true),
-                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false, description: 'Whether to clone volume data. Needs the deploy ability.'),
                 ]
             )
         ),
@@ -5151,6 +5227,7 @@ class DatabasesController extends Controller
             new OA\Response(response: 201, description: 'Database cloned.'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability to clone volume data.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -5193,6 +5270,10 @@ class DatabasesController extends Controller
 
         $this->authorize('update', $database);
         $this->authorize('create', [StandalonePostgresql::class, $database->environment]);
+
+        if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
+            return $response;
+        }
 
         $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
             ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();

@@ -253,6 +253,78 @@ describe('PATCH /api/v1/applications/{uuid}/envs', function () {
     });
 });
 
+describe('application env PATCH keeps omitted flags', function () {
+    beforeEach(function () {
+        $this->application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->env = EnvironmentVariable::create([
+            'key' => 'FLAGGED_KEY',
+            'value' => 'old-value',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $this->application->id,
+            'is_preview' => false,
+            'is_literal' => true,
+            'is_multiline' => true,
+            'is_shown_once' => true,
+        ]);
+
+        $this->headers = [
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ];
+    });
+
+    test('single update with only key and value keeps flags', function () {
+        $this->withHeaders($this->headers)
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/envs", [
+                'key' => 'FLAGGED_KEY',
+                'value' => 'new-value',
+            ])
+            ->assertStatus(201);
+
+        $env = $this->env->fresh();
+        expect($env->value)->toBe('new-value')
+            ->and((bool) $env->is_literal)->toBeTrue()
+            ->and($env->is_multiline)->toBeTrue()
+            ->and((bool) $env->is_shown_once)->toBeTrue();
+    });
+
+    test('bulk update with only key and value keeps flags', function () {
+        $this->withHeaders($this->headers)
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/envs/bulk", [
+                'data' => [['key' => 'FLAGGED_KEY', 'value' => 'new-value']],
+            ])
+            ->assertStatus(201);
+
+        $env = $this->env->fresh();
+        expect($env->value)->toBe('new-value')
+            ->and((bool) $env->is_literal)->toBeTrue()
+            ->and($env->is_multiline)->toBeTrue()
+            ->and((bool) $env->is_shown_once)->toBeTrue();
+    });
+
+    test('explicit flags are still applied', function () {
+        $this->withHeaders($this->headers)
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/envs", [
+                'key' => 'FLAGGED_KEY',
+                'value' => 'new-value',
+                'is_literal' => false,
+                'is_multiline' => false,
+                'is_shown_once' => false,
+            ])
+            ->assertStatus(201);
+
+        $env = $this->env->fresh();
+        expect((bool) $env->is_literal)->toBeFalse()
+            ->and($env->is_multiline)->toBeFalse()
+            ->and((bool) $env->is_shown_once)->toBeFalse();
+    });
+});
+
 describe('environment variable key validation for app and service APIs', function () {
     test('rejects invalid service environment variable keys on create update and bulk', function () {
         $service = Service::factory()->create([

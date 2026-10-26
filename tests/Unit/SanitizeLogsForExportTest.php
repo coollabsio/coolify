@@ -184,3 +184,22 @@ it('removes generic URL passwords', function () {
         expect($result)->toBe($expected);
     }
 });
+
+it('does not redact across lines from a URL to a later email', function () {
+    $recordA = '{"category":"api","url":"/","userAgent":"Mozilla/5.0 (compatible; +https://example.com/security-center/)","userId":null,"statusCode":200,"requestId":"11111111-1111-4111-8111-111111111111"}';
+    $recordB = '{"email":"user@example.com","eventType":"login_attempt","message":"Authentication event: login_attempt for user@example.com - ATTEMPT"}';
+
+    $lines = explode("\n", sanitizeLogsForExport($recordA."\n".$recordB));
+
+    expect($lines)->toHaveCount(2);
+    expect($lines[0])->toBe($recordA);
+    expect($lines[1])->toBe('{"email":"'.REDACTED.'","eventType":"login_attempt","message":"Authentication event: login_attempt for '.REDACTED.' - ATTEMPT"}');
+    expect(json_decode($lines[1], true))->toBeArray();
+});
+
+it('still redacts URL passwords inside JSON log lines', function () {
+    $input = '{"msg":"connecting","dsn":"postgres://app:s3cr3t:pa/ss@db:5432/app"}'."\n".'{"email":"user@example.com"}';
+
+    expect(sanitizeLogsForExport($input))
+        ->toBe('{"msg":"connecting","dsn":"postgres://app:'.REDACTED.'@db:5432/app"}'."\n".'{"email":"'.REDACTED.'"}');
+});

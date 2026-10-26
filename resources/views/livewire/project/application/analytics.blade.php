@@ -1,7 +1,9 @@
 <?php
-$tabButtonBase = 'h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
-$tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
-$tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
+$rangeListboxOptions = [
+    ['value' => '24h', 'label' => 'Last 24 hours'],
+    ['value' => '7d', 'label' => 'Last 7 days'],
+    ['value' => '30d', 'label' => 'Last 30 days'],
+];
 
 $dimensionLabels = [
     'referer' => 'Referrers',
@@ -37,7 +39,7 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
                 icon-name="network" />
         </x-application.settings-section>
     @else
-        @if ($this->isLivePollable())
+        @if ($live)
             <div wire:poll.60s="loadData" class="hidden"></div>
         @endif
 
@@ -45,21 +47,15 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
             helper="Inspect traffic statistics reported by Sentinel.">
             <x-slot:actions>
                 <div class="flex items-center gap-2">
-                    @include('livewire.traffic._live-toggle')
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        <button type="button" wire:click="setRange('24h')"
-                            @class([$tabButtonBase, $range === '24h' ? $tabButtonActive : $tabButtonInactive])>
-                            24 hours
-                        </button>
-                        <button type="button" wire:click="setRange('7d')"
-                            @class([$tabButtonBase, $range === '7d' ? $tabButtonActive : $tabButtonInactive])>
-                            7 days
-                        </button>
-                        <button type="button" wire:click="setRange('30d')"
-                            @class([$tabButtonBase, $range === '30d' ? $tabButtonActive : $tabButtonInactive])>
-                            30 days
-                        </button>
+                    <div class="relative w-full transition-opacity sm:w-44"
+                        wire:loading.class="pointer-events-none opacity-60" wire:target="setRange">
+                        <x-forms.listbox id="range" onChange="setRange" :onChangeArgs="[]" :options="$rangeListboxOptions" />
+                        <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                            wire:loading.flex wire:target="setRange">
+                            <x-loading compact aria-label="Loading analytics" />
+                        </div>
                     </div>
+                    <x-live-toggle :active="$live" storageKey="traffic-live" title="Turn live refresh on or off (updates every 60 seconds)" />
                 </div>
             </x-slot:actions>
 

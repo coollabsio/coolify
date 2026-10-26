@@ -121,6 +121,15 @@ const height = n => els.nodeEls.get(n.id)?.offsetHeight || 160;
 // A card's box in world units (its rendered size, or a usual card size).
 const boxOf = n => ({ x: n.x, y: n.y, w: width(n), h: height(n) });
 
+// The part of the viewport that the floating Steps panel does not cover,
+// relative to the viewport (on small screens the panel is above it).
+function openArea() {
+  const r = els.viewport.getBoundingClientRect();
+  const p = els.root.querySelector('.cv-palette').getBoundingClientRect();
+  const left = p.bottom > r.top ? Math.max(0, p.right - r.left) : 0;
+  return { left, width: r.width - left, height: r.height };
+}
+
 export function fit() {
   if (!els.nodeEls.size) return;
   let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
@@ -136,11 +145,11 @@ export function fit() {
     maxX = Math.max(maxX, pill.offsetLeft + pill.offsetWidth);
     maxY = Math.max(maxY, pill.offsetTop + pill.offsetHeight);
   }
-  const r = els.viewport.getBoundingClientRect();
+  const r = openArea();
   const pad = 60;
   const view = cv.view;
   view.z = Math.min(1.2, Math.max(MIN_ZOOM, Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY))));
-  view.x = (r.width - (maxX - minX) * view.z) / 2 - minX * view.z;
+  view.x = r.left + (r.width - (maxX - minX) * view.z) / 2 - minX * view.z;
   view.y = (r.height - (maxY - minY) * view.z) / 2 - minY * view.z;
   els.pz.apply();
 }
@@ -259,7 +268,8 @@ function appendToChain(type) {
 }
 function centre() {
   const r = els.viewport.getBoundingClientRect();
-  const p = toWorld(r.left + r.width / 2, r.top + r.height / 2);
+  const a = openArea();
+  const p = toWorld(r.left + a.left + a.width / 2, r.top + r.height / 2);
   return [p.x - 140, p.y - 60];
 }
 
@@ -299,6 +309,7 @@ export function dragFromPalette(type, event) {
     ghost.remove();
     const r = els.viewport.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+    if (e.target.closest?.('.cv-palette')) return;
     const p = toWorld(e.clientX, e.clientY);
     addNode(type, p.x - 30, p.y - 16);
   };

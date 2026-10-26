@@ -285,7 +285,8 @@ final class SensitiveDataRedactor
             '/((?:Authorization|Proxy-Authorization)\s*:\s*)[^\r\n]+/i' => '$1'.REDACTED,
             '/x-access-token:.*?(?=@)/' => 'x-access-token:'.REDACTED,
             '/oauth2:.*?(?=@)/' => 'oauth2:'.REDACTED,
-            '/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i' => '$1'.REDACTED.'$2',
+            // User and password cannot contain whitespace, so a match never spans log lines.
+            '/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:\s@\/]+:)[^@\s]+(@)/i' => '$1'.REDACTED.'$2',
             self::EMAIL_PATTERN => REDACTED,
             '/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i' => 'Bearer '.REDACTED,
             '/Bearer\s+[^\s,;]+/i' => 'Bearer '.REDACTED,

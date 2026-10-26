@@ -17,6 +17,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 use Stripe\Service\SubscriptionService;
 use Stripe\StripeClient;
@@ -27,6 +28,7 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     $this->rootTeam = Team::factory()->create(['id' => 0, 'name' => 'Root Team']);
     $this->rootUser = User::factory()->create(['id' => 0]);
+    fakeOpenStripeSubscriptions();
 });
 
 function deleteAccountUser(): User
@@ -138,6 +140,7 @@ it('cancels the subscription immediately before deleting the account on cloud', 
 
     $stripe = Mockery::mock(StripeClient::class);
     $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_123')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_123', 'status' => 'active']));
     $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_123', [])->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_123', 'status' => 'canceled']));
     app()->instance(StripeClient::class, $stripe);
 
@@ -159,6 +162,7 @@ it('keeps the account and subscription when immediate cancellation fails', funct
     $subscription = Subscription::create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_failed', 'stripe_invoice_paid' => true]);
     $stripe = Mockery::mock(StripeClient::class);
     $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_failed')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_failed', 'status' => 'active']));
     $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_failed', [])->andThrow(new RuntimeException('Stripe unavailable'));
     app()->instance(StripeClient::class, $stripe);
 
@@ -224,6 +228,7 @@ it('cancels a past due subscription and preserves a transferred team', function 
     $subscription = Subscription::create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_past_due', 'stripe_invoice_paid' => false, 'stripe_past_due' => true]);
     $stripe = Mockery::mock(StripeClient::class);
     $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_past_due')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_past_due', 'status' => 'past_due']));
     $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_past_due', [])->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_past_due', 'status' => 'canceled']));
     app()->instance(StripeClient::class, $stripe);
 
@@ -308,4 +313,110 @@ it('forgets busy github runners without cleanup instead of blocking the removal 
         ->and(GithubRunnerExecution::find($running->id))->toBeNull()
         ->and(GithubRunnerExecution::find($queued->id))->toBeNull()
         ->and(GithubRunnerConfig::find($config->id))->toBeNull();
+});
+
+it('lets a cloud owner whose subscription ended delete the account with the servers and projects of the personal team', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    Process::fake();
+    $user = deleteAccountUser();
+    $team = $user->teams()->first();
+    $team->update(['name' => 'Lapsed']);
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_invoice_paid' => false]);
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id]);
+    $project = Project::factory()->create(['team_id' => $team->id]);
+
+    Livewire::test(ProfileIndex::class)
+        ->assertDontSee('Before you can delete your account')
+        ->assertSee('The servers, projects, and Git sources of the team &quot;Lapsed&quot; will be removed from Coolify.', false)
+        ->call('deleteAccount', 'password')
+        ->assertRedirect(route('login'));
+
+    expect(User::find($user->id))->toBeNull()
+        ->and(Team::find($team->id))->toBeNull()
+        ->and(Server::withTrashed()->find($server->id))->toBeNull()
+        ->and(Project::find($project->id))->toBeNull();
+    Process::assertNothingRan();
+});
+
+it('lets a lapsed cloud owner delete the account when Stripe already ended a leftover subscription', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    Process::fake();
+    $user = deleteAccountUser();
+    $team = $user->teams()->first();
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_fraud_refunded', 'stripe_invoice_paid' => false]);
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_duplicate', 'stripe_invoice_paid' => false]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_fraud_refunded')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_fraud_refunded', 'status' => 'canceled']));
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_duplicate')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_duplicate', 'status' => 'unpaid']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_duplicate', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    Livewire::test(ProfileIndex::class)
+        ->call('deleteAccount', 'password')
+        ->assertRedirect(route('login'));
+
+    expect(User::find($user->id))->toBeNull()
+        ->and(Team::find($team->id))->toBeNull()
+        ->and(Subscription::where('team_id', $team->id)->exists())->toBeFalse();
+});
+
+it('still asks a cloud owner with a paying subscription to delete servers and projects first', function (array $subscription) {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $team = $user->teams()->first();
+    $team->update(['name' => 'Paying']);
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_paying', ...$subscription]);
+    Project::factory()->create(['team_id' => $team->id]);
+
+    Livewire::test(ProfileIndex::class)
+        ->assertSee('Delete all projects, servers, and Git sources of the team &quot;Paying&quot;.', false)
+        ->call('deleteAccount', 'password');
+
+    expect(User::find($user->id))->not->toBeNull()
+        ->and(Team::find($team->id))->not->toBeNull();
+})->with([
+    'paid' => [['stripe_invoice_paid' => true]],
+    'past due' => [['stripe_past_due' => true]],
+]);
+
+it('cancels the Stripe subscriptions of the email that Coolify does not record, except those of a team the user does not own', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $otherTeam = User::factory()->create()->teams()->first();
+    $otherTeam->members()->attach($user->id, ['role' => 'member']);
+    fakeOpenStripeSubscriptions([
+        ['id' => 'sub_orphan', 'status' => 'active'],
+        ['id' => 'sub_other_team', 'status' => 'active', 'metadata' => ['team_id' => (string) $otherTeam->id]],
+    ]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_orphan')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_orphan', 'status' => 'active']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_orphan', []);
+    $stripe->subscriptions->shouldNotReceive('cancel')->with('sub_other_team', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    Livewire::test(ProfileIndex::class)
+        ->assertSee('The Stripe subscription sub_orphan of your email, which is not linked to a team, will be cancelled immediately.')
+        ->assertDontSee('sub_other_team')
+        ->call('deleteAccount', 'password', [])
+        ->assertRedirect(route('login'));
+
+    expect(User::find($user->id))->toBeNull();
+});
+
+it('keeps the account when the Stripe lookup fails', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $lookup = fakeOpenStripeSubscriptions();
+    $lookup->shouldReceive('handle')->andThrow(new RuntimeException('Stripe unavailable'));
+
+    Livewire::test(ProfileIndex::class)
+        ->assertSee('Every subscription of your teams and your email will be cancelled immediately.')
+        ->call('deleteAccount', 'password', []);
+
+    // The render after the failed delete reads the cached fallback; only handle() called Stripe again.
+    $lookup->shouldHaveReceived('handle')->twice();
+
+    expect(User::find($user->id))->not->toBeNull();
 });

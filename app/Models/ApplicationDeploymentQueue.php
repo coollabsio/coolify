@@ -176,6 +176,20 @@ class ApplicationDeploymentQueue extends Model
         return $this->belongsTo(Application::class);
     }
 
+    /**
+     * Scope to deployments of the team's applications.
+     */
+    public function scopeOwnedByTeam(Builder $query, int $teamId): Builder
+    {
+        // application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
+        $applicationIds = Application::withTrashed()
+            ->whereRelation('environment.project.team', 'id', $teamId)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id);
+
+        return $query->whereIn('application_id', $applicationIds);
+    }
+
     public function server(): Attribute
     {
         return Attribute::make(

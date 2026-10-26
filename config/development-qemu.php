@@ -147,6 +147,8 @@ return [
     'dns' => '1.1.1.1',
     // MiB per VM. Many dev instances share one host, so keep this small; existing VMs get it on their next start.
     'memory' => (int) env('DEVELOPMENT_QEMU_MEMORY', 1024),
+    // MiB for a VM with a passed-through GPU (dev:qemu --gpu). The NVIDIA driver needs more than the default.
+    'gpu_memory' => (int) env('DEVELOPMENT_QEMU_GPU_MEMORY', 4096),
     'vcpus' => 2,
     'disk_size' => '20G',
     'libvirt_network' => $developmentQemuInstance === null ? 'default' : "coolify-dev-{$developmentQemuSlot}",
