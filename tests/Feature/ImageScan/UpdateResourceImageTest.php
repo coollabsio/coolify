@@ -10,6 +10,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\ImageScan;
+use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -665,4 +666,96 @@ describe('updateImage action', function () {
 
         expect($web->fresh()->image)->toBe('nginx:1.29');
     });
+});
+
+describe('base image of a Dockerfile build', function () {
+    /**
+     * A Dockerfile build from node:20.11-alpine with 7 findings at the alert level in base layers (2 critical, 5 high),
+     * one medium base finding, and one critical app finding.
+     *
+     * @param  array<string, mixed>|null  $base
+     */
+    function updateImageDockerfileScan(?array $base, string $baseImageRef = 'node:20.11-alpine'): array
+    {
+        $application = Application::factory()->create([
+            'environment_id' => test()->environment->id,
+            'destination_id' => test()->destination->id,
+            'destination_type' => test()->destination->getMorphClass(),
+            'build_pack' => 'dockerfile',
+        ]);
+        $finding = fn (string $id, string $severity, string $layer) => [
+            'id' => $id, 'aliases' => [], 'severity' => $severity, 'package' => 'openssl', 'version' => '3.1.4-r0',
+            'type' => 'apk', 'artifactId' => $id, 'fixedIn' => '3.1.7-r0', 'fixState' => 'fixed', 'kev' => false,
+            'epss' => null, 'risk' => 1.0, 'summary' => '', 'layer' => $layer,
+        ];
+        $findings = [
+            $finding('CVE-2026-0001', 'critical', 'base'), $finding('CVE-2026-0002', 'critical', 'base'),
+            ...array_map(fn (int $n) => $finding("CVE-2026-001{$n}", 'high', 'base'), range(1, 5)),
+            $finding('CVE-2026-0020', 'medium', 'base'), $finding('CVE-2026-0030', 'critical', 'app'),
+        ];
+        $scan = ImageScan::factory()->create([
+            'server_id' => test()->server->id,
+            'resource_type' => $application->getMorphClass(),
+            'resource_id' => $application->id,
+            'image_ref' => $application->uuid.':abc123',
+            'base_image_ref' => $baseImageRef,
+            'builds_image' => true,
+            'findings' => $findings,
+            'summary' => ['fixable_now_at_level' => 8, 'truncated' => false, 'eol_distro' => null],
+            'candidates' => ['status' => 'skipped', 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => [],
+                ...($base === null ? [] : ['base' => ['image' => $baseImageRef, 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, ...$base]])],
+            'scanned_at' => now(),
+        ]);
+
+        return [$application, $scan];
+    }
+
+    function updateImageBaseEntry(array $overrides = []): array
+    {
+        return updateImageEntry('node:20.18-alpine', 'line', true, [
+            'fixed_ids' => ['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014', 'CVE-2026-0020', 'CVE-2026-0030'],
+            ...$overrides,
+        ]);
+    }
+
+    it('recommends the newer base image with what it fixes and a copy button for the FROM line', function () {
+        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
+
+        updateImagePage($this->admin, $application, 'application')
+            ->assertSeeHtml('Change <code')
+            ->assertSee('FROM node:20.11-alpine')
+            ->assertSeeText('Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 7.')
+            ->assertSeeHtml("copy(await ('FROM node:20.18-alpine'))")
+            ->assertDontSee('Update to')
+            ->assertDontSeeHtml('updateImage(');
+    });
+
+    it('does not count base findings that are ignored now', function () {
+        [$application, $scan] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
+        ImageScanIgnore::factory()->create([
+            'team_id' => $this->team->id,
+            'resource_type' => $application->getMorphClass(),
+            'resource_id' => $application->id,
+            'vulnerability_id' => 'CVE-2026-0002',
+        ]);
+
+        updateImagePage($this->admin, $application, 'application')
+            ->assertSeeText('Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 6.');
+    });
+
+    it('shows nothing for the base image without a better line candidate', function (?array $base) {
+        [$application] = updateImageDockerfileScan($base);
+
+        updateImagePage($this->admin, $application, 'application')
+            ->assertDontSee('Change FROM')
+            ->assertDontSee('No newer version')
+            ->assertDontSee('Coolify could not check')
+            ->assertDontSeeHtml('data-image-scan-fix-panel');
+    })->with([
+        'not checked' => [null],
+        'no better' => [['status' => 'no_better', 'entries' => [updateImageBaseEntry(['better' => false])]]],
+        'failed' => [['status' => 'failed', 'error' => 'registry', 'entries' => []]],
+        'login needed' => [['status' => 'auth_required', 'error' => 'registry_auth', 'entries' => []]],
+        'cannot compare' => [['status' => 'cannot_compare', 'entries' => []]],
+    ]);
 });

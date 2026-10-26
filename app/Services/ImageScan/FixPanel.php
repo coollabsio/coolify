@@ -24,7 +24,7 @@ final class FixPanel
 
     /**
      * @param  Collection<int, ImageScan>  $scans  The current scans, loaded with their resource.
-     * @return list<array{key: string, image: string, owner: string, update: ?array<string, mixed>, message: ?string, registryUrl: ?string, loginUrl: ?string, major: ?string}>
+     * @return list<array{key: string, image: string, owner: string, update: ?array<string, mixed>, message: ?string, registryUrl: ?string, loginUrl: ?string, major: ?string, base: ?array{from: string, to: string, fixed: int, total: int}}>
      */
     public static function items(Model $resource, Collection $scans, User $user): array
     {
@@ -40,7 +40,7 @@ final class FixPanel
             }
 
             $item = self::item($resource, $owner, $scan, $user);
-            if ($item['update'] !== null || $item['message'] !== null || $item['major'] !== null) {
+            if ($item['update'] !== null || $item['message'] !== null || $item['major'] !== null || $item['base'] !== null) {
                 $items[] = $item;
             }
         }
@@ -146,7 +146,62 @@ final class FixPanel
     }
 
     /**
-     * @return array{key: string, image: string, owner: string, update: ?array<string, mixed>, message: ?string, registryUrl: ?string, loginUrl: ?string, major: ?string}
+     * A better base image for the final `FROM` of a Dockerfile build (spec 7.4): what it fixes of the findings in base
+     * layers at the alert level that are not ignored. Null without a better line candidate; failures of the base
+     * check are not shown.
+     *
+     * @return array{from: string, to: string, fixed: int, total: int}|null
+     */
+    public static function baseImage(ImageScan $scan, Model $owner): ?array
+    {
+        $from = (string) $scan->base_image_ref;
+        $base = data_get($scan->candidates, 'base');
+        if ($from === '' || ! is_array($base) || ($base['status'] ?? null) !== 'ok' || ($base['image'] ?? null) !== $from) {
+            return null;
+        }
+
+        $entry = collect(is_array($base['entries'] ?? null) ? $base['entries'] : [])
+            ->first(fn ($entry): bool => is_array($entry) && ($entry['kind'] ?? null) === 'line' && ($entry['better'] ?? false) === true && is_string($entry['ref'] ?? null));
+        if ($entry === null) {
+            return null;
+        }
+
+        try {
+            $current = ImageRef::parse($from);
+            $candidate = ImageRef::parse($entry['ref']);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+        if ($current->tag === null || $current->digest !== null || $candidate->tag === null || $candidate->tag === $current->tag
+            || $candidate->qualifiedName() !== $current->qualifiedName()) {
+            return null;
+        }
+
+        $fixedIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($entry['fixed_ids'] ?? [])));
+        $findings = RefreshCandidates::baseFindings($scan, $owner);
+        $fixed = count(array_filter($findings, function (Finding $finding) use ($fixedIds): bool {
+            foreach ([$finding->id, ...$finding->aliases] as $id) {
+                if (isset($fixedIds[mb_strtolower($id)])) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
+        if ($fixed === 0) {
+            return null;
+        }
+
+        return [
+            'from' => $from,
+            'to' => substr($from, 0, (int) strrpos($from, ':')).':'.$candidate->tag,
+            'fixed' => $fixed,
+            'total' => count($findings),
+        ];
+    }
+
+    /**
+     * @return array{key: string, image: string, owner: string, update: ?array<string, mixed>, message: ?string, registryUrl: ?string, loginUrl: ?string, major: ?string, base: ?array{from: string, to: string, fixed: int, total: int}}
      */
     private static function item(Model $resource, Model $owner, ImageScan $scan, User $user): array
     {
@@ -174,6 +229,7 @@ final class FixPanel
                 ? route('server.registries', ['server_uuid' => $server->uuid])
                 : null,
             'major' => $major === null ? null : (string) $major['ref'],
+            'base' => self::baseImage($scan, $owner),
         ];
     }
 

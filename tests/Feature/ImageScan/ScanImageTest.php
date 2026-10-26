@@ -169,6 +169,52 @@ it('marks findings in base layers as base', function () {
         ->and(collect($scan->findings)->where('artifactId', '0bbf5c9dd36d4a50')->pluck('layer')->unique()->all())->toBe(['base']);
 });
 
+it('stores the base image of a Dockerfile build and marks the findings in its layers as base', function () {
+    scanImageTestFake();
+    $baseLayers = [
+        'sha256:994393dc58e7931862558d06e46aa2bb17487044f670f310dffe1d24e4d1eec7',
+        'sha256:c107d84c5ee5434184266dd999ba59186dbe34ef4c6d1464f2ddd742f5eaa7f8',
+        'sha256:1191ff7875541dfd09e2f07b69b294d01cae17d396860e2d255308cb4ee9de5f',
+        'sha256:427eca9eca256d5db3002eb8993b59d663e44ac34a8098f3dcfe151c8bb32d54',
+    ];
+
+    $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', null, 0, ['ref' => 'postgres:15.0-alpine', 'layers' => [...$baseLayers, 'not-a-digest']]);
+
+    expect($scan->base_image_ref)->toBe('postgres:15.0-alpine')
+        ->and(ImageSbom::query()->sole()->base_layer_ids)->toBe($baseLayers)
+        ->and(collect($scan->findings)->pluck('layer')->unique()->values()->all())->toBe(['base']);
+});
+
+it('keeps the findings in app layers when the base image layers hold no package', function () {
+    scanImageTestFake();
+
+    $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', null, 0, ['ref' => 'alpine:3.16', 'layers' => ['sha256:994393dc58e7931862558d06e46aa2bb17487044f670f310dffe1d24e4d1eec7']]);
+
+    expect($scan->base_image_ref)->toBe('alpine:3.16')
+        ->and(collect($scan->findings)->pluck('layer')->unique()->values()->all())->toBe(['app']);
+});
+
+it('fills the base layers of a stored SBOM that has none', function () {
+    scanImageTestFake();
+    scanImageTestRun();
+    $layer = 'sha256:427eca9eca256d5db3002eb8993b59d663e44ac34a8098f3dcfe151c8bb32d54';
+
+    $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', null, 0, ['ref' => 'postgres:15.0-alpine', 'layers' => [$layer]]);
+
+    expect(ImageSbom::query()->sole()->base_layer_ids)->toBe([$layer])
+        ->and(collect($scan->findings)->pluck('layer')->unique()->values()->all())->toBe(['base']);
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker save'), 1);
+});
+
+it('keeps the base image of a scan when a rescan has none', function () {
+    scanImageTestFake();
+    ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', null, 0, ['ref' => 'postgres:15.0-alpine', 'layers' => []]);
+
+    $scan = scanImageTestRun();
+
+    expect($scan->base_image_ref)->toBe('postgres:15.0-alpine');
+});
+
 it('reuses the SBOM of an image that was scanned on the server before', function () {
     scanImageTestFake();
 
@@ -652,6 +698,18 @@ describe('candidate check', function () {
         scanImageTestRun($this->application->fresh());
 
         Queue::assertNotPushed(RefreshCandidatesJob::class);
+    });
+
+    it('queues a base image check for a Dockerfile build with findings in base layers', function () {
+        scanImageTestFake();
+        $this->application->forceFill(['build_pack' => 'dockerfile'])->save();
+
+        $scan = ScanImage::run($this->server, $this->application->fresh(), 'postgres:15.0-alpine', null, 0, [
+            'ref' => 'postgres:15.0-alpine',
+            'layers' => ['sha256:427eca9eca256d5db3002eb8993b59d663e44ac34a8098f3dcfe151c8bb32d54'],
+        ]);
+
+        Queue::assertPushed(RefreshCandidatesJob::class, fn (RefreshCandidatesJob $job) => $job->scan->is($scan));
     });
 
     it('queues no candidate check when the last check is recent', function () {

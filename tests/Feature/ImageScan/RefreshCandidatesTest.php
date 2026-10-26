@@ -19,6 +19,7 @@ use App\Models\Team;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\ImageScanGate;
+use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -520,4 +521,122 @@ it('records that the tag list was cut at 10,000 tags', function () {
 
 it('allows a candidate job to run up to the worst case of two candidate scans', function () {
     expect((new RefreshCandidatesJob(candidatesScan()))->timeout)->toBeGreaterThanOrEqual(6000);
+});
+
+/**
+ * A Dockerfile build from postgres:15.0-alpine: the apk findings are in the base image layers, the others in app layers.
+ */
+function candidatesDockerfileScan(string $baseImageRef = 'postgres:15.0-alpine', bool $withBaseFindings = true): ImageScan
+{
+    $application = Application::factory()->create([
+        'environment_id' => test()->environment->id,
+        'destination_id' => test()->destination->id,
+        'destination_type' => test()->destination->getMorphClass(),
+        'build_pack' => 'dockerfile',
+    ]);
+    $scan = candidatesScan();
+    $scan->update([
+        'resource_type' => $application->getMorphClass(),
+        'resource_id' => $application->id,
+        'image_ref' => $application->uuid.':abc123',
+        'repo_digest' => null,
+        'builds_image' => true,
+        'base_image_ref' => $baseImageRef,
+        'findings' => array_map(fn (Finding $finding) => $finding->withLayer($withBaseFindings && $finding->type === 'apk' ? 'base' : 'app')->toArray(), candidatesFindings()),
+    ]);
+
+    return $scan->fresh();
+}
+
+it('recommends a newer base image for a Dockerfile build from the findings in base layers only', function () {
+    candidatesFake();
+    $scan = candidatesDockerfileScan();
+    ResourceScans::refreshSummaries(collect([$scan]));
+    $summary = $scan->fresh()->summary;
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    $base = $scan->candidates['base'];
+    $line = $base['entries'][0];
+    $baseIds = collect(candidatesFindings())->where('type', 'apk')->flatMap(fn (Finding $finding) => [$finding->id, ...$finding->aliases])->all();
+    $appOnlyIds = collect(candidatesFindings())->where('type', '!=', 'apk')->pluck('id')->diff($baseIds)->values()->all();
+
+    expect($scan->candidateStatus())->toBe('skipped')
+        ->and($scan->candidateEntries())->toBe([])
+        ->and($base)->toMatchArray(['image' => 'postgres:15.0-alpine', 'status' => 'ok', 'tags_truncated' => false])
+        ->and($base['checked_at'])->not->toBeNull()
+        ->and($base['entries'])->toHaveCount(1)
+        ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 3, 'high' => 32, 'medium' => 0]])
+        ->and($line['fixed_ids'])->not->toBeEmpty()
+        ->and(array_diff($line['fixed_ids'], $baseIds))->toBe([])
+        ->and(array_intersect($line['fixed_ids'], $appOnlyIds))->toBe([])
+        ->and($line['fixes']['critical'] + $line['fixes']['high'])->toBeGreaterThan(0)->toBeLessThanOrEqual(57)
+        ->and($scan->summary['counts'])->toBe($summary['counts'])
+        ->and(candidatesScansToday())->toBe(1)
+        ->and(RefreshCandidates::shouldRefresh($scan))->toBeFalse();
+
+    Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'tag' 'ls' 'docker.io/library/postgres'"));
+    Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'registry:postgres@".CANDIDATES_LINE."'"));
+});
+
+it('never makes base image candidates fixable now for the gate', function () {
+    candidatesFake();
+    $scan = candidatesDockerfileScan();
+    RefreshCandidates::run($scan);
+
+    $scan = $scan->fresh();
+    $fixedId = $scan->candidates['base']['entries'][0]['fixed_ids'][0];
+    $finding = collect(candidatesFindings())->first(fn (Finding $finding) => $finding->id === $fixedId || in_array($fixedId, $finding->aliases, true));
+    $scan->builds_image = false;
+
+    expect(ImageScanGate::classifierFor($scan)($finding)->value)->not->toBe('fixable_now');
+});
+
+it('says that no newer base image is better when the line candidate has more findings in its layers', function () {
+    candidatesFake();
+    $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype';
+    $scan = candidatesDockerfileScan();
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'no_better'])
+        ->and($scan->fresh()->candidates['base']['entries'][0]['better'])->toBeFalse();
+});
+
+it('looks for no base image candidates without base layer findings at the alert level or for another build pack', function (bool $withBaseFindings, string $buildPack, ?string $baseImageRef) {
+    candidatesFake();
+    $scan = candidatesDockerfileScan($baseImageRef ?? 'postgres:15.0-alpine', $withBaseFindings);
+    $scan->update(['base_image_ref' => $baseImageRef]);
+    $scan->resource->update(['build_pack' => $buildPack]);
+
+    RefreshCandidates::run($scan->fresh());
+
+    expect($scan->fresh()->candidates)->toBeNull();
+    Process::assertNothingRan();
+})->with([
+    'no base findings' => [false, 'dockerfile', 'postgres:15.0-alpine'],
+    'no base image' => [true, 'dockerfile', null],
+    'nixpacks' => [true, 'nixpacks', 'postgres:15.0-alpine'],
+]);
+
+it('counts base image candidate scans toward the daily limit of the server', function () {
+    candidatesFake();
+    $this->server->settings->forceFill(['image_candidate_scans_today' => 20, 'image_candidate_scans_date' => today()])->saveQuietly();
+    $scan = candidatesDockerfileScan();
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'failed', 'error' => 'daily_limit'])
+        ->and(candidatesRan("'registry:"))->toBe(0);
+});
+
+it('cannot compare a base image without a version tag', function () {
+    candidatesFake();
+    $scan = candidatesDockerfileScan('postgres:latest');
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['image' => 'postgres:latest', 'status' => 'cannot_compare', 'entries' => []]);
+    Process::assertNothingRan();
 });

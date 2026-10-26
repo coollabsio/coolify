@@ -5,6 +5,7 @@
 
 @php
     $linkClasses = 'inline-flex items-center gap-0.5 font-medium text-coollabs hover:underline dark:text-brand-light';
+    $code = 'rounded bg-neutral-100 px-1 py-px font-mono text-[11px] dark:bg-white/[0.06]';
     $tile = 'mt-px flex size-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200 dark:bg-white/[0.06] dark:text-fg-dim dark:ring-white/[0.08]';
 @endphp
 
@@ -12,12 +13,15 @@
     <div id="fix-panel" data-image-scan-fix-panel
         class="flex flex-col divide-y divide-neutral-200 border-b border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]">
         @foreach ($items as $item)
-            @php $update = $item['update']; @endphp
+            @php
+                $update = $item['update'];
+                $base = $item['base'] ?? null;
+            @endphp
             <div wire:key="fix-panel-{{ $item['key'] }}" class="flex flex-col gap-2 p-3">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex min-w-0 items-start gap-2.5">
                         <span class="{{ $tile }}" aria-hidden="true">
-                            <x-reicon :name="$update !== null ? 'bandage' : 'info-circle'" class="size-3.5" />
+                            <x-reicon :name="$update !== null || $base !== null ? 'bandage' : 'info-circle'" class="size-3.5" />
                         </span>
                         <div class="flex min-w-0 flex-col gap-0.5">
                             <span class="truncate font-mono text-[11px] text-neutral-500 dark:text-fg-faint" title="{{ $item['image'] }}">{{ $item['image'] }}</span>
@@ -35,6 +39,12 @@
                                         <a href="{{ $item['loginUrl'] }}" {{ wireNavigate() }} class="{{ $linkClasses }}">Registry logins</a>
                                     @endif
                                 </p>
+                            @endif
+                            @if ($base !== null)
+                                <div class="flex items-center gap-1.5">
+                                    <p class="text-[12px] leading-5 text-neutral-800 dark:text-fg">Change <code class="{{ $code }}">FROM {{ $base['from'] }}</code> to <code class="{{ $code }}">{{ $base['to'] }}</code>: fixes {{ $base['fixed'] }} of {{ $base['total'] }}.</p>
+                                    <x-copy-button :value="'FROM ' . $base['to']" label="Copy the FROM line" />
+                                </div>
                             @endif
                         </div>
                     </div>

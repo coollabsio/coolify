@@ -35,9 +35,12 @@ use Throwable;
  * Candidates are scanned from the registry on the server, at most 2 per image and 20 per server and day; the SBOM of
  * a candidate digest is kept per server and reused.
  *
- * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`. Never throws for registry or scan
- * problems: they become the status. Registry credentials are read only after an anonymous request failed, only for
- * the registry of the image, and are never stored or logged.
+ * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`, with status `skipped` when
+ * only the base image was checked. The base image of a Dockerfile build (spec 7.4) gets the newest tag of its line under
+ * `base`: `{image, status, checked_at, error, tags_truncated, entries}`, compared on the findings in base layers only.
+ * Base entries never make a finding fixable now. Never throws for registry or scan problems: they become the status.
+ * Registry credentials are read only after an anonymous request failed, only for the registry of the image, and are
+ * never stored or logged.
  */
 class RefreshCandidates
 {
@@ -86,6 +89,9 @@ class RefreshCandidates
 
     private ?string $error = null;
 
+    /** Candidate scans of this check, image and base image together. */
+    private int $candidateScans = 0;
+
     public function handle(ImageScan $scan, int $lockWaitSeconds = self::LOCK_WAIT_SECONDS): void
     {
         $scan = ImageScan::query()->with(['resource', 'server.settings', 'sbom'])->find($scan->id);
@@ -101,26 +107,60 @@ class RefreshCandidates
 
         $this->commands = new ScannerCommands($server, Str::lower(Str::random(24)));
         $ranOnServer = false;
+        $result = ['status' => 'skipped', 'error' => null, 'entries' => [], 'tags_truncated' => false];
+        $base = null;
 
         try {
-            $result = $this->check($scan, $resource, $lockWaitSeconds, $ranOnServer);
-        } catch (Throwable $e) {
-            report($e);
-            $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => []];
+            if (self::needsImageCandidates($scan)) {
+                $result = $this->guarded(fn () => $this->check($scan, $resource, $lockWaitSeconds, $ranOnServer));
+            }
+            if (self::needsBaseCandidates($scan)) {
+                $base = $this->guarded(fn () => $this->checkBase($scan, $resource, $lockWaitSeconds, $ranOnServer));
+            }
         } finally {
             if ($ranOnServer) {
                 instant_remote_process($this->commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
             }
         }
 
-        $this->store($scan, $result);
+        $this->store($scan, $result, $base);
+    }
+
+    /**
+     * Runs one check with a fresh registry state and adds whether the tag list was cut.
+     *
+     * @param  callable(): array{status: string, error: ?string, entries: list<array<string, mixed>>}  $check
+     * @return array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool}
+     */
+    private function guarded(callable $check): array
+    {
+        $this->auth = null;
+        $this->loginRead = false;
+        $this->authRequired = false;
+        $this->anonymousWorked = false;
+        $this->tagsTruncated = false;
+        $this->error = null;
+
+        try {
+            $result = $check();
+        } catch (Throwable $e) {
+            report($e);
+            $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => []];
+        }
+
+        return [...$result, 'tags_truncated' => $this->tagsTruncated];
+    }
+
+    public static function needsCandidates(ImageScan $scan): bool
+    {
+        return self::needsImageCandidates($scan) || self::needsBaseCandidates($scan);
     }
 
     /**
      * Candidates are looked for only for images the user does not build in Coolify, with a package fix at or above
      * the alert level that is not ignored (spec 7.1).
      */
-    public static function needsCandidates(ImageScan $scan): bool
+    private static function needsImageCandidates(ImageScan $scan): bool
     {
         $resource = $scan->resource;
         if ($scan->status !== ImageScanStatus::Completed || ! $resource instanceof Model) {
@@ -143,12 +183,48 @@ class RefreshCandidates
     }
 
     /**
-     * The last check finished less than FRESH_HOURS ago with a result that does not need a retry.
+     * A newer base image is looked for when a Dockerfile build has findings in the layers of its base image at or
+     * above the alert level that are not ignored (spec 7.4). Nixpacks, Railpack, and static builds have no base image.
+     */
+    private static function needsBaseCandidates(ImageScan $scan): bool
+    {
+        $resource = $scan->resource;
+
+        return $scan->status === ImageScanStatus::Completed
+            && $resource instanceof Application
+            && $resource->build_pack === 'dockerfile'
+            && filled($scan->base_image_ref)
+            && self::baseFindings($scan, $resource) !== [];
+    }
+
+    /**
+     * Findings in base image layers at or above the alert level that are not ignored.
+     *
+     * @return list<Finding>
+     */
+    public static function baseFindings(ImageScan $scan, Model $resource): array
+    {
+        $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
+        $ignores = IgnoreMatcher::forResource($resource);
+
+        return array_values(array_filter(
+            ResourceScans::findings($scan),
+            fn (Finding $finding): bool => $finding->layer === 'base' && $level->includes($finding->severity) && $ignores->matches($finding) === null,
+        ));
+    }
+
+    /**
+     * The last check finished less than FRESH_HOURS ago with a result that does not need a retry, also for the base image.
      */
     public static function isFresh(ImageScan $scan): bool
     {
-        $checkedAt = is_array($scan->candidates) ? ($scan->candidates['checked_at'] ?? null) : null;
-        if (! is_string($checkedAt) || ! in_array($scan->candidateStatus(), ['ok', 'no_better', 'cannot_compare'], true)) {
+        $candidates = $scan->candidates;
+        $checkedAt = is_array($candidates) ? ($candidates['checked_at'] ?? null) : null;
+        $fresh = ['ok', 'no_better', 'cannot_compare', 'skipped'];
+        if (! is_string($checkedAt) || ! in_array($scan->candidateStatus(), $fresh, true)) {
+            return false;
+        }
+        if (self::needsBaseCandidates($scan) && ! in_array(data_get($candidates, 'base.status'), $fresh, true)) {
             return false;
         }
 
@@ -244,7 +320,7 @@ class RefreshCandidates
             }
         }
 
-        $entries = $this->evaluate($scan, $resource, array_slice($toScan, 0, self::MAX_CANDIDATE_SCANS), $platform, $lockWaitSeconds);
+        $entries = $this->evaluate($scan, $resource, ResourceScans::findings($scan), array_slice($toScan, 0, self::MAX_CANDIDATE_SCANS), $platform, $lockWaitSeconds);
 
         if ($selected['major'] !== null) {
             $entries[] = [
@@ -276,11 +352,72 @@ class RefreshCandidates
     }
 
     /**
+     * The newest tag of the line of the base image (spec 7.4). Only a different tag can change the `FROM` line, so a
+     * newer build of the same tag is not checked.
+     *
+     * @return array{status: string, error: ?string, entries: list<array<string, mixed>>}
+     */
+    private function checkBase(ImageScan $scan, Model $resource, int $lockWaitSeconds, bool &$ranOnServer): array
+    {
+        try {
+            $this->image = ImageRef::parse((string) $scan->base_image_ref);
+        } catch (InvalidArgumentException) {
+            return ['status' => 'cannot_compare', 'error' => null, 'entries' => []];
+        }
+
+        $tag = $this->image->tag ?? 'latest';
+        $selector = new TagSelector;
+        if ($this->image->digest !== null || ! $selector->isVersion($tag)) {
+            return ['status' => 'cannot_compare', 'error' => null, 'entries' => []];
+        }
+
+        $platform = $scan->sbom?->platform;
+        if (! is_string($platform) || $platform === '') {
+            return ['status' => 'failed', 'error' => 'unknown', 'entries' => []];
+        }
+
+        $ranOnServer = true;
+        $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
+        if ($tags === null) {
+            return $this->failure();
+        }
+        $tags = array_values(array_filter(array_map('trim', explode("\n", $tags)), fn (string $line) => $line !== ''));
+        $this->tagsTruncated = count($tags) > TagSelector::MAX_TAGS;
+        $line = $selector->select($tag, $tags)['line'];
+
+        $toScan = [];
+        if ($line !== null && $line !== $tag) {
+            $digest = $this->digest($line);
+            if ($digest === null) {
+                return $this->failure();
+            }
+            $toScan[] = ['kind' => 'line', 'tag' => $line, 'digest' => $digest];
+        }
+
+        $entries = $this->evaluate($scan, $resource, self::baseFindings($scan, $resource), $toScan, $platform, $lockWaitSeconds);
+
+        return [
+            'status' => match (true) {
+                in_array(true, array_column($entries, 'better'), true) => 'ok',
+                $this->authRequired => 'auth_required',
+                $this->error !== null => 'failed',
+                default => 'no_better',
+            },
+            'error' => $this->error,
+            'entries' => $entries,
+        ];
+    }
+
+    /**
+     * Scans the candidates and compares them with the current findings. At most MAX_CANDIDATE_SCANS per check.
+     *
+     * @param  list<Finding>  $current  The findings to compare: all of the image, or those in base layers.
      * @param  list<array{kind: string, tag: string, digest: string}>  $candidates
      * @return list<array<string, mixed>>
      */
-    private function evaluate(ImageScan $scan, Model $resource, array $candidates, string $platform, int $lockWaitSeconds): array
+    private function evaluate(ImageScan $scan, Model $resource, array $current, array $candidates, string $platform, int $lockWaitSeconds): array
     {
+        $candidates = array_slice($candidates, 0, max(0, self::MAX_CANDIDATE_SCANS - $this->candidateScans));
         if ($candidates === []) {
             return [];
         }
@@ -289,13 +426,14 @@ class RefreshCandidates
         $ignores = IgnoreMatcher::forResource($resource);
         $notIgnored = fn (array $findings) => array_values(array_filter($findings, fn (Finding $finding) => $ignores->matches($finding) === null));
         $evaluator = new CandidateEvaluator;
-        $current = $notIgnored(ResourceScans::findings($scan));
+        $current = $notIgnored($current);
         $currentAtLevel = $evaluator->atLevel($current, $level);
         $currentSummary = $evaluator->summarize($current, $level);
         $currentEol = is_array(data_get($scan->summary, 'eol_distro'));
 
         $entries = [];
         foreach ($candidates as $candidate) {
+            $this->candidateScans++;
             $report = $this->scanCandidate($candidate['digest'], $platform, $lockWaitSeconds);
             if ($report === null) {
                 continue;
@@ -562,21 +700,31 @@ class RefreshCandidates
      * Writes the result on the current row and recomputes its summary: a better candidate makes findings of images
      * the user does not build fixable now (spec 7.5).
      *
-     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>}  $result
+     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool}  $result
+     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool}|null  $base
      */
-    private function store(ImageScan $scan, array $result): void
+    private function store(ImageScan $scan, array $result, ?array $base): void
     {
         $fresh = ImageScan::query()->find($scan->id);
         if (! $fresh instanceof ImageScan || ! $scan->resource instanceof Model) {
             return;
         }
 
+        $checkedAt = now()->toIso8601String();
         $fresh->candidates = [
             'status' => $result['status'],
-            'checked_at' => now()->toIso8601String(),
+            'checked_at' => $checkedAt,
             'error' => $result['error'],
-            'tags_truncated' => $this->tagsTruncated,
+            'tags_truncated' => $result['tags_truncated'],
             'entries' => $result['entries'],
+            ...($base === null ? [] : ['base' => [
+                'image' => (string) $scan->base_image_ref,
+                'status' => $base['status'],
+                'checked_at' => $checkedAt,
+                'error' => $base['error'],
+                'tags_truncated' => $base['tags_truncated'],
+                'entries' => $base['entries'],
+            ]]),
         ];
         $fresh->setRelation('resource', $scan->resource);
         ResourceScans::refreshSummaries(collect([$fresh]));

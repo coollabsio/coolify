@@ -77,8 +77,11 @@ class ScanImage
      * Never throws for scan problems. Callers such as the deploy gate must use the returned scan: on a failure it is an
      * unsaved scan with status Failed and an error code, and a completed scan row of the same image keeps its results.
      * A Failed row is saved only when no row exists yet for the inspected image.
+     *
+     * @param  array{ref: string, layers: list<string>}|null  $baseImage  The base image of a Dockerfile build and its
+     *                                                                    layer IDs (spec 7.4), stored on the scan and the SBOM.
      */
-    public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0): ImageScan
+    public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?array $baseImage = null): ImageScan
     {
         $this->runId = Str::lower(Str::random(24));
         $this->startedAt = CarbonImmutable::now();
@@ -101,7 +104,7 @@ class ScanImage
         }
 
         try {
-            $scan = $this->scan($server, $resource, $imageRef, $deployment, $policy, $context);
+            $scan = $this->scan($server, $resource, $imageRef, $deployment, $policy, $context, self::validBaseImage($baseImage));
         } finally {
             $lock->release();
         }
@@ -186,9 +189,34 @@ class ScanImage
     }
 
     /**
-     * @param  array{server: string}  $context
+     * A base image reference that ImageRef accepts and at most 256 layer IDs in the sha256 digest format.
+     *
+     * @param  array<string, mixed>|null  $baseImage
+     * @return array{ref: string, layers: list<string>}|null
      */
-    private function scan(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, array $context): ImageScan
+    private static function validBaseImage(?array $baseImage): ?array
+    {
+        $ref = $baseImage['ref'] ?? null;
+        if (! is_string($ref) || mb_strlen($ref) > 512) {
+            return null;
+        }
+
+        try {
+            ImageRef::parse($ref);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        $layers = array_values(array_filter((array) ($baseImage['layers'] ?? []), fn ($layer): bool => is_string($layer) && ImageRef::isValidDigest($layer)));
+
+        return ['ref' => $ref, 'layers' => array_slice($layers, 0, 256)];
+    }
+
+    /**
+     * @param  array{server: string}  $context
+     * @param  array{ref: string, layers: list<string>}|null  $baseImage
+     */
+    private function scan(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, array $context, ?array $baseImage = null): ImageScan
     {
         $commands = new ScannerCommands($server, $this->runId);
         $isBaseline = ! $this->resourceScans($resource)->where('status', ImageScanStatus::Completed)->exists();
@@ -200,9 +228,9 @@ class ScanImage
             $this->progress($resource, 'inspect');
             $image = $this->inspect($commands, $imageRef);
             $this->progress($resource, 'sbom');
-            [$sbom, $grype] = $this->sbomAndReport($commands, [$resource], $imageRef, $image);
+            [$sbom, $grype] = $this->sbomAndReport($commands, [$resource], $imageRef, $image, $baseImage['layers'] ?? []);
 
-            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($sbom, $grype), $image, $databaseBuiltAt, $isBaseline);
+            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($sbom, $grype), $image, $databaseBuiltAt, $isBaseline, $baseImage['ref'] ?? null);
         } catch (ScanFailed $e) {
             $errorContext = [...$context, ...$e->context];
 
@@ -414,12 +442,14 @@ class ScanImage
     /**
      * Reuses the SBOM of the image on this server. When its file is gone, Grype cannot mount it: the file is
      * created once more and the row is updated in place (scans of other resources keep their link).
+     * Base layer IDs replace the stored ones; an image ID always has the same layers.
      *
      * @param  list<Model>  $resources
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
+     * @param  list<string>  $baseLayerIds
      * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}}
      */
-    private function sbomAndReport(ScannerCommands $commands, array $resources, string $imageRef, array $image): array
+    private function sbomAndReport(ScannerCommands $commands, array $resources, string $imageRef, array $image, array $baseLayerIds = []): array
     {
         $sbom = ImageSbom::query()->where('server_id', $commands->server->id)->where('image_id', $image['id'])->first();
 
@@ -429,7 +459,7 @@ class ScanImage
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
                 $this->assertSucceeded($grype['code']);
-                $sbom->forceFill(['last_used_at' => now()])->save();
+                $sbom->forceFill(['last_used_at' => now(), ...($baseLayerIds !== [] ? ['base_layer_ids' => $baseLayerIds] : [])])->save();
 
                 return [$sbom, $grype];
             }
@@ -437,7 +467,7 @@ class ScanImage
             $this->progressAll($resources, 'sbom');
         }
 
-        $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
+        $sbom = $this->createSbom($commands, $imageRef, $image, $sbom, $baseLayerIds);
         $this->progressAll($resources, 'vulnerabilities');
         $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
         $this->assertSucceeded($grype['code']);
@@ -447,8 +477,9 @@ class ScanImage
 
     /**
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
+     * @param  list<string>  $baseLayerIds
      */
-    private function createSbom(ScannerCommands $commands, string $imageRef, array $image, ?ImageSbom $sbom): ImageSbom
+    private function createSbom(ScannerCommands $commands, string $imageRef, array $image, ?ImageSbom $sbom, array $baseLayerIds = []): ImageSbom
     {
         self::checkDiskSpace($commands, $image['size']);
 
@@ -466,6 +497,7 @@ class ScanImage
             'packages' => array_map(fn (Package $package) => $package->toArray(), $parsed['packages']),
             'packages_truncated' => $parsed['truncated'] || $cut,
             'last_used_at' => now(),
+            ...($baseLayerIds !== [] ? ['base_layer_ids' => $baseLayerIds] : []),
         ];
 
         if ($sbom !== null) {
@@ -502,7 +534,7 @@ class ScanImage
      * @param  array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}  $report
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
      */
-    private function complete(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, ImageSbom $sbom, array $report, array $image, CarbonImmutable $databaseBuiltAt, bool $isBaseline): ImageScan
+    private function complete(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, ImageSbom $sbom, array $report, array $image, CarbonImmutable $databaseBuiltAt, bool $isBaseline, ?string $baseImageRef = null): ImageScan
     {
         $findings = $report['findings'];
 
@@ -525,6 +557,7 @@ class ScanImage
             'repo_digest' => $image['repo_digest'],
             'image_ref' => mb_substr($imageRef, 0, 512),
             ...($deployment !== null ? ['deployment_queue_id' => $deployment->id] : []),
+            ...($baseImageRef !== null ? ['base_image_ref' => $baseImageRef] : []),
             'status' => ImageScanStatus::Completed,
             'error_code' => null,
             'error_context' => null,

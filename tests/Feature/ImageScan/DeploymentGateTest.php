@@ -728,3 +728,98 @@ it('scans the images of the latest completed scans when no image is given', func
 
     expect($scanned)->toBe(['new:2', 'old:1']);
 });
+
+const GATE_BASE_LAYERS = [
+    'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+];
+
+/**
+ * A job after the build of a Dockerfile app: the Dockerfile was read from the repository, and the base image
+ * on the build server has GATE_BASE_LAYERS (or is missing with $layersOutput '').
+ */
+function deployGateDockerfileJob(string $dockerfile = "FROM node:20.11-alpine AS build\nRUN npm ci\nFROM build\n", ?string $layersOutput = null, array $overrides = []): DeploymentGateTestJob
+{
+    $job = deployGateJob(['saved_outputs' => new Collection(['dockerfile_from_repo' => str($dockerfile)]), ...$overrides]);
+    $job->outputs = ['RootFS.Layers' => $layersOutput ?? json_encode(GATE_BASE_LAYERS), ...$job->outputs];
+
+    return $job;
+}
+
+it('passes the base image of a Dockerfile build and its layers to the gate scan', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->once()
+        ->withArgs(fn ($server, $resource, $ref, $deployment, $wait, $baseImage) => $baseImage === ['ref' => 'node:20.11-alpine', 'layers' => GATE_BASE_LAYERS])
+        ->andReturn(deployGateReturnedScan([]));
+    $job = deployGateDockerfileJob();
+
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+
+    $inspect = collect($job->commands)->first(fn (string $command) => str_contains($command, 'RootFS.Layers'));
+    expect($inspect)->toBe("docker image inspect --format '{{json .RootFS.Layers}}' 'node:20.11-alpine' 2>/dev/null")
+        ->and(parseLineForSudo($inspect, $this->server->forceFill(['user' => 'deploy'])))->toBe("sudo {$inspect}")
+        ->and(deployGateReachesStart($job))->toBeTrue();
+});
+
+it('passes the base image of a Dockerfile build to the scan after the deploy', function () {
+    Queue::fake();
+    $job = deployGateDockerfileJob();
+
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+    deployGateCall($job, 'post_deployment');
+
+    Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->baseImage === ['ref' => 'node:20.11-alpine', 'layers' => GATE_BASE_LAYERS]);
+});
+
+it('scans the started image with the base image in the queued job', function () {
+    $baseImage = ['ref' => 'node:20.11-alpine', 'layers' => GATE_BASE_LAYERS];
+    ScanImage::shouldRun()->once()
+        ->withArgs(fn ($server, $resource, $ref, $deployment, $wait, $passed) => $ref === 'app:1' && $passed === $baseImage)
+        ->andReturn(deployGateReturnedScan([]));
+
+    (new ScanResourceImagesJob($this->application, $this->queue->id, ['app:1'], false, $baseImage))->handle();
+});
+
+it('reads the base image of an inline Dockerfile and of the build target', function (array $application, string $expected) {
+    $this->application->update($application);
+    $job = deployGateDockerfileJob("FROM alpine:3.20\n");
+
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+
+    expect((new ReflectionProperty(ApplicationDeploymentJob::class, 'imageScanBaseImage'))->getValue($job)['ref'])->toBe($expected);
+})->with([
+    'inline Dockerfile' => [['dockerfile' => "FROM nginx:1.27-alpine\nCOPY . /usr/share/nginx/html\n"], 'nginx:1.27-alpine'],
+    'build target' => [['dockerfile' => "FROM node:20 AS dev\nFROM nginx:1.27 AS prod\n", 'dockerfile_target_build' => 'dev'], 'node:20'],
+]);
+
+it('keeps the base image without layers when the base image is not on the build server', function () {
+    $job = deployGateDockerfileJob(layersOutput: '');
+
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+
+    expect((new ReflectionProperty(ApplicationDeploymentJob::class, 'imageScanBaseImage'))->getValue($job))->toBe(['ref' => 'node:20.11-alpine', 'layers' => []]);
+});
+
+it('reads no base image when it cannot be known or scanning is off', function (string $dockerfile, string $buildPack, bool $scanning) {
+    $this->application->update(['build_pack' => $buildPack]);
+    $this->server->settings->forceFill(['is_image_scan_enabled' => $scanning])->saveQuietly();
+    $job = deployGateDockerfileJob($dockerfile, overrides: ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
+
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+
+    expect((new ReflectionProperty(ApplicationDeploymentJob::class, 'imageScanBaseImage'))->getValue($job))->toBeNull()
+        ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, 'RootFS.Layers')))->toBeFalse();
+})->with([
+    'ARG in FROM' => ["ARG BASE=node:20\nFROM \${BASE}\n", 'dockerfile', true],
+    'scratch' => ["FROM golang:1.23 AS build\nFROM scratch\n", 'dockerfile', true],
+    'nixpacks' => ["FROM node:20\n", 'nixpacks', true],
+    'scanning off on the server' => ["FROM node:20\n", 'dockerfile', false],
+]);
+
+it('does not fail the deploy when the base image layers cannot be read', function () {
+    $job = deployGateDockerfileJob(layersOutput: '{"not": "a list"');
+
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+
+    expect((new ReflectionProperty(ApplicationDeploymentJob::class, 'imageScanBaseImage'))->getValue($job))->toBe(['ref' => 'node:20.11-alpine', 'layers' => []]);
+});

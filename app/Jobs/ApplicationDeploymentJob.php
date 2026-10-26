@@ -30,6 +30,7 @@ use App\Models\User;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Services\ImageScan\DockerfileBaseImage;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanGate;
@@ -259,6 +260,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /** Repo digest reference that replaces the image tag in the compose file. */
     private ?string $imageScanPinnedImage = null;
+
+    /** @var array{ref: string, layers: list<string>}|null The base image of a Dockerfile build (spec 7.4). */
+    private ?array $imageScanBaseImage = null;
 
     /** @var array<string, true> Compose images that the gate checked on the server. */
     private array $imageScanCheckedImages = [];
@@ -719,6 +723,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+        $this->rememberDockerfileBaseImage();
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
@@ -1259,6 +1264,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+        $this->rememberDockerfileBaseImage();
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
@@ -2970,7 +2976,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $scan = $image !== null ? $this->completedImageScan($image['id']) : null;
-        $scan ??= ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: 120);
+        $scan ??= ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: 120, baseImage: $this->imageScanBaseImage);
 
         $this->applyImageScanGate($scan);
     }
@@ -3298,6 +3304,46 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * Remembers the base image of the final stage of a Dockerfile build for the image scan (spec 7.4), with its layer
+     * IDs when the base image is on the build server. Never fails the deployment.
+     */
+    private function rememberDockerfileBaseImage(): void
+    {
+        $this->imageScanBaseImage = null;
+
+        try {
+            if ($this->application->build_pack !== 'dockerfile'
+                || (! ImageScanPolicyResolver::for($this->application, $this->server)->scanEnabled
+                    && ! ImageScanPolicyResolver::for($this->application, $this->mainServer)->scanEnabled)) {
+                return;
+            }
+
+            $dockerfile = filled($this->application->dockerfile) ? (string) $this->application->dockerfile : (string) $this->saved_outputs->get('dockerfile_from_repo');
+            $ref = DockerfileBaseImage::finalStage($dockerfile, $this->application->dockerfile_target_build);
+            if ($ref === null) {
+                return;
+            }
+
+            $this->imageScanBaseImage = ['ref' => $ref, 'layers' => []];
+            $format = escapeshellarg('{{json .RootFS.Layers}}');
+            $this->execute_remote_command([
+                "docker image inspect --format {$format} ".escapeshellarg($ref).' 2>/dev/null',
+                'hidden' => true,
+                'ignore_errors' => true,
+                'save' => 'image_scan_base_layers',
+                'append' => false,
+            ]);
+
+            $layers = json_decode($this->trimmedSavedOutput('image_scan_base_layers')->value(), true);
+            if (is_array($layers) && array_is_list($layers)) {
+                $this->imageScanBaseImage['layers'] = array_values(array_filter($layers, fn ($layer): bool => is_string($layer) && ImageRef::isValidDigest($layer)));
+            }
+        } catch (Throwable $e) {
+            \Log::warning("Deployment {$this->deployment_uuid} could not read the base image for the image scan: {$e->getMessage()}");
+        }
+    }
+
+    /**
      * Queues one scan of the started images when the gate did not scan them before the start. Restarts, skipped
      * builds, and additional servers run an image that was scanned before, so they get no scan (spec 4.4), except
      * for a rollback.
@@ -3325,7 +3371,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($images !== []) {
-                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $images);
+                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $images, false, $this->imageScanBaseImage);
             }
         } catch (Throwable $e) {
             \Log::warning("Deployment {$this->deployment_uuid} could not queue the image scan: {$e->getMessage()}");
@@ -3523,6 +3569,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_pull_request_image();
+        $this->rememberDockerfileBaseImage();
 
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
