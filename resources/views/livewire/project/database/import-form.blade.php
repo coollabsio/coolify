@@ -59,9 +59,9 @@
                 description="Configure how the selected backup is applied to this database.">
                 <div class="space-y-4">
             @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
-                            <x-callout type="warning" title="Full restore overwrites administrator passwords">
-                                The backup replaces PostgreSQL administrator role passwords, including the destination administrator password.
-                                <span class="mt-1 block">If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
+                            <x-callout type="warning" title="Full restore runs as a superuser">
+                                Restoring all databases needs a PostgreSQL superuser (it recreates databases and roles), so Coolify cannot restrict it. Only use a backup you trust.
+                                <span class="mt-1 block">The backup also replaces PostgreSQL administrator role passwords, including the destination administrator password. If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
                             </x-callout>
             @endif
                             <x-forms.textarea rows="10" readonly label="Import command"

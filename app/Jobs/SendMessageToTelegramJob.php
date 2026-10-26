@@ -53,8 +53,8 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
     {
         $response = $this->sendMessage();
 
-        // 401: invalid bot token, 403: the bot was blocked or removed from the chat, 400 "chat not found": wrong chat ID.
-        $isConfigurationError = in_array($response->status(), [401, 403], true)
+        // 401: invalid bot token, 404: malformed bot token, 403: the bot was blocked or removed from the chat, 400 "chat not found": wrong chat ID.
+        $isConfigurationError = in_array($response->status(), [401, 403, 404], true)
             || ($response->status() === 400 && Str::contains((string) $response->json('description'), 'chat not found', true));
         $this->handleNotificationResponse($response, 'Telegram', $isConfigurationError);
     }
@@ -64,7 +64,8 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function sendMessage(): Response
     {
-        $url = 'https://api.telegram.org/bot'.$this->token.'/sendMessage';
+        // Pasted values often keep a space or new line. In the URL it gives a malformed token, so Telegram answers 404.
+        $url = 'https://api.telegram.org/bot'.trim($this->token).'/sendMessage';
         $inlineButtons = [];
         if (! empty($this->buttons)) {
             foreach ($this->buttons as $button) {
@@ -86,7 +87,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
                     [...$inlineButtons],
                 ],
             ]),
-            'chat_id' => $this->chatId,
+            'chat_id' => trim($this->chatId),
             'text' => $this->text,
         ];
         if ($this->threadId) {

@@ -87,7 +87,7 @@ class StartProxy
                 "echo '$caddyfile' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                "docker compose -f $compose_file pull",
+                serverDockerConfigPrefix($server)."docker compose -f $compose_file pull",
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
                 '    docker stop coolify-proxy 2>/dev/null || true',

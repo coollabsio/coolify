@@ -75,6 +75,8 @@ it('starts a database through the queued executor on a non-root server', functio
     expect(implode("\n", $lines))
         ->toContain("| sudo tee {$configurationDirectory}/README.md > /dev/null")
         ->toContain("sudo find {$configurationDirectory}/docker-entrypoint-initdb.d -mindepth 1 -maxdepth 1 -exec rm -rf {} +")
+        // The pull uses the SSH user's Docker config, where the registry logins are; sudo would read /root/.docker.
+        ->toContain("sudo DOCKER_CONTEXT=default DOCKER_CONFIG=\"\$(sudo find \"\$HOME/.docker/config.json\" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)\" docker compose -f {$configurationDirectory}/docker-compose.yml pull")
         ->toContain("sudo docker compose -f {$configurationDirectory}/docker-compose.yml up -d");
 });
 
