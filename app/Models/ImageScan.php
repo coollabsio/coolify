@@ -36,6 +36,7 @@ class ImageScan extends BaseModel
         'builds_image',
         'is_baseline',
         'notified_ids',
+        'notified_candidates',
         'grype_db_built_at',
         'scanned_at',
     ];
@@ -52,6 +53,7 @@ class ImageScan extends BaseModel
             'builds_image' => 'boolean',
             'is_baseline' => 'boolean',
             'notified_ids' => 'array',
+            'notified_candidates' => 'array',
             'grype_db_built_at' => 'datetime',
             'scanned_at' => 'datetime',
         ];

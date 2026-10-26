@@ -35,4 +35,44 @@ final class NotificationText
     {
         return preg_replace('/([\\\\`*_{}\[\]()#+\-.!|~=])/u', '\\\\$1', self::plain($value)) ?? '';
     }
+
+    /**
+     * Cuts a raw value before it is escaped, so one long name cannot fill a message.
+     */
+    public static function limit(?string $value, int $max): string
+    {
+        $value = self::plain($value);
+
+        return mb_strlen($value) > $max ? rtrim(mb_substr($value, 0, $max - 1)).'…' : $value;
+    }
+
+    /**
+     * The lines that fit in $budget characters, joined with new lines, then "And N more." for the rest.
+     *
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    public static function fitLines(array $lines, int $budget): array
+    {
+        $kept = [];
+        $used = 0;
+        $count = count($lines);
+        foreach ($lines as $index => $line) {
+            $remaining = $count - $index - 1;
+            $reserve = $remaining > 0 ? mb_strlen("\nAnd {$remaining} more.") : 0;
+            $length = mb_strlen($line) + ($kept === [] ? 0 : 1);
+            if ($used + $length + $reserve > $budget) {
+                break;
+            }
+            $kept[] = $line;
+            $used += $length;
+        }
+
+        $more = $count - count($kept);
+        if ($more > 0) {
+            $kept[] = "And {$more} more.";
+        }
+
+        return $kept;
+    }
 }

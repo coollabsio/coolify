@@ -7,7 +7,6 @@ use App\Models\ImageScanIgnore;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\ImageScan\VulnerabilityDigest;
-use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\ScanNotifications;
 use App\Services\ImageScan\TeamVulnerabilities;
 use Illuminate\Bus\Queueable;
@@ -56,7 +55,7 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
             return;
         }
 
-        /** @var list<callable(): void> $marks */
+        /** @var list<array{id: int, read: list<string>, ids: list<string>, candidates: list<string>}> $marks */
         $marks = [];
         $resources = [];
         foreach (TeamVulnerabilities::load($this->team->id)->entries as $entry) {
@@ -106,7 +105,7 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
 
         foreach ($marks as $mark) {
             try {
-                $mark();
+                ScanNotifications::applyMark($mark);
             } catch (Throwable $e) {
                 report($e);
             }
@@ -119,56 +118,63 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
     }
 
     /**
-     * New findings and fixes of one resource page (a service covers its applications and databases).
+     * New findings and fixes of one resource page (a service covers its applications and databases). Loads and
+     * decodes one scan at a time and keeps only counts, IDs, and the marks to write after sending.
      *
      * @param  Collection<int, ImageScan>  $current  The current scans, with their owner.
-     * @param  list<callable(): void>  $marks
+     * @param  list<array{id: int, read: list<string>, ids: list<string>, candidates: list<string>}>  $marks
      * @return array<string, mixed>|null
      */
     private function resourceDigest(Model $resource, Collection $current, array &$marks): ?array
     {
-        $owners = $current->mapWithKeys(fn (ImageScan $scan): array => [$scan->id => $scan->resource]);
-        $scans = ImageScan::query()->whereIn('id', $owners->keys())->get();
-
-        /** @var list<Finding> $new */
-        $new = [];
+        $counts = [];
+        $total = 0;
+        $knownExploited = 0;
+        $ids = [];
         $updates = [];
         $fix = null;
-        foreach ($scans as $scan) {
-            $owner = $owners->get($scan->id);
-            if (! $owner instanceof Model) {
+        foreach ($current as $currentScan) {
+            $owner = $currentScan->resource;
+            $scan = ImageScan::query()->find($currentScan->id);
+            if (! $owner instanceof Model || ! $scan instanceof ImageScan) {
                 continue;
             }
-            $scan->setRelation('resource', $owner);
 
-            $fixable = ScanNotifications::fixableNow($scan, $owner);
-            $candidates = ScanNotifications::betterCandidates($scan, $owner);
-            $newFindings = ScanNotifications::newFindings($scan, $fixable);
-            $updates = [...$updates, ...array_values(ScanNotifications::newCandidates($scan, $candidates))];
-            if ($newFindings !== [] && $fix === null) {
-                $fix = array_values($candidates)[0] ?? null;
+            $plan = ScanNotifications::digestPlan($scan, $owner);
+            $marks[] = $plan['mark'];
+            $updates = [...$updates, ...$plan['newCandidates']];
+            if ($plan['new'] === []) {
+                continue;
             }
-            $new = [...$new, ...$newFindings];
-            $marks[] = fn () => ScanNotifications::markNotified($scan, $fixable, array_keys($candidates));
+
+            $fix ??= $plan['fix'];
+            $total += count($plan['new']);
+            foreach (ScanNotifications::counts($plan['new']) as $severity => $count) {
+                $counts[$severity] = ($counts[$severity] ?? 0) + $count;
+            }
+            foreach ($plan['new'] as $finding) {
+                $knownExploited += $finding->kev ? 1 : 0;
+                $ids[$finding->id] = true;
+            }
         }
 
         $updates = array_values(array_unique($updates));
-        if ($new === [] && $updates === []) {
+        if ($total === 0 && $updates === []) {
             return null;
         }
 
-        $counts = ScanNotifications::counts($new);
+        $counts = array_filter(array_merge(array_fill_keys(ScanNotifications::SEVERITIES, 0), $counts));
 
         return [
             'name' => (string) $resource->getAttribute('name'),
             'uuid' => (string) $resource->getAttribute('uuid'),
             'url' => ScanNotifications::link($resource),
             'counts' => $counts,
-            'total' => count($new),
+            'total' => $total,
             'worst' => array_key_first($counts),
-            'known_exploited' => count(array_filter($new, fn (Finding $finding): bool => $finding->kev)),
+            'known_exploited' => $knownExploited,
             'fix' => $fix,
-            'ids' => array_slice(array_values(array_unique(array_map(fn (Finding $finding): string => $finding->id, $new))), 0, VulnerabilityDigest::MAIL_ID_LIMIT),
+            'ids' => array_slice(array_map('strval', array_keys($ids)), 0, VulnerabilityDigest::MAIL_ID_LIMIT),
             'updates' => $updates,
         ];
     }
@@ -192,7 +198,8 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
     }
 
     /**
-     * Servers of the team whose daily rescan failed 2 days in a row, not named yet for this run of failures.
+     * Servers of the team that still scan images and whose daily rescan failed 2 days in a row, not named yet for
+     * this run of failures.
      *
      * @return Collection<int, Server>
      */
@@ -200,8 +207,10 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
     {
         return Server::query()
             ->where('team_id', $this->team->id)
+            ->with('settings')
             ->get()
-            ->filter(fn (Server $server): bool => ! $server->isTransferredAway()
+            ->filter(fn (Server $server): bool => (bool) $server->settings?->is_image_scan_enabled
+                && ! $server->isTransferredAway()
                 && ImageRescanJob::failedDays($server) >= 2
                 && ! ImageRescanJob::isFailureNotified($server))
             ->values();

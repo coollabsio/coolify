@@ -750,7 +750,6 @@ class RefreshCandidates
         }
 
         $checkedAt = now()->toIso8601String();
-        $notified = data_get($fresh->candidates, 'notified');
         $fresh->candidates = [
             'status' => $result['status'],
             'checked_at' => $checkedAt,
@@ -768,7 +767,6 @@ class RefreshCandidates
                 'current_digest' => $base['current_digest'],
                 'entries' => $base['entries'],
             ]]),
-            ...(is_array($notified) ? ['notified' => $notified] : []),
         ];
         $fresh->setRelation('resource', $scan->resource);
         ResourceScans::refreshSummaries(collect([$fresh]));

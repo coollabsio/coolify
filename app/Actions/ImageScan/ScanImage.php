@@ -109,8 +109,8 @@ class ScanImage
             $lock->release();
         }
 
-        $this->queueCandidateCheck($scan);
         $this->notifyAfterScan($scan);
+        $this->queueCandidateCheck($scan);
 
         return $scan;
     }

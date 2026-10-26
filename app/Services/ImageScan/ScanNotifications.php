@@ -5,12 +5,15 @@ namespace App\Services\ImageScan;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ImageScanFixState;
 use App\Enums\ImageScanStatus;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageScan;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\Team;
 use App\Notifications\ImageScan\KnownExploitedFound;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 /**
@@ -20,15 +23,22 @@ use InvalidArgumentException;
  * baseline) covered. A finding is new when none of its IDs and aliases is in the list. IDs of findings that are no
  * longer in the scan are dropped, so a vulnerability that comes back notifies again. A scan with `is_baseline` or
  * without a list is a baseline: its findings are recorded without a notification. The better candidates a digest
- * named are kept under `candidates.notified`.
+ * named are kept in `image_scans.notified_candidates`.
  */
 final class ScanNotifications
 {
     public const SEVERITIES = ['critical', 'high', 'medium', 'low', 'unknown'];
 
+    /** The candidates a resource remembers as named; older ones are dropped. */
+    public const MAX_NOTIFIED_CANDIDATES = 50;
+
     /**
      * After a scan stored its results: records a baseline, drops the IDs that are no longer found, and alerts the
-     * team right away for a new known exploited finding that is fixable now.
+     * team right away for a new known exploited finding that is fixable now. Preview scans never notify.
+     *
+     * A new image row starts from the union of what the current scans of the resource before this deployment had
+     * notified. Without such scans (the first deployment, also each image of a first Compose deployment) the scan is
+     * a baseline.
      */
     public static function afterScan(ImageScan $scan): void
     {
@@ -37,32 +47,50 @@ final class ScanNotifications
         }
 
         $owner = $scan->resource;
-        if (! $owner instanceof Model) {
+        if (! $owner instanceof Model || self::isPreview($scan)) {
             return;
         }
 
         $fixable = self::fixableNow($scan, $owner);
-        $notified = $scan->notified_ids;
-        if (! $scan->is_baseline && $notified === null) {
-            $notified = self::previousNotifiedIds($scan);
+        $ids = $scan->notified_ids;
+        $candidates = $scan->notified_candidates;
+        $baseline = (bool) $scan->is_baseline;
+
+        if (! $baseline && $ids === null) {
+            $previous = self::previousCurrentScans($scan)->filter(fn (ImageScan $row): bool => is_array($row->notified_ids));
+            $baseline = $previous->isEmpty();
+            if (! $baseline) {
+                $ids = $previous->flatMap(fn (ImageScan $row): array => $row->notified_ids)->unique()->values()->all();
+                $candidates ??= $previous->contains(fn (ImageScan $row): bool => is_array($row->notified_candidates))
+                    ? self::capCandidates($previous->flatMap(fn (ImageScan $row): array => (array) $row->notified_candidates)->all())
+                    : null;
+            }
         }
 
-        if ($scan->is_baseline || $notified === null) {
-            self::saveNotifiedIds($scan, self::ids($fixable));
+        if ($baseline) {
+            // Candidates of a baseline arrive later: without a list, the next digest records them without a notification.
+            $scan->forceFill(['notified_ids' => self::ids($fixable), 'notified_candidates' => $candidates]);
+            if ($scan->isDirty()) {
+                $scan->saveQuietly();
+            }
 
             return;
         }
 
-        $notified = self::present($scan, $notified);
+        $ids = self::present($scan, $ids);
+        $notified = self::idSet($ids);
         $known = array_values(array_filter($fixable, fn (Finding $finding): bool => $finding->kev && ! self::isIn($finding, $notified)));
-        if ($known !== []) {
-            $notified = [...$notified, ...self::ids($known)];
+        $scan->forceFill([
+            'notified_ids' => array_values(array_unique([...$ids, ...self::ids($known)])),
+            'notified_candidates' => $candidates,
+        ]);
+        if ($scan->isDirty()) {
+            $scan->saveQuietly();
         }
-        self::saveNotifiedIds($scan, $notified);
 
         $team = method_exists($owner, 'team') ? $owner->team() : null;
         if ($known !== [] && $team instanceof Team) {
-            $team->notify(new KnownExploitedFound($scan, count($known)));
+            $team->notify(new KnownExploitedFound($scan, count($known), self::ids($known)));
         }
     }
 
@@ -86,48 +114,64 @@ final class ScanNotifications
         ));
     }
 
+    /**
+     * The digest records what a baseline sees without a notification: the first scan of a resource until its next
+     * rescan, and a scan without notified IDs or candidates yet (each image of a first deployment).
+     */
     public static function isBaseline(ImageScan $scan): bool
     {
-        return (bool) $scan->is_baseline || $scan->notified_ids === null;
+        return (bool) $scan->is_baseline || $scan->notified_ids === null || $scan->notified_candidates === null;
     }
 
     /**
-     * The fixable-now findings at the alert level that no notification covered yet. Empty for a baseline.
+     * What a digest reports for one current scan, and what it records after sending (see `applyMark()`). A baseline
+     * reports nothing and records what it sees.
      *
-     * @param  list<Finding>  $fixable
-     * @return list<Finding>
+     * @return array{new: list<Finding>, fix: ?string, newCandidates: list<string>, mark: array{id: int, read: list<string>, ids: list<string>, candidates: list<string>}}
      */
-    public static function newFindings(ImageScan $scan, array $fixable): array
+    public static function digestPlan(ImageScan $scan, Model $owner): array
     {
-        if (self::isBaseline($scan)) {
-            return [];
-        }
+        $fixable = self::fixableNow($scan, $owner);
+        $candidates = self::betterCandidates($scan, $owner);
+        $baseline = self::isBaseline($scan);
 
-        $notified = (array) $scan->notified_ids;
+        $ids = $baseline ? [] : self::present($scan, (array) $scan->notified_ids);
+        $notified = self::idSet($ids);
+        $new = array_values(array_filter($fixable, fn (Finding $finding): bool => ! self::isIn($finding, $notified)));
+        $namedCandidates = array_flip(array_map('strval', (array) $scan->notified_candidates));
 
-        return array_values(array_filter($fixable, fn (Finding $finding): bool => ! self::isIn($finding, $notified)));
+        return [
+            'new' => $baseline ? [] : $new,
+            'fix' => array_values($candidates)[0] ?? null,
+            'newCandidates' => $baseline ? [] : array_values(array_diff_key($candidates, $namedCandidates)),
+            'mark' => [
+                'id' => (int) $scan->getKey(),
+                'read' => array_values(array_map('strval', (array) $scan->notified_ids)),
+                'ids' => array_values(array_unique([...$ids, ...self::ids($new)])),
+                'candidates' => array_map('strval', array_keys($candidates)),
+            ],
+        ];
     }
 
     /**
-     * Records the findings and candidates a digest covered (or a baseline saw), and drops IDs no longer found.
+     * Records what a digest covered. Reads the row again, so IDs that an alert added meanwhile are kept, and writes
+     * only the two notification columns.
      *
-     * @param  list<Finding>  $fixable
-     * @param  list<string>  $candidateKeys
+     * @param  array{id: int, read: list<string>, ids: list<string>, candidates: list<string>}  $mark
      */
-    public static function markNotified(ImageScan $scan, array $fixable, array $candidateKeys): void
+    public static function applyMark(array $mark): void
     {
-        $notified = self::isBaseline($scan) ? [] : self::present($scan, (array) $scan->notified_ids);
-        $new = array_filter($fixable, fn (Finding $finding): bool => ! self::isIn($finding, $notified));
-
-        $candidates = $scan->candidates;
-        if (is_array($candidates) && $candidates !== []) {
-            $candidates = array_is_list($candidates) ? ['entries' => $candidates] : $candidates;
-            if (($candidates['notified'] ?? null) !== $candidateKeys) {
-                $scan->candidates = [...$candidates, 'notified' => $candidateKeys];
-            }
+        $row = ImageScan::query()->select(['id', 'notified_ids', 'notified_candidates'])->find($mark['id']);
+        if (! $row instanceof ImageScan) {
+            return;
         }
 
-        self::saveNotifiedIds($scan, [...$notified, ...self::ids(array_values($new))]);
+        $addedMeanwhile = array_diff(array_map('strval', (array) $row->notified_ids), $mark['read']);
+
+        ImageScan::query()->whereKey($mark['id'])->update([
+            'notified_ids' => json_encode(array_values(array_unique([...$mark['ids'], ...$addedMeanwhile]))),
+            'notified_candidates' => json_encode(self::capCandidates([...(array) $row->notified_candidates, ...$mark['candidates']])),
+        ]);
     }
 
     /**
@@ -157,24 +201,6 @@ final class ScanNotifications
         }
 
         return $candidates;
-    }
-
-    /**
-     * The candidates a digest has not named yet. Empty for a baseline.
-     *
-     * @param  array<string, string>  $candidates
-     * @return array<string, string>
-     */
-    public static function newCandidates(ImageScan $scan, array $candidates): array
-    {
-        if (self::isBaseline($scan)) {
-            return [];
-        }
-
-        $notified = data_get($scan->candidates, 'notified');
-        $notified = is_array($notified) ? array_flip(array_map('strval', $notified)) : [];
-
-        return array_diff_key($candidates, $notified);
     }
 
     /**
@@ -255,25 +281,54 @@ final class ScanNotifications
     }
 
     /**
-     * The notified IDs of the latest other completed scan of the same resource, for a new image of the resource.
+     * The current scans of the resource before the deployment of this scan (see `ResourceScans::currentFor()`):
+     * the latest other non-preview scan, with the other images of its deployment.
      *
-     * @return list<string>|null
+     * @return Collection<int, ImageScan>
      */
-    private static function previousNotifiedIds(ImageScan $scan): ?array
+    private static function previousCurrentScans(ImageScan $scan): Collection
     {
-        $previous = ImageScan::query()
+        $query = fn (): Builder => ImageScan::query()
+            ->select(['id', 'deployment_queue_id', 'scanned_at', 'notified_ids', 'notified_candidates'])
             ->where('resource_type', $scan->resource_type)
             ->where('resource_id', $scan->resource_id)
             ->whereKeyNot($scan->getKey())
             ->where('status', ImageScanStatus::Completed)
-            ->whereNotNull('notified_ids')
+            ->where(fn (Builder $query) => $query
+                ->whereNull('deployment_queue_id')
+                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
+            ->when($scan->deployment_queue_id !== null, fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->whereNull('deployment_queue_id')
+                ->orWhere('deployment_queue_id', '!=', $scan->deployment_queue_id)))
             ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->value('notified_ids');
+            ->orderByDesc('id');
 
-        $ids = is_string($previous) ? json_decode($previous, true) : $previous;
+        $latest = $query()->first();
+        if (! $latest instanceof ImageScan) {
+            return collect();
+        }
 
-        return is_array($ids) ? array_values(array_map('strval', $ids)) : null;
+        return $latest->deployment_queue_id === null
+            ? collect([$latest])
+            : $query()->where('deployment_queue_id', $latest->deployment_queue_id)->get();
+    }
+
+    /**
+     * A scan of a pull request preview deployment.
+     */
+    private static function isPreview(ImageScan $scan): bool
+    {
+        return $scan->deployment_queue_id !== null
+            && (int) ApplicationDeploymentQueue::query()->withoutGlobalScopes()->whereKey($scan->deployment_queue_id)->value('pull_request_id') !== 0;
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    private static function capCandidates(array $keys): array
+    {
+        return array_slice(array_values(array_unique(array_map('strval', $keys))), -self::MAX_NOTIFIED_CANDIDATES);
     }
 
     /**
@@ -295,13 +350,28 @@ final class ScanNotifications
     }
 
     /**
+     * Lower-case IDs as keys, built once per scan.
+     *
      * @param  list<string>  $ids
+     * @return array<string, true>
      */
-    private static function isIn(Finding $finding, array $ids): bool
+    private static function idSet(array $ids): array
     {
-        $ids = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), $ids));
+        $set = [];
+        foreach ($ids as $id) {
+            $set[mb_strtolower((string) $id)] = true;
+        }
+
+        return $set;
+    }
+
+    /**
+     * @param  array<string, true>  $set
+     */
+    private static function isIn(Finding $finding, array $set): bool
+    {
         foreach ([$finding->id, ...$finding->aliases] as $id) {
-            if (isset($ids[mb_strtolower($id)])) {
+            if (isset($set[mb_strtolower($id)])) {
                 return true;
             }
         }
@@ -316,20 +386,5 @@ final class ScanNotifications
     private static function ids(array $findings): array
     {
         return array_values(array_unique(array_map(fn (Finding $finding): string => $finding->id, $findings)));
-    }
-
-    /**
-     * @param  list<string>  $ids
-     */
-    private static function saveNotifiedIds(ImageScan $scan, array $ids): void
-    {
-        $ids = array_values(array_unique($ids));
-        if ($scan->notified_ids !== $ids) {
-            $scan->notified_ids = $ids;
-        }
-
-        if ($scan->isDirty()) {
-            $scan->saveQuietly();
-        }
     }
 }
