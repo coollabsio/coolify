@@ -75,7 +75,7 @@ test('builds dump-all commands and postgres safety scan', function () {
         ->toContain('unable to inspect custom archive')
         ->not->toContain('then exit 0')
         ->and($script)
-        ->toContain("tr '\\n\\r\\t'");
+        ->toContain("tr '\\n\\r' '~~'");
 });
 
 test('restores dump-all PostgreSQL custom archives with pg_restore from the decompressed stream', function () {
@@ -83,8 +83,8 @@ test('restores dump-all PostgreSQL custom archives with pg_restore from the deco
 
     // pg_restore cannot read gzip files, so it must receive the decompressed archive on stdin.
     expect($command)
-        ->toContain('stream | pg_restore -U "$pg_user" -d "$db"')
-        ->toContain('stream | psql -U "$pg_user" -d "$db"')
+        ->toContain('stream | pg_restore --exit-on-error -U "$pg_user" -d "$db"')
+        ->toContain('stream | psql -v ON_ERROR_STOP=1 -U "$pg_user" -d "$db"')
         ->not->toContain("-d \"\$db\" '/tmp/backup.dump.gz'");
 });
 
