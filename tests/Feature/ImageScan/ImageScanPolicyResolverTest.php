@@ -203,14 +203,16 @@ it('uses the team of the resource and not the session team', function () {
     expect(ImageScanPolicyResolver::for($this->application)->alertLevel)->toBe(ImageScanAlertLevel::High);
 });
 
-it('uses the given server instead of the destination server', function () {
+it('scans on the given server but resolves the rules through the main destination server', function () {
     $buildServer = Server::factory()->create(['team_id' => $this->team->id]);
-    resolverPolicyFor($this->server, ['alert_level' => ImageScanAlertLevel::High]);
-    resolverPolicyFor($buildServer, ['alert_level' => ImageScanAlertLevel::Medium]);
+    resolverPolicyFor($this->server, ['alert_level' => ImageScanAlertLevel::High, 'gate_enabled' => true]);
+    resolverPolicyFor($buildServer, ['alert_level' => ImageScanAlertLevel::Medium, 'gate_enabled' => false]);
 
     $policy = ImageScanPolicyResolver::for($this->application, $buildServer);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::Medium)
+    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::High)
+        ->and($policy->gateEnabled)->toBeTrue()
+        ->and($policy->sources['gate_enabled'])->toBe('server')
         ->and($policy->scanServer->is($buildServer))->toBeTrue();
 });
 

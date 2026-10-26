@@ -22,21 +22,25 @@ class ImageScanPolicyResolver
     private const FIELDS = ['alert_level', 'gate_enabled', 'on_scan_error'];
 
     /**
+     * Rules always resolve through the main destination server (spec 3.1). The given server only decides where the
+     * image is scanned and whether scanning is on there.
+     *
      * @param  Model  $resource  Application, ServiceApplication, ServiceDatabase, Service or a standalone database.
-     * @param  Server|null  $server  Overrides the main destination server (the build server for a gated build).
+     * @param  Server|null  $server  Overrides the scan server (the build server for a gated build).
      */
     public static function for(Model $resource, ?Server $server = null): ResolvedImageScanPolicy
     {
         $isApplication = $resource instanceof Application;
-        $scanServer = $server ?? self::mainServer($resource);
+        $mainServer = self::mainServer($resource);
+        $scanServer = $server ?? $mainServer;
 
         $levels = [['instance', self::instanceRow()]];
         $team = method_exists($resource, 'team') ? $resource->team() : null;
         if ($team instanceof Model) {
             $levels[] = ['team', self::scopeRow($team)];
         }
-        if ($scanServer instanceof Server) {
-            $levels[] = ['server', self::scopeRow($scanServer)];
+        if ($mainServer instanceof Server) {
+            $levels[] = ['server', self::scopeRow($mainServer)];
         }
         if ($isApplication) {
             $levels[] = ['app', self::scopeRow($resource)];

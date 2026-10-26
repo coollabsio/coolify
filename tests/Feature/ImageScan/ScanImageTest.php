@@ -583,6 +583,23 @@ it('counts the same fixable findings in the summary as the gate', function () {
         ->and($scan->summary['fixable_now_at_level'])->toBe($gate->count);
 });
 
+it('counts the summary of a build server scan at the alert level of the main destination server', function () {
+    scanImageTestFake();
+    $buildServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id]);
+    $buildServer->settings->forceFill(['is_reachable' => true, 'is_usable' => true, 'is_image_scan_enabled' => true])->saveQuietly();
+    $buildServer = $buildServer->fresh();
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => ImageScanAlertLevel::High]);
+    ImageScanPolicy::factory()->create(['scope_type' => $buildServer->getMorphClass(), 'scope_id' => $buildServer->id, 'alert_level' => ImageScanAlertLevel::Critical]);
+
+    $scan = ScanImage::run($buildServer, $this->application, 'postgres:15.0-alpine');
+
+    $policy = new ResolvedImageScanPolicy(ImageScanAlertLevel::High, true, ImageScanOnError::Deploy, true, [], $this->server);
+    $gate = (new ImageScanGate)->evaluate($scan->fresh(), $policy, IgnoreMatcher::forResource($this->application));
+    expect($scan->server_id)->toBe($buildServer->id)
+        ->and($scan->summary['fixable_now_at_level'])->toBe($gate->count)
+        ->and($scan->summary['fixable_now_at_level'])->toBeGreaterThan((int) data_get($scan->summary, 'counts.fixable_now.critical', 0));
+});
+
 it('scopes the SBOM reuse and the scan writes to the server', function () {
     $otherServer = scanImageTestServer(Team::factory()->create());
     $otherSbom = ImageSbom::factory()->create(['server_id' => $otherServer->id, 'image_id' => 'sha256:'.SCAN_TEST_IMAGE_HEX]);

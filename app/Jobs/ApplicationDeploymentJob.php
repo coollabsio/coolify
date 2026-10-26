@@ -3046,7 +3046,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Rules resolve through the build server when the image is there, else through the main server.
+     * The image is scanned on the build server when it is there, else on the main server. The rules always resolve
+     * through the main destination server.
      */
     private function imageScanPolicy(): ResolvedImageScanPolicy
     {

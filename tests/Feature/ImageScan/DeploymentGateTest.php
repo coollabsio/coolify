@@ -807,3 +807,15 @@ it('does not fail the deploy when the Dockerfile cannot be read', function () {
 
     expect(deployGateBaseImageRef($job))->toBeNull();
 });
+
+it('gates a build server image with the rules of the main destination server', function () {
+    ImageScanPolicy::query()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_enabled' => true, 'alert_level' => 'high']);
+    $buildServer = deployGateServer($this->team, 'build-server');
+    ImageScanPolicy::query()->create(['scope_type' => $buildServer->getMorphClass(), 'scope_id' => $buildServer->id, 'gate_enabled' => false, 'alert_level' => 'critical']);
+    ScanImage::shouldRun()->once()
+        ->withArgs(fn ($server) => $server->is($buildServer))
+        ->andReturn(deployGateReturnedScan([deployGateFindingRow('high')]));
+    $job = deployGateJob(['use_build_server' => true, 'build_server' => $buildServer, 'server' => $buildServer]);
+
+    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 high vulnerability with a fix.');
+});
