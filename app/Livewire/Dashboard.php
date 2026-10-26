@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\TeamInvitation;
 use App\Services\Access\AccessResolver;
+use App\Services\ImageScan\TeamVulnerabilities;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -28,6 +29,12 @@ class Dashboard extends Component
     #[Locked]
     public bool $showsTeamSections = true;
 
+    /**
+     * Resources the user can see with something fixable now at the alert level.
+     */
+    #[Locked]
+    public int $fixableResourceCount = 0;
+
     public function mount()
     {
         $this->showsTeamSections = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
@@ -38,6 +45,7 @@ class Dashboard extends Component
             return;
         }
 
+        $this->fixableResourceCount = TeamVulnerabilities::fixableResourceCount(currentTeam()->id);
         $this->privateKeys = $this->showsTeamSections ? PrivateKey::ownedByCurrentTeamCached() : collect();
         $this->servers = $this->showsTeamSections ? Server::ownedByCurrentTeamCached() : collect();
         $this->projects = Project::ownedByCurrentTeam()

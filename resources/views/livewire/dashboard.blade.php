@@ -64,6 +64,22 @@
             </div>
         @endif
 
+        @if ($fixableResourceCount > 0)
+            {{-- Dismissed until the count changes: the key holds the count. --}}
+            @php
+                $vulnerabilitiesKey = 'coolify.image-scan.dashboard-dismissed.'.$fixableResourceCount;
+            @endphp
+            <div x-data="{ hidden: localStorage.getItem(@js($vulnerabilitiesKey)) === '1' }" x-show="!hidden" x-cloak
+                wire:key="dashboard-vulnerabilities-{{ $fixableResourceCount }}">
+                <x-callout type="warning" dismissible
+                    :title="$fixableResourceCount === 1 ? '1 resource has vulnerabilities you can fix now.' : $fixableResourceCount.' resources have vulnerabilities you can fix now.'"
+                    on-dismiss="localStorage.setItem({{ \Illuminate\Support\Js::from($vulnerabilitiesKey) }}, '1'); hidden = true">
+                    <a href="{{ route('vulnerabilities') }}" {{ wireNavigate() }}
+                        class="font-medium underline-offset-2 hover:underline">Review</a>
+                </x-callout>
+            </div>
+        @endif
+
         {{-- Wide screens: projects and servers fill the left, activity is a fixed-width column on the right.
              It stays one column while the activity side has no section (no deployments, no traffic). --}}
         <div class="grid min-w-0 gap-8 xl:items-start xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_22rem] 2xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_26rem]">

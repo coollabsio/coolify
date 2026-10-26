@@ -1355,6 +1355,34 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   icon with the count, in the normal text color, not red. `label` is both
   `aria-label` and `data-tooltip`. It renders nothing when the count is 0, so a
   clean or unscanned resource shows no marker.
+  - The count is "fixable now" at the alert level. The label names the
+    severities and, when Coolify can update the image, the version:
+    `2 critical, 5 high with a fix.` or `1 critical with a fix. Update to
+    16.4-alpine.`
+  - It sits right after the resource name: the environment list (table and
+    cards), the server Resources tab, and the canvas cards (in the chip row,
+    before the extra servers chip; `Card.svelte` draws the same anatomy).
+  - Lists rendered by Alpine pass an expression instead of values:
+    `<x-image-scan.marker bind="item.vulnerabilities" class="relative" />`.
+    Add `relative` when the row has a full-row link overlay, so the tooltip
+    still opens.
+  - Compute the markers of a whole list at once with
+    `VulnerabilityMarkers::for($resources)`: a fixed number of queries, never
+    one per row. No marker shows when the instance does not allow scanning.
+- The team Vulnerabilities page (Monitoring > Vulnerabilities,
+  `livewire/image-scan/fleet-vulnerabilities.blade.php`) is a top-level
+  destination: title and summary, one dense table (Resource, Project /
+  environment, Server, Fixable now as severity badges, Fix, Last scan), worst
+  first, with Server, Project, and Severity in one `x-table.filter`. A search
+  by CVE, GHSA, or package switches the last columns to the match and its state
+  ("Fixable now", "Fix not released yet", "No fix", "Ignored"). Resources that
+  were not scanned are never hidden silently: a muted line under the table
+  says "{n} resources on {m} servers were not scanned, so Coolify cannot tell."
+- Fleet callouts are dismissible until their number changes: the
+  `localStorage` key holds the number, so a new number shows the callout again.
+  The dashboard shows at most one ("{n} resources have vulnerabilities you can
+  fix now." + Review); the Vulnerabilities page shows admins "{n} servers do
+  not scan images." Nothing else about vulnerabilities goes on the dashboard.
 - `<x-image-scan.gate-status :result="$deployment->scan_gate_result" />` is the
   deploy gate state: a `x-status-badge` button ("Blocked" error, or "Not
   scanned" warning when the scan could not run) that opens a popover with the

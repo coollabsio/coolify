@@ -814,6 +814,13 @@ class GlobalSearch extends Component
                 'search_text' => 'team audit log activity history events',
             ] : null,
             instanceSettings()->is_image_scanning_allowed ? [
+                'name' => 'Vulnerabilities',
+                'type' => 'navigation',
+                'description' => 'Fixable vulnerabilities in images across your team',
+                'link' => route('vulnerabilities'),
+                'search_text' => 'vulnerabilities cve ghsa image scanning fixable packages security',
+            ] : null,
+            instanceSettings()->is_image_scanning_allowed ? [
                 'name' => 'Team Image Scanning',
                 'type' => 'navigation',
                 'description' => 'Scan rules and ignored vulnerabilities of the team',
@@ -970,6 +977,7 @@ class GlobalSearch extends Component
                 route('profile'),
                 route('profile.appearance'),
                 route('security.api-tokens'),
+                route('vulnerabilities'),
             ];
             $navigation = $navigation->whereIn('link', $projectPages)->values();
         }
@@ -1098,6 +1106,7 @@ class GlobalSearch extends Component
         }
 
         // Case-insensitive search in existing resources
+        $vulnerabilitySearch = $this->vulnerabilitySearchItem(trim($this->searchQuery));
         $existingResults = collect($this->allSearchableItems)
             ->filter(function ($item) use ($query) {
                 // Use word boundary matching to avoid substring matches (e.g., "wordpress" shouldn't match "classicpress")
@@ -1127,6 +1136,11 @@ class GlobalSearch extends Component
         // Merge results: existing resources first, then priority create item, then other creatable suggestions
         $results = [];
 
+        // A vulnerability ID opens the Vulnerabilities page with that search
+        if ($vulnerabilitySearch !== null) {
+            $results[] = $vulnerabilitySearch;
+        }
+
         // If we have existing results, show them first
         $results = array_merge($results, $existingResults);
 
@@ -1139,6 +1153,30 @@ class GlobalSearch extends Component
         $results = array_merge($results, $creatableSuggestions);
 
         $this->searchResults = $results;
+    }
+
+    /**
+     * An entry that opens the Vulnerabilities page with the search, for a query such as CVE-2021-44228 or
+     * GHSA-jfh8-c2jp-5v3q.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function vulnerabilitySearchItem(string $query): ?array
+    {
+        if (preg_match('/\A(CVE|GHSA)-[A-Za-z0-9-]+\z/i', $query) !== 1 || ! instanceSettings()->is_image_scanning_allowed) {
+            return null;
+        }
+
+        $id = strtoupper((string) strstr($query, '-', true)).strstr($query, '-');
+
+        return [
+            'name' => "Find {$id} in your images",
+            'type' => 'navigation',
+            'description' => 'Search the Vulnerabilities page',
+            'link' => route('vulnerabilities', ['search' => $id]),
+            'search_text' => $id,
+            'match_priority' => 0,
+        ];
     }
 
     private function loadCreatableItems()

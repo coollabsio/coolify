@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Server;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -172,13 +173,16 @@ class Resources extends Component
             $this->setPage($page);
         }
 
+        $pageResources = $resources->forPage($page, $this->perPage)->values();
+
         return view('livewire.server.resources', [
             'resources' => new LengthAwarePaginator(
-                $resources->forPage($page, $this->perPage)->values(),
+                $pageResources,
                 $resources->count(),
                 $this->perPage,
                 $page,
             ),
+            'markers' => $this->activeTab === 'managed' ? VulnerabilityMarkers::for($pageResources) : [],
         ]);
     }
 }

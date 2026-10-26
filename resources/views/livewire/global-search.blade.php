@@ -17,6 +17,7 @@
     scope: 'global',
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
     developerCommandsEnabled: @js(app()->environment('local')),
+    vulnerabilitiesUrl: @js(instanceSettings()->is_image_scanning_allowed ? route('vulnerabilities') : null),
 
     get showServerTimingCommand() {
         if (!this.developerCommandsEnabled) return false;
@@ -99,6 +100,19 @@
             if (!item.search_text) return false;
             return item.search_text.toLowerCase().includes(query);
         }).slice(0, 20);
+
+        // A vulnerability ID opens the Vulnerabilities page with that search.
+        const trimmed = this.searchQuery.trim();
+        if (this.vulnerabilitiesUrl && /^(cve|ghsa)-[a-z0-9-]+$/i.test(trimmed)) {
+            const id = trimmed.replace(/^[a-z]+/i, prefix => prefix.toUpperCase());
+            return [{
+                name: `Find ${id} in your images`,
+                type: 'navigation',
+                description: 'Search the Vulnerabilities page',
+                link: `${this.vulnerabilitiesUrl}?search=${encodeURIComponent(id)}`,
+                search_text: id,
+            }, ...results].slice(0, 20);
+        }
 
         return results;
     },

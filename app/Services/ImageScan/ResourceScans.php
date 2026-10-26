@@ -9,7 +9,10 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -107,6 +110,105 @@ final class ResourceScans
             : $query()->where('deployment_queue_id', $latest->deployment_queue_id)->get();
 
         return $scans->each(fn (ImageScan $scan) => $scan->setRelation('resource', $owner))->values();
+    }
+
+    /**
+     * Same as `owners()` for many resources: the applications and databases of all services with two queries.
+     *
+     * @param  Collection<int, Model>  $resources
+     * @return Collection<string, Collection<int, Model>> Keyed by `key()` of the resource.
+     */
+    public static function ownersOfMany(Collection $resources): Collection
+    {
+        $services = $resources->filter(fn (Model $resource): bool => $resource instanceof Service)->keyBy('id');
+        $unloaded = $services->reject(fn (Service $service): bool => $service->relationLoaded('applications') && $service->relationLoaded('databases'));
+
+        if ($unloaded->isNotEmpty()) {
+            $applications = ServiceApplication::query()->whereIn('service_id', $unloaded->keys())->get()->groupBy('service_id');
+            $databases = ServiceDatabase::query()->whereIn('service_id', $unloaded->keys())->get()->groupBy('service_id');
+            foreach ($unloaded as $id => $service) {
+                $service->setRelation('applications', $applications->get($id, new EloquentCollection));
+                $service->setRelation('databases', $databases->get($id, new EloquentCollection));
+            }
+        }
+
+        return $resources->mapWithKeys(function (Model $resource): array {
+            if (! $resource instanceof Service) {
+                return [self::key($resource) => collect([$resource])];
+            }
+
+            $owners = $resource->applications->concat($resource->databases)->values();
+            $owners->each(fn (Model $owner) => $owner->setRelation('service', $resource));
+
+            return [self::key($resource) => $owners];
+        });
+    }
+
+    /**
+     * The current scans of many owners, like `currentFor()`, with two queries: the IDs of the current scans first,
+     * then the columns of those scans only.
+     *
+     * @param  Collection<int, Model>  $owners
+     * @param  list<string>  $columns
+     * @return Collection<string, Collection<int, ImageScan>> Keyed by `key()` of the owner, with the owner loaded.
+     */
+    public static function currentForMany(Collection $owners, array $columns = ['*']): Collection
+    {
+        $byType = $owners->groupBy(fn (Model $owner): string => $owner->getMorphClass())
+            ->map(fn (Collection $group): array => $group->map(fn (Model $owner) => $owner->getKey())->unique()->values()->all());
+        if ($byType->isEmpty()) {
+            return collect();
+        }
+
+        $rows = ImageScan::query()
+            ->select(['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'scanned_at'])
+            ->where('status', ImageScanStatus::Completed)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('deployment_queue_id')
+                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
+            ->where(function (Builder $query) use ($byType): void {
+                foreach ($byType as $type => $ids) {
+                    $query->orWhere(fn (Builder $query) => $query->where('resource_type', $type)->whereIn('resource_id', $ids));
+                }
+            })
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $currentIds = $rows
+            ->groupBy(fn (ImageScan $scan): string => $scan->resource_type.':'.$scan->resource_id)
+            ->flatMap(function (Collection $group): array {
+                $latest = $group->first();
+
+                return $latest->deployment_queue_id === null
+                    ? [$latest->id]
+                    : $group->where('deployment_queue_id', $latest->deployment_queue_id)->pluck('id')->all();
+            })
+            ->values()
+            ->all();
+        if ($currentIds === []) {
+            return collect();
+        }
+
+        $columns = $columns === ['*'] ? $columns : array_values(array_unique([...$columns, 'id', 'resource_type', 'resource_id', 'scanned_at']));
+        $ownersByKey = $owners->keyBy(fn (Model $owner): string => self::key($owner));
+
+        return ImageScan::query()
+            ->select($columns)
+            ->whereIn('id', $currentIds)
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->get()
+            ->each(fn (ImageScan $scan) => $scan->setRelation('resource', $ownersByKey->get($scan->resource_type.':'.$scan->resource_id)))
+            ->groupBy(fn (ImageScan $scan): string => $scan->resource_type.':'.$scan->resource_id);
+    }
+
+    /**
+     * A key for a resource or scan owner that is unique across resource types.
+     */
+    public static function key(Model $resource): string
+    {
+        return $resource->getMorphClass().':'.$resource->getKey();
     }
 
     /**

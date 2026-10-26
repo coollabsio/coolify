@@ -8,6 +8,8 @@ use App\Models\Project;
 use App\Models\ResourceLink;
 use App\Models\Server;
 use App\Models\Service;
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use App\Support\ResourceStartActivity;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
@@ -101,13 +103,17 @@ class EnvironmentCanvas
     {
         $startingServiceUuids = $this->startingServiceUuids($resources->filter(fn (Model $resource) => $resource instanceof Service));
 
+        $markers = VulnerabilityMarkers::for($resources->values());
+
         $servers = collect();
-        $nodes = $resources->map(function (Model $resource) use (&$servers, $startingServiceUuids) {
+        $nodes = $resources->map(function (Model $resource) use (&$servers, $startingServiceUuids, $markers) {
             $node = match (true) {
                 $resource instanceof Application => $this->applicationNode($resource),
                 $resource instanceof Service => $this->serviceNode($resource, in_array($resource->uuid, $startingServiceUuids, true)),
                 default => $this->databaseNode($resource),
             };
+            // Fixable now at the alert level: the resource vulnerability marker of the card.
+            $node['vulnerabilities'] = $markers[ResourceScans::key($resource)] ?? null;
             foreach ($node['servers'] as $server) {
                 $servers->put($server->id, $server);
             }

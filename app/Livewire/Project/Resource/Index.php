@@ -5,6 +5,8 @@ namespace App\Livewire\Project\Resource;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
@@ -44,6 +46,9 @@ class Index extends Component
     protected Collection $sqlites;
 
     protected Collection $services;
+
+    /** @var array<string, array{count: int, label: string}> */
+    private array $markers = [];
 
     public function mount(): void
     {
@@ -168,6 +173,11 @@ class Index extends Component
 
     public function render()
     {
+        $this->markers = VulnerabilityMarkers::for(collect([
+            $this->applications, $this->postgresqls, $this->redis, $this->mongodbs, $this->mysqls, $this->mariadbs,
+            $this->keydbs, $this->dragonflies, $this->clickhouses, $this->sqlites, $this->services,
+        ])->flatten(1));
+
         return view('livewire.project.resource.index', [
             'applications' => $this->applications,
             'postgresqls' => $this->postgresqls,
@@ -221,6 +231,7 @@ class Index extends Component
                 'id' => $tag->id,
                 'name' => $tag->name,
             ])->values()->toArray(),
+            'vulnerabilities' => $this->markers[ResourceScans::key($item)] ?? null,
         ])->values()->toArray();
     }
 }

@@ -35,6 +35,7 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\ImageScan\FleetVulnerabilities;
 use App\Livewire\ImageScan\InstanceImageScanning;
 use App\Livewire\ImageScan\ServerImageScanning;
 use App\Livewire\ImageScan\TeamImageScanning;
@@ -199,6 +200,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/two-factor-required', TwoFactorRequired::class)->name('two-factor.required');
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    // Members limited to some projects see the resources they have access to.
+    Route::get('/vulnerabilities', FleetVulnerabilities::class)->name('vulnerabilities');
     Route::middleware('access.team-wide')->group(function () {
         Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
         Route::get('/analytics', Analytics::class)->name('analytics');

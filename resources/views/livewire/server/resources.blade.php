@@ -75,6 +75,10 @@
                                         {{ wireNavigate() }} href="{{ $resource->link() }}">
                                         {{ $resource->name }}
                                     </a>
+                                    @php($marker = $markers[\App\Services\ImageScan\ResourceScans::key($resource)] ?? null)
+                                    @if ($marker)
+                                        <x-image-scan.marker :count="$marker['count']" :label="$marker['label']" />
+                                    @endif
                                 </div>
                                 <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
                                     {{ data_get($resource->project(), 'name') }}
