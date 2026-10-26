@@ -189,8 +189,6 @@ class GithubPrivateRepository extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Application::class);
-
             // Validate git repository parts and branch
             $validator = validator([
                 'selected_repository_owner' => $this->selected_repository_owner,
@@ -217,6 +215,7 @@ class GithubPrivateRepository extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
 
             $application_init = [
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),

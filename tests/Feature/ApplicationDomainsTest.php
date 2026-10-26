@@ -2099,6 +2099,16 @@ it('shows the compose service name in the domain conflict modal', function () {
     expect($html)->toContain('(application: web)');
 });
 
+it('does not link a hidden resource in the domain conflict modal', function () {
+    $html = Blade::render(
+        '<x-domain-conflict-modal :conflicts="$conflicts" :show-modal="true" />',
+        ['conflicts' => [hiddenDomainConflict('https://hidden-taken.example.com', 'application')]],
+    );
+
+    expect($html)->toContain('<strong>another resource</strong>')
+        ->not->toContain('href=""');
+});
+
 it('checks each domain configured for one docker compose service', function () {
     Application::factory()->create([
         'uuid' => (string) Str::uuid(),

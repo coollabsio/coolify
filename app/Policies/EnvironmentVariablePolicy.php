@@ -4,7 +4,12 @@ namespace App\Policies;
 
 use App\Models\EnvironmentVariable;
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 
+/**
+ * An environment variable is part of its resource's configuration: listing it needs view on the resource,
+ * reading its value needs viewSensitive, and every change needs manageEnvironment (write access).
+ */
 class EnvironmentVariablePolicy
 {
     /**
@@ -20,9 +25,15 @@ class EnvironmentVariablePolicy
      */
     public function view(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
+        return $this->allowsOnResource($user, 'view', $environmentVariable);
+    }
 
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+    /**
+     * Determine whether the user can read the value.
+     */
+    public function viewSensitive(User $user, EnvironmentVariable $environmentVariable): bool
+    {
+        return $this->allowsOnResource($user, 'viewSensitive', $environmentVariable);
     }
 
     /**
@@ -38,9 +49,7 @@ class EnvironmentVariablePolicy
      */
     public function update(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 
     /**
@@ -48,9 +57,7 @@ class EnvironmentVariablePolicy
      */
     public function delete(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 
     /**
@@ -74,19 +81,13 @@ class EnvironmentVariablePolicy
      */
     public function manageEnvironment(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        $teamId = $this->getTeamId($environmentVariable);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 
-    private function getTeamId(EnvironmentVariable $environmentVariable): ?int
+    private function allowsOnResource(User $user, string $ability, EnvironmentVariable $environmentVariable): bool
     {
         $resource = $environmentVariable->resourceable;
 
-        if (! $resource || ! method_exists($resource, 'team')) {
-            return null;
-        }
-
-        return $resource->team()?->id;
+        return $resource !== null && Gate::forUser($user)->allows($ability, $resource);
     }
 }

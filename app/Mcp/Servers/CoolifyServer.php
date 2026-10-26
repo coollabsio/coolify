@@ -83,7 +83,9 @@ use App\Mcp\Tools\ManageStorage;
 use App\Mcp\Tools\ManageTags;
 use App\Mcp\Tools\RollbackApplication;
 use App\Mcp\Tools\SearchResources;
+use App\Services\Access\AccessResolver;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
 
 class CoolifyServer extends Server
@@ -117,7 +119,7 @@ Lifecycle (requires token ability **deploy**):
 - control (start|stop|restart; stop needs confirm=true)
 - deploy, cancel_deployment, rollback_application
 
-Changes (requires token ability **write**): manage_* and create_* tools. They run the same REST API routes, with the same validation and permissions. Destructive actions need confirm=true: ask the user first.
+Changes (requires token ability **write**, or **delete** for delete actions): manage_* and create_* tools. They run the same REST API routes, with the same validation and permissions. Destructive actions need confirm=true: ask the user first.
 
 Prompts: troubleshoot_application, explain_failed_deploy.
 Resources: coolify://overview, coolify://application/{uuid}.
@@ -210,7 +212,63 @@ MD;
         GetServerMetrics::class,
     ];
 
+    /**
+     * Tools for team-level objects. Tokens and members limited to some projects, environments,
+     * or resources do not get them (same rule as ApiAbility::SCOPED_ACCESS_ROUTES for REST).
+     *
+     * @var array<int, class-string<Tool>>
+     */
+    public const TEAM_LEVEL_TOOLS = [
+        GetCurrentTeam::class,
+        ListTeamMembers::class,
+        ListServers::class,
+        GetServer::class,
+        GetServerDomains::class,
+        GetServerResources::class,
+        GetServerMetrics::class,
+        ListDestinations::class,
+        GetDestination::class,
+        ListTags::class,
+        ListGithubApps::class,
+        ListGithubRepositories::class,
+        ListGithubBranches::class,
+        ListAuditEvents::class,
+        ManageTags::class,
+        ManageServer::class,
+        ManageProxy::class,
+        DockerCleanup::class,
+        ManageDestination::class,
+        ManageRegistry::class,
+        ManagePrivateKey::class,
+        ManageS3Storage::class,
+        ManageGitSource::class,
+        CloudProvider::class,
+        ManageNotifications::class,
+    ];
+
     protected array $tools = self::TOOLS;
+
+    /**
+     * @return array<int, class-string<Tool>>
+     */
+    public static function toolsForCurrentActor(): array
+    {
+        $user = request()->user();
+        $teamId = $user?->currentAccessToken()?->team_id;
+
+        if ($user !== null && $teamId !== null && app(AccessResolver::class)->coversWholeTeam($user, (int) $teamId)) {
+            return self::TOOLS;
+        }
+
+        return array_values(array_diff(self::TOOLS, self::TEAM_LEVEL_TOOLS));
+    }
+
+    public function createContext(): ServerContext
+    {
+        $this->tools = self::toolsForCurrentActor();
+
+        return parent::createContext();
+    }
 
     protected array $resources = [
         InfrastructureOverviewResource::class,
