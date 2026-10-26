@@ -3586,7 +3586,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -6779,7 +6779,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
@@ -13753,7 +13753,7 @@ paths:
                 content:
                   type: string
                   nullable: true
-                  description: 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'
+                  description: 'The file content (file only, not allowed for read-only storages). Changing the content needs the deploy permission.'
               type: object
               additionalProperties: false
       responses:
