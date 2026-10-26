@@ -1274,8 +1274,6 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
 
-        $this->authorize('create', Application::class);
-
         // removeUnnecessaryFieldsFromRequest() strips force_domain_override before the docker_compose_domains checks run.
         $forceDomainOverride = $request->boolean('force_domain_override');
 
@@ -1419,6 +1417,7 @@ class ApplicationsController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
+        $this->authorize('create', [Application::class, $environment]);
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
@@ -6017,6 +6016,7 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+        $this->authorize('create', [Application::class, $application->environment]);
 
         $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
             ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();

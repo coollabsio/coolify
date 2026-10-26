@@ -39,7 +39,8 @@ class ActiveDeployments extends Component
 
         $baseQuery = ApplicationDeploymentQueue::query()
             ->with(['application.environment.project'])
-            ->whereIn('server_id', $serverIds);
+            ->whereIn('server_id', $serverIds)
+            ->visibleToCurrentActor();
 
         $this->activeDeployments = (clone $baseQuery)
             ->whereIn('status', [

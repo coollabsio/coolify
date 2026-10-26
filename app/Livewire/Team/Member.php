@@ -69,7 +69,7 @@ class Member extends Component
             }
             $teamId = currentTeam()->id;
             DB::transaction(function () use ($teamId): void {
-                $this->member->teams()->updateExistingPivot($teamId, ['role' => Role::MEMBER->value]);
+                $this->member->teams()->updateExistingPivot($teamId, ['role' => Role::MEMBER->value, 'access' => null]);
                 RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
             });
             $this->auditRoleUpdate($teamId, Role::MEMBER);

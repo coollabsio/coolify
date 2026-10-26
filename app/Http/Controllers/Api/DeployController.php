@@ -13,6 +13,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Tag;
+use App\Services\Access\AccessResolver;
 use App\Support\ResourceStartActivity;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -75,7 +76,12 @@ class DeployController extends Controller
             return invalidTokenResponse();
         }
         $servers = Server::whereTeamId($teamId)->get();
-        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get()->sortBy('id');
+        $query = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'));
+        if (! app(AccessResolver::class)->coversWholeTeam($request->user(), $teamId)) {
+            // application_id is a string column, so compare with string IDs of the applications the actor can see.
+            $query->whereIn('application_id', Application::ownedByCurrentTeamAPI($teamId)->pluck('id')->map(fn ($id) => (string) $id));
+        }
+        $deployments_per_server = $query->get()->sortBy('id');
         $deployments_per_server = $deployments_per_server->map(function ($deployment) {
             return $this->removeSensitiveData($deployment);
         });
@@ -232,6 +238,15 @@ class DeployController extends Controller
         $servers = Server::whereTeamId($teamId)->pluck('id');
         if (! $servers->contains($deployment->server_id)) {
             return response()->json(['message' => 'You do not have permission to cancel this deployment.'], 403);
+        }
+        // For an actor limited by access grants, deployments of applications outside the grants do not exist.
+        // Soft-deleted applications stay included so a deploy that runs during a delete can still be cancelled.
+        if (! app(AccessResolver::class)->coversWholeTeam($request->user(), $teamId)) {
+            $deploymentApplication = $deployment->application()->withTrashed()->first();
+            if (! $deploymentApplication) {
+                return response()->json(['message' => 'Deployment not found.'], 404);
+            }
+            $this->authorize('deploy', $deploymentApplication);
         }
 
         // Check if deployment can be cancelled (must be queued or in_progress)
