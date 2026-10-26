@@ -18,6 +18,7 @@ use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\SyftPackageParser;
 use App\Services\ImageScan\TagSelector;
@@ -34,7 +35,7 @@ use Throwable;
  * Candidates are scanned from the registry on the server, at most 2 per image and 20 per server and day; the SBOM of
  * a candidate digest is kept per server and reused.
  *
- * Writes `image_scans.candidates` as `{status, checked_at, error, entries}`. Never throws for registry or scan
+ * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`. Never throws for registry or scan
  * problems: they become the status. Registry credentials are read only after an anonymous request failed, only for
  * the registry of the image, and are never stored or logged.
  */
@@ -73,6 +74,15 @@ class RefreshCandidates
     private bool $loginRead = false;
 
     private bool $authRequired = false;
+
+    /** A registry call without credentials worked, so a later failure is not a missing login. */
+    private bool $anonymousWorked = false;
+
+    private bool $tagsTruncated = false;
+
+    private ?string $currentImageId = null;
+
+    private ?int $currentImageSize = null;
 
     private ?string $error = null;
 
@@ -198,6 +208,7 @@ class RefreshCandidates
         }
 
         $ranOnServer = true;
+        $this->currentImageId = $scan->image_id;
         $tag = $this->image->tag ?? 'latest';
         $selector = new TagSelector;
         $isVersion = $selector->isVersion($tag);
@@ -208,7 +219,9 @@ class RefreshCandidates
             if ($tags === null) {
                 return $this->failure();
             }
-            $selected = $selector->select($tag, array_values(array_filter(array_map('trim', explode("\n", $tags, TagSelector::MAX_TAGS + 1)), fn (string $line) => $line !== '')));
+            $tags = array_values(array_filter(array_map('trim', explode("\n", $tags)), fn (string $line) => $line !== ''));
+            $this->tagsTruncated = count($tags) > TagSelector::MAX_TAGS;
+            $selected = $selector->select($tag, $tags);
         }
 
         $toScan = [];
@@ -346,6 +359,12 @@ class RefreshCandidates
                 }
             }
 
+            if (! $this->hasDiskSpace()) {
+                $this->error ??= 'disk';
+
+                return null;
+            }
+
             if (! $this->reserveDailyScan($server)) {
                 $this->error ??= 'daily_limit';
 
@@ -382,6 +401,32 @@ class RefreshCandidates
     }
 
     /**
+     * The disk rule of local scans (image size × 2 + 1 GB), with the size of the current image: Syft writes the
+     * candidate's layers to the scratch directory. A current image that is no longer on the server counts as 0 bytes.
+     */
+    private function hasDiskSpace(): bool
+    {
+        if ($this->currentImageSize === null) {
+            $this->currentImageSize = 0;
+            if (is_string($this->currentImageId) && preg_match('/\Asha256:[a-f0-9]{64}\z/', $this->currentImageId) === 1) {
+                $inspect = $this->runStep($this->commands->inspect($this->currentImageId), 'inspect', self::TIMEOUT_DEFAULT);
+                $parts = $inspect !== null && $inspect['code'] === 0 ? explode('|', trim($inspect['payload'])) : [];
+                if (count($parts) === 4 && preg_match('/\A\d{1,18}\z/', $parts[3]) === 1) {
+                    $this->currentImageSize = (int) $parts[3];
+                }
+            }
+        }
+
+        try {
+            ScanImage::checkDiskSpace($this->commands, $this->currentImageSize);
+        } catch (ScanFailed) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Counts a registry scan against the daily limit of the server; false when the limit is reached.
      */
     private function reserveDailyScan(Server $server): bool
@@ -409,7 +454,8 @@ class RefreshCandidates
 
     /**
      * Runs a registry command anonymously first. After a failure it reads the server's login for the registry of the
-     * image once and repeats the command with it. Without a usable login, a private image needs one.
+     * image once and repeats the command with it. Without a usable login, a private image needs one. When an anonymous
+     * call already worked, a failure is a registry error, not a missing login.
      *
      * @param  callable(): list<string>  $commands
      */
@@ -417,6 +463,8 @@ class RefreshCandidates
     {
         $result = $this->runStep($commands(), $step, self::TIMEOUT_REGISTRY);
         if ($result !== null && $result['code'] === 0) {
+            $this->anonymousWorked = $this->anonymousWorked || $this->auth === null;
+
             return $this->payload($result)[0];
         }
         if ($result === null || in_array($result['code'], self::EXIT_TIMEOUT, true)) {
@@ -424,7 +472,7 @@ class RefreshCandidates
 
             return null;
         }
-        if ($this->loginRead) {
+        if ($this->loginRead || $this->anonymousWorked) {
             $this->error ??= 'registry';
 
             return null;
@@ -527,6 +575,7 @@ class RefreshCandidates
             'status' => $result['status'],
             'checked_at' => now()->toIso8601String(),
             'error' => $result['error'],
+            'tags_truncated' => $this->tagsTruncated,
             'entries' => $result['entries'],
         ];
         $fresh->setRelation('resource', $scan->resource);

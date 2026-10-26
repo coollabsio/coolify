@@ -19,6 +19,7 @@ use App\Models\Team;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\ImageScanGate;
+use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
@@ -62,6 +63,8 @@ beforeEach(function () {
     $this->grype = [substr(CANDIDATES_LINE, 7) => 'grype-candidate-15-alpine', substr(CANDIDATES_NEW_BUILD, 7) => 'grype-candidate-15.11'];
     $this->dockerConfig = '';
     $this->anonymousFails = false;
+    $this->diskFree = '50000000000 50000000000';
+    $this->grypeCut = false;
 });
 
 function candidatesServer(Team $team): Server
@@ -126,9 +129,11 @@ function candidatesCommand(PendingProcess $process): string
     return str_replace("'\\''", "'", $process->command);
 }
 
-function candidatesPayload(string $step, string $payload, int $code = 0): string
+function candidatesPayload(string $step, string $payload, int $code = 0, ?int $size = null): string
 {
-    return "coolify-scan-exit {$step} {$code} ".strlen($payload)."\ncoolify-scan-payload\n{$payload}";
+    $size ??= strlen($payload);
+
+    return "coolify-scan-exit {$step} {$code} {$size}\ncoolify-scan-payload\n{$payload}";
 }
 
 /**
@@ -147,6 +152,8 @@ function candidatesFake(): void
 
         return Process::result(output: match (true) {
             str_contains($command, '.docker/config.json') => test()->dockerConfig,
+            str_contains($command, 'df -P') => test()->diskFree,
+            str_contains($command, 'docker image inspect') => "coolify-scan-exit inspect 0\ncoolify-scan-payload\nsha256:".CANDIDATES_CURRENT_HEX.'|postgres@'.CANDIDATES_REPO_DIGEST.'|linux/amd64|2000000000',
             str_contains($command, 'coolify-scan-exit tags') => candidatesPayload('tags', implode("\n", test()->tags)),
             str_contains($command, 'coolify-scan-exit digest') => preg_match("/'digest' '[^']*:([A-Za-z0-9_.-]+)'/", $command, $tag) === 1 && isset(test()->digests[$tag[1]])
                 ? candidatesPayload('digest', test()->digests[$tag[1]])
@@ -154,7 +161,7 @@ function candidatesFake(): void
             str_contains($command, "'registry:") => 'coolify-scan-exit sbom 0',
             str_contains($command, 'coolify-scan-exit packages') => candidatesPayload('packages', file_get_contents(base_path('tests/Fixtures/image-scan/syft-packages.ndjson'))),
             str_contains($command, 'coolify-scan-exit grype') => preg_match('#sboms/([a-f0-9]{64})\.json#', $command, $hex) === 1 && isset(test()->grype[$hex[1]])
-                ? candidatesPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/'.test()->grype[$hex[1]].'.ndjson')))
+                ? candidatesPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/'.test()->grype[$hex[1]].'.ndjson')), size: test()->grypeCut ? ScannerCommands::OUTPUT_LIMIT + 1 : null)
                 : candidatesPayload('grype', '', 125),
             default => '',
         });
@@ -425,4 +432,92 @@ it('is a unique queued job per scan', function () {
     expect($job)->toBeInstanceOf(ShouldBeUnique::class)
         ->and($job->uniqueId())->toBe((string) $scan->id)
         ->and($job->queue)->toBe('default');
+});
+
+it('checks the disk space for the current image size before a registry scan', function () {
+    candidatesFake();
+    $this->diskFree = '4000000000 50000000000';
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    expect(candidatesRan("'registry:"))->toBe(0)
+        ->and(candidatesRan('df -P'))->toBe(1)
+        ->and($scan->fresh()->candidateStatus())->toBe('failed')
+        ->and($scan->fresh()->candidates['error'])->toBe('disk')
+        ->and(candidatesScansToday())->toBe(0);
+});
+
+it('runs a registry scan when the disk has image size × 2 + 1 GB free', function () {
+    candidatesFake();
+    $this->diskFree = '5100000000 5100000000';
+
+    RefreshCandidates::run(candidatesScan());
+
+    expect(candidatesRan("'registry:"))->toBe(1);
+});
+
+it('does not ask for a login when anonymous registry access worked', function () {
+    candidatesFake();
+    $this->tags = ['1.0', '1.1'];
+    $this->digests = ['1.0' => CANDIDATES_REPO_DIGEST];
+    $scan = candidatesScan('ghcr.io/acme/api:1.0');
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidateStatus())->toBe('failed')
+        ->and($scan->fresh()->candidates['error'])->toBe('registry')
+        ->and(candidatesRan('.docker/config.json'))->toBe(0);
+});
+
+it('does not ask for a login for a Docker Hub official image', function () {
+    candidatesFake();
+    $this->anonymousFails = true;
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidateStatus())->toBe('failed')
+        ->and(candidatesRan('.docker/config.json'))->toBe(1);
+});
+
+it('never recommends a candidate whose scan output was cut', function () {
+    candidatesFake();
+    $this->grypeCut = true;
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    expect(collect($scan->fresh()->candidateEntries())->firstWhere('kind', 'line')['better'])->toBeFalse()
+        ->and($scan->fresh()->candidateStatus())->toBe('no_better');
+});
+
+it('records a busy server lock and scans nothing', function () {
+    candidatesFake();
+    $lock = Cache::lock("image-scan:{$this->server->id}", 60);
+    $lock->get();
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan, 1);
+
+    expect(candidatesRan("'registry:"))->toBe(0)
+        ->and($scan->fresh()->candidateStatus())->toBe('failed')
+        ->and($scan->fresh()->candidates['error'])->toBe('lock_busy');
+    $lock->release();
+});
+
+it('records that the tag list was cut at 10,000 tags', function () {
+    candidatesFake();
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+    expect($scan->fresh()->candidates['tags_truncated'])->toBeFalse();
+
+    $this->tags = [...array_map(fn (int $patch) => "15.{$patch}-alpine", range(100, 10_100)), '15.0-alpine'];
+    RefreshCandidates::run($scan->fresh());
+    expect($scan->fresh()->candidates['tags_truncated'])->toBeTrue();
+});
+
+it('allows a candidate job to run up to the worst case of two candidate scans', function () {
+    expect((new RefreshCandidatesJob(candidatesScan()))->timeout)->toBeGreaterThanOrEqual(6000);
 });

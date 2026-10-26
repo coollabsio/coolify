@@ -14,6 +14,7 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -23,6 +24,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -112,16 +114,28 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
     /**
      * Looks for newer versions of each rescanned image that has a package fix at the alert level (spec 4.5, 7.1).
-     * The rescan released the lock; each candidate scan takes it again.
+     * The rescan released the lock; each candidate scan takes it again. Runs here, one image after the other, under
+     * the unique lock of RefreshCandidatesJob: a queued or running job of the same scan does the check instead.
      *
      * @param  list<ImageScan>  $scans
      */
     private function refreshCandidates(array $scans): void
     {
+        $uniqueLock = new UniqueLock(Cache::store());
+
         foreach ($scans as $scan) {
             try {
-                if (RefreshCandidates::shouldRefresh($scan)) {
+                if (! RefreshCandidates::shouldRefresh($scan)) {
+                    continue;
+                }
+                $job = new RefreshCandidatesJob($scan);
+                if (! $uniqueLock->acquire($job)) {
+                    continue;
+                }
+                try {
                     RefreshCandidates::run($scan, self::LOCK_WAIT_SECONDS);
+                } finally {
+                    $uniqueLock->release($job);
                 }
             } catch (Throwable $e) {
                 report($e);

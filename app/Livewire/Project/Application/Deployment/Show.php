@@ -196,26 +196,41 @@ class Show extends Component
     }
 
     /**
-     * Tag of a newer image version that fixes vulnerabilities, from the scans of this deployment.
+     * Tag of a newer version in the same line that fixes vulnerabilities, from the scans of this deployment. A newer
+     * build of the same tag is a pull and restart, not an update, and a major version is never offered.
      */
     private function betterImageTag(ApplicationDeploymentQueue $deployment): ?string
     {
-        $candidate = ImageScan::query()
+        $scans = ImageScan::query()
             ->where('resource_type', $this->application->getMorphClass())
             ->where('resource_id', $this->application->id)
             ->where('deployment_queue_id', $deployment->id)
-            ->get(['id', 'candidates'])
-            ->flatMap(fn (ImageScan $scan): array => $scan->candidateEntries())
-            ->first(fn ($candidate): bool => is_array($candidate) && ($candidate['better'] ?? false) === true && is_string($candidate['ref'] ?? null));
-        if (! $candidate) {
-            return null;
+            ->get(['id', 'image_ref', 'candidates']);
+
+        foreach ($scans as $scan) {
+            try {
+                $currentTag = ImageRef::parse((string) $scan->image_ref)->tag;
+            } catch (Throwable) {
+                $currentTag = null;
+            }
+
+            foreach ($scan->candidateEntries() as $candidate) {
+                if (($candidate['kind'] ?? null) !== 'line' || ($candidate['better'] ?? false) !== true || ! is_string($candidate['ref'] ?? null)) {
+                    continue;
+                }
+
+                try {
+                    $tag = ImageRef::parse(Str::before($candidate['ref'], '@'))->tag;
+                } catch (Throwable) {
+                    continue;
+                }
+                if ($tag !== null && $tag !== $currentTag) {
+                    return $tag;
+                }
+            }
         }
 
-        try {
-            return ImageRef::parse(Str::before($candidate['ref'], '@'))->tag;
-        } catch (Throwable) {
-            return null;
-        }
+        return null;
     }
 
     public function refreshQueue()

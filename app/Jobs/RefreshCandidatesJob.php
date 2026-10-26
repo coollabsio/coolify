@@ -20,10 +20,10 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
 
     public $tries = 1;
 
-    /** Two candidate scans with their lock waits. */
-    public $timeout = 5400;
+    /** Two candidate scans with their lock waits and disk checks, plus the registry calls (about 6,400 s). */
+    public $timeout = 7200;
 
-    public $uniqueFor = 5400;
+    public $uniqueFor = 7200;
 
     public $deleteWhenMissingModels = true;
 

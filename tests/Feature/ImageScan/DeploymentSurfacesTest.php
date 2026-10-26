@@ -214,6 +214,21 @@ describe('log toolbar', function () {
         ]]]);
 
         surfacesShow($this->admin, $deployment)->assertSee('Update to 16.5-alpine');
+
+        $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
+            ['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+            ['ref' => 'postgres:16.3-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+            ['ref' => 'postgres:17.0-alpine', 'kind' => 'major', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+        ]]]);
+
+        surfacesShow($this->admin, $deployment)->assertDontSee('Update to');
+
+        $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
+            ['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+            ['ref' => 'postgres:16.6-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+        ]]]);
+
+        surfacesShow($this->admin, $deployment)->assertSee('Update to 16.6-alpine');
     });
 });
 

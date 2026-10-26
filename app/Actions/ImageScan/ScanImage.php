@@ -394,8 +394,11 @@ class ScanImage
 
     /**
      * `docker save` and the SBOM need image size × 2 + 1 GiB on the Docker root and on the scan directory.
+     * Candidate scans from a registry use the same rule (Syft writes the layers to the scratch directory).
+     *
+     * @throws ScanFailed
      */
-    private function checkDiskSpace(ScannerCommands $commands, int $imageSize): void
+    public static function checkDiskSpace(ScannerCommands $commands, int $imageSize): void
     {
         $output = instant_remote_process($commands->diskFree(), $commands->server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         if (preg_match('/(\d+) +(\d+)\s*\z/', (string) $output, $free) !== 1) {
@@ -447,7 +450,7 @@ class ScanImage
      */
     private function createSbom(ScannerCommands $commands, string $imageRef, array $image, ?ImageSbom $sbom): ImageSbom
     {
-        $this->checkDiskSpace($commands, $image['size']);
+        self::checkDiskSpace($commands, $image['size']);
 
         $result = $this->runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
         $this->assertSucceeded($result['code']);

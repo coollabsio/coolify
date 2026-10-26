@@ -5,6 +5,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
 use App\Jobs\ImageRescanJob;
 use App\Jobs\PrepareImageScannerJob;
+use App\Jobs\RefreshCandidatesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -23,6 +24,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Services\ImageScan\ScannerCommands;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -416,6 +418,38 @@ describe('rescan', function () {
         expect(ImageScan::query()->where('resource_type', $database->getMorphClass())->sole()->candidateStatus())->not->toBeNull()
             ->and(ImageScan::query()->where('resource_type', $this->application->getMorphClass())->sole()->candidates)->toBeNull()
             ->and(rescanTestRanCommand("'tag'\\'' '\\''ls'\\'' '\\''docker.io/library/postgres'"))->toBe(1);
+    });
+
+    it('skips the candidate check of a scan whose candidate job is queued or running', function () {
+        rescanTestFake();
+        ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high']);
+        $database = StandalonePostgresql::forceCreate([
+            'name' => 'pg',
+            'postgres_password' => 'secret',
+            'image' => 'postgres:15.0-alpine',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $scan = rescanTestScan($database, ['image_id' => 'sha256:'.RESCAN_TEST_HEX, 'image_ref' => 'postgres:15.0-alpine']);
+        rescanTestContainer(RESCAN_TEST_HEX, 'postgres:15.0-alpine', [
+            'coolify.type' => 'database',
+            'coolify.databaseId' => (string) $database->id,
+            'coolify.databaseUuid' => $database->uuid,
+        ]);
+        $uniqueLock = new UniqueLock(Cache::store());
+        expect($uniqueLock->acquire(new RefreshCandidatesJob($scan)))->toBeTrue();
+
+        rescanTestRun();
+
+        expect($scan->fresh()->candidates)->toBeNull()
+            ->and(rescanTestRanCommand('coolify-scan-exit tags'))->toBe(0);
+
+        $uniqueLock->release(new RefreshCandidatesJob($scan));
+        rescanTestRun();
+
+        expect($scan->fresh()->candidateStatus())->not->toBeNull()
+            ->and((new UniqueLock(Cache::store()))->acquire(new RefreshCandidatesJob($scan)))->toBeTrue();
     });
 });
 

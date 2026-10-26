@@ -17,13 +17,13 @@ class DockerRegistryLogins
 {
     public const DOCKER_HUB = 'docker.io';
 
+    /** Credentials stay in the output, which instant_remote_process neither logs nor stores. */
+    private const READ_CONFIG = 'cat "$HOME/.docker/config.json" 2>/dev/null || true';
+
     /**
      * A registry host with an optional port. An IPv6 host is bracketed ([2a01:4f8::1]:5000) and holds only
      * hex digits, ':' and '.', so the value stays safe in shell commands.
      */
-    /** Credentials stay in the output, which instant_remote_process neither logs nor stores. */
-    private const READ_CONFIG = 'cat "$HOME/.docker/config.json" 2>/dev/null || true';
-
     public const REGISTRY_PATTERN = '/^(?:[a-z0-9]([a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(:[0-9]{1,5})?$/';
 
     /**
@@ -43,7 +43,8 @@ class DockerRegistryLogins
     /**
      * The `auths` login of one registry from the server's Docker config, as a base64 Docker config that holds only
      * that registry, for the scanner commands. The config is read over SSH without logging; the result is never
-     * stored or logged. Credential helpers cannot be read: they return the status `helper`.
+     * stored or logged. Credential helpers and stores cannot be read and take precedence over `auths`, like in Docker:
+     * they return the status `helper`.
      *
      * @return array{status: 'ok'|'helper'|'none', config: ?string}
      */
@@ -65,6 +66,13 @@ class DockerRegistryLogins
             return ['status' => 'none', 'config' => null];
         }
 
+        // Docker reads a credential helper or store before `auths`, so an `auths` entry next to one may be stale.
+        $helpers = is_array($decoded['credHelpers'] ?? null) ? array_map(fn ($key) => self::normalizeRegistry((string) $key), array_keys($decoded['credHelpers'])) : [];
+        $store = is_string($decoded['credsStore'] ?? null) && $decoded['credsStore'] !== '';
+        if ($store || in_array($registry, $helpers, true)) {
+            return ['status' => 'helper', 'config' => null];
+        }
+
         foreach (is_array($decoded['auths'] ?? null) ? $decoded['auths'] : [] as $key => $entry) {
             $auth = is_array($entry) && self::normalizeRegistry((string) $key) === $registry ? self::basicAuth($entry) : null;
             if ($auth !== null) {
@@ -77,12 +85,7 @@ class DockerRegistryLogins
             }
         }
 
-        $helpers = is_array($decoded['credHelpers'] ?? null) ? array_map(fn ($key) => self::normalizeRegistry((string) $key), array_keys($decoded['credHelpers'])) : [];
-        $store = is_string($decoded['credsStore'] ?? null) && $decoded['credsStore'] !== '';
-
-        return in_array($registry, $helpers, true) || $store
-            ? ['status' => 'helper', 'config' => null]
-            : ['status' => 'none', 'config' => null];
+        return ['status' => 'none', 'config' => null];
     }
 
     /**

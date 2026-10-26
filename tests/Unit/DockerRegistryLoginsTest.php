@@ -111,6 +111,8 @@ it('reports a credential helper login as unusable for one registry', function (a
 })->with([
     'credHelpers' => [['credHelpers' => ['ghcr.io' => 'gh'], 'auths' => ['docker.io' => ['auth' => base64_encode('a:b')]]]],
     'credsStore' => [['credsStore' => 'desktop', 'auths' => ['ghcr.io' => []]]],
+    'credHelpers before an auths entry' => [['credHelpers' => ['ghcr.io' => 'gh'], 'auths' => ['ghcr.io' => ['auth' => base64_encode('old:STALE_SECRET')]]]],
+    'credsStore before an auths entry' => [['credsStore' => 'desktop', 'auths' => ['ghcr.io' => ['auth' => base64_encode('old:STALE_SECRET')]]]],
 ]);
 
 it('reports no login for a registry that is not in the config', function (?string $config) {
