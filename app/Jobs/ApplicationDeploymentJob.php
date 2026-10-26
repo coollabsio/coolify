@@ -261,8 +261,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /** Repo digest reference that replaces the image tag in the compose file. */
     private ?string $imageScanPinnedImage = null;
 
-    /** @var array{ref: string, layers: list<string>}|null The base image of a Dockerfile build (spec 7.4). */
-    private ?array $imageScanBaseImage = null;
+    /** The base image of the final stage of a Dockerfile build (spec 7.4). */
+    private ?string $imageScanBaseImageRef = null;
 
     /** @var array<string, true> Compose images that the gate checked on the server. */
     private array $imageScanCheckedImages = [];
@@ -2976,7 +2976,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $scan = $image !== null ? $this->completedImageScan($image['id']) : null;
-        $scan ??= ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: 120, baseImage: $this->imageScanBaseImage);
+        $scan ??= ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: 120, baseImageRef: $this->imageScanBaseImageRef);
 
         $this->applyImageScanGate($scan);
     }
@@ -3304,12 +3304,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Remembers the base image of the final stage of a Dockerfile build for the image scan (spec 7.4), with its layer
-     * IDs when the base image is on the build server. Never fails the deployment.
+     * Remembers the base image of the final stage of a Dockerfile build for the image scan (spec 7.4). Runs no remote
+     * command and never fails the deployment.
      */
     private function rememberDockerfileBaseImage(): void
     {
-        $this->imageScanBaseImage = null;
+        $this->imageScanBaseImageRef = null;
 
         try {
             if ($this->application->build_pack !== 'dockerfile'
@@ -3319,25 +3319,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $dockerfile = filled($this->application->dockerfile) ? (string) $this->application->dockerfile : (string) $this->saved_outputs->get('dockerfile_from_repo');
-            $ref = DockerfileBaseImage::finalStage($dockerfile, $this->application->dockerfile_target_build);
-            if ($ref === null) {
-                return;
-            }
-
-            $this->imageScanBaseImage = ['ref' => $ref, 'layers' => []];
-            $format = escapeshellarg('{{json .RootFS.Layers}}');
-            $this->execute_remote_command([
-                "docker image inspect --format {$format} ".escapeshellarg($ref).' 2>/dev/null',
-                'hidden' => true,
-                'ignore_errors' => true,
-                'save' => 'image_scan_base_layers',
-                'append' => false,
-            ]);
-
-            $layers = json_decode($this->trimmedSavedOutput('image_scan_base_layers')->value(), true);
-            if (is_array($layers) && array_is_list($layers)) {
-                $this->imageScanBaseImage['layers'] = array_values(array_filter($layers, fn ($layer): bool => is_string($layer) && ImageRef::isValidDigest($layer)));
-            }
+            $this->imageScanBaseImageRef = DockerfileBaseImage::finalStage($dockerfile, $this->application->dockerfile_target_build);
         } catch (Throwable $e) {
             \Log::warning("Deployment {$this->deployment_uuid} could not read the base image for the image scan: {$e->getMessage()}");
         }
@@ -3371,7 +3353,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($images !== []) {
-                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $images, false, $this->imageScanBaseImage);
+                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $images, false, $this->imageScanBaseImageRef);
             }
         } catch (Throwable $e) {
             \Log::warning("Deployment {$this->deployment_uuid} could not queue the image scan: {$e->getMessage()}");

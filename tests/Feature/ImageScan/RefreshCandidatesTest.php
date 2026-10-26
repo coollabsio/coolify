@@ -524,15 +524,23 @@ it('allows a candidate job to run up to the worst case of two candidate scans', 
 });
 
 /**
- * A Dockerfile build from postgres:15.0-alpine: the apk findings are in the base image layers, the others in app layers.
+ * A Dockerfile build from postgres:15.0-alpine: the app has the findings of the base image (grype fixture) and one
+ * more of a package that the Dockerfile added (CVE-2099-0001). The registry scan of the current base image answers
+ * with the grype fixture, the line candidate 15.15-alpine with the 15-alpine fixture.
  */
-function candidatesDockerfileScan(string $baseImageRef = 'postgres:15.0-alpine', bool $withBaseFindings = true): ImageScan
+function candidatesDockerfileScan(string $baseImageRef = 'postgres:15.0-alpine', bool $withFindings = true): ImageScan
 {
+    test()->grype = [...test()->grype, substr(CANDIDATES_REPO_DIGEST, 7) => 'grype'];
     $application = Application::factory()->create([
         'environment_id' => test()->environment->id,
         'destination_id' => test()->destination->id,
         'destination_type' => test()->destination->getMorphClass(),
         'build_pack' => 'dockerfile',
+    ]);
+    $added = Finding::fromArray([
+        'id' => 'CVE-2099-0001', 'aliases' => [], 'severity' => 'High', 'package' => 'curl', 'version' => '8.0.0-r0',
+        'type' => 'apk', 'artifactId' => 'added-curl', 'fixedIn' => '8.0.1-r0', 'fixState' => 'fixed', 'kev' => false,
+        'epss' => null, 'risk' => 9.0, 'summary' => '', 'layer' => 'app',
     ]);
     $scan = candidatesScan();
     $scan->update([
@@ -542,13 +550,21 @@ function candidatesDockerfileScan(string $baseImageRef = 'postgres:15.0-alpine',
         'repo_digest' => null,
         'builds_image' => true,
         'base_image_ref' => $baseImageRef,
-        'findings' => array_map(fn (Finding $finding) => $finding->withLayer($withBaseFindings && $finding->type === 'apk' ? 'base' : 'app')->toArray(), candidatesFindings()),
+        'findings' => $withFindings ? array_map(fn (Finding $finding) => $finding->toArray(), [...candidatesFindings(), $added]) : [],
     ]);
 
     return $scan->fresh();
 }
 
-it('recommends a newer base image for a Dockerfile build from the findings in base layers only', function () {
+/**
+ * The findings of the grype fixture at the alert level (high): those the current base image has too.
+ */
+function candidatesAttributableCount(): int
+{
+    return collect(candidatesFindings())->filter(fn (Finding $finding) => in_array(strtolower($finding->severity), ['critical', 'high'], true))->count();
+}
+
+it('attributes findings to the base image from a registry scan of the current base and recommends the newer tag', function () {
     candidatesFake();
     $scan = candidatesDockerfileScan();
     ResourceScans::refreshSummaries(collect([$scan]));
@@ -559,25 +575,48 @@ it('recommends a newer base image for a Dockerfile build from the findings in ba
     $scan->refresh();
     $base = $scan->candidates['base'];
     $line = $base['entries'][0];
-    $baseIds = collect(candidatesFindings())->where('type', 'apk')->flatMap(fn (Finding $finding) => [$finding->id, ...$finding->aliases])->all();
-    $appOnlyIds = collect(candidatesFindings())->where('type', '!=', 'apk')->pluck('id')->diff($baseIds)->values()->all();
 
     expect($scan->candidateStatus())->toBe('skipped')
         ->and($scan->candidateEntries())->toBe([])
-        ->and($base)->toMatchArray(['image' => 'postgres:15.0-alpine', 'status' => 'ok', 'tags_truncated' => false])
+        ->and($base)->toMatchArray(['image' => 'postgres:15.0-alpine', 'status' => 'ok', 'tags_truncated' => false, 'current_digest' => CANDIDATES_REPO_DIGEST])
+        ->and($base['attributable'])->toBe(candidatesAttributableCount())
         ->and($base['checked_at'])->not->toBeNull()
         ->and($base['entries'])->toHaveCount(1)
         ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 3, 'high' => 32, 'medium' => 0]])
-        ->and($line['fixed_ids'])->not->toBeEmpty()
-        ->and(array_diff($line['fixed_ids'], $baseIds))->toBe([])
-        ->and(array_intersect($line['fixed_ids'], $appOnlyIds))->toBe([])
-        ->and($line['fixes']['critical'] + $line['fixes']['high'])->toBeGreaterThan(0)->toBeLessThanOrEqual(57)
+        ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
+        ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
+        ->and(array_sum($line['fixes']))->toBeGreaterThan(0)->toBeLessThanOrEqual($base['attributable'])
         ->and($scan->summary['counts'])->toBe($summary['counts'])
-        ->and(candidatesScansToday())->toBe(1)
+        ->and(candidatesScansToday())->toBe(2)
         ->and(RefreshCandidates::shouldRefresh($scan))->toBeFalse();
 
     Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'tag' 'ls' 'docker.io/library/postgres'"));
+    Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'registry:postgres@".CANDIDATES_REPO_DIGEST."'")
+        && str_contains(candidatesCommand($process), "'--platform' 'linux/amd64'"));
     Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'registry:postgres@".CANDIDATES_LINE."'"));
+});
+
+it('counts only findings that the current base image has as attributable and fixed', function () {
+    candidatesFake();
+    $scan = candidatesDockerfileScan();
+    // The current base image has 56 of the 91 high and critical findings of the app; the line candidate has none of the app's.
+    $this->grype[substr(CANDIDATES_REPO_DIGEST, 7)] = 'grype-candidate-15.11';
+    $currentBase = (new GrypeReportParser)->parse(file_get_contents(base_path('tests/Fixtures/image-scan/grype-candidate-15.11.ndjson')))['findings'];
+    $baseKeys = collect($currentBase)->flatMap(fn (Finding $finding) => [$finding->id, ...$finding->aliases])->map(fn (string $id) => strtolower($id))->flip();
+    $attributable = collect(candidatesFindings())
+        ->filter(fn (Finding $finding) => in_array(strtolower($finding->severity), ['critical', 'high'], true))
+        ->filter(fn (Finding $finding) => collect([$finding->id, ...$finding->aliases])->contains(fn (string $id) => $baseKeys->has(strtolower($id))));
+
+    RefreshCandidates::run($scan);
+
+    $base = $scan->fresh()->candidates['base'];
+    $line = $base['entries'][0];
+    expect($attributable)->toHaveCount(56)
+        ->and($base['status'])->toBe('ok')
+        ->and($base['attributable'])->toBe(56)
+        ->and(array_sum($line['fixes']))->toBe(56)
+        ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
+        ->and(collect($line['fixed_ids'])->every(fn (string $id) => $baseKeys->has(strtolower($id))))->toBeTrue();
 });
 
 it('never makes base image candidates fixable now for the gate', function () {
@@ -593,20 +632,20 @@ it('never makes base image candidates fixable now for the gate', function () {
     expect(ImageScanGate::classifierFor($scan)($finding)->value)->not->toBe('fixable_now');
 });
 
-it('says that no newer base image is better when the line candidate has more findings in its layers', function () {
+it('says that no newer base image is better when the line candidate has as many findings as the current base', function () {
     candidatesFake();
     $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype';
     $scan = candidatesDockerfileScan();
 
     RefreshCandidates::run($scan);
 
-    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'no_better'])
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'no_better', 'attributable' => candidatesAttributableCount()])
         ->and($scan->fresh()->candidates['base']['entries'][0]['better'])->toBeFalse();
 });
 
-it('looks for no base image candidates without base layer findings at the alert level or for another build pack', function (bool $withBaseFindings, string $buildPack, ?string $baseImageRef) {
+it('looks for no base image candidates without findings at the alert level or for another build pack', function (bool $withFindings, string $buildPack, ?string $baseImageRef) {
     candidatesFake();
-    $scan = candidatesDockerfileScan($baseImageRef ?? 'postgres:15.0-alpine', $withBaseFindings);
+    $scan = candidatesDockerfileScan($baseImageRef ?? 'postgres:15.0-alpine', $withFindings);
     $scan->update(['base_image_ref' => $baseImageRef]);
     $scan->resource->update(['build_pack' => $buildPack]);
 
@@ -615,20 +654,36 @@ it('looks for no base image candidates without base layer findings at the alert 
     expect($scan->fresh()->candidates)->toBeNull();
     Process::assertNothingRan();
 })->with([
-    'no base findings' => [false, 'dockerfile', 'postgres:15.0-alpine'],
+    'no findings' => [false, 'dockerfile', 'postgres:15.0-alpine'],
     'no base image' => [true, 'dockerfile', null],
     'nixpacks' => [true, 'nixpacks', 'postgres:15.0-alpine'],
 ]);
 
-it('counts base image candidate scans toward the daily limit of the server', function () {
+it('counts both base image scans toward the daily limit and records the limit', function (int $scansToday, int $registryScans, ?int $attributable) {
     candidatesFake();
-    $this->server->settings->forceFill(['image_candidate_scans_today' => 20, 'image_candidate_scans_date' => today()])->saveQuietly();
+    $this->server->settings->forceFill(['image_candidate_scans_today' => $scansToday, 'image_candidate_scans_date' => today()])->saveQuietly();
     $scan = candidatesDockerfileScan();
 
     RefreshCandidates::run($scan);
 
-    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'failed', 'error' => 'daily_limit'])
-        ->and(candidatesRan("'registry:"))->toBe(0);
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'failed', 'error' => 'daily_limit', 'entries' => [], 'attributable' => $attributable === null ? null : candidatesAttributableCount()])
+        ->and(candidatesRan("'registry:"))->toBe($registryScans)
+        ->and(candidatesScansToday())->toBe(20);
+})->with([
+    'limit reached' => [20, 0, null],
+    'one scan left for the current base' => [19, 1, 1],
+]);
+
+it('reuses the SBOM of the current base image on the server and does not count it', function () {
+    candidatesFake();
+    $scan = candidatesDockerfileScan();
+    ImageSbom::factory()->create(['server_id' => $this->server->id, 'image_id' => CANDIDATES_REPO_DIGEST]);
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidates['base']['status'])->toBe('ok')
+        ->and(candidatesRan("'registry:"))->toBe(1)
+        ->and(candidatesScansToday())->toBe(1);
 });
 
 it('cannot compare a base image without a version tag', function () {
@@ -637,6 +692,6 @@ it('cannot compare a base image without a version tag', function () {
 
     RefreshCandidates::run($scan);
 
-    expect($scan->fresh()->candidates['base'])->toMatchArray(['image' => 'postgres:latest', 'status' => 'cannot_compare', 'entries' => []]);
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['image' => 'postgres:latest', 'status' => 'cannot_compare', 'entries' => [], 'attributable' => null]);
     Process::assertNothingRan();
 });

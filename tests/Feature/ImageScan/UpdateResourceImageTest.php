@@ -10,7 +10,6 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\ImageScan;
-use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -29,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Js;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
@@ -670,8 +670,7 @@ describe('updateImage action', function () {
 
 describe('base image of a Dockerfile build', function () {
     /**
-     * A Dockerfile build from node:20.11-alpine with 7 findings at the alert level in base layers (2 critical, 5 high),
-     * one medium base finding, and one critical app finding.
+     * A Dockerfile build from node:20.11-alpine. The base check found 7 findings that the current base image has too.
      *
      * @param  array<string, mixed>|null  $base
      */
@@ -683,16 +682,6 @@ describe('base image of a Dockerfile build', function () {
             'destination_type' => test()->destination->getMorphClass(),
             'build_pack' => 'dockerfile',
         ]);
-        $finding = fn (string $id, string $severity, string $layer) => [
-            'id' => $id, 'aliases' => [], 'severity' => $severity, 'package' => 'openssl', 'version' => '3.1.4-r0',
-            'type' => 'apk', 'artifactId' => $id, 'fixedIn' => '3.1.7-r0', 'fixState' => 'fixed', 'kev' => false,
-            'epss' => null, 'risk' => 1.0, 'summary' => '', 'layer' => $layer,
-        ];
-        $findings = [
-            $finding('CVE-2026-0001', 'critical', 'base'), $finding('CVE-2026-0002', 'critical', 'base'),
-            ...array_map(fn (int $n) => $finding("CVE-2026-001{$n}", 'high', 'base'), range(1, 5)),
-            $finding('CVE-2026-0020', 'medium', 'base'), $finding('CVE-2026-0030', 'critical', 'app'),
-        ];
         $scan = ImageScan::factory()->create([
             'server_id' => test()->server->id,
             'resource_type' => $application->getMorphClass(),
@@ -700,10 +689,17 @@ describe('base image of a Dockerfile build', function () {
             'image_ref' => $application->uuid.':abc123',
             'base_image_ref' => $baseImageRef,
             'builds_image' => true,
-            'findings' => $findings,
-            'summary' => ['fixable_now_at_level' => 8, 'truncated' => false, 'eol_distro' => null],
+            'findings' => [[
+                'id' => 'CVE-2026-0001', 'aliases' => [], 'severity' => 'critical', 'package' => 'openssl', 'version' => '3.1.4-r0',
+                'type' => 'apk', 'artifactId' => 'a1', 'fixedIn' => '3.1.7-r0', 'fixState' => 'fixed', 'kev' => false,
+                'epss' => null, 'risk' => 1.0, 'summary' => '', 'layer' => 'app',
+            ]],
+            'summary' => ['fixable_now_at_level' => 1, 'truncated' => false, 'eol_distro' => null],
             'candidates' => ['status' => 'skipped', 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => [],
-                ...($base === null ? [] : ['base' => ['image' => $baseImageRef, 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, ...$base]])],
+                ...($base === null ? [] : ['base' => [
+                    'image' => $baseImageRef, 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false,
+                    'attributable' => 7, 'current_digest' => 'sha256:'.str_repeat('c', 64), ...$base,
+                ]])],
             'scanned_at' => now(),
         ]);
 
@@ -713,7 +709,8 @@ describe('base image of a Dockerfile build', function () {
     function updateImageBaseEntry(array $overrides = []): array
     {
         return updateImageEntry('node:20.18-alpine', 'line', true, [
-            'fixed_ids' => ['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014', 'CVE-2026-0020', 'CVE-2026-0030'],
+            'fixed_ids' => ['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014'],
+            'fixes' => ['critical' => 1, 'high' => 4, 'medium' => 0],
             ...$overrides,
         ]);
     }
@@ -723,27 +720,21 @@ describe('base image of a Dockerfile build', function () {
 
         updateImagePage($this->admin, $application, 'application')
             ->assertSeeHtml('Change <code')
-            ->assertSee('FROM node:20.11-alpine')
             ->assertSeeText('Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 7.')
             ->assertSeeHtml("copy(await ('FROM node:20.18-alpine'))")
             ->assertDontSee('Update to')
             ->assertDontSeeHtml('updateImage(');
     });
 
-    it('does not count base findings that are ignored now', function () {
-        [$application, $scan] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
-        ImageScanIgnore::factory()->create([
-            'team_id' => $this->team->id,
-            'resource_type' => $application->getMorphClass(),
-            'resource_id' => $application->id,
-            'vulnerability_id' => 'CVE-2026-0002',
-        ]);
+    it('keeps the name of the base image as the Dockerfile writes it', function () {
+        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageEntry('node:20.18-alpine', 'line', true, ['fixes' => ['critical' => 0, 'high' => 2, 'medium' => 0]])]], 'docker.io/library/node:20.11-alpine');
 
         updateImagePage($this->admin, $application, 'application')
-            ->assertSeeText('Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 6.');
+            ->assertSeeText('Change FROM docker.io/library/node:20.11-alpine to docker.io/library/node:20.18-alpine: fixes 2 of 7.')
+            ->assertSeeHtml('copy(await ('.Js::from('FROM docker.io/library/node:20.18-alpine').'))');
     });
 
-    it('shows nothing for the base image without a better line candidate', function (?array $base) {
+    it('shows nothing for the base image without a better line candidate that fixes something', function (?array $base) {
         [$application] = updateImageDockerfileScan($base);
 
         updateImagePage($this->admin, $application, 'application')
@@ -755,7 +746,10 @@ describe('base image of a Dockerfile build', function () {
         'not checked' => [null],
         'no better' => [['status' => 'no_better', 'entries' => [updateImageBaseEntry(['better' => false])]]],
         'failed' => [['status' => 'failed', 'error' => 'registry', 'entries' => []]],
+        'daily limit' => [['status' => 'failed', 'error' => 'daily_limit', 'entries' => []]],
         'login needed' => [['status' => 'auth_required', 'error' => 'registry_auth', 'entries' => []]],
-        'cannot compare' => [['status' => 'cannot_compare', 'entries' => []]],
+        'cannot compare' => [['status' => 'cannot_compare', 'entries' => [], 'attributable' => null]],
+        'nothing attributable' => [['status' => 'ok', 'attributable' => 0, 'entries' => [updateImageBaseEntry(['fixes' => ['critical' => 0, 'high' => 0, 'medium' => 0]])]]],
+        'fixes nothing' => [['status' => 'ok', 'entries' => [updateImageBaseEntry(['fixed_ids' => [], 'fixes' => ['critical' => 0, 'high' => 0, 'medium' => 0]])]]],
     ]);
 });

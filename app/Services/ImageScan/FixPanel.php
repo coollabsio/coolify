@@ -146,13 +146,13 @@ final class FixPanel
     }
 
     /**
-     * A better base image for the final `FROM` of a Dockerfile build (spec 7.4): what it fixes of the findings in base
-     * layers at the alert level that are not ignored. Null without a better line candidate; failures of the base
-     * check are not shown.
+     * A better base image for the final `FROM` of a Dockerfile build (spec 7.4): of the findings at the alert level
+     * that the current base image has too (m), how many the newer tag no longer has (n). Null without a better line
+     * candidate that fixes one; failures of the base check are not shown.
      *
      * @return array{from: string, to: string, fixed: int, total: int}|null
      */
-    public static function baseImage(ImageScan $scan, Model $owner): ?array
+    public static function baseImage(ImageScan $scan): ?array
     {
         $from = (string) $scan->base_image_ref;
         $base = data_get($scan->candidates, 'base');
@@ -177,18 +177,9 @@ final class FixPanel
             return null;
         }
 
-        $fixedIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($entry['fixed_ids'] ?? [])));
-        $findings = RefreshCandidates::baseFindings($scan, $owner);
-        $fixed = count(array_filter($findings, function (Finding $finding) use ($fixedIds): bool {
-            foreach ([$finding->id, ...$finding->aliases] as $id) {
-                if (isset($fixedIds[mb_strtolower($id)])) {
-                    return true;
-                }
-            }
-
-            return false;
-        }));
-        if ($fixed === 0) {
+        $total = (int) ($base['attributable'] ?? 0);
+        $fixed = min($total, array_sum(array_map('intval', array_intersect_key((array) ($entry['fixes'] ?? []), array_flip(self::SEVERITIES)))));
+        if ($total <= 0 || $fixed <= 0) {
             return null;
         }
 
@@ -196,7 +187,7 @@ final class FixPanel
             'from' => $from,
             'to' => substr($from, 0, (int) strrpos($from, ':')).':'.$candidate->tag,
             'fixed' => $fixed,
-            'total' => count($findings),
+            'total' => $total,
         ];
     }
 
@@ -229,7 +220,7 @@ final class FixPanel
                 ? route('server.registries', ['server_uuid' => $server->uuid])
                 : null,
             'major' => $major === null ? null : (string) $major['ref'],
-            'base' => self::baseImage($scan, $owner),
+            'base' => self::baseImage($scan),
         ];
     }
 

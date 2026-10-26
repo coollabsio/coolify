@@ -51,9 +51,9 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * @param  list<string>  $imageRefs  Empty: the images of the resource (imageRefsFor()).
      * @param  bool  $retryWhenImageMissing  A job after a service or database start retries an image that is not pulled yet.
-     * @param  array{ref: string, layers: list<string>}|null  $baseImage  The base image of the Dockerfile build of the application.
+     * @param  ?string  $baseImageRef  The base image of the Dockerfile build of the application.
      */
-    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [], public bool $retryWhenImageMissing = false, public ?array $baseImage = null)
+    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [], public bool $retryWhenImageMissing = false, public ?string $baseImageRef = null)
     {
         $this->tries = $retryWhenImageMissing ? self::START_MAX_ATTEMPTS : 1;
         // Self-hosted Horizon works through 'high' first, so scans there would delay deployments.
@@ -94,8 +94,8 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
 
-            $baseImage = $this->baseImage !== null && $resource === $this->resource && $resource instanceof Application ? $this->baseImage : null;
-            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, self::LOCK_WAIT_SECONDS, $baseImage);
+            $baseImageRef = $resource === $this->resource && $resource instanceof Application ? $this->baseImageRef : null;
+            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, self::LOCK_WAIT_SECONDS, $baseImageRef);
 
             if ($this->shouldRetry($scan)) {
                 // Only the last attempt leaves the error visible.

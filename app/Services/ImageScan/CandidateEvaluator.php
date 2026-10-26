@@ -99,6 +99,20 @@ final class CandidateEvaluator
     }
 
     /**
+     * The current findings that the other list also has under one of their IDs.
+     *
+     * @param  list<Finding>  $current
+     * @param  list<Finding>  $other
+     * @return list<Finding>
+     */
+    public function shared(array $current, array $other): array
+    {
+        $fixed = $this->fixed($current, $other);
+
+        return array_values(array_filter($current, fn (Finding $finding) => ! in_array($finding, $fixed, true)));
+    }
+
+    /**
      * @param  list<Finding>  $findings
      * @return list<Finding>
      */

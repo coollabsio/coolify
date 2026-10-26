@@ -74,3 +74,12 @@ it('rejects an end-of-life candidate only when the current distro is supported',
         ->and($evaluator->isBetter($current, [], ImageScanAlertLevel::High, true, true))->toBeTrue()
         ->and($evaluator->isBetter($current, [], ImageScanAlertLevel::High, false, false))->toBeTrue();
 });
+
+it('keeps the current findings that another image also has under one of their IDs', function () {
+    $evaluator = new CandidateEvaluator;
+    $inBase = evaluatorFinding('GHSA-aaaa', aliases: ['CVE-2026-0001']);
+    $added = evaluatorFinding('CVE-2099-0001');
+
+    expect($evaluator->shared([$inBase, $added], [evaluatorFinding('cve-2026-0001')]))->toBe([$inBase])
+        ->and($evaluator->shared([$inBase, $added], []))->toBe([]);
+});

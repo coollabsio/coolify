@@ -36,9 +36,10 @@ use Throwable;
  * a candidate digest is kept per server and reused.
  *
  * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`, with status `skipped` when
- * only the base image was checked. The base image of a Dockerfile build (spec 7.4) gets the newest tag of its line under
- * `base`: `{image, status, checked_at, error, tags_truncated, entries}`, compared on the findings in base layers only.
- * Base entries never make a finding fixable now. Never throws for registry or scan problems: they become the status.
+ * only the base image was checked. The base image of a Dockerfile build (spec 7.4) is scanned from the registry with the
+ * newest tag of its line; the result is under `base`: `{image, status, checked_at, error, tags_truncated, attributable,
+ * current_digest, entries}`. A finding of the app is attributable to the base image when the current base image has it
+ * too; the line candidate fixes the attributable findings it does not have. Base entries never make a finding fixable now. Never throws for registry or scan problems: they become the status.
  * Registry credentials are read only after an anonymous request failed, only for the registry of the image, and are
  * never stored or logged.
  */
@@ -88,9 +89,6 @@ class RefreshCandidates
     private ?int $currentImageSize = null;
 
     private ?string $error = null;
-
-    /** Candidate scans of this check, image and base image together. */
-    private int $candidateScans = 0;
 
     public function handle(ImageScan $scan, int $lockWaitSeconds = self::LOCK_WAIT_SECONDS): void
     {
@@ -145,7 +143,7 @@ class RefreshCandidates
             $result = $check();
         } catch (Throwable $e) {
             report($e);
-            $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => []];
+            $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => [], 'attributable' => null, 'current_digest' => null];
         }
 
         return [...$result, 'tags_truncated' => $this->tagsTruncated];
@@ -183,8 +181,8 @@ class RefreshCandidates
     }
 
     /**
-     * A newer base image is looked for when a Dockerfile build has findings in the layers of its base image at or
-     * above the alert level that are not ignored (spec 7.4). Nixpacks, Railpack, and static builds have no base image.
+     * A newer base image is looked for when a Dockerfile build with a known base image has findings at or above the
+     * alert level that are not ignored (spec 7.4). Nixpacks, Railpack, and static builds have no base image.
      */
     private static function needsBaseCandidates(ImageScan $scan): bool
     {
@@ -194,22 +192,22 @@ class RefreshCandidates
             && $resource instanceof Application
             && $resource->build_pack === 'dockerfile'
             && filled($scan->base_image_ref)
-            && self::baseFindings($scan, $resource) !== [];
+            && self::alertFindings($scan, $resource) !== [];
     }
 
     /**
-     * Findings in base image layers at or above the alert level that are not ignored.
+     * Findings at or above the alert level that are not ignored.
      *
      * @return list<Finding>
      */
-    public static function baseFindings(ImageScan $scan, Model $resource): array
+    private static function alertFindings(ImageScan $scan, Model $resource): array
     {
         $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
         $ignores = IgnoreMatcher::forResource($resource);
 
         return array_values(array_filter(
             ResourceScans::findings($scan),
-            fn (Finding $finding): bool => $finding->layer === 'base' && $level->includes($finding->severity) && $ignores->matches($finding) === null,
+            fn (Finding $finding): bool => $level->includes($finding->severity) && $ignores->matches($finding) === null,
         ));
     }
 
@@ -320,7 +318,7 @@ class RefreshCandidates
             }
         }
 
-        $entries = $this->evaluate($scan, $resource, ResourceScans::findings($scan), array_slice($toScan, 0, self::MAX_CANDIDATE_SCANS), $platform, $lockWaitSeconds);
+        $entries = $this->evaluate($scan, $resource, array_slice($toScan, 0, self::MAX_CANDIDATE_SCANS), $platform, $lockWaitSeconds);
 
         if ($selected['major'] !== null) {
             $entries[] = [
@@ -352,72 +350,104 @@ class RefreshCandidates
     }
 
     /**
-     * The newest tag of the line of the base image (spec 7.4). Only a different tag can change the `FROM` line, so a
-     * newer build of the same tag is not checked.
+     * Scans the current base image and the newest tag of its line from the registry (spec 7.4): two candidate scans
+     * with the usual lock, disk, reuse, and daily rules. Only a different tag can change the `FROM` line, so a newer
+     * build of the same tag is not checked.
      *
-     * @return array{status: string, error: ?string, entries: list<array<string, mixed>>}
+     * @return array{status: string, error: ?string, entries: list<array<string, mixed>>, attributable: ?int, current_digest: ?string}
      */
     private function checkBase(ImageScan $scan, Model $resource, int $lockWaitSeconds, bool &$ranOnServer): array
     {
+        $result = fn (string $status, array $entries = [], ?int $attributable = null, ?string $currentDigest = null): array => [
+            'status' => $status,
+            'error' => $status === 'cannot_compare' ? null : $this->error,
+            'entries' => $entries,
+            'attributable' => $attributable,
+            'current_digest' => $currentDigest,
+        ];
+        $failure = fn (?int $attributable = null, ?string $currentDigest = null): array => [...$this->failure(), 'attributable' => $attributable, 'current_digest' => $currentDigest];
+
         try {
             $this->image = ImageRef::parse((string) $scan->base_image_ref);
         } catch (InvalidArgumentException) {
-            return ['status' => 'cannot_compare', 'error' => null, 'entries' => []];
+            return $result('cannot_compare');
         }
 
         $tag = $this->image->tag ?? 'latest';
         $selector = new TagSelector;
         if ($this->image->digest !== null || ! $selector->isVersion($tag)) {
-            return ['status' => 'cannot_compare', 'error' => null, 'entries' => []];
+            return $result('cannot_compare');
         }
 
         $platform = $scan->sbom?->platform;
         if (! is_string($platform) || $platform === '') {
-            return ['status' => 'failed', 'error' => 'unknown', 'entries' => []];
+            $this->error = 'unknown';
+
+            return $result('failed');
         }
 
         $ranOnServer = true;
         $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
         if ($tags === null) {
-            return $this->failure();
+            return $failure();
         }
         $tags = array_values(array_filter(array_map('trim', explode("\n", $tags)), fn (string $line) => $line !== ''));
         $this->tagsTruncated = count($tags) > TagSelector::MAX_TAGS;
         $line = $selector->select($tag, $tags)['line'];
-
-        $toScan = [];
-        if ($line !== null && $line !== $tag) {
-            $digest = $this->digest($line);
-            if ($digest === null) {
-                return $this->failure();
-            }
-            $toScan[] = ['kind' => 'line', 'tag' => $line, 'digest' => $digest];
+        if ($line === null || $line === $tag) {
+            return $result('no_better');
         }
 
-        $entries = $this->evaluate($scan, $resource, self::baseFindings($scan, $resource), $toScan, $platform, $lockWaitSeconds);
+        $currentDigest = $this->digest($tag);
+        $lineDigest = $currentDigest === null ? null : $this->digest($line);
+        if ($currentDigest === null || $lineDigest === null) {
+            return $failure(null, $currentDigest);
+        }
+        if ($lineDigest === $currentDigest) {
+            return $result('no_better', [], null, $currentDigest);
+        }
 
-        return [
-            'status' => match (true) {
-                in_array(true, array_column($entries, 'better'), true) => 'ok',
-                $this->authRequired => 'auth_required',
-                $this->error !== null => 'failed',
-                default => 'no_better',
-            },
-            'error' => $this->error,
-            'entries' => $entries,
+        $currentBase = $this->scanCandidate($currentDigest, $platform, $lockWaitSeconds);
+        if ($currentBase === null) {
+            return $failure(null, $currentDigest);
+        }
+
+        $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
+        $ignores = IgnoreMatcher::forResource($resource);
+        $notIgnored = fn (array $findings) => array_values(array_filter($findings, fn (Finding $finding) => $ignores->matches($finding) === null));
+        $evaluator = new CandidateEvaluator;
+        $currentBaseFindings = $notIgnored($currentBase['findings']);
+        $attributable = $evaluator->shared(self::alertFindings($scan, $resource), $currentBaseFindings);
+
+        $candidate = $this->scanCandidate($lineDigest, $platform, $lockWaitSeconds);
+        if ($candidate === null) {
+            return $failure(count($attributable), $currentDigest);
+        }
+
+        $candidateFindings = $notIgnored($candidate['findings']);
+        $better = ! $currentBase['truncated'] && ! $candidate['truncated']
+            && $evaluator->isBetter($evaluator->summarize($currentBaseFindings, $level), $candidateFindings, $level, $currentBase['eol'] !== null, $candidate['eol'] !== null);
+        $entry = [
+            'ref' => (string) $this->image->withTag($line),
+            'digest' => $lineDigest,
+            'kind' => 'line',
+            'better' => $better,
+            'fixed_ids' => $evaluator->fixedIds($attributable, $candidateFindings),
+            'fixes' => $evaluator->counts($evaluator->fixed($attributable, $candidateFindings)),
+            'left' => $evaluator->counts($evaluator->atLevel($candidateFindings, $level)),
+            'eol' => $candidate['eol'],
+            'scanned_at' => now()->toIso8601String(),
         ];
+
+        return $result($better ? 'ok' : 'no_better', [$entry], count($attributable), $currentDigest);
     }
 
     /**
-     * Scans the candidates and compares them with the current findings. At most MAX_CANDIDATE_SCANS per check.
-     *
-     * @param  list<Finding>  $current  The findings to compare: all of the image, or those in base layers.
      * @param  list<array{kind: string, tag: string, digest: string}>  $candidates
      * @return list<array<string, mixed>>
      */
-    private function evaluate(ImageScan $scan, Model $resource, array $current, array $candidates, string $platform, int $lockWaitSeconds): array
+    private function evaluate(ImageScan $scan, Model $resource, array $candidates, string $platform, int $lockWaitSeconds): array
     {
-        $candidates = array_slice($candidates, 0, max(0, self::MAX_CANDIDATE_SCANS - $this->candidateScans));
         if ($candidates === []) {
             return [];
         }
@@ -426,14 +456,13 @@ class RefreshCandidates
         $ignores = IgnoreMatcher::forResource($resource);
         $notIgnored = fn (array $findings) => array_values(array_filter($findings, fn (Finding $finding) => $ignores->matches($finding) === null));
         $evaluator = new CandidateEvaluator;
-        $current = $notIgnored($current);
+        $current = $notIgnored(ResourceScans::findings($scan));
         $currentAtLevel = $evaluator->atLevel($current, $level);
         $currentSummary = $evaluator->summarize($current, $level);
         $currentEol = is_array(data_get($scan->summary, 'eol_distro'));
 
         $entries = [];
         foreach ($candidates as $candidate) {
-            $this->candidateScans++;
             $report = $this->scanCandidate($candidate['digest'], $platform, $lockWaitSeconds);
             if ($report === null) {
                 continue;
@@ -701,7 +730,7 @@ class RefreshCandidates
      * the user does not build fixable now (spec 7.5).
      *
      * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool}  $result
-     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool}|null  $base
+     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool, attributable: ?int, current_digest: ?string}|null  $base
      */
     private function store(ImageScan $scan, array $result, ?array $base): void
     {
@@ -723,6 +752,8 @@ class RefreshCandidates
                 'checked_at' => $checkedAt,
                 'error' => $base['error'],
                 'tags_truncated' => $base['tags_truncated'],
+                'attributable' => $base['attributable'],
+                'current_digest' => $base['current_digest'],
                 'entries' => $base['entries'],
             ]]),
         ];
