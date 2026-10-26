@@ -106,9 +106,10 @@ class DatabaseBackupFileValidator
         // more input, never less.
         $sep = '(?:\s|/\*.*?\*/|--[^\r\n]*[\r\n])';
 
-        // psql meta-commands that spawn a shell, matched at a statement boundary.
+        // psql meta-commands that can run a shell command, anywhere on a line. Same rules as
+        // the restore scan in DatabaseImportCommandBuilder::buildPostgresRestoreScanScript().
         // A regex error (for example the backtrack limit) returns false and blocks.
-        if (preg_match('~(?:^|;)'.$sep.'*\\\\(?:!|copy'.$sep.'+[^;]*'.$sep.'+program|(?:o|g|w)'.$sep.'*\|)~mis', $sql) !== 0) {
+        if (preg_match('~(?:^|[^\\\\])(?:\\\\\\\\)*\\\\(?:!|(?:o|out|gx?|w|write)[^\S\n][^\\\\\n]*\||copy[^\S\n].*program|(?:setenv|e|edit|ef|ev|i|ir|include|include_relative)(?:\s|$)|(?:[^nbv\s\\\\]|[nbv][^\s\\\\])[^\s\\\\]*[^\S\n][^\\\\\n]*`)~mi', $sql) !== 0) {
             return true;
         }
 

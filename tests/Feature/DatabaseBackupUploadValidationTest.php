@@ -393,3 +393,47 @@ test('ALLOWED_EXTENSIONS does not include executable formats', function () {
         expect($constant)->not->toContain($bad);
     }
 });
+
+// psql meta-commands can follow SQL on the same line, so they are matched anywhere after an
+// odd backslash run. COPY data writes a literal backslash as "\\" and uses \n, \b, \v and \N,
+// which psql does not know as commands, so ordinary dumps must still pass.
+dataset('psql shell meta-commands', [
+    'shell escape after sql without semicolon' => ["SELECT 1 \\! id\n"],
+    'output long name piped' => ["\\out |id\nSELECT 1;\n"],
+    'output piped after sql' => ["SELECT 1 \\o |id\n"],
+    'query piped with options' => ["SELECT 1 \\g (format=csv) |id\n"],
+    'expanded query piped' => ["SELECT 1 \\gx |id\n"],
+    'write long name piped' => ["\\write |id\n"],
+    'copy program after sql' => ["SELECT 1 \\copy t from program 'id'\n"],
+    'backquote in set' => ["\\set x `id`\n"],
+    'backquote in short command after sql' => ["SELECT 1 \\t `id`\n"],
+    'include file' => ["\\i /tmp/generated.sql\n"],
+    'include relative file' => ["\\include_relative generated.sql\n"],
+    'editor environment' => ["\\setenv PSQL_EDITOR id\n"],
+    'editor' => ["\\e\n"],
+    'shell escape after escaped backslash' => ["SELECT 1 \\\\\\! id\n"],
+]);
+
+dataset('psql safe dump content', [
+    'escaped backslash before bang in copy data' => ["COPY notes FROM stdin;\n1\tC:\\\\! dir\n\\.\n"],
+    'copy escapes before backquotes' => ["COPY notes FROM stdin;\n1\tline\\n `code` \\b `x` \\v `y`\t\\N\n\\.\n"],
+    'copy hex and octal escapes' => ["COPY notes FROM stdin;\n1\t\\x41 \\101 |pipe\n\\.\n"],
+    'pg_dumpall connect' => ["\\connect app\nSELECT 1;\n"],
+    'pg_dump restrict keys' => ["\\restrict abc123\nSELECT 1;\n\\unrestrict abc123\n"],
+]);
+
+test('postgresql backup safety scanner blocks psql shell meta-commands anywhere on a line', function (string $payload) {
+    expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($payload))->toBeTrue();
+})->with('psql shell meta-commands');
+
+test('postgresql backup safety scanner allows backslash sequences of ordinary dumps', function (string $payload) {
+    expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($payload))->toBeFalse();
+})->with('psql safe dump content');
+
+test('remote postgresql scanner blocks psql shell meta-commands anywhere on a line', function (string $payload) {
+    expect(scannerBlocks(postgresScanScript(writeScanPayload($payload))))->toBeTrue();
+})->with('psql shell meta-commands');
+
+test('remote postgresql scanner allows backslash sequences of ordinary dumps', function (string $payload) {
+    expect(scannerBlocks(postgresScanScript(writeScanPayload($payload))))->toBeFalse();
+})->with('psql safe dump content');
