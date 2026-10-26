@@ -201,8 +201,7 @@ it('saves application name description and ports from the general form', functio
 
 it('shows the unsaved bar for a Compose location edit and saves it with the name', function () {
     Process::fake(fn ($process) => match (true) {
-        str_contains($process->command, 'git --version') => Process::result('git version 2.43.0'),
-        str_contains($process->command, 'head -c') => Process::result("services:\n  web:\n    image: nginx\n"),
+        str_contains($process->command, 'git cat-file blob') => Process::result("services:\n  web:\n    image: nginx\n"),
         default => Process::result(''),
     });
     $this->application->update([

@@ -46,9 +46,8 @@ test('the Compose file loads through the server commands for root and non-root u
     ]);
     $application->settings->update(['is_git_submodules_enabled' => true]);
     $uuid = 'compose-load-'.bin2hex(random_bytes(4));
-    $gitVersion = (string) str((new Process(['git', '--version']))->mustRun()->getOutput())->trim()->explode(' ')->last();
 
-    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid, $gitVersion);
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
     if ($user !== 'root') {
         $server = Mockery::mock(Server::class)->makePartial();
         $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
@@ -73,6 +72,72 @@ test('the Compose file loads through the server commands for root and non-root u
     'branch head' => [false],
     'pinned commit' => [true],
 ]);
+
+/**
+ * Commits the given symlinks to the repository, pushes them to the bare remote, and runs the
+ * Compose read commands for an application with the given base directory and Compose file location.
+ */
+function runComposeReadWithSymlinks(object $test, array $symlinks, string $baseDirectory, string $composeLocation): Process
+{
+    foreach ($symlinks as $link => $target) {
+        @mkdir(dirname($test->root.'/src/'.$link), 0755, true);
+        symlink($target, $test->root.'/src/'.$link);
+    }
+    foreach ([
+        ['git', 'add', '-A'],
+        ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'symlinks'],
+        ['git', 'push', '-q', $test->root.'/repo.git', 'main'],
+    ] as $command) {
+        (new Process($command, $test->root.'/src'))->mustRun();
+    }
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $test->root.'/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => $baseDirectory,
+        'docker_compose_location' => $composeLocation,
+    ]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $test->root.'/bin:'.getenv('PATH')]);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    return $process;
+}
+
+test('a symlinked Compose file is rejected', function (string $target) {
+    if ($target === 'outside') {
+        $target = $this->root.'/linked-target.yml';
+    }
+    file_put_contents($this->root.'/linked-target.yml', "services:\n  linked:\n    environment:\n      TOKEN: linked-target-value\n");
+
+    $process = runComposeReadWithSymlinks($this, ['docker-compose.yml' => $target], '/', '/docker-compose.yml');
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getOutput())->toBe('')
+        ->and($process->getErrorOutput())->toContain('symbolic link')
+        ->and($process->getErrorOutput())->not->toContain('linked-target-value');
+})->with([
+    'absolute path' => ['outside'],
+    'file in the repository' => ['apps/web/docker-compose.yml'],
+]);
+
+test('a symlinked base directory is not found', function () {
+    mkdir($this->root.'/linked-app');
+    file_put_contents($this->root.'/linked-app/docker-compose.yml', "services:\n  linked:\n    image: linked-target-value\n");
+
+    $process = runComposeReadWithSymlinks($this, ['linked' => $this->root.'/linked-app'], '/linked', '/docker-compose.yml');
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getOutput())->toBe('')
+        ->and($process->getErrorOutput())->toContain('No such file')
+        ->and($process->getErrorOutput())->not->toContain('linked-target-value');
+});
 
 test('the Compose file loads from inside a Git submodule', function (string $submodulePath, string $composeLocation, string $user) {
     $submoduleSource = $this->root.'/infra-src';
@@ -103,9 +168,8 @@ test('the Compose file loads from inside a Git submodule', function (string $sub
     ]);
     $application->settings->update(['is_git_submodules_enabled' => true]);
     $uuid = 'compose-load-'.bin2hex(random_bytes(4));
-    $gitVersion = (string) str((new Process(['git', '--version']))->mustRun()->getOutput())->trim()->explode(' ')->last();
 
-    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid, $gitVersion);
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
     if ($user !== 'root') {
         $server = Mockery::mock(Server::class)->makePartial();
         $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
@@ -135,3 +199,44 @@ test('the Compose file loads from inside a Git submodule', function (string $sub
     'root' => ['root'],
     'non-root' => ['ubuntu'],
 ]);
+
+test('a symlinked Compose file inside a Git submodule is rejected', function () {
+    $submoduleSource = $this->root.'/infra-src';
+    mkdir($submoduleSource);
+    file_put_contents($this->root.'/linked-target.yml', "services:\n  linked:\n    image: linked-target-value\n");
+    symlink($this->root.'/linked-target.yml', "{$submoduleSource}/docker-compose.yml");
+    $gitEnv = ['GIT_CONFIG_COUNT' => '1', 'GIT_CONFIG_KEY_0' => 'protocol.file.allow', 'GIT_CONFIG_VALUE_0' => 'always'];
+    foreach ([
+        [$submoduleSource, ['git', 'init', '-q', '-b', 'main']],
+        [$submoduleSource, ['git', 'add', '-A']],
+        [$submoduleSource, ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'infra']],
+        [$submoduleSource, ['git', 'clone', '-q', '--bare', '.', $this->root.'/infra.git']],
+        [$this->root.'/src', ['git', 'submodule', '-q', 'add', $this->root.'/infra.git', 'infra']],
+        [$this->root.'/src', ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'add infra']],
+        [$this->root.'/src', ['git', 'push', '-q', $this->root.'/repo.git', 'main']],
+    ] as [$cwd, $command]) {
+        (new Process($command, $cwd, $gitEnv))->mustRun();
+    }
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $this->root.'/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => '/',
+        'docker_compose_location' => '/infra/docker-compose.yml',
+    ]);
+    $application->settings->update(['is_git_submodules_enabled' => true]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $this->root.'/bin:'.getenv('PATH')] + $gitEnv);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getOutput())->toBe('')
+        ->and($process->getErrorOutput())->toContain('symbolic link')
+        ->and($process->getErrorOutput())->not->toContain('linked-target-value');
+});
