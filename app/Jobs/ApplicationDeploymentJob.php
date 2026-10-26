@@ -3116,13 +3116,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $domains = str($fqdn)->explode(',')
-                ->map(fn (string $domain) => trim($domain))
-                ->filter()
-                ->filter(fn (string $domain) => isValidDomainUrl($domain));
+            $domains = $this->validDomainsFromFqdn($fqdn);
             if ($domains->isNotEmpty()) {
                 $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
-                $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
+                $fqdn = $this->hostsFromFqdn($fqdn);
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
                     $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
@@ -3136,6 +3133,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->coolify_variables .= 'COOLIFY_BRANCH='.escapeShellValue($this->application->git_branch).' ';
         }
         $this->coolify_variables .= 'COOLIFY_RESOURCE_UUID='.escapeShellValue($this->application->uuid).' ';
+    }
+
+    private function validDomainsFromFqdn(?string $fqdn): Collection
+    {
+        return str($fqdn ?? '')->explode(',')
+            ->map(fn (string $domain) => trim($domain))
+            ->filter()
+            ->filter(fn (string $domain) => isValidDomainUrl($domain));
+    }
+
+    /**
+     * Comma-separated hosts without scheme, port, or path (the COOLIFY_FQDN value).
+     */
+    private function hostsFromFqdn(?string $fqdn): string
+    {
+        return $this->validDomainsFromFqdn($fqdn)
+            ->map(fn (string $domain) => Url::fromString($domain)->getHost())
+            ->implode(',');
     }
 
     private function shellAssignmentForDockerfileArg(string $assignment): string
@@ -4021,7 +4036,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+                $url = $this->hostsFromFqdn($this->preview->fqdn);
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $coolify_envs->put('COOLIFY_FQDN', $url);
                 } else {
@@ -4068,7 +4083,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
+                $url = $this->hostsFromFqdn($this->application->fqdn);
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $coolify_envs->put('COOLIFY_FQDN', $url);
                 } else {
