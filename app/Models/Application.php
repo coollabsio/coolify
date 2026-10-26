@@ -2271,37 +2271,40 @@ class Application extends BaseModel
     }
 
     /**
-     * Commands that check out only the Compose file on the server and print it. They run on the
-     * server itself, not in a helper container, so the checkout uses an absolute folder in /tmp.
+     * Commands that clone the repository on the server and print the Compose file. They run on the
+     * server itself, not in a helper container, so the clone uses an absolute folder in /tmp.
+     *
+     * The file is read from the Git objects, not from a working tree, so no checkout is needed. Only
+     * regular files are loaded; a symbolic link (mode 120000) gets a clear error message.
      *
      * @return Collection<int, string>
      */
-    private function composeFileReadCommands(string $uuid, string $gitVersion): Collection
+    private function composeFileReadCommands(string $uuid): Collection
     {
         $checkoutDir = "/tmp/{$uuid}/checkout";
         ['command' => $cloneCommand, 'git' => $git] = $this->serverCheckout($uuid, $checkoutDir);
-        $workdir = rtrim($this->base_directory, '/');
-        $fileList = collect([".{$workdir}{$this->docker_compose_location}"]);
-        $composeFilePath = escapeshellarg(".{$workdir}{$this->docker_compose_location}");
-        $composeReadLimit = self::MAX_DOCKER_COMPOSE_SIZE_BYTES + 1;
-        $readComposeFile = "if [ \"$(wc -c < {$composeFilePath})\" -gt ".self::MAX_DOCKER_COMPOSE_SIZE_BYTES." ]; then echo '__COOLIFY_COMPOSE_TOO_LARGE__'; else head -c {$composeReadLimit} {$composeFilePath}; fi";
-
-        $isConeMode = version_compare($gitVersion, '2.35.1', '>=');
-        if (! $isConeMode) {
-            $fileList = $fileList->map(function ($file) {
-                $parts = explode('/', trim($file, '.'));
-                $paths = collect();
-                $currentPath = '';
-                foreach ($parts as $part) {
-                    $currentPath .= ($currentPath ? '/' : '').$part;
-                    if (str($currentPath)->isNotEmpty()) {
-                        $paths->push($currentPath);
-                    }
-                }
-
-                return $paths;
-            })->flatten()->unique()->values();
-        }
+        $composeFile = ltrim(rtrim($this->base_directory, '/').$this->docker_compose_location, '/');
+        $submoduleCommands = $this->composeFileSubmoduleCommands($git, $composeFile);
+        // Go into the submodule that contains the Compose file, and read the file from the objects of that submodule.
+        $enterSubmodule = $submoduleCommands === [] ? '' : implode(' ', [
+            'while sub=$(git ls-tree -r HEAD | while read -r mode type object path; do',
+            'if [ "$mode" = 160000 ]; then case "$file" in "$path"/*) echo "$path"; break ;; esac; fi; done) && [ -n "$sub" ];',
+            'do cd "$sub" || exit 1; file="${file#"$sub"/}"; done;',
+        ]);
+        $readComposeFile = implode(' ', [
+            'file='.escapeshellarg($composeFile).';',
+            $enterSubmodule,
+            'git ls-tree HEAD -- "$file" | {',
+            'read -r mode type object path;',
+            'case "$mode" in',
+            '100644|100755) ;;',
+            "120000) echo 'The Docker Compose file is a symbolic link.' >&2; exit 1 ;;",
+            "*) echo 'No such file' >&2; exit 1 ;;",
+            'esac;',
+            'if [ "$(git cat-file -s "$object")" -gt '.self::MAX_DOCKER_COMPOSE_SIZE_BYTES." ]; then echo '__COOLIFY_COMPOSE_TOO_LARGE__';",
+            'else git cat-file blob "$object"; fi;',
+            '}',
+        ]);
 
         return collect([
             "rm -rf /tmp/{$uuid}",
@@ -2310,17 +2313,14 @@ class Application extends BaseModel
             // One sh -c line: the non-root sudo parser would turn `&& if ...; then` into invalid `&& sudo if`.
             'sh -c '.escapeshellarg($cloneCommand),
             "cd {$checkoutDir}",
-            $isConeMode ? 'git sparse-checkout init --cone' : 'git sparse-checkout init',
-            "git sparse-checkout set {$fileList->implode(' ')}",
-            'git read-tree -mu HEAD',
-            ...$this->composeFileSubmoduleCommands($git, ltrim("{$workdir}{$this->docker_compose_location}", '/')),
-            $readComposeFile,
+            ...$submoduleCommands,
+            'sh -c '.escapeshellarg($readComposeFile),
         ]);
     }
 
     /**
-     * A sparse checkout has no submodules. If the Compose file is inside a submodule, this clones only that
-     * submodule, with the credentials of the clone.
+     * The clone has no checkout and no submodules. If the Compose file is inside a submodule, this fills the
+     * index (without a working tree) and clones only that submodule, with the credentials of the clone.
      *
      * @return list<string>
      */
@@ -2334,7 +2334,7 @@ class Application extends BaseModel
         $escapedComposeFile = escapeshellarg($composeFile);
 
         // One sh -c line: the non-root sudo parser cannot change commands inside a loop.
-        return ['sh -c '.escapeshellarg(
+        return ['git read-tree HEAD', 'sh -c '.escapeshellarg(
             'git ls-files -s | while read -r mode object stage path; do '
             ."if [ \"\$mode\" = 160000 ]; then case {$escapedComposeFile} in \"\$path\"/*) "
             ."{$git} submodule update --init --recursive{$depthFlag} -- \"\$path\" >/dev/null || exit 1 ;; esac; fi; done"
@@ -2362,8 +2362,7 @@ class Application extends BaseModel
         if (! $gitRemoteStatus['is_accessible']) {
             throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.'.$this->gitFailureReason('Failed to read Git source.', (string) $gitRemoteStatus['error']));
         }
-        $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
-        $commands = $this->composeFileReadCommands($uuid, (string) str($getGitVersion)->explode(' ')->last());
+        $commands = $this->composeFileReadCommands($uuid);
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
             if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
@@ -2375,6 +2374,9 @@ class Application extends BaseModel
             $this->base_directory = $initialBaseDirectory;
             $this->save();
 
+            if (str($e->getMessage())->contains('The Docker Compose file is a symbolic link.')) {
+                throw new RuntimeException("Docker Compose file at $workdir$composeFile (branch: {$this->git_branch}) is a symbolic link. Coolify reads only regular files from the repository. Commit the file itself instead of a link to it.");
+            }
             if (str($e->getMessage())->contains('No such file')) {
                 throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
             }
