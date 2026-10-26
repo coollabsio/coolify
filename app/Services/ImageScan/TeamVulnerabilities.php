@@ -90,7 +90,8 @@ final class TeamVulnerabilities
         }
 
         $owners = ImageScan::query()
-            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->whereRelation('settings', 'is_image_scan_enabled', true)->select('id'))
+            // Whether a resource is scanned is decided below by the shared rule, not by the server of its scans.
+            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))
             ->where('status', ImageScanStatus::Completed)
             ->select(['resource_type', 'resource_id'])
             ->distinct()
