@@ -91,6 +91,7 @@ class EnvironmentVariable extends BaseModel
         'preserve_compose_null' => 'boolean',
         'is_multiline' => 'boolean',
         'is_preview' => 'boolean',
+        'is_production_value_copy' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
         'uses_legacy_escaping' => 'boolean',
@@ -115,6 +116,10 @@ class EnvironmentVariable extends BaseModel
 
     protected static function booted()
     {
+        static::creating(function (ModelsEnvironmentVariable $environmentVariable) {
+            $environmentVariable->version = config('constants.coolify.version');
+        });
+
         static::created(function (ModelsEnvironmentVariable $environment_variable) {
             if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
@@ -126,10 +131,12 @@ class EnvironmentVariable extends BaseModel
                 if (! $found) {
                     $application = Application::find($environment_variable->resourceable_id);
                     if ($application) {
-                        ModelsEnvironmentVariable::create([
+                        $usesProductionValue = $application->settings?->use_production_values_in_previews !== false;
+                        ModelsEnvironmentVariable::forceCreate([
                             'key' => $environment_variable->key,
                             // Without production values, the copy only shows which keys the previews need.
-                            'value' => $application->settings?->use_production_values_in_previews === false ? '' : $environment_variable->value,
+                            'value' => $usesProductionValue ? $environment_variable->value : '',
+                            'is_production_value_copy' => $usesProductionValue && filled($environment_variable->value),
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
@@ -143,14 +150,15 @@ class EnvironmentVariable extends BaseModel
                     }
                 }
             }
-            $environment_variable->update([
-                'version' => config('constants.coolify.version'),
-            ]);
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
             if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
                 $environmentVariable->preserve_compose_null = false;
+            }
+            // A changed preview value is the user's own value, not the copy of production.
+            if ($environmentVariable->exists && $environmentVariable->is_preview && $environmentVariable->isDirty('value')) {
+                $environmentVariable->is_production_value_copy = false;
             }
             $environmentVariable->updateIsShared();
         });

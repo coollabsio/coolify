@@ -86,7 +86,7 @@
 
             <div class="w-full">
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
-                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that still have the production value. Give previews their own values, and do not use production secrets in them."
+                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that have the production value (marked 'Production value'), also after the production value changes. Give previews their own values, and do not use production secrets in them."
                     :options="[
                         ['value' => false, 'label' => 'Repository members only'],
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
@@ -95,7 +95,7 @@
             <div class="w-full">
                 <x-forms.checkbox instantSave="savePreviewSettings" id="useProductionValuesInPreviews" fullWidth
                     label="Use production values in previews"
-                    helper="When on, a new environment variable gets the same value in previews as in production.<br><br>When off, its preview copy is empty, and previews do not get preview variables that still have the production value. Use this when untrusted code can run in previews (for example, branches that cannot be merged, or bot PRs), or when production secrets must not reach previews. Existing preview values do not change."
+                    helper="When on, a new environment variable gets the same value in previews as in production.<br><br>When off, its preview copy is empty, and previews do not get preview variables that have the production value (marked 'Production value'). Use this when untrusted code can run in previews (for example, branches that cannot be merged, or bot PRs), or when production secrets must not reach previews. Existing preview values do not change."
                     :disabled="! $canUpdate" />
             </div>
         </x-application.settings-section>

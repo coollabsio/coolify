@@ -38,7 +38,7 @@
             @endif
             @if ($sameAsProduction)
                 <span class="table-badge shrink-0"
-                    title="This preview variable has the same value as the production variable with the same key.">Same as production</span>
+                    title="This preview variable has the production value: an unchanged copy of the production variable, or the same value. Change the value to give previews their own value.">Production value</span>
             @endif
             @if ($composeInfo)
                 <span class="table-badge shrink-0"

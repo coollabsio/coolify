@@ -1248,7 +1248,7 @@ test('export refuses credentials of another team', function () {
         ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });
 
-test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, the Coolify default variables switch, and the production values in previews switch', function () {
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, the Coolify default variables switch, and the production values in previews switch and copies', function () {
     $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
     $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
     $this->application->settings->forceFill(['include_coolify_default_variables' => false, 'use_production_values_in_previews' => false])->saveQuietly();
@@ -1266,6 +1266,17 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ]);
         $env->uuid = new_public_id();
         $env->save();
+        $copy = new EnvironmentVariable;
+        $copy->forceFill([
+            'key' => 'COPIED_SECRET',
+            'value' => 'old-secret',
+            'is_preview' => true,
+            'is_production_value_copy' => true,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $this->application->id,
+        ]);
+        $copy->uuid = new_public_id();
+        $copy->save();
     });
     $appUuid = $this->application->uuid;
     $serviceUuid = $this->service->uuid;
@@ -1294,6 +1305,7 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ->and($variable->preserve_compose_null)->toBeTrue()
         ->and($variable->value)->toBeNull()
         ->and($variable->version)->toBe('4.0.0-beta.400')
+        ->and($application->environment_variables_preview()->where('key', 'COPIED_SECRET')->sole()->is_production_value_copy)->toBeTrue()
         ->and($application->settings->include_coolify_default_variables)->toBeFalse()
         ->and($application->settings->use_production_values_in_previews)->toBeFalse()
         ->and($service->include_coolify_default_variables)->toBeFalse()

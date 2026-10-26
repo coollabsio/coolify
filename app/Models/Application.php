@@ -1204,9 +1204,11 @@ class Application extends BaseModel
     }
 
     /**
-     * IDs of preview variables that have the same value as the production variable with the same key.
-     * Coolify copies each new production variable to the previews, so these still hold the production value.
-     * Empty values do not count, because they hold no production data.
+     * IDs of preview variables that have the production value: automatic copies of a production variable that
+     * the user did not change, and preview variables with the same value as the production variable with the
+     * same key. An automatic copy stays in the list after production changes (for example a rotated secret),
+     * because the old production value can still be valid. Empty values do not count, because they hold no
+     * production data.
      *
      * @return array<int, int>
      */
@@ -1216,12 +1218,9 @@ class Application extends BaseModel
             ->reject(fn (EnvironmentVariable $env) => blank($env->value))
             ->pluck('value', 'key');
 
-        if ($productionValues->isEmpty()) {
-            return [];
-        }
-
-        return $this->environment_variables_preview()->whereIn('key', $productionValues->keys())->get()
-            ->filter(fn (EnvironmentVariable $env) => $productionValues->get($env->key) === $env->value)
+        return $this->environment_variables_preview()->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value))
+            ->filter(fn (EnvironmentVariable $env) => $env->is_production_value_copy || $productionValues->get($env->key) === $env->value)
             ->pluck('id')
             ->all();
     }

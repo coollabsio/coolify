@@ -1501,6 +1501,7 @@ class ServerTransferImporter
                     'is_literal' => (bool) data_get($variable, 'is_literal', false),
                     'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
                     'is_preview' => $isPreview || (bool) data_get($variable, 'is_preview', false),
+                    'is_production_value_copy' => (bool) data_get($variable, 'is_production_value_copy', false),
                     'is_runtime' => (bool) data_get($variable, 'is_runtime', true),
                     'is_buildtime' => (bool) data_get($variable, 'is_buildtime', true),
                     'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
