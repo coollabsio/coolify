@@ -864,6 +864,7 @@ class ServerTransferExporter
         // Ensure hidden encrypted fields are included as plaintext.
         foreach ([
             'http_basic_auth_password',
+            'git_https_password',
             'manual_webhook_secret_github',
             'manual_webhook_secret_gitlab',
             'manual_webhook_secret_bitbucket',
