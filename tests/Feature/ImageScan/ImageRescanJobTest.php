@@ -13,6 +13,7 @@ use App\Models\Environment;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
+use App\Models\ImageScanNotificationState;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -23,6 +24,7 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\Job;
@@ -32,6 +34,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -248,6 +251,48 @@ describe('when the job runs', function () {
 });
 
 describe('rescan', function () {
+    it('adds a rescanned image to the current scans of the latest finished deployment', function () {
+        rescanTestFake();
+        $deployment = rescanTestDeployment($this->application, 'abc123', ApplicationDeploymentStatus::FINISHED);
+        rescanTestScan($this->application, [
+            'image_id' => 'sha256:'.RESCAN_TEST_HEX,
+            'image_ref' => 'web:1',
+            'deployment_queue_id' => $deployment->id,
+            'scanned_at' => now()->subDay(),
+        ]);
+        rescanTestApplicationContainer($this->application, RESCAN_TEST_HEX);
+        rescanTestApplicationContainer($this->application, RESCAN_TEST_OTHER_HEX, tag: 'worker');
+
+        rescanTestRun();
+
+        expect(ResourceScans::currentFor($this->application)->pluck('image_id')->sort()->values()->all())
+            ->toBe(['sha256:'.RESCAN_TEST_HEX, 'sha256:'.RESCAN_TEST_OTHER_HEX]);
+    });
+
+    it('records every image of a Compose application as the baseline when scanning is turned on', function () {
+        $hexes = [RESCAN_TEST_HEX, RESCAN_TEST_OTHER_HEX, 'd1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90'];
+        rescanTestFake(['grype' => function (string $command) use ($hexes) {
+            $index = collect($hexes)->search(fn (string $hex) => str_contains($command, $hex));
+            $finding = ['art' => 'a'.$index, 'desc' => '', 'epss' => 0.5, 'fix' => 'fixed', 'fixv' => ['2.0'], 'id' => 'CVE-2026-100'.$index,
+                'kev' => true, 'pkg' => 'lib'.$index, 'rel' => [], 'risk' => 90.0, 'sev' => 'Critical', 'sugg' => '2.0', 'type' => 'apk', 'ver' => '1.0'];
+
+            return rescanTestPayload('grype', json_encode($finding));
+        }]);
+        Notification::fake();
+        rescanTestDeployment($this->application, 'abc123', ApplicationDeploymentStatus::FINISHED);
+        foreach ($hexes as $index => $hex) {
+            rescanTestApplicationContainer($this->application, $hex, tag: 'service-'.$index);
+        }
+
+        rescanTestRun();
+
+        $state = ImageScanNotificationState::query()->where('resource_id', $this->application->id)->sole();
+        Notification::assertNothingSent();
+        expect(ImageScan::query()->where('status', ImageScanStatus::Completed)->count())->toBe(3)
+            ->and($state->is_baseline)->toBeTrue()
+            ->and(collect($state->notified_ids)->sort()->values()->all())->toBe(['CVE-2026-1000', 'CVE-2026-1001', 'CVE-2026-1002']);
+    });
+
     it('runs Grype once for resources that share an image ID and updates each row', function () {
         rescanTestFake();
         $deployment = rescanTestDeployment($this->application, 'abc123', ApplicationDeploymentStatus::FINISHED);

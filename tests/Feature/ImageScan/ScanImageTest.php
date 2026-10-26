@@ -330,6 +330,55 @@ it('does not change a completed scan when a concurrent call finds the lock busy'
         ->and($row->server_id)->toBe($this->server->id);
 });
 
+function scanImageTestDeployment(string $uuid, string $status, int $pullRequestId = 0): ApplicationDeploymentQueue
+{
+    return ApplicationDeploymentQueue::create([
+        'application_id' => test()->application->id,
+        'deployment_uuid' => $uuid,
+        'server_id' => test()->server->id,
+        'status' => $status,
+        'pull_request_id' => $pullRequestId,
+    ]);
+}
+
+it('links a scan without a deployment to the latest finished deployment of the application', function () {
+    scanImageTestFake();
+    scanImageTestDeployment('dep-old', 'finished');
+    $latest = scanImageTestDeployment('dep-latest', 'finished');
+    scanImageTestDeployment('dep-preview', 'finished', 4);
+    scanImageTestDeployment('dep-failed', 'failed');
+
+    expect(scanImageTestRun()->deployment_queue_id)->toBe($latest->id);
+});
+
+it('keeps the newer deployment of a row when a scan without a deployment updates it', function () {
+    scanImageTestFake();
+    scanImageTestDeployment('dep-finished', 'finished');
+    $blocked = scanImageTestDeployment('dep-blocked', 'failed');
+    ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', $blocked);
+
+    expect(scanImageTestRun()->deployment_queue_id)->toBe($blocked->id);
+});
+
+it('never moves the row of the application to a preview deployment', function () {
+    scanImageTestFake();
+    $production = scanImageTestDeployment('dep-production', 'finished');
+    $preview = scanImageTestDeployment('dep-preview', 'in_progress', 4);
+    $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', $production);
+
+    ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', $preview);
+
+    expect($scan->fresh()->deployment_queue_id)->toBe($production->id)
+        ->and($scan->fresh()->status)->toBe(ImageScanStatus::Completed);
+});
+
+it('links a new image of a preview to the preview deployment', function () {
+    scanImageTestFake();
+    $preview = scanImageTestDeployment('dep-preview', 'in_progress', 4);
+
+    expect(ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', $preview)->deployment_queue_id)->toBe($preview->id);
+});
+
 it('releases the server lock after a scan', function () {
     scanImageTestFake();
 

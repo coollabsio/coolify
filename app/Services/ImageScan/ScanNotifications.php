@@ -58,7 +58,10 @@ final class ScanNotifications
 
         $owner = $scan->resource;
         $teamId = $owner instanceof Model ? self::teamId($owner) : null;
-        if ($teamId === null || self::isPreview($deploymentId ?? $scan->deployment_queue_id)) {
+        // A rescan or Scan now belongs to the deployment its row is linked to, so the first rescan of a Compose
+        // application records all its images as one baseline.
+        $deploymentId ??= $scan->deployment_queue_id !== null ? (int) $scan->deployment_queue_id : null;
+        if ($teamId === null || self::isPreview($deploymentId)) {
             return;
         }
 
