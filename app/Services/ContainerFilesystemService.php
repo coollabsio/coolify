@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Data\FileEntry;
+use App\Exceptions\ContainerShellUnavailableException;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\LocalFileVolume;
 use App\Models\Server;
@@ -20,9 +21,30 @@ class ContainerFilesystemService
     /** Largest file, or uncompressed folder, the file browser may download. */
     public const MAX_DOWNLOAD_SIZE = 1024 * 1024 * 1024;
 
+    /**
+     * Linux capability names by bit number, as Docker expects them in --cap-add.
+     */
+    private const CAPABILITIES = [
+        'CHOWN', 'DAC_OVERRIDE', 'DAC_READ_SEARCH', 'FOWNER', 'FSETID', 'KILL', 'SETGID', 'SETUID',
+        'SETPCAP', 'LINUX_IMMUTABLE', 'NET_BIND_SERVICE', 'NET_BROADCAST', 'NET_ADMIN', 'NET_RAW',
+        'IPC_LOCK', 'IPC_OWNER', 'SYS_MODULE', 'SYS_RAWIO', 'SYS_CHROOT', 'SYS_PTRACE', 'SYS_PACCT',
+        'SYS_ADMIN', 'SYS_BOOT', 'SYS_NICE', 'SYS_RESOURCE', 'SYS_TIME', 'SYS_TTY_CONFIG', 'MKNOD',
+        'LEASE', 'AUDIT_WRITE', 'AUDIT_CONTROL', 'SETFCAP', 'MAC_OVERRIDE', 'MAC_ADMIN', 'SYSLOG',
+        'WAKE_ALARM', 'BLOCK_SUSPEND', 'AUDIT_READ', 'PERFMON', 'BPF', 'CHECKPOINT_RESTORE',
+    ];
+
+    /** @var array{user: string, groups: array<int, string>, capabilities: array<int, string>}|null */
+    private ?array $helperIdentity = null;
+
+    /**
+     * With $useHelper, commands run in a short-lived helper container that
+     * shares the PID namespace of the target and reaches its files through
+     * /proc/1/root. This supports images without a shell (scratch, distroless).
+     */
     public function __construct(
         private Server $server,
         private string $container,
+        private bool $useHelper = false,
     ) {}
 
     public function buildListCommand(string $path): string
@@ -41,18 +63,34 @@ class ContainerFilesystemService
         // strips that prefix. Names containing a tab/newline are skipped (v1 scope).
         $tab = "\t";
         $format = '%F'.$tab.'%s'.$tab.'%Y'.$tab.'%a'.$tab.'%U'.$tab.'%G'.$tab.'%n';
-        $inner = 'cd '.$escapedPath.' 2>/dev/null || exit 0; '
-            .'find . ! -name . -prune -exec stat -c "'.$format.'" -- {} + 2>/dev/null';
+        // Exit 127 when find or stat is missing, so list() can switch to the helper.
+        $inner = 'command -v find >/dev/null && command -v stat >/dev/null || exit 127; '
+            .'cd '.$escapedPath.' 2>/dev/null || exit 0; '
+            .'find . ! -name . -prune -exec stat -c "'.$format.'" -- {} + 2>/dev/null; exit 0';
 
         return $this->dockerExecShell($inner);
     }
 
     /**
+     * docker exec exits with 126 or 127 when it cannot start `sh` or the
+     * listing tools in the container. Other docker exec failures still list
+     * as an empty folder. In helper mode, every failure is reported.
+     *
      * @return array<int, FileEntry>
+     *
+     * @throws ContainerShellUnavailableException when the files cannot be listed this way
      */
     public function list(string $path): array
     {
-        $raw = instant_remote_process([$this->buildListCommand($path)], $this->server, throwError: false);
+        try {
+            $raw = instant_remote_process([$this->buildListCommand($path)], $this->server);
+        } catch (\RuntimeException $e) {
+            if ($this->useHelper || in_array($e->getCode(), [126, 127], true)) {
+                throw new ContainerShellUnavailableException($e->getMessage(), (int) $e->getCode(), $e);
+            }
+
+            return [];
+        }
 
         return $this->parseListing($raw);
     }
@@ -95,6 +133,10 @@ class ContainerFilesystemService
         $content = base64_decode(trim($payload), true);
         if ($status !== 'OK' || $content === false || strlen($content) > $max) {
             throw new \RuntimeException('Could not read file.');
+        }
+        // BusyBox grep ignores -I, so a binary file can pass the remote probe.
+        if (str_contains($content, "\0")) {
+            throw new \RuntimeException('File is not editable (binary or too large).');
         }
 
         return $content;
@@ -337,6 +379,9 @@ class ContainerFilesystemService
     public function buildDownloadCommand(string $path, bool $isDir): string
     {
         $escaped = $this->escapePath($path, 'download path');
+        if ($this->useHelper) {
+            return $this->dockerExecShell($isDir ? "tar czf - -C {$escaped} ." : "cat -- {$escaped}");
+        }
         $escapedContainer = escapeshellarg($this->container);
 
         return $isDir
@@ -414,13 +459,94 @@ class ContainerFilesystemService
     {
         validateShellSafePath($path, $label);
 
-        return escapeshellarg($path);
+        return escapeshellarg(($this->useHelper ? '/proc/1/root' : '').$path);
     }
 
     protected function dockerExecShell(string $innerShell): string
     {
         $escapedContainer = escapeshellarg($this->container);
+        if (! $this->useHelper) {
+            return "docker exec {$escapedContainer} sh -c ".escapeshellarg($innerShell);
+        }
 
-        return "docker exec {$escapedContainer} sh -c ".escapeshellarg($innerShell);
+        // The helper gets exactly the user, groups and capabilities of the
+        // target process: the kernel requires them to reach /proc/1/root,
+        // and nothing more is given. It has no network, a read-only root
+        // file system, and no Docker socket or host mounts, and it is removed
+        // when the command ends. Exit 126 means the kernel denied access.
+        $identity = $this->helperIdentity();
+        $options = [
+            '--rm',
+            '--pid container:'.$escapedContainer,
+            '--user '.escapeshellarg($identity['user']),
+            ...array_map(fn (string $group) => '--group-add '.escapeshellarg($group), $identity['groups']),
+            '--cap-drop ALL',
+            ...array_map(fn (string $capability) => '--cap-add '.$capability, $identity['capabilities']),
+            '--security-opt no-new-privileges',
+            '--network none',
+            '--ipc none',
+            '--read-only',
+            '--log-driver none',
+            '--pids-limit 64',
+            '--label coolify.file-browser=true',
+            "--entrypoint ''",
+        ];
+        $image = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+
+        return 'docker run '.implode(' ', $options)." {$image} sh -c "
+            .escapeshellarg('[ -x /proc/1/root/ ] || exit 126; '.$innerShell);
+    }
+
+    /**
+     * Read the effective user, group, supplementary groups and permitted
+     * capabilities of the main process of the target container.
+     *
+     * @return array{user: string, groups: array<int, string>, capabilities: array<int, string>}
+     */
+    protected function helperIdentity(): array
+    {
+        if ($this->helperIdentity !== null) {
+            return $this->helperIdentity;
+        }
+
+        $escapedContainer = escapeshellarg($this->container);
+        $status = (string) instant_remote_process(
+            ["cat /proc/$(docker inspect --format '{{.State.Pid}}' {$escapedContainer})/status"],
+            $this->server,
+        );
+
+        return $this->helperIdentity = $this->parseProcessStatus($status);
+    }
+
+    /**
+     * @return array{user: string, groups: array<int, string>, capabilities: array<int, string>}
+     */
+    public function parseProcessStatus(string $status): array
+    {
+        $fields = [];
+        foreach (explode("\n", $status) as $line) {
+            [$key, $value] = array_pad(explode(':', $line, 2), 2, '');
+            $fields[trim($key)] = preg_split('/\s+/', trim($value), -1, PREG_SPLIT_NO_EMPTY);
+        }
+
+        $uid = $fields['Uid'][1] ?? '';
+        $gid = $fields['Gid'][1] ?? '';
+        $capabilityMask = $fields['CapPrm'][0] ?? '';
+        if (! ctype_digit($uid) || ! ctype_digit($gid) || ! ctype_xdigit($capabilityMask) || strlen($capabilityMask) > 16) {
+            throw new \RuntimeException('Could not read the user of the container process.');
+        }
+
+        $groups = array_values(array_filter($fields['Groups'] ?? [], fn (string $group) => ctype_digit($group) && $group !== $gid));
+
+        // Read the mask one hex digit at a time; hexdec() turns 64-bit masks into floats.
+        $digits = strrev($capabilityMask);
+        $capabilities = [];
+        foreach (self::CAPABILITIES as $bit => $name) {
+            if (hexdec($digits[intdiv($bit, 4)] ?? '0') & (1 << ($bit % 4))) {
+                $capabilities[] = $name;
+            }
+        }
+
+        return ['user' => "{$uid}:{$gid}", 'groups' => $groups, 'capabilities' => $capabilities];
     }
 }

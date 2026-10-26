@@ -206,7 +206,7 @@ it('requires the deploy ability to run a post-install script or add SSH keys on 
             ...$extra,
         ])
         ->assertForbidden()
-        ->assertJsonFragment(['message' => 'Missing required permissions: deploy']);
+        ->assertJsonPath('message', fn (string $message) => str_starts_with($message, 'Missing required permissions: deploy.'));
 
     Http::assertNothingSent();
     $this->assertDatabaseMissing('servers', ['team_id' => $this->team->id]);

@@ -7,6 +7,7 @@ use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyPortParser;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Spatie\Activitylog\Models\Activity;
@@ -40,12 +41,35 @@ class StartProxy
             ProxyStatusChangedUI::dispatch($server->team_id);
         }
 
+        SaveProxyConfiguration::run($server, $configuration);
+        $server->markProxyConfigurationApplied($configuration);
+        $commands = self::startCommands($server);
+
+        if ($async) {
+            $server->markProxyTransitionStarted();
+
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
+        } else {
+            instant_remote_process($commands, $server);
+
+            $server->proxy->set('type', $proxyType);
+            $server->save();
+            ProxyStatusChanged::dispatch($server->id);
+
+            return 'OK';
+        }
+    }
+
+    /**
+     * Commands that start the proxy. They first remove an existing proxy container.
+     * RestartProxyJob uses the same commands after its stop phase.
+     */
+    public static function startCommands(Server $server): Collection
+    {
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
         // Absolute paths: a non-root SSH user may not be able to enter the proxy directory (#4255).
         $compose_file = rtrim($proxy_path, '/').'/docker-compose.yml';
-        SaveProxyConfiguration::run($server, $configuration);
-        $server->markProxyConfigurationApplied($configuration);
 
         if ($server->isSwarmManager()) {
             $commands = $commands->merge([
@@ -79,7 +103,7 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
             ]);
-            if ($proxyType !== ProxyTypes::TRAEFIK->value) {
+            if ($server->proxyType() !== ProxyTypes::TRAEFIK->value) {
                 // The sidecar belongs to the Traefik compose project, so --remove-orphans of another proxy keeps it.
                 $commands->push('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
             }
@@ -93,16 +117,6 @@ class StartProxy
             $commands = $commands->merge(connectProxyToNetworks($server));
         }
 
-        if ($async) {
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
-        } else {
-            instant_remote_process($commands, $server);
-
-            $server->proxy->set('type', $proxyType);
-            $server->save();
-            ProxyStatusChanged::dispatch($server->id);
-
-            return 'OK';
-        }
+        return $commands;
     }
 }

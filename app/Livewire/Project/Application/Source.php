@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
@@ -127,7 +128,7 @@ class Source extends Component
             if ($source instanceof GithubApp) {
                 return ! is_null($source->app_id);
             }
-            if ($source instanceof GitlabApp) {
+            if ($source instanceof GitlabApp || $source instanceof GiteaApp) {
                 return $source->isConnected();
             }
 
@@ -191,7 +192,7 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
+            $allowedSourceTypes = [GithubApp::class, GitlabApp::class, GiteaApp::class];
             abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
             $teamId = $this->application->team()->id;
             $source = $sourceType::query()
@@ -214,6 +215,12 @@ class Source extends Component
                     $encoded = urlencode($customRepository);
                     $project = gitlabApi($source, "/projects/{$encoded}");
                     $repository_project_id = data_get($project, 'data.id');
+                }
+            } elseif ($sourceType === GiteaApp::class) {
+                if ($source->isConnected()) {
+                    $repositoryPath = collect(explode('/', $customRepository, 2))->map(fn ($part) => rawurlencode($part))->implode('/');
+                    $repository = giteaApi($source, "/repos/{$repositoryPath}");
+                    $repository_project_id = data_get($repository, 'data.id');
                 }
             }
 

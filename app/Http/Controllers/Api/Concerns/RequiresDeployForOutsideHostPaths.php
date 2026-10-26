@@ -13,18 +13,15 @@ use Illuminate\Http\Request;
  */
 trait RequiresDeployForOutsideHostPaths
 {
+    use RequiresDeployAbility;
+
     private function outsideHostPathForbiddenResponse(Request $request, LocalFileVolume $storage): ?JsonResponse
     {
         if ($storage->is_host_file || ! $storage->isOutsideResourceDirectory()) {
             return null;
         }
-        if ($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root')) {
-            return null;
-        }
 
-        return response()->json([
-            'message' => 'Missing required permissions: deploy. A mount outside the resource directory needs a token with the deploy permission.',
-        ], 403);
+        return $this->deployAbilityForbiddenResponse($request, 'A mount outside the resource directory needs a token with the deploy permission.');
     }
 
     private function outsideContentChangeForbiddenResponse(Request $request, LocalFileVolume|LocalPersistentVolume $storage): ?JsonResponse

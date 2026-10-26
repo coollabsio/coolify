@@ -105,6 +105,9 @@ class InstanceSettings extends Model
         'webhook_allow_localhost' => 'boolean',
         'is_dashboard_force_https_enabled' => 'boolean',
         'is_passkey_enabled' => 'boolean',
+        'server_validation_rate_limit_seconds' => 'integer',
+        'server_validation_max_failures_per_ip' => 'integer',
+        'server_validation_max_failures_per_team' => 'integer',
     ];
 
     protected static function booted(): void

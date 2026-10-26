@@ -121,6 +121,16 @@ class IntegrationToken extends BaseModel
         return $this->provider === 'cloudflare' && data_get($this->metadata, 'proxied_dns') === true;
     }
 
+    /**
+     * Optional request timeout in seconds for self-hosted secret managers.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public static function requestTimeout(array $metadata): ?int
+    {
+        return filled($metadata['timeout'] ?? null) ? (int) $metadata['timeout'] : null;
+    }
+
     public function dopplerTokenType(): ?string
     {
         if ($this->provider !== 'doppler') {

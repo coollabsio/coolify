@@ -11,7 +11,7 @@ class CreateApplication extends RestActionTool
 {
     protected string $name = 'create_application';
 
-    protected string $description = 'Create an application in a project of the authenticated team, from a public Git repository, a private repository (GitHub App or deploy key), a Dockerfile, or a Docker image. Requires write ability (instant_deploy also needs deploy). Same validation and permissions as the REST API.';
+    protected string $description = 'Create an application in a project of the authenticated team, from a public Git repository, a private repository (GitHub App or deploy key), a Dockerfile, or a Docker image. Requires write ability (instant_deploy and manual webhook secrets also need deploy). Same validation and permissions as the REST API.';
 
     protected function actions(): array
     {

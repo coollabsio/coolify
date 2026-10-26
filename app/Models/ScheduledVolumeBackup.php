@@ -158,6 +158,20 @@ class ScheduledVolumeBackup extends BaseModel
         return $this->backupable?->resource;
     }
 
+    /**
+     * Link to the resource in the Coolify UI. Built from base_url(), because queued notifications have no request and route() would use APP_URL.
+     */
+    public function resourceUrl(): ?string
+    {
+        $resource = $this->targetResource();
+        $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
+        if (! $linkable || ! method_exists($linkable, 'link') || ! $link = $linkable->link()) {
+            return null;
+        }
+
+        return rtrim(base_url(), '/').parse_url($link, PHP_URL_PATH);
+    }
+
     public function targetType(): string
     {
         return $this->backupable instanceof LocalFileVolume ? 'Directory' : 'Volume';

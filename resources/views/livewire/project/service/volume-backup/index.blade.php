@@ -227,10 +227,9 @@
             </div>
         </div>
 
-        <div @class([
-            'application-settings-section-body relative w-full',
-            'is-flush' => $backups->isNotEmpty() || $databaseBackups->isNotEmpty(),
-        ])>
+        <x-application.settings-section title="Schedules"
+            helper="Database, persistent volume, and directory backup schedules for this service."
+            :flush="$backups->isNotEmpty() || $databaseBackups->isNotEmpty()">
             <x-table.loading target="openSchedule" text="Loading schedule..." />
 
             <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
@@ -365,7 +364,7 @@
                     description="Add a database, persistent volume, or directory backup schedule to protect service data."
                     icon-name="storages" />
             @endif
-        </div>
+        </x-application.settings-section>
         <livewire:project.service.backup-executions :service="$service"
             wire:key="service-backup-executions-{{ $service->id }}" />
             </div>

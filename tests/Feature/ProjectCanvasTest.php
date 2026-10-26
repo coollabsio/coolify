@@ -269,3 +269,61 @@ test('a member cannot create an environment from the project canvas', function (
 
     expect($this->project->environments()->where('name', 'testing')->exists())->toBeFalse();
 });
+
+test('an admin moves project zones on the projects canvas and the canvas returns their place', function () {
+    $blog = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Blog']);
+    // Another team's project with the same request stays as it is.
+    $foreign = Project::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+    projectCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/projects/canvas')
+        ->assertJsonPath('can_move_zones', true)
+        ->assertJsonPath('zones.0.position', null);
+
+    projectCanvasSession($this, $this->admin, $this->team)
+        ->patchJson('/canvas/api/projects/canvas/positions', ['positions' => [
+            $this->project->uuid => ['x' => 640, 'y' => -120],
+            $blog->uuid => ['x' => 0, 'y' => 0],
+            $foreign->uuid => ['x' => 5, 'y' => 5],
+        ]])
+        ->assertOk()
+        ->assertJsonPath("positions.{$this->project->uuid}", ['x' => 640, 'y' => -120])
+        ->assertJsonMissingPath("positions.{$foreign->uuid}");
+
+    expect($foreign->fresh()->canvas_position)->toBeNull();
+    // Zones are sorted by name: Blog, Shop.
+    projectCanvasSession($this, $this->admin, $this->team)
+        ->getJson('/canvas/api/projects/canvas')
+        ->assertJsonPath('zones.0.position', ['x' => 0, 'y' => 0])
+        ->assertJsonPath('zones.1.position', ['x' => 640, 'y' => -120]);
+});
+
+test('project zone positions must be whole coordinates on the canvas', function () {
+    projectCanvasSession($this, $this->admin, $this->team)
+        ->patchJson('/canvas/api/projects/canvas/positions', ['positions' => [$this->project->uuid => ['x' => 'left', 'y' => 999999999]]])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(["positions.{$this->project->uuid}.x", "positions.{$this->project->uuid}.y"]);
+
+    expect($this->project->fresh()->canvas_position)->toBeNull();
+});
+
+test('members and other teams cannot move a project zone', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    projectCanvasSession($this, $member, $this->team)
+        ->getJson('/canvas/api/projects/canvas')
+        ->assertJsonPath('can_move_zones', false);
+    projectCanvasSession($this, $member, $this->team)
+        ->patchJson('/canvas/api/projects/canvas/positions', ['positions' => [$this->project->uuid => ['x' => 10, 'y' => 10]]])
+        ->assertForbidden();
+
+    // Admin of this team, owner of another team, with the session switched to the other team.
+    $otherTeam = Team::factory()->create(['show_boarding' => false]);
+    $otherTeam->members()->attach($this->admin->id, ['role' => 'owner']);
+    projectCanvasSession($this, $this->admin, $otherTeam)
+        ->patchJson('/canvas/api/projects/canvas/positions', ['positions' => [$this->project->uuid => ['x' => 10, 'y' => 10]]])
+        ->assertOk()
+        ->assertJsonPath('positions', []);
+
+    expect($this->project->fresh()->canvas_position)->toBeNull();
+});

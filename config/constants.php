@@ -5,9 +5,9 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.5',
-        'helper_version' => '1.0.18',
-        'railpack_version' => '0.40.1',
+        'version' => env('COOLIFY_VERSION') ?: '4.5.1',
+        'helper_version' => '1.0.19',
+        'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -26,6 +26,11 @@ return [
         'releases_url' => env('RELEASES_URL', 'https://cdn.coollabs.io/coolify/releases.json'),
         // "sequential" or "concurrent". Empty uses sequential on self-hosted and concurrent on Coolify Cloud.
         'scheduled_jobs_dispatch_mode' => env('SCHEDULED_JOBS_DISPATCH_MODE'),
+    ],
+
+    'cloud' => [
+        // Days after a subscription ends (or after a never-paid team was created) before cloud:cleanup-unsubscribed-teams deletes the team's data.
+        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 30),
     ],
 
     'urls' => [
@@ -103,10 +108,6 @@ return [
 
     'email_change' => [
         'verification_code_expiry_minutes' => 10,
-    ],
-
-    'sentry' => [
-        'sentry_dsn' => env('SENTRY_DSN'),
     ],
 
     'sentinel' => [

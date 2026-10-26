@@ -11,7 +11,7 @@ class ManagePreview extends RestActionTool
 {
     protected string $name = 'manage_preview';
 
-    protected string $description = 'Create (and deploy), update the domains of, or delete a pull request preview deployment of an application of the authenticated team. create requires deploy ability, update and delete require write. Same validation and permissions as the REST API.';
+    protected string $description = 'Create (and deploy), update the domains of, or delete a pull request preview deployment of an application of the authenticated team. create requires deploy ability, update requires write, delete requires delete. Same validation and permissions as the REST API.';
 
     protected function actions(): array
     {

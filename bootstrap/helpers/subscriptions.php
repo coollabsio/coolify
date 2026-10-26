@@ -91,6 +91,7 @@ function allowedPathsForUnsubscribedAccounts()
         'user/passkeys/options',
         'passkeys/confirm',
         'passkeys/confirm/options',
+        ...allowedPathsForTwoFactorSetup(),
     ];
 }
 function allowedPathsForBoardingAccounts()
@@ -109,6 +110,27 @@ function allowedPathsForInvalidAccounts()
         'force-password-reset',
         'two-factor-challenge',
         'livewire/update',
+        ...allowedPathsForTwoFactorSetup(),
+    ];
+}
+/**
+ * Paths a user needs to configure 2FA when their team requires it.
+ *
+ * @return array<int, string>
+ */
+function allowedPathsForTwoFactorSetup(): array
+{
+    return [
+        'two-factor-required',
+        'two-factor-challenge',
+        'logout',
+        'user/confirm-password',
+        'user/confirmed-password-status',
+        'user/two-factor-authentication',
+        'user/confirmed-two-factor-authentication',
+        'user/two-factor-qr-code',
+        'user/two-factor-secret-key',
+        'user/two-factor-recovery-codes',
     ];
 }
 

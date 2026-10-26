@@ -18,13 +18,6 @@ it('uses Livewire navigation after deleting or converting page resources', funct
             "redirectRoute(\$this, 'project.database.backup.index'",
         ],
     ],
-    'scheduled task' => [
-        'app/Livewire/Project/Shared/ScheduledTask/Show.php',
-        [
-            "redirectRoute(\$this, 'project.application.scheduled-tasks.show'",
-            "redirectRoute(\$this, 'project.service.scheduled-tasks.show'",
-        ],
-    ],
     'GitHub source' => [
         'app/Livewire/Source/Github/Change.php',
         ["redirectRoute(\$this, 'source.all')"],

@@ -70,11 +70,16 @@ class Delete extends Component
                 return;
             }
 
+            $resources = $this->server->definedResources();
             if ($isArchive) {
-                app(ServerTransferClaimer::class)->forgetDnsRecords($this->server);
+                $claimer = app(ServerTransferClaimer::class);
+                $claimer->forgetDnsRecords($this->server);
+                // Applications that use the server only as an additional destination stay; they lose this server.
+                $claimer->detachAdditionalApplications($this->server);
+                $resources = $claimer->archiveResources($this->server);
             }
             if ($this->force_delete_resources) {
-                foreach ($this->server->definedResources() as $resource) {
+                foreach ($resources as $resource) {
                     DeleteResourceJob::dispatch($resource, deleteFromCoolifyOnly: $isArchive);
                 }
             }

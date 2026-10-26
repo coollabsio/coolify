@@ -139,10 +139,10 @@
         }));
     }
 }" x-init="
-    selectedCloneServer = null;
-    selectedCloneDestination = null;
-    selectedCloneProject = null;
-    selectedCloneEnvironment = null;
+    selectedCloneServer = currentServerId;
+    selectedCloneDestination = currentDestinationUuid;
+    selectedCloneProject = currentProjectId;
+    selectedCloneEnvironment = currentEnvironmentId;
     selectedMigrateServer = null;
     selectedMigrateDestination = null;
     $watch('selectedCloneServer', () => selectedCloneDestination = null);
@@ -151,8 +151,8 @@
     $watch('selectedMoveProject', () => selectedMoveEnvironment = null);
 " class="flex flex-col gap-6">
     @can('update', $resource)
-        <x-application.settings-section id="clone-destination-section" title="Clone to another destination"
-            helper="Create the clone in the current environment on another server or network.">
+        <x-application.settings-section id="clone-resource-section" title="Clone resource"
+            helper="Create a copy of this resource. Choose where it runs and where it belongs. The current values are selected by default.">
             <x-callout type="info" title="Configuration only">
                 Cloning copies settings, environment variables, and resource configuration. Stored files,
                 database records, and other persistent data are not copied.
@@ -168,14 +168,24 @@
                     x-bind:disabled="selectedCloneServer === null || selectedCloneServer === ''"
                     placeholder="Choose a destination…"
                     emptyText="No network destinations are available on this server." />
+
+                <x-forms.listbox id="clone-resource-project" label="Project" :wire="false"
+                    x-model="selectedCloneProject" x-effect="options = cloneProjectOptions"
+                    placeholder="Choose a project…" />
+
+                <x-forms.listbox id="clone-resource-environment" label="Environment" :wire="false"
+                    x-model="selectedCloneEnvironment" x-effect="options = cloneEnvironmentOptions"
+                    x-bind:disabled="!selectedCloneProject || availableCloneEnvironments.length === 0"
+                    placeholder="Choose an environment…" />
             </div>
 
-            <div x-show="selectedCloneDestination" x-cloak
+            <div
                 class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
                 <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
                     The running resource will not be changed.
                 </p>
-                <x-forms.button @click="$wire.cloneTo(selectedCloneDestination)">
+                <x-forms.button x-bind:disabled="!selectedCloneDestination || !selectedCloneEnvironment"
+                    @click="$wire.cloneTo(selectedCloneDestination, selectedCloneEnvironment)">
                     Clone resource
                 </x-forms.button>
             </div>
@@ -231,32 +241,6 @@
                 </div>
             </x-application.settings-section>
         @endif
-
-        <x-application.settings-section id="clone-environment-section" title="Clone to another environment"
-            helper="Create the clone in another project environment while keeping the current server and network.">
-            <div class="grid gap-4 md:grid-cols-2">
-                <x-forms.listbox id="clone-resource-project" label="Project" :wire="false"
-                    x-model="selectedCloneProject" x-effect="options = cloneProjectOptions"
-                    placeholder="Choose a project…" />
-
-                <x-forms.listbox id="clone-resource-environment" label="Environment" :wire="false"
-                    x-model="selectedCloneEnvironment" x-effect="options = cloneEnvironmentOptions"
-                    x-bind:disabled="!selectedCloneProject || availableCloneEnvironments.length === 0"
-                    placeholder="Choose an environment…" />
-            </div>
-
-            <div x-show="selectedCloneEnvironment" x-cloak
-                class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
-                <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                    Uses {{ data_get($resource, 'destination.server.name') }} ·
-                    {{ data_get($resource, 'destination.network') }}.
-                </p>
-                <x-forms.button
-                    @click="$wire.cloneTo(currentDestinationUuid, selectedCloneEnvironment)">
-                    Clone resource
-                </x-forms.button>
-            </div>
-        </x-application.settings-section>
 
         <x-application.settings-section id="move-resource-section" title="Move resource"
             helper="Transfer this resource to another project environment without changing the running deployment.">

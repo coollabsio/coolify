@@ -27,7 +27,28 @@ class Subscription extends Model
     {
         return [
             'stripe_refunded_at' => 'datetime',
+            'ended_at' => 'datetime',
         ];
+    }
+
+    /**
+     * ended_at marks when the team stopped paying, which starts the data retention period.
+     * A past-due subscription is still in dunning, so it counts as paying.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Subscription $subscription): void {
+            if ($subscription->isPaying()) {
+                $subscription->ended_at = null;
+            } elseif ($subscription->ended_at === null) {
+                $subscription->ended_at = now();
+            }
+        });
+    }
+
+    public function isPaying(): bool
+    {
+        return (bool) $this->stripe_invoice_paid || (bool) $this->stripe_past_due;
     }
 
     public function team()

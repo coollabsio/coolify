@@ -4,7 +4,6 @@
             ($resource->build_pack !== 'dockercompose' &&
                 $resource->destination->server->isMetricsEnabled() &&
                 str($resource->status)->contains('running'))) x-init="$wire.loadData()"
-        @if ($poll) wire:poll.5000ms="pollData" @endif
     @endif>
     @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
@@ -39,16 +38,18 @@
                 icon-name="dashboard" />
         </x-application.settings-section>
     @else
+        @if ($live)
+            <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="loadData" class="hidden"></div>
+        @endif
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect recent CPU and memory usage reported by Sentinel.">
             <x-slot:actions>
-                <x-status-badge :status="$poll ? 'Live updates' : 'Historical range'"
-                    :type="$poll ? 'success' : 'neutral'" />
+                <x-live-toggle :active="$live" storageKey="resource-metrics-live" />
             </x-slot:actions>
             <div class="max-w-xs">
                 <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
-                    ['value' => 5, 'label' => 'Last 5 minutes · live'],
-                    ['value' => 10, 'label' => 'Last 10 minutes · live'],
+                    ['value' => 5, 'label' => 'Last 5 minutes'],
+                    ['value' => 10, 'label' => 'Last 10 minutes'],
                     ['value' => 30, 'label' => 'Last 30 minutes'],
                     ['value' => 60, 'label' => 'Last hour'],
                     ['value' => 720, 'label' => 'Last 12 hours'],
@@ -57,12 +58,15 @@
                 ]" />
             </div>
             <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                Five and ten minute ranges refresh automatically every five seconds.
+                While live, ranges up to one hour refresh every five seconds. Longer ranges refresh every minute.
             </p>
         </x-application.settings-section>
 
         <x-application.settings-section id="cpu-metrics-section" title="CPU usage"
             helper="Percentage of available CPU capacity used by the application container.">
+            <x-slot:actions>
+                <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+            </x-slot:actions>
             <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
 
             @script
@@ -166,6 +170,7 @@
                     });
 
                     cpuChart.render();
+                    window.syncChartTooltips('{!! $chartId !!}', [cpuChart]);
 
                     Livewire.on('refreshChartData-{!! $chartId !!}-cpu', chartData => {
                         checkTheme();
@@ -206,6 +211,12 @@
                                 },
                             },
                         });
+                        renderChartLegend(document.getElementById('{!! $chartId !!}-cpu-legend'), [{
+                            name: 'CPU',
+                            color: cpuColor,
+                            data: chartData[0].seriesData,
+                            formatter: value => `${Number(value.toFixed(Math.abs(value) < 1 ? 2 : 1))}%`,
+                        }]);
                     });
                 })();
             </script>
@@ -214,6 +225,9 @@
 
         <x-application.settings-section id="memory-metrics-section" title="Memory usage"
             helper="Memory consumed by the application container, measured in megabytes.">
+            <x-slot:actions>
+                <div wire:ignore id="{!! $chartId !!}-memory-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+            </x-slot:actions>
             <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
 
             @script
@@ -313,6 +327,7 @@
                     });
 
                     memoryChart.render();
+                    window.syncChartTooltips('{!! $chartId !!}', [memoryChart]);
 
                     Livewire.on('refreshChartData-{!! $chartId !!}-memory', chartData => {
                         checkTheme();
@@ -349,6 +364,12 @@
                                 },
                             },
                         });
+                        renderChartLegend(document.getElementById('{!! $chartId !!}-memory-legend'), [{
+                            name: 'Memory',
+                            color: ramColor,
+                            data: chartData[0].seriesData,
+                            formatter: value => `${Math.round(value)} MB`,
+                        }]);
                     });
                 })();
             </script>

@@ -1648,26 +1648,26 @@
       required: true
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
-    SERVICE_FQDN_ADMIN: 7.admin.example.com
+    SERVICE_FQDN_ADMIN: referenceapplication0001.10.0.0.1.sslip.io
     SERVICE_FQDN_ADMIN_8080: null
-    SERVICE_FQDN_API: 7.www.api.example.com
-    SERVICE_FQDN_API_V2: 7.api-v2.example.com
-    SERVICE_FQDN_BLOG: 7.blog.example.com
-    SERVICE_FQDN_MY_APP: 7.my-app.example.com
-    SERVICE_FQDN_WEB: 7.web.example.com
-    SERVICE_FQDN_WEB_3000: null
+    SERVICE_FQDN_API: referenceapplication0001.10.0.0.1.sslip.io/api
+    SERVICE_FQDN_API_V2: api-v2.example.com
+    SERVICE_FQDN_BLOG: blog.example.com
+    SERVICE_FQDN_MY_APP: my-app.example.com
+    SERVICE_FQDN_WEB: web.example.com
+    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
     SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
     SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
     SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
     SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
-    SERVICE_URL_ADMIN: 'https://7.admin.example.com'
-    SERVICE_URL_API: 'https://7.www.api.example.com'
-    SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
-    SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
-    SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+    SERVICE_URL_ADMIN: 'https://admin.example.com'
+    SERVICE_URL_API: 'https://www.api.example.com'
+    SERVICE_URL_API_V2: 'https://api-v2.example.com'
+    SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+    SERVICE_URL_MY_APP: 'https://my-app.example.com'
     SERVICE_URL_MY_APP_80: null
-    SERVICE_URL_WEB: 'https://7.web.example.com'
-    SERVICE_URL_WEB_3000: null
+    SERVICE_URL_WEB: 'https://web.example.com'
+    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
     WITH_DEFAULT: null
@@ -2511,23 +2511,23 @@
     SERVICE_FQDN_ADMIN: referenceapplication0001.10.0.0.1.sslip.io
     SERVICE_FQDN_ADMIN_8080: null
     SERVICE_FQDN_API: referenceapplication0001.10.0.0.1.sslip.io/api
-    SERVICE_FQDN_API_V2: 7.api-v2.example.com
-    SERVICE_FQDN_BLOG: 7.blog.example.com
-    SERVICE_FQDN_MY_APP: 7.my-app.example.com
-    SERVICE_FQDN_WEB: 7.web.example.com
-    SERVICE_FQDN_WEB_3000: null
+    SERVICE_FQDN_API_V2: api-v2.example.com
+    SERVICE_FQDN_BLOG: blog.example.com
+    SERVICE_FQDN_MY_APP: my-app.example.com
+    SERVICE_FQDN_WEB: web.example.com
+    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
     SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
     SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
     SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
     SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
-    SERVICE_URL_ADMIN: 'https://7.admin.example.com'
-    SERVICE_URL_API: 'https://7.www.api.example.com'
-    SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
-    SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
-    SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+    SERVICE_URL_ADMIN: 'https://admin.example.com'
+    SERVICE_URL_API: 'https://www.api.example.com'
+    SERVICE_URL_API_V2: 'https://api-v2.example.com'
+    SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+    SERVICE_URL_MY_APP: 'https://my-app.example.com'
     SERVICE_URL_MY_APP_80: null
-    SERVICE_URL_WEB: 'https://7.web.example.com'
-    SERVICE_URL_WEB_3000: null
+    SERVICE_URL_WEB: 'https://web.example.com'
+    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
     WITH_DEFAULT: null

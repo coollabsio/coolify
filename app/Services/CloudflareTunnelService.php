@@ -55,6 +55,7 @@ class CloudflareTunnelService
      */
     public function setUp(Server $server, IntegrationToken $token, string $hostname, ?array $confirmedConflict = null): Activity
     {
+        $server->assertNotTransferredAway();
         $zone = $this->zoneFor($server, $token, $hostname);
         $accountId = $zone->account_id;
         if (blank($accountId)) {
@@ -108,6 +109,10 @@ class CloudflareTunnelService
         $settings = $server->settings;
         if (blank($settings->cloudflare_tunnel_id)) {
             return [];
+        }
+        // Another Coolify instance uses the tunnel of a transferred server.
+        if ($server->isTransferredAway()) {
+            return ['This server is managed by another Coolify instance.'];
         }
 
         $warnings = [];

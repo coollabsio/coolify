@@ -157,10 +157,9 @@
                 </div>
             </div>
 
-            <div @class([
-                'application-settings-section-body w-full',
-                'is-flush' => $backups->isNotEmpty(),
-            ])>
+            <x-application.settings-section title="Schedules"
+                helper="Persistent volume and directory backup schedules for this application."
+                :flush="$backups->isNotEmpty()">
                 <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
                     <x-empty size="sm" title="No backups found"
                         description="No scheduled backups match your search." />
@@ -227,7 +226,7 @@
                         description="Add a persistent volume or directory backup schedule to protect application data."
                         icon-name="storages" />
                 @endif
-            </div>
+            </x-application.settings-section>
         </div>
         </div>
     </section>

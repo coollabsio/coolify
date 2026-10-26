@@ -34,7 +34,7 @@
             x-model="file" x-bind:disabled="{{ $disabled }}" @blur="file = location" />
         <p class="col-span-full text-xs text-neutral-500 dark:text-fg-dim">
             Resolved file:
-            <code class="font-mono text-coollabs dark:text-warning" x-text="directory + location"></code>
+            <code class="font-mono text-coollabs dark:text-brand-light" x-text="directory + location"></code>
         </p>
         <x-callout class="col-span-full" x-cloak x-show="repeatsBase" title="Base directory is repeated">
             {{ $fileLabel }} is relative to the base directory, so it should not start with

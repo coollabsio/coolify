@@ -1,11 +1,11 @@
-<div>
+<div @class(['flex min-h-0 min-w-0 flex-1 flex-col' => $fill])>
 @if (! $canReadLogs)
     <x-callout type="info" title="Hidden (only admins can view)">
         Container logs can contain secrets.
     </x-callout>
 @else
-<div @class(['w-full min-w-0', 'runtime-log-shell' => $collapsible])>
-    <div id="screen" x-data="runtimeLogs(@js([
+<div @class(['w-full min-w-0', 'runtime-log-shell' => $collapsible, 'runtime-logs-fill flex flex-1 flex-col' => $fill])>
+    <div id="screen" @class(['flex min-h-0 flex-1 flex-col' => $fill]) x-data="runtimeLogs(@js([
         'collapsible' => $collapsible,
         'expanded' => $expandByDefault || ! $collapsible,
         'containerName' => $container ?? 'logs',
@@ -35,10 +35,11 @@
             </div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse.duration.200ms' : '' }}
-            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full mx-auto'"
+            @class(['runtime-logs-stream', 'flex min-h-0 w-full flex-1 flex-col' => $fill, 'mx-auto w-full' => ! $fill])
+            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative'"
             :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
             <div class="runtime-log-panel"
-                :class="fullscreen ? 'h-full w-full' : ''">
+                :class="fullscreen ? 'h-full w-full' : '{{ $fill ? 'flex min-h-0 flex-1 flex-col' : '' }}'">
                 <div class="runtime-log-toolbar logs-viewer-toolbar">
                     <div class="logs-viewer-toolbar-controls">
                         <div class="logs-viewer-actions">
@@ -199,6 +200,7 @@
                                         x-on:click="
                                             open = false;
                                             $wire.copyLogs().then(logs => {
+                                                logs = logs.replace(/^([^\t\n]+)\t/gm, '$1 | ');
                                                 if (!navigator.clipboard?.writeText) {
                                                     Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
                                                     return;
@@ -257,15 +259,12 @@
                 <div id="logsContainer" x-ref="viewport" @scroll="handleScroll" @wheel="handleWheel"
                     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
                     class="runtime-log-viewport logs-viewer-viewport relative flex min-w-0 w-full flex-col overflow-x-hidden overflow-y-auto scrollbar"
-                    :class="fullscreen ? 'flex-1' : 'max-h-[min(40rem,70dvh)] sm:max-h-[40rem]'">
-                    <div class="runtime-log-loading" x-show="loading && lineCount === 0" role="status">
+                    :class="fullscreen ? 'flex-1' : '{{ $fill ? 'min-h-0 flex-1' : 'max-h-[min(40rem,70dvh)] sm:max-h-[40rem]' }}'">
+                    <div class="runtime-log-loading" x-show="loading && lineCount === 0" x-cloak role="status">
                         <x-loading compact aria-label="Loading logs" />
                         <span>Loading logs</span>
                     </div>
                     <div class="runtime-log-empty" x-show="!loading && lineCount === 0" role="status">
-                        <span class="runtime-log-empty-icon" aria-hidden="true">
-                            <x-reicon name="terminal" class="size-4" />
-                        </span>
                         <div>
                             <p>No logs yet</p>
                             <span>Logs will appear here when the container produces output.</span>
@@ -273,7 +272,7 @@
                     </div>
                     {{-- Alpine renders only the visible rows. Livewire must not morph them. --}}
                     <div id="logs" wire:ignore x-cloak x-show="lineCount > 0"
-                        :class="{ 'runtime-log-without-time': !$wire.showTimeStamps, 'runtime-log-text-view': textView }"
+                        :class="{ 'runtime-log-without-time': !$wire.showTimeStamps, 'runtime-log-text-view': textView, 'mt-auto': alwaysScroll }"
                         class="font-logs max-w-full cursor-default text-[11px] leading-relaxed sm:text-xs">
                         <div x-ref="columns" x-show="!textView" class="runtime-log-columns" aria-hidden="true">
                             <span x-show="$wire.showTimeStamps">Time</span>
@@ -284,7 +283,7 @@
                             <template x-for="row in virtualRows" :key="row.key">
                                 <div class="runtime-log-virtual-row" :data-index="row.index"
                                     :style="{ transform: 'translateY(' + (row.start - scrollMargin) + 'px)' }"
-                                    x-init="$nextTick(() => measureRow($el))">
+                                    x-init="$nextTick(() => measureRow($el, row.line))">
                                     <div data-log-line :role="textView ? null : 'button'" :tabindex="textView ? null : 0" :data-log-level="row.line.level"
                                         :class="colorLogs ? 'log-' + row.line.level : ''"
                                         :aria-expanded="isLogExpanded(row.line.id)"
@@ -294,7 +293,7 @@
                                         <template x-if="$wire.showTimeStamps && row.line.ts">
                                             <span class="logs-viewer-timestamp text-gray-500" x-text="formatTimestamp(row.line.ts)"></span>
                                         </template>
-                                        <span data-line-text class="logs-viewer-line-text"><template x-for="(segment, segmentIndex) in highlight(row.line.text)" :key="segmentIndex"><span :class="segment.match ? 'log-highlight' : ''" x-text="segment.text"></span></template></span>
+                                        <span data-line-text class="logs-viewer-line-text"><template x-if="multipleSources && row.line.source"><span class="runtime-log-source" :style="{ color: row.line.sourceColor }" x-text="row.line.source"></span></template><span class="runtime-log-message"><template x-for="(segment, segmentIndex) in highlight(row.line.text)" :key="segmentIndex"><span :class="segment.match ? 'log-highlight' : ''" x-text="segment.text"></span></template></span></span>
                                     </div>
                                     <template x-if="isLogExpanded(row.line.id)">
                                         <pre class="runtime-log-detail" aria-label="Full log entry"

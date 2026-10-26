@@ -3,6 +3,7 @@
 use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
+use App\Jobs\RestartProxyJob;
 use App\Livewire\Project\Shared\Maintenance;
 use App\Models\Application;
 use App\Models\Environment;
@@ -204,6 +205,22 @@ it('writes the maintenance blocks into the base Caddyfile on Caddy servers', fun
 
     expect(writtenProxyFile(maintenanceScriptLines(), '/data/coolify/proxy/caddy/dynamic/Caddyfile'))
         ->toContain("@coolify-maintenance-{$application->uuid}-0 path /*");
+});
+
+it('keeps the maintenance blocks and removes the Traefik logrotate sidecar when Caddy restarts', function () {
+    $this->server->proxy->type = ProxyTypes::CADDY->value;
+    $this->server->save();
+    $application = maintenanceApplication(['is_maintenance_enabled' => true]);
+    $server = maintenanceServer();
+
+    $method = new ReflectionMethod(RestartProxyJob::class, 'buildRestartCommands');
+    $commands = $method->invoke(new RestartProxyJob($server), "services:\n  caddy:\n    container_name: coolify-proxy\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n");
+    $caddyfile = base64_encode($server->caddyBaseCaddyfile());
+
+    expect(base64_decode($caddyfile))->toContain("@coolify-maintenance-{$application->uuid}-0 path /*")
+        ->and($commands)
+        ->toContain("echo '{$caddyfile}' | base64 -d | tee /data/coolify/proxy/caddy/dynamic/Caddyfile > /dev/null")
+        ->toContain('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
 });
 
 it('keeps the page container for maintenance when a redirect URL replaces the catch-all page', function () {

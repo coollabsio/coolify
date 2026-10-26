@@ -216,7 +216,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     );
 }
 
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false, ?int $maxAttempts = null): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -248,13 +248,13 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
             'command_preview' => substr($command_string, 0, 100),
             'function' => 'instant_remote_process',
         ],
-        $throwError
+        $throwError,
+        $maxAttempts
     );
 }
 
 /**
- * Throws the remote command error. Handler::register() never sends RuntimeException to Sentry,
- * so SSH key, DNS, and timeout failures on user servers are not reported.
+ * Throws the remote command error.
  */
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
 {

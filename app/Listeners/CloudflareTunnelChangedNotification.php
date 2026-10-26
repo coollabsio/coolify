@@ -19,6 +19,9 @@ class CloudflareTunnelChangedNotification
         $ssh_domain = data_get($event, 'data.ssh_domain');
 
         $this->server = Server::where('id', $server_id)->firstOrFail();
+        if ($this->server->isTransferredAway()) {
+            return;
+        }
 
         // Check if cloudflare tunnel is running (container is healthy) - try 3 times with 5 second intervals
         $cloudflareHealthy = false;

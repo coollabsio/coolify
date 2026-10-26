@@ -54,6 +54,29 @@ test('getTerminalProcessEnv uses the default PATH when PATH is empty', () => {
     });
 });
 
+test('getTerminalProcessEnv passes the cloudflared Access service token to SSH proxy commands', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        PATH: '/usr/bin:/bin',
+        TUNNEL_SERVICE_TOKEN_ID: 'token-id.access',
+        TUNNEL_SERVICE_TOKEN_SECRET: 'token-secret',
+        TUNNEL_SERVICE_URL: 'must-not-be-inherited',
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/bin:/bin',
+        TUNNEL_SERVICE_TOKEN_ID: 'token-id.access',
+        TUNNEL_SERVICE_TOKEN_SECRET: 'token-secret',
+    });
+});
+
+test('getTerminalProcessEnv omits empty cloudflared service token variables', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        PATH: '/usr/bin:/bin',
+        TUNNEL_SERVICE_TOKEN_ID: '',
+    }), {
+        PATH: '/usr/bin:/bin',
+    });
+});
+
 test('extractTargetHost normalizes quoted IPv4 hosts from generated ssh commands', () => {
     const sshArgs = extractSshArgs(
         "timeout 3600 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=20 -o ConnectTimeout=10 'root'@'10.0.0.5' 'bash -se' << \\\\$abc\necho hi\nabc"

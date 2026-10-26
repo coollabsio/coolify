@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -196,9 +197,11 @@ class Metrics extends Component
         $this->loadData();
     }
 
-    public function isLivePollable(): bool
+    public function updatedLive(): void
     {
-        return $this->live && $this->range === '24h';
+        if ($this->live) {
+            $this->loadData();
+        }
     }
 
     /**
@@ -226,6 +229,10 @@ class Metrics extends Component
         $clients = [];
         $summaryTasks = [];
         foreach ($targets as $server) {
+            // Coolify does not connect to an unreachable server, and its SSH retries would hold a worker past the process timeout.
+            if (! $server->isFunctional()) {
+                continue;
+            }
             $client = $clients[$server->uuid] = $this->metricsClient($server);
             $summaryTasks[$server->uuid] = static fn () => $client->summary();
         }
@@ -245,21 +252,21 @@ class Metrics extends Component
         $results = $this->runMetricTasks($tasks);
 
         foreach ($targets as $server) {
-            $summary = $summaries[$server->uuid];
+            $summary = $summaries[$server->uuid] ?? null;
             foreach (['cpu', 'memory', 'disk', 'load'] as $metric) {
                 $series[$metric][] = $results[$server->uuid.':'.$metric] ?? [];
             }
 
             if ($summary === null) {
-                $rows[] = $this->offlineRow($server);
+                $rows[] = $this->rowWithoutMetrics($server);
 
                 continue;
             }
 
             $current = $results[$server->uuid.':containers'] ?? [];
             $rows[] = array_merge(
-                ['uuid' => $server->uuid, 'name' => $server->name, 'online' => true, 'containers' => count($current)],
-                $summary
+                $summary,
+                ['uuid' => $server->uuid, 'name' => $server->name, 'online' => true, 'reporting' => true, 'containers' => count($current)]
             );
 
             foreach ($current as $c) {
@@ -301,19 +308,28 @@ class Metrics extends Component
         }
         $results = [];
         foreach (array_chunk($tasks, 8, true) as $batch) {
-            $results += Concurrency::run($batch);
+            try {
+                $results += Concurrency::run($batch);
+            } catch (\Throwable $e) {
+                // A worker that runs past the process timeout fails its batch. Show those metrics as missing, not a server error.
+                Log::warning('Fleet metrics batch failed', ['error' => $e->getMessage()]);
+                $results += array_fill_keys(array_keys($batch), null);
+            }
         }
 
         return $results;
     }
 
     /**
+     * A server whose Sentinel returned no current metrics. It is online when Coolify can reach it,
+     * because a failed metrics request does not mean that the server is down.
+     *
      * @return array<string, mixed>
      */
-    protected function offlineRow(Server $server): array
+    protected function rowWithoutMetrics(Server $server): array
     {
         return [
-            'uuid' => $server->uuid, 'name' => $server->name, 'online' => false,
+            'uuid' => $server->uuid, 'name' => $server->name, 'online' => (bool) $server->isFunctional(), 'reporting' => false,
             'cpu' => null, 'memUsed' => null, 'memTotal' => null,
             'diskUsed' => null, 'diskTotal' => null, 'diskPercent' => null,
             'load1' => null, 'netRx' => null, 'netTx' => null, 'containers' => null,

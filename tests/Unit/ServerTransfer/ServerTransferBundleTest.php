@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\ServerTransfer\ServerTransferBundle;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -74,4 +75,20 @@ test('validate accepts a bundle from an older Coolify version', function () {
     $bundle['coolify_version'] = '4.0.0';
 
     expect(ServerTransferBundle::validate($bundle)['valid'])->toBeTrue();
+});
+
+test('validate accepts Coolify ids and legacy RFC 4122 uuids', function () {
+    $bundle = bundleTestMinimalBundle();
+    $bundle['server']['uuid'] = new_public_id();
+    $bundle['private_key']['uuid'] = (string) Str::uuid();
+    $bundle['volume_backups'] = [['uuid' => 'abc_DEF-123', 's3_storage_uuids' => [(string) Str::uuid()], 'frequency' => 'daily']];
+
+    expect(ServerTransferBundle::validate($bundle)['errors'])->toBe([]);
+});
+
+test('validate rejects an unsafe id in an id list', function () {
+    $bundle = bundleTestMinimalBundle();
+    $bundle['volume_backups'] = [['s3_storage_uuids' => ['ok', '../../x']]];
+
+    expect(ServerTransferBundle::validate($bundle)['errors'])->toContain('volume_backups.0.s3_storage_uuids.1 is not a valid id. An id may only contain letters, digits, hyphens, and underscores (at most 64 characters).');
 });

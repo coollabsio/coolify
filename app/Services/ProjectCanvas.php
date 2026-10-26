@@ -20,11 +20,11 @@ class ProjectCanvas
     /**
      * The canvas of every project of a team: one zone per project, cards grouped by environment.
      *
-     * @return array{title: string, title_link: string, can_edit: bool, can_move: false, can_move_groups: bool, layout: 'server', zones: array<int, array<string, mixed>>, nodes: array<int, array<string, mixed>>, links: array<int, array<string, mixed>>, positions: array{}}
+     * @return array{title: string, title_link: string, can_edit: bool, can_move: false, can_move_groups: bool, can_move_zones: bool, layout: 'server', zones: array<int, array<string, mixed>>, nodes: array<int, array<string, mixed>>, links: array<int, array<string, mixed>>, positions: array{}}
      */
     public function teamPayload(int $teamId, bool $canReadSensitive, bool $canEdit = false): array
     {
-        $projects = Project::query()->where('team_id', $teamId)->orderBy('name')->get(['id', 'uuid', 'name', 'team_id']);
+        $projects = Project::query()->where('team_id', $teamId)->orderBy('name')->get(['id', 'uuid', 'name', 'team_id', 'canvas_position']);
         $environments = Environment::query()->whereIn('project_id', $projects->pluck('id'))
             ->orderBy('id')
             ->get(['id', 'uuid', 'name', 'project_id']);
@@ -48,6 +48,8 @@ class ProjectCanvas
             'can_move' => false,
             // Admins move groups and cards here; the canvas saves them on their environment canvas.
             'can_move_groups' => $canEdit,
+            // Admins move the project zones; each project saves its place (zone.position).
+            'can_move_zones' => $canEdit,
             // Same grouped layout as the server canvas, with projects as the zones.
             'layout' => 'server',
             'zones' => $projects->map(fn (Project $project) => [
@@ -55,6 +57,7 @@ class ProjectCanvas
                 'name' => $project->name,
                 'icon' => 'projects',
                 'link' => route('project.show', ['project_uuid' => $project->uuid]),
+                'position' => $this->canvas->zonePosition($project->canvas_position),
             ])->values()->all(),
             'nodes' => collect($graph['nodes'])->map(fn (array $node) => [...$node, ...$grouping->get($node['id'])])
                 ->concat($projects->flatMap(fn (Project $project) => $this->emptyNodes($project, $environments->where('project_id', $project->id), $resources, $project->uuid, $canEdit)))

@@ -208,7 +208,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($db) {
                         $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
                     } else {
-                        throw new \Exception('MYSQL_DATABASE not found');
+                        $databasesToBackup = $this->configuredDatabasesToBackup();
+                        if (blank($databasesToBackup)) {
+                            $this->recordUndeterminedDatabases('MYSQL_DATABASE');
+
+                            return;
+                        }
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $commands[] = "docker exec {$escapedContainerName} env";
@@ -242,7 +247,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         if ($db) {
                             $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
                         } else {
-                            throw new \Exception('MARIADB_DATABASE or MYSQL_DATABASE not found');
+                            $databasesToBackup = $this->configuredDatabasesToBackup();
+                            if (blank($databasesToBackup)) {
+                                $this->recordUndeterminedDatabases('MARIADB_DATABASE or MYSQL_DATABASE');
+
+                                return;
+                            }
                         }
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
@@ -307,7 +317,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
-            if ($this->database->name === 'coolify-db') {
+            if ($this->database instanceof StandalonePostgresql && $this->database->isInstanceDatabase()) {
                 $databasesToBackup = ['coolify'];
                 $this->directory_name = $this->container_name = 'coolify-db';
                 $ip = Str::slug($this->server->ip);
@@ -450,6 +460,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     // Local backup failed: the partial file is not tracked, so retention would never remove it.
                     deleteBackupsLocally($this->backup_location, $this->server);
                     $failureMessage = $this->redact($this->error_output ?? $this->backup_output ?? $e->getMessage());
+                    $exitCodeReason = $this->exitCodeReason($e->getCode());
+                    if ($exitCodeReason !== null) {
+                        $failureMessage = $exitCodeReason."\n\n".$failureMessage;
+                    }
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
@@ -688,7 +702,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --no-acl --no-owner --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
+                // Keep owners and privileges in the archive: services such as Supabase need them,
+                // and the restore skips them unless "Keep owners and privileges" is selected.
+                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
             }
 
             $commands[] = $backupCommand;
@@ -804,6 +820,24 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Explains exit codes of a dump that was stopped from outside. The dump tool cannot report these
+     * itself, so its output ends after the last progress line without an error.
+     */
+    private function exitCodeReason(int|string $exitCode): ?string
+    {
+        return match ($exitCode) {
+            137 => 'The backup stopped with exit code 137: the dump process or the database container was killed (SIGKILL). '
+                .'This is usually the out-of-memory killer: the dump runs inside the database container and shares its memory limit. '
+                .'Check the memory limit of the database and the kernel log (dmesg) on the server.',
+            143 => 'The backup stopped with exit code 143: the dump process or the database container was terminated (SIGTERM), '
+                .'for example because the database was stopped or restarted during the backup.',
+            255 => 'The backup stopped with exit code 255: the SSH connection to the server closed. '
+                .'Check the network connection and the SSH server log on the server.',
+            default => null,
+        };
+    }
+
     private function add_to_backup_output($output): void
     {
         if ($this->backup_output) {
@@ -904,7 +938,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             // Remove a leftover helper in the same batch, so a replayed batch does not fail with a name conflict.
             $commands[] = "docker rm -f backup-of-{$this->backup_log_uuid} >/dev/null 2>&1 || true";
             $mount = escapeshellarg($this->backupMountSource().':'.$this->backup_location.':ro');
-            $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm -v {$mount} {$fullImageName}";
+            $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm {$s3->minioClientRegionOption()} -v {$mount} {$fullImageName}";
 
             // Escape S3 credentials to prevent command injection
             $escapedEndpoint = escapeshellarg($endpoint);
@@ -1042,6 +1076,38 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             'filename' => null,
             'local_storage_deleted' => false,
         ]);
+    }
+
+    /**
+     * Databases picked on the backup, for service databases whose container does not name one.
+     *
+     * @return string|array<int, string>|null
+     */
+    private function configuredDatabasesToBackup(): string|array|null
+    {
+        if ($this->backup->dump_all) {
+            return ['all'];
+        }
+
+        return $this->backup->databases_to_backup;
+    }
+
+    /**
+     * Show a run that cannot start because no database is known in the execution list, and notify the team.
+     */
+    private function recordUndeterminedDatabases(string $envNames): void
+    {
+        $message = "No database to back up: the container does not set {$envNames}. Select \"All databases\" or enter the databases to back up in the backup settings.";
+        $this->recordSkippedBackup($message);
+        $this->logSkippedRun('no_databases_determined');
+        try {
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $message, 'unknown'));
+        } catch (Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
+                'backup_id' => $this->backup->uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function markStaleExecutionsAsFailed(): void

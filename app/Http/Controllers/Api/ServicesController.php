@@ -7,7 +7,6 @@ use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
-use App\Jobs\VolumeCloneJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -23,13 +22,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
 class ServicesController extends Controller
 {
     use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployAbility;
     use Concerns\RequiresDeployForOutsideHostPaths;
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
@@ -77,7 +76,12 @@ class ServicesController extends Controller
             $service->makeHidden(['value', 'real_value']);
         }
 
-        return serializeApiResponse($service);
+        $payload = serializeApiResponse($service);
+        if ($service instanceof Service && filled(data_get($payload, 'docker_compose'))) {
+            $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $service);
+        }
+
+        return $payload;
     }
 
     /**
@@ -1009,7 +1013,7 @@ class ServicesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete',
-        description: 'Delete service by UUID.',
+        description: 'Delete service by UUID. Needs a token with the write and deploy permissions.',
         path: '/services/{uuid}',
         operationId: 'delete-service-by-uuid',
         security: [
@@ -1022,7 +1026,6 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
-            new OA\Parameter(name: 'delete_from_coolify_only', in: 'query', required: false, description: 'Remove only Coolify metadata without deleting Docker resources.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1052,6 +1055,8 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function delete_by_uuid(Request $request)
@@ -1070,10 +1075,14 @@ class ServicesController extends Controller
 
         $this->authorize('delete', $service);
 
-        $service->delete();
+        // The parameter was removed. Reject it instead of ignoring it, so old clients do not delete Docker resources they asked to keep.
+        if ($request->boolean('delete_from_coolify_only')) {
+            return response()->json([
+                'message' => 'The delete_from_coolify_only parameter is no longer supported. Nothing was deleted. Send the request without it: Coolify removes the service also when the server is not reachable.',
+            ], 422);
+        }
 
-        $deleteFromCoolifyOnlyRequested = $request->boolean('delete_from_coolify_only');
-        $deleteFromCoolifyOnly = $deleteFromCoolifyOnlyRequested || ! $service->server?->isFunctional();
+        $service->delete();
 
         DeleteResourceJob::dispatch(
             resource: $service,
@@ -1081,23 +1090,15 @@ class ServicesController extends Controller
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true),
-            deleteFromCoolifyOnly: $deleteFromCoolifyOnly,
         );
 
         auditLog('api.service.deleted', [
             'team_id' => $teamId,
             'service_uuid' => $service->uuid,
             'service_name' => $service->name,
-            'delete_from_coolify_only' => $deleteFromCoolifyOnly,
         ]);
 
-        $message = match (true) {
-            $deleteFromCoolifyOnlyRequested => 'The service will be removed from Coolify only; Docker resources will remain.',
-            $deleteFromCoolifyOnly => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
-            default => 'Service deletion request queued.',
-        };
-
-        return response()->json(['message' => $message]);
+        return response()->json(['message' => 'Service deletion request queued.']);
     }
 
     #[OA\Patch(
@@ -1148,6 +1149,7 @@ class ServicesController extends Controller
                             'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'],
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'default' => true, 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                         ],
                     )
                 ),
@@ -1236,7 +1238,7 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
-        if ($request->has('redact_all_env_values_in_logs')) {
+        if ($request->has('redact_all_env_values_in_logs') || $request->has('include_coolify_default_variables')) {
             $this->authorize('manageEnvironment', $service);
         }
 
@@ -1245,7 +1247,7 @@ class ServicesController extends Controller
             $this->authorize('deploy', $service);
         }
 
-        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'redact_all_env_values_in_logs'];
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'redact_all_env_values_in_logs', 'include_coolify_default_variables'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -1260,6 +1262,7 @@ class ServicesController extends Controller
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
             'redact_all_env_values_in_logs' => 'boolean',
+            'include_coolify_default_variables' => 'boolean',
         ];
         $validationMessages = [
             'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
@@ -1329,6 +1332,9 @@ class ServicesController extends Controller
         }
         if ($request->has('redact_all_env_values_in_logs')) {
             $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
+        }
+        if ($request->has('include_coolify_default_variables')) {
+            $service->include_coolify_default_variables = $request->boolean('include_coolify_default_variables');
         }
         $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
         $service->save();
@@ -2498,7 +2504,7 @@ class ServicesController extends Controller
                             'resource_uuid' => ['type' => 'string', 'description' => 'UUID of the service application or database sub-resource.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional). Needs the deploy ability when set.'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
                         ],
@@ -2516,7 +2522,7 @@ class ServicesController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
-            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory.'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -2720,6 +2726,13 @@ class ServicesController extends Controller
                     'message' => 'Validation failed.',
                     'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
                 ], 422);
+            }
+
+            if ($request->filled('content')) {
+                $forbidden = $this->deployAbilityForbiddenResponse($request, 'Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
+                if ($forbidden) {
+                    return $forbidden;
+                }
             }
 
             $storage = LocalFileVolume::create([
@@ -3259,7 +3272,7 @@ class ServicesController extends Controller
                 properties: [
                     new OA\Property(property: 'destination_uuid', type: 'string'),
                     new OA\Property(property: 'name', type: 'string', nullable: true),
-                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false, description: 'Whether to clone volume data. Needs the deploy ability.'),
                 ]
             )
         ),
@@ -3267,6 +3280,7 @@ class ServicesController extends Controller
             new OA\Response(response: 201, description: 'Service cloned.'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability to clone volume data.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -3310,6 +3324,10 @@ class ServicesController extends Controller
         $this->authorize('update', $service);
         $this->authorize('create', [Service::class, $service->environment]);
 
+        if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
+            return $response;
+        }
+
         $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
             ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
 
@@ -3323,149 +3341,10 @@ class ServicesController extends Controller
             : $service->name.'-clone-'.$uuid;
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
-        $newService = $service->replicate([
-            'id',
-            'created_at',
-            'updated_at',
-        ])->fill([
+        $newService = clone_service($service, $destination, [
             'uuid' => $uuid,
             'name' => $name,
-            'destination_id' => $destination->id,
-            'destination_type' => $destination->getMorphClass(),
-            'server_id' => $destination->server_id,
-        ]);
-        $newService->save();
-
-        foreach ($service->tags as $tag) {
-            $newService->tags()->attach($tag->id);
-        }
-
-        foreach ($service->scheduled_tasks()->get() as $task) {
-            $task->replicate([
-                'id',
-                'created_at',
-                'updated_at',
-            ])->fill([
-                'uuid' => new_public_id(),
-                'service_id' => $newService->id,
-                'team_id' => $teamId,
-            ])->save();
-        }
-
-        foreach ($service->environment_variables()->get() as $environmentVariable) {
-            $environmentVariable->replicate([
-                'id',
-                'created_at',
-                'updated_at',
-            ])->fill([
-                'resourceable_id' => $newService->id,
-                'resourceable_type' => $newService->getMorphClass(),
-            ])->save();
-        }
-
-        // Create applications/databases (and their volumes) for the clone first.
-        // Child rows are not copied by Service::replicate().
-        $newService->parse();
-        $newService->refresh();
-
-        $sourceApplicationsByName = $service->applications()->get()->keyBy('name');
-        $sourceDatabasesByName = $service->databases()->get()->keyBy('name');
-        $pendingVolumeClones = [];
-        $sourceServer = $service->destination?->server;
-        $targetServer = $newService->destination?->server;
-
-        foreach ($newService->applications()->get() as $application) {
-            $application->fill(['status' => 'exited'])->save();
-
-            $sourceApplication = $sourceApplicationsByName->get($application->name);
-            if (! $sourceApplication) {
-                continue;
-            }
-
-            if ($cloneVolumeData) {
-                $targetVolumesByMount = $application->persistentStorages()->get()->keyBy('mount_path');
-                foreach ($sourceApplication->persistentStorages()->get() as $sourceVolume) {
-                    $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
-                    if (! $targetVolume) {
-                        continue;
-                    }
-
-                    $pendingVolumeClones[] = [
-                        'source' => $sourceVolume->name,
-                        'target' => $targetVolume->name,
-                        'model' => $targetVolume,
-                    ];
-                }
-            }
-        }
-
-        foreach ($newService->databases()->get() as $database) {
-            $database->fill(['status' => 'exited'])->save();
-
-            $sourceDatabase = $sourceDatabasesByName->get($database->name);
-            if (! $sourceDatabase) {
-                continue;
-            }
-
-            if ($cloneVolumeData) {
-                $targetVolumesByMount = $database->persistentStorages()->get()->keyBy('mount_path');
-                foreach ($sourceDatabase->persistentStorages()->get() as $sourceVolume) {
-                    $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
-                    if (! $targetVolume) {
-                        continue;
-                    }
-
-                    $pendingVolumeClones[] = [
-                        'source' => $sourceVolume->name,
-                        'target' => $targetVolume->name,
-                        'model' => $targetVolume,
-                    ];
-                }
-            }
-
-            foreach ($sourceDatabase->scheduledBackups()->get() as $backup) {
-                $newBackup = $backup->replicate([
-                    'id',
-                    'created_at',
-                    'updated_at',
-                ])->fill([
-                    'uuid' => new_public_id(),
-                    'database_id' => $database->id,
-                    'database_type' => $database->getMorphClass(),
-                    'team_id' => $teamId,
-                ]);
-                $newBackup->save();
-                $backup->copyS3StoragesTo($newBackup);
-            }
-        }
-
-        if ($cloneVolumeData && $pendingVolumeClones !== [] && $sourceServer && $targetServer) {
-            try {
-                $chain = [
-                    function () use ($service) {
-                        StopService::run($service);
-                    },
-                ];
-
-                foreach ($pendingVolumeClones as $clone) {
-                    $chain[] = new VolumeCloneJob(
-                        $clone['source'],
-                        $clone['target'],
-                        $sourceServer,
-                        $targetServer,
-                        $clone['model'],
-                    );
-                }
-
-                $chain[] = function () use ($service) {
-                    StartService::run($service);
-                };
-
-                Bus::chain($chain)->onQueue('high')->dispatch();
-            } catch (\Exception $e) {
-                \Log::error('Failed to queue service volume clone for '.$service->uuid.': '.$e->getMessage());
-            }
-        }
+        ], $cloneVolumeData);
 
         auditLog('api.service.cloned', [
             'team_id' => $teamId,

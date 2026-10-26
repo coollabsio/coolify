@@ -6,6 +6,8 @@ use App\Models\Server;
 use App\Services\ProxyPortParser;
 use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Tag\TaggedValue;
+use Symfony\Component\Yaml\Yaml;
 
 class SaveProxyConfiguration
 {
@@ -21,6 +23,10 @@ class SaveProxyConfiguration
             throw ValidationException::withMessages([
                 'configuration' => [$exception->getMessage()],
             ]);
+        }
+
+        if (! $server->isSwarm()) {
+            $this->ensureDefaultContainerName($configuration);
         }
 
         $proxy_path = $server->proxyPath();
@@ -59,5 +65,30 @@ class SaveProxyConfiguration
         $commands[] = "echo '$docker_compose_yml_base64' | base64 -d | tee $proxy_path/docker-compose.yml > /dev/null";
 
         instant_remote_process($commands, $server);
+    }
+
+    /**
+     * Coolify finds the proxy by its container name, so a renamed or unnamed proxy shows as stopped (#7083).
+     */
+    private function ensureDefaultContainerName(string $configuration): void
+    {
+        $services = data_get(Yaml::parse($configuration, Yaml::PARSE_CUSTOM_TAGS), 'services');
+
+        foreach (['traefik', 'caddy'] as $proxyService) {
+            if (! is_array($services) || ! array_key_exists($proxyService, $services)) {
+                continue;
+            }
+
+            $containerName = data_get($services, "{$proxyService}.container_name");
+            if ($containerName instanceof TaggedValue) {
+                $containerName = $containerName->getValue();
+            }
+
+            if ($containerName !== 'coolify-proxy') {
+                throw ValidationException::withMessages([
+                    'configuration' => ["The {$proxyService} container_name must be coolify-proxy. Coolify uses this name to manage the proxy."],
+                ]);
+            }
+        }
     }
 }

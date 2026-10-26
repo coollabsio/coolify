@@ -29,7 +29,7 @@
                 </div>
                 <p class="mt-2 text-xs text-neutral-500 dark:text-fg-dim">
                     Need a sample? Browse
-                    <a class="font-medium text-coollabs hover:underline dark:text-warning"
+                    <a class="font-medium text-coollabs hover:underline dark:text-brand-light"
                         href="https://github.com/coollabsio/coolify-examples/" target="_blank">
                         Coolify Examples
                     </a>.

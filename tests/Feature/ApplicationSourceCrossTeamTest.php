@@ -3,6 +3,7 @@
 use App\Livewire\Project\Application\Source;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -241,4 +242,48 @@ describe('after the user switches the session team', function () {
 
         expect($this->applicationA->refresh()->source_id)->toBe($this->systemWideGithubApp->id);
     });
+});
+
+function applicationSourceGiteaAppForTeam(int $teamId, string $name): GiteaApp
+{
+    // Http::GitSource() pins DNS before Http::fake() answers, so use an IP literal.
+    return GiteaApp::create([
+        'name' => $name,
+        'team_id' => $teamId,
+        'api_url' => 'https://1.1.1.1/api/v1',
+        'html_url' => 'https://1.1.1.1',
+        'access_token' => 'gitea-access-token',
+        'refresh_token' => 'gitea-refresh-token',
+        'expires_at' => time() + 3600,
+        'is_public' => false,
+    ]);
+}
+
+test('changeSource switches to an owned GiteaApp and stores the Gitea repository id', function () {
+    Http::fake([
+        '1.1.1.1/api/v1/repos/acme/web' => Http::response(['id' => 314, 'full_name' => 'acme/web']),
+    ]);
+    $source = applicationSourceGiteaAppForTeam($this->teamA->id, 'own-gitea-app');
+    $this->applicationA->update(['git_repository' => 'acme/web']);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA->fresh()])
+        ->call('changeSource', $source->id, GiteaApp::class)
+        ->assertDispatched('configurationChanged');
+
+    $this->applicationA->refresh();
+    expect($this->applicationA->source_type)->toBe(GiteaApp::class)
+        ->and($this->applicationA->source_id)->toBe($source->id)
+        ->and($this->applicationA->repository_project_id)->toBe(314);
+});
+
+test('changeSource rejects a GiteaApp owned by another team', function () {
+    Http::fake();
+    $victimSource = applicationSourceGiteaAppForTeam($this->teamB->id, 'victim-gitea-app');
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->call('changeSource', $victimSource->id, GiteaApp::class);
+
+    $this->applicationA->refresh();
+    expect($this->applicationA->source_type)->not->toBe(GiteaApp::class);
+    Http::assertNothingSent();
 });

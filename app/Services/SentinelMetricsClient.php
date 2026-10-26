@@ -81,6 +81,10 @@ class SentinelMetricsClient
             return [];
         }
 
+        // Sentinel keeps the last samples of a removed container until retention deletes them,
+        // but only a container that Docker still lists has a status.
+        $running = array_filter($rows, fn ($c) => ($c['status']['state'] ?? null) === 'running');
+
         return array_values(array_map(function ($c) {
             $disk = ($c['disk']['writableLayer'] ?? 0) + ($c['disk']['volumesTotal'] ?? 0);
             $net = ($c['network']['rxBytesPerSec'] ?? 0) + ($c['network']['txBytesPerSec'] ?? 0);
@@ -93,7 +97,7 @@ class SentinelMetricsClient
                 'diskBytes' => isset($c['disk']) ? (int) $disk : null,
                 'net' => isset($c['network']) ? (float) $net : null,
             ];
-        }, $rows));
+        }, $running));
     }
 
     /**
@@ -141,7 +145,8 @@ class SentinelMetricsClient
 
         // Disk history interleaves every mount; keep the root filesystem only.
         if ($rootOnly && array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
-            $rows = array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/');
+            $mount = self::rootMountName($rows);
+            $rows = array_filter($rows, fn ($row) => ($row['mount'] ?? null) === $mount);
         }
 
         // Average raw samples into epoch-aligned buckets so every server shares the same
@@ -160,13 +165,29 @@ class SentinelMetricsClient
     }
 
     /**
+     * The mount that stands for the root disk: `/`, else the disk that holds /data/coolify.
+     * Sentinel runs in a container and reports only the disks of its own mounts:
+     * 1.1.2 and older as `/app/db`, 1.1.3 and newer by host mount point, which is
+     * `/data` or `/data/coolify` when that directory is on its own disk.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private static function rootMountName(array $rows): ?string
+    {
+        $mounts = array_column($rows, 'mount');
+
+        return collect(['/', '/app/db', '/data/coolify', '/data'])->first(fn ($mount) => in_array($mount, $mounts, true));
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $mounts
      * @return array{used: ?int, total: ?int, percent: ?float}
      */
     private function rootMount(array $mounts): array
     {
-        $root = collect($mounts)->firstWhere('mount', '/');
-        if ($root === null && ! array_any($mounts, fn ($mount) => array_key_exists('mount', $mount))) {
+        if (array_any($mounts, fn ($mount) => array_key_exists('mount', $mount))) {
+            $root = collect($mounts)->firstWhere('mount', self::rootMountName($mounts));
+        } else {
             $root = $mounts[0] ?? null;
         }
 
@@ -209,7 +230,9 @@ class SentinelMetricsClient
             ["docker exec coolify-sentinel sh -c 'curl -s --max-time 10 -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
             $this->server,
             false,
-            timeout: 15
+            timeout: 15,
+            // Metrics are read again on the next refresh. SSH retries would keep a worker past its timeout.
+            maxAttempts: 1
         );
     }
 

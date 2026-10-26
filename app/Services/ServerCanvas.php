@@ -25,7 +25,7 @@ class ServerCanvas
 
     /**
      * @param  Collection<int, Server>  $servers  servers of the team to show
-     * @return array{title: string, title_link: ?string, can_edit: bool, can_move: false, can_move_groups: bool, layout: 'server', zones: array<int, array<string, mixed>>, nodes: array<int, array<string, mixed>>, links: array<int, array<string, mixed>>, positions: array{}}
+     * @return array{title: string, title_link: ?string, can_edit: bool, can_move: false, can_move_groups: bool, can_move_zones: bool, layout: 'server', zones: array<int, array<string, mixed>>, nodes: array<int, array<string, mixed>>, links: array<int, array<string, mixed>>, positions: array{}}
      */
     public function payload(int $teamId, Collection $servers, ?Server $single, bool $canReadSensitive, bool $canEdit = false): array
     {
@@ -65,6 +65,23 @@ class ServerCanvas
             ->reject(fn (Environment $environment) => $used->has($environment->id))
             ->map(fn (Environment $environment) => $this->canvas->emptyNode($environment->project, $environment, $zoneOf($environment->project), $environment->project->name.' / '.$environment->name, $canEdit))
             ->values();
+        // The canvas draws a zone around its cards, so a server without cards gets a placeholder card.
+        $filled = $nodes->concat($empty)->pluck('zone')->flip();
+        $bare = $servers->reject(fn (Server $server) => $filled->has($server->uuid))->map(fn (Server $server) => [
+            'id' => 'empty-server:'.$server->uuid,
+            'type' => 'empty',
+            'name' => 'No resources yet',
+            'subtitle' => 'Open to see this server',
+            'status' => null,
+            'zone' => $server->uuid,
+            'extra_zones' => [],
+            'urls' => [],
+            'children' => [],
+            'link' => route('server.show', ['server_uuid' => $server->uuid]),
+            'context' => null,
+            'project' => null,
+            'environment' => null,
+        ])->values();
 
         return [
             'title' => $single ? $single->name : 'Servers',
@@ -75,12 +92,18 @@ class ServerCanvas
             'can_move' => false,
             // Admins drag the project / environment group boxes; the canvas saves the moved cards on their environment canvas.
             'can_move_groups' => $canEdit,
+            // Admins move the server zones of the every-server canvases; each server saves its place (zone.position).
+            'can_move_zones' => $canEdit && ! $single,
             // Tells the canvas to group cards by project / environment and place linked cards side by side.
             'layout' => 'server',
-            'zones' => $servers->map(fn (Server $server) => [...$this->canvas->zone($server, $canReadSensitive), 'details' => $this->details($server)])
+            'zones' => $servers->map(fn (Server $server) => [
+                ...$this->canvas->zone($server, $canReadSensitive),
+                'details' => $this->details($server),
+                'position' => $single ? null : $this->canvas->zonePosition($server->canvas_position),
+            ])
                 ->when($empty->contains('zone', EnvironmentCanvas::EMPTY_ZONE), fn (Collection $zones) => $zones->push($this->canvas->emptyZone()))
                 ->values()->all(),
-            'nodes' => $nodes->concat($empty)->all(),
+            'nodes' => $nodes->concat($empty)->concat($bare)->all(),
             'links' => collect($graph['links'])->filter(fn (array $link) => $shown->has($link['source']) && $shown->has($link['target']))->values()->all(),
             'positions' => [],
         ];
@@ -127,6 +150,8 @@ class ServerCanvas
                     return null;
                 }
             };
+
+            $server->prefetchMetrics(['cpu', 'memory', 'disk'], 1);
 
             return [
                 'cpu' => $latest(fn () => $server->getCpuMetrics(1)),

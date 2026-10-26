@@ -29,7 +29,7 @@
                         </div>
                     </div>
 
-                    @if (auth()->user()->isAdmin())
+                    @can('update', $server)
                         <div wire:key="terminal-access-change-{{ $isTerminalEnabled }}">
                             <x-modal-confirmation title="Confirm Terminal Access Change?"
                                 temporaryDisableTwoStepConfirmation
@@ -44,7 +44,7 @@
                                 step3ButtonText="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
                                 :isHighlightedButton="!$isTerminalEnabled" />
                         </div>
-                    @endif
+                    @endcan
                 </div>
             </x-application.settings-section>
         </div>

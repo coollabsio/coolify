@@ -63,6 +63,16 @@ test('applications with a domain get the favicon of their first domain', functio
     ['https://*.example.com', null],
 ]);
 
+test('applications behind HTTP basic auth get no favicon, so the browser does not ask for credentials', function () {
+    $application = (new Application)->forceFill([
+        'build_pack' => 'nixpacks',
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => true,
+    ]);
+
+    expect(resource_logo($application)['favicon'])->toBeNull();
+});
+
 test('resource logo URLs carry the file modification time, so browsers load changed logos', function () {
     $modifiedAt = filemtime(public_path('svgs/resources/docker-image.svg'));
 

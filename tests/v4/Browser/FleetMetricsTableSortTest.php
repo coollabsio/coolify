@@ -34,8 +34,8 @@ class FakeBrowserFleetMetricsClient extends SentinelMetricsClient
     public function containersCurrent(): array
     {
         return match ($this->server->name) {
-            'alpha' => [['id' => 'zeta', 'cpu' => 70.0, 'memUsed' => 10, 'memPercent' => 1.0, 'diskBytes' => 1, 'net' => 0.0]],
-            'bravo' => [['id' => 'beta', 'cpu' => 5.0, 'memUsed' => 20, 'memPercent' => 2.0, 'diskBytes' => 2, 'net' => 0.0]],
+            'alpha' => [['id' => 'zeta', 'cpu' => 70.0, 'memUsed' => 10, 'memPercent' => 1.0, 'diskBytes' => 1, 'net' => 30.0]],
+            'bravo' => [['id' => 'beta', 'cpu' => 5.0, 'memUsed' => 20, 'memPercent' => 2.0, 'diskBytes' => 2, 'net' => 10.0]],
             default => [],
         };
     }
@@ -111,7 +111,8 @@ it('sorts the servers and containers tables when a column header is selected', f
     expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['bravo', 'alpha', 'charlie']);
 
     // A data refresh keeps the sort.
-    $page->click('button:visible:has-text("7 days")')
+    $page->click('button:visible:has-text("Last 24 hours")')
+        ->click('[role="option"]:has-text("Last 7 days")')
         ->assertQueryStringHas('range', '7d');
     expect(visibleFleetMetricsRowNames($page, 'metrics-servers-section'))->toBe(['bravo', 'alpha', 'charlie']);
 
@@ -119,6 +120,14 @@ it('sorts the servers and containers tables when a column header is selected', f
     // The notification banner at the bottom of the page covers this header, so a pointer click cannot reach it.
     $page->script('document.querySelector(\'#metrics-containers-section button[title="Sort by container"]\').click()');
     expect(visibleFleetMetricsRowNames($page, 'metrics-containers-section'))->toBe(['beta', 'zeta']);
+
+    foreach (['memory' => ['beta', 'zeta'], 'disk' => ['beta', 'zeta'], 'network' => ['zeta', 'beta'], 'cpu' => ['zeta', 'beta']] as $metric => $expected) {
+        $page->script("document.querySelector('#metrics-containers-section button[title=\"Sort by {$metric}\"]').click()");
+        expect(visibleFleetMetricsRowNames($page, 'metrics-containers-section'))->toBe($expected);
+
+        $page->script("document.querySelector('#metrics-containers-section button[title=\"Sort by {$metric}\"]').click()");
+        expect(visibleFleetMetricsRowNames($page, 'metrics-containers-section'))->toBe(array_reverse($expected));
+    }
 
     $page->assertNoJavaScriptErrors()
         ->screenshot(filename: 'fleet-metrics-tables-sorted');

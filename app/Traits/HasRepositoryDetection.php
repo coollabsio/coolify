@@ -6,6 +6,7 @@ use App\Data\RepositoryDetectionResult;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
@@ -111,7 +112,7 @@ trait HasRepositoryDetection
     /**
      * Builds an application that is not saved, only to generate the clone command for the scan.
      */
-    protected function unsavedApplicationForDetection(string $repository, string $branch, GithubApp|GitlabApp|null $source = null, ?PrivateKey $privateKey = null): Application
+    protected function unsavedApplicationForDetection(string $repository, string $branch, GithubApp|GitlabApp|GiteaApp|null $source = null, ?PrivateKey $privateKey = null): Application
     {
         $application = (new Application)->forceFill([
             'git_repository' => $repository,

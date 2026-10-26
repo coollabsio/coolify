@@ -79,7 +79,7 @@ beforeEach(function () {
 
 it('dispatches a chart payload with every trend series', function () {
     $s = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $s->settings->update(['is_metrics_enabled' => true]);
+    $s->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
 
     Livewire::test(ChartTestableMetrics::class)
         ->call('loadData')
@@ -96,7 +96,7 @@ it('dispatches a chart payload with every trend series', function () {
 
 it('includes KPI-tile spark series aligned to one shared time axis', function () {
     $s = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $s->settings->update(['is_metrics_enabled' => true]);
+    $s->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
 
     Livewire::test(ChartTestableMetrics::class)
         ->call('loadData')
@@ -115,7 +115,7 @@ it('includes KPI-tile spark series aligned to one shared time axis', function ()
 
 it('caps KPI-tile sparks to a readable point count on a shared axis', function () {
     $s = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $s->settings->update(['is_metrics_enabled' => true]);
+    $s->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
 
     Livewire::test(DenseTestableMetrics::class)
         ->call('loadData')

@@ -88,16 +88,12 @@ it('rejects oversized docker compose files loaded from git before parsing', func
     $application->base_directory = '/';
     $application->docker_compose_location = '/docker-compose.yml';
     $application->setRelation('destination', (object) ['server' => $server]);
-    $application->shouldReceive('generateGitImportCommands')->andReturn(['commands' => collect(['git clone example checkout'])]);
+    $application->shouldReceive('generateGitImportCommands')->andReturn(['commands' => collect(['git clone example checkout']), 'git' => 'git']);
     $application->shouldReceive('getGitRemoteStatus')->andReturn(['is_accessible' => true]);
     $application->shouldReceive('save')->once();
 
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'git --version')) {
-            return Process::result(output: 'git version 2.40.0');
-        }
-
-        if (str_contains($process->command, 'wc -c')) {
+        if (str_contains($process->command, 'git cat-file -s')) {
             return Process::result(output: '__COOLIFY_COMPOSE_TOO_LARGE__');
         }
 
@@ -107,7 +103,7 @@ it('rejects oversized docker compose files loaded from git before parsing', func
     expect(fn () => $application->loadComposeFile())
         ->toThrow(RuntimeException::class, 'Docker Compose file exceeds the 5 MiB size limit.');
     expect($application->docker_compose_raw)->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'head -c '.(Application::MAX_DOCKER_COMPOSE_SIZE_BYTES + 1)));
+    Process::assertRan(fn ($process) => str_contains($process->command, '-gt '.Application::MAX_DOCKER_COMPOSE_SIZE_BYTES));
 });
 it('bounds scheduled task output before storing or notifying', function () {
     $source = remoteOutputSource('app/Jobs/ScheduledTaskJob.php');

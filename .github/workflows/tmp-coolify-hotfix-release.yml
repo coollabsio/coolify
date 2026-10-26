@@ -1,0 +1,159 @@
+# Temporary: releases the 4.0 to 4.3 security fixes from the v4.0.x to v4.3.x branches without moving latest.
+# Delete this workflow once 4.5 ships.
+name: TMP Release Coolify Hotfix
+run-name: tmp ${{ inputs.branch }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Release line branch
+        required: true
+        type: choice
+        options:
+          - v4.3.x
+          - v4.2.x
+          - v4.1.x
+          - v4.0.x
+
+permissions: {}
+
+concurrency:
+  group: tmp-coolify-hotfix-release
+  cancel-in-progress: false
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  DOCKER_REGISTRY: docker.io
+  IMAGE_NAME: coollabsio/coolify
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+
+      - name: Resolve version
+        id: version
+        env:
+          BRANCH: ${{ inputs.branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)
+          if [[ "${VERSION}" != "${BRANCH:1:3}."* || ! "${VERSION}" =~ ^4\.[0-3]\.[0-9]+$ ]]; then
+            echo "Version ${VERSION} does not belong to ${BRANCH}."
+            exit 1
+          fi
+          if gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            echo "Release v${VERSION} already exists."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: validate
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            COOLIFY_VERSION=${{ needs.validate.outputs.version }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.validate.outputs.sha }}
+          tags: |
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:release-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.sha }}-${{ matrix.arch }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:release-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.sha }}-${{ matrix.arch }}
+
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish the version tag
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          for REGISTRY in "${GITHUB_REGISTRY}" "${DOCKER_REGISTRY}"; do
+            IMAGE="${REGISTRY}/${IMAGE_NAME}"
+            docker buildx imagetools create \
+              "${IMAGE}:release-${VERSION}-${SHA}-amd64" \
+              "${IMAGE}:release-${VERSION}-${SHA}-aarch64" \
+              --tag "${IMAGE}:${VERSION}"
+          done
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          gh release create "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${SHA}" \
+            --title "v${VERSION}" \
+            --latest=false \
+            --notes "Security fix release for Coolify ${VERSION%.*}. Apply it with: curl -fsSL https://cdn.coollabs.io/coolify/patch.sh | sudo bash"

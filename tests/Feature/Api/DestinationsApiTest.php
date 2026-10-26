@@ -2,6 +2,7 @@
 
 use App\Actions\Destination\RemoveStandaloneDockerNetwork;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -11,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
@@ -21,7 +23,10 @@ beforeEach(function () {
         'session.driver' => 'array',
         'queue.default' => 'sync',
         'app.maintenance.driver' => 'file',
+        'constants.ssh.mux_enabled' => false,
     ]);
+    // Creating a standalone destination lists the Docker networks on the server first.
+    Process::fake();
 
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(
         ['id' => 0],
@@ -34,8 +39,12 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 
     $this->bearerToken = destinationsApiToken($this->user, $this->team, ['*']);
-    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $this->server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id,
+    ]);
     $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
 function destinationsApiHeaders(string $bearerToken): array
@@ -120,6 +129,18 @@ describe('POST /api/v1/servers/{server_uuid}/destinations', function () {
         expect(StandaloneDocker::where('server_id', $this->server->id)
             ->where('network', 'api-standalone-network')
             ->exists())->toBeTrue();
+    });
+
+    test('does not connect to a server that is not validated', function () {
+        $this->server->settings->update(['is_reachable' => false, 'is_usable' => false]);
+
+        $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/destinations", ['network' => 'api-standalone-network'])
+            ->assertStatus(400)
+            ->assertJsonPath('message', 'Server is not functional.');
+
+        Process::assertNothingRan();
+        expect(StandaloneDocker::where('network', 'api-standalone-network')->exists())->toBeFalse();
     });
 
     test('requires a write token', function () {

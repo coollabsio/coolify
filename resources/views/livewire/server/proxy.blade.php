@@ -154,6 +154,9 @@
                                     {{ $this->newerTraefikBranchAvailable }} is available (latest patch:
                                     {{ $this->latestNewerTraefikVersion }}). Review the Traefik changelog for breaking
                                     changes before upgrading.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
                         @elseif ($this->outdatedCaddyImage)

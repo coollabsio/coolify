@@ -63,7 +63,7 @@ class Show extends Component
         $user = auth()->user();
 
         return view('livewire.project.show', [
-            'environmentsJs' => $this->project->environments->map(function (Environment $environment) use ($user): array {
+            'environmentsJs' => $this->project->environments->sort(fn (Environment $first, Environment $second): int => Environment::compareNames($first->name, $second->name))->values()->map(function (Environment $environment) use ($user): array {
                 $resourceCount = collect([
                     $environment->applications_count,
                     $environment->services_count,
