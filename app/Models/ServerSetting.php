@@ -95,6 +95,9 @@ class ServerSetting extends Model
 
     protected $fillable = [
         'server_id',
+        'is_image_scan_enabled',
+        'image_candidate_scans_today',
+        'image_candidate_scans_date',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -178,6 +181,8 @@ class ServerSetting extends Model
      */
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
+        'is_image_scan_enabled' => false,
+        'image_candidate_scans_today' => 0,
     ];
 
     protected $casts = [
@@ -210,6 +215,9 @@ class ServerSetting extends Model
         'patch_checked_at' => 'datetime',
         'is_auto_security_updates_enabled' => 'boolean',
         'is_logdrain_cloudwatch_enabled' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
+        'image_candidate_scans_today' => 'integer',
+        'image_candidate_scans_date' => 'date',
     ];
 
     /**

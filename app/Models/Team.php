@@ -61,12 +61,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled',
         'is_build_server_fallback_enabled',
         'is_two_factor_required',
+        'scan_images_on_new_servers',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
         'is_build_server_fallback_enabled' => true,
         'is_two_factor_required' => false,
+        'scan_images_on_new_servers' => false,
     ];
 
     protected $casts = [
@@ -74,6 +76,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled' => 'boolean',
         'is_build_server_fallback_enabled' => 'boolean',
         'is_two_factor_required' => 'boolean',
+        'scan_images_on_new_servers' => 'boolean',
     ];
 
     protected static function booted()

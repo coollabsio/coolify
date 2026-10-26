@@ -148,6 +148,8 @@ class ApplicationDeploymentQueue extends Model
         'horizon_job_id',
         'horizon_job_worker',
         'finished_at',
+        'scan_gate_result',
+        'scan_gate_bypassed_by',
     ];
 
     /**
@@ -167,6 +169,7 @@ class ApplicationDeploymentQueue extends Model
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
+        'scan_gate_result' => 'array',
         'configuration_snapshot' => EncryptedArrayCast::class,
         'configuration_diff' => EncryptedArrayCast::class,
     ];
