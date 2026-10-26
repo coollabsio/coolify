@@ -74,6 +74,36 @@ it('does not count an empty preview value as the production value', function () 
     expect($this->application->previewEnvironmentVariableIdsWithProductionValues())->toBe([]);
 });
 
+it('keeps an unchanged copy in the list after the production value changes', function () {
+    createProductionValueTestVariable($this->application, 'DB_PASSWORD', 'old-secret');
+    $this->application->environment_variables()->where('key', 'DB_PASSWORD')->sole()->update(['value' => 'rotated-secret']);
+    $preview = previewProductionValueTestVariable($this->application, 'DB_PASSWORD');
+
+    expect($preview->value)->toBe('old-secret')
+        ->and($this->application->previewEnvironmentVariableIdsWithProductionValues())->toBe([$preview->id]);
+});
+
+it('removes a copy from the list when the user changes the preview value', function () {
+    createProductionValueTestVariable($this->application, 'DB_PASSWORD', 'old-secret');
+    $preview = previewProductionValueTestVariable($this->application, 'DB_PASSWORD');
+
+    $preview->update(['comment' => 'Not a value change']);
+    expect($preview->fresh()->is_production_value_copy)->toBeTrue();
+
+    $preview->update(['value' => 'preview-secret']);
+    $this->application->environment_variables()->where('key', 'DB_PASSWORD')->sole()->update(['value' => 'rotated-secret']);
+
+    expect($preview->fresh()->is_production_value_copy)->toBeFalse()
+        ->and($this->application->previewEnvironmentVariableIdsWithProductionValues())->toBe([]);
+});
+
+it('does not mark an empty preview copy as a production copy', function () {
+    $this->application->settings->update(['use_production_values_in_previews' => false]);
+    createProductionValueTestVariable($this->application->fresh(), 'API_KEY', 'production-value');
+
+    expect(previewProductionValueTestVariable($this->application, 'API_KEY')->is_production_value_copy)->toBeFalse();
+});
+
 it('copies the production value to a new preview variable by default', function () {
     expect($this->application->settings->use_production_values_in_previews)->toBeTrue();
 
@@ -120,7 +150,7 @@ it('marks preview rows that have the production value without sending values to 
         'preview:CHANGED' => false,
         'preview:LOCKED' => true,
     ]);
-    $component->assertSee('Same as production')
+    $component->assertSee('Production value')
         ->assertDontSee('locked-production-secret')
         ->assertDontSee('plain-production-value');
 });
