@@ -101,17 +101,10 @@
             return item.search_text.toLowerCase().includes(query);
         }).slice(0, 20);
 
-        // A vulnerability ID opens the Vulnerabilities page with that search.
-        const trimmed = this.searchQuery.trim();
-        if (this.vulnerabilitiesUrl && /^(cve|ghsa)-[a-z0-9-]+$/i.test(trimmed)) {
-            const id = trimmed.replace(/^[a-z]+/i, prefix => prefix.toUpperCase());
-            return [{
-                name: `Find ${id} in your images`,
-                type: 'navigation',
-                description: 'Search the Vulnerabilities page',
-                link: `${this.vulnerabilitiesUrl}?search=${encodeURIComponent(id)}`,
-                search_text: id,
-            }, ...results].slice(0, 20);
+        // A vulnerability ID opens the Vulnerabilities page with that search (resources/js/vulnerability-search.js).
+        const vulnerability = window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl);
+        if (vulnerability) {
+            return [vulnerability, ...results].slice(0, 20);
         }
 
         return results;

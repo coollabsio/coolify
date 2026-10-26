@@ -654,12 +654,7 @@ class Vulnerabilities extends Component
      */
     private function offState(Model $resource, ?Server $server): ?string
     {
-        return match (true) {
-            ! instanceSettings()->is_image_scanning_allowed => 'instance',
-            ! $server instanceof Server || ! $server->settings?->is_image_scan_enabled => 'server',
-            $resource instanceof Application && ! $resource->settings?->is_image_scan_enabled => 'application',
-            default => null,
-        };
+        return ImageScanPolicyResolver::offState($resource, $server);
     }
 
     /**

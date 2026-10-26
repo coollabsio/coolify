@@ -36,6 +36,8 @@ class FleetVulnerabilities extends Component
 
     public int $perPage = 10;
 
+    private ?TeamVulnerabilities $fleet = null;
+
     public function getListeners(): array
     {
         return $this->teamChannelListeners([
@@ -103,7 +105,7 @@ class FleetVulnerabilities extends Component
             return view('livewire.image-scan.fleet-vulnerabilities', ['allowed' => false]);
         }
 
-        $fleet = TeamVulnerabilities::load($team->id);
+        $fleet = $this->fleet($team->id);
         $entries = $fleet->entries;
 
         $serverOptions = $entries->pluck('server')->filter()->unique('id')
@@ -122,19 +124,20 @@ class FleetVulnerabilities extends Component
         $searching = trim($this->search) !== '';
 
         $rows = $searching
-            ? $fleet->search($scanned, mb_substr($this->search, 0, 100), $this->severities)
+            ? $fleet->search($scanned, $this->search, $this->severities)
             : $this->worstFirst($scanned);
         $items = $this->paginate($rows);
         $packageCounts = $searching ? [] : $fleet->fixablePackageCounts(collect($items->items())
             ->filter(fn (array $entry): bool => $entry['summary']['count'] > 0 && $entry['summary']['update'] === null));
+        $notScannedServers = $notScanned->pluck('server')->filter()->unique('id')->count();
 
         return view('livewire.image-scan.fleet-vulnerabilities', [
             'allowed' => true,
             'items' => $items,
             'searching' => $searching,
             'packageCounts' => $packageCounts,
-            'notScannedResources' => $notScanned->count(),
-            'notScannedServers' => $notScanned->pluck('server')->filter()->unique('id')->count(),
+            'notScannedLine' => $notScanned->isEmpty() ? null : self::notScannedSentence($notScanned->count(), $notScannedServers),
+            'searchCapped' => $searching && $fleet->searchWasCapped(),
             'serversNotScanning' => $user->isAdminOfTeam($team->id) ? TeamVulnerabilities::serversNotScanning($team->id) : 0,
             'serverOptions' => $serverOptions,
             'projectOptions' => $projectOptions,
@@ -143,6 +146,32 @@ class FleetVulnerabilities extends Component
             'hasResources' => $entries->isNotEmpty(),
             'stateLabels' => TeamVulnerabilities::STATE_LABELS,
         ]);
+    }
+
+    /**
+     * "3 resources on 2 servers were not scanned, so Coolify cannot tell." Resources without a server leave out the
+     * servers part when no server is left.
+     */
+    public static function notScannedSentence(int $resources, int $servers): string
+    {
+        $subject = $resources.' '.str('resource')->plural($resources);
+        if ($servers > 0) {
+            $subject .= ' on '.$servers.' '.str('server')->plural($servers);
+        }
+
+        return $subject.($resources === 1 ? ' was' : ' were').' not scanned, so Coolify cannot tell.';
+    }
+
+    /**
+     * The team's resources and their scan totals, loaded once per request.
+     */
+    private function fleet(int $teamId): TeamVulnerabilities
+    {
+        if ($this->fleet?->teamId !== $teamId) {
+            $this->fleet = TeamVulnerabilities::load($teamId);
+        }
+
+        return $this->fleet;
     }
 
     /**

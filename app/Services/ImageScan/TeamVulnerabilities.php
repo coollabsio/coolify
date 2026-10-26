@@ -11,8 +11,12 @@ use App\Models\ImageScanIgnore;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Services\Access\AccessResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 
 /**
@@ -33,8 +37,10 @@ final class TeamVulnerabilities
 
     private const SEVERITY_RANK = ['critical' => 4, 'high' => 3, 'medium' => 2, 'low' => 1, 'unknown' => 0];
 
-    /** Search terms with only these characters are looked up in the stored findings by the database first. */
-    private const PREFILTER_PATTERN = '/\A[a-z0-9._:-]+\z/';
+    /** At most this many scans have their findings decoded in one request. */
+    public const MAX_DECODED_SCANS = 200;
+
+    private bool $searchCapped = false;
 
     /**
      * @param  Collection<int, array{key: string, resource: Model, server: ?Server, project: ?Project, environment: ?Environment, link: ?string, scanned: bool, scans: Collection<int, ImageScan>, summary: array<string, mixed>}>  $entries
@@ -44,7 +50,10 @@ final class TeamVulnerabilities
     public static function load(int $teamId): self
     {
         $resources = self::resources($teamId);
-        $owners = ResourceScans::ownersOfMany($resources);
+        ResourceScans::loadScanRelations($resources);
+        $scanOn = $resources->filter(fn (Model $resource): bool => ImageScanPolicyResolver::isScanOn($resource))
+            ->mapWithKeys(fn (Model $resource): array => [ResourceScans::key($resource) => true]);
+        $owners = ResourceScans::ownersOfMany($resources->filter(fn (Model $resource): bool => $scanOn->has(ResourceScans::key($resource)))->values());
         $scans = ResourceScans::currentForMany($owners->flatten(1), VulnerabilityMarkers::SCAN_COLUMNS);
 
         $entries = $resources->map(function (Model $resource) use ($owners, $scans): array {
@@ -52,19 +61,18 @@ final class TeamVulnerabilities
             $resourceScans = $owners->get($key, collect())
                 ->flatMap(fn (Model $owner): Collection => $scans->get(ResourceScans::key($owner), collect()))
                 ->values();
-            $server = self::serverOf($resource);
-            $scanned = $server?->settings?->is_image_scan_enabled === true && $resourceScans->isNotEmpty();
+            $scanned = $resourceScans->isNotEmpty();
 
             return [
                 'key' => $key,
                 'resource' => $resource,
-                'server' => $server,
+                'server' => ImageScanPolicyResolver::mainServerOf($resource),
                 'project' => $resource->environment?->project,
                 'environment' => $resource->environment,
                 'link' => self::vulnerabilitiesUrl($resource),
                 'scanned' => $scanned,
-                'scans' => $scanned ? $resourceScans : collect(),
-                'summary' => VulnerabilityMarkers::summarize($resource, $scanned ? $resourceScans : collect()),
+                'scans' => $resourceScans,
+                'summary' => VulnerabilityMarkers::summarize($resource, $resourceScans),
             ];
         })->values();
 
@@ -72,8 +80,8 @@ final class TeamVulnerabilities
     }
 
     /**
-     * How many resources the user can see have something fixable now at the alert level. Teams without any scan
-     * skip loading the resources.
+     * How many resources the user can see have something fixable now at the alert level. Starts from the current
+     * scans with a count above 0, so only those resources are loaded, not every resource of the team.
      */
     public static function fixableResourceCount(int $teamId): int
     {
@@ -81,14 +89,45 @@ final class TeamVulnerabilities
             return 0;
         }
 
-        $hasScans = ImageScan::query()
-            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))
+        $owners = ImageScan::query()
+            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->whereRelation('settings', 'is_image_scan_enabled', true)->select('id'))
             ->where('status', ImageScanStatus::Completed)
-            ->exists();
+            ->select(['resource_type', 'resource_id'])
+            ->distinct()
+            ->toBase()
+            ->get();
+        $currentIds = ResourceScans::currentScanIds($owners->groupBy('resource_type')
+            ->map(fn (Collection $rows): array => $rows->pluck('resource_id')->unique()->values()->all())
+            ->all());
+        if ($currentIds === []) {
+            return 0;
+        }
 
-        return $hasScans
-            ? self::load($teamId)->entries->filter(fn (array $entry): bool => $entry['summary']['count'] > 0)->count()
-            : 0;
+        $fixable = ImageScan::query()
+            ->select(['id', 'resource_type', 'resource_id', 'summary'])
+            ->whereIn('id', $currentIds)
+            ->get()
+            ->filter(fn (ImageScan $scan): bool => (int) data_get($scan->summary, 'fixable_now_at_level', 0) > 0)
+            ->groupBy('resource_type')
+            ->map(fn (Collection $scans): array => $scans->pluck('resource_id')->unique()->values()->all());
+
+        $resourceIds = [];
+        foreach ($fixable as $type => $ids) {
+            $class = Relation::getMorphedModel($type) ?? $type;
+            if (in_array($class, [ServiceApplication::class, ServiceDatabase::class], true)) {
+                $resourceIds[Service::class] = [...($resourceIds[Service::class] ?? []), ...$class::query()->whereIn('id', $ids)->pluck('service_id')->all()];
+            } elseif (in_array($class, AccessResolver::RESOURCE_MODELS, true)) {
+                $resourceIds[$class] = [...($resourceIds[$class] ?? []), ...$ids];
+            }
+        }
+
+        $resources = collect($resourceIds)->flatMap(fn (array $ids, string $class): Collection => $class::query()
+            ->whereIn('id', array_values(array_unique($ids)))
+            ->whereRelation('environment.project', 'team_id', $teamId)
+            ->get());
+        ResourceScans::loadScanRelations($resources);
+
+        return $resources->filter(fn (Model $resource): bool => ImageScanPolicyResolver::isScanOn($resource))->count();
     }
 
     /**
@@ -110,21 +149,33 @@ final class TeamVulnerabilities
      *
      * @param  Collection<int, array<string, mixed>>  $entries
      * @param  list<string>  $severities  Only findings of these severities, or all when empty.
+     * @param  int  $maxScans  At most this many matching scans are decoded; see `searchWasCapped()`.
      * @return Collection<int, array<string, mixed>> The entries with a `match` array.
      */
-    public function search(Collection $entries, string $term, array $severities = []): Collection
+    public function search(Collection $entries, string $term, array $severities = [], int $maxScans = self::MAX_DECODED_SCANS): Collection
     {
-        $term = mb_strtolower(trim($term));
+        $this->searchCapped = false;
+        $term = self::searchTerm($term);
         $scanIds = $entries->flatMap(fn (array $entry): Collection => $entry['scans']->pluck('id'))->all();
         if ($term === '' || $scanIds === []) {
             return collect();
         }
 
-        $query = ImageScan::query()->select(['id', 'findings'])->whereIn('id', $scanIds);
-        if (preg_match(self::PREFILTER_PATTERN, $term) === 1) {
-            $query->whereRaw('LOWER(CAST(findings AS TEXT)) LIKE ?', ['%'.$term.'%']);
+        // The database narrows the scans first, with "!" as the LIKE escape. jsonb text keeps "/" as is, while a
+        // JSON string written by PHP has "\/", so "/" matches any run of characters.
+        $pattern = '%'.strtr($term, ['!' => '!!', '%' => '!%', '_' => '!_', '/' => '%']).'%';
+        $findings = ImageScan::query()
+            ->select(['id', 'findings'])
+            ->whereIn('id', $scanIds)
+            ->whereRaw("LOWER(CAST(findings AS TEXT)) LIKE ? ESCAPE '!'", [$pattern])
+            ->orderByDesc('id')
+            ->limit($maxScans + 1)
+            ->get();
+        if ($findings->count() > $maxScans) {
+            $this->searchCapped = true;
+            $findings = $findings->take($maxScans);
         }
-        $findings = $query->get()->keyBy('id');
+        $findings = $findings->keyBy('id');
         $ignores = $this->ignores();
 
         return $entries
@@ -174,19 +225,20 @@ final class TeamVulnerabilities
     }
 
     /**
-     * Distinct packages with a fix the user can apply now, per entry key, for the "Fix" column of built images.
+     * Distinct packages with a fix the user can apply now, per entry key, for the "Fix" column when there is no
+     * version to update to.
      *
      * @param  Collection<int, array<string, mixed>>  $entries
      * @return array<string, int>
      */
     public function fixablePackageCounts(Collection $entries): array
     {
-        $scans = $entries->flatMap(fn (array $entry): Collection => $entry['scans']->filter(fn (ImageScan $scan): bool => (bool) $scan->builds_image));
-        if ($scans->isEmpty()) {
+        $scanIds = $entries->flatMap(fn (array $entry): Collection => $entry['scans']->pluck('id'))->take(self::MAX_DECODED_SCANS);
+        if ($scanIds->isEmpty()) {
             return [];
         }
 
-        $findings = ImageScan::query()->select(['id', 'findings'])->whereIn('id', $scans->pluck('id'))->get()->keyBy('id');
+        $findings = ImageScan::query()->select(['id', 'findings'])->whereIn('id', $scanIds)->get()->keyBy('id');
         $ignores = $this->ignores();
 
         $counts = [];
@@ -211,6 +263,23 @@ final class TeamVulnerabilities
         }
 
         return $counts;
+    }
+
+    /**
+     * Whether the last search found more matching scans than it reads, so some resources may be missing.
+     */
+    public function searchWasCapped(): bool
+    {
+        return $this->searchCapped;
+    }
+
+    /**
+     * The search term: lower case, at most 100 characters, without quotes and backslashes (they never occur in IDs
+     * or package names and would need JSON escaping).
+     */
+    public static function searchTerm(string $term): string
+    {
+        return mb_substr(mb_strtolower(trim(str_replace(['"', '\\'], '', $term))), 0, 100);
     }
 
     public static function severityOf(Finding $finding): string
@@ -258,8 +327,8 @@ final class TeamVulnerabilities
         $inTeam = fn (Builder $query): Builder => $query->whereRelation('environment.project', 'team_id', $teamId);
 
         return collect()
-            ->concat($inTeam(Application::query())->with(['environment.project', 'destination.server.settings'])->get())
-            ->concat($inTeam(Service::query())->with(['environment.project', 'server.settings'])->get())
+            ->concat($inTeam(Application::query())->with(['environment.project', 'settings', 'destination.server.settings'])->get())
+            ->concat($inTeam(Service::query())->with(['environment.project', 'destination.server.settings', 'server.settings'])->get())
             ->concat(collect(STANDALONE_DATABASE_MODELS)->flatMap(fn (string $class) => $inTeam($class::query())
                 ->with(['environment.project', 'destination.server.settings'])
                 ->get()))
@@ -284,14 +353,5 @@ final class TeamVulnerabilities
             $resource instanceof Service => route('project.service.vulnerabilities', [...$parameters, 'service_uuid' => $resource->uuid]),
             default => route('project.database.vulnerabilities', [...$parameters, 'database_uuid' => $resource->uuid]),
         };
-    }
-
-    private static function serverOf(Model $resource): ?Server
-    {
-        $server = $resource instanceof Service
-            ? $resource->server
-            : $resource->destination?->server;
-
-        return $server instanceof Server ? $server : null;
     }
 }

@@ -216,9 +216,14 @@
                 </x-slot:pageSize>
             </x-table-pagination>
 
-            @if ($notScannedResources > 0)
+            @if ($searchCapped)
                 <div class="border-t border-neutral-200 px-4 py-2.5 text-[12px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                    {{ $notScannedResources.' '.str('resource')->plural($notScannedResources).' on '.$notScannedServers.' '.str('server')->plural($notScannedServers).($notScannedResources === 1 ? ' was' : ' were').' not scanned, so Coolify cannot tell.' }}
+                    Only the first {{ \App\Services\ImageScan\TeamVulnerabilities::MAX_DECODED_SCANS }} images with a match were searched. Filter by server or project to see the rest.
+                </div>
+            @endif
+            @if ($notScannedLine)
+                <div class="border-t border-neutral-200 px-4 py-2.5 text-[12px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                    {{ $notScannedLine }}
                 </div>
             @endif
         </div>

@@ -1368,7 +1368,10 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     still opens.
   - Compute the markers of a whole list at once with
     `VulnerabilityMarkers::for($resources)`: a fixed number of queries, never
-    one per row. No marker shows when the instance does not allow scanning.
+    one per row. A resource that is not scanned now (instance does not allow
+    scanning, its server has scanning off, or an app turned its scan off; one
+    rule in `ImageScanPolicyResolver::offState()`) has no marker, no sidebar
+    count, no dashboard count, and counts as not scanned on the team page.
 - The team Vulnerabilities page (Monitoring > Vulnerabilities,
   `livewire/image-scan/fleet-vulnerabilities.blade.php`) is a top-level
   destination: title and summary, one dense table (Resource, Project /

@@ -141,17 +141,38 @@ class ImageScanPolicyResolver
 
     private static function isScanEnabled(Model $resource, ?Server $scanServer): bool
     {
-        if (! $scanServer instanceof Server || ! InstanceSettings::get()->is_image_scanning_allowed) {
-            return false;
-        }
-        if (! $scanServer->settings?->is_image_scan_enabled) {
-            return false;
-        }
-        if ($resource instanceof Application && ! $resource->settings?->is_image_scan_enabled) {
-            return false;
-        }
+        return self::offState($resource, $scanServer) === null;
+    }
 
-        return true;
+    /**
+     * Why the resource is not scanned now: "instance" (the instance does not allow scanning), "server" (scanning is
+     * off for its server), "application" (the app turned its scan off), or null when it is scanned. Every surface
+     * that shows results (resource page, sidebar count, markers, team page, dashboard) uses this rule. Reads loaded
+     * relations, so eager load the server settings (and the app settings) for lists.
+     */
+    public static function offState(Model $resource, ?Server $scanServer = null): ?string
+    {
+        $scanServer ??= self::mainServer($resource);
+
+        return match (true) {
+            ! InstanceSettings::get()->is_image_scanning_allowed => 'instance',
+            ! $scanServer instanceof Server || ! $scanServer->settings?->is_image_scan_enabled => 'server',
+            $resource instanceof Application && ! $resource->settings?->is_image_scan_enabled => 'application',
+            default => null,
+        };
+    }
+
+    public static function isScanOn(Model $resource): bool
+    {
+        return self::offState($resource) === null;
+    }
+
+    /**
+     * The server whose scan settings apply: the destination server, or the server of a service.
+     */
+    public static function mainServerOf(Model $resource): ?Server
+    {
+        return self::mainServer($resource);
     }
 
     private static function mainServer(Model $resource): ?Server

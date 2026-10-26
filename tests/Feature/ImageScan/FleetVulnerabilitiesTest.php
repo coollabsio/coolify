@@ -16,7 +16,9 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\EnvironmentCanvas;
+use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\TeamVulnerabilities;
 use App\Services\ImageScan\VulnerabilityMarkers;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -287,6 +289,83 @@ describe('page', function () {
             ->assertSee('Image scanning is off for this Coolify instance.')
             ->assertDontSee('scanned-app');
     });
+
+    it('never shows a server that runs only resources a limited member cannot see', function () {
+        $visible = fleetApplication('visible-app');
+        fleetScan($visible, ['high' => 1], 1, ['findings' => [fleetFinding(['package' => 'shared-lib'])]]);
+        $hiddenServer = fleetServer($this->team, 'hidden-server');
+        $hiddenEnvironment = Environment::factory()->create([
+            'project_id' => Project::factory()->create(['team_id' => $this->team->id])->id,
+        ]);
+        $hiddenDestination = StandaloneDocker::query()->where('server_id', $hiddenServer->id)->firstOrFail();
+        $hidden = fleetApplication('hidden-app', $hiddenEnvironment, $hiddenDestination);
+        fleetScan($hidden, ['critical' => 1], 1, ['server' => $hiddenServer, 'findings' => [fleetFinding(['package' => 'shared-lib'])]]);
+        fleetApplication('unscanned-hidden-app', $hiddenEnvironment, $hiddenDestination);
+
+        $member = fleetMember($this->team, 'member', [['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read']]]);
+
+        fleetPage($member)
+            ->assertSee('scanning-server')
+            ->assertDontSee('hidden-server')
+            ->assertDontSee('not scanned, so Coolify cannot tell.')
+            ->set('search', 'shared-lib')
+            ->assertSee('visible-app')
+            ->assertDontSee('hidden-app')
+            ->assertDontSee('hidden-server');
+    });
+
+    it('searches package names with slashes and at signs, and escapes LIKE wildcards', function () {
+        fleetScan(fleetApplication('go-app'), [], 0, ['findings' => [fleetFinding(['package' => 'golang.org/x/net', 'type' => 'go-module'])]]);
+        fleetScan(fleetApplication('node-app'), [], 0, ['findings' => [fleetFinding(['package' => '@babel/traverse', 'type' => 'npm'])]]);
+
+        fleetPage($this->admin)
+            ->set('search', 'Golang.org/x/net')
+            ->assertSee('go-app')
+            ->assertDontSee('node-app')
+            ->set('search', '@babel/traverse')
+            ->assertSee('node-app')
+            ->assertDontSee('go-app')
+            ->set('search', '%')
+            ->assertDontSee('go-app')
+            ->assertDontSee('node-app')
+            ->set('search', '"openssl\\')
+            ->assertDontSee('go-app');
+    });
+
+    it('decodes at most the capped number of scans and says so', function () {
+        foreach (['first-app', 'second-app'] as $name) {
+            fleetScan(fleetApplication($name), [], 0, ['findings' => [fleetFinding(['package' => 'zlib'])]]);
+        }
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+
+        $fleet = TeamVulnerabilities::load($this->team->id);
+        $scanned = $fleet->entries->filter(fn (array $entry): bool => $entry['scanned']);
+
+        expect($fleet->search($scanned, 'zlib', maxScans: 1))->toHaveCount(1)
+            ->and($fleet->searchWasCapped())->toBeTrue()
+            ->and($fleet->search($scanned, 'zlib'))->toHaveCount(2)
+            ->and($fleet->searchWasCapped())->toBeFalse();
+    });
+
+    it('names the packages to update for an image whose update is blocked', function () {
+        $application = fleetApplication('third-party-app', attributes: ['docker_registry_image_tag' => '1.28']);
+        fleetScan($application, ['high' => 1], 1, [
+            'image_ref' => 'nginx:1.27',
+            'builds_image' => false,
+            'candidates' => ['status' => 'ok', 'entries' => [[
+                'ref' => 'nginx:1.27.5', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2024-0001'],
+            ]]],
+        ]);
+
+        fleetPage($this->admin)->assertSee('third-party-app')->assertSee('1 package')->assertDontSee('Update to');
+    });
+
+    it('words the not scanned line for one resource and resources without a server', function () {
+        expect(FleetVulnerabilities::notScannedSentence(1, 1))->toBe('1 resource on 1 server was not scanned, so Coolify cannot tell.')
+            ->and(FleetVulnerabilities::notScannedSentence(1, 0))->toBe('1 resource was not scanned, so Coolify cannot tell.')
+            ->and(FleetVulnerabilities::notScannedSentence(3, 2))->toBe('3 resources on 2 servers were not scanned, so Coolify cannot tell.');
+    });
 });
 
 describe('markers', function () {
@@ -401,14 +480,15 @@ describe('dashboard and search', function () {
         $search = Livewire::test(GlobalSearch::class)->call('openSearchModal');
         expect(collect($search->get('allSearchableItems'))->pluck('link'))->toContain(route('vulnerabilities'));
 
-        $results = collect($search->set('searchQuery', 'cve-2021-44228')->get('searchResults'));
-        expect($results->first())->toMatchArray([
-            'name' => 'Find CVE-2021-44228 in your images',
-            'link' => route('vulnerabilities', ['search' => 'CVE-2021-44228']),
-        ]);
+        // The palette builds the vulnerability ID entry in the browser (resources/js/vulnerability-search.js, tested
+        // with node --test) from this URL.
+        $search->assertSeeHtml('window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl)')
+            ->assertDontSeeHtml('vulnerabilitiesUrl: null');
 
-        expect(collect($search->set('searchQuery', 'log4j')->get('searchResults'))->pluck('name'))
-            ->not->toContain('Find log4j in your images');
+        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
+        Once::flush();
+
+        Livewire::test(GlobalSearch::class)->assertSeeHtml('vulnerabilitiesUrl: null');
     });
 
     it('lists the page in the navbar only when the instance allows scanning', function () {
@@ -424,3 +504,73 @@ describe('dashboard and search', function () {
         expect((string) $this->blade('<x-navbar desktop />'))->not->toContain('href="'.route('vulnerabilities').'"');
     });
 });
+
+describe('one scanned rule', function () {
+    it('treats a resource on a server with scanning off as not scanned everywhere', function () {
+        $application = fleetApplication('marked-app');
+        fleetScan($application, ['high' => 3], 3);
+        $this->server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
+        $application = $application->fresh();
+
+        fleetExpectNotScannedEverywhere($this, $application);
+    });
+
+    it('treats an application with its own scan off as not scanned everywhere', function () {
+        $application = fleetApplication('marked-app');
+        fleetScan($application, ['high' => 3], 3);
+        $application->settings->forceFill(['is_image_scan_enabled' => false])->save();
+        $application = $application->fresh();
+
+        fleetExpectNotScannedEverywhere($this, $application);
+    });
+
+    it('counts the dashboard resources without loading every resource of the team', function () {
+        $count = function (int $resources): int {
+            collect(range(1, $resources))->each(fn (int $index) => fleetScan(fleetApplication('clean-'.$resources.'-'.$index), [], 0));
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            TeamVulnerabilities::fixableResourceCount(test()->team->id);
+            $queries = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $queries;
+        };
+
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        fleetScan(fleetApplication('marked-app'), ['high' => 1], 1);
+
+        expect($count(2))->toBe($count(6))
+            ->and(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
+    });
+
+    it('counts only the dashboard resources a limited member can see', function () {
+        fleetScan(fleetApplication('visible-app'), ['high' => 1], 1);
+        $hiddenEnvironment = Environment::factory()->create([
+            'project_id' => Project::factory()->create(['team_id' => $this->team->id])->id,
+        ]);
+        fleetScan(fleetApplication('hidden-app', $hiddenEnvironment), ['critical' => 1], 1);
+
+        $this->actingAs(fleetMember($this->team, 'member', [['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read']]]));
+        session(['currentTeam' => $this->team]);
+        expect(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
+
+        $this->actingAs($this->admin);
+        expect(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(2);
+    });
+});
+
+function fleetExpectNotScannedEverywhere(mixed $test, Application $application): void
+{
+    $test->actingAs($test->admin);
+    session(['currentTeam' => $test->team]);
+
+    expect(VulnerabilityMarkers::for(collect([$application])))->toBe([])
+        ->and(ResourceScans::fixableNowCount($application))->toBe(0)
+        ->and(TeamVulnerabilities::fixableResourceCount($test->team->id))->toBe(0)
+        ->and(ImageScanPolicyResolver::offState($application))->not->toBeNull();
+
+    fleetPage($test->admin)
+        ->assertDontSee('marked-app')
+        ->assertSee('1 resource on 1 server was not scanned, so Coolify cannot tell.');
+}

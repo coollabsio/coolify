@@ -155,37 +155,9 @@ final class ResourceScans
     public static function currentForMany(Collection $owners, array $columns = ['*']): Collection
     {
         $byType = $owners->groupBy(fn (Model $owner): string => $owner->getMorphClass())
-            ->map(fn (Collection $group): array => $group->map(fn (Model $owner) => $owner->getKey())->unique()->values()->all());
-        if ($byType->isEmpty()) {
-            return collect();
-        }
-
-        $rows = ImageScan::query()
-            ->select(['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'scanned_at'])
-            ->where('status', ImageScanStatus::Completed)
-            ->where(fn (Builder $query) => $query
-                ->whereNull('deployment_queue_id')
-                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
-            ->where(function (Builder $query) use ($byType): void {
-                foreach ($byType as $type => $ids) {
-                    $query->orWhere(fn (Builder $query) => $query->where('resource_type', $type)->whereIn('resource_id', $ids));
-                }
-            })
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->get();
-
-        $currentIds = $rows
-            ->groupBy(fn (ImageScan $scan): string => $scan->resource_type.':'.$scan->resource_id)
-            ->flatMap(function (Collection $group): array {
-                $latest = $group->first();
-
-                return $latest->deployment_queue_id === null
-                    ? [$latest->id]
-                    : $group->where('deployment_queue_id', $latest->deployment_queue_id)->pluck('id')->all();
-            })
-            ->values()
+            ->map(fn (Collection $group): array => $group->map(fn (Model $owner) => $owner->getKey())->unique()->values()->all())
             ->all();
+        $currentIds = self::currentScanIds($byType);
         if ($currentIds === []) {
             return collect();
         }
@@ -204,6 +176,62 @@ final class ResourceScans
     }
 
     /**
+     * The IDs of the current scans (see `currentFor()`) of the given owners, with one query that reads no JSON.
+     *
+     * @param  array<string, list<int|string>>  $idsByType  Owner IDs by morph type.
+     * @return list<int>
+     */
+    public static function currentScanIds(array $idsByType): array
+    {
+        $idsByType = array_filter($idsByType);
+        if ($idsByType === []) {
+            return [];
+        }
+
+        return ImageScan::query()
+            ->select(['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'scanned_at'])
+            ->where('status', ImageScanStatus::Completed)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('deployment_queue_id')
+                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
+            ->where(function (Builder $query) use ($idsByType): void {
+                foreach ($idsByType as $type => $ids) {
+                    $query->orWhere(fn (Builder $query) => $query->where('resource_type', $type)->whereIn('resource_id', $ids));
+                }
+            })
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn (ImageScan $scan): string => $scan->resource_type.':'.$scan->resource_id)
+            ->flatMap(function (Collection $group): array {
+                $latest = $group->first();
+
+                return $latest->deployment_queue_id === null
+                    ? [$latest->id]
+                    : $group->where('deployment_queue_id', $latest->deployment_queue_id)->pluck('id')->all();
+            })
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Loads what `ImageScanPolicyResolver::offState()` reads (server settings, app settings) for a list of
+     * applications, services, and standalone databases, with a fixed number of queries per type.
+     *
+     * @param  Collection<int, Model>  $resources
+     */
+    public static function loadScanRelations(Collection $resources): void
+    {
+        $resources->groupBy(fn (Model $resource): string => $resource::class)
+            ->each(fn (Collection $group, string $class) => EloquentCollection::make($group->all())->loadMissing(match ($class) {
+                Application::class => ['settings', 'destination.server.settings'],
+                Service::class => ['destination.server.settings', 'server.settings'],
+                default => ['destination.server.settings'],
+            }));
+    }
+
+    /**
      * A key for a resource or scan owner that is unique across resource types.
      */
     public static function key(Model $resource): string
@@ -212,10 +240,14 @@ final class ResourceScans
     }
 
     /**
-     * Fixable now at the alert level, from the stored summaries: the sidebar count.
+     * Fixable now at the alert level, from the stored summaries: the sidebar count. 0 while the resource is not scanned.
      */
     public static function fixableNowCount(Model $resource): int
     {
+        if (! ImageScanPolicyResolver::isScanOn($resource)) {
+            return 0;
+        }
+
         return (int) self::current($resource, null, ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'summary', 'scanned_at'])
             ->sum(fn (ImageScan $scan): int => (int) data_get($scan->summary, 'fixable_now_at_level', 0));
     }
