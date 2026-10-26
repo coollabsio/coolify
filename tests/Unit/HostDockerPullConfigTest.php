@@ -83,18 +83,18 @@ function hostDockerPullJob(Server $server, string $buildPack = 'dockerfile'): ar
 
 /**
  * Runs a command as ExecuteRemoteCommand sends it to the server, with a sudo that resets HOME like env_reset,
- * and returns the Docker config directory that each docker call reads. The SSH user's home is shown as
- * /home/administrator.
+ * and returns the Docker config directory that each docker call reads, followed by the Docker context that it
+ * selects. The SSH user's home is shown as /home/administrator.
  */
-function hostDockerConfigDirectoryOf(string $command, Server $server, bool $sshUserHasDockerConfig = true): string
+function hostDockerConfigDirectoryOf(string $command, Server $server, bool $sshUserHasDockerConfig = true, bool $withContext = false): string
 {
     $directory = sys_get_temp_dir().'/host-docker-pull-'.uniqid();
     mkdir("{$directory}/bin", recursive: true);
     mkdir("{$directory}/home/.docker", recursive: true);
-    file_put_contents("{$directory}/bin/docker", "#!/bin/sh\nprintf '%s\\n' \"\${DOCKER_CONFIG:-\$HOME/.docker}\"\n");
+    file_put_contents("{$directory}/bin/docker", "#!/bin/sh\nprintf '%s\\n' \"\${DOCKER_CONFIG:-\$HOME/.docker}\"\n".($withContext ? "printf '%s\\n' \"\${DOCKER_CONTEXT:-config.json}\"\n" : ''));
     chmod("{$directory}/bin/docker", 0755);
     if ($sshUserHasDockerConfig) {
-        file_put_contents("{$directory}/home/.docker/config.json", '{"auths":{}}');
+        file_put_contents("{$directory}/home/.docker/config.json", '{"auths":{},"currentContext":"rootless"}');
     }
 
     if ($server->isNonRoot()) {
@@ -130,6 +130,17 @@ it('pulls with the SSH user Docker config, where the registry login is, on a non
     $command = collect($job->recordedCommands)->first(fn (string $command) => str_contains($command, $pull));
     expect($command)->not->toBeNull()
         ->and(hostDockerConfigDirectoryOf($command, $server))->toBe('/home/administrator/.docker');
+})->with($pulls);
+
+it('pulls on the host daemon when the SSH user Docker config selects another context', function (string $method, string $pull) {
+    $server = hostDockerPullServer('administrator');
+    [$job, $reflection] = hostDockerPullJob($server);
+
+    $reflection->getMethod($method)->invoke($job);
+
+    $command = collect($job->recordedCommands)->first(fn (string $command) => str_contains($command, $pull));
+    expect($command)->not->toBeNull()
+        ->and(hostDockerConfigDirectoryOf($command, $server, withContext: true))->toBe("/home/administrator/.docker\ndefault");
 })->with($pulls);
 
 it('keeps the root Docker config on a non-root server when the SSH user has no Docker config', function (string $method, string $pull) {
