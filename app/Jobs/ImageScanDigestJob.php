@@ -124,10 +124,24 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
      * the marks to record after sending are kept.
      *
      * @param  Collection<int, ImageScan>  $current  The current scans, with their owner.
-     * @param  list<array<string, mixed>>  $marks
+     * @param  list<array<string, mixed>>  $marks  Gets the marks of the resource only when its digest succeeded.
      * @return array<string, mixed>|null
      */
     private function resourceDigest(Model $resource, Collection $current, array &$marks): ?array
+    {
+        $resourceMarks = [];
+        $digest = $this->buildResourceDigest($resource, $current, $resourceMarks);
+        array_push($marks, ...$resourceMarks);
+
+        return $digest;
+    }
+
+    /**
+     * @param  Collection<int, ImageScan>  $current
+     * @param  list<array<string, mixed>>  $marks
+     * @return array<string, mixed>|null
+     */
+    private function buildResourceDigest(Model $resource, Collection $current, array &$marks): ?array
     {
         $owners = $current->map(fn (ImageScan $scan) => $scan->resource)
             ->filter(fn ($owner): bool => $owner instanceof Model)

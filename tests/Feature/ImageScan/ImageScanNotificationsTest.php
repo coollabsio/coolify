@@ -29,6 +29,7 @@ use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\ImageScan\KnownExploitedFound;
 use App\Notifications\ImageScan\VulnerabilityDigest;
 use App\Services\ImageScan\ScanNotifications;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -36,6 +37,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -433,6 +435,69 @@ describe('notification state', function () {
 
         Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
         expect(notifyStateOf($this->application)->notified_ids)->toEqualCanonicalizing(['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0003']);
+    });
+
+    it('does not record a baseline plan when the baseline ended while the digest ran', function () {
+        $first = notifyDeployment($this->application);
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['deployment_queue_id' => $first->id, 'scanned_at' => now()->subHour()], state: false);
+        notifyState($this->application, [], baseline: true, deploymentId: $first->id);
+        $plan = ScanNotifications::digestPlan($this->application);
+
+        $second = notifyDeployment($this->application);
+        $redeploy = notifyScan($this->application, [notifyFinding('CVE-2026-0001'), notifyFinding('CVE-2026-0002')], ['deployment_queue_id' => $second->id, 'image_id' => 'sha256:'.str_repeat('e', 64)], state: false);
+        ScanNotifications::afterScan($redeploy, $second->id);
+        ScanNotifications::applyDigest($plan['mark']);
+        notifyRunDigest();
+
+        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
+        expect(notifySentDigest()->digest['resources'][0]['ids'])->toBe(['CVE-2026-0001', 'CVE-2026-0002']);
+    });
+
+    it('records only the checked scan when a candidate check continues an open baseline', function () {
+        $first = notifyDeployment($this->application);
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['deployment_queue_id' => $first->id, 'scanned_at' => now()->subHour()], state: false);
+        ScanNotifications::afterScan($scan, $first->id);
+        $second = notifyDeployment($this->application);
+        // The redeploy wrote its scan; its own notification runs after the candidate check below.
+        $redeploy = notifyScan($this->application, [notifyFinding('CVE-2026-0002')], ['deployment_queue_id' => $second->id, 'image_id' => 'sha256:'.str_repeat('e', 64)], state: false);
+
+        $scan->update(['candidates' => notifyCandidates()]);
+        ScanNotifications::afterScan($scan->fresh(), candidateCheck: true);
+        expect(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001']);
+
+        ScanNotifications::afterScan($redeploy, $second->id);
+        notifyRunDigest();
+
+        expect(notifySentDigest()->digest['resources'][0]['ids'])->toBe(['CVE-2026-0002']);
+    });
+
+    it('keeps the notified candidates while a candidate check has not run yet', function () {
+        $key = 'nginx:1.28@sha256:'.str_repeat('b', 64);
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['candidates' => null]);
+        notifyState($this->application, ['CVE-2026-0001'], [$key]);
+
+        notifyRunDigest();
+
+        expect(notifyStateOf($this->application)->notified_candidates)->toBe([$key]);
+    });
+
+    it('records nothing for a resource whose digest failed', function () {
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')]);
+        notifyState($this->application, []);
+        // The team page link works; the link of the digest line fails after the plan of the resource was made.
+        $calls = 0;
+        URL::partialMock()->shouldReceive('route')->andReturnUsing(function () use (&$calls) {
+            if (++$calls > 1) {
+                throw new RuntimeException('no route');
+            }
+
+            return 'https://coolify.example.com/vulnerabilities';
+        });
+        app()->instance(ExceptionHandler::class, Mockery::mock(ExceptionHandler::class)->shouldIgnoreMissing());
+
+        notifyRunDigest();
+
+        expect(notifyStateOf($this->application)->notified_ids)->toBe([]);
     });
 
     it('deletes the state with the resource', function () {

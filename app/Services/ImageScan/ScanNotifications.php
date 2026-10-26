@@ -2,6 +2,7 @@
 
 namespace App\Services\ImageScan;
 
+use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanFixState;
@@ -65,27 +66,36 @@ final class ScanNotifications
             return;
         }
 
-        $current = self::current($owner);
-        if ($current['scans']->isEmpty()) {
-            return;
-        }
+        // The current scans are read under the lock, so a scan that lands meanwhile is not recorded without notice.
+        [$known, $current] = self::locked($owner, function (?ImageScanNotificationState $state) use ($owner, $teamId, $scan, $deploymentId, $candidateCheck): array {
+            $current = self::current($owner);
+            if ($current['scans']->isEmpty()) {
+                return [[], $current];
+            }
 
-        $known = self::locked($owner, function (?ImageScanNotificationState $state) use ($owner, $teamId, $current, $deploymentId, $candidateCheck): array {
             if (! $state instanceof ImageScanNotificationState) {
                 self::createState($owner, $teamId, $current, $deploymentId);
 
-                return [];
+                return [[], $current];
             }
 
-            $extendsBaseline = $state->is_baseline
-                && ($candidateCheck || ($deploymentId !== null && $deploymentId === $state->baseline_deployment_queue_id));
-            if ($extendsBaseline) {
+            if ($state->is_baseline && $candidateCheck) {
+                // A candidate check adds only what the checked scan can fix now; a redeploy meanwhile is not part of the baseline.
+                $state->update([
+                    'notified_ids' => self::merge((array) $state->notified_ids, self::ids(self::fixableNow($scan, $owner))),
+                    'notified_candidates' => self::capCandidates([...(array) $state->notified_candidates, ...array_keys(self::betterCandidates($scan, $owner))]),
+                ]);
+
+                return [[], $current];
+            }
+
+            if ($state->is_baseline && $deploymentId !== null && $deploymentId === $state->baseline_deployment_queue_id) {
                 $state->update([
                     'notified_ids' => self::merge((array) $state->notified_ids, self::ids($current['fixable'])),
                     'notified_candidates' => self::capCandidates([...(array) $state->notified_candidates, ...array_keys($current['candidates'])]),
                 ]);
 
-                return [];
+                return [[], $current];
             }
 
             $notified = self::idSet((array) $state->notified_ids);
@@ -95,7 +105,7 @@ final class ScanNotifications
                 'notified_ids' => self::merge((array) $state->notified_ids, self::ids($known)),
             ]);
 
-            return $known;
+            return [$known, $current];
         });
 
         $team = $known === [] ? null : Team::query()->find($teamId);
@@ -131,6 +141,7 @@ final class ScanNotifications
             'fix' => array_values($current['candidates'])[0] ?? null,
             'newCandidates' => array_values($newCandidates),
             'mark' => [
+                'baseline' => $baseline,
                 'owner_type' => $owner->getMorphClass(),
                 'owner_id' => $owner->getKey(),
                 'team_id' => $teamId,
@@ -173,6 +184,13 @@ final class ScanNotifications
                 ]);
 
                 return;
+            }
+
+            // The plan recorded a baseline without reporting it; when the baseline ended meanwhile (an alert or a
+            // scan of another deployment), those findings are not added, so they can still be reported.
+            if (($mark['baseline'] ?? false) && ! $state->is_baseline) {
+                $mark['add_ids'] = [];
+                $mark['add_candidates'] = [];
             }
 
             $present = array_flip($mark['present']);
@@ -332,7 +350,10 @@ final class ScanNotifications
                     $present[mb_strtolower($id)] = true;
                 }
             }
-            if ($scan->candidateStatus() === 'failed' || data_get($scan->candidates, 'base.status') === 'failed') {
+            // A failed check, or one that did not run yet, keeps the candidates the team was told about.
+            $status = $scan->candidateStatus();
+            if ($status === 'failed' || data_get($scan->candidates, 'base.status') === 'failed'
+                || ($status === null && RefreshCandidates::needsCandidates($scan))) {
                 $checked = false;
             }
         }
