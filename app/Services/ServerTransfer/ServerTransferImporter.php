@@ -2497,13 +2497,19 @@ class ServerTransferImporter
                 continue;
             }
 
-            ImageScanIgnore::query()->create($fields + [
+            // A retried import (adopt mode) finds the ignore it created before.
+            $ignore = ImageScanIgnore::query()->firstOrCreate([
                 'team_id' => $teamId,
                 'resource_type' => $resource->getMorphClass(),
                 'resource_id' => $resource->id,
+                'vulnerability_id' => filled($fields['vulnerability_id']) ? $fields['vulnerability_id'] : null,
+                'package' => filled($fields['package']) ? $fields['package'] : null,
+            ], [
+                'reason' => $fields['reason'],
+                'expires_at' => $fields['expires_at'],
                 'created_by' => null,
             ]);
-            $count++;
+            $count += $ignore->wasRecentlyCreated ? 1 : 0;
         }
 
         return $count;

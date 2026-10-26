@@ -2095,3 +2095,14 @@ test('scan rules that fail the validation of the UI or point to nothing in the b
         ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'vulnerability ignore')))->toHaveCount(5)
         ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(2);
 });
+
+test('an ignore that the import created before is not created again', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $entry = ['resource_kind' => 'application', 'resource_uuid' => $this->application->uuid, 'vulnerability_id' => 'CVE-2024-7', 'package' => null, 'reason' => 'Not reachable', 'expires_at' => null];
+    $bundle['image_scan_ignores'] = [$entry, $entry, [...$entry, 'vulnerability_id' => null, 'package' => 'openssl'], [...$entry, 'vulnerability_id' => null, 'package' => 'openssl']];
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
+        ->and($result['created']['image_scan_ignores'])->toBe(2);
+});
