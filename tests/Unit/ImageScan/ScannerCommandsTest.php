@@ -190,7 +190,7 @@ it('writes the SBOM to a temp file and moves it into place after Syft succeeds',
     $tmp = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json.tmp-'.SCANNER_TEST_RUN_ID;
     $final = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json';
 
-    expect($commands[$index])->toStartWith("sh -c '")
+    expect($commands[$index])->toStartWith("sh -c 'ulimit -f 2097152; ")
         ->and($syft)->toContain("> '{$tmp}' 2>/dev/null && chown 65534:65534 '{$tmp}' && chmod 600 '{$tmp}' && mv -f '{$tmp}' '{$final}'; rc=\$?")
         ->and($commands)->toContain("rm -f '{$tmp}' || true");
 });
@@ -207,9 +207,23 @@ it('reads tool output through a size cap and prints an exit marker', function ()
         $all = implode("\n", scannerUnwrapped($commands));
 
         expect($all)->toContain("head -c 10485761 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || true")
-            ->toContain("rc=\$?; echo \"coolify-scan-exit {$step} \$rc \$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || echo 0)\"")
+            ->toContain('ulimit -f 40960; timeout ')
+            ->toContain("rc=\$?; size=\$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge 20971520 ]; then rc=0; fi; echo \"coolify-scan-exit {$step} \$rc \$size\"")
             ->and(array_search('echo coolify-scan-payload', $commands, true))->toBeLessThan(collect($commands)->search(fn (string $line) => str_starts_with($line, 'head -c')))
             ->and(end($commands))->toBe("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true");
+    }
+});
+
+it('caps tool output on disk at twice the read limit in the blocks that sh counts', function () {
+    expect(ScannerCommands::OUTPUT_FILE_LIMIT_BLOCKS * 512)->toBe(2 * ScannerCommands::OUTPUT_LIMIT)
+        ->and(ScannerCommands::SBOM_FILE_LIMIT_BLOCKS * 512)->toBe(1024 ** 3);
+
+    foreach (scannerCommandLists($this->commands) as $name => $commands) {
+        foreach ($commands as $line) {
+            if (str_contains($line, 'docker run') && str_contains($line, '> ')) {
+                expect($line)->toStartWith("sh -c 'ulimit -f ", $name);
+            }
+        }
     }
 });
 

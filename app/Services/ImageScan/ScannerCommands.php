@@ -23,7 +23,9 @@ use InvalidArgumentException;
  *   (sbomFromLocal), `sbom` (sbomFromRegistry), `grype`, `packages`, `tags`, `digest`.
  * - A failed run does not stop the batch, and the container and the work directory are still removed.
  * - Methods with a payload print the line `coolify-scan-payload` after the markers, then at most 10485761
- *   bytes of the tool output (`head -c`), so the output is cut when `bytes > OUTPUT_LIMIT`. Use `parseOutput()`:
+ *   bytes of the tool output (`head -c`), so the output is cut when `bytes > OUTPUT_LIMIT`. The file that holds the
+ *   output stops at 20 MiB (`ulimit -f`); a run that reached it reports exit code 0 with the size of the file, so it
+ *   reads as cut output, not as a failed run. Use `parseOutput()`:
  *   it reads markers only before the separator, so the payload cannot fake one. Only setup commands (mkdir, chown,
  *   chmod) stop the batch when they fail; call `cleanup()` after every scan, also after an exception.
  * - `inspect`: one line `{Id}|{RepoDigest or empty}|{os}/{arch}|{size}`. `diskFree`: `{docker root free} {scan dir free}` in bytes.
@@ -43,6 +45,14 @@ class ScannerCommands
     public const DB_VOLUME = 'coolify-grype-db';
 
     public const OUTPUT_LIMIT = 10485760;
+
+    /**
+     * Tool output written to disk stops at this size (`ulimit -f`, in the 512-byte blocks that dash, bash in POSIX
+     * mode, and BusyBox sh use): 20 MiB for captured output, 1 GiB for an SBOM.
+     */
+    public const OUTPUT_FILE_LIMIT_BLOCKS = 40960;
+
+    public const SBOM_FILE_LIMIT_BLOCKS = 2097152;
 
     public const MARKER = 'coolify-scan-exit';
 
@@ -489,20 +499,20 @@ class ScannerCommands
         return [
             ...$commands,
             ...$this->ownWorkDir($auth !== null),
-            $this->shell("{$dockerRun} > {$out} 2>/dev/null; rc=\$?; echo \"".self::MARKER." {$step} \$rc \$(wc -c < {$out} 2>/dev/null || echo 0)\""),
+            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$out} 2>/dev/null; rc=\$?; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
             ...$this->finish(['echo '.self::PAYLOAD_SEPARATOR, 'head -c '.(self::OUTPUT_LIMIT + 1)." {$out} 2>/dev/null || true"]),
         ];
     }
 
     /**
-     * Syft writes the SBOM to stdout; only a complete run is moved into place.
+     * Syft writes the SBOM to stdout; only a complete run is moved into place. An SBOM over the file limit fails.
      */
     private function writeSbom(string $name, string $dockerRun): string
     {
         $tmp = escapeshellarg($this->sbomTmpPath($name));
         $final = escapeshellarg($this->sbomPath($name));
 
-        return $this->shell("{$dockerRun} > {$tmp} 2>/dev/null && chown ".self::SCANNER_USER." {$tmp} && chmod 600 {$tmp} && mv -f {$tmp} {$final}; rc=\$?; echo \"".self::MARKER.' sbom $rc"');
+        return $this->shell('ulimit -f '.self::SBOM_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$tmp} 2>/dev/null && chown ".self::SCANNER_USER." {$tmp} && chmod 600 {$tmp} && mv -f {$tmp} {$final}; rc=\$?; echo \"".self::MARKER.' sbom $rc"');
     }
 
     private function usageMarker(string $step, string $path): string
