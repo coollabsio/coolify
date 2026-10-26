@@ -47,7 +47,7 @@ class StartService
         // Give Compose no stdin so it uses the default answer (keep the volume). Never pass --yes:
         // it recreates the volume and deletes its data.
         // Pass -f so Compose uses only the file that Coolify wrote.
-        $compose = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
+        $compose = serverDockerConfigPrefix($service->server)."docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "{$compose} pull < /dev/null";

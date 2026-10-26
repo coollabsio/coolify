@@ -125,8 +125,8 @@ it('removes the dedicated realtime service from bundled compose files', function
     $soketi = Yaml::parse($composeContents)['services']['soketi'] ?? null;
 
     // Production keeps "coolify-realtime" only as a network alias of the coolify container, and "soketi"
-    // only as an inactive placeholder for old overrides in docker-compose.custom.yml.
-    expect($soketi === null || array_keys($soketi) === ['image', 'profiles'])->toBeTrue();
+    // only as a placeholder with no replicas for old overrides in docker-compose.custom.yml.
+    expect($soketi === null || $soketi === ['image' => 'busybox:1.37', 'deploy' => ['replicas' => 0]])->toBeTrue();
     expect($composeContents)
         ->not->toContain('container_name: coolify-realtime')
         ->not->toContain('coolify-realtime:')
@@ -309,7 +309,7 @@ it('uses current Reverb and terminal names in development tooling', function () 
         ->not->toContain('SOKETI');
 });
 
-it('accepts a soketi override from 4.3.23 in docker-compose.custom.yml without starting soketi', function (string $composeFile, string $override) {
+it('accepts a soketi override from 4.3.23 in docker-compose.custom.yml with zero soketi replicas', function (string $composeFile, string $override) {
     if (! (new ExecutableFinder)->find('docker')) {
         $this->markTestSkipped('Docker is not installed.');
     }
@@ -320,14 +320,17 @@ it('accepts a soketi override from 4.3.23 in docker-compose.custom.yml without s
     file_put_contents("{$directory}/docker-compose.custom.yml", $override);
 
     try {
-        $result = Process::path($directory)->run('docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.custom.yml config --services');
+        $result = Process::path($directory)->run('docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.custom.yml config --no-env-resolution --format json');
     } finally {
         File::deleteDirectory($directory);
     }
 
+    // Zero replicas, not an inactive profile: "docker compose up" then also removes the old coolify-realtime
+    // container. An inactive profile keeps it running, even with --remove-orphans.
     expect($result->successful())->toBeTrue($result->errorOutput())
-        ->and(array_filter(explode("\n", trim($result->output()))))->not->toContain('soketi')
-        ->toContain('coolify');
+        ->and(json_decode($result->output(), true)['services'])
+        ->toHaveKey('coolify')
+        ->toHaveKey('soketi.deploy.replicas', 0);
 })->with([
     'production compose, partial override' => ['docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n    ports:\n      - '6001:6001'\n"],
     'production compose, full service' => ['docker-compose.prod.yml', "services:\n  soketi:\n    image: quay.io/soketi/soketi:1.6-16-alpine\n    container_name: coolify-realtime\n    ports:\n      - '6001:6001'\n"],
