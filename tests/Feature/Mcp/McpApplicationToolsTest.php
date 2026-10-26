@@ -307,13 +307,13 @@ test('manage_application updates, clones and moves an application of the token t
         ->and($this->application->fresh()->environment_id)->toBe($target->id);
 });
 
-test('manage_application deletes an application only with confirm=true and a deploy token', function () {
-    $writeOnly = mcpAppCall(mcpAppToken($this->user), 'manage_application', ['action' => 'delete', 'uuid' => $this->application->uuid, 'confirm' => true]);
+test('manage_application deletes an application only with confirm=true and a delete token', function () {
+    $writeOnly = mcpAppCall(mcpAppToken($this->user, ['write']), 'manage_application', ['action' => 'delete', 'uuid' => $this->application->uuid, 'confirm' => true]);
     expect(mcpAppIsError($writeOnly))->toBeTrue()
-        ->and(mcpAppText($writeOnly))->toContain('Missing required permissions: deploy')
+        ->and(mcpAppText($writeOnly))->toContain('Missing required permissions: delete')
         ->and(Application::find($this->application->id))->not->toBeNull();
 
-    $token = mcpAppToken($this->user, ['write', 'deploy']);
+    $token = mcpAppToken($this->user, ['write', 'delete']);
 
     $denied = mcpAppCall($token, 'manage_application', ['action' => 'delete', 'uuid' => $this->application->uuid]);
     expect(mcpAppIsError($denied))->toBeTrue()
@@ -411,7 +411,7 @@ test('manage_application rejects read-only and member tokens', function () {
 // manage_preview and get_application_preview
 
 test('manage_preview creates, updates and deletes a preview of the token team', function () {
-    $writeToken = mcpAppToken($this->user, ['write', 'delete']);
+    $writeToken = mcpAppToken($this->user, ['write']);
     $deployToken = mcpAppToken($this->user, ['deploy']);
 
     $writeOnly = mcpAppCall($writeToken, 'manage_preview', ['action' => 'create', 'uuid' => $this->application->uuid, 'data' => ['pull_request_id' => 7, 'git_type' => 'github', 'instant_deploy' => false]]);
@@ -428,14 +428,14 @@ test('manage_preview creates, updates and deletes a preview of the token team', 
 
     $writeOnlyDelete = mcpAppCall($writeToken, 'manage_preview', ['action' => 'delete', 'uuid' => $this->application->uuid, 'pull_request_id' => '7', 'confirm' => true]);
     expect(mcpAppIsError($writeOnlyDelete))->toBeTrue()
-        ->and(mcpAppText($writeOnlyDelete))->toContain('Missing required permissions: deploy');
+        ->and(mcpAppText($writeOnlyDelete))->toContain('Missing required permissions: delete');
 
-    $writeDeployToken = mcpAppToken($this->user, ['write', 'deploy']);
-    $denied = mcpAppCall($writeDeployToken, 'manage_preview', ['action' => 'delete', 'uuid' => $this->application->uuid, 'pull_request_id' => '7']);
+    $deleteToken = mcpAppToken($this->user, ['delete']);
+    $denied = mcpAppCall($deleteToken, 'manage_preview', ['action' => 'delete', 'uuid' => $this->application->uuid, 'pull_request_id' => '7']);
     expect(mcpAppIsError($denied))->toBeTrue()
         ->and(mcpAppText($denied))->toContain('confirm=true');
 
-    $deleted = mcpAppCall($writeDeployToken, 'manage_preview', ['action' => 'delete', 'uuid' => $this->application->uuid, 'pull_request_id' => '7', 'confirm' => true]);
+    $deleted = mcpAppCall($deleteToken, 'manage_preview', ['action' => 'delete', 'uuid' => $this->application->uuid, 'pull_request_id' => '7', 'confirm' => true]);
     expect(mcpAppIsError($deleted))->toBeFalse(mcpAppText($deleted))
         ->and(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 7)->exists())->toBeFalse();
 });

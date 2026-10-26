@@ -215,7 +215,7 @@ test('server group write actions reject member tokens', function (string $tool, 
 ]);
 
 test('server group destructive actions need confirm=true', function (string $tool, array $arguments) {
-    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), $tool, $arguments);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy', 'delete']), $tool, $arguments);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('requires confirm=true');
