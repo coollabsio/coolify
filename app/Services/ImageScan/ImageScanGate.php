@@ -84,7 +84,8 @@ final class ImageScanGate
 
         if ($result->blocked && $result->error === null) {
             foreach (array_slice($result->top, 0, self::TOP_LIMIT) as $row) {
-                $lines[] = "  {$row['id']}  {$row['severity']}  {$row['package']} {$row['version']} → {$row['fixed_in']}".($row['kev'] ? '  known exploited' : '');
+                $fix = $row['fixed_in'] === null ? '  fixed in a newer image' : " → {$row['fixed_in']}";
+                $lines[] = "  {$row['id']}  {$row['severity']}  {$row['package']} {$row['version']}{$fix}".($row['kev'] ? '  known exploited' : '');
             }
 
             $lines[] = 'See the Vulnerabilities page for all results.';
@@ -123,10 +124,7 @@ final class ImageScanGate
      */
     private function blockingFindings(ImageScan $scan, ResolvedImageScanPolicy $policy, IgnoreMatcher $ignores): array
     {
-        $buildsImage = (bool) $scan->builds_image;
-        $isBuilderImage = $this->isBuilderImage($scan);
-        $candidateFixedIds = $this->candidateFixedIds($scan);
-        $classifier = new FixClassifier;
+        $classify = self::classifierFor($scan);
         $blocking = [];
 
         foreach ((array) $scan->findings as $row) {
@@ -136,7 +134,7 @@ final class ImageScanGate
                 continue;
             }
 
-            if ($classifier->classify($finding, $buildsImage, $isBuilderImage, $candidateFixedIds) === ImageScanFixState::FixableNow) {
+            if ($classify($finding) === ImageScanFixState::FixableNow) {
                 $blocking[] = $finding;
             }
         }
@@ -144,7 +142,22 @@ final class ImageScanGate
         return $blocking;
     }
 
-    private function isBuilderImage(ImageScan $scan): bool
+    /**
+     * The one way to classify the findings of a scan. The gate and the summary writer both use it, so the counts and the block never differ.
+     *
+     * @return \Closure(Finding): ImageScanFixState
+     */
+    public static function classifierFor(ImageScan $scan): \Closure
+    {
+        $classifier = new FixClassifier;
+        $buildsImage = (bool) $scan->builds_image;
+        $isBuilderImage = self::isBuilderImage($scan);
+        $candidateFixedIds = self::candidateFixedIds($scan);
+
+        return fn (Finding $finding): ImageScanFixState => $classifier->classify($finding, $buildsImage, $isBuilderImage, $candidateFixedIds);
+    }
+
+    private static function isBuilderImage(ImageScan $scan): bool
     {
         $resource = $scan->resource;
 
@@ -158,7 +171,7 @@ final class ImageScanGate
     /**
      * @return list<string>
      */
-    private function candidateFixedIds(ImageScan $scan): array
+    private static function candidateFixedIds(ImageScan $scan): array
     {
         $ids = [];
 

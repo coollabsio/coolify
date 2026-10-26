@@ -8,7 +8,6 @@ use App\Models\Application;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Services\ImageScan\Finding;
-use App\Services\ImageScan\FixClassifier;
 use App\Services\ImageScan\GateResult;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanGate;
@@ -64,11 +63,9 @@ function gateIgnores(array ...$rows): IgnoreMatcher
 
 function gateSummary(ImageScan $scan, ?ImageScanAlertLevel $level = null, ?IgnoreMatcher $ignores = null): array
 {
-    $classifier = new FixClassifier;
-
     return ScanSummary::build(
         array_map(fn (array $row) => Finding::fromArray($row), $scan->findings),
-        fn (Finding $finding) => $classifier->classify($finding, (bool) $scan->builds_image, false, []),
+        ImageScanGate::classifierFor($scan),
         $ignores ?? gateIgnores(),
         $level ?? ImageScanAlertLevel::Critical,
     );
@@ -294,3 +291,58 @@ it('writes a skipped line for a scan error', function () {
 
     expect($gate->logLines($result, []))->toBe(['Scan skipped: The scan took too long and was stopped.']);
 });
+
+it('writes a fixed in a newer image line when there is no package fix version', function () {
+    $scan = gateScan([gateFinding('CVE-1', 'critical', ['fixedIn' => null, 'fixState' => 'not-fixed', 'kev' => true]), gateFinding('CVE-2')], [
+        'builds_image' => false,
+        'candidates' => [['tag' => '1.2', 'better' => true, 'fixed_ids' => ['CVE-1', 'CVE-2']]],
+    ]);
+    $gate = new ImageScanGate;
+    $result = $gate->evaluate($scan, gatePolicy(), gateIgnores());
+
+    expect($gate->logLines($result, gateSummary($scan)))->toContain(
+        '  CVE-1  critical  openssl 3.0.13  fixed in a newer image  known exploited',
+        '  CVE-2  critical  openssl 3.0.13 → 3.0.15',
+    );
+});
+
+it('keeps the summary fixable count and the gate count equal', function (string $buildPack, bool $buildsImage, ?array $candidates, array $ignoreRows) {
+    $scan = gateScan([
+        gateFinding('CVE-C1', 'critical'),
+        gateFinding('CVE-C2', 'critical', ['type' => 'java-archive']),
+        gateFinding('CVE-C3', 'critical', ['fixedIn' => null, 'fixState' => 'not-fixed']),
+        gateFinding('CVE-H1', 'high'),
+        gateFinding('CVE-H2', 'high', ['type' => 'npm', 'aliases' => ['GHSA-h2']]),
+        gateFinding('CVE-M1', 'medium'),
+        gateFinding('CVE-M2', 'medium', ['type' => 'apk']),
+        gateFinding('CVE-L1', 'low'),
+        gateFinding('CVE-U1', 'unknown'),
+    ], ['builds_image' => $buildsImage, 'candidates' => $candidates]);
+    $scan->setRelation('resource', new Application(['build_pack' => $buildPack]));
+    $ignores = gateIgnores(...$ignoreRows);
+
+    foreach (ImageScanAlertLevel::cases() as $level) {
+        $policy = gatePolicy(['alertLevel' => $level]);
+        $summary = ScanSummary::build(
+            array_map(fn (array $row) => Finding::fromArray($row), $scan->findings),
+            ImageScanGate::classifierFor($scan),
+            $ignores,
+            $level,
+        );
+        $result = (new ImageScanGate)->evaluate($scan, $policy, $ignores);
+
+        expect($result->count)->toBe($summary['fixable_now_at_level'])
+            ->and($result->blocked)->toBe($summary['fixable_now_at_level'] > 0);
+    }
+})->with([
+    'dockerfile' => ['dockerfile', true, null, []],
+    'dockerfile with ignores' => ['dockerfile', true, null, [['vulnerability_id' => 'CVE-C1'], ['vulnerability_id' => 'GHSA-h2'], ['package' => 'nothing']]],
+    'nixpacks builder image' => ['nixpacks', true, null, []],
+    'static builder image with ignore' => ['static', true, null, [['vulnerability_id' => 'CVE-C2']]],
+    'candidates fix some' => ['dockerfile', false, [
+        ['better' => true, 'fixed_ids' => ['CVE-C1', 'GHSA-h2', 'CVE-M1', 'CVE-L1']],
+        ['better' => false, 'fixed_ids' => ['CVE-C2', 'CVE-H1']],
+    ], []],
+    'candidates with ignores' => ['dockerfile', false, [['better' => true, 'fixed_ids' => ['CVE-C1', 'CVE-C2', 'CVE-H1']]], [['vulnerability_id' => 'CVE-C2']]],
+    'no candidates' => ['dockerfile', false, null, []],
+]);
