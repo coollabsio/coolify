@@ -1634,7 +1634,7 @@ test('team members cannot retrieve logs with sensitive read ability', function (
     // Elevated member tokens are rejected as JSON-RPC errors (HTTP 200) so MCP clients can parse them.
     $response->assertOk();
     expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
-        ->toMatch('/team role|Missing required/i');
+        ->toMatch('/more access than you have/');
 });
 
 test('get_logs returns structured next_tools when application is not running', function () {
@@ -1811,7 +1811,7 @@ test('team member with deploy ability cannot call lifecycle tools', function () 
     $response->assertOk();
     expect($response->json('jsonrpc'))->toBe('2.0');
     expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
-        ->toMatch('/team role|Missing required/i');
+        ->toMatch('/more access than you have/');
 });
 
 test('control start with deploy ability queues application deployment', function () {

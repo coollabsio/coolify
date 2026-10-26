@@ -66,6 +66,13 @@
                                             :disabled="in_array('root', $permissions) || !$canUseWritePermissions" />
                                     </div>
                                     <div class="listbox-option p-0!">
+                                        <x-forms.checkbox id="permission-delete" label="Delete" fullWidth
+                                            wire:model.live="permissions" domValue="delete"
+                                            helper="Delete resources and their settings (every DELETE request)."
+                                            :checked="in_array('delete', $permissions)"
+                                            :disabled="in_array('root', $permissions) || !$canUseDeletePermissions" />
+                                    </div>
+                                    <div class="listbox-option p-0!">
                                         <x-forms.checkbox id="permission-deploy" label="Deploy" fullWidth
                                             wire:model.live="permissions" domValue="deploy"
                                             helper="Deploy, start, stop, and restart resources. With Write, also apply changes that run on servers immediately, such as scheduled tasks, proxy configuration, and imports."
@@ -87,6 +94,25 @@
                                             :disabled="in_array('root', $permissions) || !$canUseSensitivePermissions" />
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                            <div class="mb-3 flex items-center gap-2">
+                                <h4 class="text-[12px] font-semibold text-black dark:text-fg">Access</h4>
+                                <x-helper helper="A limited token sees only the selected projects, environments, and resources, and cannot use team-level endpoints such as servers, keys, or notifications." />
+                            </div>
+                            <div class="grid gap-4 lg:grid-cols-2">
+                                <x-forms.listbox id="scopeMode" label="Resources" live :options="[
+                                    ['value' => 'team', 'label' => 'All resources in the team', 'disabled' => !$canUseTeamScope],
+                                    ['value' => 'selected', 'label' => 'Selected projects, environments, or resources'],
+                                ]" />
+                                @if ($scopeMode === 'selected')
+                                    <x-forms.listbox id="selectedScopes" label="Selected" multiple searchable portal
+                                        placeholder="Choose projects, environments, or resources"
+                                        emptyText="No projects or resources available."
+                                        :options="$this->scopeOptions" />
+                                @endif
                             </div>
                         </div>
                     </x-application.settings-section>
@@ -181,14 +207,23 @@
                                 <div wire:key="api-token-{{ $token->id }}"
                                     x-show="isVisible(@js((string) $token->id))"
                                     class="data-table-row api-tokens-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                                    <div class="min-w-0 truncate text-[12px] font-medium text-black dark:text-fg">
-                                        {{ $token->name }}
+                                    <div class="min-w-0">
+                                        <div class="truncate text-[12px] font-medium text-black dark:text-fg">
+                                            {{ $token->name }}
+                                        </div>
+                                        <div class="truncate text-[11px] text-neutral-500 dark:text-fg-dim">
+                                            @if ($token->scopes === null)
+                                                All resources in the team
+                                            @else
+                                                {{ collect($token->scopes)->map(fn ($scope) => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? 'Unavailable '.($scope['scope'] ?? 'scope'))->join(', ') }}
+                                            @endif
+                                        </div>
                                     </div>
                                     <div class="flex min-w-0 flex-wrap items-center gap-1.5">
                                         @foreach ($token->abilities ?? [] as $ability)
                                             <span @class([
                                                 'inline-flex min-h-5 items-center rounded-md border px-2 py-0.5 text-[10px] font-medium',
-                                                'border-error/20 bg-error/10 text-error' => $ability === 'root',
+                                                'border-error/20 bg-error/10 text-error' => in_array($ability, ['root', 'delete']),
                                                 'border-warning/20 bg-warning/10 text-warning' => in_array($ability, ['write', 'write:sensitive']),
                                                 'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-warning/20 dark:bg-warning/10 dark:text-warning' => $ability === 'deploy',
                                                 'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim' => in_array($ability, ['read', 'read:sensitive']),

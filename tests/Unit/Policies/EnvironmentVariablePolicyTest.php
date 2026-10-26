@@ -4,7 +4,13 @@ use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\User;
 use App\Policies\EnvironmentVariablePolicy;
+use Illuminate\Contracts\Auth\Access\Gate as GateContract;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
+
+afterEach(function () {
+    Gate::clearResolvedInstance('gate');
+});
 
 it('allows any user to view any environment variables', function () {
     $user = Mockery::mock(User::class)->makePartial();
@@ -15,13 +21,13 @@ it('allows any user to view any environment variables', function () {
 
 it('allows team member to view environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->teams = new Collection([(object) ['id' => 1]]);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('view', $resource)->andReturn(true);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->view($user, $envVar))->toBeTrue();
@@ -29,13 +35,13 @@ it('allows team member to view environment variable', function () {
 
 it('denies non-team member from viewing environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->teams = new Collection([(object) ['id' => 2]]);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('view', $resource)->andReturn(false);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->view($user, $envVar))->toBeFalse();
@@ -70,13 +76,13 @@ it('denies member from creating environment variable', function () {
 
 it('allows team admin to update environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('manageEnvironment', $resource)->andReturn(true);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->update($user, $envVar))->toBeTrue();
@@ -84,13 +90,13 @@ it('allows team admin to update environment variable', function () {
 
 it('denies non-admin from updating environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('manageEnvironment', $resource)->andReturn(false);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->update($user, $envVar))->toBeFalse();
@@ -108,13 +114,13 @@ it('denies update when resourceable is null', function () {
 
 it('allows team admin to delete environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('manageEnvironment', $resource)->andReturn(true);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->delete($user, $envVar))->toBeTrue();
@@ -122,13 +128,13 @@ it('allows team admin to delete environment variable', function () {
 
 it('denies non-admin from deleting environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('manageEnvironment', $resource)->andReturn(false);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->delete($user, $envVar))->toBeFalse();
@@ -162,13 +168,13 @@ it('denies force delete for environment variable', function () {
 
 it('allows team admin to manage environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('manageEnvironment', $resource)->andReturn(true);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->manageEnvironment($user, $envVar))->toBeTrue();
@@ -176,13 +182,13 @@ it('allows team admin to manage environment', function () {
 
 it('denies non-admin from managing environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
-
     $resource = Mockery::mock(Application::class)->makePartial();
-    $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
     $envVar = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $envVar->shouldReceive('getAttribute')->with('resourceable')->andReturn($resource);
+
+    $gate = Mockery::mock(GateContract::class);
+    $gate->shouldReceive('allows')->with('manageEnvironment', $resource)->andReturn(false);
+    Gate::shouldReceive('forUser')->with($user)->andReturn($gate);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->manageEnvironment($user, $envVar))->toBeFalse();

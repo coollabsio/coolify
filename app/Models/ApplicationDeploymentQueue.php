@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Services\Access\AccessResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -49,6 +50,20 @@ use OpenApi\Attributes as OA;
 )]
 class ApplicationDeploymentQueue extends Model
 {
+    /**
+     * Only deployments of applications the authenticated member or API token can see.
+     */
+    public function scopeVisibleToCurrentActor(Builder $query): Builder
+    {
+        foreach (app(AccessResolver::class)->currentLayers() as $layer) {
+            if (! $layer->coversWholeTeam()) {
+                return $query->whereIn('application_id', Application::query()->pluck('id')->map(fn ($id) => (string) $id));
+            }
+        }
+
+        return $query;
+    }
+
     /**
      * Log redaction variants of remote secrets. Kept in memory only, never saved.
      *

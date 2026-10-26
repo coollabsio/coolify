@@ -15,6 +15,7 @@ use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
 use App\Http\Middleware\EnsureTeamMcpEnabled;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
@@ -116,6 +117,7 @@ class Kernel extends HttpKernel
         'can.create.resources' => CanCreateResources::class,
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,
+        'access.team-wide' => EnsureTeamWideAccess::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
         'api.ip.allowed' => ApiIpAllowed::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,

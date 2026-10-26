@@ -18,10 +18,10 @@ class ManageProject extends RestActionTool
         return [
             'create' => ['method' => 'POST', 'path' => 'projects', 'ability' => 'write', 'description' => 'create a project (data: name, description)'],
             'update' => ['method' => 'PATCH', 'path' => 'projects/{uuid}', 'ability' => 'write', 'description' => 'update a project (data: name, description)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'projects/{uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete an empty project'],
+            'delete' => ['method' => 'DELETE', 'path' => 'projects/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete an empty project'],
             'create_environment' => ['method' => 'POST', 'path' => 'projects/{uuid}/environments', 'ability' => 'write', 'description' => 'create an environment (data: name)'],
             'update_environment' => ['method' => 'PATCH', 'path' => 'projects/{uuid}/environments/{environment_name_or_uuid}', 'ability' => 'write', 'description' => 'rename an environment (data: name)'],
-            'delete_environment' => ['method' => 'DELETE', 'path' => 'projects/{uuid}/environments/{environment_name_or_uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete an empty environment'],
+            'delete_environment' => ['method' => 'DELETE', 'path' => 'projects/{uuid}/environments/{environment_name_or_uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete an empty environment'],
         ];
     }
 

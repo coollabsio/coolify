@@ -399,8 +399,6 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
-        $this->authorize('create', Service::class);
-
         if ($request->boolean('instant_deploy')) {
             abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
         }
@@ -483,6 +481,7 @@ class ServicesController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
+        $this->authorize('create', [Service::class, $environment]);
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
@@ -692,6 +691,7 @@ class ServicesController extends Controller
             if (! $environment) {
                 return response()->json(['message' => 'Environment not found.'], 404);
             }
+            $this->authorize('create', [Service::class, $environment]);
             $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
             if (! $server) {
                 return response()->json(['message' => 'Server not found.'], 404);
@@ -3318,6 +3318,7 @@ class ServicesController extends Controller
         }
 
         $this->authorize('update', $service);
+        $this->authorize('create', [Service::class, $service->environment]);
 
         if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
             return $response;
