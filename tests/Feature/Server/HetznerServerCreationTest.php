@@ -221,7 +221,7 @@ describe('Boarding Flow Integration', function () {
             ->assertSeeHtml('x-text="current">Select SSH keys</span>');
     });
 
-    test('shows the cloud init script name only when saving the script', function () {
+        test('shows the cloud init script name only when saving the script', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
             ->set('show_cloud_init_script', true)

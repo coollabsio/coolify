@@ -19,7 +19,7 @@ use InvalidArgumentException;
  *   the full output size in bytes: `coolify-scan-exit {step} {code} {bytes}`. `{code}` is the exit code of
  *   the run: 0 success, 124 timeout, 137 killed (timeout kill or memory limit), 125 `docker run` failed
  *   (for example the image could not be pulled), any other value is an error of the tool. Steps: `pull-syft`,
- *   `pull-grype`, `pull-regctl` (prepare), `db-update`, `db-status`, `inspect`, `save` and `sbom`
+ *   `pull-grype`, `pull-regctl` (prepare), `db-update`, `db-status`, `disk-db` and `disk-sboms` (diskUsage, size = bytes), `inspect`, `save` and `sbom`
  *   (sbomFromLocal), `sbom` (sbomFromRegistry), `grype`, `packages`, `tags`, `digest`.
  * - A failed run does not stop the batch, and the container and the work directory are still removed.
  * - Methods with a payload print the line `coolify-scan-payload` after the markers, then at most 10485761
@@ -144,6 +144,24 @@ class ScannerCommands
             "mkdir -p -m 0755 {$base}",
             "df -P -B1 \"\$(docker info -f '{{.DockerRootDir}}')\" | awk 'NR==2 {printf \"%s \", \$4}'",
             "df -P -B1 {$base} | awk 'NR==2 {print \$4}'",
+        ];
+    }
+
+    /**
+     * Prints the bytes that scanner data uses on the server: `coolify-scan-exit disk-db 0 {bytes}` for the
+     * Grype database volume and `coolify-scan-exit disk-sboms 0 {bytes}` for `/data/coolify/image-scans`.
+     * A missing volume or directory counts as 0 bytes.
+     *
+     * @return list<string>
+     */
+    public function diskUsage(): array
+    {
+        $mountpoint = "\"\$(docker volume inspect -f '{{.Mountpoint}}' ".self::DB_VOLUME.' 2>/dev/null)"';
+
+        return [
+            $this->removeContainer(),
+            $this->shell($this->usageMarker('disk-db', $mountpoint)),
+            $this->shell($this->usageMarker('disk-sboms', escapeshellarg(self::BASE_DIR))),
         ];
     }
 
@@ -443,6 +461,11 @@ class ScannerCommands
         $final = escapeshellarg($this->sbomPath($name));
 
         return $this->shell("{$dockerRun} > {$tmp} 2>/dev/null && chown ".self::SCANNER_USER." {$tmp} && chmod 600 {$tmp} && mv -f {$tmp} {$final}; rc=\$?; echo \"".self::MARKER.' sbom $rc"');
+    }
+
+    private function usageMarker(string $step, string $path): string
+    {
+        return 'echo "'.self::MARKER." {$step} 0 \$(du -sb {$path} 2>/dev/null | cut -f1 | grep -E '^[0-9]+\$' || echo 0)\"";
     }
 
     /**

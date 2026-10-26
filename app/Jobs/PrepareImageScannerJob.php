@@ -9,6 +9,7 @@ use App\Services\ImageScan\ScannerCommands;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -22,7 +23,7 @@ use Illuminate\Support\Str;
  * The progress is kept in the cache (`image-scan-prepare:{server_id}`: pulling, updating_database, ready,
  * failed) and broadcast as ImageScanUpdated with the scan UUID `prepare`.
  */
-class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
+class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -40,6 +41,8 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
+    public $uniqueFor = 3600;
+
     private const TIMEOUT_PREPARE = 1900;
 
     private const TIMEOUT_DB_UPDATE = 400;
@@ -49,6 +52,11 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
     public function __construct(public Server $server)
     {
         $this->onQueue(maintenance_queue());
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->server->id;
     }
 
     public static function stateCacheKey(Server $server): string
@@ -61,6 +69,11 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
         return self::stateCacheKey($server).':built-at';
     }
 
+    public static function diskUsedCacheKey(Server $server): string
+    {
+        return self::stateCacheKey($server).':disk-used';
+    }
+
     public static function failedStepCacheKey(Server $server): string
     {
         return self::stateCacheKey($server).':failed-step';
@@ -71,6 +84,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
         Cache::forget(self::stateCacheKey($server));
         Cache::forget(self::failedStepCacheKey($server));
         Cache::forget(self::builtAtCacheKey($server));
+        Cache::forget(self::diskUsedCacheKey($server));
     }
 
     public function handle(): void
@@ -91,6 +105,11 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
             report($e);
             $this->setState($server, self::STATE_FAILED);
         }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        $this->setState($this->server, self::STATE_FAILED);
     }
 
     private function prepare(Server $server, ?string $dbUrl): void
@@ -119,7 +138,11 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $this->storeBuiltAt($server, $commands);
+        if (! $this->isStillEnabled($server)) {
+            return;
+        }
+
+        $this->storeDetails($server, $commands);
         $this->setState($server, self::STATE_READY);
     }
 
@@ -132,9 +155,10 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
         return ScannerCommands::parseOutput(instant_remote_process($commands, $server, throwError: false, timeout: $timeout));
     }
 
-    private function storeBuiltAt(Server $server, ScannerCommands $commands): void
+    private function storeDetails(Server $server, ScannerCommands $commands): void
     {
         Cache::forget(self::builtAtCacheKey($server));
+        Cache::forget(self::diskUsedCacheKey($server));
 
         try {
             $status = $this->run($commands->dbStatus(), $server, self::TIMEOUT_DB_STATUS);
@@ -142,6 +166,15 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldQueue
             $built = is_array($report) && ($report['valid'] ?? false) === true ? ($report['built'] ?? null) : null;
             if (is_string($built)) {
                 Cache::put(self::builtAtCacheKey($server), CarbonImmutable::parse($built)->toIso8601ZuluString(), now()->addDays(7));
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        try {
+            $usage = $this->run($commands->diskUsage(), $server, self::TIMEOUT_DB_STATUS);
+            if (isset($usage['sizes']['disk-db']) || isset($usage['sizes']['disk-sboms'])) {
+                Cache::put(self::diskUsedCacheKey($server), ($usage['sizes']['disk-db'] ?? 0) + ($usage['sizes']['disk-sboms'] ?? 0), now()->addDays(7));
             }
         } catch (\Throwable $e) {
             report($e);

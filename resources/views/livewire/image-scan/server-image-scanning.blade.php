@@ -65,7 +65,13 @@
                                 }" />
                         </div>
 
-                        <p class="text-[12px] text-neutral-500 dark:text-fg-faint">{{ $costText }}</p>
+                        <div class="flex flex-col gap-1 text-[12px] text-neutral-500 dark:text-fg-faint">
+                            <p>Scanner tools: {{ $toolVersions }}.</p>
+                            @if ($diskUsed)
+                                <p>Disk used by scanner data: {{ $diskUsed }}.</p>
+                            @endif
+                            <p>{{ $costText }}</p>
+                        </div>
 
                         @can('update', $server)
                             <div class="flex flex-wrap items-center gap-2">

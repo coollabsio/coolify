@@ -3,17 +3,21 @@
 use App\Events\ImageScanUpdated;
 use App\Jobs\PrepareImageScannerJob;
 use App\Livewire\ImageScan\ServerImageScanning;
+use App\Livewire\Server\New\ByHetzner;
 use App\Livewire\Server\New\ByIp;
+use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -52,12 +56,14 @@ function fakeScannerPreparation(array $overrides = []): void
     $outputs = array_merge([
         'prepare' => "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0",
         'db-update' => 'coolify-scan-exit db-update 0',
+        'disk' => "coolify-scan-exit disk-db 0 1000\ncoolify-scan-exit disk-sboms 0 234",
         'db-status' => "coolify-scan-exit db-status 0 90\ncoolify-scan-payload\n".json_encode(['built' => '2026-10-25T08:15:00Z', 'valid' => true]),
     ], $overrides);
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
         $key = match (true) {
             str_contains($process->command, 'docker pull') => 'prepare',
+            str_contains($process->command, 'coolify-scan-exit disk-db') => 'disk',
             str_contains($process->command, 'coolify-scan-exit db-status') => 'db-status',
             str_contains($process->command, 'coolify-scan-exit db-update') => 'db-update',
             default => null,
@@ -143,6 +149,37 @@ describe('server image scanning page', function () {
         Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'docker volume rm -f coolify-grype-db'));
         expect(Cache::has(PrepareImageScannerJob::stateCacheKey($this->server)))->toBeFalse();
     });
+
+    it('reports a failed deletion and keeps the progress when the server cannot be reached', function () {
+        Process::fake(fn () => Process::result(errorOutput: 'ssh: connect to host failed', exitCode: 255));
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
+
+        imageScanningPage()
+            ->call('deleteScannerData')
+            ->assertDispatched('error')
+            ->assertNotDispatched('success');
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('ready');
+    });
+
+    it('shows the scanner tool versions and the cached disk usage', function () {
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
+        Cache::put(PrepareImageScannerJob::diskUsedCacheKey($this->server), 1181116006);
+
+        imageScanningPage()
+            ->assertSee('Syft '.config('constants.image_scan.images.syft.version'))
+            ->assertSee('Grype '.config('constants.image_scan.images.grype.version'))
+            ->assertSee('regctl '.config('constants.image_scan.images.regctl.version'))
+            ->assertSee('Disk used by scanner data: 1.1 GB');
+    });
+
+    it('shows no disk usage before the job has stored it', function () {
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+
+        imageScanningPage()->assertDontSee('Disk used by scanner data');
+    });
 });
 
 describe('server image scanning authorization', function () {
@@ -207,6 +244,45 @@ describe('prepare image scanner job', function () {
             ->and(Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server)))->toBe('2026-10-25T08:15:00Z');
         Event::assertDispatched(ImageScanUpdated::class, 3);
         Event::assertDispatched(ImageScanUpdated::class, fn ($event) => $event->resourceUuid === $this->server->uuid && $event->scanUuid === 'prepare' && $event->teamId === $this->team->id);
+    });
+
+    it('stores the disk used by the scanner data next to the database date', function () {
+        fakeScannerPreparation();
+
+        (new PrepareImageScannerJob($this->server))->handle();
+
+        expect(Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server)))->toBe(1234);
+    });
+
+    it('is unique per server', function () {
+        expect((new PrepareImageScannerJob($this->server))->uniqueId())->toBe((string) $this->server->id)
+            ->and(new PrepareImageScannerJob($this->server))->toBeInstanceOf(ShouldBeUnique::class);
+    });
+
+    it('marks the state failed when the job fails', function () {
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'pulling');
+
+        (new PrepareImageScannerJob($this->server))->failed(new RuntimeException('killed'));
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('failed');
+    });
+
+    it('forgets the state when scanning was turned off during the database update', function () {
+        Process::fake(function (PendingProcess $process) {
+            if (str_contains($process->command, 'coolify-scan-exit db-update')) {
+                $this->server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
+
+                return Process::result(output: 'coolify-scan-exit db-update 0');
+            }
+
+            return Process::result(output: str_contains($process->command, 'docker pull')
+                ? "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0"
+                : '');
+        });
+
+        (new PrepareImageScannerJob($this->server))->handle();
+
+        expect(Cache::has(PrepareImageScannerJob::stateCacheKey($this->server)))->toBeFalse();
     });
 
     it('uses the database URL of the instance', function () {
@@ -308,6 +384,29 @@ describe('create server image scanning choice', function () {
         expect($server)->not->toBeNull()
             ->and($server->settings->is_image_scan_enabled)->toBeTrue();
         Queue::assertNothingPushed();
+    });
+
+    it('turns scanning on for a server created by a provider flow', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/ssh_keys' => Http::response(['ssh_key' => ['id' => 42, 'fingerprint' => 'ff:ff']], 201),
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response(['ssh_keys' => []], 200),
+            'https://api.hetzner.cloud/v1/servers' => Http::response([
+                'server' => ['id' => 777, 'status' => 'running', 'public_net' => ['ipv4' => ['ip' => '203.0.113.30']]],
+            ], 201),
+        ]);
+        $token = CloudProviderToken::create(['team_id' => $this->team->id, 'provider' => 'hetzner', 'token' => 'test-hetzner-token', 'name' => 'Test token']);
+
+        Livewire::test(ByHetzner::class, ['selectedTokenUuid' => $token->uuid])
+            ->set('server_name', 'scan-hetzner')
+            ->set('selected_location', 'fsn1')
+            ->set('selected_server_type', 'cx22')
+            ->set('selected_image', 114690387)
+            ->set('private_key_id', $this->privateKey->id)
+            ->set('scan_images', 'on')
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        expect(Server::query()->where('ip', '203.0.113.30')->firstOrFail()->settings->is_image_scan_enabled)->toBeTrue();
     });
 
     it('keeps scanning off when the choice is off', function () {

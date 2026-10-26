@@ -106,12 +106,12 @@ class ServerImageScanning extends Component
         try {
             $this->ensureManagedHere();
             $commands = new ScannerCommands($this->server, Str::lower(Str::random(24)));
-            instant_remote_process($commands->deleteScannerData(), $this->server, throwError: false, timeout: 120);
+            instant_remote_process($commands->deleteScannerData(), $this->server, throwError: true, timeout: 120);
             PrepareImageScannerJob::forget($this->server);
             $this->auditImageScanning('image_scanner_data_deleted');
             $this->dispatch('success', 'Scanner data deleted.');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            return handleError($e, $this, 'Could not delete the scanner data.');
         }
     }
 
@@ -147,12 +147,17 @@ class ServerImageScanning extends Component
         $state = Cache::get(PrepareImageScannerJob::stateCacheKey($this->server));
         $builtAt = Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server));
         $failedStep = Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server));
+        $diskUsed = Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server));
 
         return view('livewire.image-scan.server-image-scanning', [
             'allowed' => (bool) InstanceSettings::get()->is_image_scanning_allowed,
             'enabled' => (bool) $this->server->settings->is_image_scan_enabled,
             'prepareState' => is_string($state) ? $state : null,
             'failedStep' => is_string($failedStep) ? $failedStep : null,
+            'diskUsed' => is_int($diskUsed) ? formatBytes($diskUsed, 1) : null,
+            'toolVersions' => collect(['syft' => 'Syft', 'grype' => 'Grype', 'regctl' => 'regctl'])
+                ->map(fn (string $name, string $tool) => $name.' '.config("constants.image_scan.images.{$tool}.version"))
+                ->implode(', '),
             'builtAt' => is_string($builtAt) ? CarbonImmutable::parse($builtAt) : null,
         ]);
     }

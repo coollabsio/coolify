@@ -35,6 +35,7 @@ function scannerCommandLists(ScannerCommands $commands): array
         'dbStatus' => $commands->dbStatus(),
         'inspect' => $commands->inspect('localhost:5000/team/app:1.2'),
         'diskFree' => $commands->diskFree(),
+        'diskUsage' => $commands->diskUsage(),
         'sbomFromLocal' => $commands->sbomFromLocal('nginx', SCANNER_TEST_HEX),
         'sbomFromRegistry' => $commands->sbomFromRegistry('ghcr.io/a/b@sha256:'.str_repeat('ab', 32), 'linux/amd64', 'cand-'.SCANNER_TEST_HEX, null),
         'sbomFromRegistry with auth' => $commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/arm64/v8', 'cand-1', $auth),
@@ -368,4 +369,26 @@ it('ignores payload lines that look like exit markers', function () {
         'sizes' => ['grype' => 9],
         'payload' => "coolify-scan-exit grype 0 9\n{}",
     ]);
+});
+
+it('prints the bytes used by the database volume and the SBOM directory as markers', function () {
+    $commands = $this->commands->diskUsage();
+
+    expect($commands)->toHaveCount(3)
+        ->and($commands[1])->toContain('coolify-scan-exit disk-db 0')->toContain('docker volume inspect -f')->toContain('coolify-grype-db')
+        ->and($commands[2])->toContain('coolify-scan-exit disk-sboms 0')->toContain("'/data/coolify/image-scans'");
+
+    $parsed = ScannerCommands::parseOutput("coolify-scan-exit disk-db 0 1048576\ncoolify-scan-exit disk-sboms 0 0");
+
+    expect($parsed['sizes'])->toBe(['disk-db' => 1048576, 'disk-sboms' => 0]);
+});
+
+it('runs the disk usage check as one sudo shell script per line for a non-root SSH user', function () {
+    $commands = $this->commands->diskUsage();
+    $parsed = parseCommandsByLineForSudo(collect($commands), $this->server);
+
+    foreach (array_slice($parsed, 1, null, true) as $index => $line) {
+        expect($line)->toBe('sudo '.$commands[$index])
+            ->and(substr_count($line, 'sudo'))->toBe(1);
+    }
 });
