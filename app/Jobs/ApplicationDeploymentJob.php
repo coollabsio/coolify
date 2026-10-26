@@ -23,6 +23,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -51,6 +52,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, EnvironmentVariableAnalyzer, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
     public const BUILD_TIME_ENV_PATH = '/artifacts/build-time.env';
+
+    private const BUILD_FINGERPRINT_LABEL = 'coolify.build-fingerprint';
 
     public const BUILD_TIME_SHELL_ENV_PATH = '/artifacts/build-time-shell.env';
 
@@ -102,6 +105,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private bool $force_rebuild;
 
     private bool $restart_only;
+
+    private ?string $docker_compose_build_fingerprint = null;
 
     private ?string $dockerImage = null;
 
@@ -253,7 +258,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->force_rebuild = true;
         }
         $this->restart_only = $this->application_deployment_queue->restart_only;
-        $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
+        // These build packs need the cloned repository to start, so a restart runs a regular deployment.
+        // The deployment skips the build when the image for the commit exists.
+        $this->restart_only = $this->restart_only && ! in_array($this->application->build_pack, ['dockerimage', 'dockerfile', 'dockercompose'], true);
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
         $this->dockerImagePreviewTag = $this->application_deployment_queue->docker_registry_image_tag;
         $this->validateDockerRegistryImageConfiguration();
@@ -822,6 +829,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
 
         $this->loadComposeFileForDeployment();
+        $buildEnvironment = null;
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
@@ -853,6 +861,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $composeFile = $this->add_build_secrets_to_compose($composeFile);
             }
 
+            $buildEnvironment = $this->generate_buildtime_environment_variables();
+            $this->docker_compose_build_fingerprint = $this->docker_compose_build_fingerprint($buildEnvironment);
+            $composeFile = $this->add_build_fingerprint_to_compose(convertToArray($composeFile));
+
             $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
         $this->generated_docker_compose = $yaml;
@@ -865,13 +877,55 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'hidden' => true,
         ]);
 
+        if ($this->can_reuse_docker_compose_images($composeFile)) {
+            $this->skip_build = true;
+        } else {
+            $this->build_docker_compose_images($composeFile, $buildEnvironment);
+        }
+
+        // Save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
+
+        $this->pull_docker_compose_images();
+
+        $this->stop_running_container(force: true);
+        $this->application_deployment_queue->addLogEntry('Starting new application.');
+        $networkId = $this->application->uuid;
+        if ($this->pull_request_id !== 0) {
+            $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
+        }
+        if ($this->server->isSwarm()) {
+            // TODO
+        } else {
+            $this->execute_remote_command([
+                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true",
+                'hidden' => true,
+                'ignore_errors' => true,
+            ], [
+                "docker network connect {$networkId} coolify-proxy >/dev/null 2>&1 || true",
+                'hidden' => true,
+                'ignore_errors' => true,
+            ]);
+        }
+
+        $this->start_docker_compose_services();
+
+        $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    /**
+     * Builds the images of the Compose services that have a build section.
+     */
+    private function build_docker_compose_images(mixed $composeFile, ?Collection $buildEnvironment): void
+    {
         // Modify Dockerfiles for ARGs and build secrets
         $this->modify_dockerfiles_for_compose($composeFile);
         // Build new container to limit downtime.
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
         // Save build-time .env file BEFORE the build
-        $this->save_buildtime_environment_variables();
+        $this->save_buildtime_environment_variables($buildEnvironment);
 
         if ($this->docker_compose_custom_build_command) {
             // Auto-inject -f (compose file) and --env-file flags using helper function
@@ -935,36 +989,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
             );
         }
-
-        // Save runtime environment variables AFTER the build
-        // This overwrites the build-time .env with ALL variables (build-time + runtime)
-        $this->save_runtime_environment_variables();
-
-        $this->pull_docker_compose_images();
-
-        $this->stop_running_container(force: true);
-        $this->application_deployment_queue->addLogEntry('Starting new application.');
-        $networkId = $this->application->uuid;
-        if ($this->pull_request_id !== 0) {
-            $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
-        }
-        if ($this->server->isSwarm()) {
-            // TODO
-        } else {
-            $this->execute_remote_command([
-                "docker network inspect '{$networkId}' >/dev/null 2>&1 || docker network create --attachable '{$networkId}' >/dev/null || true",
-                'hidden' => true,
-                'ignore_errors' => true,
-            ], [
-                "docker network connect {$networkId} coolify-proxy >/dev/null 2>&1 || true",
-                'hidden' => true,
-                'ignore_errors' => true,
-            ]);
-        }
-
-        $this->start_docker_compose_services();
-
-        $this->application_deployment_queue->addLogEntry('New container started.');
     }
 
     /**
@@ -1576,6 +1600,87 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         return false;
+    }
+
+    /**
+     * Hash of every input that changes a Compose build: the build settings, the resolved build-time
+     * variables (with domains, shared variables, and secrets), and the variables of the build command.
+     * The hash goes on the built images as a label, so a later deployment can see what an image was built from.
+     */
+    private function docker_compose_build_fingerprint(Collection $buildEnvironment): string
+    {
+        $buildSettings = collect((new ApplicationConfigurationSnapshot($this->application))->toArray()['sections'])
+            ->flatMap(fn (array $section) => $section['items'])
+            ->where('impact', 'build')
+            ->mapWithKeys(fn (array $item) => [$item['key'] => $item['compare_value']]);
+
+        return hash('sha256', json_encode([$buildSettings, $buildEnvironment->values(), $this->coolify_variables]));
+    }
+
+    private function add_build_fingerprint_to_compose(array $composeFile): array
+    {
+        foreach ($composeFile['services'] ?? [] as $serviceName => $service) {
+            if (! isset($service['build'])) {
+                continue;
+            }
+            if (is_string($service['build'])) {
+                $service['build'] = ['context' => $service['build']];
+            }
+            $labels = $service['build']['labels'] ?? [];
+            if (array_is_list($labels)) {
+                $labels[] = self::BUILD_FINGERPRINT_LABEL.'='.$this->docker_compose_build_fingerprint;
+            } else {
+                $labels[self::BUILD_FINGERPRINT_LABEL] = $this->docker_compose_build_fingerprint;
+            }
+            $service['build']['labels'] = $labels;
+            $composeFile['services'][$serviceName] = $service;
+        }
+
+        return $composeFile;
+    }
+
+    /**
+     * Whether every Compose service with a build section has an image on the server for this commit
+     * that was built from the same inputs, so the deployment can start it without a build.
+     * Only images tagged by the parser with the commit qualify: an image name set in the Compose
+     * file can hold an older build.
+     */
+    private function can_reuse_docker_compose_images(mixed $composeFile): bool
+    {
+        if ($this->force_rebuild
+            || $this->use_build_server
+            || $this->pull_request_id !== 0
+            || $this->application->settings->is_raw_compose_deployment_enabled
+            || $this->docker_compose_custom_build_command
+            || blank($this->docker_compose_build_fingerprint)
+            || blank($this->commit)
+            || $this->commit === 'HEAD') {
+            return false;
+        }
+
+        $images = collect(data_get($composeFile, 'services', []))
+            ->filter(fn ($service) => data_get($service, 'build') !== null)
+            ->map(fn ($service, $name) => [data_get($service, 'image'), "{$this->application->uuid}_{$name}:{$this->commit}"]);
+        if ($images->isEmpty() || $images->contains(fn (array $image) => $image[0] !== $image[1])) {
+            return false;
+        }
+
+        $imageNames = $images->map(fn (array $image) => escapeshellarg($image[1]))->implode(' ');
+        $format = escapeshellarg('{{ index .Config.Labels "'.self::BUILD_FINGERPRINT_LABEL.'" }}');
+        $this->execute_remote_command([
+            "docker image inspect --format {$format} {$imageNames} 2>/dev/null",
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => 'compose_image_fingerprints',
+        ]);
+        $fingerprints = $this->trimmedSavedOutput('compose_image_fingerprints')->explode("\n")->map(fn (string $line) => trim($line));
+        if ($fingerprints->count() !== $images->count() || $fingerprints->contains(fn (string $fingerprint) => $fingerprint !== $this->docker_compose_build_fingerprint)) {
+            return false;
+        }
+
+        $this->application_deployment_queue->addLogEntry('Images found with the same Git Commit SHA and build inputs. Build step skipped.');
+
+        return true;
     }
 
     private function has_remote_buildtime_secret_references(): bool
@@ -2587,9 +2692,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $variables->reject(fn ($value, $key): bool => str_contains((string) $key, '.'));
     }
 
-    private function save_buildtime_environment_variables()
+    private function save_buildtime_environment_variables(?Collection $environment_variables = null)
     {
-        $environment_variables = $this->generate_buildtime_environment_variables();
+        $environment_variables ??= $this->generate_buildtime_environment_variables();
         [$shell_environment_variables, $dotted_environment_variables] = $environment_variables->partition(function (string $environmentVariable): bool {
             [$key] = explode('=', $environmentVariable, 2);
 
