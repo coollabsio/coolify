@@ -1288,6 +1288,43 @@ Relevant classes:
 Create a page-specific grid class when columns differ. Add responsive rules
 that hide secondary columns before allowing horizontal overflow.
 
+### Severity badge, severity bar, and vulnerability marker
+
+Image scan findings use three shared pieces in
+`resources/views/components/image-scan/`. All three keep the status badge rule:
+the surface stays neutral and only a small mark carries the color, and the
+severity word is always in the text, so color is never the only signal.
+
+Severity tokens live in `app.css`, with a light value in `@theme` and a dark
+value in `.dark`. They are OKLCH only and never follow the accent or
+`--color-warning`, because the custom theme recolors both.
+
+| Severity | Dot color | Why |
+|---|---|---|
+| critical | `--color-error` (`bg-error`) | the existing error red |
+| high | `--color-severity-high` (orange) | between error red and warning yellow |
+| medium | `--color-severity-medium` (sky blue) | not yellow like warnings, not purple like the accent |
+| low, unknown | neutral | no urgency |
+
+- Every severity dot clears 3:1 (non-text contrast) on the badge background in
+  both themes, and medium is more than 10 ΔE (OKLab ×100) from the accent and
+  the warning color. `tests/Unit/ImageScan/SeverityTokenContrastTest.php`
+  enforces both. Change a token and run it.
+- `<x-image-scan.severity-badge severity="critical" :count="2" />` renders
+  `x-status-badge` with the types `severity-critical`, `severity-high`,
+  `severity-medium`, or `severity-low` (unknown is neutral). The label is
+  `2 critical`, or `Critical` (sentence case) when `count` is null.
+- `<x-image-scan.severity-bar :counts="[...]" />` is a 6px, fully rounded bar
+  with 1px gaps. Segment widths are proportional. It shows fixable-now counts
+  only (critical, high, medium), has `role="img"` and an `aria-label` such as
+  `Fixable now: 2 critical, 5 high, 0 medium`, never animates, and renders
+  nothing when all counts are 0. Do not add a legend: the label is the legend.
+- `<x-image-scan.marker :count="2" :label="'2 critical, 5 high with a fix.'" />`
+  is the resource vulnerability marker for lists and headers: a `shield-alert`
+  icon with the count, in the normal text color, not red. `label` is both
+  `aria-label` and `data-tooltip`. It renders nothing when the count is 0, so a
+  clean or unscanned resource shows no marker.
+
 ---
 
 ### Domain rows on mobile
@@ -1452,6 +1489,7 @@ Use these as implementation references:
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
 | Empty state | `resources/views/components/empty.blade.php` |
 | Status pill | `resources/views/components/status-badge.blade.php` |
+| Severity badge, severity bar, vulnerability marker | `resources/views/components/image-scan/` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
 | Command palette / global search | `resources/views/livewire/global-search.blade.php` |

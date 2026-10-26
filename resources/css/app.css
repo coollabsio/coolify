@@ -36,6 +36,13 @@
     --color-warning-900: oklch(42.1% 0.0897 57.71);
     --color-success: oklch(72.27% 0.192 149.58);
     --color-error: oklch(57.71% 0.2152 27.33);
+    /* Vulnerability severity. Critical uses --color-error; low and unknown are
+       neutral. These two never follow the accent or --color-warning (the custom
+       theme recolors both): high is orange, medium is sky blue, so neither reads
+       as the yellow warning or the purple accent. Light values here, dark
+       values in .dark. */
+    --color-severity-high: oklch(56% 0.135 50);
+    --color-severity-medium: oklch(55% 0.1 235);
     --color-coollabs-50: oklch(96.33% 0.0206 301.15);
     --color-coollabs: oklch(49.65% 0.2709 289.33);
     --color-coollabs-100: oklch(52.34% 0.287 289.16);
@@ -1408,6 +1415,8 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
        (4.10/3.75/3.53). Brightened for dark mode so text-error clears AA on the
        card ladder while staying unmistakably red. */
     --color-error: oklch(66% 0.2 27.33);
+    --color-severity-high: oklch(74% 0.15 55);
+    --color-severity-medium: oklch(76% 0.11 230);
 }
 
 /* Light-mode semantic text.
