@@ -35,6 +35,8 @@ class FakeBrowserUserAgentTrafficClient extends SentinelTrafficClient
 }
 
 beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
+
     $this->stack = seedBrowserResourceStack();
 
     $server = $this->stack['server'];
