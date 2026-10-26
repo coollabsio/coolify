@@ -36,6 +36,10 @@
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
             @endif
+            @if ($sameAsProduction)
+                <span class="table-badge shrink-0"
+                    title="This preview variable has the same value as the production variable with the same key.">Same as production</span>
+            @endif
             @if ($composeInfo)
                 <span class="table-badge shrink-0"
                     title="Used by Compose services: {{ implode(', ', $composeInfo['services']) }}">Used by Compose</span>

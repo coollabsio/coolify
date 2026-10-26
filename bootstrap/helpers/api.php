@@ -207,6 +207,7 @@ function sharedDataApplications(?Application $application = null): array
         'is_env_sorting_enabled' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
+        'use_production_values_in_previews' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
@@ -483,6 +484,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_env_sorting_enabled');
     $request->offsetUnset('redact_all_env_values_in_logs');
     $request->offsetUnset('is_pr_deployments_public_enabled');
+    $request->offsetUnset('use_production_values_in_previews');
     $request->offsetUnset('stop_grace_period');
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');

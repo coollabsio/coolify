@@ -2451,9 +2451,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * IDs of preview variables that have the same value as the production variable with the same key.
-     * Coolify copies each new production variable to the previews. With public PR deployments, a
-     * preview can run code from a fork, so it gets only the preview values that the user changed.
+     * IDs of preview variables that still have the production value, which this preview deployment skips.
+     * With public PR deployments, a preview can run code from a fork. With "Use production values in
+     * previews" off, the user does not want production values in previews at all. In both cases a
+     * preview gets only the preview values that the user changed.
      *
      * @return array<int, int>
      */
@@ -2463,16 +2464,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->previewVariableIdsWithProductionValues;
         }
 
-        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled) {
+        $settings = $this->application->settings;
+        if ($this->pull_request_id === 0 || ($settings->use_production_values_in_previews && ! $settings->is_pr_deployments_public_enabled)) {
             return $this->previewVariableIdsWithProductionValues = [];
         }
 
-        $productionValues = $this->application->environment_variables()->get()->pluck('value', 'key');
-
-        return $this->previewVariableIdsWithProductionValues = $this->application->environment_variables_preview()->get()
-            ->filter(fn (EnvironmentVariable $env) => $productionValues->has($env->key) && $productionValues->get($env->key) === $env->value)
-            ->pluck('id')
-            ->all();
+        return $this->previewVariableIdsWithProductionValues = $this->application->previewEnvironmentVariableIdsWithProductionValues();
     }
 
     /**

@@ -54,6 +54,7 @@ function recommendedApplicationSettingsPayload(): array
         'include_source_commit_in_build' => true,
         'is_env_sorting_enabled' => true,
         'is_pr_deployments_public_enabled' => true,
+        'use_production_values_in_previews' => false,
         'stop_grace_period' => 45,
         'docker_images_to_keep' => 7,
         'is_gzip_enabled' => false,

@@ -1202,6 +1202,29 @@ class Application extends BaseModel
             ");
     }
 
+    /**
+     * IDs of preview variables that have the same value as the production variable with the same key.
+     * Coolify copies each new production variable to the previews, so these still hold the production value.
+     * Empty values do not count, because they hold no production data.
+     *
+     * @return array<int, int>
+     */
+    public function previewEnvironmentVariableIdsWithProductionValues(): array
+    {
+        $productionValues = $this->environment_variables()->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value))
+            ->pluck('value', 'key');
+
+        if ($productionValues->isEmpty()) {
+            return [];
+        }
+
+        return $this->environment_variables_preview()->whereIn('key', $productionValues->keys())->get()
+            ->filter(fn (EnvironmentVariable $env) => $productionValues->get($env->key) === $env->value)
+            ->pluck('id')
+            ->all();
+    }
+
     public function runtime_environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')

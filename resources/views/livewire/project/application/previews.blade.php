@@ -92,6 +92,12 @@
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
                     ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
             </div>
+            <div class="w-full">
+                <x-forms.checkbox instantSave="savePreviewSettings" id="useProductionValuesInPreviews" fullWidth
+                    label="Use production values in previews"
+                    helper="When on, a new environment variable gets the same value in previews as in production.<br><br>When off, its preview copy is empty, and previews do not get preview variables that still have the production value. Use this when untrusted code can run in previews (for example, branches that cannot be merged, or bot PRs), or when production secrets must not reach previews. Existing preview values do not change."
+                    :disabled="! $canUpdate" />
+            </div>
         </x-application.settings-section>
     @endif
 
