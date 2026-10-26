@@ -395,6 +395,24 @@ describe('ignore list', function () {
         expect(ImageScanIgnore::query()->whereKey($this->appIgnore->id)->exists())->toBeFalse();
     });
 
+    it('links team-wide ignores to the team settings only for the session team with team-wide access', function () {
+        scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
+            ->assertSee('Team settings');
+
+        $ownTeam = Team::factory()->create();
+        $this->admin->teams()->attach($ownTeam, ['role' => 'owner']);
+        scanSettingsAs($this->admin->fresh(), $ownTeam, 'application', $this->application->uuid)
+            ->assertSee('CVE-2024-11111')
+            ->assertDontSee('Team settings');
+
+        $limited = scanSettingsMember($this->team, 'member', [
+            ['scope' => 'resource', 'uuid' => $this->application->uuid, 'levels' => ['read', 'write']],
+        ]);
+        scanSettingsAs($limited, $this->team, 'application', $this->application->uuid)
+            ->assertSee('CVE-2024-11111')
+            ->assertDontSee('Team settings');
+    });
+
     it('queues a refresh of the team counts after a team-wide ignore is removed', function () {
         Queue::fake();
 

@@ -21,6 +21,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
@@ -367,6 +368,24 @@ describe('topbar warning', function () {
 
         Livewire::test(Heading::class, ['application' => $this->application])
             ->assertDontSeeHtml('data-image-scan-gate');
+    });
+
+    it('reads no deployment when the instance does not allow scanning', function () {
+        surfacesDeployment(['scan_gate_result' => surfacesBlockedResult()]);
+        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
+        Once::flush();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $component = Livewire::test(Heading::class, ['application' => $this->application]);
+
+        DB::enableQueryLog();
+        $gate = $component->instance()->imageScanGate();
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        expect($gate)->toBeNull()
+            ->and($queries->filter(fn (string $query) => str_contains($query, 'application_deployment_queues')))->toBeEmpty();
+        $component->assertDontSeeHtml('data-image-scan-gate');
     });
 
     it('ignores blocked preview deployments', function () {

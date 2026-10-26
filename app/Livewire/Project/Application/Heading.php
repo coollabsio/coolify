@@ -166,6 +166,10 @@ class Heading extends Component
     #[Computed]
     public function imageScanGate(): ?array
     {
+        if (! instanceSettings()->is_image_scanning_allowed) {
+            return null;
+        }
+
         $deployment = ApplicationDeploymentQueue::query()
             ->where('application_id', $this->application->id)
             ->where('pull_request_id', 0)

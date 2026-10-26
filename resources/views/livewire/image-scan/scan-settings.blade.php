@@ -99,10 +99,12 @@
                             </div>
                             <div class="flex justify-end">
                                 @if ($isApplication && $isTeamWide)
-                                    <a href="{{ route('team.image-scanning') }}" wire:navigate
-                                        class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 hover:bg-neutral-100 dark:text-fg-dim dark:hover:bg-white/[0.06]">
-                                        Team settings
-                                    </a>
+                                    @if ($showsTeamSettingsLink)
+                                        <a href="{{ route('team.image-scanning') }}" wire:navigate
+                                            class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 hover:bg-neutral-100 dark:text-fg-dim dark:hover:bg-white/[0.06]">
+                                            Team settings
+                                        </a>
+                                    @endif
                                 @elseif ($canEdit)
                                     <x-modal-confirmation title="Remove this ignore?"
                                         submitAction="removeIgnore('{{ $ignore->uuid }}')" :actions="[

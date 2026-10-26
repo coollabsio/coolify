@@ -10,6 +10,7 @@ use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\Server;
 use App\Models\Team;
+use App\Services\Access\AccessResolver;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResourceScans;
 use Illuminate\Contracts\View\View;
@@ -337,6 +338,19 @@ class ScanSettings extends Component
         };
     }
 
+    /**
+     * The team settings page opens the session team, so the link is shown only when that is the team of the
+     * application and the user can open team-wide pages.
+     */
+    private function showsTeamSettingsLink(?Model $scope): bool
+    {
+        $teamId = $scope instanceof Application ? $scope->team()?->id : null;
+
+        return $teamId !== null
+            && currentTeam()?->id === $teamId
+            && app(AccessResolver::class)->coversWholeTeam(auth()->user(), $teamId);
+    }
+
     public function render(): View
     {
         $scope = $this->loadScope();
@@ -353,6 +367,7 @@ class ScanSettings extends Component
             'appScanOn' => $scope instanceof Application ? (bool) $scope->settings?->is_image_scan_enabled : true,
             'isDockerImage' => $scope instanceof Application && $scope->build_pack === 'dockerimage',
             'showsIgnores' => $scope instanceof Team || $scope instanceof Application,
+            'showsTeamSettingsLink' => $this->showsTeamSettingsLink($scope),
             'ignores' => $this->ignores($scope),
         ]);
     }
