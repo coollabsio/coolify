@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://github.com/grocy/grocy
 # slogan: Grocy is a web-based household management and grocery list application.
 # category: productivity
@@ -8,7 +7,7 @@
 
 services:
   grocy:
-    image: lscr.io/linuxserver/grocy:4.6.0
+    image: lscr.io/linuxserver/grocy:4.7.1
     environment:
       - SERVICE_URL_GROCY
       - PUID=1000

@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://appwrite.io/docs
 # slogan: A backend-as-a-service platform that simplifies the web & mobile app development.
 # category: backend
@@ -8,7 +7,7 @@
 
 services:
   appwrite:
-    image: appwrite/appwrite:2.5.0
+    image: appwrite/appwrite:2.6.1
     environment:
       - SERVICE_URL_APPWRITE=/v1
       - _APP_DNS_EXTERNAL=${_APP_DNS_EXTERNAL}
@@ -99,6 +98,7 @@ services:
       - _APP_STORAGE_LIMIT=${_APP_STORAGE_LIMIT:-30000000}
       - _APP_STORAGE_PREVIEW_LIMIT=${_APP_STORAGE_PREVIEW_LIMIT:-20000000}
       - _APP_AUTOGRAVITY_HOST=${_APP_AUTOGRAVITY_HOST}
+      - _APP_EXIFTOOL_HOST=${_APP_EXIFTOOL_HOST:-http://appwrite-exiftool:8080}
       - _APP_STORAGE_ANTIVIRUS=${_APP_STORAGE_ANTIVIRUS:-disabled}
       - _APP_STORAGE_ANTIVIRUS_HOST=${_APP_STORAGE_ANTIVIRUS_HOST}
       - _APP_STORAGE_ANTIVIRUS_PORT=${_APP_STORAGE_ANTIVIRUS_PORT:-3310}
@@ -108,6 +108,7 @@ services:
       - _APP_STORAGE_S3_REGION=${_APP_STORAGE_S3_REGION:-us-east-1}
       - _APP_STORAGE_S3_BUCKET=${_APP_STORAGE_S3_BUCKET}
       - _APP_STORAGE_S3_ENDPOINT=${_APP_STORAGE_S3_ENDPOINT}
+      - _APP_STORAGE_S3_PATH_STYLE=${_APP_STORAGE_S3_PATH_STYLE}
       - _APP_STORAGE_DO_SPACES_ACCESS_KEY=${_APP_STORAGE_DO_SPACES_ACCESS_KEY}
       - _APP_STORAGE_DO_SPACES_SECRET=${_APP_STORAGE_DO_SPACES_SECRET}
       - _APP_STORAGE_DO_SPACES_REGION=${_APP_STORAGE_DO_SPACES_REGION:-us-east-1}
@@ -176,6 +177,10 @@ services:
       - _APP_VCS_BITBUCKET_WEBHOOK_SECRET=${_APP_VCS_BITBUCKET_WEBHOOK_SECRET}
       - _APP_VCS_ORIGIN_CLIENT_ID=${_APP_VCS_ORIGIN_CLIENT_ID}
       - _APP_VCS_ORIGIN_PRIVATE_KEY=${_APP_VCS_ORIGIN_PRIVATE_KEY}
+      - _APP_VCS_ENTIRE_PLUGIN=${_APP_VCS_ENTIRE_PLUGIN}
+      - _APP_VCS_ENTIRE_PRIVATE_KEY=${_APP_VCS_ENTIRE_PRIVATE_KEY}
+      - _APP_VCS_ENTIRE_ISSUER=${_APP_VCS_ENTIRE_ISSUER}
+      - _APP_VCS_ENTIRE_ENDPOINT=${_APP_VCS_ENTIRE_ENDPOINT}
       - _APP_VCS_WEBHOOK_URL=${_APP_VCS_WEBHOOK_URL}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_ID=${_APP_MIGRATIONS_FIREBASE_CLIENT_ID}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET=${_APP_MIGRATIONS_FIREBASE_CLIENT_SECRET}
@@ -212,19 +217,21 @@ services:
         condition: service_healthy
       appwrite-geo:
         condition: service_healthy
+      appwrite-exiftool:
+        condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost/v1/health/version || exit 1"]
+      test: ["CMD-SHELL", "test -f /tmp/.appwrite-ready && curl -fsS -o /dev/null http://localhost/v1/health/version || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 6
       start_period: 120s
 
   appwrite-console:
-    image: appwrite/new:1.2.74-self-hosted
+    image: appwrite/new:1.2.97-self-hosted
     environment:
       - SERVICE_URL_APPWRITE_3000=/
       - VITE_CONSOLE_PROFILE=self-hosted
-      - VITE_APPWRITE_VERSION=2.5.0
+      - VITE_APPWRITE_VERSION=2.6.1
       - APPWRITE_ENDPOINT_SAME_ORIGIN=true
     depends_on:
       appwrite:
@@ -236,7 +243,7 @@ services:
       retries: 3
 
   appwrite-realtime:
-    image: appwrite/appwrite:2.5.0
+    image: appwrite/appwrite:2.6.1
     entrypoint: realtime
     environment:
       - SERVICE_URL_APPWRITE=/v1/realtime
@@ -294,7 +301,7 @@ services:
       retries: 3
 
   appwrite-worker:
-    image: appwrite/appwrite:2.5.0
+    image: appwrite/appwrite:2.6.1
     entrypoint: worker
     environment:
       - _APP_ENV=${_APP_ENV:-production}
@@ -309,9 +316,10 @@ services:
       - _APP_MAINTENANCE_RETENTION_USAGE_TTL=${_APP_MAINTENANCE_RETENTION_USAGE_TTL:-180}
       - _APP_STATS_USAGE_QUEUE_NAME=${_APP_STATS_USAGE_QUEUE_NAME:-v1-stats-usage}
       - _APP_STATS_RESOURCES_QUEUE_NAME=${_APP_STATS_RESOURCES_QUEUE_NAME:-v1-stats-resources}
+      - _APP_MAINTENANCE_QUEUE_NAME=${_APP_MAINTENANCE_QUEUE_NAME:-v1-maintenance}
       - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL:-3600}
       - _APP_WORKERS_NUM=1
-      - _APP_WORKER_MAX_COROUTINES=78
+      - _APP_WORKER_MAX_COROUTINES=79
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-security@appwrite.io}
@@ -364,6 +372,7 @@ services:
       - _APP_STORAGE_S3_REGION=${_APP_STORAGE_S3_REGION:-us-east-1}
       - _APP_STORAGE_S3_BUCKET=${_APP_STORAGE_S3_BUCKET}
       - _APP_STORAGE_S3_ENDPOINT=${_APP_STORAGE_S3_ENDPOINT}
+      - _APP_STORAGE_S3_PATH_STYLE=${_APP_STORAGE_S3_PATH_STYLE}
       - _APP_STORAGE_DO_SPACES_ACCESS_KEY=${_APP_STORAGE_DO_SPACES_ACCESS_KEY}
       - _APP_STORAGE_DO_SPACES_SECRET=${_APP_STORAGE_DO_SPACES_SECRET}
       - _APP_STORAGE_DO_SPACES_REGION=${_APP_STORAGE_DO_SPACES_REGION:-us-east-1}
@@ -409,6 +418,10 @@ services:
       - _APP_VCS_BITBUCKET_WEBHOOK_SECRET=${_APP_VCS_BITBUCKET_WEBHOOK_SECRET}
       - _APP_VCS_ORIGIN_CLIENT_ID=${_APP_VCS_ORIGIN_CLIENT_ID}
       - _APP_VCS_ORIGIN_PRIVATE_KEY=${_APP_VCS_ORIGIN_PRIVATE_KEY}
+      - _APP_VCS_ENTIRE_PLUGIN=${_APP_VCS_ENTIRE_PLUGIN}
+      - _APP_VCS_ENTIRE_PRIVATE_KEY=${_APP_VCS_ENTIRE_PRIVATE_KEY}
+      - _APP_VCS_ENTIRE_ISSUER=${_APP_VCS_ENTIRE_ISSUER}
+      - _APP_VCS_ENTIRE_ENDPOINT=${_APP_VCS_ENTIRE_ENDPOINT}
       - _APP_VCS_WEBHOOK_URL=${_APP_VCS_WEBHOOK_URL}
       - _APP_BUILDS_VOLUME=${COMPOSE_PROJECT_NAME}_appwrite-builds
       - _APP_JOBS_HOST=${_APP_JOBS_HOST:-http://orchestrator:8080}
@@ -463,7 +476,7 @@ services:
       retries: 3
 
   appwrite-task-scheduler:
-    image: appwrite/appwrite:2.5.0
+    image: appwrite/appwrite:2.6.1
     entrypoint: schedule
     environment:
       - _APP_ENV=${_APP_ENV:-production}
@@ -476,6 +489,7 @@ services:
       - _APP_MAINTENANCE_RETENTION_USAGE_TTL=${_APP_MAINTENANCE_RETENTION_USAGE_TTL:-180}
       - _APP_STATS_USAGE_QUEUE_NAME=${_APP_STATS_USAGE_QUEUE_NAME:-v1-stats-usage}
       - _APP_STATS_RESOURCES_QUEUE_NAME=${_APP_STATS_RESOURCES_QUEUE_NAME:-v1-stats-resources}
+      - _APP_MAINTENANCE_QUEUE_NAME=${_APP_MAINTENANCE_QUEUE_NAME:-v1-maintenance}
       - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL:-3600}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
       - _APP_WORKER_MAX_COROUTINES=8
@@ -500,6 +514,7 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_POSTGRES
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_FUNCTIONS_SCHEDULE_SPREAD=${_APP_FUNCTIONS_SCHEDULE_SPREAD:-0}
+      - _APP_MAINTENANCE_INACTIVE_INTERVAL=${_APP_MAINTENANCE_INACTIVE_INTERVAL:-604800}
     depends_on:
       appwrite-postgresql:
         condition: service_healthy
@@ -512,7 +527,7 @@ services:
       retries: 3
 
   appwrite-task-maintenance:
-    image: appwrite/appwrite:2.5.0
+    image: appwrite/appwrite:2.6.1
     entrypoint: maintenance
     environment:
       - _APP_ENV=${_APP_ENV:-production}
@@ -559,7 +574,7 @@ services:
       retries: 3
 
   appwrite-task-interval:
-    image: appwrite/appwrite:2.5.0
+    image: appwrite/appwrite:2.6.1
     entrypoint: interval
     environment:
       - _APP_ENV=${_APP_ENV:-production}
@@ -618,6 +633,15 @@ services:
       - 8.8.8.8
     exclude_from_hc: true
 
+  appwrite-exiftool:
+    image: ghcr.io/appwrite/exiftool:0.1.0
+    healthcheck:
+      test: ["CMD", "healthcheck"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   openruntimes-executor:
     image: openruntimes/executor:1.1.2
     hostname: openruntimes-executor
@@ -651,7 +675,7 @@ services:
       start_period: 10s
 
   orchestrator:
-    image: ghcr.io/open-runtimes/orchestrator/orchestrator:2.2.2
+    image: ghcr.io/open-runtimes/orchestrator/orchestrator:2.2.4
     hostname: orchestrator
     user: root
     environment:
@@ -674,6 +698,7 @@ services:
 
   appwrite-postgresql:
     image: appwrite/postgres:0.1.0
+    shm_size: 1g
     environment:
       - POSTGRES_DB=${_APP_DB_SCHEMA:-appwrite}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES

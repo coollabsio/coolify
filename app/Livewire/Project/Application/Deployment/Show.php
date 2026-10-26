@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application\Deployment;
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\EnvironmentVariable;
 use App\Traits\AuditsApplicationSettings;
 use Livewire\Component;
 
@@ -34,20 +35,20 @@ class Show extends Component
         ];
     }
 
-    public function mount()
+    public function mount(string $project_uuid, string $environment_uuid, string $application_uuid, string $deployment_uuid)
     {
-        $deploymentUuid = request()->route('deployment_uuid');
+        $deploymentUuid = $deployment_uuid;
 
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', $project_uuid)->first();
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
+        $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
         if (! $environment) {
             abort(404);
         }
         $environment->load(['applications']);
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
+        $application = $environment->applications->where('uuid', $application_uuid)->first();
         if (! $application) {
             return redirect()->route('dashboard');
         }
@@ -69,6 +70,34 @@ class Show extends Component
             ? false
             : $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
+    }
+
+    /**
+     * Swap the logs viewer to another deployment of this application without a page load.
+     */
+    public function selectDeployment(string $deploymentUuid): void
+    {
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)
+            ->where('application_id', $this->application->id)
+            ->first();
+        if (! $deployment) {
+            return;
+        }
+
+        $this->application_deployment_queue = $deployment;
+        $this->deployment_uuid = $deploymentUuid;
+        $this->horizon_job_status = $deployment->getHorizonJobStatus();
+        $this->isKeepAliveOn();
+
+        $this->dispatch('deploymentSelected', deploymentUuid: $deploymentUuid)->to(Index::class);
+
+        $url = route('project.application.deployment.show', [
+            'project_uuid' => $this->application->environment->project->uuid,
+            'environment_uuid' => $this->application->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+            'deployment_uuid' => $deploymentUuid,
+        ]);
+        $this->js('history.replaceState(history.state, "", '.json_encode($url).')');
     }
 
     public function toggleDebug()
@@ -116,25 +145,57 @@ class Show extends Component
         return decode_remote_command_output($this->application_deployment_queue);
     }
 
+    /**
+     * The displayed log lines that match the search, with secrets hidden.
+     */
+    public function exportLogs(bool $withTimestamps = true, string $search = ''): string
+    {
+        $this->authorize('view', $this->application);
+
+        $search = mb_strtolower(trim($search));
+        $lines = $this->logLines
+            ->map(fn (array $line): array => [
+                'timestamp' => $line['timestamp'],
+                'text' => $this->exportLineText($line),
+            ])
+            ->filter(fn (array $line): bool => $search === '' || str_contains(mb_strtolower($line['timestamp'].' '.$line['text']), $search))
+            ->map(fn (array $line): string => $withTimestamps ? $line['timestamp'].' '.$line['text'] : $line['text'])
+            ->join("\n");
+
+        return sanitizeLogsForExport($lines, $this->logRedactionSecrets());
+    }
+
+    /**
+     * Every log line, also the debug lines, with secrets hidden.
+     */
     public function downloadAllLogs(): string
     {
         $this->authorize('update', $this->application);
 
         $logs = decode_remote_command_output($this->application_deployment_queue, includeAll: true)
-            ->map(function ($line) {
-                $prefix = '';
-                if ($line['hidden']) {
-                    $prefix = '[DEBUG] ';
-                }
-                if (isset($line['command']) && $line['command']) {
-                    $prefix .= '[CMD]: ';
-                }
-
-                return $line['timestamp'].' '.$prefix.trim($line['line']);
-            })
+            ->map(fn (array $line): string => $line['timestamp'].' '.($line['hidden'] ? '[DEBUG] ' : '').$this->exportLineText($line))
             ->join("\n");
 
-        return sanitizeLogsForExport($logs);
+        return sanitizeLogsForExport($logs, $this->logRedactionSecrets());
+    }
+
+    /**
+     * @param  array{line: string, command?: bool|null}  $line
+     */
+    private function exportLineText(array $line): string
+    {
+        return (! empty($line['command']) ? '[CMD]: ' : '').trim($line['line']);
+    }
+
+    /**
+     * @return array{known: list<string>, locked: list<string>}
+     */
+    private function logRedactionSecrets(): array
+    {
+        return EnvironmentVariable::logRedactionSecretsFor(
+            $this->application,
+            includePreview: (int) $this->application_deployment_queue->pull_request_id !== 0,
+        );
     }
 
     public function render()

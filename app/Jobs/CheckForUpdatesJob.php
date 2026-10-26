@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -21,15 +22,18 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
         $this->cdnTries = $cdnTries;
     }
 
-    public function handle(): void
+    /**
+     * @return bool Whether the check finished and new_version_available is up to date
+     */
+    public function handle(): bool
     {
         try {
             if (isDev() || isCloud()) {
-                return;
+                return false;
             }
             $versions = refresh_versions_file($this->cdnTries);
             if ($versions === null) {
-                return;
+                return false;
             }
 
             CheckTraefikVersionJob::dispatch();
@@ -37,8 +41,12 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             $latestVersion = data_get($versions, 'coolify.v4.version');
             $newVersionAvailable = version_compare($latestVersion, config('constants.coolify.version'), '>');
             instanceSettings()->update(['new_version_available' => $newVersionAvailable]);
+
+            return true;
         } catch (\Throwable $e) {
-            // Consider implementing a notification to administrators
+            Log::warning('Could not check for Coolify updates', ['error' => $e->getMessage()]);
+
+            return false;
         }
     }
 }

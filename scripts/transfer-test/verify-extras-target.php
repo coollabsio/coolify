@@ -42,6 +42,9 @@ $sourceAppId = trim((string) @file_get_contents('/tmp/source-app-id'));
 $sameInstanceId = $sourceAppId === (string) config('app.id');
 $check('DNS ownership '.($sameInstanceId ? 'kept (same instance ID, no adoption needed)' : 'dropped (fake token cannot adopt)'), $record?->owned === $sameInstanceId);
 
+$ssh = ManagedDnsRecord::where('name', 'ssh-debian.example.test')->first();
+$check('tunnel SSH DNS record moved with the server', $ssh?->references()->where('resource_type', $server?->getMorphClass())->where('resource_id', $server?->id)->exists() === true && $ssh->owned === $sameInstanceId);
+
 $githubApp = GithubApp::where('name', 'fake-gh-app')->first();
 $runner = GithubRunnerConfig::where('server_id', $server?->id)->first();
 $check('GitHub App moved (only the runner config uses it)', $githubApp !== null && $githubApp->organization === 'fake-org');

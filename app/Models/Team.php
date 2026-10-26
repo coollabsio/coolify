@@ -60,17 +60,20 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'custom_server_limit',
         'is_mcp_server_enabled',
         'is_build_server_fallback_enabled',
+        'is_two_factor_required',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
         'is_build_server_fallback_enabled' => true,
+        'is_two_factor_required' => false,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
         'is_build_server_fallback_enabled' => 'boolean',
+        'is_two_factor_required' => 'boolean',
     ];
 
     protected static function booted()
@@ -80,7 +83,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::updating(function ($team) {
-            if (auth()->user()?->isMember()) {
+            if (auth()->user()?->roleInTeam($team->id) === 'member') {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
@@ -158,7 +161,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             return true;
         }
         $serverLimit = Team::serverLimit($team);
-        $servers = $team->servers()->count();
+        $servers = $team->managedServers()->count();
 
         return $servers >= $serverLimit;
     }
@@ -192,7 +195,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function serverOverflow()
     {
-        if (Team::serverLimit($this) < $this->servers->count()) {
+        if (Team::serverLimit($this) < $this->managedServers()->count()) {
             return true;
         }
 
@@ -390,6 +393,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function servers()
     {
         return $this->hasMany(Server::class);
+    }
+
+    /**
+     * Servers that use a server slot. Archives of transferred servers are left out.
+     */
+    public function managedServers()
+    {
+        return $this->servers()->notTransferredAway();
     }
 
     public function usesSwarm(): bool

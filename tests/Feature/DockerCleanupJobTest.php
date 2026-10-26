@@ -5,6 +5,7 @@ use App\Events\DockerCleanupDone;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledJobManager;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\DockerCleanupExecution;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -521,10 +522,10 @@ it('scans application images with a fixed number of remote commands and keeps th
         ->and($removals)->toHaveCount(1);
 
     $removal = $removals->first();
-    foreach (["{$app->uuid}:v1", "{$app->uuid}:v3", "{$app->uuid}:pr-7", "{$app->uuid}:v1-build", "{$app->uuid}_web:v1"] as $deleted) {
+    foreach (["{$app->uuid}:v1", "{$app->uuid}:v3", "{$app->uuid}:pr-7", "{$app->uuid}:v1-build"] as $deleted) {
         expect($removal)->toContain("'{$deleted}'");
     }
-    foreach (["{$app->uuid}:v2'", "{$app->uuid}:v4'", "{$app->uuid}:v2-build", "{$app->uuid}:v4-build", "{$app->uuid}/other"] as $kept) {
+    foreach (["{$app->uuid}:v2'", "{$app->uuid}:v4'", "{$app->uuid}:v2-build", "{$app->uuid}:v4-build", "{$app->uuid}_web:v1", "{$app->uuid}/other"] as $kept) {
         expect($removal)->not->toContain($kept);
     }
 });
@@ -660,3 +661,163 @@ it('keeps an application image name with a single quote inside the grep pattern'
     expect(file_exists($marker))->toBeFalse()
         ->and(explode("\n", $output))->toBe(['rmi postgres:16']);
 })->with(['root user' => false, 'non-root user' => true]);
+
+function dockerCleanupDeployment(Server $server, string $status, string $column = 'server_id', ?Carbon $updatedAt = null): void
+{
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => '1',
+        'deployment_uuid' => 'deployment-'.str()->random(8),
+        'status' => $status,
+        $column => $server->id,
+    ]);
+    if ($updatedAt) {
+        $deployment->forceFill(['updated_at' => $updatedAt])->saveQuietly();
+    }
+}
+
+it('skips a forced scheduled cleanup while a deployment is queued or running on the server, so the build cache is not pruned', function (string $status, string $column) {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => true]);
+    dockerCleanupDeployment($server, $status, $column);
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    $execution = DockerCleanupExecution::query()->sole();
+    expect($commands->contains(fn (string $command) => str_contains($command, 'prune')))->toBeFalse()
+        ->and($execution->status)->toBe('success')
+        ->and($execution->message)->toContain('skipped')
+        ->and($execution->finished_at)->not->toBeNull();
+})->with([
+    'running on the server' => ['in_progress', 'server_id'],
+    'queued on the server' => ['queued', 'server_id'],
+    'building on the server' => ['in_progress', 'build_server_id'],
+]);
+
+it('runs a forced scheduled cleanup when the only deployments are finished, on another server, or stuck', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => true, 'dynamic_timeout' => 3600]);
+    dockerCleanupDeployment($server, 'finished');
+    dockerCleanupDeployment(dockerCleanupReachableServer(), 'in_progress');
+    dockerCleanupDeployment($server, 'in_progress', updatedAt: now()->subSeconds(3601));
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeTrue()
+        ->and(DockerCleanupExecution::query()->sole()->message)->toContain('Forced Docker cleanup');
+});
+
+it('runs a manual cleanup while a deployment is running, because the user started it', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh(), true))->handle();
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeTrue();
+});
+
+it('does not clean after a stop while a deployment is running on the server', function () {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['docker_cleanup_threshold' => 10]);
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = dockerCleanupFakeProcesses();
+
+    expect(CleanupDocker::run($server->fresh(), false, false, true))->toBe([])
+        ->and($commands)->toBeEmpty()
+        ->and(Cache::has(CleanupDocker::lastRunCacheKey($server)))->toBeFalse();
+});
+
+/**
+ * Runs a cleanup with the given `docker ps` and `docker images` output and returns the image
+ * removal commands.
+ *
+ * @param  array<int, string>  $containers  name#image lines
+ * @param  array<int, string>  $images  repository#tag#created lines
+ * @return Collection<int, string>
+ */
+function dockerCleanupImageRemovals(Server $server, array $containers, array $images): Collection
+{
+    $commands = collect();
+    Process::fake(function ($process) use ($commands, $containers, $images) {
+        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands->push($command);
+
+        return match (true) {
+            str_contains($command, 'docker ps -a --format') => Process::result(output: implode("\n", $containers)),
+            str_contains($command, "docker images --format '{{.Repository}}#") => Process::result(output: implode("\n", $images)),
+            default => Process::result(output: ''),
+        };
+    });
+
+    CleanupDocker::run($server);
+
+    return $commands->filter(fn (string $command) => str_contains($command, 'docker rmi \''))->values();
+}
+
+function dockerCleanupApplication(Server $server): Application
+{
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $server->team_id]);
+    $environment = $project->environments()->first() ?? Environment::factory()->create(['project_id' => $project->id]);
+
+    return Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
+it('keeps the images of each Docker Compose service separately, so a new build of one service does not remove the build of another', function () {
+    $server = dockerCleanupReachableServer();
+    $app = dockerCleanupApplication($server);
+    $app->settings()->update(['docker_images_to_keep' => 1]);
+
+    $containers = [];
+    $images = [];
+    foreach (['web', 'api', 'worker'] as $service) {
+        $containers[] = "{$service}-{$app->uuid}-123456789#{$app->uuid}_{$service}:old";
+        $images[] = "{$app->uuid}_{$service}#oldest#2026-01-01 00:00:00 +0000 UTC";
+        $images[] = "{$app->uuid}_{$service}#old#2026-01-02 00:00:00 +0000 UTC";
+        $images[] = "{$app->uuid}_{$service}#new#2026-01-03 00:00:00 +0000 UTC";
+    }
+
+    $removals = dockerCleanupImageRemovals($server, $containers, $images);
+
+    expect($removals)->toHaveCount(1);
+    foreach (['web', 'api', 'worker'] as $service) {
+        expect($removals->first())->toContain("'{$app->uuid}_{$service}:oldest'")
+            ->not->toContain("{$app->uuid}_{$service}:new")
+            ->not->toContain("{$app->uuid}_{$service}:old'");
+    }
+});
+
+it('keeps the images of an application while it deploys, because its new images are not used by a container yet', function (string $status) {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['disable_application_image_retention' => true]);
+    $deploying = dockerCleanupApplication($server);
+    $idle = dockerCleanupApplication($server);
+    ApplicationDeploymentQueue::create([
+        'application_id' => (string) $deploying->id,
+        'deployment_uuid' => 'deployment-'.str()->random(8),
+        'status' => $status,
+        'server_id' => $server->id,
+    ]);
+
+    $removals = dockerCleanupImageRemovals($server, [], [
+        "{$deploying->uuid}_api#new#2026-01-03 00:00:00 +0000 UTC",
+        "{$deploying->uuid}#new#2026-01-03 00:00:00 +0000 UTC",
+        "{$idle->uuid}#old#2026-01-01 00:00:00 +0000 UTC",
+    ]);
+
+    expect($removals)->toHaveCount(1)
+        ->and($removals->first())->toContain("'{$idle->uuid}:old'")
+        ->not->toContain($deploying->uuid);
+})->with(['queued', 'in_progress']);

@@ -16,8 +16,8 @@ const CSS = `
     --cv-line: var(--coollabs-hairline, light-dark(#e5e5e5, rgb(255 255 255 / 0.08)));
     --cv-input-bg: light-dark(#fafafa, rgb(255 255 255 / 0.04));
     --cv-input-line: light-dark(#e5e5e5, rgb(255 255 255 / 0.08));
-    --cv-brand: light-dark(var(--color-coollabs), var(--color-warning));
-    --cv-brand-text: var(--cv-brand);
+    --cv-brand: light-dark(var(--color-coollabs), var(--color-brand));
+    --cv-brand-text: light-dark(var(--color-coollabs), var(--color-brand-light));
     position: absolute; inset: 0; z-index: 10;
     display: grid; grid-template-columns: 15.5rem minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
     gap: 8px; padding: 8px;
@@ -95,11 +95,20 @@ const CSS = `
   .cv-item:focus-visible { outline: none; }
   .cv-item:focus-visible i { outline: 1px solid var(--color-accent, currentColor); outline-offset: 2px; }
   .cv-item:active i { transform: translateY(2px); box-shadow: none; }
+  /* Appearance → Style → Flat: no ledge, lift, or press, like app.css .button. */
+  html[data-nav-items="flat"] .cv-item i { --cv-depth: transparent; transform: none; }
   .cv-item b { display: block; font-size: 13px; font-weight: 500; }
   .cv-item small { display: block; color: var(--cv-subtle); font-size: 11.5px; }
 
   /* Canvas island */
   .cv-stage { position: relative; overflow: hidden; border: 0; background: transparent; }
+  /* Wide screens: the canvas fills the whole area to the screen edges and the
+     Steps panel floats over it, so cards slide under the panel, not cut off. */
+  @media (min-width: 768px) {
+    .cv-stage { grid-column: 1 / -1; grid-row: -2 / -1; margin: 0 -8px -8px; }
+    .cv-docked .cv-stage { margin-top: -8px; }
+    .cv-palette { grid-column: 1; grid-row: -2 / -1; position: relative; z-index: 15; box-shadow: 0 16px 40px -20px rgb(0 0 0 / 0.35); }
+  }
   .cv-viewport {
     position: absolute; inset: 0; cursor: grab; touch-action: none;
     /* The dots are on .cv-root, so the viewport has none of its own. */

@@ -70,16 +70,15 @@ function customThemeAccent() {
     return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// A custom theme can be light or dark: it sets only the cursor accent, and the page brightness picks the text colors.
 function createSystemTerminalTheme() {
-    if (document.documentElement.dataset.theme === 'custom') {
-        return createApplicationTerminalTheme(customThemeAccent());
-    }
+    const isCustomTheme = document.documentElement.dataset.theme === 'custom';
 
     if (document.documentElement.classList.contains('dark')) {
-        return createApplicationTerminalTheme('#8C8E9C');
+        return createApplicationTerminalTheme(isCustomTheme ? customThemeAccent() : '#8C8E9C');
     }
 
-    return createApplicationTerminalTheme('#52525b', {
+    return createApplicationTerminalTheme(isCustomTheme ? customThemeAccent() : '#52525b', {
         black: '#18181b',
         red: '#dc2626',
         green: '#15803d',
@@ -89,6 +88,12 @@ function createSystemTerminalTheme() {
         cyan: '#0e7490',
         white: '#52525b',
         brightBlack: '#71717a',
+        brightRed: '#b91c1c',
+        brightGreen: '#166534',
+        brightYellow: '#854d0e',
+        brightBlue: '#1d4ed8',
+        brightMagenta: '#7e22ce',
+        brightCyan: '#155e75',
         brightWhite: '#18181b',
         foreground: '#18181b',
     });

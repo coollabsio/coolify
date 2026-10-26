@@ -217,9 +217,9 @@
                 </form>
                 @can('update', $server)
                     <x-process-dialog @sysbox-install-started.window="processDialogOpen = true" closeWithX size="xl">
-                        <x-slot:title>Install Sysbox</x-slot:title>
+                        <x-slot:title>Sysbox Installation Logs</x-slot:title>
                         <x-slot:content>
-                            <livewire:activity-monitor header="Logs" fullHeight />
+                            <livewire:activity-monitor fullHeight />
                         </x-slot:content>
                     </x-process-dialog>
                 @endcan

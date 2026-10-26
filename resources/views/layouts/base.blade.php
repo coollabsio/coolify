@@ -6,8 +6,16 @@
         // The OS color picker only speaks hex. Convert it once so the whole theme
         // cascade is authored in OKLCH (sRGB -> linear -> OKLab -> OKLCH).
         const srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        // localStorage can hold values from older versions or manual edits, so accept
+        // only #rgb / #rrggbb and fall back to the default color for anything else.
+        window.normalizeThemeColor = (color) => {
+            const hex = String(color ?? '').trim().replace(/^#/, '').toLowerCase();
+            if (/^[a-f\d]{6}$/.test(hex)) return `#${hex}`;
+            if (/^[a-f\d]{3}$/.test(hex)) return `#${hex.replace(/./g, '$&$&')}`;
+            return '#6b16ed';
+        };
         window.hexToOklch = (hex) => {
-            const [r, g, b] = hex.match(/[a-f\d]{2}/gi).map((channel) => srgbToLinear(parseInt(channel, 16) / 255));
+            const [r, g, b] = window.normalizeThemeColor(hex).match(/[a-f\d]{2}/gi).map((channel) => srgbToLinear(parseInt(channel, 16) / 255));
             const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
             const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
             const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
@@ -20,7 +28,7 @@
             return `oklch(${(okL * 100).toFixed(2)}% ${chroma.toFixed(4)} ${hue.toFixed(2)})`;
         };
         window.themeAccentForeground = (color) => {
-            const channels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
+            const channels = window.normalizeThemeColor(color).match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
             const luminance = channels
                 .map(channel => channel / 255)
                 .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
@@ -28,55 +36,251 @@
 
             return luminance > 0.179 ? 'oklch(0% 0 0)' : 'oklch(100% 0 0)';
         };
+        // Custom theme: four colors. Its share code is "#sidebar,#selected,#accent,#background".
+        // Every text color is derived from the color under it, so text stays readable.
+        const strictHex = (color) => {
+            const hex = String(color ?? '').trim().replace(/^#/, '').toLowerCase();
+            if (/^[a-f\d]{6}$/.test(hex)) return `#${hex}`;
+            if (/^[a-f\d]{3}$/.test(hex)) return `#${hex.replace(/./g, '$&$&')}`;
+            return null;
+        };
+        const relativeLuminance = (hex) => hex.match(/[a-f\d]{2}/gi)
+            .map((channel) => srgbToLinear(parseInt(channel, 16) / 255))
+            .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+        const mixHex = (from, to, amount) => `#${[1, 3, 5].map((offset) => {
+            const start = parseInt(from.slice(offset, offset + 2), 16);
+            const end = parseInt(to.slice(offset, offset + 2), 16);
+            return Math.round(start + (end - start) * amount).toString(16).padStart(2, '0');
+        }).join('')}`;
+        // True when light text has more contrast on this color than dark text (WCAG ratios).
+        window.isDarkColor = (hex) => {
+            const luminance = relativeLuminance(window.normalizeThemeColor(hex));
+            return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / (relativeLuminance('#18181b') + 0.05);
+        };
+        window.readableTextOn = (hex) => window.isDarkColor(hex) ? '#f4f4f5' : '#18181b';
+        window.customThemeKeys = ['sidebar', 'selected', 'accent', 'background'];
+        window.serializeCustomTheme = (theme) => window.customThemeKeys.map((key) => theme[key]).join(',');
+        // A theme from a share code, or null when the text is not four hex colors.
+        window.parseCustomTheme = (code) => {
+            const colors = String(code ?? '').split(/[\s,]+/).filter(Boolean).map(strictHex);
+            if (colors.length !== 4 || colors.includes(null)) return null;
+            return Object.fromEntries(window.customThemeKeys.map((key, index) => [key, colors[index]]));
+        };
+        // The saved theme. Older versions saved one color and a light/dark mode; build the four colors from them.
+        window.storedCustomTheme = () => {
+            const saved = window.parseCustomTheme(localStorage.customTheme);
+            if (saved) return saved;
+            const accent = window.normalizeThemeColor(localStorage.themeColor);
+            return localStorage.customMode === 'light'
+                ? { sidebar: mixHex('#f4f4f5', accent, 0.06), selected: mixHex('#ffffff', accent, 0.16), accent, background: mixHex('#fafafa', accent, 0.03) }
+                : { sidebar: mixHex('#0c0c0e', accent, 0.1), selected: mixHex('#1c1c1f', accent, 0.3), accent, background: mixHex('#0f0f11', accent, 0.12) };
+        };
+        window.customThemePresets = [
+            // The built-in Dark theme, not a custom theme. Its colors start the fields when the user edits it. The sidebar is
+            // the color that the Dark sidebar shows: #120e1a with its 9% purple wash.
+            { name: 'Coolify', theme: null, swatch: { sidebar: '#1a0f2d', selected: '#1c1c1c', accent: '#6b16ed', background: '#0a0a0a' } },
+            { name: 'Midnight', theme: { sidebar: '#0f172a', selected: '#2e4a7d', accent: '#f2458f', background: '#1a2338' } },
+            { name: 'Forest', theme: { sidebar: '#12342b', selected: '#2c6e57', accent: '#f4b860', background: '#1b2a25' } },
+            { name: 'Ember', theme: { sidebar: '#3b1410', selected: '#8f2d1f', accent: '#ffb86b', background: '#241816' } },
+            { name: 'Slate', theme: { sidebar: '#2b3038', selected: '#4a5361', accent: '#6cc4f5', background: '#353b45' } },
+            { name: 'Nord', theme: { sidebar: '#2e3440', selected: '#4c566a', accent: '#88c0d0', background: '#3b4252' } },
+            { name: 'Dracula', theme: { sidebar: '#21222c', selected: '#44475a', accent: '#bd93f9', background: '#282a36' } },
+            { name: 'GitHub Dark', theme: { sidebar: '#010409', selected: '#21262d', accent: '#2f81f7', background: '#0d1117' } },
+            { name: 'Aubergine', theme: { sidebar: '#3f0e40', selected: '#1164a3', accent: '#1164a3', background: '#ffffff' } },
+            { name: 'GitHub Light', theme: { sidebar: '#f6f8fa', selected: '#dde4ec', accent: '#0969da', background: '#ffffff' } },
+            { name: 'Paper', theme: { sidebar: '#ebe6da', selected: '#d9d1bf', accent: '#c2410c', background: '#f7f4ec' } },
+            { name: 'Blossom', theme: { sidebar: '#fde8f1', selected: '#f9c4dc', accent: '#d61f69', background: '#fff7fa' } },
+        ];
+        // Sets the variables that app.css derives the custom theme from. The sidebar gets its own
+        // light/dark scheme (data-sidebar-scheme) when it differs from the page.
+        window.applyCustomTheme = (theme) => {
+            const root = document.documentElement;
+            const isDark = window.isDarkColor(theme.background);
+            const sidebarIsDark = window.isDarkColor(theme.sidebar);
+            Object.entries({
+                '--theme-bg': theme.background,
+                '--theme-text': window.readableTextOn(theme.background),
+                '--theme-light': isDark ? '0' : '1',
+                '--theme-sidebar': theme.sidebar,
+                '--theme-sidebar-text': window.readableTextOn(theme.sidebar),
+                '--theme-sidebar-light': sidebarIsDark ? '0' : '1',
+                '--theme-selected': theme.selected,
+                '--theme-selected-text': window.readableTextOn(theme.selected),
+                '--theme-base-color': window.hexToOklch(theme.accent),
+                '--theme-accent-foreground': window.themeAccentForeground(theme.accent),
+            }).forEach(([name, value]) => root.style.setProperty(name, value));
+            root.dataset.theme = 'custom';
+            root.classList.toggle('dark', isDark);
+            if (sidebarIsDark === isDark) {
+                delete root.dataset.sidebarScheme;
+            } else {
+                root.dataset.sidebarScheme = sidebarIsDark ? 'dark' : 'light';
+            }
+            document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme.background);
+        };
         window.applyStoredTheme = () => {
+            const root = document.documentElement;
             const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
-            const themeColor = localStorage.themeColor || '#6b16ed';
-            const customMode = localStorage.customMode || 'dark';
-            document.documentElement.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
-            document.documentElement.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
-            const isDark = theme === 'dark'
-                || (theme === 'custom' && customMode === 'dark')
-                || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-
+            root.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
+            root.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
             localStorage.theme = theme;
-            document.documentElement.classList.toggle('dark', isDark);
-            document.documentElement.dataset.theme = theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-            document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(themeColor));
-            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(themeColor));
+            if (localStorage.themeColor) localStorage.themeColor = window.normalizeThemeColor(localStorage.themeColor);
+            if (theme === 'custom') {
+                window.applyCustomTheme(window.storedCustomTheme());
+                return;
+            }
+
+            const isDark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+            root.classList.toggle('dark', isDark);
+            root.dataset.theme = isDark ? 'dark' : 'light';
+            delete root.dataset.sidebarScheme;
+            root.style.setProperty('--theme-base-color', window.hexToOklch(localStorage.themeColor));
+            root.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(localStorage.themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
         };
-        // Single source for the theme controls Alpine state, shared by the
-        // Appearance page and the profile dropdown via x-data="themeControls()".
+        // Time lines for chart tooltips. By default only the browser time zone is shown;
+        // the "Chart times" option on the Appearance page adds the UTC time.
+        window.chartTooltipTime = (timestamp, { seconds = true } = {}) => {
+            const format = (timeZone) => new Date(timestamp).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                ...(seconds ? { second: '2-digit' } : {}),
+                hourCycle: 'h23',
+                ...(timeZone ? { timeZone, timeZoneName: 'short' } : {}),
+            });
+            if (localStorage.getItem('chartTimes') !== 'utc') {
+                return `<div class="apexcharts-tooltip-custom-title">${format()}</div>`;
+            }
+            const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            return `<div class="apexcharts-tooltip-custom-title">Your time: ${format(localTimeZone)}</div>
+                <div class="apexcharts-tooltip-custom-title">UTC: ${format('UTC')}</div>`;
+        };
+        // Shows the tooltip at the same time on every chart of a group while one of them is hovered.
+        // ApexCharts' own chart.group needs equal widths and equal x ranges, so it does not
+        // fit side-by-side cards. Instead, replay the hover as a mouse event at the matching x.
+        // Charts can join a group from separate scripts; charts removed from the page drop out.
+        window.chartSyncGroups ??= {};
+        window.syncChartTooltips = (group, charts) => {
+            const grid = chart => chart.el.querySelector('.apexcharts-grid')?.getBoundingClientRect();
+            const hoverArea = chart => chart.el.querySelector('.apexcharts-svg');
+            const hide = chart => hoverArea(chart)?.dispatchEvent(new MouseEvent('mouseout', { clientX: 0, clientY: -1 }));
+            const peers = source => window.chartSyncGroups[group].filter(chart => chart !== source && chart.el.isConnected);
+
+            window.chartSyncGroups[group] = [
+                ...(window.chartSyncGroups[group] ?? []).filter(chart => chart.el.isConnected),
+                ...charts,
+            ];
+
+            charts.forEach(source => {
+                source.el.addEventListener('mousemove', event => {
+                    // Replayed events are untrusted; skip them so charts do not echo each other.
+                    const rect = grid(source);
+                    const { minX, maxX } = source.w.globals;
+                    if (!event.isTrusted || !rect?.width || !(maxX > minX)) {
+                        return;
+                    }
+                    // ApexCharts hides the source tooltip outside the plot grid; hide the peers too.
+                    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+                        peers(source).forEach(hide);
+                        return;
+                    }
+                    const timestamp = minX + (event.clientX - rect.left) / rect.width * (maxX - minX);
+
+                    peers(source).forEach(chart => {
+                        const target = grid(chart);
+                        const { minX: min, maxX: max } = chart.w.globals;
+                        if (!target?.width || !(max > min) || timestamp < min || timestamp > max) {
+                            hide(chart);
+                            return;
+                        }
+                        hoverArea(chart)?.dispatchEvent(new MouseEvent('mousemove', {
+                            clientX: target.left + (timestamp - min) / (max - min) * target.width,
+                            clientY: target.top + target.height / 2,
+                        }));
+                    });
+                });
+                source.el.addEventListener('mouseleave', () => peers(source).forEach(hide));
+            });
+        };
+        // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
         window.themeControls = () => ({
             theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
-            themeColor: localStorage.getItem('themeColor') || '#6b16ed',
-            customMode: localStorage.getItem('customMode') || 'dark',
+            customTheme: window.storedCustomTheme(),
             pageWidth: localStorage.getItem('pageWidth') || 'centered',
             navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
             navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
-            themeColorFrame: null,
-            pickerOpen: false,
-            init() {
-                localStorage.setItem('theme', this.theme);
-                this.applyTheme();
+            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
+            presets: window.customThemePresets,
+            // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
+            dialogOpen: false,
+            draft: null,
+            get draftColors() {
+                return this.draft ?? window.customThemePresets[0].swatch;
             },
-            chooseCustom() {
-                this.setTheme('custom');
-                this.pickerOpen = !this.pickerOpen;
-            },
+            shareCode: '',
+            shareCodeInvalid: false,
+            shareCodeCopied: false,
             setTheme(type) {
                 this.theme = type;
                 localStorage.setItem('theme', type);
-                this.applyTheme();
+                window.applyStoredTheme();
             },
-            setCustomMode(mode) {
-                this.customMode = mode;
-                localStorage.setItem('customMode', mode);
-                if (this.theme !== 'custom') {
-                    this.setTheme('custom');
+            openCustomDialog() {
+                this.setDraft(this.theme === 'custom' ? { ...this.customTheme } : null);
+                this.dialogOpen = true;
+            },
+            setDraft(theme) {
+                this.draft = theme;
+                this.shareCode = window.serializeCustomTheme(this.draftColors);
+                this.shareCodeInvalid = false;
+            },
+            setDraftColor(key, value) {
+                const theme = window.parseCustomTheme(window.serializeCustomTheme({ ...this.draftColors, [key]: value }));
+                if (theme) {
+                    this.setDraft(theme);
+                }
+            },
+            readShareCode(code) {
+                const theme = window.parseCustomTheme(code);
+                if (theme) {
+                    this.setDraft(theme);
                     return;
                 }
-                this.applyTheme();
+                this.shareCodeInvalid = code.trim() !== '';
+            },
+            async copyShareCode() {
+                try {
+                    await navigator.clipboard.writeText(this.shareCode);
+                    this.shareCodeCopied = true;
+                    setTimeout(() => this.shareCodeCopied = false, 1500);
+                } catch {
+                    this.$refs.shareCode?.select();
+                }
+            },
+            isDraftPreset(preset) {
+                return preset.theme === null || this.draft === null
+                    ? preset.theme === this.draft
+                    : window.serializeCustomTheme(preset.theme) === window.serializeCustomTheme(this.draft);
+            },
+            textOn(color) {
+                return window.readableTextOn(color);
+            },
+            accentTextOn(color) {
+                return window.themeAccentForeground(color);
+            },
+            saveCustomTheme() {
+                this.dialogOpen = false;
+                if (this.draft === null) {
+                    localStorage.removeItem('customTheme');
+                    this.setTheme('dark');
+                    return;
+                }
+                this.customTheme = { ...this.draft };
+                localStorage.setItem('customTheme', window.serializeCustomTheme(this.customTheme));
+                localStorage.setItem('themeColor', this.customTheme.accent);
+                this.setTheme('custom');
             },
             setWidth(width) {
                 this.pageWidth = width;
@@ -93,38 +297,9 @@
                 localStorage.setItem('navItems', style);
                 document.documentElement.dataset.navItems = style;
             },
-            previewThemeColor(color) {
-                this.themeColor = color;
-                if (this.theme !== 'custom') {
-                    this.theme = 'custom';
-                    localStorage.setItem('theme', 'custom');
-                }
-                document.documentElement.dataset.theme = 'custom';
-                document.documentElement.classList.toggle('dark', this.customMode === 'dark');
-                if (this.themeColorFrame) {
-                    return;
-                }
-                this.themeColorFrame = requestAnimationFrame(() => {
-                    document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(this.themeColor));
-                    document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
-                    this.themeColorFrame = null;
-                });
-            },
-            saveThemeColor(color) {
-                this.previewThemeColor(color);
-                localStorage.setItem('themeColor', color);
-                localStorage.setItem('theme', 'custom');
-            },
-            applyTheme() {
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const isDark = this.theme === 'dark'
-                    || (this.theme === 'custom' && this.customMode === 'dark')
-                    || (this.theme === 'system' && prefersDark);
-                document.documentElement.classList.toggle('dark', isDark);
-                document.documentElement.dataset.theme = this.theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-                document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(this.themeColor));
-                document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
-                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+            setChartTimes(value) {
+                this.chartTimes = value;
+                localStorage.setItem('chartTimes', value);
             },
         });
 
@@ -180,9 +355,10 @@
     @vite(['resources/js/app.js', 'resources/css/app.css'])
     <script>
         // Update theme-color meta tag (non-critical, can run async)
-        const t = localStorage.theme || 'dark';
-        const isDark = t === 'dark' || t === 'custom' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.getElementById('theme-color-meta')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+        const isDark = document.documentElement.classList.contains('dark');
+        document.getElementById('theme-color-meta')?.setAttribute('content', document.documentElement.dataset.theme === 'custom'
+            ? window.storedCustomTheme().background
+            : (isDark ? '#101010' : '#ffffff'));
     </script>
     <style>
         [x-cloak] {
@@ -274,7 +450,9 @@
         let theme = localStorage.theme
         let cpuColor = '#1e90ff'
         let ramColor = '#00ced1'
-        let textColor = '#ffffff'
+        // Chart text follows the CSS text color, so it stays readable after a theme change without a re-render
+        // (for example a page that Livewire restores from its cache on Back).
+        const textColor = 'currentColor'
         let editorBackground = '#181818'
         let editorTheme = 'blackboard'
 
@@ -283,19 +461,41 @@
             if (theme == 'system') {
                 theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
             }
-            if (theme == 'dark' || theme == 'custom') {
+            if (theme == 'dark' || (theme == 'custom' && document.documentElement.classList.contains('dark'))) {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
-                textColor = '#ffffff'
                 editorBackground = '#181818'
                 editorTheme = 'blackboard'
             } else {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
-                textColor = '#000000'
                 editorBackground = '#ffffff'
                 editorTheme = null
             }
+        }
+        // Chart legend in a card header: one entry per series with its last known value.
+        // items: [{ name, color, data: [[timestamp, value], ...], formatter }]
+        function renderChartLegend(element, items) {
+            if (!element) return;
+            element.replaceChildren(...items.map(({ name, color, data, formatter }) => {
+                const last = (data || []).findLast(point => point?.[1] !== null && point?.[1] !== undefined);
+                const item = document.createElement('span');
+                item.className = 'inline-flex items-center gap-1.5';
+                const dot = document.createElement('span');
+                dot.className = 'size-2 shrink-0 rounded-full';
+                dot.style.backgroundColor = color;
+                const label = document.createElement('span');
+                label.className = 'text-neutral-500 dark:text-fg-dim';
+                label.textContent = name;
+                item.append(dot, label);
+                if (last) {
+                    const value = document.createElement('span');
+                    value.className = 'font-medium tabular-nums text-black dark:text-fg';
+                    value.textContent = formatter(last[1]);
+                    item.append(value);
+                }
+                return item;
+            }));
         }
         @auth
             window.Pusher = Pusher;

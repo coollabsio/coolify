@@ -129,7 +129,7 @@
                     description="Try a different name, email address, or role." />
             </div>
 
-            <x-client-pagination x-cloak x-show="filteredMembers.length > 0"
+            <x-client-pagination total="filteredMembers.length" x-cloak x-show="filteredMembers.length > 0"
                 summary="`${firstVisibleRow}-${lastVisibleRow} of ${filteredMembers.length}`"
                 page-size-model="perPage" storage-key="coolify.page-size.team-members"
                 previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"

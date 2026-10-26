@@ -6,7 +6,7 @@
   // The server canvas (data-endpoint) reuses this view. It saves moves and links on the environment canvas of each card.
   // The shared variables and tags canvases (data-mode) reuse it too: their links add a variable or a tag to a resource.
   import { flushSync, onMount, tick } from 'svelte';
-  import { api, BOX_GAP, freeSpot, panZoom } from '../../canvas-core.js';
+  import { api, apart, BOX_GAP, freeSpot, panZoom } from '../../canvas-core.js';
   import {
     canConnect,
     canLink,
@@ -31,8 +31,10 @@
     readView,
     STATUS_CHANNELS,
     unreachableZones,
+    ZONE_PADDING,
     zoneBoxes,
     zoneGroups,
+    zoneHeader,
   } from '../../environment-canvas.js';
   import Card from './Card.svelte';
   import Deployments from './Deployments.svelte';
@@ -89,7 +91,7 @@
   const unsaved = {};
   // Saved moves stay on the canvas until a load that started after the save returns them, so an older
   // response (a poll or status refresh during the drag or the request) cannot put the cards back for a moment.
-  const settling = { positions: {}, saved: {} }; // id -> { at, after: load number the save finished at }
+  const settling = { positions: {}, saved: {}, zones: {} }; // id -> { at, after: load number the save finished at }
   let loads = 0;
   let reloadQueued = false;
   let fitted = false;
@@ -118,6 +120,9 @@
   /** Server view: key of the card's group when the card can be moved there (it is saved on its environment canvas). */
   const movableGroupOf = node => (canMoveGroups && node ? groupKey([node], node.zone) : null);
   let groupMeta = {}; // server view: frame top-left and zone inner top-left per group key (see layoutServerView)
+  // Projects, servers and dashboard canvases: admins drag the zones; each project or server saves its top-left (zone.position).
+  const canMoveZones = $derived(canEdit && !!graph?.can_move_zones);
+  let zoneOrigins = {}; // server view: top-left per zone id (see layoutServerView)
   // Environment canvas endpoints of a card (the server view has no endpoints of its own for changes).
   const environmentBase = node => (serverView
     ? `/projects/${encodeURIComponent(node?.project?.uuid || '')}/environments/${encodeURIComponent(node?.environment?.uuid || '')}/canvas`
@@ -212,14 +217,15 @@
   // so the top bar keeps only the brand and breadcrumb.
   const topbar = document.querySelector('.app-topbar');
   const floatingBar = () => desktop.matches && !!topbar && document.documentElement.dataset.navStyle === 'floating';
-  // Floating nav: the canvas fills the screen behind the top bar and the sidebar (see app.css),
-  // so fit and the side panel use only the part that the floating panels do not cover.
+  // Desktop: the canvas fills the space behind the top bar (and, with floating nav, the sidebar; see app.css),
+  // so fit and the side panel use only the part that the top bar and floating panels do not cover.
   function coveredInsets() {
     const gap = 8;
     const v = viewport.getBoundingClientRect();
     // The bottom-left controls and deployments sit below the cards; fit keeps no side space for them.
     const deploymentsRight = 0;
-    if (!floatingBar()) return { top: 0, left: Math.max(0, deploymentsRight) };
+    if (!desktop.matches || !topbar) return { top: 0, left: Math.max(0, deploymentsRight) };
+    if (!floatingBar()) return { top: Math.max(0, topbar.getBoundingClientRect().bottom + gap - v.top), left: Math.max(0, deploymentsRight) };
     // The main sidebar, and a page's fixed settings rail (server canvas) when it is on the left.
     const rail = document.querySelector('.application-settings-navigation');
     const panels = [document.querySelector('.app-sidebar > div > nav'), rail && getComputedStyle(rail).position === 'fixed' ? rail : null]
@@ -236,7 +242,7 @@
   const inControls = () => !!bar?.closest('[data-canvas-controls]');
   function alignFloatingBar() {
     if (!floatingBar()) {
-      panelTop = '';
+      panelTop = desktop.matches && topbar ? `${coveredInsets().top}px` : '';
       return;
     }
     if (inControls()) {
@@ -315,7 +321,7 @@
         clearTimeout(timers.view);
         timers.view = setTimeout(saveView, 300);
       },
-      canPan: e => !e.target.closest('[data-ec-card],[data-ec-zone-header],[data-ec-group-header],[data-ec-label],[data-ec-link],a,button,input'),
+      canPan: e => !e.target.closest('[data-ec-card],[data-ec-zone-header],[data-ec-zone-drag],[data-ec-group-header],[data-ec-label],[data-ec-link],a,button,input'),
       onPanEnd: moved => {
         if (!moved) closePanel();
       },
@@ -510,7 +516,7 @@
   }
 
   function startZoneDrag(box, header, e) {
-    if (e.button !== 0 || !canMove || e.target.closest('a')) return;
+    if (e.button !== 0 || !(canMove || canMoveZones) || e.target.closest('a,button')) return;
     e.stopPropagation();
     const ids = box.nodes.filter(id => positions[id]);
     const starts = Object.fromEntries(ids.map(id => [id, { ...positions[id] }]));
@@ -518,22 +524,44 @@
     // Zones cannot cover each other: the frame stops at the edge of another zone.
     const zone = toBox(box);
     const others = zoneBoxes(graph, positions, sizes).filter(z => z.id !== box.id).map(toBox);
-    let moved = false;
+    let moved = null; // { x, y }: how far the zone moved
     capture(header, e.pointerId);
     begin('zone');
     track(header, ev => {
       if (!moved && Math.hypot(ev.clientX - origin.cx, ev.clientY - origin.cy) < 4) return;
       const spot = freeSpot({ ...zone, x: zone.x + (ev.clientX - origin.cx) / view.z, y: zone.y + (ev.clientY - origin.cy) / view.z }, others);
       if (!spot) return;
-      moved = true;
-      const dx = spot.x - zone.x;
-      const dy = spot.y - zone.y;
-      for (const id of ids) positions[id] = { x: starts[id].x + dx, y: starts[id].y + dy };
+      moved = { x: spot.x - zone.x, y: spot.y - zone.y };
+      for (const id of ids) positions[id] = { x: starts[id].x + moved.x, y: starts[id].y + moved.y };
     }, () => {
-      if (moved) queueSave(Object.fromEntries(ids.map(id => [id, { ...positions[id] }])));
+      if (moved && canMove) queueSave(Object.fromEntries(ids.map(id => [id, { ...positions[id] }])));
+      else if (moved) saveZones(box.id, moved);
       end('zone');
     });
   }
+
+  /**
+   * Projects, servers and dashboard canvases: saves the place of a moved zone. Zones that are still placed automatically are saved where they
+   * are too, so they do not move into the space the zone left.
+   */
+  async function saveZones(id, delta) {
+    const saved = Object.fromEntries(Object.entries(zoneOrigins)
+      .filter(([zoneId]) => zoneId === id || !isPlaced(full.zones.find(z => z.id === zoneId)?.position))
+      .map(([zoneId, at]) => [zoneId, zoneId === id ? { x: Math.round(at.x + delta.x), y: Math.round(at.y + delta.y) } : at]));
+    hold(settling.zones, saved);
+    try {
+      await api('PATCH', `${base}/positions`, { positions: saved });
+      settle(settling.zones, saved);
+    } catch (e) {
+      release(settling.zones, saved);
+      if (destroyed) return;
+      toast(e.message, true);
+      load({ quiet: true });
+      return;
+    }
+    if (!destroyed) applyGraph(full);
+  }
+  const isPlaced = p => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 
   /** Server view: drag a project / environment group inside its server zone; it cannot cover another group. */
   function startGroupDrag(frame, header, e) {
@@ -544,7 +572,18 @@
     const starts = Object.fromEntries(ids.map(id => [id, { ...positions[id] }]));
     const box = toBox(frame);
     const others = frames.filter(f => f !== frame && f.zone === frame.zone).map(toBox);
-    const fits = b => b.x >= meta.inner.x && b.y >= meta.inner.y;
+    // Movable zones can sit anywhere, so the group's zone must not grow over another zone.
+    const otherZones = canMoveZones ? boxes.filter(z => z.id !== frame.zone).map(toBox) : [];
+    const top = ZONE_PADDING + zoneHeader(boxes.find(z => z.id === frame.zone)?.zone);
+    const zoneAround = b => {
+      const all = [...others, b];
+      const x = Math.min(...all.map(f => f.x));
+      const y = Math.min(...all.map(f => f.y));
+      const w = Math.max(...all.map(f => f.x + f.w)) - x;
+      const h = Math.max(...all.map(f => f.y + f.h)) - y;
+      return { x: x - ZONE_PADDING, y: y - top, w: w + ZONE_PADDING * 2, h: h + ZONE_PADDING + top };
+    };
+    const fits = b => b.x >= meta.inner.x && b.y >= meta.inner.y && otherZones.every(z => apart(zoneAround(b), z, BOX_GAP));
     const origin = { cx: e.clientX, cy: e.clientY };
     let moved = false;
     capture(header, e.pointerId);
@@ -722,10 +761,12 @@
     const kept = Object.fromEntries(Object.entries(settling.positions).map(([id, s]) => [id, s.at]));
     next.positions = { ...next.positions, ...kept, ...Object.fromEntries(Object.entries(unsaved).map(([id, p]) => [id, { x: p.x, y: p.y }])) };
     if (Object.keys(settling.saved).length) next.nodes = next.nodes.map(n => (settling.saved[n.id] ? { ...n, saved: settling.saved[n.id].at } : n));
+    if (Object.keys(settling.zones).length) next.zones = next.zones.map(z => (settling.zones[z.id] ? { ...z, position: settling.zones[z.id].at } : z));
     full = next;
     const shown = groupByUse(filterGraph(next, filter));
     groupMeta = {};
-    positions = shown.layout === 'server' ? layoutServerView(shown, groupMeta) : layoutGraph(shown);
+    zoneOrigins = {};
+    positions = shown.layout === 'server' ? layoutServerView(shown, groupMeta, { zones: zoneOrigins }) : layoutGraph(shown);
     graph = shown;
     error = null;
     if (hover && !nodeById(hover)) hover = null;
@@ -910,7 +951,7 @@
       <div class="absolute top-0 left-0 origin-top-left">
         <div class="absolute top-0 left-0">
           {#each boxes as box (box.id ?? '__none')}
-            <Zone {box} movable={canMove} nodes={box.nodes.map(nodeById).filter(Boolean)} usage={usage[box.id]} onpress={(e, header) => startZoneDrag(box, header, e)} />
+            <Zone {box} movable={canMove || canMoveZones} grabBody={canMoveZones} nodes={box.nodes.map(nodeById).filter(Boolean)} usage={usage[box.id]} onpress={(e, header) => startZoneDrag(box, header, e)} />
           {/each}
         </div>
         <!-- Server view: project / environment frames inside the server zones. -->

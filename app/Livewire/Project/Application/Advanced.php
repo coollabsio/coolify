@@ -68,6 +68,8 @@ class Advanced extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $stopGracePeriod = null;
 
+    public ?int $rollingUpdateDrainSeconds = DEFAULT_ROLLING_UPDATE_DRAIN_SECONDS;
+
     #[Validate(['boolean'])]
     public bool $isBuildServerEnabled = false;
 
@@ -170,6 +172,7 @@ class Advanced extends Component
         // Load stop_grace_period separately since it has its own save handler
         // Convert null to empty string to prevent dirty detection issues
         $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
+        $this->rollingUpdateDrainSeconds = $this->application->settings->rollingUpdateDrainSeconds();
     }
 
     private function syncCertificateResolverFromModel(): void
@@ -425,6 +428,30 @@ class Advanced extends Component
 
             $this->dispatch('success', 'Stop grace period updated.');
             $this->dispatch('configurationChanged');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveRollingUpdateDrainSeconds()
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            $validated = $this->validate(
+                ['rollingUpdateDrainSeconds' => ['required', 'integer', 'min:0', 'max:'.MAX_ROLLING_UPDATE_DRAIN_SECONDS]],
+                [],
+                ['rollingUpdateDrainSeconds' => 'rolling update drain time']
+            );
+
+            $this->application->settings->rolling_update_drain_seconds = $validated['rollingUpdateDrainSeconds'];
+            $changedFields = array_keys($this->application->settings->getDirty());
+            $this->application->settings->save();
+            $this->auditSettingsUpdate($changedFields);
+
+            $this->dispatch('success', 'Rolling update drain time updated.');
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {

@@ -24,7 +24,7 @@ class FileBrowserDownloadController extends Controller
 
     public function __invoke(string $token): StreamedResponse
     {
-        /** @var array{user_id:int,resource_type:class-string,resource_id:int,server_id:int,container:string,path:string,name:string,is_dir:bool}|null $download */
+        /** @var array{user_id:int,resource_type:class-string,resource_id:int,server_id:int,container:string,path:string,name:string,is_dir:bool,use_helper?:bool}|null $download */
         $download = Cache::pull(self::cacheKey($token));
         abort_unless(is_array($download) && $download['user_id'] === auth()->id(), 404);
 
@@ -33,7 +33,7 @@ class FileBrowserDownloadController extends Controller
         Gate::authorize('view', $resource);
         abort_unless((int) $resource->environment->project->team_id === (int) auth()->user()->currentTeam()->id, 403);
 
-        $filesystem = new ContainerFilesystemService(Server::findOrFail($download['server_id']), $download['container']);
+        $filesystem = new ContainerFilesystemService(Server::findOrFail($download['server_id']), $download['container'], $download['use_helper'] ?? false);
 
         return response()->streamDownload(function () use ($filesystem, $download) {
             set_time_limit(0);

@@ -23,7 +23,8 @@
                  delay skips the overlay for fast requests. --}}
             run(label, action) {
                 const timer = setTimeout(() => this.busy = label, 150);
-                return Promise.resolve().then(action).catch(() => {}).finally(() => {
+                {{-- Start the action now: callers clear their inputs right after run(). --}}
+                return new Promise((resolve) => resolve(action())).catch(() => {}).finally(() => {
                     clearTimeout(timer);
                     this.busy = null;
                 });
@@ -52,10 +53,19 @@
 
         <x-slot:badges>
             <x-beta-badge />
+            @if ($containerRunning && $filesLoaded && count($availableContainers) > 1)
+                <div class="-my-0.5 w-full sm:w-72" wire:key="file-browser-container-{{ $container }}"
+                    x-data="{ selected: @js($container) }"
+                    x-init="$watch('selected', (name) => run('Loading files...', () => $wire.selectContainer(name)))">
+                    <x-forms.listbox id="file-browser-container" :wire="false" x-model="selected" searchable portal
+                        searchPlaceholder="Search containers"
+                        :options="collect($availableContainers)->map(fn ($name) => ['value' => $name, 'label' => $name])->all()" />
+                </div>
+            @endif
         </x-slot:badges>
 
         <x-slot:actions>
-            @if ($containerRunning && $filesLoaded)
+            @if ($containerRunning && $filesLoaded && ! $shellUnavailable)
                 <input type="file" class="hidden" x-ref="uploadInput"
                     @change="if ($event.target.files.length) { uploadFile($event.target.files[0]); $event.target.value = '' }" />
                 <x-forms.button type="button" title="Upload a file to this folder" canGate="canAccessTerminal" :canResource="$resource"
@@ -117,6 +127,14 @@
                 <x-forms.button type="button" @click="run('Loading files...', () => $wire.refresh())" title="Refresh this folder">
                     Refresh
                 </x-forms.button>
+            @elseif (! $filesLoaded && ! $loadFailed)
+                {{-- Disabled placeholders keep the header at its loaded height. --}}
+                <x-forms.button type="button" disabled>Upload</x-forms.button>
+                <x-forms.button type="button" disabled>
+                    New
+                    <x-reicon name="chevron-down" class="size-3.5" />
+                </x-forms.button>
+                <x-forms.button type="button" disabled>Refresh</x-forms.button>
             @endif
         </x-slot:actions>
 
@@ -136,6 +154,13 @@
                     <x-reicon name="folder" class="size-8" />
                 </x-slot:icon>
             </x-empty>
+        @elseif ($shellUnavailable)
+            <x-empty title="File browser is not available"
+                description="Coolify cannot open the files of this container. {{ $helperError }}">
+                <x-slot:icon>
+                    <x-reicon name="folder" class="size-8" />
+                </x-slot:icon>
+            </x-empty>
         @else
             {{-- Keep the current listing visible while an action runs: blur it
                  and show the action label (from run()) on top of it. --}}
@@ -150,33 +175,18 @@
             </div>
             <div x-bind:class="busy && 'pointer-events-none select-none blur-[2px] opacity-60'"
                 class="transition-[filter,opacity] duration-150 motion-reduce:transition-none">
-            {{-- Container picker (services / multi-container) --}}
-            @if (count($availableContainers) > 1)
-                <div class="flex flex-wrap items-center gap-2 border-b border-coollabs-hairline px-4 py-2">
-                    <span class="text-xs text-coollabs-subtle">Container</span>
-                    @foreach ($availableContainers as $name)
-                        <button type="button" x-on:click="run('Loading files...', () => $wire.selectContainer(@js($name)))"
-                            @class([
-                                'button',
-                                'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-white/[0.08] dark:text-white dark:ring-white/15' => $name === $container,
-                            ])>{{ $name }}</button>
-                    @endforeach
-                </div>
-            @endif
-
             {{-- Breadcrumb. The root crumb renders as "/" and doubles as the
                  first separator, so we only draw a slash between named segments
                  (index >= 2) - avoids the "/ /" duplicate. --}}
-            <div class="flex flex-wrap items-center gap-1 px-4 py-2 text-sm">
+            <div class="flex flex-wrap items-center px-4 py-2.5 text-sm">
                 @foreach ($this->breadcrumbs() as $crumb)
                     @if ($loop->index > 1)
                         <span class="text-coollabs-subtle">/</span>
                     @endif
                     <button type="button" x-on:click="run('Loading files...', () => $wire.goTo(@js($crumb['path'])))"
                         @class([
-                            'rounded-md px-1.5 py-0.5 hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]',
-                            'text-current font-medium' => $loop->last,
-                            'text-coollabs-subtle' => ! $loop->last,
+                            'text-current font-medium cursor-default' => $loop->last,
+                            'cursor-pointer text-coollabs-subtle underline-offset-4 hover:text-current hover:underline' => ! $loop->last,
                         ])>
                         {{ $crumb['label'] }}
                     </button>

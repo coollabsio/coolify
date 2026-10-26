@@ -109,8 +109,8 @@
             "hash": "tree-v2:be1c2def5d70383bc18e9893861ecb3f4c0418961dc381549b583a187e6b8d33"
         },
         "laravel/framework": {
-            "version": "v12.69.3",
-            "hash": "tree-v2:406d3fd2a8e434af41c60567dc3e57830cac780dab9753e854c4ccdaab71f3a7"
+            "version": "v12.70.1",
+            "hash": "tree-v2:887ff7aa405556b61e0ac51f27971b11c30f5072f83938595489fed6783f9804"
         },
         "laravel/horizon": {
             "version": "v5.50.0",

@@ -437,7 +437,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             instant_remote_process([
                 'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
-                'docker run -d --name '.escapeshellarg($containerName).' --rm -v '
+                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientRegionOption().' -v '
                     .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
                 'docker exec '.escapeshellarg($containerName).' mc alias set'.$resolveOptions.' temporary '
                     .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret),
@@ -476,6 +476,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             .' | sed -n '.escapeshellarg('s/.*"size":\([0-9][0-9]*\).*/\1/p');
 
         return 'docker run --rm --name '.escapeshellarg($containerName)
+            .' '.$s3->minioClientRegionOption()
             .' -v '.escapeshellarg($source.':/volume:ro')
             .' '.escapeshellarg($image)
             .' sh -c '.escapeshellarg($streamScript);

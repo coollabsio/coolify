@@ -60,3 +60,32 @@ it('opens a directory whose name contains an apostrophe', function () {
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'file-browser-apostrophe');
 });
+
+it('creates a file with the typed name from the New menu', function () {
+    config(['constants.ssh.mux_enabled' => false]);
+    Storage::fake('ssh-keys');
+    $this->postgres->update(['status' => 'running']);
+    $commands = [];
+    Process::fake(function ($process) use (&$commands) {
+        $commands[] = $process->command;
+
+        return Process::result(output: str_contains($process->command, 'docker inspect') ? '/data' : '');
+    });
+    loginAndSkipBoarding();
+    $url = databaseConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->postgres
+    ).'/files';
+    $page = visit($url)
+        ->assertSee('This folder is empty')
+        ->click('button:visible:has-text("New")')
+        ->click('button:visible:has-text("New file")')
+        ->fill('#newFileName', 'asd')
+        ->click('button:visible:has-text("Create file")')
+        ->assertSee('File created.')
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'file-browser-create-file');
+
+    expect(collect($commands)->contains(fn (string $command) => str_contains($command, '/data/asd')))->toBeTrue();
+});

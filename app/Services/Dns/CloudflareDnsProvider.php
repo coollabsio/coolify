@@ -4,9 +4,13 @@ namespace App\Services\Dns;
 
 use App\Enums\ManagedDnsDeletionResult;
 use App\Exceptions\DnsRecordConflictException;
+use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\DnsProviderZone;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
+use App\Models\Server;
+use App\Models\ServiceApplication;
 use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
@@ -141,6 +145,7 @@ class CloudflareDnsProvider
      */
     public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, array $additionalResources = [], ?bool $proxied = null): ManagedDnsRecord
     {
+        $this->assertResourcesManagedHere([$resource, ...$additionalResources]);
         $hostname = strtolower(rtrim($hostname, '.'));
 
         return $this->hostnameLock->run(
@@ -224,6 +229,7 @@ class CloudflareDnsProvider
         array $additionalResources = [],
         bool $proxied = false,
     ): ManagedDnsRecord {
+        $this->assertResourcesManagedHere([$resource, ...$additionalResources]);
         $hostname = strtolower(rtrim($hostname, '.'));
 
         return $this->hostnameLock->run(
@@ -291,6 +297,27 @@ class CloudflareDnsProvider
      * Deletes the provider record only when Coolify created it and it still carries Coolify's ownership comment and value.
      * Removes the local row when the provider record is gone.
      */
+    /**
+     * Another Coolify instance manages the DNS records of the resources of a transferred server.
+     *
+     * @param  array<int, Model|null>  $resources
+     *
+     * @throws RuntimeException
+     */
+    private function assertResourcesManagedHere(array $resources): void
+    {
+        foreach ($resources as $resource) {
+            $server = match (true) {
+                $resource instanceof Server => $resource,
+                $resource instanceof Application => $resource->destination?->server,
+                $resource instanceof ApplicationPreview => $resource->application?->destination?->server,
+                $resource instanceof ServiceApplication => $resource->service?->server,
+                default => null,
+            };
+            $server?->assertNotTransferredAway();
+        }
+    }
+
     public function deleteRecord(ManagedDnsRecord $record, ?Model $resource = null): ManagedDnsDeletionResult
     {
         if (! $record->owned) {

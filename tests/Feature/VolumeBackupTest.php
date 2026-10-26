@@ -1976,7 +1976,7 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
     [$application, $volume] = createVolumeBackupApplication($team);
     $s3Storage = S3Storage::create([
         'name' => 'Streaming destination',
-        'region' => 'us-east-1',
+        'region' => 'ru-central-1',
         'key' => 'key',
         'secret' => 'secret',
         'bucket' => 'bucket',
@@ -2008,6 +2008,7 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
+        && str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
         && ! str_contains($process->command, '--quiet')
         && str_contains($process->command, 'lock=$(mc retention info --default --json --resolve')
         && str_contains($process->command, '*) checksum=--checksum=MD5 ;; *) checksum= ;; esac && (compressor=')
@@ -2918,6 +2919,23 @@ it('notifies the team once when a volume backup fails', function () {
     Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Archive command failed'
         && str_contains((string) $notification->toMail()->render(), 'Archive command failed'));
     Notification::assertNotSentTo($team, BackupSuccess::class);
+});
+
+it('links volume backup notifications to the instance URL instead of APP_URL', function () {
+    config()->set('app.url', 'http://localhost');
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0, 'fqdn' => 'https://coolify.example.com']));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $expected = "https://coolify.example.com/project/{$application->environment->project->uuid}/environment/{$application->environment->uuid}/application/{$application->uuid}";
+
+    $notification = new BackupFailed($backup, 'Archive command failed');
+
+    expect($notification->url)->toBe($expected)
+        ->and($notification->toPushover()->toPayload('token', 'user')['message'])->toContain("href='{$expected}'");
 });
 
 it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {

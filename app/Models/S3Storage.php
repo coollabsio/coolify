@@ -274,6 +274,15 @@ class S3Storage extends BaseModel
     }
 
     /**
+     * The `docker run` option that makes the MinIO client sign requests for the storage region, as filesystem() does.
+     * Without it, mc signs for us-east-1, and providers that enforce the region reject the requests.
+     */
+    public function minioClientRegionOption(): string
+    {
+        return '-e '.escapeshellarg('MC_REGION='.$this->region);
+    }
+
+    /**
      * The bundled MinIO container is a trusted internal S3 target, not a user-supplied webhook destination.
      *
      * @return array<int, string>

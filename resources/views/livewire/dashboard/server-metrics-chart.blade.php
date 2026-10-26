@@ -92,23 +92,13 @@
                                 const memory = series[1][dataPointIndex];
                                 const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
                                 const formatPercent = value => Number.isFinite(value) ? `${Number(value.toFixed(1))}%` : '—';
-                                const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                                    hour12: false,
-                                    timeZoneName: 'short',
-                                });
-                                const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
-                                    hour12: false,
-                                    timeZone: 'UTC',
-                                    timeZoneName: 'short',
-                                });
 
                                 const dot = color => `<span style="display:inline-block;width:8px;height:8px;border-radius:9999px;margin-right:6px;flex:none;background:${color}"></span>`;
 
                                 return `<div class="apexcharts-tooltip-custom">
                                     <div class="apexcharts-tooltip-custom-value" style="display:flex;align-items:center">${dot('rgb(30, 144, 255)')}CPU: <span class="apexcharts-tooltip-value-bold" style="margin-left:4px">${formatPercent(cpu)}</span></div>
                                     <div class="apexcharts-tooltip-custom-value" style="display:flex;align-items:center">${dot('rgb(168, 85, 247)')}Memory: <span class="apexcharts-tooltip-value-bold" style="margin-left:4px">${formatPercent(memory)}</span></div>
-                                    <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
-                                    <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
+                                    ${window.chartTooltipTime(timestamp)}
                                 </div>`;
                             },
                         },

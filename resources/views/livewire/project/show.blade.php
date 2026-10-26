@@ -139,7 +139,7 @@
                         </article>
                     </template>
                 </div>
-                <x-client-pagination x-show="filteredEnvironments.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
+                <x-client-pagination total="filteredEnvironments.length" x-show="filteredEnvironments.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredEnvironments.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.project-environments" :options="[12, 24, 48, 96]" />
             </div>
@@ -190,7 +190,7 @@
                         </div>
                     </div>
                 </template>
-                <x-client-pagination x-show="filteredEnvironments.length > 0"
+                <x-client-pagination total="filteredEnvironments.length" x-show="filteredEnvironments.length > 0"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredEnvironments.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.project-environments" :options="[12, 24, 48, 96]" />
             </div>
@@ -211,13 +211,17 @@
     function projectEnvironments() {
         return {
             search: '',
-            sortBy: 'name-asc',
+            sortBy: 'default',
             sortOpen: false,
             viewMode: @js($this->listView('project', 'grid')),
             page: 1,
             pageSize: 12,
             environments: @js($environmentsJs),
             sortOptions: [{
+                    value: 'default',
+                    label: 'Default'
+                },
+                {
                     value: 'name-asc',
                     label: 'Name A–Z'
                 },
@@ -249,8 +253,12 @@
                         return second.resourceCount - first.resourceCount ||
                             first.name.localeCompare(second.name);
                     }
+                    if (this.sortBy === 'name-asc') {
+                        return first.name.localeCompare(second.name);
+                    }
 
-                    return first.name.localeCompare(second.name);
+                    // Default: the server order (production, staging, development, then by name).
+                    return 0;
                 });
             },
             get totalPages() {

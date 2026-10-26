@@ -77,7 +77,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     $this->checkLogDrainContainer();
                 }
 
-                if ($this->server->proxySet() && ! $this->server->proxy->force_stop) {
+                if ($this->server->proxySet() && ! $this->server->proxy->force_stop && ! $this->server->isProxyTransitionInProgress()) {
                     $this->server->proxyType();
                     $foundProxyContainer = $this->containers->filter(function ($value, $key) {
                         if ($this->server->isSwarm()) {

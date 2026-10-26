@@ -421,17 +421,15 @@ class Github extends Controller
                 return response('Invalid signature.');
             }
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-            if (config('app.env') !== 'local') {
-                if (! hash_equals($x_hub_signature_256, $hmac)) {
-                    auditLogWebhookFailure('github', 'invalid_signature', [
-                        'mode' => 'app',
-                        'github_app_id' => $github_app->id,
-                        'github_app_name' => $github_app->name,
-                        'installation_target_id' => $x_github_hook_installation_target_id,
-                    ]);
+            if (! hash_equals($x_hub_signature_256, $hmac)) {
+                auditLogWebhookFailure('github', 'invalid_signature', [
+                    'mode' => 'app',
+                    'github_app_id' => $github_app->id,
+                    'github_app_name' => $github_app->name,
+                    'installation_target_id' => $x_github_hook_installation_target_id,
+                ]);
 
-                    return response('Invalid signature.');
-                }
+                return response('Invalid signature.');
             }
             TransferFinishChecklist::recordWebhook('github_app', $github_app->uuid);
             if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {

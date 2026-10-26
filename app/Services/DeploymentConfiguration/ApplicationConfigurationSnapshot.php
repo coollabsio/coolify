@@ -101,6 +101,36 @@ class ApplicationConfigurationSnapshot
     }
 
     /**
+     * Removes the volumes of Docker Compose preview deployments from a snapshot. Older snapshots
+     * can contain them, because the parser stores preview volumes on the application.
+     *
+     * @param  array<string, mixed>  $snapshot
+     * @return array<string, mixed>
+     */
+    public static function withoutPreviewVolumes(array $snapshot, Application $application): array
+    {
+        if (! is_array(data_get($snapshot, 'sections.storage.items'))) {
+            return $snapshot;
+        }
+
+        $snapshot['sections']['storage']['items'] = collect($snapshot['sections']['storage']['items'])
+            ->reject(fn (array $item): bool => str_starts_with((string) data_get($item, 'key'), 'volume_')
+                && self::isPreviewVolumeName((string) data_get($item, 'compare_value.source'), $application))
+            ->values()
+            ->all();
+
+        return $snapshot;
+    }
+
+    /**
+     * The compose parser names preview volumes "{uuid}_{volume}-pr-{id}" ("{uuid}-{volume}-pr-{id}" before parser version 3).
+     */
+    private static function isPreviewVolumeName(string $name, Application $application): bool
+    {
+        return preg_match('/^'.preg_quote($application->uuid, '/').'[_-].+-pr-\d+$/', $name) === 1;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function sourceItems(): array
@@ -237,6 +267,7 @@ class ApplicationConfigurationSnapshot
         $volumes = $this->application->persistentStorages()
             ->orderBy('id')
             ->get(['id', 'name', 'mount_path', 'host_path'])
+            ->reject(fn (LocalPersistentVolume $volume): bool => blank($volume->host_path) && self::isPreviewVolumeName($volume->name, $this->application))
             ->map(function (LocalPersistentVolume $volume): array {
                 $source = $volume->host_path ?: $volume->name;
 

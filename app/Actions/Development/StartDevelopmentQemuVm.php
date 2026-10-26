@@ -15,8 +15,9 @@ class StartDevelopmentQemuVm
     /**
      * Start the VM of a profile, creating it only when its libvirt domain does not exist yet.
      * With $fresh, only this profile's VM is destroyed, undefined, and deleted before it is created again.
+     * With $gpu, the NVIDIA GPU of the host is passed through to the VM. An existing VM is stopped to add it.
      */
-    public function handle(string $profileName, bool $fresh = false): void
+    public function handle(string $profileName, bool $fresh = false, bool $gpu = false): void
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
@@ -33,9 +34,12 @@ class StartDevelopmentQemuVm
         }
 
         if (! $fresh && $this->domainExists($profile['domain'])) {
+            if ($gpu) {
+                $this->attachGpu($profile['domain']);
+            }
             $this->startExistingVm($profile['domain']);
         } else {
-            $this->createPreparedVm($profile);
+            $this->createPreparedVm($profile, $gpu);
         }
 
         ConfigureDevelopmentQemuHost::run();
@@ -43,13 +47,13 @@ class StartDevelopmentQemuVm
     }
 
     /** @param array{domain: string, template: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string} $profile */
-    private function createPreparedVm(array $profile): void
+    private function createPreparedVm(array $profile, bool $gpu): void
     {
         $preparedImage = $this->preparedImage($profile['template']);
 
         if (! File::exists($preparedImage)) {
             $this->createVm($profile, false);
-            $this->waitForPreparation($profile['domain']);
+            $this->waitForShutOff($profile['domain'], 900);
             $this->runOrFail('virsh undefine '.escapeshellarg($profile['domain']));
             $this->runOrFail('mv '.escapeshellarg($this->vmDisk($profile['domain'])).' '.escapeshellarg($preparedImage));
             if (File::exists($preparedImage)) {
@@ -57,7 +61,7 @@ class StartDevelopmentQemuVm
             }
         }
 
-        $this->createVm($profile, true);
+        $this->createVm($profile, true, $gpu);
     }
 
     private function domainExists(string $domain): bool
@@ -79,18 +83,82 @@ class StartDevelopmentQemuVm
             return;
         }
 
-        $this->applyMemory($domain);
+        $hasGpu = $this->hasGpu($domain);
+        $this->applyMemory($domain, $hasGpu);
+
+        if ($hasGpu) {
+            $this->releaseHostGpu();
+        }
+
         $this->runOrFail('virsh start '.escapeshellarg($domain));
     }
 
     /**
      * Sets the configured memory on a stopped VM, so VMs created with a larger size shrink on their next start.
      */
-    private function applyMemory(string $domain): void
+    private function applyMemory(string $domain, bool $hasGpu): void
     {
-        $memory = (int) config('development-qemu.memory').'M';
+        $memory = (int) config($hasGpu ? 'development-qemu.gpu_memory' : 'development-qemu.memory').'M';
         $this->runOrFail(sprintf('virsh setmaxmem %s %s --config', escapeshellarg($domain), $memory));
         $this->runOrFail(sprintf('virsh setmem %s %s --config', escapeshellarg($domain), $memory));
+    }
+
+    private function hasGpu(string $domain): bool
+    {
+        return str_contains(Process::run('virsh dumpxml --inactive '.escapeshellarg($domain))->output(), '<hostdev ');
+    }
+
+    /**
+     * Adds the GPU to the persistent definition of an existing VM. A running VM is shut down first.
+     */
+    private function attachGpu(string $domain): void
+    {
+        if ($this->hasGpu($domain)) {
+            return;
+        }
+
+        if (trim(Process::run('virsh domstate '.escapeshellarg($domain))->output()) !== 'shut off') {
+            $this->runOrFail('virsh shutdown '.escapeshellarg($domain));
+            $this->waitForShutOff($domain, 120);
+        }
+
+        foreach ($this->hostGpuDevices() as $device) {
+            $this->runOrFail(sprintf('virt-xml %s --add-device --hostdev %s', escapeshellarg($domain), escapeshellarg($device)));
+        }
+    }
+
+    /**
+     * Returns the libvirt node device names of every PCI function of the first NVIDIA display controller,
+     * for example pci_0000_01_00_0 (GPU) and pci_0000_01_00_1 (its audio device). All functions must move together.
+     *
+     * @return array<int, string>
+     */
+    private function hostGpuDevices(): array
+    {
+        $devices = collect(explode("\n", trim(Process::run('lspci -Dnmm -d 10de:')->output())))
+            ->filter()
+            ->map(fn (string $line): array => str_getcsv($line, ' '));
+        $gpu = $devices->first(fn (array $device): bool => in_array($device[1] ?? null, ['0300', '0302'], true));
+
+        if ($gpu === null) {
+            throw new RuntimeException('No NVIDIA GPU found on this host.');
+        }
+
+        $slot = substr($gpu[0], 0, strrpos($gpu[0], '.'));
+
+        return $devices
+            ->filter(fn (array $device): bool => str_starts_with($device[0], "{$slot}."))
+            ->map(fn (array $device): string => 'pci_'.str_replace([':', '.'], '_', $device[0]))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * nvidia-persistenced keeps the GPU open, which blocks libvirt from moving it to vfio-pci.
+     */
+    private function releaseHostGpu(): void
+    {
+        Process::run('systemctl stop nvidia-persistenced');
     }
 
     private function destroyVm(string $domain): void
@@ -101,7 +169,7 @@ class StartDevelopmentQemuVm
     }
 
     /** @param array{domain: string, template: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string} $profile */
-    private function createVm(array $profile, bool $prepared): void
+    private function createVm(array $profile, bool $prepared, bool $gpu = false): void
     {
         $directory = config('development-qemu.storage_path');
         File::ensureDirectoryExists($directory);
@@ -155,11 +223,17 @@ class StartDevelopmentQemuVm
         $seedDisk = $prepared ? '' : ' --disk path='.escapeshellarg($seedImage).',format=raw,bus=virtio,readonly=on';
         // Instance networks are isolated, so VMs of different instances may share the profile MAC.
         $macCheck = config('development-qemu.instance') === null ? '' : ' --check mac_in_use=off';
+        $hostDevices = '';
+
+        if ($gpu) {
+            $hostDevices = collect($this->hostGpuDevices())->map(fn (string $device): string => ' --hostdev '.escapeshellarg($device))->implode('');
+            $this->releaseHostGpu();
+        }
 
         $this->runOrFail(sprintf(
-            'virt-install --connect qemu:///system --name %s --memory %d --vcpus %d --import --os-variant %s --disk path=%s,format=qcow2,bus=virtio%s --network network=%s,model=virtio,mac=%s --noautoconsole'.$macCheck,
+            'virt-install --connect qemu:///system --name %s --memory %d --vcpus %d --import --os-variant %s --disk path=%s,format=qcow2,bus=virtio%s --network network=%s,model=virtio,mac=%s --noautoconsole'.$macCheck.$hostDevices,
             escapeshellarg($profile['domain']),
-            config('development-qemu.memory'),
+            config($gpu ? 'development-qemu.gpu_memory' : 'development-qemu.memory'),
             config('development-qemu.vcpus'),
             escapeshellarg($profile['os_variant']),
             escapeshellarg($disk),
@@ -182,10 +256,10 @@ class StartDevelopmentQemuVm
         return config('development-qemu.storage_path')."/{$template}-prepared.qcow2";
     }
 
-    private function waitForPreparation(string $domain): void
+    private function waitForShutOff(string $domain, int $timeoutSeconds): void
     {
         $check = 'while [ "$(virsh domstate '.escapeshellarg($domain).')" != "shut off" ]; do sleep 2; done';
-        $this->runOrFail('timeout 900 bash -c '.escapeshellarg($check));
+        $this->runOrFail("timeout {$timeoutSeconds} bash -c ".escapeshellarg($check));
     }
 
     private function moveLegacyFiles(string $directory): void

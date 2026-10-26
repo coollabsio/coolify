@@ -386,6 +386,7 @@ test('server zones show host facts, the proxy and a usage endpoint only when met
 
 test('the usage endpoint returns the latest Sentinel values and never another team server', function () {
     $server = Mockery::mock($this->web)->makePartial();
+    $server->shouldReceive('prefetchMetrics')->once()->with(['cpu', 'memory', 'disk'], 1);
     $server->shouldReceive('getCpuMetrics')->andReturn([[1, 10.0], [2, 12.34]]);
     $server->shouldReceive('getMemoryMetrics')->andReturn([[2, 40.0]]);
     $server->shouldReceive('getDiskMetrics')->andThrow(new RuntimeException('no disk data'));
@@ -410,4 +411,66 @@ test('only admins may move the environment groups on the server canvas', functio
         ->assertJsonPath('can_move_groups', true);
     serverCanvasSession($this, $member, $this->team)->getJson('/canvas/api/servers/canvas')
         ->assertJsonPath('can_move_groups', false);
+});
+
+test('an admin moves server zones on the servers and dashboard canvases and both return their place', function () {
+    // Another team's server with the same request stays as it is.
+    $foreign = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+    serverCanvasSession($this, $this->admin, $this->team)->getJson('/canvas/api/servers/canvas')
+        ->assertJsonPath('can_move_zones', true)
+        ->assertJsonPath('zones.0.position', null);
+
+    serverCanvasSession($this, $this->admin, $this->team)
+        ->patchJson('/canvas/api/dashboard/canvas/positions', ['positions' => [
+            $this->web->uuid => ['x' => 640, 'y' => -120],
+            $foreign->uuid => ['x' => 5, 'y' => 5],
+            'no-server' => ['x' => 0, 'y' => 0],
+        ]])
+        ->assertOk()
+        ->assertJsonPath('positions', [$this->web->uuid => ['x' => 640, 'y' => -120]]);
+    serverCanvasSession($this, $this->admin, $this->team)
+        ->patchJson('/canvas/api/servers/canvas/positions', ['positions' => [$this->db->uuid => ['x' => 0, 'y' => 0]]])
+        ->assertOk();
+
+    expect($foreign->fresh()->canvas_position)->toBeNull();
+    // Zones are sorted by name: db-server, web-server.
+    foreach (['/canvas/api/servers/canvas', '/canvas/api/dashboard/canvas'] as $endpoint) {
+        serverCanvasSession($this, $this->admin, $this->team)->getJson($endpoint)
+            ->assertJsonPath('zones.0.position', ['x' => 0, 'y' => 0])
+            ->assertJsonPath('zones.1.position', ['x' => 640, 'y' => -120]);
+    }
+    // The one server canvas has a single zone, which stays in its place.
+    serverCanvasSession($this, $this->admin, $this->team)->getJson("/canvas/api/servers/{$this->web->uuid}/canvas")
+        ->assertJsonPath('can_move_zones', false)
+        ->assertJsonPath('zones.0.position', null);
+});
+
+test('server zone positions must be whole coordinates on the canvas', function () {
+    serverCanvasSession($this, $this->admin, $this->team)
+        ->patchJson('/canvas/api/servers/canvas/positions', ['positions' => [$this->web->uuid => ['x' => 'left', 'y' => 999999999]]])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(["positions.{$this->web->uuid}.x", "positions.{$this->web->uuid}.y"]);
+
+    expect($this->web->fresh()->canvas_position)->toBeNull();
+});
+
+test('members and other teams cannot move a server zone', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    serverCanvasSession($this, $member, $this->team)->getJson('/canvas/api/dashboard/canvas')
+        ->assertJsonPath('can_move_zones', false);
+    serverCanvasSession($this, $member, $this->team)
+        ->patchJson('/canvas/api/servers/canvas/positions', ['positions' => [$this->web->uuid => ['x' => 10, 'y' => 10]]])
+        ->assertForbidden();
+
+    // Admin of this team, owner of another team, with the session switched to the other team.
+    $otherTeam = Team::factory()->create(['show_boarding' => false]);
+    $otherTeam->members()->attach($this->admin->id, ['role' => 'owner']);
+    serverCanvasSession($this, $this->admin, $otherTeam)
+        ->patchJson('/canvas/api/dashboard/canvas/positions', ['positions' => [$this->web->uuid => ['x' => 10, 'y' => 10]]])
+        ->assertOk()
+        ->assertJsonPath('positions', []);
+
+    expect($this->web->fresh()->canvas_position)->toBeNull();
 });

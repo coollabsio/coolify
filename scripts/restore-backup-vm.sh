@@ -242,7 +242,7 @@ delete_vm "$VM_NAME"
 
 mkdir -p "$IMAGE_DIR"
 if [ ! -f "$SSH_KEY" ]; then
-    # The comment must not contain "coolify": install.sh removes such lines from authorized_keys.
+    # Do not use the comment "coolify": install.sh removes authorized_keys lines with exactly that comment.
     ssh-keygen -q -t ed25519 -N '' -C restore-test-vm -f "$SSH_KEY"
 fi
 

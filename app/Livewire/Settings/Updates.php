@@ -159,10 +159,14 @@ class Updates extends Component
     public function checkManually()
     {
         $this->authorize('update', $this->settings);
-        CheckForUpdatesJob::dispatchSync(cdnTries: 1);
+        $checked = (new CheckForUpdatesJob(cdnTries: 1))->handle();
         $this->dispatch('updateAvailable');
-        $settings = instanceSettings();
-        if ($settings->new_version_available) {
+        if (! $checked) {
+            $this->dispatch('error', 'Could not check for updates. Try again later.');
+
+            return;
+        }
+        if (instanceSettings()->new_version_available) {
             $this->dispatch('success', 'New version available!');
         } else {
             $this->dispatch('success', 'No new version available.');

@@ -551,7 +551,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 ->select($databaseColumns)
                 ->where(fn ($query) => $this->scopeDestination($query, $standaloneDockerIds, $swarmDockerIds))
                 ->get();
-        })->filter(fn ($database) => data_get($database, 'name') !== 'coolify-db')->values();
+        })->reject(fn ($database) => $database instanceof StandalonePostgresql && $database->isInstanceDatabase())->values();
     }
 
     private function serverDestinationIds(): array
@@ -817,7 +817,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function updateProxyStatus()
     {
         // If proxy is not found, start it
-        if ($this->server->isProxyShouldRun()) {
+        if ($this->server->isProxyShouldRun() && ! $this->server->isProxyTransitionInProgress()) {
             if ($this->foundProxy === false) {
                 try {
                     if (CheckProxy::run($this->server)) {

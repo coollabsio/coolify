@@ -13,25 +13,27 @@ class FleetMetricsAggregator
     public static function fleetKpis(array $rows): array
     {
         $online = array_values(array_filter($rows, fn ($r) => $r['online'] === true));
+        // Only servers whose Sentinel returned current metrics give values.
+        $reporting = array_values(array_filter($online, fn ($r) => $r['reporting'] === true));
 
-        $cpuValues = self::present($online, 'cpu');
+        $cpuValues = self::present($reporting, 'cpu');
         $cpuAvg = $cpuValues === [] ? 0.0 : round(array_sum($cpuValues) / count($cpuValues), 1);
 
         $busiest = null;
-        foreach ($online as $r) {
+        foreach ($reporting as $r) {
             if ($r['cpu'] !== null && ($busiest === null || $r['cpu'] > $busiest['percent'])) {
                 $busiest = ['name' => $r['name'], 'percent' => (float) $r['cpu']];
             }
         }
 
-        $memUsed = (int) self::sum($online, 'memUsed');
-        $memTotal = (int) self::sum($online, 'memTotal');
-        $diskUsed = (int) self::sum($online, 'diskUsed');
-        $diskTotal = (int) self::sum($online, 'diskTotal');
-        $load1 = self::present($online, 'load1');
+        $memUsed = (int) self::sum($reporting, 'memUsed');
+        $memTotal = (int) self::sum($reporting, 'memTotal');
+        $diskUsed = (int) self::sum($reporting, 'diskUsed');
+        $diskTotal = (int) self::sum($reporting, 'diskTotal');
+        $load1 = self::present($reporting, 'load1');
 
         $needsAttention = 0;
-        foreach ($online as $r) {
+        foreach ($reporting as $r) {
             $hot = PressureLevel::for($r['cpu'], 'cpu') !== 'ok'
                 || PressureLevel::for(self::percent($r['memUsed'], $r['memTotal']), 'memory') !== 'ok'
                 || PressureLevel::for($r['diskPercent'], 'disk') !== 'ok';
@@ -42,6 +44,7 @@ class FleetMetricsAggregator
 
         return [
             'serversOnline' => count($online),
+            'serversReporting' => count($reporting),
             'serversTotal' => count($rows),
             'needsAttention' => $needsAttention,
             'cpuAvg' => $cpuAvg,
@@ -53,11 +56,11 @@ class FleetMetricsAggregator
             'diskUsed' => $diskUsed,
             'diskTotal' => $diskTotal,
             'diskPercent' => self::percent($diskUsed, $diskTotal),
-            'netRx' => (float) self::sum($online, 'netRx'),
-            'netTx' => (float) self::sum($online, 'netTx'),
+            'netRx' => (float) self::sum($reporting, 'netRx'),
+            'netTx' => (float) self::sum($reporting, 'netTx'),
             'loadBusiest' => $load1 === [] ? 0.0 : max($load1),
             'loadAvg' => $load1 === [] ? 0.0 : round(array_sum($load1) / count($load1), 2),
-            'containers' => (int) self::sum($online, 'containers'),
+            'containers' => (int) self::sum($reporting, 'containers'),
         ];
     }
 

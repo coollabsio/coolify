@@ -258,6 +258,20 @@ test('server view: one frame per project / environment, and the frames do not ov
   assert.equal(positions.a.y, positions.b.y);
 });
 
+test('groups: production, staging, and development come before the other environments of a project', () => {
+  const env = (id, project, environment) =>
+    srv(id, 'application', `${project} / ${environment}`, { project: { uuid: project, name: project }, environment: { uuid: id, name: environment } });
+  const graph = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [env('a', 'Shop', 'deprecated'), env('b', 'Shop', 'development'), env('c', 'Shop', 'production'), env('d', 'Shop', 'qa'), env('e', 'Shop', 'staging'), env('f', 'Blog', 'zeta')],
+    links: [],
+    positions: {},
+  };
+  const frames = groupFrames(graph.nodes, layoutGraph(graph));
+  assert.deepEqual(frames.map(f => f.name), ['Blog / zeta', 'Shop / production', 'Shop / staging', 'Shop / development', 'Shop / deprecated', 'Shop / qa']);
+});
+
 const envNode = (id, type, zone, environment, extra = {}) => srv(id, type, `Shop / ${environment}`, { zone, project: { uuid: 'p' }, environment: { uuid: environment }, ...extra });
 
 test('server view: cards link only to cards of the same environment', () => {
@@ -498,15 +512,16 @@ test('variables view: filter resources by project and environment, keep every va
       node('variable:1', 'variable', 'sources'),
       node('a', 'application', 'resources', { project: shop, environment: { uuid: 'e1', name: 'production' } }),
       node('b', 'application', 'resources', { project: shop, environment: { uuid: 'e2', name: 'staging' } }),
+      node('d', 'application', 'resources', { project: shop, environment: { uuid: 'e4', name: 'deprecated' } }),
       node('c', 'application', 'resources', { project: blog, environment: { uuid: 'e3', name: 'production' } }),
     ],
     links: [{ id: 'l1', source: 'variable:1', target: 'a' }, { id: 'l2', source: 'variable:1', target: 'c' }],
   };
 
-  assert.deepEqual(filterOptions(g).map(p => [p.name, p.environments.map(e => e.name)]), [['Blog', ['production']], ['Shop', ['production', 'staging']]]);
+  assert.deepEqual(filterOptions(g).map(p => [p.name, p.environments.map(e => e.name)]), [['Blog', ['production']], ['Shop', ['production', 'staging', 'deprecated']]]);
   assert.equal(filterGraph(g, {}), g);
   const shopOnly = filterGraph(g, { project: 'p1' });
-  assert.deepEqual(shopOnly.nodes.map(n => n.id), ['variable:1', 'a', 'b']);
+  assert.deepEqual(shopOnly.nodes.map(n => n.id), ['variable:1', 'a', 'b', 'd']);
   assert.deepEqual(shopOnly.links.map(l => l.id), ['l1']);
   assert.deepEqual(filterGraph(g, { environment: 'e2' }).nodes.map(n => n.id), ['variable:1', 'b']);
   assert.deepEqual(filterGraph(g, { environment: 'e2' }).links, []);
@@ -629,6 +644,24 @@ test('server view: a dragged card keeps its group as far from another group as t
   assert.equal(freeSpot({ ...start, x: start.x - 10 }, others, undefined, fits), null);
 });
 
+test('server view: cards still move when the measured cards put their group too close to another group', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'web' }],
+    nodes: [srv('a', 'application', 'Shop / prod'), srv('c', 'application', 'Blog / prod')],
+    links: [],
+    positions: {},
+  };
+  const before = layoutServerView(g);
+  // The layout uses estimated sizes; the real Blog card is wider, so the groups are less than GROUP_GAP apart.
+  const sizes = { c: { width: CARD_WIDTH + 20, height: estimateNodeHeight(g.nodes[1]) } };
+  const { fits } = dragRules(g, before, sizes, 'a');
+  const start = { ...before.a, w: CARD_WIDTH, h: estimateNodeHeight(g.nodes[0]) };
+  assert.ok(fits(start), 'the card can stay where it is');
+  assert.ok(fits({ ...start, x: start.x + 50 }), 'the card can move away from the other group');
+  assert.ok(!fits({ ...start, x: start.x - 10 }), 'the card cannot move its group closer to the other group');
+});
+
 test('groupKey: a group with only an empty-environment placeholder has no key, so it cannot be moved', () => {
   const environment = { uuid: 'env', name: 'production' };
   assert.equal(groupKey([{ id: 'empty:env', type: 'empty', environment }], 'empty'), null);
@@ -667,4 +700,34 @@ test('variables view: saved environment canvas positions do not push resources a
 
   assert.equal(resources.y, variables.y, 'both zones start at the top');
   assert.ok(resources.x - (variables.x + variables.width) <= ZONE_GAP * 2, 'resources sit next to the variables');
+});
+
+test('projects canvas: a zone with a saved place sits there, also above the other zones', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'Blog' }, { id: 'z2', name: 'Shop', position: { x: 900, y: -400 } }],
+    nodes: [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'application', 'z2', 'prod')],
+    links: [],
+  };
+  const groups = {};
+  const zones = {};
+  const positions = layoutServerView(g, groups, { zones });
+  assert.deepEqual(zones, { z1: { x: 0, y: 0 }, z2: { x: 900, y: -400 } });
+  const box = zoneBoxes(g, positions).find(z => z.id === 'z2');
+  assert.deepEqual({ x: box.x + ZONE_PADDING, y: box.y }, { x: 900, y: -400 });
+  // The group of the moved zone keeps its environment canvas mapping relative to the zone.
+  assert.equal(groups['prod:z2'].inner.y, -400 + ZONE_HEADER + ZONE_PADDING);
+});
+
+test('projects canvas: zones without a saved place stack below a saved zone that is in their way', () => {
+  const g = {
+    layout: 'server',
+    zones: [{ id: 'z1', name: 'Blog', position: { x: 0, y: 0 } }, { id: 'z2', name: 'Shop' }, { id: 'z3', name: 'Wiki' }],
+    nodes: [envNode('a', 'application', 'z1', 'prod'), envNode('b', 'application', 'z2', 'prod'), envNode('c', 'application', 'z3', 'prod')],
+    links: [],
+  };
+  const positions = layoutServerView(g);
+  const boxes = Object.fromEntries(zoneBoxes(g, positions).map(z => [z.id, z]));
+  assert.ok(boxes.z2.y >= boxes.z1.y + boxes.z1.height + ZONE_GAP);
+  assert.ok(boxes.z3.y >= boxes.z2.y + boxes.z2.height + ZONE_GAP);
 });

@@ -185,6 +185,7 @@ final class ServerTransferCoverage
             'hetzner_server_status' => self::RUNTIME, 'vultr_instance_status' => self::RUNTIME,
             'digitalocean_droplet_status' => self::RUNTIME, 'hostinger_virtual_machine_status' => self::RUNTIME,
             'server_metadata' => 'Facts about the host and the transfer state of the source; the target collects its own.',
+            'canvas_position' => 'Place of the server on the servers canvas of the source; the target places it with its own servers.',
         ],
         ServerSetting::class => [
             'server_id' => self::LINKED, 'is_reachable' => self::RUNTIME, 'is_usable' => self::RUNTIME, 'force_disabled' => self::RUNTIME,
@@ -221,6 +222,7 @@ final class ServerTransferCoverage
             'icon_path' => 'The icon file is exported as `icon` (base64 content). The target stores it in its own icon storage and sets the path.',
             'icon_storage_type' => 'The target uses its own default icon storage. See icon_path.',
             'icon_s3_storage_id' => 'The target uses its own default icon storage. See icon_path.',
+            'canvas_position' => 'Place of the project on the projects canvas of the source; the target places it with its own projects.',
         ],
         Environment::class => ['project_id' => self::LINKED],
         ResourceLink::class => [

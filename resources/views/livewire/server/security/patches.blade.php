@@ -6,10 +6,10 @@
     <livewire:server.navbar :server="$server" />
 
     <x-process-dialog @startupdate.window="processDialogOpen = true" closeWithX size="xl">
-        <x-slot:title>Updating packages</x-slot:title>
+        <x-slot:title>Package Update Logs</x-slot:title>
         <x-slot:content>
             <div class="flex h-full min-h-0 flex-col">
-                <livewire:activity-monitor header="Logs" fullHeight />
+                <livewire:activity-monitor fullHeight />
             </div>
         </x-slot:content>
     </x-process-dialog>
@@ -20,6 +20,7 @@
             ->values()
             ->all();
         $totalUpdates = count($updates);
+        $heldUpdates = collect(data_get($result, 'held_updates', []))->sortBy('package')->values()->all();
         $packageManager = data_get($result, 'package_manager');
         $checkedAt = $server->settings->patch_checked_at;
         $fullUpgradeOnly = in_array($packageManager, \App\Actions\Server\CheckUpdates::FULL_UPGRADE_ONLY, true);
@@ -267,6 +268,39 @@
                             class="flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
                             {{ $totalUpdates }} {{ Str::plural('package update', $totalUpdates) }}
                         </div>
+                    </div>
+                </x-application.settings-section>
+            @endif
+
+            @if (! $checking && ! $error && count($heldUpdates) > 0)
+                <x-application.settings-section id="server-held-updates-section" title="Held back updates"
+                    helper="The package manager does not install these updates. Phased rollout: Ubuntu releases the update to a part of all servers at a time, and this server gets it in a later phase. Held: a package hold (apt-mark hold) or a version pin (/etc/apk/world) on the server blocks the update."
+                    flush>
+                    <div class="data-table">
+                        <div class="data-table-header package-updates-table-grid">
+                            <span>Package</span>
+                            <span>New version</span>
+                            <span class="text-right">Reason</span>
+                        </div>
+                        @foreach ($heldUpdates as $update)
+                            <div wire:key="held-update-{{ data_get($update, 'package') }}-{{ data_get($update, 'architecture') }}"
+                                class="data-table-row package-updates-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
+                                <span class="min-w-0 truncate font-mono text-[12px] text-neutral-950 dark:text-fg">
+                                    {{ data_get($update, 'package') }}
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="truncate font-mono text-[12px] text-neutral-700 dark:text-fg-dim">
+                                        {{ data_get($update, 'new_version') }}
+                                    </p>
+                                    <p class="mt-0.5 truncate text-[10px] text-neutral-500 dark:text-fg-faint">
+                                        Current: {{ data_get($update, 'current_version') }}
+                                    </p>
+                                </div>
+                                <div class="flex justify-end">
+                                    <x-status-badge :status="\App\Actions\Server\CheckUpdates::HELD_REASON_LABELS[data_get($update, 'held_reason')] ?? 'Held'" type="warning" />
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </x-application.settings-section>
             @endif

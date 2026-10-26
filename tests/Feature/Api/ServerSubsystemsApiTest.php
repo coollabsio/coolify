@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StartSentinel;
+use App\Actions\Server\StopLogDrain;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\InstanceSettings;
@@ -186,6 +188,19 @@ describe('Log drains API', function () {
         $settings = $this->server->settings->fresh();
         expect($settings->logdrain_axiom_dataset_name)->toBe('api-dataset')
             ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
+    });
+
+    test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_axiom_enabled' => false,
+            ])
+            ->assertOk();
+
+        StopLogDrain::assertNotPushed();
+        StartLogDrain::assertNotPushed();
     });
 
     test('PATCH requires the deploy permission to change the custom log drain config', function (string $field) {

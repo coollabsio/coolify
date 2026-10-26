@@ -4,6 +4,7 @@ namespace App\Actions\Application;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
+use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 /**
@@ -27,10 +28,7 @@ class GetRollbackImages
 
         $server = $application->destination?->server;
         if ($server?->isFunctional()) {
-            $output = instant_remote_process([
-                "docker inspect --format='{{.Config.Image}}' {$application->uuid}",
-            ], $server, throwError: false);
-            $current = self::imageTag(str($output)->trim()->toString());
+            $current = self::currentTag($server, $application);
 
             $repository = $application->docker_registry_image_name ?: $application->uuid;
             $output = instant_remote_process([
@@ -59,6 +57,21 @@ class GetRollbackImages
             'current' => $current,
             'images' => $images->values()->all(),
         ];
+    }
+
+    /**
+     * The tag of the running production containers. Container names can have a timestamp or a
+     * custom name, so find them by their owner labels. Null when no container runs, or when the
+     * running containers use different tags (for example during a rolling update).
+     */
+    private static function currentTag(Server $server, Application $application): ?string
+    {
+        $tags = getCurrentApplicationContainerStatus($server, $application, 0)
+            ->filter(fn ($container) => data_get($container, 'State') === 'running')
+            ->map(fn ($container) => self::imageTag((string) data_get($container, 'Image')))
+            ->unique();
+
+        return $tags->count() === 1 ? $tags->first() : null;
     }
 
     /**

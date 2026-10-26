@@ -153,7 +153,7 @@ test('I finished closes the list and keeps the open steps as skipped', function 
 
     $finish = $this->checklist->of($this->server->fresh());
     expect($finish['finished_by'])->toBe($this->user->id)
-        ->and($finish['skipped'])->toBe(['sentinel:server'])
+        ->and($finish['skipped'])->toBe(['sentinel:server', 'previous_ssh_key:server'])
         ->and($this->checklist->isOpen($this->server->fresh()))->toBeFalse();
 });
 
@@ -162,14 +162,15 @@ test('the panel shows the open steps by group, collapses done steps, and finishe
 
     Livewire::test(TransferFinish::class, ['server' => $this->server])
         ->assertSee('Finish the transfer')
-        ->assertSee('0 of 2 done.')
+        ->assertSee('0 of 3 done.')
         ->assertSee('Server')
         ->assertSee('Restart Sentinel')
         ->call('markStepDone', 'sentinel:server')
-        ->assertSee('1 of 2 done.')
+        ->assertSee('1 of 3 done.')
         ->assertSee('1 step is OK or done')
         ->assertSee('Finish with open steps')
         ->call('markStepDone', 'server_connection:server')
+        ->call('markStepDone', 'previous_ssh_key:server')
         ->assertDontSee('Finish with open steps')
         ->call('finishTransfer')
         ->assertDontSee('Finish the transfer');
@@ -257,12 +258,12 @@ test('restarting Sentinel waits for its data instead of failing the step at once
 test('a changed step is broadcast to the team, and the open panel shows it without a reload', function () {
     Event::fake([TransferFinishChanged::class]);
     $this->checklist->start($this->server);
-    $component = Livewire::test(TransferFinish::class, ['server' => $this->server])->assertSee('0 of 2 done.');
+    $component = Livewire::test(TransferFinish::class, ['server' => $this->server])->assertSee('0 of 3 done.');
 
     $this->checklist->markDone($this->server->fresh(), 'sentinel:server');
 
     Event::assertDispatched(TransferFinishChanged::class, fn ($event) => $event->serverUuid === $this->server->uuid && $event->teamId === $this->team->id);
-    $component->call('handleTransferFinishChanged', ['serverUuid' => $this->server->uuid])->assertSee('1 of 2 done.');
+    $component->call('handleTransferFinishChanged', ['serverUuid' => $this->server->uuid])->assertSee('1 of 3 done.');
 });
 
 test('the GitHub App steps link to the App settings at GitHub', function () {
@@ -275,4 +276,39 @@ test('the GitHub App steps link to the App settings at GitHub', function () {
     Livewire::test(TransferFinish::class, ['server' => $this->server])
         ->assertSeeHtml('href="https://github.com/organizations/acme/settings/apps/deploy-bot" target="_blank"')
         ->assertSee('Open on GitHub');
+});
+
+test('a step key is passed to Livewire as a JavaScript string, so a quote in a domain cannot run script', function () {
+    // parse_url keeps quotes in a host, so a domain step can have one in its key.
+    $host = (string) parse_url("https://x'-alert(1)-'.example.test", PHP_URL_HOST);
+    $items = $this->checklist->start($this->server);
+    $metadata = $this->server->fresh()->server_metadata;
+    $metadata['transfer']['finish']['items'][] = [...$items[0], 'key' => "domain:{$host}", 'type' => 'domain', 'subject' => $host, 'label' => "Domain {$host}"];
+    $this->server->forceFill(['server_metadata' => $metadata])->save();
+
+    $html = Livewire::test(TransferFinish::class, ['server' => $this->server->fresh()])->html();
+
+    expect($html)->toContain("checkStep('domain:x\\u0027-alert(1)-\\u0027.example.test')")
+        ->and($html)->not->toContain("Step('domain:x&#039;");
+});
+
+test('the SSH key of the previous instance is a manual step', function () {
+    $item = collect($this->checklist->start($this->server))->firstWhere('key', 'previous_ssh_key:server');
+
+    expect($item)->not->toBeNull()
+        ->and($this->checklist->canCheck($item))->toBeFalse()
+        ->and($this->checklist->linkOf($item))->toBe(["/server/{$this->server->uuid}/private-key", 'Open private key']);
+
+    $this->checklist->markDone($this->server, 'previous_ssh_key:server');
+    expect(finishTestItem($this->server, 'previous_ssh_key:server')['status'])->toBe('done');
+});
+
+test('a GitHub App link that is not a web URL, or a saved link to another host, is not shown', function () {
+    finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id]);
+    $items = collect($this->checklist->start($this->server));
+    $this->githubApp->forceFill(['html_url' => 'javascript:alert(1)//'])->save();
+
+    expect($this->checklist->linkOf($items->firstWhere('key', "github_app_webhook:{$this->githubApp->uuid}")))->toBeNull()
+        ->and($this->checklist->linkOf(['type' => 'git_source', 'link' => '//evil.example/x']))->toBeNull()
+        ->and($this->checklist->linkOf(['type' => 'git_source', 'link' => 'javascript:alert(1)']))->toBeNull();
 });

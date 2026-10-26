@@ -25,15 +25,21 @@ change.
 - **Layers, not boxes.** Depth comes from a few surface steps (canvas, card,
   well, control), 1px borders, and very soft shadows. Never use thick borders or
   heavy floating shadows.
-- **Card and well.** Content sits in a darker inset panel (the well) inside a
-  soft outer box with a small title row.
+- **Card and well.** Content sits in an inset panel (the well) inside a soft
+  outer box with a small title row. In light mode the well is lighter than the
+  outer box. In dark mode a top-level card is a near-canvas outer box with a
+  lighter `#121212` well.
 - **Tactile buttons.** Buttons and navigation icon tiles have a 2px bottom
   edge. They lift 1px on hover and press down on click.
-- **Dark gray, not black.** Dark mode is a pure neutral dark gray (page
-  canvas about sRGB 10,10,10). Light mode is pure neutral
-  gray.
-- **One accent per theme.** Purple in light mode, yellow in dark mode (purple
-  has too little contrast on dark surfaces). Everything else is neutral.
+- **Dark gray, not black.** Dark mode page canvas and the top bar are neutral
+  sRGB 10,10,10 (`#0a0a0a`). Card wells sit one step up (`#121212`). Light mode is
+  pure neutral gray.
+- **One accent.** Coolify purple in both themes (`#6b16ed`, hover `#7317ff`,
+  pressed `#5a12c7`, depth `#4a0fa3`, light text and icons `#a391ff`). Yellow
+  is only for real warnings. In the default dark theme the sidebar, including
+  the logo cell, is purple-black (`#120e1a`) with a faint brand wash. Users
+  who want a neutral sidebar can pick a custom theme. The dark command palette
+  has a light purple tint. The page canvas stays neutral.
 - **Quiet text.** Sentence case. A clear text ladder: primary, dim, faint.
   No em dashes in UI copy.
 
@@ -94,8 +100,8 @@ follow the theme.
 
 .dark {
     /* Surfaces (dark: pure neutral dark gray) */
-    --ui-canvas: oklch(14.48% 0 0);   /* sRGB 10,10,10 */
-    --ui-panel: oklch(19.13% 0 0);     /* sRGB 20,20,20: header bar, card and table headers */
+    --ui-canvas: #0a0a0a;              /* page and top bar */
+    --ui-panel: #121212;               /* cards and table headers, not the top bar */
     --ui-card-bg: rgb(255 255 255 / 6%);
     --ui-card-border: rgb(255 255 255 / 8%);
     --ui-well-bg: rgb(0 0 0 / 34%);
@@ -114,8 +120,15 @@ follow the theme.
     --ui-fg-dim: oklch(76.99% 0 0);
     --ui-fg-faint: oklch(65% 0 0);
 
-    /* Accent and status: yellow accent in dark mode */
-    --ui-accent: oklch(88.13% 0.1507 91.7);
+    /* Accent stays purple. Yellow is the warning color, not the accent. */
+    --ui-accent: #6b16ed;
+    --ui-accent-top: #7317ff;
+    --ui-accent-bottom: #5a12c7;
+    --ui-accent-edge: #4a0fa3;
+    --ui-accent-fg: #ffffff;
+    --ui-accent-light: #a391ff;
+    --ui-sidebar: #120e1a;
+    --ui-card: #121212;
     --ui-success: oklch(72.27% 0.192 149.58);
     --ui-warning: oklch(88.13% 0.1507 91.7);
     --ui-error: oklch(66% 0.2 27.33);
@@ -131,16 +144,40 @@ Rules for the tokens:
 - Floating surfaces (menus, popovers, tooltips, modals) must be opaque. Use
   `--ui-menu-bg`, never a translucent value, or the content behind shows
   through.
-- Keep the dark surfaces pure neutral (chroma 0). A brand tint on the
-  surfaces was tried and removed.
+- Keep the page canvas, cards, menus, and logs pure neutral (chroma 0). The
+  default dark sidebar, the logo cell above it, and the dark command palette
+  are the tinted surfaces.
 - **Dark lightness level.** The canvas is at 14.48% and the header panel at
   19.13%. To
   change the level, move every dark surface and border token by the same
   amount (canvas, panel, menu, hover, borders, and the Coolify surface ladder),
   so the steps between layers stay the same. If you move only some of them, a
   hover fill can become darker than its menu.
-- The primary buttons use purple in both themes. Only focus rings, active
-  navigation, and other accent states change to yellow in dark mode.
+- Primary buttons, focus rings, and active navigation use purple in both
+  themes. Warning yellow is not an accent.
+- Do not hard-code the brand purple (`#6b16ed`, `rgb(107 22 237 / …)`,
+  `rgb(163 145 255 / …)`, `#8a4dff`), the dark canvas (`#0a0a0a`), or the
+  card color (`#121212`) in component CSS. Use the tokens: `--color-brand`,
+  `-hover`, `-press`, `-depth`, `-light`, `-ring`, `-foreground`,
+  `--color-sidebar`, `--color-app`, and `--color-card`. For a translucent tint, use
+  `color-mix(in srgb, var(--color-brand) 14%, transparent)`. A custom theme
+  (`html[data-theme="custom"]`) overrides only these tokens, so a hard-coded
+  value stays purple when the user picks another color.
+- The custom theme has four colors: Sidebar, Selected (the current page in
+  the sidebar), Accent, and Background. The accent gives the brand fill and its
+  hover, press, depth, and ring shades, and `--color-brand-foreground` (the
+  computed `--theme-accent-foreground`, so text stays readable on a light color
+  such as yellow). The surface, border, and text tokens come from one ladder
+  in `app.css` that mixes the readable text color into the background. The
+  sidebar uses the same ladder with the sidebar color, and it can have the
+  other light/dark scheme than the page (`data-sidebar-scheme`; `dark:`
+  utilities follow it). When you add a color token, give it a value in that
+  ladder.
+- A translucent fill on a control that sits directly on the page (not in a
+  card or table) shows the floating-navigation dots through it. Mix the tint
+  with the canvas instead:
+  `color-mix(in srgb, var(--color-brand) 6%, var(--color-app))`. Controls in
+  cards keep the translucent tint, so they blend with the card.
 
 ## P3. Scales
 
@@ -179,14 +216,55 @@ Class names below are examples. Keep the values and structure.
 
 - Three layers: the canvas (page and sidebar, `--ui-canvas`), the top header
   bar (`--ui-panel`, 48px high), and the cards on the canvas.
-- In dark mode, the header bar, the outer box of a top-level card, and the
-  header row of a table use the same color (`--ui-panel`). The card wells and
-  table rows are the darker content layer below them.
-- The sidebar is the canvas color and has a 1px `--ui-chrome-border` right
-  edge. The brand block (product name and version) at the top of the sidebar
-  column also uses the canvas color, with a 1px bottom border.
+- In dark mode, the outer box of a top-level card is
+  `color-mix(in srgb, var(--ui-panel) 66%, black)` (about `#0c0c0c`), and its
+  well is `--ui-panel` (`#121212`). Tables use the same pair: the darker mix
+  for the header row and `--ui-panel` for the rows.
+- In light mode the sidebar is the canvas color and has a 1px
+  `--ui-chrome-border` right edge. In the default dark theme the sidebar
+  column, including the logo cell, is `#120e1a` with a faint lavender right
+  edge (`rgb(163 145 255 / 0.10)`). The nav has a brand-purple wash that
+  starts at 9% and fades out; the logo cell has a flat 9% wash, so the two
+  read as one surface. A custom theme gets the neutral sidebar rules and its
+  own sidebar color.
+- The top bar matches the canvas. It has no bottom border at rest. After the
+  page scrolls under it, dark mode draws a neutral hairline
+  (`rgb(255 255 255 / 0.06)`), a translucent bar, blur, and a soft shadow.
+  The logo cell stays the solid sidebar color.
 - Keep the chrome borders faint. A strong border on near-black looks like a
   line drawn on the page.
+
+### App header (logo cell)
+
+- The logo cell is the top of the sidebar column, in the 48px top bar. It is
+  as wide as the sidebar: 224px expanded, 64px collapsed.
+- Expanded: the wordmark (15px semibold, tight tracking, `--ui-fg`), then the
+  version on the same baseline (10.5px medium, `--ui-fg-faint`), with 6px
+  between them and 16px side padding. An update badge sits at the right end.
+- Collapsed: only the 20px logo mark, centered. The cell gets a bottom border
+  so that it lines up with the top bar edge.
+- The update badge is a small pill: 18px high, 6px side padding, 9.5px
+  semibold text, fully rounded, a 10% fill, and a 25% inset ring of the same
+  color. It is purple in light mode and warning yellow in dark mode. While an
+  update runs, the same pill says "Updating". It hides when the sidebar is
+  collapsed.
+- The mobile drawer starts with the same wordmark and version in a 48px row
+  with a bottom border, and a 32px close button on the right. It has no update
+  badge.
+
+### Mobile header
+
+- Below the desktop breakpoint (1024px) a sticky top bar replaces the desktop
+  top bar and sidebar. It is about 56px high (12px vertical padding, 16px side
+  padding, 24px from 640px), translucent (95% of `--ui-panel`) with a small
+  blur, and has a faint bottom border.
+- Left: the logo mark (18px) in a 32px tile with an 8px radius and a neutral
+  fill (`rgb(255 255 255 / 6%)` in dark mode), then the team switcher. The
+  team name truncates.
+- Right, with 4px gaps: status indicators (configuration warnings, active
+  deployments), the update badge, the user menu, and a 36px sidebar button
+  (the same sidebar glyph as the desktop collapse toggle). The sidebar button
+  opens the drawer from the right.
 
 ### Sidebar navigation
 
@@ -205,21 +283,36 @@ Class names below are examples. Keep the values and structure.
     box-shadow: 0 2px 0 var(--ui-depth-color);
     transition: transform 80ms, box-shadow 80ms, border-color 120ms, background-color 120ms;
 }
-.dark .nav-tile { border-color: rgb(255 255 255 / 9%); background: rgb(255 255 255 / 4%); }
+.dark .nav-tile {
+    border-color: rgb(255 255 255 / 0.07);
+    background: rgb(255 255 255 / 0.03);
+    color: oklch(72% 0 0);
+}
 .nav-item:hover .nav-tile { transform: translateY(-1px); box-shadow: 0 3px 0 var(--ui-depth-color); }
 .nav-item:active .nav-tile { transform: translateY(2px); box-shadow: none; }
 .nav-item.is-active .nav-tile {
-    color: var(--ui-accent);
-    border-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
-    --ui-depth-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
+    color: #fff;
+    border-color: #8a4dff;
+    background: linear-gradient(180deg, var(--ui-accent-top), var(--ui-accent-bottom));
+    --ui-depth-color: var(--ui-accent-edge);
+    box-shadow: 0 2px 0 var(--ui-accent-edge);  /* no glow: the row clips it */
 }
 ```
 
 - Use outline icons (1.5px stroke) at 16px. A brand item can use a one-color
   brand mark when it is clearer than an outline icon.
-- Rows with a submenu end in a 12px chevron: accent in light mode, faint gray
-  in dark mode.
-- Group rows under 11px section labels, and separate groups with a 1px divider.
+- Rows with a submenu end in a 12px chevron. In dark mode the chevron is
+  hidden until the row is hovered, focused, or current.
+- Group rows under section labels (11px in light mode; 10.5px uppercase muted
+  gray in dark mode), and separate groups with a 1px divider.
+- Do not put a glow (a blurred `box-shadow`) on a tile. The current row clips
+  it, so it shows as a dim square behind the tile.
+- In the collapsed sidebar, Search is a tile like the other items: no row fill
+  and no frame around it. Only the expanded sidebar shows Search as an input.
+- A menu that replaces another menu in place starts with a back row: a
+  centered label and a 12px left chevron (`‹ Dashboard`).
+- The main menu has no row above its items. Dashboard is the first item, right
+  under Search, on every page.
 
 ### Card (outer box, title row, well)
 
@@ -230,7 +323,8 @@ Class names below are examples. Keep the values and structure.
     background: var(--ui-card-bg); box-shadow: var(--ui-card-shadow);
     overflow: visible;                      /* menus and tooltips must escape */
 }
-.dark .card { background: var(--ui-panel); }  /* top-level card: same as the header bar */
+.dark .card { background: color-mix(in srgb, var(--ui-panel) 66%, black); box-shadow: none; }  /* top-level card */
+.dark .card > .card-well { background: var(--ui-panel); box-shadow: none; }  /* top-level well */
 .card-header {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 16px; padding: 4px 8px 10px;
@@ -296,6 +390,7 @@ Class names below are examples. Keep the values and structure.
 
 - Use one primary button per area. Other actions are neutral buttons.
 - Destructive actions use the error color for text and focus ring.
+- With Appearance → Style → Flat, all buttons lose the raised edge.
 
 ### Menus, listboxes, and popovers
 
@@ -321,12 +416,11 @@ Class names below are examples. Keep the values and structure.
 ### Tables
 
 - Header row: 40px, 13px medium, `--ui-fg-faint`, and a 1px `--ui-divider`
-  bottom border. Fill: `rgb(0 0 0 / 2%)` in light mode, `--ui-panel` in dark
-  mode (the same as the header bar and the card outer box).
-- Dark mode rows use the card well color
-  (`color-mix(in srgb, var(--ui-panel) 66%, black)`, the same as
-  `--ui-well-bg` over the panel), so a table looks like a card: header on
-  top, content below.
+  bottom border. Fill: `rgb(0 0 0 / 2%)` in light mode,
+  `color-mix(in srgb, var(--ui-panel) 66%, black)` in dark mode (the same as
+  the card outer box).
+- Dark mode rows use the card well color (`--ui-panel`, `#121212`), so a
+  table looks like a card: header on top, content below.
 - Data rows: about 48px, 10px 16px padding, a 1px divider, and a faint hover
   fill. Put the row action at the far right.
 - Toolbar on top (search left; filter, sort, and add right), pagination in the
@@ -334,6 +428,17 @@ Class names below are examples. Keep the values and structure.
 - Use a table, not cards, for a collection that can grow.
 - Grid view tiles of a collection are cards without a well. In dark mode they
   are `--ui-panel`, the same as the header bar.
+
+### View switcher
+
+- A segmented control (`.view-toggle`) on the right of a collection toolbar.
+- Table and grid buttons are icon-only (30px square, 14px icon). The name is in
+  `title` and `aria-label`.
+- Show only the view that is not current. In table view the control shows the
+  grid icon; in grid view, the list icon. Do not show a selected pill for the
+  current view.
+- Text links stay labelled: the `Canvas` link with its "Try it" badge, and the
+  `List view` link that is the only way back from a canvas.
 
 ### Status badge
 
@@ -362,10 +467,27 @@ Class names below are examples. Keep the values and structure.
 
 - Modals use the card anatomy (outer box, title row, well), size to their
   content on desktop, and put the actions on the right below a divider. Use
-  `--ui-modal-shadow`.
+  `--ui-modal-shadow`. In dark mode the edge is only the 1px card border, with
+  no extra hairline ring outside it.
 - Toasts are compact cards (max width 26rem) with a status icon tile, a title,
   an optional description, and a dismiss button. They close after 4 seconds
   and pause on hover.
+- The toast edge blends into the toast background. In dark mode it is
+  `rgb(255 255 255 / 0.05)`, not the control border.
+- The status icon tile is 3D, like a navigation tile: a 1px border and a 2px
+  bottom edge in the status color (`currentColor` at 22% and 30%).
+
+### Command palette
+
+- In dark mode the palette has a light brand tint: the shell is
+  `color-mix(in oklab, #6b16ed 10%, <elevated>)` with a
+  `rgb(163 145 255 / 0.22)` ring, and the results body is 6% purple with a
+  `rgb(163 145 255 / 0.12)` ring. The search icon is `#a391ff`. The
+  placeholder is muted lavender.
+- On the selected (focused) row in dark mode, the parts on a purple fill are
+  white: the quick-command and type badges, the icon tile glyph (for example
+  the plus of a create row), and the chevron. Purple text on a purple fill is
+  not readable.
 
 ### Logs and code
 
@@ -439,15 +561,15 @@ The interface is compact and product-focused:
 
 - near-neutral layered surfaces instead of large bordered boxes;
 - 13–14px UI typography and 32px controls;
-- layer cards are a soft outer box around a darker inset well (see section 5),
+- layer cards are a soft outer box around an inset well (see section 5),
   with 1px borders and a restrained `0 1px 2px rgb(0 0 0 / 0.05)` lift, never
   heavy borders or a strong floating shadow;
 - full-width data tables for dense collections;
 - outline Reicon glyphs through `<x-reicon>`;
-- the Coolify purple brand accent in light mode;
-- the readable Coolify yellow accent in dark mode;
-- solid active-item fills (neutral black/white opacity), not accent gradients;
-  active state is a flat selected surface with no accent rail;
+- the Coolify purple brand accent in both themes (`#6b16ed`); yellow only for
+  real warnings, such as "Update available";
+- the active sidebar item is a purple gradient tile with a 2px depth edge and
+  no glow. The row itself stays transparent;
 - sentence-case labels and headings;
 - never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
   ASCII hyphen (`-`) for empty cells and separators.
@@ -527,19 +649,18 @@ the card well (`.dark .application-settings-section-body :is(.listbox-panel,
 ...)`).
 | `--coollabs-subtle` | 50% neutral | 70.8% neutral | labels and muted titles (light darkened for WCAG AA 4.5:1) |
 
-Accent behavior is intentionally theme-aware:
+Accent behavior uses Coolify purple in both themes. Brand tokens live in
+`@theme` as `--color-brand` (`#6b16ed`), `--color-brand-hover` (`#7317ff`),
+`--color-brand-press` (`#5a12c7`), `--color-brand-depth` (`#4a0fa3`), and
+`--color-brand-light` (`#a391ff`). Dark mode sets `--color-accent` to
+`--color-brand`. `--color-warning` stays yellow and is only for real warnings.
 
-- **Light mode:** Coolify purple (`coollabs`) for active controls, focus,
-  primary actions, and navigation accents.
-- **Dark mode:** Coolify yellow (`warning`) for the same states because the
-  original purple did not provide sufficient text and ring contrast.
-
-Do not hard-code blue focus rings or leave yellow accent utilities active in
-light mode. Primary action patterns should normally follow:
+Do not hard-code blue focus rings, and do not use `dark:text-warning` as a
+stand-in for the accent. Selected chips follow:
 
 ```html
 bg-coollabs/10 text-coollabs ring-coollabs/25
-dark:bg-warning/15 dark:text-warning dark:ring-warning/25
+dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25
 ```
 
 The filled top-level action/tab treatment uses the same palette at a restrained
@@ -554,16 +675,22 @@ lift off the content:
 - **Content canvas** is the base layer: `bg-app` in dark (deepest,
   `--color-app` `oklch(14.48% 0 0)`, sRGB 10,10,10), `bg-neutral-50` in light. The
   `<main>` content area and page body use it.
-- **Topbar chrome** uses `bg-panel` in dark (`--color-panel`
-  `oklch(19.13% 0 0)`, sRGB 20,20,20, a clear step lighter than the content canvas)
-  and `bg-white` in light, so the header reads as a separate panel. In dark
-  mode, top-level layer cards and table header rows use the same `--color-panel`.
+- **Topbar chrome** uses the canvas color in dark (`#0a0a0a`) and `bg-white`
+  in light. It has no bottom border until the page scrolls under it. Scrolling
+  adds `is-scrolled` on `<html>` (see `layouts/app.blade.php`) and the dark bar
+  becomes `rgb(10 10 10 / 0.72)` with blur and a neutral hairline. In dark
+  mode, top-level card wells and table rows use `--color-card` (`#121212`),
+  not the top bar.
 - **Desktop sidebar and the topbar brand block** (Coolify name and version)
-  use the content canvas color (`bg-neutral-50` / `dark:bg-app`). The sidebar
-  has a 1px right border, and the brand block has a 1px bottom border. These
-  chrome borders stay faint (`border-black/[0.06]`, `dark:border-white/[0.04]`);
-  do not use `dark:border-white/[0.06]`, which a global rule forces to the
-  solid hairline grey. The mobile drawer keeps `bg-panel` / `bg-white`.
+  use the canvas color in light mode. In the default dark theme they use
+  `--color-sidebar` (`#120e1a`): a vertical brand wash on the nav, a flat 9%
+  wash on the logo cell, and a lavender right edge. Inactive icon tiles,
+  Search, the account button, and section labels (10.5px uppercase mono) are
+  lavender. The Admin icon stays neutral. These purple rules use
+  `html.dark:not([data-theme="custom"])`; a custom theme keeps neutral tiles,
+  Search, and account button. Chevrons are hidden until the row is hovered,
+  focused, or current. Do not use `dark:border-white/[0.06]` on these chrome
+  edges; a global rule forces that utility to the solid hairline grey.
 
 Dark surface tokens are exact oklch equivalents of chosen sRGB steps. oklch
 lightness compresses toward pure black below ~15%, so check the rendered sRGB
@@ -571,23 +698,31 @@ value. The dark ladder is `--color-app` 10, `--color-panel` 20,
 `--coollabs-elevated` 22, `--coollabs-base` 28,
 `--coollabs-recessed` 34 (sRGB, r=g=b), which reads as distinct surfaces.
 
-Temperature: in both modes every panel is **pure neutral gray** (r=g=b).
-In dark mode, every surface token (`--color-app`, `--color-panel`,
-`--coollabs-*`, `--color-surface`, `--color-raised`, `--color-selected`,
-`--color-log`) has chroma 0, so menus, listbox panels, modals, logs, and the
-command palette match the canvas. Do not give one surface a cast (blue, warm,
-or purple). The light page canvas uses `bg-neutral-50` (not
+Temperature: the page canvas, cards, menus, listboxes, modals, and logs stay
+**pure neutral gray** (r=g=b). Do not tint those. The exceptions are the
+default dark sidebar (`--color-sidebar`, `#120e1a`, with a brand-purple wash)
+and the dark command palette (a faint brand-purple wash). A custom theme derives all
+of these surfaces from its background and sidebar colors (see the token rules in P2). The light page canvas uses `bg-neutral-50` (not
 `bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
-The only intentional color is the purple/yellow brand accent.
+The only intentional color is the purple brand accent. Yellow is for warnings.
 - **Layer cards** use the outer box and inset well from section 5.
+- **Top-level pages** (Projects, Servers, and the other section roots) do not
+  repeat the page title in the breadcrumb when that title is the visible `h1`.
+  Nested pages keep the full trail (project, environment, resource).
+- **Pagination** is hidden when there is only one page (both arrows disabled).
+- **Project cards** spell out their counts: "1 environment · 35 resources".
+- **The view switcher** (`x-canvas-view-toggle`,
+  `x-shared-variables.view-controls`) shows only the other view, as an icon
+  button: the grid icon in table view, the list icon in grid view. The labelled
+  `Canvas` link and the `List view` link on canvas pages keep their text.
 - **Tables and collection tiles** outside a layer card use the
   `rounded-xl border … dark:bg-white/[0.05]` shell plus the crisp
   `--coollabs-hairline` ring; in light they are `bg-white` with the ring and
   the restrained card lift. In dark mode these shells are painted like layer
   cards. A tile, a separate pagination bar, or an empty box is a card without a
-  well, so it is `--color-panel`. A table (a shell whose first child is a
-  `border-b` header row) has a `--color-panel` header row and rows in the well
-  color (`color-mix(in srgb, var(--color-panel) 66%, black)`).
+  well, so it is `--color-card` (`#121212`). A table (a shell whose first child is a
+  `border-b` header row) has a header row in the card outer color
+  (`color-mix(in srgb, var(--color-card) 66%, black)`) and `--color-card` rows.
   These rules match the Tailwind classes in `resources/css/app.css`, because
   the table shells are copied markup without a shared class.
 
@@ -606,15 +741,44 @@ color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
 - With the default tile items (not Appearance → Navigation items → Flat), each
   icon sits in a 30px 3D tile (16px icon, 6px padding, 1px border) in a 36px row.
 - With tile items, the row has no fill: the current item shows through its
-  accent tile (purple light, yellow dark) and its brighter label.
+  purple accent tile and its brighter label. The dark active tile has a 2px
+  depth edge and no glow, because the row (`overflow: hidden`) clips a glow
+  into a square.
+- In the collapsed desktop sidebar, Search is a tile like the other items. The
+  row fill is removed in `@layer utilities` (the button has a layered
+  `!important` fill utility that an unlayered rule cannot beat), and the dark
+  tile uses the same colors as the other tiles.
 - With Flat items, active rows are rounded pills (`rounded-md`) with a solid
   neutral selected fill (`bg-black/5` light, `bg-white/6` dark) and no accent
   rail. Hover rows use the same radius. Do not use accent-tinted gradients on nav
   rows; yellow washes look muddy on dark UI.
 - Nested items sit behind a thin 1px guide line (`.nav-children`) and use the
   same selected pill, not a thick box border.
-- The update badge sits on the version row and uses a tiny fully rounded
-  primary-action pill.
+- The logo cell (`.app-topbar-brand` in `layouts/app.blade.php`) is `w-56`
+  expanded and `w-16` collapsed. Expanded, it shows the `Coolify` wordmark
+  (`text-[15px] font-semibold tracking-tight`), `<x-version>`
+  (`text-[10.5px]`, `text-fg-faint` in dark), and the update badge
+  (`livewire:upgrade`, instance admins on self-hosted only) at `ml-auto`.
+  Collapsed, it shows only `/coolify-logo.svg` at `size-5` and adds
+  `border-b`.
+- The update badge sits on the version row: an 18px fully rounded pill with
+  9.5px semibold text. It is `bg-coollabs/10 text-coollabs ring-coollabs/25` in
+  light mode and the warning pill (`dark:bg-warning/15 dark:text-warning
+  dark:ring-warning/25`) in dark mode, because an update is a real warning.
+  While an upgrade runs it says "Updating". Both open the upgrade modal.
+- The mobile drawer header (`data-mobile-sidebar-brand`) repeats the wordmark
+  and version in an `h-12` row with a bottom border and a close button. It
+  does not show the update badge.
+- The mobile top bar (`MOBILE TOP BAR` in `layouts/app.blade.php`, `lg:hidden`)
+  is `sticky top-0 z-40`, `px-4 py-3 sm:px-6`, `bg-white/95 dark:bg-panel/95
+  backdrop-blur-sm` with `border-neutral-200/60 dark:border-white/[0.06]`.
+  Left: `/coolify-logo.svg` (18px) in a `size-8 rounded-lg bg-neutral-100
+  dark:bg-white/[0.06]` tile, then `livewire:switch-team`. Right (`gap-1`):
+  `#configuration-warning-hud-slot-mobile`, `deployments-indicator
+  variant="mobile"`, the update badge (`livewire:upgrade key="mobile-upgrade"`,
+  instance admins on self-hosted only), `x-top-user-menu`, and a `size-9`
+  button that toggles the drawer. Keep these in the same order as the desktop
+  top bar.
 - Submenu chevrons (the right chevron on rows that open a submenu and the back
   chevron) are `text-coollabs` in light mode and grey in dark mode
   (`dark:text-fg-faint` right, `dark:text-fg-dim` back).
@@ -632,6 +796,13 @@ in-flow resource heading, or legacy `.navbar-main` tabs to one resource type.
 
 Keep route-derived active state in Blade/Livewire. Do not rely only on Alpine
 state because it can disappear after polling or a Livewire morph.
+
+From `xl`, the resource menu replaces the main menu in the main sidebar
+(`x-main-nav-menu`, `registerMainNavContext()`, `components/navbar.blade.php`).
+Its back row (`‹ Dashboard`, `‹ Servers`, `‹ Service`) shows the menu one depth
+lower, without a page load. The main menu has no row that opens the resource
+menu again; to get back to it, open the resource again. Dashboard is always the
+first item under Search.
 
 The global topbar owns the current resource identity, its compact status
 badges, configuration warnings (`#configuration-warning-hud-slot`), and the
@@ -808,12 +979,14 @@ Anatomy:
 
 - soft outer box: 12px radius, 1px border, 6px padding, faint fill
   (`rgb(0 0 0 / 0.75%)` light). In dark mode a top-level card is
-  `--color-panel`, the same as the topbar; a nested card keeps
+  `color-mix(in srgb, var(--color-card) 66%, black)` and its well is
+  `--color-card` (`#121212`); a nested card keeps
   `rgb(255 255 255 / 6%)` over its parent;
 - small title row on the outer box (13px semibold title, 11px description and
   header links), no divider below it;
-- body is an inset well: 8px radius, 1px border, white in light and
-  `rgb(0 0 0 / 34%)` in dark;
+- body is an inset well: 8px radius, 1px border, white in light,
+  `--color-card` in a dark top-level card, and `rgb(0 0 0 / 34%)` in a dark
+  nested card;
 - 16px body padding;
 - optional `flush` mode for full-bleed tables;
 - card-level actions belong in the header slot;
@@ -831,9 +1004,9 @@ Some pages put a well (`.application-settings-section-body`) directly on the
 page without a card, for example the domains and environment variable tables.
 The well colors are defined on the well itself as well as on the card, so a
 standalone well keeps its background and border. In dark mode a standalone well
-uses the card outer-box surface (`--card-bg`, `--card-border`) instead of the
-black well fill, because the black fill directly on the canvas is darker than
-the page. An `x-empty` inside a
+matches a top-level card: its content is `--color-card` (`#121212`), and a
+table header row in it is the darker card outer color
+(`color-mix(in srgb, var(--color-card) 66%, black)`). An `x-empty` inside a
 standalone well shows only its centered text, as it does inside a card.
 
 Inside the dark well, controls use a darker translucent fill and border
@@ -1140,7 +1313,11 @@ top-anchored overlay:
 - create rows use a neutral plus tile that only picks up the accent when the
   row is focused;
 - type pills and quickcommand chips stay recessed; they tint with the accent
-  only on the focused row;
+  only on the focused row. In dark mode the text of the focused row's chips,
+  its icon tile glyph, and its chevron are white;
+- in dark mode the shell, header, and results body carry the brand-purple
+  tint from Part 1 (rules after the dark `.view-toggle` rules in
+  `resources/css/app.css`). Light mode stays neutral;
 - neutral thin scrollbar inside the results body (not brand-colored);
 - create-resource modals opened from the palette reuse the standard
   `application-settings-section` layer-card shell.
@@ -1157,7 +1334,10 @@ server → destination → project → environment create flow.
 Current toast behavior:
 
 - compact layered card, maximum width 26rem;
-- Reicon status tile for success, info, warning, danger, or default;
+- Reicon status tile for success, info, warning, danger, or default. The tile
+  (`.toast-icon`) is 3D: a border and a 2px bottom edge in the status color;
+- a faint edge (`.toast-card`, dark `rgb(255 255 255 / 0.05)`) that blends into
+  the toast background;
 - title plus optional description;
 - dismiss and copy-details actions;
 - normally up to four stacked notifications, without evicting persistent notices;

@@ -2,7 +2,7 @@
     <x-unsaved-bar action="submit" />
 
     <x-application.settings-section title="Service details"
-        description="Manage the identity and Compose configuration for this service.">
+        description="Manage the identity, Compose configuration, and network of this service.">
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (isDev())
@@ -49,15 +49,13 @@
                 placeholder="My WordPress site" />
             <x-forms.input canGate="update" :canResource="$service" id="description" label="Description" />
         </div>
-    </x-application.settings-section>
-
-    <x-application.settings-section title="Network"
-        description="Control whether this Compose stack joins Coolify's predefined network.">
-        <x-forms.listbox canGate="update" :canResource="$service" id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
-            :disabled="! auth()->user()->can('update', $service)" :options="[
-                ['value' => false, 'label' => 'Use the stack network only'],
-                ['value' => true, 'label' => 'Connect to the predefined Coolify network'],
-            ]" />
+        <x-application.settings-subsection id="service-network-section" title="Network" helper="Control whether this Compose stack joins Coolify's predefined network.">
+            <x-forms.listbox canGate="update" :canResource="$service" id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
+                :disabled="! auth()->user()->can('update', $service)" :options="[
+                    ['value' => false, 'label' => 'Use the stack network only'],
+                    ['value' => true, 'label' => 'Connect to the predefined Coolify network'],
+                ]" />
+        </x-application.settings-subsection>
     </x-application.settings-section>
 
     @if ($fields->count() > 0)
@@ -79,7 +77,9 @@
                                 <x-helper helper="Variable name: {{ $serviceName }}" />
                             @endif
                         </div>
-                        @if ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
+                        @if (data_get($field, 'isLocked'))
+                            <x-forms.input disabled value="Locked (shown once)" />
+                        @elseif ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
                             <x-forms.input disabled value="Hidden (only admins can view)" />
                         @else
                             <x-forms.input canGate="update" :canResource="$service"

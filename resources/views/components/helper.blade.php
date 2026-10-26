@@ -92,7 +92,7 @@
 
         this.style += ` top: ${top}px; left: ${left}px;`;
     }
-}" @pointerdown.window="closeWhenPointerIsOutside($event)" @keydown.window.escape="close"
+}" x-id="['helper-popup']" @pointerdown.window="closeWhenPointerIsOutside($event)" @keydown.window.escape="close"
     @resize.window="open && position()" @scroll.window="open && position()"
     {{ $attributes->merge(['class' => 'relative inline-flex align-middle']) }}>
     {{-- button (not div) so label-for associations do not steal the click on mobile --}}
@@ -114,18 +114,21 @@
                 aria-hidden="true" />
         @endisset
     </button>
-    <div x-ref="popup" x-show="open" x-cloak :id="$id('helper-popup')" role="tooltip"
-        x-transition:enter="transition ease-out duration-100"
-        x-transition:enter-start="opacity-0 translate-y-0.5"
-        x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-75"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        :style="style"
-        class="info-helper-popup fixed z-[10000] w-max max-w-[min(20rem,calc(100vw-2rem))] whitespace-normal"
-        @mouseenter="cancelHide()" @mouseleave="hide()" @focusout="closeWhenFocusLeaves()" @click.stop>
-        <div class="px-3 py-2.5 text-[13px] leading-5">
-            {!! $helper !!}
+    {{-- teleported so a dropdown or other stacking context cannot put it under the sidebar --}}
+    <template x-teleport="body">
+        <div x-ref="popup" x-show="open" x-cloak :id="$id('helper-popup')" wire:key="helper-popup" role="tooltip"
+            x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="opacity-0 translate-y-0.5"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-75"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            :style="style"
+            class="info-helper-popup fixed z-[10000] w-max max-w-[min(20rem,calc(100vw-2rem))] whitespace-normal"
+            @mouseenter="cancelHide()" @mouseleave="hide()" @focusout="closeWhenFocusLeaves()" @click.stop>
+            <div class="px-3 py-2.5 text-[13px] leading-5">
+                {!! $helper !!}
+            </div>
         </div>
-    </div>
+    </template>
 </div>

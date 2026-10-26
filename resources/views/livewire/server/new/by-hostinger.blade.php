@@ -9,7 +9,7 @@
                 New to Hostinger?
                 <a href="https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io" target="_blank"
                     rel="noopener noreferrer"
-                    class="font-medium text-coollabs hover:underline dark:text-warning">Create an account</a>
+                    class="font-medium text-coollabs hover:underline dark:text-brand-light">Create an account</a>
                 through Coolify's affiliate link.
             </p>
         </div>

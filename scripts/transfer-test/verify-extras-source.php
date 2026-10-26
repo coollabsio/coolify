@@ -21,6 +21,7 @@ $check('runner config disabled on the source', GithubRunnerConfig::where('server
 $check('runner execution cancelled on the source', GithubRunnerExecution::where('runner_name', 'coolify-runner-fake')->value('status')?->value === 'cancelled');
 $record = ManagedDnsRecord::where('name', 'whoami2.example.test')->first();
 $check('source keeps the DNS record for a take back, not owned', $record !== null && $record->owned === false);
+$check('source keeps the tunnel SSH DNS record for a take back, not owned', ManagedDnsRecord::where('name', 'ssh-debian.example.test')->value('owned') === false);
 $check('precheck NOTE about the system-wide GitHub App', $messages->contains(fn ($m) => str_starts_with($m, "NOTE: the system-wide GitHub App 'fake-system-wide-app'")));
 $checklist = implode("\n", (array) ($migration['checklist'] ?? []));
 $check('checklist: GitHub App URLs', str_contains($checklist, 'GitHub App fake-gh-app'));

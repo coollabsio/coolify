@@ -28,9 +28,9 @@ class Select extends Component
 
     public bool $onlyBuildServerAvailable = false;
 
-    public ?Collection $standaloneDockers;
+    public ?Collection $standaloneDockers = null;
 
-    public ?Collection $swarmDockers;
+    public ?Collection $swarmDockers = null;
 
     public array $parameters;
 
@@ -79,11 +79,14 @@ class Select extends Component
             $queryDestination = request()->query('destination');
 
             if ($queryType === 'postgresql' && $queryServerId !== null && $queryDestination) {
-                $this->type = $queryType;
-                $this->server_id = $queryServerId;
-                $this->destination_uuid = $queryDestination;
-                $this->server = Server::ownedByCurrentTeam()->find($queryServerId);
-                $this->current_step = 'select-postgresql-type';
+                $server = Server::isUsable()->whereKey($queryServerId)->first();
+                if ($server && $this->findDestination($server, $queryDestination)) {
+                    $this->type = $queryType;
+                    $this->server_id = $server->id;
+                    $this->destination_uuid = $queryDestination;
+                    $this->server = $server;
+                    $this->current_step = 'select-postgresql-type';
+                }
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -433,20 +436,23 @@ class Select extends Component
         if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
-                $this->setServer($server);
+                $this->setServer($server->id);
             }
         }
         if (! is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
-                return $this->setServer($foundServer);
+                return $this->setServer($foundServer->id);
             }
         }
         $this->current_step = 'servers';
     }
 
-    public function setServer(Server $server)
+    public function setServer(int $serverId)
     {
+        $server = $this->servers?->firstWhere('id', $serverId);
+        abort_unless($server instanceof Server, 404);
+
         $this->server_id = $server->id;
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
@@ -465,9 +471,16 @@ class Select extends Component
 
     public function setDestination(string $destination_uuid)
     {
+        abort_unless($this->server && $this->findDestination($this->server, $destination_uuid), 404);
+
         $this->destination_uuid = $destination_uuid;
 
         return $this->whatToDoNext();
+    }
+
+    private function findDestination(Server $server, string $destinationUuid): ?object
+    {
+        return $server->standaloneDockers->concat($server->swarmDockers)->firstWhere('uuid', $destinationUuid);
     }
 
     public function setPostgresqlType(string $type)
