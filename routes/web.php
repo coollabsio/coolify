@@ -34,6 +34,7 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\ImageScan\ServerImageScanning;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
@@ -525,6 +526,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
             Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
             Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
+            Route::get('/security/image-scanning', ServerImageScanning::class)->name('server.security.image-scanning')->middleware('can.update.resource');
             Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
         });
         Route::get('/destinations', DestinationIndex::class)->name('destination.index');

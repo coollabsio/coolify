@@ -2,6 +2,7 @@
 
 use App\Livewire\Server\New\ByHetzner;
 use App\Models\CloudProviderToken;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
@@ -148,6 +149,7 @@ describe('Boarding Flow Integration', function () {
     uses(RefreshDatabase::class);
 
     beforeEach(function () {
+        InstanceSettings::forceCreate(['id' => 0]);
         // Create a team with owner that has boarding enabled
         $this->team = Team::factory()->create([
             'show_boarding' => true,
@@ -219,7 +221,7 @@ describe('Boarding Flow Integration', function () {
             ->assertSeeHtml('x-text="current">Select SSH keys</span>');
     });
 
-        test('shows the cloud init script name only when saving the script', function () {
+    test('shows the cloud init script name only when saving the script', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
             ->set('show_cloud_init_script', true)
@@ -235,6 +237,7 @@ describe('Hetzner data loading', function () {
     uses(RefreshDatabase::class);
 
     beforeEach(function () {
+        InstanceSettings::forceCreate(['id' => 0]);
         $this->team = Team::factory()->create();
         $this->user = User::factory()->create();
         $this->team->members()->attach($this->user->id, ['role' => 'owner']);

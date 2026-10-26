@@ -1,0 +1,94 @@
+<div>
+    <x-slot:title>
+        {{ data_get_str($server, 'name')->limit(10) }} > Image Scanning | Coolify
+    </x-slot>
+
+    <livewire:server.navbar :server="$server" />
+
+    @php
+        $costText = 'Scans use up to 1 CPU and 1 GB of memory while they run, and about 1.2 GB of disk, plus temporary space for one image.';
+        $pullState = match ($prepareState) {
+            'pulling' => 'running',
+            'updating_database', 'ready' => 'success',
+            'failed' => $failedStep === 'pulling' ? 'error' : 'success',
+            default => 'idle',
+        };
+        $databaseState = match ($prepareState) {
+            'pulling' => 'pending',
+            'updating_database' => 'running',
+            'ready' => 'success',
+            'failed' => $failedStep === 'updating_database' ? 'error' : 'pending',
+            default => 'idle',
+        };
+    @endphp
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="security" activeSubMenu="image-scanning" />
+
+        <div class="application-settings-form flex w-full flex-col gap-6">
+            <x-application.settings-section id="server-image-scanning-section" title="Image Scanning"
+                helper="Scan the images on this server for known vulnerabilities before and after deployments.">
+                @if (! $allowed)
+                    <x-empty size="sm" title="Image scanning is turned off for this Coolify instance." />
+                @elseif (! $enabled)
+                    <x-empty size="sm" icon-name="shield-alert" title="Image scanning is off for {{ $server->name }}."
+                        description="{{ $costText }}">
+                        <x-slot:actions>
+                            @can('update', $server)
+                                <x-modal-confirmation title="Turn on image scanning?" buttonTitle="Turn on image scanning"
+                                    isHighlightedButton submitAction="enable" temporaryDisableTwoStepConfirmation
+                                    :confirmWithText="false" :confirmWithPassword="false" :actions="[$costText]"
+                                    step2ButtonText="Turn on image scanning" />
+                            @else
+                                <span class="text-[13px] text-neutral-500 dark:text-fg-faint">Ask a team admin to turn it
+                                    on.</span>
+                            @endcan
+                        </x-slot:actions>
+                    </x-empty>
+                @else
+                    <div class="flex flex-col gap-4">
+                        <div class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.08] dark:border-white/[0.08]">
+                            <x-checkpoint-item title="Get scanner" icon="download" :status="$pullState"
+                                :description="match ($pullState) {
+                                    'running' => 'Pulling the scanner images.',
+                                    'success' => 'The scanner images are on this server.',
+                                    'error' => 'Coolify could not pull the scanner images. Check that the server can reach ghcr.io.',
+                                    default => 'Not done yet.',
+                                }" />
+                            <x-checkpoint-item title="Update database" icon="database" :status="$databaseState"
+                                :description="match ($databaseState) {
+                                    'running' => 'Downloading the vulnerability database.',
+                                    'success' => $builtAt ? 'Database built ' . $builtAt->diffForHumans() . '.' : 'The vulnerability database is up to date.',
+                                    'error' => 'Coolify could not download the vulnerability database.',
+                                    default => 'Not done yet.',
+                                }" />
+                        </div>
+
+                        <p class="text-[12px] text-neutral-500 dark:text-fg-faint">{{ $costText }}</p>
+
+                        @can('update', $server)
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if ($prepareState === null || $prepareState === 'failed')
+                                    <x-forms.button type="button" wire:click="prepareScanner">
+                                        {{ $prepareState === 'failed' ? 'Try again' : 'Get scanner' }}
+                                    </x-forms.button>
+                                @endif
+                                <x-forms.button type="button" wire:click="disable">
+                                    Turn off image scanning
+                                </x-forms.button>
+                                <x-modal-confirmation title="Delete scanner data?" buttonTitle="Delete scanner data"
+                                    isErrorButton submitAction="deleteScannerData" temporaryDisableTwoStepConfirmation
+                                    :confirmWithText="false" :confirmWithPassword="false" :actions="[
+                                        'Coolify removes the stored SBOMs, the vulnerability database, and the scanner images from this server.',
+                                        'Scan results in Coolify stay. The next scan gets the scanner again.',
+                                    ]"
+                                    step2ButtonText="Delete scanner data" />
+                            </div>
+                        @endcan
+                    </div>
+                @endif
+            </x-application.settings-section>
+        </div>
+    </div>
+</div>
