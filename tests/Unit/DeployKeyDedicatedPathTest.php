@@ -262,8 +262,8 @@ it('uses the per-deployment deploy key for pull request fetches', function () us
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
 
-    expectCommandListToContain($result['commands'], "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify");
-    expectCommandListNotToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListToContain($result['commands'], "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify");
+    expectCommandListNotToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
@@ -282,6 +282,6 @@ it('does not force a missing per-deployment key for other repository pull reques
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
 
-    expectCommandListToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
     expectCommandListNotToContain($result['commands'], $keyPath);
 });
