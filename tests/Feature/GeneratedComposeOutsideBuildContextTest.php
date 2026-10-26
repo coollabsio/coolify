@@ -71,6 +71,7 @@ beforeEach(function () {
 });
 
 it('writes the generated compose file to the workdir only after the image build', function (string $buildPack, string $deployMethod) {
+    // Application clears the inline Dockerfile when the build pack changes away from dockerfile.
     $this->application->update(['build_pack' => $buildPack]);
     $job = new ApplicationDeploymentJob($this->deployment->id);
     // handle() detects buildx on the server before it starts a deployment.
@@ -83,6 +84,10 @@ it('writes the generated compose file to the workdir only after the image build'
 
     $buildIndex = $this->commands->search(fn (string $command) => str_contains($command, 'bash /artifacts/build.sh'));
     $composeWriteIndex = $this->commands->search(fn (string $command) => str_contains($command, 'tee /artifacts/compose-outside-build-context/docker-compose.yaml'));
+
+    if ($buildPack === 'nixpacks') {
+        expect($this->commands->contains(fn (string $command) => str_contains($command, 'nixpacks build')))->toBeTrue();
+    }
 
     expect($buildIndex)->not->toBeFalse()
         ->and($composeWriteIndex)->not->toBeFalse()
