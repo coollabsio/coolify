@@ -553,3 +553,18 @@ function clone_application(Application $source, $destination, array $overrides =
 
     return $newApplication;
 }
+
+/**
+ * The SSH command that git uses to reach a repository.
+ * The keepalive options stop a stalled connection after about one minute; without them git waits until the deployment timeout.
+ */
+function gitSshCommand(int|string $port, ?string $identityFile = null, bool $identitiesOnly = true): string
+{
+    $command = "ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p {$port} -o Port={$port} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+
+    if ($identityFile !== null) {
+        $command .= " -i {$identityFile}".($identitiesOnly ? ' -o IdentitiesOnly=yes' : '');
+    }
+
+    return $command;
+}
