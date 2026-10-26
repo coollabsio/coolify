@@ -254,6 +254,45 @@ describe('deploy anyway', function () {
         ]));
     });
 
+    it('queues on the server and destination of the blocked deployment and pins the blocked image', function () {
+        $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => 'latest']);
+        $additional = Server::factory()->create(['team_id' => $this->team->id]);
+        $additionalDestination = StandaloneDocker::query()->where('server_id', $additional->id)->firstOrFail();
+        $this->application->additional_servers()->attach($additional->id, ['standalone_docker_id' => $additionalDestination->id]);
+        $digest = 'nginx@sha256:'.str_repeat('b', 64);
+        $deployment = surfacesDeployment([
+            'server_id' => $additional->id,
+            'server_name' => $additional->name,
+            'destination_id' => $additionalDestination->id,
+            'only_this_server' => true,
+            'scan_gate_result' => [...surfacesBlockedResult(), 'repo_digest' => $digest],
+        ]);
+
+        surfacesShow($this->admin, $deployment)->call('deployAnyway')->assertDispatched('success', 'Deploy started.');
+
+        $queued = ApplicationDeploymentQueue::query()->whereKeyNot($deployment->id)->sole();
+        expect($queued->server_id)->toBe($additional->id)
+            ->and((int) $queued->destination_id)->toBe($additionalDestination->id)
+            ->and((bool) $queued->only_this_server)->toBeTrue()
+            ->and($queued->scan_gate_result)->toBe(['repo_digest' => $digest])
+            ->and($queued->isImageScanBlocked())->toBeFalse()
+            ->and($queued->isImageScanSkipped())->toBeFalse();
+    });
+
+    it('does not pin a built image or queue on a server that is not one of the application', function () {
+        $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+        $deployment = surfacesDeployment([
+            'server_id' => $otherServer->id,
+            'scan_gate_result' => [...surfacesBlockedResult(), 'repo_digest' => 'app@sha256:'.str_repeat('b', 64)],
+        ]);
+
+        surfacesShow($this->admin, $deployment)->call('deployAnyway')->assertDispatched('success', 'Deploy started.');
+
+        $queued = ApplicationDeploymentQueue::query()->whereKeyNot($deployment->id)->sole();
+        expect($queued->server_id)->toBe($this->server->id)
+            ->and($queued->scan_gate_result)->toBeNull();
+    });
+
     it('refuses a deployment that was not blocked', function () {
         $deployment = surfacesDeployment();
 

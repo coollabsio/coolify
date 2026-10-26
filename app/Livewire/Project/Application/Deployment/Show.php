@@ -6,6 +6,8 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
 use App\Models\ImageScan;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Services\ImageScan\ImageRef;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Support\Str;
@@ -146,6 +148,14 @@ class Show extends Component
                 return;
             }
 
+            // The same server and destination as the blocked deployment, and the image it blocked.
+            $server = $this->deploymentServer($deployment);
+            $destination = $server === null ? null : StandaloneDocker::query()
+                ->whereKey($deployment->destination_id)
+                ->where('server_id', $server->id)
+                ->first();
+            $pinnedImage = data_get($deployment->scan_gate_result, 'repo_digest');
+
             $deploymentUuid = new_public_id();
             $result = queue_application_deployment(
                 application: $this->application,
@@ -154,8 +164,12 @@ class Show extends Component
                 commit: $deployment->commit,
                 force_rebuild: false,
                 git_type: $deployment->git_type,
+                server: $server,
+                destination: $destination,
+                only_this_server: (bool) $deployment->only_this_server,
                 docker_registry_image_tag: $deployment->docker_registry_image_tag,
                 scan_gate_bypassed_by: auth()->id(),
+                scan_gate_pinned_image: $this->application->build_pack === 'dockerimage' && is_string($pinnedImage) ? $pinnedImage : null,
             );
             if ($result['status'] !== 'queued') {
                 $this->dispatch('error', 'Deploy did not start.', $result['message']);
@@ -174,6 +188,18 @@ class Show extends Component
         } catch (Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * The server of a deployment when it is the destination server or an additional server of the application.
+     */
+    private function deploymentServer(ApplicationDeploymentQueue $deployment): ?Server
+    {
+        $servers = collect([$this->application->destination?->server])
+            ->concat($this->application->additional_servers()->get())
+            ->filter(fn ($server) => $server instanceof Server);
+
+        return $servers->first(fn (Server $server) => (int) $server->id === (int) $deployment->server_id);
     }
 
     /**
