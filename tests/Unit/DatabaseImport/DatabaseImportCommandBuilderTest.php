@@ -75,7 +75,7 @@ test('builds dump-all commands and postgres safety scan', function () {
         ->toContain('unable to inspect custom archive')
         ->not->toContain('then exit 0')
         ->and($script)
-        ->toContain("tr '\\n\\r\\t'");
+        ->toContain("tr '\\n\\r' '~~'");
 });
 
 test('restores dump-all PostgreSQL custom archives with pg_restore from the decompressed stream', function () {

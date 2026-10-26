@@ -100,11 +100,15 @@ class DatabaseBackupFileValidator
             return false;
         }
 
-        // Token separator PostgreSQL treats as whitespace: real whitespace or a block comment.
-        $sep = '(?:\s|/\*[^*]*\*/)';
+        // Token separator PostgreSQL treats as whitespace: real whitespace, a block comment
+        // (the lazy match can extend to the outer end of a nested comment), or a line
+        // comment. Comment forms also match inside string literals, which can only block
+        // more input, never less.
+        $sep = '(?:\s|/\*.*?\*/|--[^\r\n]*[\r\n])';
 
         // psql meta-commands that spawn a shell, matched at a statement boundary.
-        if (preg_match('~(?:^|;)'.$sep.'*\\\\(?:!|copy'.$sep.'+[^;]*'.$sep.'+program|(?:o|g|w)\s*\|)~mi', $sql) === 1) {
+        // A regex error (for example the backtrack limit) returns false and blocks.
+        if (preg_match('~(?:^|;)'.$sep.'*\\\\(?:!|copy'.$sep.'+[^;]*'.$sep.'+program|(?:o|g|w)'.$sep.'*\|)~mis', $sql) !== 0) {
             return true;
         }
 
@@ -112,7 +116,7 @@ class DatabaseBackupFileValidator
         // a server-side large-object import or export, or ALTER SYSTEM. Comments are no
         // longer stripped first, because that cut inside string literals; a commented-out
         // PROGRAM statement is now blocked too, which is the safer default.
-        return preg_match('~(?:from|to)'.$sep.'+program|lo_(?:import|export)\s*\(|alter'.$sep.'+system'.$sep.'+(?:set|reset)~i', $sql) === 1;
+        return preg_match('~(?:from|to)'.$sep.'+program|lo_(?:import|export)'.$sep.'*\(|alter'.$sep.'+system'.$sep.'+(?:set|reset)~is', $sql) !== 0;
     }
 
     private static function extensionFor(string $name): ?string

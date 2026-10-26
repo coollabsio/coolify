@@ -174,6 +174,10 @@ test('postgresql backup safety scanner detects program execution payloads', func
     'copy from program' => ["COPY pwned FROM PROGRAM 'id';"],
     'copy to program' => ["COPY pwned TO PROGRAM 'cat > /tmp/out';"],
     'copy with block comment' => ["COPY pwned FROM/**/PROGRAM 'id';"],
+    'copy with asterisks in block comment' => ["COPY pwned FROM/*a*b*/PROGRAM 'id';"],
+    'copy with nested block comment' => ["COPY pwned FROM /* a /* b */ c */ PROGRAM 'id';"],
+    'copy with line comment' => ["COPY pwned FROM--note\nPROGRAM 'id';"],
+    'copy with mixed comments' => ["COPY pwned FROM /* -- */\n-- c\r\nPROGRAM 'id';"],
     'psql shell command' => ["\\! id\n"],
     'psql copy program' => ["\\copy pwned from program 'id'\n"],
     'psql shell command after statement' => ["SELECT 1; \\! id\n"],
@@ -292,6 +296,12 @@ test('remote postgresql scanner blocks bypass payloads', function (string $conte
     'psql shell escape' => ["\\! id\n", false],
     'copy from program' => ["COPY x FROM PROGRAM 'id';\n", false],
     'copy with block comment' => ["COPY x FROM/**/PROGRAM 'id';\n", false],
+    'copy with asterisks in block comment' => ["COPY x FROM/*a*b*/PROGRAM 'id';\n", false],
+    'copy with nested block comment' => ["COPY x FROM /* a /* b */ c */ PROGRAM 'id';\n", false],
+    'copy with line comment' => ["COPY x FROM--note\nPROGRAM 'id';\n", false],
+    'copy with marker char in line comment' => ["COPY x FROM -- a~b\nPROGRAM 'id';\n", false],
+    'copy with mixed comments' => ["COPY x FROM /* -- */\n-- c\r\nPROGRAM 'id';\n", false],
+    'copy with block comment across lines' => ["COPY x FROM /* a\n-- */ PROGRAM 'id';\n", true],
     'copy split across lines' => ["COPY x FROM\nPROGRAM 'id';\n", false],
     'copy to program' => ["COPY x TO PROGRAM 'cat > /tmp/x';\n", false],
     'psql pipe redirect' => ["\\o | id\n", false],
@@ -324,6 +334,7 @@ test('remote postgresql scanner allows legitimate restores', function (string $c
     'gzipped clean dump' => ["CREATE TABLE users (id int);\n", true],
     'copy keyword without program' => ["COPY users (id, name) FROM stdin;\n1\tTaylor\n\\.\n", false],
     'program word alone in data' => ["COPY notes FROM stdin;\n1\tfinished the program today\n\\.\n", false],
+    'comments between other words' => ["SELECT a FROM /* x */ t -- note\nWHERE b ~ 'program';\n", false],
 ]);
 
 test('the postgres safety command survives the non-root sudo parser', function (string $content, bool $blocked) {

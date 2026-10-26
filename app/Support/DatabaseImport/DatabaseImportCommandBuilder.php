@@ -109,25 +109,33 @@ SH;
 
         $escapedPath = escapeshellarg($path);
 
-        // Token separator PostgreSQL treats as whitespace: real whitespace or a
-        // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
-        $sep = '([[:space:]]|/\\*[^*]*\\*/)';
+        // Token separator PostgreSQL treats as whitespace: real whitespace, a /* ... */
+        // block comment (also nested or holding asterisks), or a -- comment through the
+        // line end. The joined scan maps line ends to '~' (after it deletes every real
+        // '~'), so a -- comment ends at the next '~'. Comment forms also match inside
+        // string literals, which can only block more input, never less.
+        $sep = '([[:space:]]|~|/\\*.*\\*/|--[^~]*~)';
 
         // A TO/FROM PROGRAM token pair anywhere (so it is also found inside DO blocks,
         // EXECUTE strings and function bodies), a server-side large-object import or
         // export, or ALTER SYSTEM. The pair is matched without the former (^|;) anchor
         // and [^;]* limit, which a ';' inside a string literal or dynamic SQL bypassed.
         $sqlPattern = "(from|to){$sep}+program|lo_(import|export){$sep}*\\(|alter{$sep}+system{$sep}+(set|reset)";
-        // psql meta-commands that spawn a shell: \!, \copy ... program, and \o/\g/\w
-        // piped to a command. Matched at a statement boundary (line start or after ';').
-        $psqlPattern = "(^|;){$sep}*\\\\(!|copy{$sep}+[^;]*{$sep}+program|(o|g|w){$sep}*\\|)";
+        // psql meta-commands that can run a shell command, anywhere on a line (a meta-command
+        // may follow SQL without a ';'). An odd backslash run starts a meta-command; COPY data
+        // writes a literal backslash as "\\", so its rows do not match. Blocked: \!, output
+        // piped by \o/\out/\g/\gx/\w/\write, \copy ... program, \setenv and the editor commands,
+        // the include commands (they run a file that \o or \copy wrote), and backquotes in the
+        // arguments of a command. \n, \b, \v and \N are COPY escapes that psql does not know,
+        // and psql does not expand backquotes for unknown commands.
+        $psqlPattern = '(^|[^\\\\])(\\\\\\\\)*\\\\(!|(o|out|gx?|w|write)[[:space:]][^\\\\]*\||copy[[:space:]].*program|(setenv|e|edit|ef|ev|i|ir|include|include_relative)([[:space:]]|$)|([^nbv[:space:]\\\\]|[nbv][^[:space:]\\\\])[^[:space:]\\\\]*[[:space:]][^\\\\]*`)';
         $escapedSqlPattern = escapeshellarg($sqlPattern);
         $escapedPsqlPattern = escapeshellarg($psqlPattern);
         $contents = "{ gunzip -cf {$escapedPath} 2>/dev/null || cat {$escapedPath}; }";
         // Comments are no longer stripped: deleting the rest of a line on "--" also cut
         // inside string literals, which let "SELECT '--'; COPY ... PROGRAM" slip through.
         // A commented-out PROGRAM statement is now blocked too, which is the safer default.
-        $scan = static fn (string $source): string => "{$source} | LC_ALL=C grep -Eiq {$escapedPsqlPattern} || {$source} | tr '\\n\\r\\t' '   ' | LC_ALL=C grep -Eiq {$escapedSqlPattern}";
+        $scan = static fn (string $source): string => "{$source} | LC_ALL=C grep -Eiq {$escapedPsqlPattern} || {$source} | tr -d '~' | tr '\\n\\r' '~~' | LC_ALL=C grep -Eiq {$escapedSqlPattern}";
         $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
         $sqlScan = $scan($contents);
         $blockedProgram = 'echo \'Blocked PostgreSQL restore: the backup contains a COPY ... PROGRAM, psql shell command, lo_import/lo_export, or ALTER SYSTEM pattern. If you trust this dump, restore it from the database container terminal.\'; exit 1';
