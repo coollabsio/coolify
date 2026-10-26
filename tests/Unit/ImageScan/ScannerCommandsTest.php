@@ -83,7 +83,7 @@ it('starts every command list by removing a leftover scan container', function (
 
 it('runs every scanner container with each hardening flag exactly once', function () {
     $flags = ['--rm ', '--name coolify-scan-'.SCANNER_TEST_RUN_ID.' ', '--cap-drop ALL ', '--security-opt no-new-privileges ', '--read-only ',
-        '--pids-limit 256 ', '--user 65534:65534 ', '--cpus 1 ', '--memory 1g ',
+        '--pids-limit 256 ', '--user 65534:65534 ', '--cpus 1 ', '--memory 1g ', '--memory-swap 1g ',
         "-e 'SYFT_CHECK_FOR_APP_UPDATE=false' ", "-e 'GRYPE_CHECK_FOR_APP_UPDATE=false' ", "-e 'XDG_CACHE_HOME=/scratch/cache' "];
     $runs = 0;
 
@@ -154,7 +154,6 @@ it('passes image refs as escaped shell arguments', function () {
     $script = fn (array $commands) => implode("\n", scannerUnwrapped($commands));
 
     expect($script($this->commands->inspect('localhost:5000/team/app:1.2')))->toContain("'localhost:5000/team/app:1.2'")
-        ->and($script($this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX)))->toContain("docker save -o '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/in/image.tar' 'nginx'")
         ->and($script($this->commands->sbomFromRegistry($digestRef, 'linux/amd64', 'c1', null)))->toContain("'--platform' 'linux/amd64' 'registry:{$digestRef}'")
         ->and($script($this->commands->digest($digestRef, null, null)))->toContain("'image' 'digest' '{$digestRef}'")
         ->and($script($this->commands->tags('nginx:1', null)))->toContain("'tag' 'ls' 'docker.io/library/nginx'");
@@ -185,7 +184,7 @@ it('writes the SBOM to a temp file and moves it into place after Syft succeeds',
     $commands = $this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX);
     $index = collect($commands)->search(fn (string $line) => str_contains($line, 'docker-archive:'));
     $syft = scannerUnwrapped($commands)[$index];
-    $tmp = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json.tmp';
+    $tmp = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json.tmp-'.SCANNER_TEST_RUN_ID;
     $final = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json';
 
     expect($commands[$index])->toStartWith("sh -c '")
@@ -193,12 +192,20 @@ it('writes the SBOM to a temp file and moves it into place after Syft succeeds',
         ->and($commands)->toContain("rm -f '{$tmp}' || true");
 });
 
+it('saves the local image by its ID so a moved tag cannot change the cached SBOM', function () {
+    $save = collect($this->commands->sbomFromLocal('nginx:1', SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'docker save'));
+
+    expect($save)->toContain("docker save -o '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/in/image.tar' 'sha256:".SCANNER_TEST_HEX."' >/dev/null 2>&1")
+        ->not->toContain('nginx');
+});
+
 it('reads tool output through a size cap and prints an exit marker', function () {
     foreach (['grype' => $this->commands->grype(SCANNER_TEST_HEX), 'packages' => $this->commands->packages(SCANNER_TEST_HEX), 'tags' => $this->commands->tags('nginx', null), 'digest' => $this->commands->digest('nginx', null, null), 'db-status' => $this->commands->dbStatus()] as $step => $commands) {
-        $all = implode("\n", $commands);
+        $all = implode("\n", scannerUnwrapped($commands));
 
         expect($all)->toContain("head -c 10485761 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || true")
-            ->toContain("rc=\$?; echo \"coolify-scan-exit {$step} \$rc")
+            ->toContain("rc=\$?; echo \"coolify-scan-exit {$step} \$rc \$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || echo 0)\"")
+            ->and(array_search('echo coolify-scan-payload', $commands, true))->toBeLessThan(collect($commands)->search(fn (string $line) => str_starts_with($line, 'head -c')))
             ->and(end($commands))->toBe("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true");
     }
 });
@@ -213,9 +220,9 @@ it('mounts the database and the SBOM read-only for Grype', function () {
 });
 
 it('uploads the output templates from the resources', function () {
-    $templateLine = collect($this->commands->grype(SCANNER_TEST_HEX))->first(fn (string $line) => str_starts_with($line, 'printf'));
+    $templateLine = collect($this->commands->grype(SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'base64 -d'));
 
-    preg_match("/^printf '%s' '([A-Za-z0-9+\\/=]+)' \\| base64 -d \\| tee '([^']+)' >\\/dev\\/null$/", $templateLine, $matches);
+    preg_match("/^echo '([A-Za-z0-9+\\/=]+)' \\| base64 -d \\| tee '([^']+)' >\\/dev\\/null$/", $templateLine, $matches);
 
     expect(base64_decode($matches[1], true))->toBe(file_get_contents(resource_path('image-scan/grype.tmpl')))
         ->and($matches[2])->toBe('/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID.'/tpl/grype.tmpl');
@@ -234,8 +241,56 @@ it('writes registry credentials for one registry into a private file mounted rea
     expect(implode("\n", $this->commands->tags('ghcr.io/a/b', null)))->not->toContain('DOCKER_CONFIG')->not->toContain('/auth');
 });
 
+it('keeps registry credentials out of sudo arguments for a non-root SSH user', function () {
+    $secret = base64_encode('user:secret-token');
+    $auth = base64_encode(json_encode(['auths' => ['ghcr.io' => ['auth' => $secret]]]));
+    $written = base64_encode(json_encode(['auths' => ['ghcr.io' => ['auth' => $secret]]], JSON_UNESCAPED_SLASHES));
+    $lists = [
+        $this->commands->tags('ghcr.io/a/b', $auth),
+        $this->commands->digest('ghcr.io/a/b:1', null, $auth),
+        $this->commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/amd64', 'c1', $auth),
+    ];
+
+    foreach ($lists as $commands) {
+        $parsed = parseCommandsByLineForSudo(collect($commands), $this->server);
+
+        expect(implode("\n", $parsed))->not->toContain('sudo printf')->toContain("echo '{$written}' | sudo base64 -d");
+        foreach ($parsed as $line) {
+            $sudo = strpos($line, 'sudo');
+            $secretAt = strpos($line, $written);
+            expect($secretAt === false || $sudo === false || $sudo > $secretAt)->toBeTrue($line);
+        }
+    }
+});
+
+it('accepts credentials only for the registry of the image', function (string $key, string $ref) {
+    $auth = base64_encode(json_encode(['auths' => [$key => ['auth' => 'eA==']]]));
+
+    expect($this->commands->digest($ref, null, $auth))->toBeArray();
+})->with([
+    ['ghcr.io', 'ghcr.io/a/b:1'],
+    ['https://ghcr.io', 'ghcr.io/a/b:1'],
+    ['localhost:5000', 'localhost:5000/team/app:1.2'],
+    ['https://index.docker.io/v1/', 'nginx'],
+    ['index.docker.io', 'grafana/grafana'],
+    ['docker.io', 'nginx'],
+    ['registry-1.docker.io', 'nginx'],
+]);
+
+it('refuses credentials for another registry', function (string $key, string $ref) {
+    $auth = base64_encode(json_encode(['auths' => [$key => ['auth' => 'eA==']]]));
+
+    $this->commands->tags($ref, $auth);
+})->with([
+    ['ghcr.io', 'nginx'],
+    ['https://index.docker.io/v1/', 'ghcr.io/a/b'],
+    ['ghcr.io.evil.com', 'ghcr.io/a/b'],
+    ['localhost:5001', 'localhost:5000/app'],
+])->throws(InvalidArgumentException::class);
+
 it('removes the work directory, the leftover temp files, and the container in cleanup', function () {
     expect($this->commands->cleanup())->toContain("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true")
+        ->toContain("find '/data/coolify/image-scans/sboms' -maxdepth 1 -name '*.json.tmp-*' -mmin +60 -delete 2>/dev/null || true")
         ->and($this->commands->deleteScannerData())->toContain("rm -rf '/data/coolify/image-scans' || true")
         ->toContain('docker volume rm -f coolify-grype-db >/dev/null 2>&1 || true');
 });
@@ -264,8 +319,9 @@ it('keeps every command list working for a non-root SSH user', function () {
 
                 continue;
             }
-            if (str_starts_with($original, 'printf ')) {
-                expect($line)->toMatch("/^sudo printf '%s' '[A-Za-z0-9+\\/=]+' \\| sudo base64 -d \\| sudo tee '[^']+' >\\/dev\\/null$/", $name);
+            if (str_starts_with($original, 'echo ')) {
+                expect($line)->toBe(str_replace(' | ', ' | sudo ', $original), $name)
+                    ->toMatch("/^echo (coolify-scan-payload|'[A-Za-z0-9+\\/=]+' \\| sudo base64 -d \\| sudo tee '[^']+' >\\/dev\\/null)$/", $name);
 
                 continue;
             }
@@ -288,15 +344,28 @@ it('keeps the docker root lookup inside the disk check for a non-root SSH user',
 it('prints the image ID, the repo digest, the platform, and the size in one line', function () {
     $commands = $this->commands->inspect('nginx:1');
 
-    expect($commands[2])->toBe("docker image inspect --format '{{.Id}}|{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}|{{.Os}}/{{.Architecture}}|{{.Size}}' 'nginx:1' 2>/dev/null || true");
+    expect($commands[2])->toBe('echo coolify-scan-payload')
+        ->and($commands[3])->toBe("docker image inspect --format '{{.Id}}|{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}|{{.Os}}/{{.Architecture}}|{{.Size}}' 'nginx:1' 2>/dev/null || true");
 });
 
-it('parses exit markers and the payload that follows them', function () {
-    $output = "coolify-scan-exit save 0\ncoolify-scan-exit sbom 0\ncoolify-scan-exit grype 0 12\n{\"a\":1}\ncoolify-scan-exit grype 1\n{\"b\":2}";
+it('parses exit markers before the payload separator', function () {
+    $output = "coolify-scan-exit save 0\ncoolify-scan-exit sbom 0\ncoolify-scan-exit grype 0 12\ncoolify-scan-payload\n{\"a\":1}\ncoolify-scan-payload\n{\"b\":2}";
 
     expect(ScannerCommands::parseOutput($output))->toBe([
         'exit_codes' => ['save' => 0, 'sbom' => 0, 'grype' => 0],
         'sizes' => ['grype' => 12],
-        'payload' => "{\"a\":1}\ncoolify-scan-exit grype 1\n{\"b\":2}",
+        'payload' => "{\"a\":1}\ncoolify-scan-payload\n{\"b\":2}",
+    ])->and(ScannerCommands::parseOutput("coolify-scan-exit save 0\ncoolify-scan-exit sbom 1"))->toBe([
+        'exit_codes' => ['save' => 0, 'sbom' => 1], 'sizes' => [], 'payload' => '',
     ])->and(ScannerCommands::parseOutput(null))->toBe(['exit_codes' => [], 'sizes' => [], 'payload' => '']);
+});
+
+it('ignores payload lines that look like exit markers', function () {
+    $output = "coolify-scan-exit grype 2 9\ncoolify-scan-payload\ncoolify-scan-exit grype 0 9\n{}";
+
+    expect(ScannerCommands::parseOutput($output))->toBe([
+        'exit_codes' => ['grype' => 2],
+        'sizes' => ['grype' => 9],
+        'payload' => "coolify-scan-exit grype 0 9\n{}",
+    ]);
 });

@@ -12,7 +12,7 @@ use InvalidArgumentException;
  * Each method returns one command list for `instant_remote_process()` (one `bash -se` batch). The lists
  * work as root and through `parseCommandsByLineForSudo()`, and they are safe to replay after an SSH retry:
  * each list first removes the container `coolify-scan-{runId}` and the work directory, and writes the
- * SBOM to `{name}.json.tmp` before it moves it into place.
+ * SBOM to `{name}.json.tmp-{runId}` before it moves it into place.
  *
  * Output contract (stdout of the batch):
  * - Every tool run prints one marker line `coolify-scan-exit {step} {code}`; steps that produce output add
@@ -22,8 +22,9 @@ use InvalidArgumentException;
  *   `pull-grype`, `pull-regctl` (prepare), `db-update`, `db-status`, `inspect`, `save` and `sbom`
  *   (sbomFromLocal), `sbom` (sbomFromRegistry), `grype`, `packages`, `tags`, `digest`.
  * - A failed run does not stop the batch, and the container and the work directory are still removed.
- * - The payload follows the marker lines: at most 10485761 bytes of the tool output (`head -c`), so the
- *   output is cut when `bytes > OUTPUT_LIMIT`. Use `parseOutput()`. Only setup commands (mkdir, chown,
+ * - Methods with a payload print the line `coolify-scan-payload` after the markers, then at most 10485761
+ *   bytes of the tool output (`head -c`), so the output is cut when `bytes > OUTPUT_LIMIT`. Use `parseOutput()`:
+ *   it reads markers only before the separator, so the payload cannot fake one. Only setup commands (mkdir, chown,
  *   chmod) stop the batch when they fail; call `cleanup()` after every scan, also after an exception.
  * - `inspect`: one line `{Id}|{RepoDigest or empty}|{os}/{arch}|{size}`. `diskFree`: `{docker root free} {scan dir free}` in bytes.
  *
@@ -44,6 +45,8 @@ class ScannerCommands
     public const OUTPUT_LIMIT = 10485760;
 
     public const MARKER = 'coolify-scan-exit';
+
+    public const PAYLOAD_SEPARATOR = 'coolify-scan-payload';
 
     private const SCANNER_USER = '65534:65534';
 
@@ -124,6 +127,7 @@ class ScannerCommands
         return [
             $this->removeContainer(),
             $this->step('inspect', "docker image inspect --format '{{.Id}}' {$ref} >/dev/null 2>&1"),
+            'echo '.self::PAYLOAD_SEPARATOR,
             "docker image inspect --format {$format} {$ref} 2>/dev/null || true",
         ];
     }
@@ -144,13 +148,14 @@ class ScannerCommands
     }
 
     /**
-     * Saves a local image to an archive and writes its SBOM to `sboms/{imageIdHex}.json`.
+     * Saves a local image by its ID (not by $imageRef: a tag can move after inspect) and writes its SBOM
+     * to `sboms/{imageIdHex}.json`. $imageRef is only validated.
      *
      * @return list<string>
      */
     public function sbomFromLocal(string $imageRef, string $imageIdHex): array
     {
-        $ref = (string) ImageRef::parse($imageRef);
+        ImageRef::parse($imageRef);
         if (preg_match('/\A[a-f0-9]{64}\z/', $imageIdHex) !== 1) {
             throw new InvalidArgumentException('Invalid image ID.');
         }
@@ -160,12 +165,12 @@ class ScannerCommands
             $this->removeContainer(),
             'rm -rf '.escapeshellarg($this->workDir()).' || true',
             ...$this->sbomDirectory(),
-            'rm -f '.escapeshellarg($this->sbomPath($imageIdHex).'.tmp').' || true',
+            'rm -f '.escapeshellarg($this->sbomTmpPath($imageIdHex)).' || true',
             'mkdir -p -m 0700 '.escapeshellarg($this->workDir().'/in').' '.escapeshellarg($this->workDir().'/scratch'),
-            $this->step('save', 'timeout -k 10 '.self::TIMEOUT_SBOM.' docker save -o '.escapeshellarg($archive).' '.escapeshellarg($ref).' >/dev/null 2>&1'),
+            $this->step('save', 'timeout -k 10 '.self::TIMEOUT_SBOM.' docker save -o '.escapeshellarg($archive).' '.escapeshellarg('sha256:'.$imageIdHex).' >/dev/null 2>&1'),
             ...$this->ownWorkDir(),
             $this->writeSbom($imageIdHex, $this->dockerRun('syft', self::TIMEOUT_SBOM, false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'docker-archive:/in/image.tar', '-o', 'syft-json', '-q'])),
-            ...$this->finish(['rm -f '.escapeshellarg($this->sbomPath($imageIdHex).'.tmp').' || true']),
+            ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath($imageIdHex)).' || true']),
         ];
     }
 
@@ -176,19 +181,20 @@ class ScannerCommands
      */
     public function sbomFromRegistry(string $imageRef, string $platform, string $outName, ?string $authConfigB64): array
     {
-        $ref = (string) ImageRef::parse($imageRef);
+        $parsed = ImageRef::parse($imageRef);
+        $ref = (string) $parsed;
         $platform = $this->validPlatform($platform);
         $this->validSbomName($outName);
-        $auth = $this->authConfig($authConfigB64);
+        $auth = $this->authConfig($authConfigB64, $parsed);
 
         return [
             $this->removeContainer(),
             'rm -rf '.escapeshellarg($this->workDir()).' || true',
             ...$this->sbomDirectory(),
-            'rm -f '.escapeshellarg($this->sbomPath($outName).'.tmp').' || true',
+            'rm -f '.escapeshellarg($this->sbomTmpPath($outName)).' || true',
             ...$this->workDirSetup($auth),
             $this->writeSbom($outName, $this->dockerRun('syft', self::TIMEOUT_SBOM, true, $this->authEnv($auth), $this->authMounts($auth), ['scan', '--platform', $platform, 'registry:'.$ref, '-o', 'syft-json', '-q'])),
-            ...$this->finish(['rm -f '.escapeshellarg($this->sbomPath($outName).'.tmp').' || true']),
+            ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath($outName)).' || true']),
         ];
     }
 
@@ -230,8 +236,9 @@ class ScannerCommands
      */
     public function tags(string $repository, ?string $authConfigB64): array
     {
-        $name = ImageRef::parse($repository)->qualifiedName();
-        $auth = $this->authConfig($authConfigB64);
+        $parsed = ImageRef::parse($repository);
+        $name = $parsed->qualifiedName();
+        $auth = $this->authConfig($authConfigB64, $parsed);
 
         return $this->capture('tags', $this->dockerRun('regctl', self::TIMEOUT_REGISTRY, true, $this->authEnv($auth), $this->authMounts($auth), ['tag', 'ls', $name]), null, $auth);
     }
@@ -243,12 +250,13 @@ class ScannerCommands
      */
     public function digest(string $imageRef, ?string $platform, ?string $authConfigB64): array
     {
-        $ref = (string) ImageRef::parse($imageRef);
+        $parsed = ImageRef::parse($imageRef);
+        $ref = (string) $parsed;
         $args = ['image', 'digest'];
         if ($platform !== null) {
             array_push($args, '--platform', $this->validPlatform($platform));
         }
-        $auth = $this->authConfig($authConfigB64);
+        $auth = $this->authConfig($authConfigB64, $parsed);
 
         return $this->capture('digest', $this->dockerRun('regctl', self::TIMEOUT_REGISTRY, true, $this->authEnv($auth), $this->authMounts($auth), [...$args, $ref]), null, $auth);
     }
@@ -264,7 +272,7 @@ class ScannerCommands
             $this->removeContainer(),
             'rm -rf '.escapeshellarg($this->workDir()).' || true',
             'find '.escapeshellarg(self::BASE_DIR)." -maxdepth 1 -name 'tmp-*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true",
-            'find '.escapeshellarg(self::SBOM_DIR)." -maxdepth 1 -name '*.json.tmp' -mmin +60 -delete 2>/dev/null || true",
+            'find '.escapeshellarg(self::SBOM_DIR)." -maxdepth 1 -name '*.json.tmp-*' -mmin +60 -delete 2>/dev/null || true",
         ];
     }
 
@@ -284,25 +292,32 @@ class ScannerCommands
     }
 
     /**
-     * Splits batch output into the leading marker lines and the payload after them.
+     * Splits batch output into the marker lines before `coolify-scan-payload` and the payload after it.
      *
      * @return array{exit_codes: array<string, int>, sizes: array<string, int>, payload: string}
      */
     public static function parseOutput(?string $output): array
     {
-        $lines = explode("\n", (string) $output);
+        $lines = array_map(fn (string $line) => rtrim($line, "\r"), explode("\n", (string) $output));
+        $separator = array_search(self::PAYLOAD_SEPARATOR, $lines, true);
         $exitCodes = [];
         $sizes = [];
 
-        while ($lines !== [] && preg_match('/\A'.self::MARKER.' ([a-z-]+) (\d+)(?: +(\d+))?\z/', rtrim($lines[0], "\r"), $matches) === 1) {
-            array_shift($lines);
+        foreach ($separator === false ? $lines : array_slice($lines, 0, $separator) as $line) {
+            if (preg_match('/\A'.self::MARKER.' ([a-z-]+) (\d+)(?: +(\d+))?\z/', $line, $matches) !== 1) {
+                continue;
+            }
             $exitCodes[$matches[1]] = (int) $matches[2];
             if (isset($matches[3])) {
                 $sizes[$matches[1]] = (int) $matches[3];
             }
         }
 
-        return ['exit_codes' => $exitCodes, 'sizes' => $sizes, 'payload' => implode("\n", $lines)];
+        return [
+            'exit_codes' => $exitCodes,
+            'sizes' => $sizes,
+            'payload' => $separator === false ? '' : implode("\n", array_slice($lines, $separator + 1)),
+        ];
     }
 
     private function containerName(): string
@@ -318,6 +333,14 @@ class ScannerCommands
     private function sbomPath(string $name): string
     {
         return self::SBOM_DIR.'/'.$name.'.json';
+    }
+
+    /**
+     * Per run, so a replay or a parallel run never moves another run's partial file into place.
+     */
+    private function sbomTmpPath(string $name): string
+    {
+        return $this->sbomPath($name).'.tmp-'.$this->runId;
     }
 
     private function removeContainer(): string
@@ -366,7 +389,7 @@ class ScannerCommands
             "timeout -k 10 {$timeout} docker run",
             '--rm --name '.$this->containerName(),
             '--cap-drop ALL --security-opt no-new-privileges --read-only --pids-limit 256',
-            '--user '.self::SCANNER_USER.' --cpus 1 --memory 1g --log-driver none',
+            '--user '.self::SCANNER_USER.' --cpus 1 --memory 1g --memory-swap 1g --log-driver none',
         ];
         if (! $network) {
             $parts[] = '--network none';
@@ -406,8 +429,8 @@ class ScannerCommands
         return [
             ...$commands,
             ...$this->ownWorkDir($auth !== null),
-            $this->shell("{$dockerRun} > {$out} 2>/dev/null; rc=\$?; echo \"".self::MARKER." {$step} \$rc \$(wc -c < {$out})\""),
-            ...$this->finish(['head -c '.(self::OUTPUT_LIMIT + 1)." {$out} 2>/dev/null || true"]),
+            $this->shell("{$dockerRun} > {$out} 2>/dev/null; rc=\$?; echo \"".self::MARKER." {$step} \$rc \$(wc -c < {$out} 2>/dev/null || echo 0)\""),
+            ...$this->finish(['echo '.self::PAYLOAD_SEPARATOR, 'head -c '.(self::OUTPUT_LIMIT + 1)." {$out} 2>/dev/null || true"]),
         ];
     }
 
@@ -416,7 +439,7 @@ class ScannerCommands
      */
     private function writeSbom(string $name, string $dockerRun): string
     {
-        $tmp = escapeshellarg($this->sbomPath($name).'.tmp');
+        $tmp = escapeshellarg($this->sbomTmpPath($name));
         $final = escapeshellarg($this->sbomPath($name));
 
         return $this->shell("{$dockerRun} > {$tmp} 2>/dev/null && chown ".self::SCANNER_USER." {$tmp} && chmod 600 {$tmp} && mv -f {$tmp} {$final}; rc=\$?; echo \"".self::MARKER.' sbom $rc"');
@@ -537,17 +560,22 @@ class ScannerCommands
         return 'type=bind,src='.$this->sbomPath($name).',dst=/sbom/sbom.json,readonly';
     }
 
+    /**
+     * `echo` is a shell builtin and a sudo parser keyword: the content never shows up in a process
+     * argument list or in the sudo log; only `base64 -d` and `tee` run with sudo.
+     */
     private function writeFile(string $content, string $path): string
     {
-        return "printf '%s' ".escapeshellarg(base64_encode($content)).' | base64 -d | tee '.escapeshellarg($path).' >/dev/null';
+        return 'echo '.escapeshellarg(base64_encode($content)).' | base64 -d | tee '.escapeshellarg($path).' >/dev/null';
     }
 
     /**
      * Accepts a Docker config with one registry in `auths` and nothing else (no credential helpers).
+     * The registry must be the registry of the image.
      *
      * @return array<string, mixed>|null
      */
-    private function authConfig(?string $authConfigB64): ?array
+    private function authConfig(?string $authConfigB64, ImageRef $image): ?array
     {
         if ($authConfigB64 === null) {
             return null;
@@ -558,8 +586,22 @@ class ScannerCommands
         if (! is_array($config) || array_keys($config) !== ['auths'] || ! is_array($config['auths']) || count($config['auths']) !== 1 || ! is_array(reset($config['auths']))) {
             throw new InvalidArgumentException('The registry credentials must be a Docker config for one registry.');
         }
+        if (! $this->credentialsMatchRegistry((string) array_key_first($config['auths']), $image->registry)) {
+            throw new InvalidArgumentException('The registry credentials are not for the registry of the image.');
+        }
 
         return $config;
+    }
+
+    private function credentialsMatchRegistry(string $key, string $registry): bool
+    {
+        $host = rtrim(preg_replace('#\Ahttps?://#', '', $key) ?? '', '/');
+
+        if ($registry === 'docker.io') {
+            return in_array($host, ['index.docker.io/v1', 'index.docker.io', 'docker.io', 'registry-1.docker.io'], true);
+        }
+
+        return $host === $registry;
     }
 
     /**
