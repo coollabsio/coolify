@@ -63,6 +63,15 @@ class ValidateServer
             }
         }
 
+        if ($server->hostinger_virtual_machine_id) {
+            $status = $server->refreshHostingerState();
+            if (in_array($status, ['stopping', 'stopped', 'suspending', 'suspended', 'destroying', 'destroyed', 'error'], true)) {
+                $this->error = 'Hostinger VPS is '.($status ?? 'not running').'. Power it on before validating.';
+                $server->update(['validation_logs' => $this->error]);
+                throw new \Exception($this->error);
+            }
+        }
+
         ['uptime' => $this->uptime, 'error' => $error] = $server->validateConnection();
         if (! $this->uptime) {
             $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
@@ -105,7 +114,7 @@ class ValidateServer
         if ($this->docker_version) {
             return 'OK';
         } else {
-            $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="text-black underline dark:text-white" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = $server->dockerEngineVersionError();
             $server->update([
                 'validation_logs' => $this->error,
             ]);

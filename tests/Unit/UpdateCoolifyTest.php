@@ -3,7 +3,11 @@
 use App\Actions\Server\UpdateCoolify;
 use App\Livewire\Settings\Updates;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\RemoteProcessCommand;
@@ -11,8 +15,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
@@ -51,6 +57,58 @@ function updateCoolifyTestActionWithStatus(string $status): UpdateCoolify
             return $this->status;
         }
     };
+}
+
+function updateCoolifyTestCreateInstanceBackup(): void
+{
+    Storage::fake('ssh-keys');
+    Notification::fake();
+    Server::query()->whereKey(0)->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => 0])->id]);
+    Server::flushIdentityMap();
+    StandalonePostgresql::forceCreate([
+        'id' => 0,
+        'name' => 'coolify-db',
+        'postgres_password' => 'password',
+        'destination_type' => StandaloneDocker::class,
+        'destination_id' => 0,
+    ]);
+    ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'database_id' => 0,
+        'database_type' => StandalonePostgresql::class,
+        'team_id' => 0,
+    ]);
+}
+
+function updateCoolifyTestPrepareUpgrade(): void
+{
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.coolify.helper_version' => '1.0.14',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings([
+        'is_auto_update_enabled' => true,
+        'new_version_available' => true,
+        'docker_registry_url' => 'docker.io',
+    ]);
+
+    Http::fake([
+        '*' => Http::response([
+            'coolify' => ['v4' => ['version' => '4.0.10']],
+        ], 200),
+    ]);
+}
+
+function updateCoolifyTestPrepareUpdate(array $settings = []): void
+{
+    updateCoolifyTestPrepareUpgrade();
+    InstanceSettings::findOrFail(0)->update($settings);
+    updateCoolifyTestCreateInstanceBackup();
 }
 
 afterEach(function () {
@@ -362,4 +420,34 @@ it('starts an upgrade when the previous upgrade status is older than the lock ex
 
     expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
         ->toContain("bash /data/coolify/source/upgrade.sh '4.0.10'");
+});
+
+it('backs up the instance database before the update', function () {
+    updateCoolifyTestPrepareUpdate();
+    Process::fake(['*du -b*' => '128', '*' => '']);
+
+    (new UpdateCoolify)->handle(manual_update: true);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
+        ->toContain("bash /data/coolify/source/upgrade.sh '4.0.10'");
+});
+
+it('skips the backup before the update when it is disabled', function () {
+    updateCoolifyTestPrepareUpdate(['is_backup_before_update_enabled' => false]);
+    Process::fake();
+
+    (new UpdateCoolify)->handle(manual_update: true);
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+    expect(Activity::query()->count())->toBe(1);
+});
+
+it('does not start the update when the instance backup fails', function () {
+    updateCoolifyTestPrepareUpdate();
+    Process::fake(['*pg_dump*' => Process::result(exitCode: 1), '*' => '']);
+
+    expect(fn () => (new UpdateCoolify)->handle(manual_update: true))
+        ->toThrow(Exception::class, 'The database backup failed, so the update was not started.')
+        ->and(Activity::query()->count())->toBe(0);
 });

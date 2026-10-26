@@ -269,13 +269,115 @@ it('stores service database backups in the folder of earlier releases', function
         'status' => 'running:healthy',
     ]);
     $backup = backupRunSafetySchedule($database, $this->team);
-    backupRunSafetyFakeRemoteCommands(['env | grep POSTGRES_' => "POSTGRES_USER=rallly\nPOSTGRES_DB=rallly"]);
+    backupRunSafetyFakeRemoteCommands(['| grep -E' => "POSTGRES_USER=rallly\nPOSTGRES_DB=rallly"]);
 
     (new DatabaseBackupJob($backup))->handle();
 
     expect(ScheduledDatabaseBackupExecution::query()->sole()->filename)
         ->toContain("/rallly-rallly_db-{$service->uuid}/pg-dump-rallly-");
 });
+
+it('backs up a service PostgreSQL database as the user from PGUSER or POSTGRESQL_USERNAME', function (string $env, string $user) {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'app_db',
+        'image' => 'postgres:16-alpine',
+        'status' => 'running:healthy',
+    ]);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    $commands = backupRunSafetyFakeRemoteCommands(['| grep -E' => $env."\nPOSTGRES_DB=app"]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect($commands->first(fn (string $command) => str_contains($command, 'pg_dump')))
+        ->toContain("--username '\\''{$user}'\\''");
+})->with([
+    'PGUSER' => ['PGUSER=pguser', 'pguser'],
+    'Bitnami POSTGRESQL_USERNAME' => ['POSTGRESQL_USERNAME=bitnami', 'bitnami'],
+    'POSTGRES_USER wins' => ["POSTGRES_USER=app\nPGUSER=pguser", 'app'],
+]);
+
+it('keeps owners and privileges in a single PostgreSQL database backup', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'supabase-db',
+        'image' => 'supabase/postgres:15.14.1.163',
+        'status' => 'running:healthy',
+    ]);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    $commands = backupRunSafetyFakeRemoteCommands(['| grep -E' => "POSTGRES_USER=postgres\nPOSTGRES_DB=postgres"]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect($commands->first(fn (string $command) => str_contains($command, 'pg_dump')))
+        ->toContain('pg_dump --format=custom --username')
+        ->not->toContain('--no-acl')
+        ->not->toContain('--no-owner');
+});
+
+function backupRunSafetyServiceDatabase(Server $server, StandaloneDocker $destination, Environment $environment, string $image): ServiceDatabase
+{
+    $service = Service::factory()->create([
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'environment_id' => $environment->id,
+    ]);
+
+    return ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'db',
+        'image' => $image,
+        'status' => 'running:healthy',
+    ]);
+}
+
+it('backs up a service database without a database env variable from the backup settings', function (string $image, string $env, array $settings, string $databaseName) {
+    $database = backupRunSafetyServiceDatabase($this->server, $this->destination, $this->environment, $image);
+    $backup = backupRunSafetySchedule($database, $this->team, $settings);
+    backupRunSafetyFakeRemoteCommands(["docker exec '{$database->name}-{$database->service->uuid}' env" => $env]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect(ScheduledDatabaseBackupExecution::query()->sole())
+        ->status->toBe('success')
+        ->database_name->toBe($databaseName);
+})->with([
+    'mariadb, all databases' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret', ['dump_all' => true], 'all'],
+    'mariadb, selected database' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
+    'mysql, all databases' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['dump_all' => true], 'all'],
+    'mysql, selected database' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
+]);
+
+it('records a failed execution and notifies when no service database to back up is known', function (string $image, string $env) {
+    $database = backupRunSafetyServiceDatabase($this->server, $this->destination, $this->environment, $image);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    $this->team->emailNotificationSettings->update(['smtp_enabled' => true, 'backup_failure_email_notifications' => true]);
+    $commands = backupRunSafetyFakeRemoteCommands(["docker exec '{$database->name}-{$database->service->uuid}' env" => $env]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect(ScheduledDatabaseBackupExecution::query()->sole())
+        ->status->toBe('failed')
+        ->message->toContain('No database to back up');
+    expect($commands->contains(fn (string $command) => str_contains($command, 'dump')))->toBeFalse();
+    Notification::assertSentTo($this->team, BackupFailed::class);
+})->with([
+    'mariadb' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret'],
+    'mysql' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret'],
+]);
 
 // --- Worker timeout (M16) ---
 

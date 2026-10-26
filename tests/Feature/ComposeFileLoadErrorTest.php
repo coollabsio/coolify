@@ -40,12 +40,12 @@ function fakeComposeLoadServer(?string $failingStep, string $errorOutput): void
             return Process::result(errorOutput: $errorOutput, exitCode: 128);
         }
 
-        return Process::result(output: str_contains($command, 'git --version') ? 'git version 2.43.0' : '');
+        return Process::result(output: '');
     });
 }
 
 it('shows and logs why the Compose file could not be read, without credentials', function () {
-    fakeComposeLoadServer('sparse-checkout', $this->gitError);
+    fakeComposeLoadServer('git ls-tree', $this->gitError);
 
     expect(fn () => $this->application->loadComposeFile())
         ->toThrow(function (RuntimeException $exception) {
@@ -76,4 +76,13 @@ it('shows and logs why the Git source could not be read, without credentials', f
 
     Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'Failed to read Git source.'
         && ! str_contains(json_encode($context), 'ghs_SECRET123'));
+});
+
+it('tells the user that a symlinked Compose file is not loaded', function () {
+    $this->application->update(['docker_compose_raw' => "services:\n  web:\n    image: nginx\n"]);
+    fakeComposeLoadServer('git ls-tree', 'The Docker Compose file is a symbolic link.');
+
+    expect(fn () => $this->application->loadComposeFile())
+        ->toThrow(RuntimeException::class, 'Docker Compose file at /docker-compose.yml (branch: main) is a symbolic link.');
+    expect($this->application->fresh()->docker_compose_raw)->toBe("services:\n  web:\n    image: nginx\n");
 });

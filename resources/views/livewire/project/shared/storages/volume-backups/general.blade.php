@@ -1,10 +1,11 @@
-<form wire:submit="save" class="application-settings-form">
+<form wire:submit="save" class="application-settings-form flex flex-col gap-6">
     <x-unsaved-bar action="save" />
 
     <x-application.settings-section title="Backup schedule"
         description="Choose when this storage is archived and how long each backup may run.">
         <x-slot:actions>
-            <div class="flex items-center gap-2">
+            {{-- Below xl the header bar is hidden, so keep the buttons here. --}}
+            <div @class(['flex items-center gap-2', 'xl:hidden' => $actionsInHeader && $backup])>
                 @if (!$enabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
                         wire:target="toggleEnabled" isHighlighted>Enable backup</x-forms.button>
@@ -49,4 +50,7 @@
                 helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
         </div>
     </x-application.settings-section>
+
+    @include('livewire.project.shared.storages.volume-backups.s3')
+    @include('livewire.project.shared.storages.volume-backups.retention')
 </form>

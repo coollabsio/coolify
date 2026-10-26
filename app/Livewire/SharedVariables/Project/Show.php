@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SharedVariables\Project;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Project $project;
 
@@ -53,6 +55,9 @@ class Show extends Component
             return redirect()->route('dashboard');
         }
         $this->project = $project;
+        if ($this->prefersCanvasView('project_variables')) {
+            return $this->redirectRoute('shared-variables.project.canvas', ['project_uuid' => $project->uuid], navigate: true);
+        }
         $this->getDevView();
     }
 

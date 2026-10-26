@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -317,6 +318,14 @@ class StandalonePostgresql extends BaseModel
     public function type(): string
     {
         return 'standalone-postgresql';
+    }
+
+    /**
+     * Coolify's own database is the instance sentinel row (id 0). Users can give any database the name "coolify-db".
+     */
+    public function isInstanceDatabase(): bool
+    {
+        return $this->id === 0;
     }
 
     protected function internalDbUrl(): Attribute

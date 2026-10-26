@@ -14,7 +14,7 @@ class VaultService
     /** @var array<string, mixed> */
     private array $httpClientOptions;
 
-    public function __construct(string $baseUrl, private string $token, private ?string $namespace = null)
+    public function __construct(string $baseUrl, private string $token, private ?string $namespace = null, private ?int $timeout = null)
     {
         $this->baseUrl = rtrim($baseUrl, '/');
         Validator::make(['base_url' => $this->baseUrl], ['base_url' => new SafeExternalUrl])->validate();
@@ -56,8 +56,8 @@ class VaultService
         $client = Http::withHeaders(['X-Vault-Token' => $this->token])
             ->acceptJson()
             ->withOptions($this->httpClientOptions)
-            ->connectTimeout(5)
-            ->timeout(10);
+            ->connectTimeout($this->timeout ?? 5)
+            ->timeout($this->timeout ?? 10);
 
         if (filled($this->namespace)) {
             $client = $client->withHeaders(['X-Vault-Namespace' => $this->namespace]);

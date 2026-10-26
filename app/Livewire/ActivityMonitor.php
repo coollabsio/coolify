@@ -3,7 +3,9 @@
 namespace App\Livewire;
 
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
@@ -79,41 +81,37 @@ class ActivityMonitor extends Component
             return;
         }
 
-        $currentTeamId = currentTeam()?->id;
+        $this->activity = $this->canReadActivity($activity) ? $activity : null;
+    }
 
-        // Check team_id stored directly in activity properties
-        $activityTeamId = data_get($activity, 'properties.team_id');
-        if ($activityTeamId !== null) {
-            if ((int) $activityTeamId !== (int) $currentTeamId) {
-                $this->activity = null;
-
-                return;
-            }
-
-            $this->activity = $activity;
-
-            return;
+    /**
+     * Activity output can contain secrets, so only users who can edit the resource that the
+     * activity ran for (or its server) may read it. The policy uses the team of that resource,
+     * not the session team.
+     */
+    private function canReadActivity(Activity $activity): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
         }
 
-        // Fallback: verify ownership via the server that ran the command
+        $subject = $activity->subject;
+        if ($subject instanceof Model) {
+            return $user->can('update', $subject);
+        }
+
+        // Service starts store the service uuid instead of a subject.
+        $typeUuid = data_get($activity, 'properties.type_uuid');
+        if (filled($typeUuid) && ($service = Service::where('uuid', $typeUuid)->first())) {
+            return $user->can('update', $service);
+        }
+
         $serverUuid = data_get($activity, 'properties.server_uuid');
-        if ($serverUuid) {
-            $server = Server::where('uuid', $serverUuid)->first();
-            if ($server && (int) $server->team_id !== (int) $currentTeamId) {
-                $this->activity = null;
+        $server = filled($serverUuid) ? Server::where('uuid', $serverUuid)->first() : null;
 
-                return;
-            }
-
-            if ($server) {
-                $this->activity = $activity;
-
-                return;
-            }
-        }
-
-        // Fail closed: no team_id and no server_uuid means we cannot verify ownership
-        $this->activity = null;
+        // Fail closed: an activity without a resource or server cannot be authorized.
+        return $server !== null && $user->can('update', $server);
     }
 
     public function polling()

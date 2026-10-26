@@ -301,6 +301,7 @@ class StartDatabaseImport
                     .' -e S3_ENDPOINT='.escapeshellarg((string) $storage->endpoint)
                     .' -e S3_ACCESS_KEY='.escapeshellarg((string) $storage->key)
                     .' -e S3_SECRET_KEY='.escapeshellarg((string) $storage->secret)
+                    .' '.$storage->minioClientRegionOption()
                     .' '.$image.' sleep 86400',
             ], $server);
         } catch (Throwable) {

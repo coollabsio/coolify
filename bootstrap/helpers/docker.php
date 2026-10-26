@@ -787,7 +787,20 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains($normalize($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
+/**
+ * Caddy site address of a domain. Maintenance blocks in the base Caddyfile must use the same
+ * address as the labels, so caddy-docker-proxy merges them into one site block.
+ */
+function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnabled): string
+{
+    if ($scheme === 'https' && ! $isForceHttpsEnabled) {
+        return "http://{$host}, https://{$host}";
+    }
+
+    return "{$scheme}://{$host}";
+}
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false, bool $is_retry_enabled = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -798,7 +811,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     if ($is_http_basic_auth_enabled) {
-        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $hashedPassword = $http_basic_auth_argon2id_options
+            ? password_hash($http_basic_auth_password, PASSWORD_ARGON2ID, $http_basic_auth_argon2id_options)
+            : password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => $http_basic_auth_bcrypt_cost ?? 10]);
     }
 
     $trafficAppKey = caddyTrafficAppKey($uuid, $service_name);
@@ -809,10 +824,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $path = $url->getPath();
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
-        $siteAddress = "{$schema}://{$host}";
-        if ($schema === 'https' && ! $is_force_https_enabled) {
-            $siteAddress = "http://{$host}, https://{$host}";
-        }
+        $siteAddress = caddySiteAddress($schema, $host, $is_force_https_enabled);
         $portlessDomain = ServiceApplication::withoutPort($domain);
         $port = $url->getPort() ?? ($domainPortOverrides[$portlessDomain] ?? null);
         $handle = 'handle_path';
@@ -841,20 +853,29 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         } else {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
+        if ($is_retry_enabled) {
+            // A failed connection, for example to the old container that stops during a rolling
+            // update, is retried on another upstream. Caddy always retries a connection that failed.
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.lb_try_duration=5s");
+        }
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
         $redirect_schema = $is_force_https_enabled ? $schema : '{scheme}';
+        $redirect_code = $is_permanent_redirect_enabled ? ' permanent' : '';
         if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$redirect_schema}://www.{$host}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://www.{$host}{uri}{$redirect_code}");
         }
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}{$redirect_code}");
         }
         if ($is_http_basic_auth_enabled) {
             // Caddy 2.8 renamed basicauth to basic_auth; see Server::caddySupportsBasicAuthDirective().
             $basicAuthDirective = $supports_basic_auth_directive ? 'basic_auth' : 'basicauth';
+            if ($http_basic_auth_argon2id_options) {
+                $labels->push("caddy_{$loop}.{$basicAuthDirective}=argon2id");
+            }
             $labels->push("caddy_{$loop}.{$basicAuthDirective}.{$http_basic_auth_username}=\"{$hashedPassword}\"");
         }
         if ($is_traffic_analytics_enabled) {
@@ -941,19 +962,29 @@ function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
     ) : $label);
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt')
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false, bool $is_retry_enabled = false)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     if ($is_gzip_enabled) {
-        $labels->push('traefik.http.middlewares.gzip.compress=true');
+        // Not named `gzip`: containers that are not redeployed still declare the old `gzip`
+        // definition, and Traefik drops a middleware with conflicting definitions (#5076).
+        $labels->push('traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream');
     }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
+    // Every container declares the shared middleware, so a permanent variant needs its own name.
+    $redirect_to_https_name = 'redirect-to-https';
+    if ($is_permanent_redirect_enabled) {
+        $redirect_to_https_name = 'redirect-to-https-permanent';
+        $labels->push('traefik.http.middlewares.redirect-to-https-permanent.redirectscheme.scheme=https');
+        $labels->push('traefik.http.middlewares.redirect-to-https-permanent.redirectscheme.permanent=true');
+    }
+    $redirect_permanent = $is_permanent_redirect_enabled ? 'true' : 'false';
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     $http_basic_auth_label = "http-basic-auth-{$uuid}";
     if ($is_http_basic_auth_enabled) {
-        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => $http_basic_auth_bcrypt_cost ?? 10]);
     }
 
     if ($is_http_basic_auth_enabled) {
@@ -985,6 +1016,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         })->flatten()
             ->filter()
             ->unique();
+    }
+    if ($is_retry_enabled) {
+        // Sends a request to another container when the connection fails, for example to the old
+        // container that stops during a rolling update. Traefik does not retry after a response.
+        // A retry can pick the old container again under load; 3 attempts left about 5% of the
+        // requests failing in a live test, 5 attempts less than 1% (#8627).
+        $labels->push("traefik.http.middlewares.retry-{$uuid}.retry.attempts=5");
+        $middlewares_from_labels->push("retry-{$uuid}");
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -1031,12 +1070,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://{$redirect_capture_prefix}{2}",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent={$redirect_permanent}",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://www.{$redirect_capture_prefix}{2}",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent={$redirect_permanent}",
             ];
             if ($schema === 'https') {
                 // Set labels for https
@@ -1054,7 +1093,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip');
+                        $middlewares->push('gzip-sse');
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1082,7 +1121,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip');
+                        $middlewares->push('gzip-sse');
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1125,7 +1164,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_noindex) {
                         $httpMiddlewares->push($noindex_name);
                     }
-                    $httpMiddlewares->push('redirect-to-https');
+                    $httpMiddlewares->push($redirect_to_https_name);
                 } else {
                     $httpMiddlewares = $middlewares;
                 }
@@ -1147,7 +1186,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip');
+                        $middlewares->push('gzip-sse');
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1176,7 +1215,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip');
+                        $middlewares->push('gzip-sse');
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1224,6 +1263,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
     $labels = collect([]);
+    $httpBasicAuthArgon2idOptions = $application->usesArgon2idBasicAuth() ? [
+        'memory_cost' => $application->http_basic_auth_argon2id_memory_cost,
+        'time_cost' => $application->http_basic_auth_argon2id_time_cost,
+    ] : [];
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
@@ -1237,14 +1280,17 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             domains: $domains,
                             onlyPort: $onlyPort,
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect,
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
+                            is_retry_enabled: true,
                             certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                         ));
                         break;
@@ -1255,17 +1301,21 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             domains: $domains,
                             onlyPort: $onlyPort,
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect,
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                            http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                             noindex_domains: $noindexDomains,
                             is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                             supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                             domainPortOverrides: $application->domain_port_overrides ?? [],
+                            is_retry_enabled: true,
                         ));
                         break;
                 }
@@ -1275,15 +1325,18 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     domains: $domains,
                     onlyPort: $onlyPort,
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect,
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
+                    is_retry_enabled: true,
                     certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
@@ -1292,17 +1345,21 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     domains: $domains,
                     onlyPort: $onlyPort,
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect,
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                    http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                     noindex_domains: $noindexDomains,
                     is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                     supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                     domainPortOverrides: $application->domain_port_overrides ?? [],
+                    is_retry_enabled: true,
                 ));
             }
         }
@@ -1323,11 +1380,13 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         domains: $domains,
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
+                        is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                         noindex_domains: $noindexDomains,
                         escape_redirect_replacement_for_compose: false,
                         domainPortOverrides: $preview->domain_port_overrides ?? [],
@@ -1341,11 +1400,14 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         domains: $domains,
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
+                        is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                        http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                         noindex_domains: $noindexDomains,
                         is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                         supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1360,11 +1422,13 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 domains: $domains,
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled(),
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                 noindex_domains: $noindexDomains,
                 escape_redirect_replacement_for_compose: false,
                 domainPortOverrides: $preview->domain_port_overrides ?? [],
@@ -1376,11 +1440,14 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 domains: $domains,
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
+                is_permanent_redirect_enabled: $application->isPermanentRedirectEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled(),
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                 noindex_domains: $noindexDomains,
                 is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                 supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1592,8 +1659,11 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    // A value is one shell word: double-quoted (with escapes), single-quoted, and unquoted parts, as in key="a b".
+    // It cannot start with "-" (except a negative number, as in --pids-limit -1), so the next flag is not taken as a value.
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s+|=)?((?!-(?!\d))(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
+        '--add-host',
         '--cap-add',
         '--cap-drop',
         '--security-opt',
@@ -1602,42 +1672,32 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--device',
         '--shm-size',
         '--dns',
+        '--tmpfs',
     ]);
-    $mapping = collect([
-        '--cap-add' => 'cap_add',
-        '--cap-drop' => 'cap_drop',
-        '--security-opt' => 'security_opt',
-        '--sysctl' => 'sysctls',
-        '--device' => 'devices',
-        '--init' => 'init',
-        '--ulimit' => 'ulimits',
-        '--privileged' => 'privileged',
-        '--ip' => 'ip',
-        '--ip6' => 'ip6',
-        '--shm-size' => 'shm_size',
-        '--dns' => 'dns',
-        '--gpus' => 'gpus',
-        '--hostname' => 'hostname',
-        '--entrypoint' => 'entrypoint',
-    ]);
+    $mapping = collect(DOCKER_RUN_OPTION_MAPPING);
     foreach ($matches as $match) {
         $option = $match[1];
+        // Remove the quotes like a shell: unescape \" \$ \` \\ in double quotes, keep single-quoted text as is
+        $value = preg_replace_callback(
+            '/"((?:\\\\.|[^"])*)"|\'([^\']*)\'/',
+            fn ($quoted) => isset($quoted[2]) ? $quoted[2] : preg_replace('/\\\\(["$`\\\\])/', '$1', $quoted[1]),
+            $match[2] ?? ''
+        );
         if ($option === '--gpus') {
-            $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
-            preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
-            $value = $device_matches[1] ?? 'all';
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
-        }
-        if ($option === '--hostname') {
-            // Match --hostname=value or --hostname value
-            $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
-            preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
-            $value = $hostname_matches[1] ?? null;
-            if ($value && ! empty(trim($value))) {
-                $options[$option][] = $value;
-                $options[$option] = array_unique($options[$option]);
+            // all, a count (2), or device IDs ("device=0,1"; the inner quotes are part of the Docker syntax)
+            $gpus = trim($value, '"');
+            $payload = [
+                'driver' => 'nvidia',
+                'capabilities' => ['gpu'],
+            ];
+            if (preg_match('/^device=([0-9A-Za-z-,]+)$/', $gpus, $device_matches)) {
+                $payload['device_ids'] = explode(',', $device_matches[1]);
+            } elseif (ctype_digit($gpus)) {
+                $payload['count'] = (int) $gpus;
             }
+            $options[$option] = $payload;
+
+            continue;
         }
         if ($option === '--entrypoint') {
             $value = null;
@@ -1671,14 +1731,18 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
             continue;
         }
-        if (isset($match[2]) && $match[2] !== '') {
-            $value = $match[2];
-            $options[$option][] = $value;
-            $options[$option] = array_unique($options[$option]);
-        } else {
-            $value = true;
-            $options[$option] = $value;
+        if (in_array($option, ['--init', '--privileged', '--read-only'], true)) {
+            // Boolean flags only take a value with "=" (--privileged=false); a space-separated word is not their value
+            $hasInlineValue = str_starts_with(substr($match[0], strlen($option)), '=');
+            $options[$option] = ! ($hasInlineValue && strtolower($value) === 'false');
+
+            continue;
         }
+        if (trim($value) === '') {
+            continue;
+        }
+        $options[$option][] = $value;
+        $options[$option] = array_unique($options[$option]);
     }
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
@@ -1689,7 +1753,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         if ($option === '--ulimit') {
             $ulimits = collect([]);
             collect($value)->map(function ($ulimit) use ($ulimits) {
-                $ulimit = explode('=', $ulimit);
+                if (! str_contains($ulimit, '=')) {
+                    return;
+                }
+                $ulimit = explode('=', $ulimit, 2);
                 $type = $ulimit[0];
                 $limits = explode(':', $ulimit[1]);
                 if (count($limits) == 2) {
@@ -1700,16 +1767,20 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                         'hard' => $hard_limit,
                     ]);
                 } else {
-                    $soft_limit = $ulimit[1];
-                    $ulimits->put($type, [
-                        'soft' => $soft_limit,
-                    ]);
+                    // Compose needs both soft and hard in the mapping form, so a single limit is set directly
+                    $ulimits->put($type, $ulimit[1]);
                 }
             });
-            $compose_options->put($mapping[$option], $ulimits);
-        } elseif ($option === '--shm-size' || $option === '--hostname') {
+            if ($ulimits->isNotEmpty()) {
+                $compose_options->put($mapping[$option], $ulimits);
+            }
+        } elseif (in_array($option, ['--shm-size', '--hostname', '--runtime'], true)) {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--pids-limit') {
+            if (is_numeric($value[0])) {
+                $compose_options->put($mapping[$option], (int) $value[0]);
             }
         } elseif ($option === '--entrypoint') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
@@ -1718,23 +1789,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
-            $payload = [
-                'driver' => 'nvidia',
-                'capabilities' => ['gpu'],
-            ];
-            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
-                if (str($value[0]) != 'all') {
-                    if (str($value[0])->contains(',')) {
-                        $payload['device_ids'] = str($value[0])->explode(',')->toArray();
-                    } else {
-                        $payload['device_ids'] = [$value[0]];
-                    }
-                }
-            }
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
-                        'devices' => [$payload],
+                        'devices' => [$value],
                     ],
                 ],
             ]);
@@ -1755,7 +1813,71 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         }
     }
 
+    // Short interactive/TTY flags (-i, -t, -it, -ti) and their long forms are not matched by
+    // the long-option regex above. Map them to compose so a single-image app can keep STDIN
+    // open (docker -i) and/or allocate a TTY (docker -t) — required for `docker attach` to an
+    // interactive main process, e.g. game-server consoles.
+    // Keep quoted option values together so flags inside an entrypoint are not options.
+    preg_match_all('/(?:[^\\s\'"\\\\]+|\\\\.|"(?:\\\\.|[^"\\\\])*"|\'(?:\\\\.|[^\'\\\\])*\')+/', (string) $custom_docker_run_options, $tokens);
+    foreach ($tokens[0] as $token) {
+        if ($token === '--interactive') {
+            $compose_options->put('stdin_open', true);
+        } elseif ($token === '--tty') {
+            $compose_options->put('tty', true);
+        } elseif (preg_match('/^-[dit]+$/', $token)) {
+            if (str_contains($token, 'i')) {
+                $compose_options->put('stdin_open', true);
+            }
+            if (str_contains($token, 't')) {
+                $compose_options->put('tty', true);
+            }
+        }
+    }
+
     return $compose_options->toArray();
+}
+
+/**
+ * Returns the options (--network, -e, ...) that convertDockerRunToCompose() does not apply.
+ *
+ * @return array<int, string>
+ */
+function unsupportedDockerRunOptions(?string $custom_docker_run_options): array
+{
+    // Split into shell words, so text inside a quoted value is not taken as an option
+    preg_match_all('/(?:"(?:\\\\.|[^"])*"|\'[^\']*\'|[^\s"\']|["\'])+/', $custom_docker_run_options ?? '', $words);
+    $unsupported = [];
+    foreach ($words[0] as $word) {
+        if (! str_starts_with($word, '-') || preg_match('/^-\d/', $word)) {
+            continue;
+        }
+        // convertDockerRunToCompose() maps these outside DOCKER_RUN_OPTION_MAPPING
+        if (preg_match('/^(-[dit]+|--interactive|--tty)$/', $word)) {
+            continue;
+        }
+        $option = str_starts_with($word, '--') ? '--'.ltrim(strtok($word, '='), '-') : strtok($word, '=');
+        if (! array_key_exists($option, DOCKER_RUN_OPTION_MAPPING)) {
+            $unsupported[] = $option;
+        }
+    }
+
+    return array_values(array_unique($unsupported));
+}
+
+/**
+ * Returns --mount flags that make seccomp profile files from the custom Docker options readable in the deployment
+ * helper container, where docker compose reads them. The path stays the same, so security_opt works unchanged.
+ */
+function seccompProfileMountFlags(?string $custom_docker_run_options): string
+{
+    $flags = [];
+    foreach (data_get(convertDockerRunToCompose($custom_docker_run_options), 'security_opt', []) as $security_opt) {
+        if (preg_match('#^seccomp[=:](/[A-Za-z0-9._/-]+)$#', $security_opt, $profile) && ! str_contains($profile[1], '..')) {
+            $flags[] = '--mount '.escapeshellarg("type=bind,source={$profile[1]},target={$profile[1]},readonly");
+        }
+    }
+
+    return implode(' ', array_unique($flags));
 }
 
 function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $network)
@@ -1772,6 +1894,10 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
     }
     if ($ipv6) {
         $docker_compose['services'][$container_name]['networks'][$network]['ipv6_address'] = $ipv6;
+    }
+    // A custom ulimit replaces the default of the same type; a recursive merge would combine both into an invalid value
+    foreach (array_keys(data_get($docker_run_options, 'ulimits', [])) as $type) {
+        unset($docker_compose['services'][$container_name]['ulimits'][$type]);
     }
     $docker_compose['services'][$container_name] = array_merge_recursive($docker_compose['services'][$container_name], $docker_run_options);
 
@@ -2130,4 +2256,38 @@ function injectDockerComposeBuildArgs(string $command, string $buildArgsString):
     );
 
     return $modifiedCommand ?? $command;
+}
+
+/**
+ * Run a command that uses the Railpack BuildKit builder, then stop the builder when no other
+ * process uses it. An idle buildkitd keeps the memory of earlier builds until it restarts.
+ *
+ * The lock file is in the buildx metadata directory, which all helper containers of a server share.
+ * The script has no `&&`, `||`, pipe, or `$(`, because the sudo parser would put sudo into it.
+ */
+function railpackBuilderLockedScript(string $command): string
+{
+    return 'exec 9>/root/.docker/buildx/coolify-railpack.lock; if flock -s 9; then :; else exit $?; fi; '
+        ."{$command}; status=\$?; "
+        .'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi; '
+        .'exit $status';
+}
+
+/**
+ * The buildx metadata of a server, as the `docker run -v` source that the deployment helper uses.
+ */
+function railpackBuildxMetadataVolume(Server $server): string
+{
+    return isDev() && $server->isLocalhost() ? 'coolify-buildx' : '$HOME/.docker/buildx';
+}
+
+/**
+ * Run a command for the Railpack builder from a temporary helper container, then stop the builder
+ * when no build uses it.
+ */
+function railpackBuilderHelperCommand(string $buildxMetadataVolume, string $helperImage, string $command): string
+{
+    $script = railpackBuilderLockedScript($command);
+
+    return "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImage} bash -c '{$script}' 2>/dev/null || true";
 }

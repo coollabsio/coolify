@@ -3,6 +3,7 @@
     'errorId' => null,
     'hostLabel' => 'Domain',
     'hostPlaceholder' => 'app.example.com',
+    'inheritedPortExpression' => null,
 ])
 
 <div class="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)_8rem]">
@@ -42,8 +43,20 @@
             <label for="{{ $id }}-port" class="mb-0! flex items-center gap-1.5 leading-4">Port</label>
         </div>
         <input id="{{ $id }}-port" type="number" class="input" wire:model="{{ $id }}.port"
-            placeholder="3000" min="1" max="65535" inputmode="numeric" />
+            placeholder="3000" min="1" max="65535" inputmode="numeric"
+            @if ($inheritedPortExpression)
+                x-bind:placeholder="({{ $inheritedPortExpression }}) ?? ''"
+            @endif />
     </div>
+
+    @if ($inheritedPortExpression)
+        <div class="min-w-0 sm:col-span-3"
+            x-show="!({{ $inheritedPortExpression }}) && !$wire.{{ $id }}?.port" x-cloak>
+            <x-callout type="danger" title="Port is required">
+                The proxy cannot route this domain. Enter the port your container listens on in the Port field.
+            </x-callout>
+        </div>
+    @endif
 
     <div class="min-w-0 sm:col-span-3">
         <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">

@@ -83,8 +83,8 @@ test('restores dump-all PostgreSQL custom archives with pg_restore from the deco
 
     // pg_restore cannot read gzip files, so it must receive the decompressed archive on stdin.
     expect($command)
-        ->toContain('stream | pg_restore -U ${POSTGRES_USER} -d "$db"')
-        ->toContain('stream | psql -U ${POSTGRES_USER} -d "$db"')
+        ->toContain('stream | pg_restore -U "$pg_user" -d "$db"')
+        ->toContain('stream | psql -U "$pg_user" -d "$db"')
         ->not->toContain("-d \"\$db\" '/tmp/backup.dump.gz'");
 });
 

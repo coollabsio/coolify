@@ -449,3 +449,17 @@ test('changing the content of a mount outside the resource directory needs deplo
         ->assertOk();
     expect($storage->fresh()->content)->toBe('listen 9090;');
 })->with(['application', 'database', 'service']);
+
+test('a failed conversion keeps the storage type that is on the server', function (string $action, bool $isDirectory) {
+    // The legacy parser stored this raw source, so the server step rejects it.
+    $volume = storageHostPathFileVolume('${AO_CONFIG_FILE:-./agent-orchestrator.yaml}', null, $isDirectory);
+
+    Livewire::test(FileStorage::class, ['fileStorage' => $volume])
+        ->call($action)
+        ->assertDispatched('error');
+
+    expect($volume->fresh()->is_directory)->toBe($isDirectory);
+})->with([
+    'to file' => ['convertToFile', true],
+    'to directory' => ['convertToDirectory', false],
+]);

@@ -45,6 +45,9 @@ class Domains extends Component
     /** @var array<int|string, bool> */
     public array $forceHttpsRedirects = [];
 
+    /** @var array<int|string, bool> */
+    public array $permanentRedirects = [];
+
     /** Service application id when a pending domain conflict belongs to setServiceRedirect. */
     public ?int $pendingRedirectServiceApplicationId = null;
 
@@ -145,6 +148,8 @@ class Domains extends Component
             'serviceRedirects.*' => 'string|in:both,www,non-www',
             'forceHttpsRedirects' => 'array',
             'forceHttpsRedirects.*' => 'boolean',
+            'permanentRedirects' => 'array',
+            'permanentRedirects.*' => 'boolean',
         ];
     }
 
@@ -239,6 +244,24 @@ class Domains extends Component
         $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
     }
 
+    public function updatePermanentRedirect(int $serviceApplicationId, bool $enabled): void
+    {
+        $application = $this->service->applications()->findOrFail($serviceApplicationId);
+        $this->authorize('update', $application);
+
+        $this->permanentRedirects[$serviceApplicationId] = $enabled;
+        $this->validateOnly("permanentRedirects.{$serviceApplicationId}");
+
+        $application->is_permanent_redirect_enabled = $enabled;
+        $changedFields = auditChangedFields($application);
+        $application->save();
+        $this->auditServiceApplicationUpdate($application, $changedFields);
+        $this->service->parse();
+        $this->refreshDomains();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Redirect type updated.');
+    }
+
     public function loadDomainState(): void
     {
         $this->service->loadMissing(['applications', 'server']);
@@ -265,6 +288,10 @@ class Domains extends Component
 
         $this->forceHttpsRedirects = $this->service->applications
             ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isForceHttpsEnabled()])
+            ->all();
+
+        $this->permanentRedirects = $this->service->applications
+            ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isPermanentRedirectEnabled()])
             ->all();
 
         $this->serviceApps = $this->service->applications

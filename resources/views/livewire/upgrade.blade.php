@@ -107,7 +107,7 @@
                                             <p class="text-[12px]" style="color: var(--coollabs-subtle)">
                                                 Reloading in
                                                 <span x-text="successCountdown"
-                                                    class="font-semibold text-coollabs dark:text-warning"></span>
+                                                    class="font-semibold text-coollabs dark:text-brand-light"></span>
                                                 seconds…
                                             </p>
                                             <p class="text-center text-[11px] leading-4"
@@ -146,7 +146,7 @@
 
                                     <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)">
                                         If something goes wrong, check the
-                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-warning dark:decoration-warning/30 dark:hover:decoration-warning"
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light"
                                             href="https://coolify.io/docs/upgrade" target="_blank"
                                             rel="noopener noreferrer">upgrade guide</a>
                                         or the logs on the server at

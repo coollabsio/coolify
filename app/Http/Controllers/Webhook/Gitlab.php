@@ -13,8 +13,10 @@ use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GitlabApp;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -84,6 +86,9 @@ class Gitlab extends Controller
         try {
             $return_payloads = collect([]);
             $payload = $request->collect();
+            if ($request->header('X-Gitlab-Event') === 'System Hook') {
+                $payload = $this->normalizeSystemHookPayload($payload);
+            }
             $x_gitlab_token = $request->header('X-Gitlab-Token');
             $object_kind = $this->webhookString(data_get($payload, 'object_kind'));
 
@@ -118,6 +123,7 @@ class Gitlab extends Controller
                 ], 401);
             }
 
+            TransferFinishChecklist::recordWebhook('gitlab_app', $gitlab_app->uuid);
             $project_id = $this->webhookPayloadDatabaseId($payload, 'project.id', required: true);
             $applications = Application::where('source_id', $gitlab_app->id)
                 ->where('source_type', GitlabApp::class)
@@ -475,6 +481,7 @@ class Gitlab extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([
@@ -665,6 +672,30 @@ class Gitlab extends Controller
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Give a system hook payload the project webhook shape. Current GitLab sends
+     * the project webhook data to system hooks, but the documented push payload
+     * has only `event_name` and a top-level `project_id`.
+     *
+     * @see https://docs.gitlab.com/administration/system_hooks/#push-events
+     *
+     * @param  Collection<string, mixed>  $payload
+     * @return Collection<string, mixed>
+     */
+    private function normalizeSystemHookPayload(Collection $payload): Collection
+    {
+        if (! $payload->has('object_kind') && $payload->has('event_name')) {
+            $payload->put('object_kind', $payload->get('event_name'));
+        }
+
+        $project = $payload->get('project');
+        if (is_array($project) && ! array_key_exists('id', $project) && $payload->has('project_id')) {
+            $payload->put('project', ['id' => $payload->get('project_id')] + $project);
+        }
+
+        return $payload;
     }
 
     /**

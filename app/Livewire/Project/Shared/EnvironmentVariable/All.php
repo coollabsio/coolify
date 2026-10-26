@@ -59,6 +59,8 @@ class All extends Component
 
     public bool $include_coolify_default_variables = true;
 
+    public bool $redact_all_env_values_in_logs = true;
+
     /**
      * Environment variable rows are loaded after first paint via wire:init
      * so the surrounding configuration page can render immediately.
@@ -66,6 +68,8 @@ class All extends Component
     public bool $readyToLoad = false;
 
     private ?Collection $composeEnvironmentAssignments = null;
+
+    private ?bool $canViewComposeContent = null;
 
     protected $listeners = [
         'saveKey' => 'submit',
@@ -113,6 +117,9 @@ class All extends Component
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $coolifyDefaultVariablesOwner = $this->resource instanceof Application ? $this->resource->settings : $this->resource;
         $this->include_coolify_default_variables = data_get($coolifyDefaultVariablesOwner, 'include_coolify_default_variables') !== false;
+        if ($this->hasLogRedactionSetting()) {
+            $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+        }
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -138,6 +145,41 @@ class All extends Component
 
         if ($this->view === 'dev') {
             $this->getDevView();
+        }
+    }
+
+    /**
+     * Applications, services, and standalone databases have the "Environment values in logs" setting.
+     */
+    public function hasLogRedactionSetting(): bool
+    {
+        return method_exists($this->resource, 'redactsAllEnvValuesInLogs');
+    }
+
+    public function saveLogRedactionSetting()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resource instanceof Application) {
+                $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } elseif ($this->hasLogRedactionSetting()) {
+                // Services and databases use the Auditable trait, so saving records the changed field.
+                $this->resource->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->resource->save();
+            } else {
+                return;
+            }
+
+            $this->dispatch('success', 'Log redaction setting updated.');
+        } catch (\Throwable $e) {
+            if ($this->hasLogRedactionSetting()) {
+                $this->resource->refresh();
+                $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+            }
+
+            return handleError($e, $this);
         }
     }
 
@@ -858,10 +900,24 @@ class All extends Component
     /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
     private function composeInfoFor(string $key): ?array
     {
-        return dockerComposeEnvironmentVariableInfo(
+        $composeInfo = dockerComposeEnvironmentVariableInfo(
             $this->resource->docker_compose_raw ?? $this->resource->docker_compose,
             $key
         );
+
+        if ($composeInfo !== null && ! $this->canViewComposeContent()) {
+            $composeInfo['default'] = null;
+        }
+
+        return $composeInfo;
+    }
+
+    /**
+     * Compose defaults are compose content, which only users who can update the resource may see.
+     */
+    private function canViewComposeContent(): bool
+    {
+        return $this->canViewComposeContent ??= auth()->user()?->can('update', $this->resource) ?? false;
     }
 
     private function composeEnvironmentAssignments(): Collection

@@ -4,10 +4,13 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
+use App\Livewire\Project\Service\Storage;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Heading extends Component
@@ -29,14 +32,23 @@ class Heading extends Component
 
     public bool $docker_cleanup = true;
 
+    /**
+     * Set once when the General page opens, where the user sees the Compose file location. Other pages
+     * only show the button, and a later switch to the Compose build pack waits for the user.
+     */
+    #[Locked]
+    public bool $loadComposeOnOpen = false;
+
     public function getListeners()
     {
         return [
             'compose_loaded' => '$refresh',
+            'configurationChanged' => '$refresh',
             'update_links' => '$refresh',
             ...$this->teamChannelListeners([
                 'ServiceStatusChanged' => 'checkStatus',
                 'ServiceChecked' => '$refresh',
+                'ApplicationStopFailed' => 'stopFailed',
             ]),
         ];
     }
@@ -52,6 +64,41 @@ class Heading extends Component
         $lastDeployment = $this->application->get_last_successful_deployment();
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
+        $this->loadComposeOnOpen = $this->activeRouteName === 'project.application.configuration'
+            && $this->needsComposeFile()
+            && auth()->user()?->can('update', $this->application);
+    }
+
+    public function needsComposeFile(): bool
+    {
+        return $this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw);
+    }
+
+    public function loadComposeFile(bool $isInit = false)
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            if ($isInit && ! $this->needsComposeFile()) {
+                return;
+            }
+
+            $loaded = $this->application->loadComposeFile();
+            if (is_null(data_get($loaded, 'parsedServices'))) {
+                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+
+                return;
+            }
+
+            $this->dispatch('success', 'Docker compose file loaded.');
+            $this->dispatch('composeFileLoaded')->to(General::class);
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
+            $this->dispatch('refreshEnvs')->to(All::class);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->application->refresh();
+        }
     }
 
     /**
@@ -75,6 +122,20 @@ class Heading extends Component
         } else {
             $this->dispatch('error', 'Server is not functional.');
         }
+    }
+
+    /**
+     * @param  array{applicationUuid?: mixed, message?: mixed}  $event
+     */
+    public function stopFailed(array $event): void
+    {
+        if (($event['applicationUuid'] ?? null) !== $this->application->uuid || ! is_string($event['message'] ?? null)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->dispatch('error', 'Failed to stop the application.', $event['message']);
     }
 
     public function manualCheckStatus()
@@ -111,7 +172,7 @@ class Heading extends Component
         try {
             $this->authorize('deploy', $this->application);
 
-            if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
+            if ($this->needsComposeFile()) {
                 $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
 
                 return;

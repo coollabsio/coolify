@@ -200,3 +200,16 @@ test('the UI does not enable an unsupported custom log drain', function () {
 
     expect((bool) $this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeFalse();
 });
+
+test('the UI saves a cleared custom config while the custom log drain is disabled', function () {
+    $this->actingAs($this->user);
+    $this->server->settings->update(['logdrain_custom_config' => SAFE_CUSTOM_LOG_DRAIN_CONFIG]);
+
+    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
+        ->set('logDrainCustomConfig', '')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect($this->server->settings->fresh()->logdrain_custom_config)->toBeEmpty();
+});
