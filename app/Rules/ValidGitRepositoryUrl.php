@@ -34,6 +34,22 @@ class ValidGitRepositoryUrl implements ValidationRule
             $value,
         );
 
+        // Git decodes %XX sequences, so check the decoded URL. A '%' that is left after decoding
+        // is a malformed or double-encoded sequence and is rejected with the other characters.
+        $decodedValue = rawurldecode($valueWithoutIpv6Host);
+
+        // Control characters (newline, null byte, tab) can inject git credential-helper lines (CVE-2020-5260)
+        if (preg_match('/[\x00-\x1F\x7F]/', $decodedValue)) {
+            Log::warning('Git repository URL validation failed - control character', [
+                'url' => $value,
+                'ip' => request()->ip(),
+                'user_id' => auth()->id(),
+            ]);
+            $fail('The :attribute contains invalid characters.');
+
+            return;
+        }
+
         // Check for dangerous shell metacharacters that could be used for command injection
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
@@ -43,7 +59,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         ];
 
         foreach ($dangerousChars as $char) {
-            if (str_contains($valueWithoutIpv6Host, $char)) {
+            if (str_contains($decodedValue, $char)) {
                 Log::warning('Git repository URL validation failed - dangerous character', [
                     'url' => $value,
                     'character' => $char,
@@ -70,7 +86,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         ];
 
         foreach ($dangerousPatterns as $pattern) {
-            if (preg_match($pattern, $valueWithoutIpv6Host)) {
+            if (preg_match($pattern, $decodedValue)) {
                 Log::warning('Git repository URL validation failed - dangerous pattern', [
                     'url' => $value,
                     'pattern' => $pattern,
@@ -93,7 +109,7 @@ class ValidGitRepositoryUrl implements ValidationRule
 
             // Validate scp-style SSH URL format (user@host:user/repo.git)
             $scp = parseScpStyleGitUrl($value);
-            if ($scp === null || preg_match('/^(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+)$/', $scp['host']) !== 1 || preg_match('/^[a-zA-Z0-9\-_\/.~]+$/', $scp['path']) !== 1) {
+            if ($scp === null || preg_match('/^(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+)$/', $scp['host']) !== 1 || preg_match('/^[a-zA-Z0-9\-_\/.~%]+$/', $scp['path']) !== 1) {
                 $fail('The :attribute is not a valid SSH repository URL.');
 
                 return;
@@ -106,7 +122,7 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
 
             // Validate ssh:// URL format (ssh://user@host[:port]/user/repo.git)
-            if (! preg_match('/^ssh:\/\/[a-zA-Z0-9._-]+@(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+)(:[0-9]{1,5})?\/[a-zA-Z0-9\-_\/.~]+$/', $value)) {
+            if (! preg_match('/^ssh:\/\/[a-zA-Z0-9._-]+@(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9.-]+)(:[0-9]{1,5})?\/[a-zA-Z0-9\-_\/.~%]+$/', $value)) {
                 $fail('The :attribute is not a valid SSH repository URL.');
 
                 return;
@@ -151,6 +167,13 @@ class ValidGitRepositoryUrl implements ValidationRule
                 return;
             }
 
+            // Percent-encoding is only allowed in the path, because hosts and credentials can be decoded differently
+            if (str_contains(($parsed['host'] ?? '').($parsed['user'] ?? '').($parsed['pass'] ?? ''), '%')) {
+                $fail('The :attribute contains invalid characters.');
+
+                return;
+            }
+
             // Ensure no query parameters or fragments
             if (! empty($parsed['query']) || ! empty($parsed['fragment'])) {
                 $fail('The :attribute should not contain query parameters or fragments.');
@@ -160,14 +183,14 @@ class ValidGitRepositoryUrl implements ValidationRule
 
             // Validate path contains only safe characters
             $path = $parsed['path'] ?? '';
-            if (! empty($path) && ! preg_match('/^[a-zA-Z0-9\-_\/\.@~]+$/', $path)) {
+            if (! empty($path) && ! preg_match('/^[a-zA-Z0-9\-_\/\.@~%]+$/', $path)) {
                 $fail('The :attribute path contains invalid characters.');
 
                 return;
             }
         } elseif (str_starts_with($value, 'git://')) {
             // Validate git:// protocol URL (supports both git://host/path and git://host:port/path with tilde)
-            if (! preg_match('/^git:\/\/(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9\.\-]+)(:[0-9]+)?[:\/][a-zA-Z0-9\-_\/\.~]+$/', $value)) {
+            if (! preg_match('/^git:\/\/(\[[0-9A-Fa-f:.]+\]|[a-zA-Z0-9\.\-]+)(:[0-9]+)?[:\/][a-zA-Z0-9\-_\/\.~%]+$/', $value)) {
                 $fail('The :attribute is not a valid git:// URL.');
 
                 return;
