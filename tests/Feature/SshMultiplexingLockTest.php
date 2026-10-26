@@ -6,10 +6,14 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyTimeoutException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 /**
  * Tests for the explicit per-server mux lock that prevents concurrent workers
@@ -53,6 +57,25 @@ function makeMuxServer(): Server
     Storage::disk('ssh-keys')->put("ssh_key@{$server->privateKey->uuid}", $server->privateKey->private_key);
 
     return $server;
+}
+
+/**
+ * A fake process that times out. Laravel does not record a fake that throws, so the
+ * timeout of each call goes into $timeouts.
+ *
+ * @param  array<int, int|float|null>  $timeouts
+ */
+function muxProcessTimeout(array &$timeouts = []): Closure
+{
+    return function ($pendingProcess) use (&$timeouts) {
+        $timeouts[] = $pendingProcess->timeout;
+        $process = new SymfonyProcess(['ssh']);
+
+        throw new ProcessTimedOutException(
+            new SymfonyTimeoutException($process, SymfonyTimeoutException::TYPE_GENERAL),
+            new ProcessResult($process),
+        );
+    };
 }
 
 it('establishes a master with ssh -fN and never the orphan-prone ssh -fNM', function () {
@@ -103,6 +126,113 @@ it('reuses a healthy master regardless of its absolute age', function () {
 
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+});
+
+it('bounds mux check commands so a wedged master cannot block callers', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    $server = makeMuxServer();
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 1),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::ensureMultiplexedConnection($server);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, '-O check'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '-O check') && $process->timeout !== 5);
+});
+
+it('replaces a wedged master whose control check times out', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    $server = makeMuxServer();
+    $muxSocket = "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}";
+
+    File::partialMock()->shouldReceive('delete')->once()->with($muxSocket)->andReturnTrue();
+    $timeouts = [];
+    Process::fake([
+        '*-O check*' => muxProcessTimeout($timeouts),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue()
+        ->and($timeouts)->each->toBe(5);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '-O stop'));
+});
+
+it('does not delete the control socket when the master is simply absent', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = makeMuxServer();
+
+    File::partialMock()->shouldNotReceive('delete');
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 255),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+});
+
+it('bounds the control commands used to stop a mux master', function () {
+    config(['constants.ssh.mux_health_check_timeout' => 5]);
+    $server = makeMuxServer();
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O check') && $process->timeout === 5);
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop') && $process->timeout === 5);
+});
+
+it('replaces a master whose health check times out', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_enabled' => true,
+    ]);
+    $server = makeMuxServer();
+
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
+        '*health_check_ok*' => muxProcessTimeout(),
+        '*-O stop*' => Process::result(exitCode: 0),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+});
+
+it('gives the mux health check at least the server connection timeout', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    $server = makeMuxServer();
+    $server->settings->update(['connection_timeout' => 30]);
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 0),
+        '*health_check_ok*' => Process::result(output: 'health_check_ok', exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server->fresh()))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'health_check_ok') && $process->timeout === 30);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, '-O check') && $process->timeout !== 5);
 });
 
 it('does not spawn a master when the per-server lock is already held', function () {
@@ -418,6 +548,33 @@ it('does not mark a mux process as retiring when stop fails', function () {
     expect(SshMultiplexingHelper::isMuxProcessRetiring('444', "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}"))->toBeFalse();
 });
 
+it('removes the control socket when the mux master does not stop', function (bool $stopTimesOut) {
+    $server = makeMuxServer();
+    File::partialMock()->shouldReceive('delete')->once()->with("/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}");
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=888)', exitCode: 0),
+        '*-O stop*' => $stopTimesOut ? muxProcessTimeout() : Process::result(exitCode: 255),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    expect(SshMultiplexingHelper::isMuxProcessRetiring('888', "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}"))->toBeFalse();
+})->with([
+    'stop fails' => false,
+    'stop times out' => true,
+]);
+
+it('keeps the control socket untouched when the mux master stops', function () {
+    $server = makeMuxServer();
+    File::partialMock()->shouldNotReceive('delete');
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=999)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+});
+
 it('kills only old cloudflared proxies whose stdin pipe no live ssh holds', function () {
     config(['constants.ssh.mux_orphan_reap_enabled' => true]);
 
@@ -542,6 +699,58 @@ it('removes a stale mux retirement marker when stopping fails', function () {
     $method->invoke($job);
 
     expect(SshMultiplexingHelper::isMuxProcessRetiring('777', $muxSocket))->toBeFalse();
+});
+
+it('removes a mux connection whose control check times out during cleanup', function () {
+    config([
+        'constants.ssh.mux_orphan_reap_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    Storage::fake('ssh-mux');
+    $server = makeMuxServer();
+    $file = "mux_{$server->uuid}";
+    Storage::disk('ssh-mux')->put($file, 'x');
+
+    $timeouts = [];
+    Process::fake([
+        '*-O check*' => muxProcessTimeout($timeouts),
+        '*-O stop*' => muxProcessTimeout($timeouts),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupStaleConnections');
+    $method->invoke($job);
+
+    expect(Storage::disk('ssh-mux')->exists($file))->toBeFalse()
+        ->and($timeouts)->toBe([5, 5, 5]);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, $server->ip));
+});
+
+it('does not reap ssh processes when the socket owner check times out', function () {
+    config([
+        'constants.ssh.mux_orphan_reap_enabled' => true,
+        'constants.ssh.mux_health_check_timeout' => 5,
+    ]);
+    $muxDir = storage_path('app/ssh/mux');
+    File::ensureDirectoryExists($muxDir);
+    $socket = $muxDir.'/mux_wedged_'.uniqid();
+    File::put($socket, 'x');
+
+    $timeouts = [];
+    Process::fake([
+        'ps*' => Process::result(output: "111 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n"),
+        '*ssh -O check*' => muxProcessTimeout($timeouts),
+        'kill*' => Process::result(exitCode: 0),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupOrphanedSshProcesses');
+    $method->invoke($job);
+
+    expect($timeouts)->toBe([5]);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill'));
+
+    File::delete($socket);
 });
 
 it('does not remove a healthy mux connection based on its absolute age', function () {
