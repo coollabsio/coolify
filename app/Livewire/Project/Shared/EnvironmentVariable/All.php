@@ -775,7 +775,7 @@ class All extends Component
     }
 
     /**
-     * Compared on the server, so the "Same as production" badge sends no values to the browser.
+     * Compared on the server, so the "Production value" badge sends no values to the browser.
      *
      * @return array<int, int>
      */
