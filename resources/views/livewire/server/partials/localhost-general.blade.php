@@ -3,14 +3,12 @@
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Operating system and hardware details for the server running this Coolify instance.">
                         <x-slot:actions>
-                            @if ($server->server_metadata)
-                                <x-forms.button type="button" wire:click="refreshServerMetadata"
-                                    :disabled="! $server->isFunctional()"
-                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Refresh details
-                                </x-forms.button>
-                            @endif
+                            <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                :disabled="! $server->isFunctional()"
+                                :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                {{ $server->server_metadata ? 'Refresh details' : 'Fetch server details' }}
+                            </x-forms.button>
                             <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
                                 :isHighlighted="! $server->isFunctional()" canGate="update" :canResource="$server">
                                 <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
@@ -44,15 +42,6 @@
 
                         @if ($server->server_metadata)
                             @include('livewire.server.partials.server-details', ['server' => $server])
-                        @else
-                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button" wire:click="refreshServerMetadata"
-                                    :disabled="! $server->isFunctional()"
-                                    :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Fetch server details
-                                </x-forms.button>
-                            </div>
                         @endif
                     </x-application.settings-section>
 

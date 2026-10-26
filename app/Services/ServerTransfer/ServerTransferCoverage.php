@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -16,6 +17,7 @@ use App\Models\DockerCleanupExecution;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
@@ -109,7 +111,9 @@ final class ServerTransferCoverage
         GithubApp::class => ['github_apps.*'],
         GithubRunnerConfig::class => ['github_runner_config'],
         GitlabApp::class => ['gitlab_apps.*'],
+        GiteaApp::class => ['gitea_apps.*'],
         S3Storage::class => ['s3_storages.*'],
+        AgeKey::class => ['age_keys.*'],
         Project::class => ['projects.*'],
         Environment::class => ['projects.*.environments.*'],
         ResourceLink::class => ['projects.*.environments.*.resource_links.*'],
@@ -183,6 +187,7 @@ final class ServerTransferCoverage
             'hetzner_server_status' => self::RUNTIME, 'vultr_instance_status' => self::RUNTIME,
             'digitalocean_droplet_status' => self::RUNTIME, 'hostinger_virtual_machine_status' => self::RUNTIME,
             'server_metadata' => 'Facts about the host and the transfer state of the source; the target collects its own.',
+            'canvas_position' => 'Place of the server on the servers canvas of the source; the target places it with its own servers.',
         ],
         ServerSetting::class => [
             'server_id' => self::LINKED, 'is_reachable' => self::RUNTIME, 'is_usable' => self::RUNTIME, 'force_disabled' => self::RUNTIME,
@@ -191,6 +196,7 @@ final class ServerTransferCoverage
             'sentinel_token' => 'The target makes a new Sentinel token when it claims the server.',
             'sentinel_custom_url' => 'The target sets its own URL when it claims the server.',
             'cloudflare_tunnel_integration_token_id' => 'Exported as cloudflare_tunnel_integration_token_uuid. '.self::LINKED,
+            'patch_check_result' => self::RUNTIME, 'patch_check_error' => self::RUNTIME, 'patch_checked_at' => self::RUNTIME,
         ],
         PrivateKey::class => ['team_id' => self::TEAM],
         StandaloneDocker::class => ['server_id' => self::LINKED],
@@ -211,12 +217,15 @@ final class ServerTransferCoverage
             'github_app_id' => 'Exported as github_app_uuid. '.self::LINKED,
         ],
         GitlabApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
+        GiteaApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         S3Storage::class => ['team_id' => self::TEAM, 'unusable_email_sent' => self::RUNTIME],
+        AgeKey::class => ['team_id' => self::TEAM],
         Project::class => [
             'team_id' => self::TEAM,
             'icon_path' => 'The icon file is exported as `icon` (base64 content). The target stores it in its own icon storage and sets the path.',
             'icon_storage_type' => 'The target uses its own default icon storage. See icon_path.',
             'icon_s3_storage_id' => 'The target uses its own default icon storage. See icon_path.',
+            'canvas_position' => 'Place of the project on the projects canvas of the source; the target places it with its own projects.',
         ],
         Environment::class => ['project_id' => self::LINKED],
         ResourceLink::class => [
@@ -252,6 +261,7 @@ final class ServerTransferCoverage
         Tag::class => ['team_id' => self::TEAM],
         ScheduledDatabaseBackup::class => [
             'team_id' => self::TEAM, 'database_type' => self::LINKED, 'database_id' => self::LINKED, 's3_storage_id' => self::LINKED,
+            'age_key_id' => 'Exported as age_key_uuid. '.self::LINKED,
             'last_execution_at' => 'Execution history of the source.',
         ],
         ScheduledVolumeBackup::class => [

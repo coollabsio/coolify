@@ -13,7 +13,7 @@ class CloudProvider extends RestActionTool
 {
     protected string $name = 'cloud_provider';
 
-    protected string $description = 'Manage cloud provider API tokens of the authenticated team (Hetzner, DigitalOcean, Vultr, Hostinger), read provider catalogs, and provision new paid servers. Provider tokens are never returned. Requires read ability for list_tokens/get_token/catalog, write ability for the rest. Same validation and permissions as the REST API.';
+    protected string $description = 'Manage cloud provider API tokens of the authenticated team (Hetzner, DigitalOcean, Vultr, Hostinger), read provider catalogs, and provision new paid servers. Provider tokens are never returned. Requires read ability for list_tokens/get_token/catalog, write ability for the rest (provision_server with a cloud-init or post-install script or extra SSH keys also needs deploy). Same validation and permissions as the REST API.';
 
     private const CATALOG_PATHS = [
         'hetzner_locations' => 'hetzner/locations',
@@ -54,7 +54,7 @@ class CloudProvider extends RestActionTool
             'delete_token' => ['method' => 'DELETE', 'path' => 'cloud-tokens/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a provider token that no server uses'],
             'validate_token' => ['method' => 'POST', 'path' => 'cloud-tokens/{uuid}/validate', 'ability' => 'write', 'description' => 'check a stored provider token with the provider'],
             'catalog' => ['method' => 'GET', 'paths' => self::CATALOG_PATHS, 'ability' => 'read', 'description' => 'read a provider catalog; resource is <provider>_<catalog>, for example hetzner_locations (data: cloud_provider_token_uuid)'],
-            'provision_server' => ['method' => 'POST', 'paths' => self::PROVISION_PATHS, 'ability' => 'write', 'confirm' => true, 'description' => 'create a new paid server at the provider and add it to Coolify; resource is the provider (data: cloud_provider_token_uuid, private_key_uuid, name, and the provider fields, for example location, server_type, image for hetzner)'],
+            'provision_server' => ['method' => 'POST', 'paths' => self::PROVISION_PATHS, 'ability' => 'write', 'confirm' => true, 'description' => 'create a new paid server at the provider and add it to Coolify; resource is the provider (data: cloud_provider_token_uuid, private_key_uuid, name, and the provider fields, for example location, server_type, image for hetzner; a cloud-init or post-install script or extra SSH keys need deploy ability)'],
         ];
     }
 

@@ -245,14 +245,14 @@ it('gives the job enough time for every connection check step', function () {
         ->and($lock->expiresAfter)->toBeGreaterThan($job->timeout);
 });
 
-it('stops managing a server when its owner marker names another instance', function () {
+it('stops managing a server when its owner marker names a newer claim of another instance', function () {
     $server = createServerForConnectionIsolationTest([
         'ip' => '203.0.113.10',
-        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance']]],
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance', 'claimed_at' => '2026-01-01T00:00:00+00:00']]],
     ]);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
     Process::fake([
-        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-instance-b","instance_url":"https://coolify-b.test"}', exitCode: 0),
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-instance-b","instance_url":"https://8.8.8.8","claimed_at":"2026-02-01T00:00:00+00:00"}', exitCode: 0),
         '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
     ]);
 
@@ -260,7 +260,7 @@ it('stops managing a server when its owner marker names another instance', funct
 
     $server->refresh();
     expect($server->isTransferredAway())->toBeTrue()
-        ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://coolify-b.test')
+        ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://8.8.8.8')
         ->and((bool) $server->settings->force_disabled)->toBeTrue();
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'docker version'));
 });

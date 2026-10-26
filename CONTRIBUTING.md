@@ -193,12 +193,11 @@ Choose the branch based on the type of change:
 | --- | --- | --- |
 | Fixes and small improvements | `main` | `main` |
 | Security fixes | `main` | `main` |
-| New features and larger changes | `release/v4.x` | `release/v4.x` |
+| New features and larger changes | `next` | `next` |
 
 - For a fix, branch from `main` and target `main`.
-- For a feature, branch from `release/v4.x` and target `release/v4.x`.
-- `x` is the number of the next minor release. For example, when the production version is `4.4.x`, use `release/v4.5`. There is no `next` branch.
-- If a fix is discovered while developing a feature, submit it separately to `main`. Maintainers will merge `main` into `release/v4.x` so the fix is included there too.
+- For a feature, branch from `next` and target `next`.
+- If a fix is discovered while developing a feature, submit it separately to `main`. `main` is merged into `next` automatically, so the fix is included there too.
 - Pull requests targeting the wrong branch may be closed or asked to retarget.
 
 
@@ -230,6 +229,8 @@ A: Yes, but keep in mind a PR closure is feedback, not a rejection of your effor
 To build and run Coolify locally, see: [Development](./DEVELOPMENT.md)
 
 ### Testing the Coolify Helper Locally
+
+When you change a tool version in `docker/coolify-helper/Dockerfile`, run `./scripts/helper-checksums` to update the SHA256 checksums of the downloads.
 
 Use `scripts/dev-helper` to build a local helper image and test it with the running development instance. The script requires the standard local Coolify container and the seeded Dockerfile, Docker Compose, and Nixpacks applications.
 

@@ -11,13 +11,13 @@ class ManageRegistry extends RestActionTool
 {
     protected string $name = 'manage_registry';
 
-    protected string $description = 'List, add, check, or remove Docker registry logins on a server of the authenticated team. Passwords are never returned. Requires read:sensitive ability for list, write ability for changes. Same validation and permissions as the REST API.';
+    protected string $description = 'List, add, check, or remove Docker registry logins on a server of the authenticated team. Passwords are never returned. Requires read:sensitive ability for list, deploy ability for create, write ability for check and delete. Same validation and permissions as the REST API.';
 
     protected function actions(): array
     {
         return [
             'list' => ['method' => 'GET', 'path' => 'servers/{uuid}/registries', 'ability' => 'read:sensitive', 'description' => 'registry logins on the server (registry and username only)'],
-            'create' => ['method' => 'POST', 'path' => 'servers/{uuid}/registries', 'ability' => 'write', 'description' => 'log in to a registry on the server (data: registry, username, password)'],
+            'create' => ['method' => 'POST', 'path' => 'servers/{uuid}/registries', 'ability' => 'deploy', 'description' => 'log in to a registry on the server (data: registry, username, password)'],
             'check' => ['method' => 'POST', 'path' => 'servers/{uuid}/registries/{registry}/check', 'ability' => 'write', 'description' => 'check that a registry login works'],
             'delete' => ['method' => 'DELETE', 'path' => 'servers/{uuid}/registries/{registry}', 'ability' => 'delete', 'confirm' => true, 'description' => 'log out of a registry; private image pulls can fail afterwards'],
         ];

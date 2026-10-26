@@ -158,3 +158,16 @@ it('keeps S3 credentials available to an owner who can update the storage', func
         ->assertSet('key', 'stored-access-key')
         ->assertSet('secret', 'stored-secret-key');
 });
+
+it('hides the S3 credential fields for a member after the session switches to a team they own', function () {
+    $storage = createS3StorageWithSecrets($this->team);
+    $ownTeam = Team::factory()->create();
+    $ownTeam->members()->attach($this->member, ['role' => 'owner']);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $ownTeam]);
+
+    Livewire::test(StorageForm::class, ['storage' => $storage])
+        ->assertSet('isPasswordHiddenForMember', true)
+        ->assertSet('secret', '');
+});

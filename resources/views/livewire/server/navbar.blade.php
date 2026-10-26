@@ -11,7 +11,7 @@
                     </div>
                 @endif
                 <div class="flex min-h-0 flex-1 flex-col">
-                    <livewire:activity-monitor header="Logs" fullHeight />
+                    <livewire:activity-monitor fullHeight />
                 </div>
             </div>
         </x-slot:content>
@@ -42,7 +42,7 @@
                 'label' => 'Proxy',
                 'route' => 'server.proxy',
                 'active' => request()->routeIs('server.proxy', 'server.proxy.*'),
-                'visible' => ! $server->isSwarmWorker() && $server->canHostResources(),
+                'visible' => $server->isFunctional() && ! $server->isSwarmWorker() && $server->canHostResources(),
                 'warning' => $this->hasTraefikOutdated || $this->hasPendingProxyConfiguration,
             ],
             [
@@ -59,19 +59,20 @@
                 'label' => 'Resources',
                 'route' => 'server.resources',
                 'active' => request()->routeIs('server.resources'),
+                'visible' => $server->isFunctional(),
             ],
             [
                 'label' => 'Terminal',
                 'route' => 'server.command',
                 'active' => $currentRoute === 'server.command',
                 'navigate' => false,
-                'visible' => auth()->user()?->can('canAccessTerminal'),
+                'visible' => $server->isFunctional() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Security',
                 'route' => 'server.security.patches',
                 'active' => request()->routeIs('server.security.*'),
-                'visible' => auth()->user()?->can('update', $server),
+                'visible' => $server->isFunctional() && auth()->user()?->can('update', $server),
             ],
         ];
 
@@ -154,103 +155,106 @@
     @endteleport
 
     <div>
-        {{-- Name lives in the desktop topbar (teleport) from lg up. Below that the
-             mobile topbar has no resource context, so show the H1 through lg. --}}
-        <div class="mb-3 w-full lg:hidden">
-            <div class="flex min-w-0 flex-col gap-2">
-                <h1 data-testid="server-subtitle"
-                    class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
-                    {{ $server->name }}
-                </h1>
-                <div class="flex w-full min-w-0 items-center gap-2">
-                    <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
-                        :show-sentinel-status="$showSentinelStatus" />
-                    @if ($traefikDashboardAvailable)
-                        <a target="_blank" href="http://{{ formatHostForUrl((string) $serverIp) }}:8080" title="Open Traefik dashboard"
-                            class="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white">
-                            <x-reicon name="external-link" class="size-3" />
-                            Traefik
-                        </a>
-                    @endif
+        {{-- Below xl: the title and the resource actions share one row. --}}
+        <div class="mb-3 flex w-full min-w-0 items-start gap-3 xl:hidden">
+            {{-- Name lives in the desktop topbar (teleport) from lg up. Below that the
+                 mobile topbar has no resource context, so show the H1 through lg. --}}
+            <div class="min-w-0 flex-1 lg:hidden">
+                <div class="flex min-w-0 flex-col gap-2">
+                    <h1 data-testid="server-subtitle"
+                        class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+                        {{ $server->name }}
+                    </h1>
+                    <div class="flex w-full min-w-0 items-center gap-2">
+                        <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
+                            :show-sentinel-status="$showSentinelStatus" />
+                        @if ($traefikDashboardAvailable)
+                            <a target="_blank" href="http://{{ formatHostForUrl((string) $serverIp) }}:8080" title="Open Traefik dashboard"
+                                class="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white">
+                                <x-reicon name="external-link" class="size-3" />
+                                Traefik
+                            </a>
+                        @endif
+                    </div>
                 </div>
             </div>
-        </div>
 
-        {{-- Resource actions stay available below the desktop action HUD. Navigation lives in the sidebar. --}}
-        <div class="w-full xl:hidden">
-            @if ($server->proxySet())
-                @can('manageProxy', $server)
-                    <x-split-action id="server-mobile-actions" class="mb-3 flex w-full">
-                        @if ($proxyCanBeStopped)
-                            <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
-                                @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
-                                <x-reicon name="restart" class="size-3.5" />
-                                Restart Proxy
-                            </x-slot:main>
-                            <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                @click="open = false; document.getElementById('server-mobile-stop-proxy-trigger')?.click()"
-                                role="menuitem">
-                                <x-reicon name="stop-circle" class="size-3.5 text-error" />
-                                Stop Proxy
-                            </button>
-                        @else
-                            <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
-                                <x-reicon name="play-circle" class="size-3.5" />
-                                Start Proxy
-                            </x-slot:main>
-                        @endif
-                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="checkProxyStatus"
-                            wire:loading.attr="disabled" @click="open = false" role="menuitem">
-                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                            Refresh Proxy Status
-                        </button>
-                    </x-split-action>
-
-                    {{-- Programmatic open only (clicked from the Actions menu). Keep fully
-                         display:none so the modal shells never reserve a layout row. --}}
-                    <div class="hidden" aria-hidden="true">
-                        <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
-                            submitAction="restart" :actions="[
-                                'This proxy will be stopped and started again.',
-                                'All resources hosted on Coolify will be unavailable during the restart.',
-                            ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Proxy"
-                            :dispatchEvent="true" dispatchEventType="restartEvent">
-                            <x-slot:trigger>
-                                <button id="server-mobile-restart-proxy-trigger" type="button">
+            {{-- Resource actions stay available below the desktop action HUD. Navigation lives in the sidebar. --}}
+            <div class="ml-auto shrink-0">
+                @if ($server->proxySet())
+                    @can('manageProxy', $server)
+                        <x-split-action id="server-mobile-actions">
+                            @if ($proxyCanBeStopped)
+                                <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
+                                    @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
+                                    <x-reicon name="restart" class="size-3.5" />
                                     Restart Proxy
-                                </button>
-                            </x-slot:trigger>
-                        </x-modal-confirmation>
-                        <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
-                            submitAction="stop(true)" :actions="[
-                                'The Coolify proxy will be stopped.',
-                                'All resources hosted on Coolify will be unavailable.',
-                            ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Stop Proxy"
-                            :dispatchEvent="true" dispatchEventType="stopEvent">
-                            <x-slot:trigger>
-                                <button id="server-mobile-stop-proxy-trigger" type="button">
+                                </x-slot:main>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('server-mobile-stop-proxy-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="stop-circle" class="size-3.5 text-error" />
                                     Stop Proxy
                                 </button>
-                            </x-slot:trigger>
-                        </x-modal-confirmation>
-                    </div>
-                @endcan
-            @endif
+                            @else
+                                <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
+                                    <x-reicon name="play-circle" class="size-3.5" />
+                                    Start Proxy
+                                </x-slot:main>
+                            @endif
+                            <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="checkProxyStatus"
+                                wire:loading.attr="disabled" @click="open = false" role="menuitem">
+                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                Refresh Proxy Status
+                            </button>
+                        </x-split-action>
 
-            <div class="hidden" aria-hidden="true">
-                <x-resource-heading-tabs class="min-w-0 flex-1">
-                    @foreach ($serverMenuItems as $menuItem)
-                        <a @class([
-                            'app-tab shrink-0',
-                            'app-tab-active' => $menuItem['active'],
-                        ])
-                            @if ($menuItem['active']) aria-current="page" @endif
-                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                            href="{{ route($menuItem['route'], $serverRouteParameters) }}">
-                            {{ $menuItem['label'] }}
-                        </a>
-                    @endforeach
-                </x-resource-heading-tabs>
+                        {{-- Programmatic open only (clicked from the Actions menu). Keep fully
+                             display:none so the modal shells never reserve a layout row. --}}
+                        <div class="hidden" aria-hidden="true">
+                            <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
+                                submitAction="restart" :actions="[
+                                    'This proxy will be stopped and started again.',
+                                    'All resources hosted on Coolify will be unavailable during the restart.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Proxy"
+                                :dispatchEvent="true" dispatchEventType="restartEvent">
+                                <x-slot:trigger>
+                                    <button id="server-mobile-restart-proxy-trigger" type="button">
+                                        Restart Proxy
+                                    </button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                            <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
+                                submitAction="stop(true)" :actions="[
+                                    'The Coolify proxy will be stopped.',
+                                    'All resources hosted on Coolify will be unavailable.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Stop Proxy"
+                                :dispatchEvent="true" dispatchEventType="stopEvent">
+                                <x-slot:trigger>
+                                    <button id="server-mobile-stop-proxy-trigger" type="button">
+                                        Stop Proxy
+                                    </button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                        </div>
+                    @endcan
+                @endif
+
+                <div class="hidden" aria-hidden="true">
+                    <x-resource-heading-tabs class="min-w-0 flex-1">
+                        @foreach ($serverMenuItems as $menuItem)
+                            <a @class([
+                                'app-tab shrink-0',
+                                'app-tab-active' => $menuItem['active'],
+                            ])
+                                @if ($menuItem['active']) aria-current="page" @endif
+                                @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                href="{{ route($menuItem['route'], $serverRouteParameters) }}">
+                                {{ $menuItem['label'] }}
+                            </a>
+                        @endforeach
+                    </x-resource-heading-tabs>
+                </div>
             </div>
         </div>
 

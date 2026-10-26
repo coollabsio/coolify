@@ -143,6 +143,30 @@ test('MCP endpoint accepts a token from an IP inside the allow-list', function (
     mcpListTools($token)->assertOk();
 });
 
+test('MCP endpoint checks the allow-list against the client IP behind Cloudflare', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '160.79.104.0/21']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    test()->withServerVariables(['REMOTE_ADDR' => '10.0.1.5'])
+        ->withHeaders(['X-Forwarded-For' => '172.71.194.182', 'CF-Connecting-IP' => '160.79.104.10']);
+
+    mcpListTools($token)->assertOk();
+});
+
+test('MCP endpoint ignores a CF-Connecting-IP header that does not come from Cloudflare', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '160.79.104.0/21']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    test()->withServerVariables(['REMOTE_ADDR' => '10.0.1.5'])
+        ->withHeaders(['X-Forwarded-For' => '198.51.100.7', 'CF-Connecting-IP' => '160.79.104.10']);
+
+    mcpListTools($token)
+        ->assertForbidden()
+        ->assertJson(['message' => 'You are not allowed to access the API.']);
+});
+
 test('MCP endpoint lists tools for an authenticated token', function () {
     $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
 

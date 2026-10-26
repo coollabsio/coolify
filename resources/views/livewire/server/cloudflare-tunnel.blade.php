@@ -17,9 +17,9 @@
                         <x-forms.button wire:click="updateCloudflareTunnel">Update Cloudflare Tunnel</x-forms.button>
                         <x-process-dialog @cloudflare-tunnel-update-started.window="processDialogOpen = true"
                             closeWithX size="xl">
-                            <x-slot:title>Cloudflare Tunnel Update</x-slot:title>
+                            <x-slot:title>Cloudflare Tunnel Update Logs</x-slot:title>
                             <x-slot:content>
-                                <livewire:activity-monitor header="Logs" fullHeight />
+                                <livewire:activity-monitor fullHeight />
                             </x-slot:content>
                         </x-process-dialog>
                     @endif
@@ -91,9 +91,9 @@
                         </x-callout>
                     @else
                         <x-process-dialog @automated.window="processDialogOpen = true" closeWithX size="xl">
-                            <x-slot:title>Cloudflare Tunnel Configuration</x-slot:title>
+                            <x-slot:title>Cloudflare Tunnel Configuration Logs</x-slot:title>
                             <x-slot:content>
-                                <livewire:activity-monitor header="Logs" fullHeight />
+                                <livewire:activity-monitor fullHeight />
                             </x-slot:content>
                         </x-process-dialog>
 

@@ -263,6 +263,7 @@ class StartPostgresql
         $environment_variables = collect();
         $this->resolvedPostgresUser = (string) $this->database->postgres_user;
         $this->resolvedPostgresDatabase = (string) $this->database->postgres_db;
+        $postgresPassword = (string) $this->database->postgres_password;
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
@@ -273,6 +274,8 @@ class StartPostgresql
                 $this->resolvedPostgresUser = $composeFileValue;
             } elseif ($env->key === 'POSTGRES_DB') {
                 $this->resolvedPostgresDatabase = $composeFileValue;
+            } elseif ($env->key === 'POSTGRES_PASSWORD') {
+                $postgresPassword = $resolvedValue;
             }
         }
 
@@ -285,6 +288,10 @@ class StartPostgresql
 
         if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_PASSWORD')) {
             $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
+        }
+        // psql in the healthcheck, backups, and restores reads PGPASSWORD when pg_hba.conf requires a password for local connections.
+        if (! $this->hasEnvironmentVariable($environment_variables, 'PGPASSWORD')) {
+            $environment_variables->push("PGPASSWORD={$postgresPassword}");
         }
 
         if (! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_DB')) {

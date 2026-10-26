@@ -1967,7 +1967,7 @@ it('keeps the upload destination on the volume backup execution', function () {
         ->and($execution->s3Replicas()->sole()->s3_storage_id)->toBe($s3Storage->id);
 });
 
-it('streams S3-only volume backups without creating or copying a local archive', function () {
+it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and without a local archive', function () {
     config(['broadcasting.default' => 'null']);
     defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
     Carbon::setTestNow('2026-08-15 12:00:00');
@@ -1976,7 +1976,7 @@ it('streams S3-only volume backups without creating or copying a local archive',
     [$application, $volume] = createVolumeBackupApplication($team);
     $s3Storage = S3Storage::create([
         'name' => 'Streaming destination',
-        'region' => 'us-east-1',
+        'region' => 'ru-central-1',
         'key' => 'key',
         'secret' => 'secret',
         'bucket' => 'bucket',
@@ -2008,13 +2008,16 @@ it('streams S3-only volume backups without creating or copying a local archive',
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
     Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
         && str_contains($process->command, 'mc pipe')
+        && str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
         && ! str_contains($process->command, '--quiet')
-        && str_contains($process->command, '>/dev/null && (compressor=')
+        && str_contains($process->command, 'lock=$(mc retention info --default --json --resolve')
+        && str_contains($process->command, '*) checksum=--checksum=MD5 ;; *) checksum= ;; esac && (compressor=')
+        && str_contains($process->command, ' $checksum ')
         && str_contains($process->command, '>/dev/null 2>/tmp/mc-pipe.log || {')
         && str_contains($process->command, '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
         && str_contains($process->command, 'temporary/bucket/')
         && str_contains($process->command, $expectedFilename)
-        && substr_count($process->command, '--resolve') === 3
+        && substr_count($process->command, '--resolve') === 4
         && substr_count($process->command, '>/dev/null') >= 2
         && ! str_contains($process->command, ' > ')
         && ! str_contains($process->command, 'mc cp'));
@@ -2916,6 +2919,23 @@ it('notifies the team once when a volume backup fails', function () {
     Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => $notification->output === 'Archive command failed'
         && str_contains((string) $notification->toMail()->render(), 'Archive command failed'));
     Notification::assertNotSentTo($team, BackupSuccess::class);
+});
+
+it('links volume backup notifications to the instance URL instead of APP_URL', function () {
+    config()->set('app.url', 'http://localhost');
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0, 'fqdn' => 'https://coolify.example.com']));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $expected = "https://coolify.example.com/project/{$application->environment->project->uuid}/environment/{$application->environment->uuid}/application/{$application->uuid}";
+
+    $notification = new BackupFailed($backup, 'Archive command failed');
+
+    expect($notification->url)->toBe($expected)
+        ->and($notification->toPushover()->toPayload('token', 'user')['message'])->toContain("href='{$expected}'");
 });
 
 it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {

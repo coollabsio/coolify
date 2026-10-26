@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
@@ -55,7 +56,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private object $repository_url_parsed;
 
-    private GithubApp|GitlabApp|string $git_source = 'other';
+    private GithubApp|GitlabApp|GiteaApp|string $git_source = 'other';
 
     private ?string $git_host = null;
 
@@ -143,7 +144,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         return $this->unsavedApplicationForDetection(
             $this->git_repository,
             $this->branch ?? 'main',
-            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp ? $this->git_source : null,
+            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp || $this->git_source instanceof GiteaApp ? $this->git_source : null,
             PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id),
         );
     }

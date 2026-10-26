@@ -17,6 +17,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -59,77 +60,100 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'custom_server_limit',
         'is_mcp_server_enabled',
         'is_build_server_fallback_enabled',
+        'is_two_factor_required',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
         'is_build_server_fallback_enabled' => true,
+        'is_two_factor_required' => false,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
         'is_build_server_fallback_enabled' => 'boolean',
+        'is_two_factor_required' => 'boolean',
     ];
 
     protected static function booted()
     {
-        static::created(function ($team) {
-            $team->emailNotificationSettings()->create([
-                'use_instance_email_settings' => isDev(),
-            ]);
-            $team->discordNotificationSettings()->create();
-            $team->slackNotificationSettings()->create();
-            $team->telegramNotificationSettings()->create();
-            $team->pushoverNotificationSettings()->create();
-            $team->webhookNotificationSettings()->create();
+        static::created(function (Team $team) {
+            $team->createDefaultNotificationSettings();
         });
 
         static::updating(function ($team) {
-            if (auth()->user()?->isMember()) {
+            if (auth()->user()?->roleInTeam($team->id) === 'member') {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
 
         static::deleting(function (Team $team) {
-            RevokeUserTeamTokens::forTeam($team->id);
-
-            foreach ($team->privateKeys as $key) {
-                $key->delete();
-            }
-
-            // Transfer instance-wide sources to root team so they remain available
-            $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
-                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
-            foreach ($systemWideSources as $source) {
-                $source->update(['team_id' => 0]);
-            }
-
-            // Delete non-instance-wide sources owned by this team
-            $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->concat(GitlabApp::where('team_id', $team->id)->get());
-            foreach ($teamSources as $source) {
-                $source->delete();
-            }
-
-            foreach (Tag::whereTeamId($team->id)->get() as $tag) {
-                $tag->delete();
-            }
-
-            foreach ($team->environment_variables()->get() as $sharedVariable) {
-                $sharedVariable->delete();
-            }
-
-            foreach ($team->s3s as $s3) {
-                $s3->delete();
-            }
-
-            $team->ageKeys()->delete();
+            $team->deleteOwnedRecords();
         });
 
         static::deleted(function (Team $team) {
             app(TeamAvatarStorageService::class)->deleteTeamFile($team);
         });
+    }
+
+    /**
+     * Creates the notification settings rows every team needs, with their default values.
+     */
+    public function createDefaultNotificationSettings(): void
+    {
+        $this->emailNotificationSettings()->create([
+            'use_instance_email_settings' => isDev(),
+        ]);
+        $this->discordNotificationSettings()->create();
+        $this->slackNotificationSettings()->create();
+        $this->telegramNotificationSettings()->create();
+        $this->pushoverNotificationSettings()->create();
+        $this->webhookNotificationSettings()->create();
+    }
+
+    /**
+     * Deletes the API tokens, private keys, sources, tags, shared variables, and S3 storages of the
+     * team. Instance-wide sources move to the root team instead.
+     */
+    public function deleteOwnedRecords(): void
+    {
+        RevokeUserTeamTokens::forTeam($this->id);
+
+        foreach ($this->privateKeys()->get() as $key) {
+            $key->delete();
+        }
+
+        // Transfer instance-wide sources to root team so they remain available
+        $systemWideSources = GithubApp::where('team_id', $this->id)->where('is_system_wide', true)->get()
+            ->concat(GitlabApp::where('team_id', $this->id)->where('is_system_wide', true)->get())
+            ->concat(GiteaApp::where('team_id', $this->id)->where('is_system_wide', true)->get());
+        foreach ($systemWideSources as $source) {
+            $source->update(['team_id' => 0]);
+        }
+
+        // Delete non-instance-wide sources owned by this team
+        $teamSources = GithubApp::where('team_id', $this->id)->get()
+            ->concat(GitlabApp::where('team_id', $this->id)->get())
+            ->concat(GiteaApp::where('team_id', $this->id)->get());
+        foreach ($teamSources as $source) {
+            $source->delete();
+        }
+
+        foreach (Tag::whereTeamId($this->id)->get() as $tag) {
+            $tag->delete();
+        }
+
+        foreach ($this->environment_variables()->get() as $sharedVariable) {
+            $sharedVariable->delete();
+        }
+
+        // Also unusable storages, which the s3s relation hides.
+        foreach (S3Storage::query()->where('team_id', $this->id)->get() as $s3) {
+            $s3->delete();
+        }
+
+        $this->ageKeys()->delete();
     }
 
     public static function serverLimitReached(?Team $team = null)
@@ -139,7 +163,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             return true;
         }
         $serverLimit = Team::serverLimit($team);
-        $servers = $team->servers()->count();
+        $servers = $team->managedServers()->count();
 
         return $servers >= $serverLimit;
     }
@@ -173,7 +197,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function serverOverflow()
     {
-        if (Team::serverLimit($this) < $this->servers->count()) {
+        if (Team::serverLimit($this) < $this->managedServers()->count()) {
             return true;
         }
 
@@ -263,14 +287,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
-    public function subscriptionEnded(?Subscription $subscription = null): void
+    /**
+     * Ends one subscription row. The servers stay usable while another row of the team still pays.
+     */
+    public function subscriptionEnded(Subscription $subscription): void
     {
-        $subscription ??= $this->subscription;
-
-        if (! $subscription) {
-            return;
-        }
-
         $subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
@@ -278,6 +299,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'stripe_trial_already_ended' => false,
             'stripe_past_due' => false,
         ]);
+        if ($this->subscriptions()->get()->contains(fn (Subscription $other): bool => $other->isPaying())) {
+            return;
+        }
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => false,
@@ -326,6 +350,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasOne(Subscription::class);
     }
 
+    /**
+     * A team can have more than one subscription row, for example after it subscribed again.
+     */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
     public function applications()
     {
         return $this->hasManyThrough(Application::class, Project::class);
@@ -345,7 +377,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'projects' => $this->projects()->count(),
             'servers' => $this->servers()->count(),
             'sources' => GithubApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
-                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
+                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
+                + GiteaApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
         ]);
     }
 
@@ -362,6 +395,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function servers()
     {
         return $this->hasMany(Server::class);
+    }
+
+    /**
+     * Servers that use a server slot. Archives of transferred servers are left out.
+     */
+    public function managedServers()
+    {
+        return $this->servers()->notTransferredAway();
     }
 
     public function usesSwarm(): bool
@@ -413,7 +454,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             })->where('is_public', false);
         })->get();
 
-        return $sources->merge($github_apps)->merge($gitlab_apps);
+        $gitea_apps = GiteaApp::where(function ($query) {
+            $query->where(function ($q) {
+                $q->where('team_id', $this->id)
+                    ->orWhere('is_system_wide', true);
+            })->where('is_public', false);
+        })->get();
+
+        return $sources->merge($github_apps)->merge($gitlab_apps)->merge($gitea_apps);
     }
 
     public function s3s()

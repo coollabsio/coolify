@@ -42,7 +42,7 @@ beforeEach(function () {
     $this->server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
     $this->server->refresh();
 
-    $this->writeToken = serverRegistriesApiToken($this->user, $this->team, ['read', 'write', 'delete']);
+    $this->writeToken = serverRegistriesApiToken($this->user, $this->team, ['read', 'write', 'deploy', 'delete']);
     $this->sensitiveToken = serverRegistriesApiToken($this->user, $this->team, ['read', 'read:sensitive']);
 });
 

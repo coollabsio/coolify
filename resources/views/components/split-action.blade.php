@@ -12,7 +12,7 @@
             </span>
         </button>
         <div x-cloak x-show="open" x-transition.origin.top
-            class="listbox-panel right-0! xl:left-auto! xl:min-w-60! xl:max-w-96!" role="menu">
+            class="listbox-panel right-0! left-auto! xl:min-w-60! xl:max-w-96!" role="menu">
             {{ $slot }}
         </div>
     @endif

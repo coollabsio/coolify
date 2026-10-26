@@ -470,6 +470,39 @@ test('saving a vault token with unchanged connection settings and a blank token 
         ->and($savedToken->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
 });
 
+test('changing the vault request timeout keeps the stored token and validates with the new timeout', function () {
+    $timeouts = [];
+    Http::fake(function ($request, array $options) use (&$timeouts) {
+        $timeouts[] = $options['timeout'];
+
+        return Http::response(['data' => []]);
+    });
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.timeout', '45')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $savedToken->refresh();
+    expect($timeouts)->toBe([45])
+        ->and($savedToken->token)->toBe('hvs.stored-secret')
+        ->and(IntegrationToken::requestTimeout($savedToken->metadata))->toBe(45);
+});
+
+test('a request timeout outside 1 to 300 seconds is rejected', function (string $timeout) {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.timeout', $timeout)
+        ->call('save')
+        ->assertHasErrors(['metadata.timeout']);
+
+    Http::assertNothingSent();
+})->with(['0', '301', 'abc']);
+
 test('the token list shows its empty state after the editor deletes the last token', function () {
     $token = IntegrationToken::query()->create([
         'team_id' => $this->team->id,

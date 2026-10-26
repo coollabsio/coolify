@@ -206,6 +206,8 @@ class GetLogs extends Tool
             $next[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start if token has deploy ability'];
         }
 
+        $next = $this->onlyVisibleTools($next);
+
         return [
             'ok' => false,
             'reason' => $reason,

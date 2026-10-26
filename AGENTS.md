@@ -29,7 +29,7 @@ Docker Compose-based dev setup with services: coolify (app, which also runs Reve
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. To pass the host NVIDIA GPU through to the KVM localhost VM (`ubuntu-root` only), start with `COOLIFY_DEV_GPU=1 ./scripts/dev start` (or `php artisan dev:qemu ubuntu-root --as-localhost --gpu`). This attaches every PCI function of the GPU, gives the VM 4 GiB, stops `nvidia-persistenced` on the host, and installs the NVIDIA driver and container toolkit in the VM. The host cannot use the GPU while the VM runs. Remove it with `--fresh` without `--gpu`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 
@@ -262,13 +262,14 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- Nixpacks is deprecated. Never recommend it to users (issue replies, docs, UI copy, workarounds). Recommend the Dockerfile build pack, or Railpack where it fits.
 - When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 
 - Production branch: `main`
-- Development branch: `release/v4.x`, where `x` is the next minor release (for example, `release/v4.5` while production is `4.4.x`). Do not use `next`.
-- Fix PRs should target the current production branch; feature PRs should target the current `release/v4.x` branch
+- Development branch: `next`. Do not create `release/v*` branches.
+- Fix PRs should target the current production branch; feature PRs should target `next`
 
 <laravel-boost-guidelines>
 === foundation rules ===

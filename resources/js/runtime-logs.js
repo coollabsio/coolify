@@ -12,10 +12,38 @@ import {
 
 export const MAX_CLIENT_LOG_LINES = 50000;
 export const STREAM_INTERVAL_MS = 2000;
-const ESTIMATED_ROW_HEIGHT = 44;
+const ESTIMATED_ROW_HEIGHT = 30;
 const ESTIMATED_TEXT_ROW_HEIGHT = 20;
 
 const TIMESTAMP_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z) (.*)$/s;
+const SOURCE_PREFIX = /^([^\t]+)\t(.*)$/s;
+const SOURCE_COLORS = ['#6f6c78', '#6d7ea8', '#6e8b74', '#a98462', '#8d7398', '#6f8f95'];
+
+function sourceColor(label) {
+    let hash = 0;
+    for (let i = 0; i < label.length; i++) {
+        hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+    }
+    return SOURCE_COLORS[hash % SOURCE_COLORS.length];
+}
+
+export function formatLogDetails(content) {
+    const trimmed = String(content ?? '').trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return content;
+    try {
+        return JSON.stringify(JSON.parse(trimmed), null, 2);
+    } catch {
+        return content;
+    }
+}
+
+/**
+ * A row can expand only when the detail shows more than the row: the row cut
+ * the text off, or the text is JSON that the detail formats.
+ */
+export function isExpandableLog(content, truncated) {
+    return truncated || formatLogDetails(content) !== content;
+}
 
 export function getLogLevel(content) {
     if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(content)) return 'error';
@@ -32,11 +60,22 @@ export function parseLogLines(output, nextId) {
     const lines = [];
     for (const rawLine of String(output ?? '').split('\n')) {
         if (rawLine.trim() === '') continue;
-        const match = rawLine.match(TIMESTAMP_PATTERN);
+        const sourced = rawLine.match(SOURCE_PREFIX);
+        const source = sourced ? sourced[1] : '';
+        const body = sourced ? sourced[2] : rawLine;
+        const match = body.match(TIMESTAMP_PATTERN);
         const ts = match ? match[1] : '';
-        const text = match ? match[2] : rawLine;
-        const lower = text.toLowerCase();
-        lines.push(Object.freeze({ id: nextId(), ts, text, lower, level: getLogLevel(lower) }));
+        const text = match ? match[2] : body;
+        const lower = `${source}\n${text}`.toLowerCase();
+        lines.push(Object.freeze({
+            id: nextId(),
+            ts,
+            text,
+            source,
+            sourceColor: source ? sourceColor(source) : '',
+            lower,
+            level: getLogLevel(text.toLowerCase()),
+        }));
     }
     return lines;
 }
@@ -45,7 +84,7 @@ export function parseLogLines(output, nextId) {
  * Remove lines that a `--since` request returns again. Docker includes lines
  * with the same timestamp as the `--since` value, so compare that boundary.
  */
-export function newLinesSince(existing, incoming) {
+function linesSinceBoundary(existing, incoming) {
     let lastTs = '';
     for (let i = existing.length - 1; i >= 0; i--) {
         if (existing[i].ts) {
@@ -70,6 +109,34 @@ export function newLinesSince(existing, incoming) {
         seenAtBoundary.set(line.text, seen - 1);
         return false;
     });
+}
+
+function groupLinesBySource(entries) {
+    const groups = new Map();
+    for (const line of entries) {
+        const key = line.source || '';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(line);
+    }
+    return groups;
+}
+
+export function newLinesSince(existing, incoming) {
+    const sourced = existing.some((line) => line.source) || incoming.some((line) => line.source);
+    if (!sourced) return linesSinceBoundary(existing, incoming);
+
+    const existingBySource = groupLinesBySource(existing);
+    const fresh = [];
+    for (const [source, group] of groupLinesBySource(incoming)) {
+        fresh.push(...linesSinceBoundary(existingBySource.get(source) ?? [], group));
+    }
+    fresh.sort((left, right) => {
+        if (left.ts === right.ts) return (left.source || '').localeCompare(right.source || '');
+        if (!left.ts) return 1;
+        if (!right.ts) return -1;
+        return left.ts < right.ts ? -1 : 1;
+    });
+    return fresh;
 }
 
 export function lastTimestamp(lines) {
@@ -158,6 +225,10 @@ function downloadText(content, filename) {
     URL.revokeObjectURL(url);
 }
 
+export function prefersTextView(stored) {
+    return stored !== 'false';
+}
+
 export function initializeRuntimeLogsComponent() {
     window.Alpine.data('runtimeLogs', (config = {}) => {
         let lines = [];
@@ -165,7 +236,7 @@ export function initializeRuntimeLogsComponent() {
         let lineId = 0;
         let virtualizer = null;
         let cleanupVirtualizer = null;
-        let headerObserver = null;
+        let layoutObserver = null;
         let streamTimer = null;
         const nextId = () => ++lineId;
         const formatTimestamp = createTimestampFormatter(config.timezone);
@@ -188,7 +259,7 @@ export function initializeRuntimeLogsComponent() {
             scrollDebounce: null,
             destroyed: false,
             colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
-            textView: localStorage.getItem('coolify-log-text-view') === 'true',
+            textView: prefersTextView(localStorage.getItem('coolify-log-text-view')),
             logFilters: readLogFilters(localStorage.getItem('coolify-log-filters')),
             searchQuery: '',
             appliedQuery: '',
@@ -198,10 +269,12 @@ export function initializeRuntimeLogsComponent() {
             virtualRows: [],
             totalSize: 0,
             scrollMargin: 0,
+            multipleSources: false,
 
             init() {
                 this.allLines = Number(this.$wire.numberOfLines) === -1;
                 this.$watch('searchQuery', () => this.applyFilters());
+                this.$watch('loading', () => this.$nextTick(() => this.updateVirtualizer()));
                 this.$nextTick(() => this.mountVirtualizer());
                 streamTimer = setInterval(() => this.streamTick(), STREAM_INTERVAL_MS);
                 if (this.expanded) {
@@ -214,7 +287,7 @@ export function initializeRuntimeLogsComponent() {
                 this.destroyed = true;
                 clearInterval(streamTimer);
                 clearTimeout(this.scrollDebounce);
-                headerObserver?.disconnect();
+                layoutObserver?.disconnect();
                 cleanupVirtualizer?.();
                 virtualizer = null;
             },
@@ -227,30 +300,66 @@ export function initializeRuntimeLogsComponent() {
                     estimateSize: () => (this.textView ? ESTIMATED_TEXT_ROW_HEIGHT : ESTIMATED_ROW_HEIGHT),
                     getItemKey: (index) => filtered[index]?.id ?? index,
                     overscan: 12,
-                    // Keep the visible rows in place when old lines are trimmed from the top.
-                    anchorTo: 'end',
+                    // Follow mode keeps the newest line in view. Otherwise the first line stays at the top.
+                    anchorTo: 'start',
                     observeElementRect,
                     observeElementOffset,
                     scrollToFn: elementScroll,
-                    measureElement,
-                    onChange: () => this.syncRows(),
+                    // A row can be measured before its text is laid out. Caching that 0
+                    // collapses the top of the list and the first lines never come back.
+                    measureElement: (element, entry, instance) => {
+                        const size = measureElement(element, entry, instance);
+                        if (size > 0) return size;
+                        const index = instance.indexFromElement(element);
+                        const key = instance.options.getItemKey(index);
+                        return instance.itemSizeCache.get(key) ?? instance.options.estimateSize(index);
+                    },
+                    onChange: () => {
+                        // Measurement corrections can advance the internal offset while the
+                        // element is still at the top, which hides the first lines.
+                        this.pinScrollOffset();
+                        this.syncRows();
+                    },
                 });
                 cleanupVirtualizer = virtualizer._didMount();
                 virtualizer._willUpdate();
-                if (this.$refs.columns && window.ResizeObserver) {
-                    headerObserver = new ResizeObserver(() => this.updateVirtualizer());
-                    headerObserver.observe(this.$refs.columns);
+                if (window.ResizeObserver) {
+                    layoutObserver = new ResizeObserver(() => {
+                        const margin = this.measureScrollMargin();
+                        if (margin !== this.scrollMargin) this.updateVirtualizer();
+                    });
+                    if (this.$refs.list) layoutObserver.observe(this.$refs.list);
+                    if (this.$refs.viewport) layoutObserver.observe(this.$refs.viewport);
                 }
                 this.updateVirtualizer();
             },
 
+            measureScrollMargin() {
+                const list = this.$refs.list;
+                const viewport = this.$refs.viewport;
+                if (!list || !viewport || this.lineCount === 0) return 0;
+                const margin = list.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop;
+                return Number.isFinite(margin) ? Math.max(0, margin) : 0;
+            },
+
+            // Keep the virtual offset on the real scroll position while the reader is at the top.
+            pinScrollOffset() {
+                const viewport = this.$refs.viewport;
+                if (!virtualizer || this.alwaysScroll || !viewport || viewport.scrollTop !== 0) return;
+                if (!virtualizer.scrollOffset && !virtualizer.scrollAdjustments) return;
+                virtualizer.scrollOffset = 0;
+                virtualizer.scrollAdjustments = 0;
+            },
+
             updateVirtualizer() {
                 if (!virtualizer) return;
-                this.scrollMargin = this.$refs.list?.offsetTop ?? 0;
+                this.pinScrollOffset();
+                this.scrollMargin = this.measureScrollMargin();
                 virtualizer.setOptions({
                     ...virtualizer.options,
                     count: filtered.length,
                     scrollMargin: this.scrollMargin,
+                    anchorTo: this.alwaysScroll ? 'end' : 'start',
                     // A new function makes the virtualizer recalculate keys after every data change.
                     getItemKey: (index) => filtered[index]?.id ?? index,
                 });
@@ -266,7 +375,13 @@ export function initializeRuntimeLogsComponent() {
                 this.totalSize = virtualizer.getTotalSize();
             },
 
-            measureRow(el) {
+            measureRow(el, logLine = null) {
+                const line = el.querySelector('[data-log-line]');
+                const message = line?.querySelector('.runtime-log-message');
+                if (line && message && !this.textView) {
+                    const text = logLine?.text ?? message.textContent;
+                    line.toggleAttribute('data-expandable', isExpandableLog(text, message.scrollWidth > message.clientWidth));
+                }
                 virtualizer?.measureElement(el);
             },
 
@@ -303,9 +418,25 @@ export function initializeRuntimeLogsComponent() {
                 }
             },
 
+            sinceArgument() {
+                const bySource = {};
+                let last = null;
+                let sourced = false;
+                for (const line of lines) {
+                    if (!line.ts) continue;
+                    last = line.ts;
+                    if (line.source) {
+                        sourced = true;
+                        bySource[line.source] = line.ts;
+                    }
+                }
+                if (!sourced) return last;
+                return Object.keys(bySource).length > 0 ? bySource : null;
+            },
+
             async streamTick() {
                 if (this.destroyed || this.loading || !this.expanded || document.hidden || !this.$wire.streamLogs) return;
-                const since = lastTimestamp(lines);
+                const since = this.sinceArgument();
                 if (!since) {
                     await this.refresh();
                     return;
@@ -341,6 +472,8 @@ export function initializeRuntimeLogsComponent() {
                 this.appliedQuery = this.searchQuery.trim();
                 this.matchCount = this.appliedQuery ? filtered.length : 0;
                 this.lineCount = lines.length;
+                const sources = new Set(filtered.map((line) => line.source).filter(Boolean));
+                this.multipleSources = sources.size > 1;
                 // Wait for x-show to reveal the list so its offset can be measured.
                 this.$nextTick(() => {
                     this.updateVirtualizer();
@@ -350,8 +483,12 @@ export function initializeRuntimeLogsComponent() {
 
             visibleText(source = filtered) {
                 const withTime = this.$wire.showTimeStamps;
+                const showSource = new Set(source.map((line) => line.source).filter(Boolean)).size > 1;
                 return source
-                    .map((line) => (withTime && line.ts ? `${formatTimestamp(line.ts)} ${line.text}` : line.text))
+                    .map((line) => {
+                        const body = withTime && line.ts ? `${formatTimestamp(line.ts)} ${line.text}` : line.text;
+                        return showSource && line.source ? `${line.source} | ${body}` : body;
+                    })
                     .join('\n');
             },
 
@@ -364,11 +501,7 @@ export function initializeRuntimeLogsComponent() {
             },
 
             formatLogDetails(content) {
-                try {
-                    return JSON.stringify(JSON.parse(content), null, 2);
-                } catch {
-                    return content;
-                }
+                return formatLogDetails(content);
             },
 
             toggleLogDetails(id, event) {
@@ -376,6 +509,7 @@ export function initializeRuntimeLogsComponent() {
                 if (window.getSelection()?.toString()) return;
                 if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
                 if (event.type === 'keydown') event.preventDefault();
+                if (!this.expandedLogs[id] && !event.currentTarget?.hasAttribute('data-expandable')) return;
                 this.expandedLogs[id] = !this.expandedLogs[id];
             },
 
@@ -467,6 +601,7 @@ export function initializeRuntimeLogsComponent() {
             toggleScroll() {
                 this.alwaysScroll = !this.alwaysScroll;
                 this.followManuallyDisabled = !this.alwaysScroll;
+                this.updateVirtualizer();
                 if (this.alwaysScroll) this.scrollToBottom();
             },
 
@@ -500,8 +635,10 @@ export function initializeRuntimeLogsComponent() {
                     if (this.destroyed) return;
                     const el = event.target;
                     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                    if (!this.alwaysScroll && !this.followManuallyDisabled && distanceFromBottom <= 10) {
+                    const overflows = el.scrollHeight - el.clientHeight > 10;
+                    if (!this.alwaysScroll && !this.followManuallyDisabled && overflows && el.scrollTop > 0 && distanceFromBottom <= 10) {
                         this.alwaysScroll = true;
+                        this.updateVirtualizer();
                     }
                 }, 150);
             },

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\RateLimitException;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -20,6 +21,8 @@ use OpenApi\Attributes as OA;
 
 class HetznerController extends Controller
 {
+    use RequiresDeployAbility;
+
     /**
      * Get cloud provider token UUID from request.
      * Prefers cloud_provider_token_uuid over deprecated cloud_provider_token_id.
@@ -652,7 +655,7 @@ class HetznerController extends Controller
 
     #[OA\Post(
         summary: 'Create Hetzner Server',
-        description: 'Create a new server on Hetzner and register it in Coolify.',
+        description: 'Create a new server on Hetzner and register it in Coolify. A cloud-init script or extra SSH key IDs need a token with the deploy permission.',
         path: '/servers/hetzner',
         operationId: 'create-hetzner-server',
         security: [
@@ -678,10 +681,10 @@ class HetznerController extends Controller
                         'enable_ipv4' => ['type' => 'boolean', 'example' => true, 'description' => 'Enable IPv4 (default: true)'],
                         'enable_ipv6' => ['type' => 'boolean', 'example' => true, 'description' => 'Enable IPv6 (default: true)'],
                         'enable_backups' => ['type' => 'boolean', 'example' => false, 'description' => 'Enable Hetzner server backups after creation (adds 20% to the monthly server fee)'],
-                        'hetzner_ssh_key_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Additional Hetzner SSH key IDs'],
+                        'hetzner_ssh_key_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Additional Hetzner SSH key IDs. Needs a token with the deploy permission.'],
                         'hetzner_firewall_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Existing Hetzner firewall IDs to apply during server creation'],
                         'hetzner_network_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Existing Hetzner network IDs to attach during server creation'],
-                        'cloud_init_script' => ['type' => 'string', 'description' => 'Cloud-init YAML script (optional)'],
+                        'cloud_init_script' => ['type' => 'string', 'description' => 'Cloud-init YAML script (optional). Needs a token with the deploy permission.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Validate server immediately after creation'],
                     ],
                 ),
@@ -712,6 +715,7 @@ class HetznerController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'),
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
@@ -791,6 +795,13 @@ class HetznerController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+
+        if (! empty($request->cloud_init_script) || ! empty($request->hetzner_ssh_key_ids)) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A cloud-init script or extra SSH keys run as root on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
         }
 
         // Check server limit

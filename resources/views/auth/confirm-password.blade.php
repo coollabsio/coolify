@@ -22,7 +22,7 @@
 
             <form action="/user/confirm-password" method="POST" class="flex flex-col gap-4">
                 @csrf
-                <x-forms.input required type="password" name="password" autocomplete="current-password" autofocus
+                <x-forms.input required type="password" :copyable="false" name="password" autocomplete="current-password" autofocus
                     label="{{ __('input.password') }}" />
                 <x-forms.button class="w-full justify-center" type="submit" isHighlighted>
                     {{ __('auth.confirm_password') }}

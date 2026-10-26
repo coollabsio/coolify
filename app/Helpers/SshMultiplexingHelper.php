@@ -5,7 +5,10 @@ namespace App\Helpers;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Contracts\Process\ProcessResult;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -42,8 +45,15 @@ class SshMultiplexingHelper
                     return true;
                 }
 
-                if (self::masterConnectionExists($server)) {
+                $check = self::runMuxControlCommand($server, 'check');
+                if ($check?->successful()) {
                     return self::refreshMultiplexedConnection($server);
+                }
+
+                // A wedged master accepts on its socket but never answers, and a new
+                // `ssh -fN` would hang on it too. Remove the socket so a fresh master can bind.
+                if ($check === null) {
+                    File::delete(self::muxSocket($server));
                 }
 
                 return self::establishNewMultiplexedConnection($server);
@@ -64,8 +74,20 @@ class SshMultiplexingHelper
         }
     }
 
+    /**
+     * A disabled server, such as the archive of a transferred server, gets no SSH or scp connection.
+     */
+    private static function assertNotDisabled(Server $server): void
+    {
+        // Read the saved flag too: a job that loaded the server before a transfer finished must stop.
+        if ($server->settings->force_disabled || ($server->exists && $server->settings()->value('force_disabled'))) {
+            throw new \RuntimeException('Server is disabled.');
+        }
+    }
+
     public static function establishNewMultiplexedConnection(Server $server): bool
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
@@ -73,7 +95,7 @@ class SshMultiplexingHelper
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = "ssh -fN -o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        $establishCommand = 'ssh -fN -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
@@ -92,8 +114,8 @@ class SshMultiplexingHelper
 
     public static function removeMuxFile(Server $server): void
     {
-        $checkProcess = Process::run(self::muxControlCommand($server, 'check'));
-        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+        $checkProcess = self::runMuxControlCommand($server, 'check');
+        $pid = $checkProcess && preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
             ? $matches[1]
             : null;
 
@@ -101,11 +123,19 @@ class SshMultiplexingHelper
             self::markMuxProcessAsRetiring($pid, self::muxSocket($server));
         }
 
-        $stopProcess = Process::run(self::muxControlCommand($server, 'stop'));
+        $stopProcess = self::runMuxControlCommand($server, 'stop');
 
-        if ($pid !== null && ! $stopProcess->successful()) {
+        if ($stopProcess?->successful()) {
+            return;
+        }
+
+        if ($pid !== null) {
             self::unmarkMuxProcessAsRetiring($pid, self::muxSocket($server));
         }
+
+        // A master that does not stop must not stay reusable under the old user, IP, or port.
+        // Without its socket it is an orphan, and the cleanup job reaps it.
+        File::delete(self::muxSocket($server));
     }
 
     public static function markMuxProcessAsRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): void
@@ -133,6 +163,7 @@ class SshMultiplexingHelper
 
     public static function generateScpCommand(Server $server, string $source, string $dest): string
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
@@ -173,6 +204,7 @@ class SshMultiplexingHelper
      */
     public static function generateScpDownloadCommand(Server $server, string $remoteSource, string $localDest): string
     {
+        self::assertNotDisabled($server);
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
@@ -234,9 +266,7 @@ class SshMultiplexingHelper
 
     private static function sshCommandPrefix(Server $server, bool $disableMultiplexing, ?int $commandTimeout): string
     {
-        if ($server->settings->force_disabled) {
-            throw new \RuntimeException('Server is disabled.');
-        }
+        self::assertNotDisabled($server);
 
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
@@ -288,17 +318,17 @@ class SshMultiplexingHelper
     {
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
-        $healthCheckTimeout = config('constants.ssh.mux_health_check_timeout');
-
-        $healthCommand = "timeout $healthCheckTimeout ssh -o ControlMaster=auto -o ControlPath=$muxSocket ";
+        $healthCommand = 'ssh -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
         $healthCommand .= self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
-        $process = Process::run($healthCommand);
+        // The health check goes over the network, so a slow link gets at least the server's connection timeout.
+        $timeout = max((int) config('constants.ssh.mux_health_check_timeout'), self::getConnectionTimeout($server));
+        $process = self::runWithTimeout($healthCommand, $timeout);
 
-        return $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
+        return $process?->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
     }
 
     public static function refreshMultiplexedConnection(Server $server): bool
@@ -337,7 +367,36 @@ class SshMultiplexingHelper
 
     private static function masterConnectionExists(Server $server): bool
     {
-        return Process::run(self::muxControlCommand($server, 'check'))->exitCode() === 0;
+        return self::runMuxControlCommand($server, 'check')?->successful() === true;
+    }
+
+    /**
+     * Run `ssh -O <operation>` against a mux socket file. Returns null when the master does not answer in time.
+     */
+    public static function runMuxSocketCommand(string $muxSocket, string $operation): ?ProcessResult
+    {
+        return self::runWithTimeout(
+            "ssh -O {$operation} -o ControlPath=".escapeshellarg($muxSocket).' localhost',
+            (int) config('constants.ssh.mux_health_check_timeout'),
+        );
+    }
+
+    private static function runMuxControlCommand(Server $server, string $operation): ?ProcessResult
+    {
+        return self::runWithTimeout(self::muxControlCommand($server, $operation), (int) config('constants.ssh.mux_health_check_timeout'));
+    }
+
+    /**
+     * Use a PHP-side timeout, not the `timeout` binary: BusyBox `timeout` in the Coolify image
+     * kills ssh with SIGTERM, and Symfony turns that into an exception. Returns null on timeout.
+     */
+    private static function runWithTimeout(string $command, int $timeout): ?ProcessResult
+    {
+        try {
+            return Process::timeout($timeout)->run($command);
+        } catch (ProcessTimedOutException) {
+            return null;
+        }
     }
 
     private static function connectionIsReusable(Server $server): bool
@@ -355,7 +414,7 @@ class SshMultiplexingHelper
 
     private static function muxControlCommand(Server $server, string $operation): string
     {
-        $command = "ssh -O {$operation} -o ControlPath=".self::muxSocket($server).' ';
+        $command = "ssh -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
@@ -366,7 +425,7 @@ class SshMultiplexingHelper
     private static function multiplexingOptions(Server $server): string
     {
         return '-o ControlMaster=auto '
-            .'-o ControlPath='.self::muxSocket($server).' '
+            .'-o ControlPath='.escapeshellarg(self::muxSocket($server)).' '
             .'-o ControlPersist='.config('constants.ssh.mux_persist_time').' ';
     }
 
@@ -422,7 +481,7 @@ class SshMultiplexingHelper
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
-        $options = "-i {$sshKeyLocation} "
+        $options = '-i '.escapeshellarg($sshKeyLocation).' '
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "

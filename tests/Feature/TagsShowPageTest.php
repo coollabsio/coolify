@@ -50,7 +50,7 @@ it('shows a card grid overview when tags exist and none is selected', function (
         ->assertSee('Table view', false)
         ->assertSee('Grid view', false)
         ->assertSee('tagsIndex', false)
-        ->assertSee('tags-view', false)
+        ->assertSee('Number(filteredTags.length)', false)
         ->assertDontSee('Switch tag')
         ->assertDontSee('Deploy webhook URL');
 });

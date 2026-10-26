@@ -7,6 +7,7 @@ use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
@@ -161,6 +162,12 @@ class ServerSetting extends Model
         'docker_version_checked_at',
         'compose_version',
         'compose_version_checked_at',
+        'patch_check_frequency',
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
+        'is_auto_security_updates_enabled',
+        'auto_security_updates_time',
     ];
 
     /**
@@ -193,11 +200,15 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
+        'logdrain_custom_config' => 'encrypted',
         'traffic_ip_mode' => TrafficIpMode::class,
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
         'server_disk_usage_notification_interval_hours' => 'integer',
+        'patch_check_result' => 'array',
+        'patch_checked_at' => 'datetime',
+        'is_auto_security_updates_enabled' => 'boolean',
         'is_logdrain_cloudwatch_enabled' => 'boolean',
     ];
 
@@ -449,5 +460,28 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    /**
+     * Summary of the saved patch check, or null when the server was never checked.
+     * Results saved before security and reboot detection count as 0 and false.
+     *
+     * @return array{updates: int, security: int, reboot_required: bool, error: ?string, checked_at: Carbon}|null
+     */
+    public function patchStatus(): ?array
+    {
+        if ($this->patch_checked_at === null) {
+            return null;
+        }
+
+        $result = $this->patch_check_result ?? [];
+
+        return [
+            'updates' => (int) ($result['total_updates'] ?? 0),
+            'security' => (int) ($result['security_updates'] ?? 0),
+            'reboot_required' => ($result['reboot_required'] ?? null) === true,
+            'error' => filled($this->patch_check_error) ? $this->patch_check_error : null,
+            'checked_at' => $this->patch_checked_at,
+        ];
     }
 }

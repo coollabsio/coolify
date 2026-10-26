@@ -648,7 +648,7 @@
             @endif
             <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
                 @forelse($servers as $server)
-                    <button type="button" wire:click="setServer({{ $server }})"
+                    <button type="button" wire:click="setServer({{ $server->id }})"
                         class="group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                         <span
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -754,7 +754,7 @@
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 18 <span
-                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-warning/15 dark:text-warning">Default</span>
+                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">Default</span>
                         </div>
                         <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
                             PostgreSQL is a powerful, open-source object-relational database system (no extensions).

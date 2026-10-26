@@ -22,7 +22,7 @@ class ApiIpAllowed
 
         $allowedIps = array_filter(array_map('trim', explode(',', $allowedIps)));
 
-        if (! empty($allowedIps) && ! checkIPAgainstAllowlist($request->ip(), $allowedIps)) {
+        if (! empty($allowedIps) && ! checkIPAgainstAllowlist(client_ip($request), $allowedIps)) {
             return response()->json(['success' => true, 'message' => 'You are not allowed to access the API.'], 403);
         }
 

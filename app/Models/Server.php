@@ -34,11 +34,13 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
@@ -130,6 +132,8 @@ class Server extends BaseModel
     public const PLACEHOLDER_IP = '1.2.3.4';
 
     public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
+
+    protected array $auditExclude = ['canvas_position'];
 
     /**
      * Serves the proxy error pages (503.html) for the Traefik and Caddy catch-all.
@@ -338,6 +342,7 @@ class Server extends BaseModel
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
+        'canvas_position' => 'array',
     ];
 
     /**
@@ -411,6 +416,10 @@ class Server extends BaseModel
      */
     public function backfillPlaceholderIp(?string $ip): bool
     {
+        if ($this->isTransferredAway()) {
+            return false;
+        }
+
         $ip = blank($ip) ? null : self::normalizeIp($ip);
         if (self::isPlaceholderIp($ip)) {
             return false;
@@ -455,6 +464,11 @@ class Server extends BaseModel
 
     public function refreshHetznerState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->hetzner_server_status;
+        }
+
         if (! $this->hetzner_server_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hetzner') {
             return $this->hetzner_server_status;
         }
@@ -476,6 +490,11 @@ class Server extends BaseModel
 
     public function refreshVultrState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->vultr_instance_status;
+        }
+
         if (! $this->vultr_instance_id || ! $this->cloudProviderToken) {
             return null;
         }
@@ -512,6 +531,11 @@ class Server extends BaseModel
 
     public function refreshDigitalOceanState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->digitalocean_droplet_status;
+        }
+
         if (! $this->digitalocean_droplet_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'digitalocean') {
             return $this->digitalocean_droplet_status;
         }
@@ -553,6 +577,11 @@ class Server extends BaseModel
 
     public function refreshHostingerState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->hostinger_virtual_machine_status;
+        }
+
         if (! $this->hostinger_virtual_machine_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hostinger') {
             return $this->hostinger_virtual_machine_status;
         }
@@ -1331,6 +1360,16 @@ $siteAddress {
         return $this->proxy->modelScope();
     }
 
+    /**
+     * Servers that this instance manages. A transferred server is only an archive and does not use a server slot.
+     */
+    public function scopeNotTransferredAway(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereNull('server_metadata->transfer->status')
+            ->orWhere('server_metadata->transfer->status', '!=', 'transferred'));
+    }
+
     public function scopeWhereProxyType(Builder $query, string $proxyType): Builder
     {
         return $query->where('proxy->type', $proxyType);
@@ -1387,11 +1426,82 @@ $siteAddress {
     }
 
     /**
+     * Stops an action that changes the host, its cloud server, its Cloudflare tunnel, or its DNS records.
+     * Another Coolify instance manages a transferred server; this instance keeps only an archive of it.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertNotTransferredAway(): void
+    {
+        if ($this->isTransferredAway()) {
+            throw new \RuntimeException('This server is managed by another Coolify instance.');
+        }
+    }
+
+    /**
      * Whether this server may be validated / installed against from this instance.
      */
     public function canBeValidated(): bool
     {
         return ! $this->isTransferredAway();
+    }
+
+    /**
+     * On Coolify Cloud, limit how often SSH validations can run against one IP and from one team.
+     * The window and the maximums are server_validation_* instance settings.
+     * Without a limit, users can make Cloud try SSH logins on hosts that they do not own.
+     * A successful connection gives its attempt back, so only failed logins use up the limit.
+     *
+     * @throws ThrottleRequestsException
+     */
+    public static function throttleValidation(int $teamId, string $ip): void
+    {
+        if (! isCloud()) {
+            return;
+        }
+
+        $limits = self::validationRateLimits($teamId, $ip);
+        foreach ($limits as $key => $maxAttempts) {
+            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                $seconds = RateLimiter::availableIn($key);
+
+                throw new ThrottleRequestsException("Too many server validations. Please try again in {$seconds} seconds.", headers: ['Retry-After' => $seconds]);
+            }
+        }
+        foreach (array_keys($limits) as $key) {
+            RateLimiter::hit($key, self::validationRateLimitSeconds());
+        }
+    }
+
+    private static function validationRateLimitSeconds(): int
+    {
+        return instanceSettings()->server_validation_rate_limit_seconds;
+    }
+
+    /**
+     * @return array<string, int> rate limiter key => max attempts
+     */
+    private static function validationRateLimits(int $teamId, string $ip): array
+    {
+        $settings = instanceSettings();
+
+        return [
+            'server-validation:ip:'.strtolower(self::normalizeIp($ip)) => $settings->server_validation_max_failures_per_ip,
+            'server-validation:team:'.$teamId => $settings->server_validation_max_failures_per_team,
+        ];
+    }
+
+    private function refundValidationAttempt(): void
+    {
+        if (! isCloud()) {
+            return;
+        }
+
+        foreach (array_keys(self::validationRateLimits($this->team_id, $this->ip)) as $key) {
+            if (RateLimiter::attempts($key) > 0) {
+                RateLimiter::decrement($key, self::validationRateLimitSeconds());
+            }
+        }
     }
 
     public function forceEnableServer()
@@ -1783,7 +1893,7 @@ $siteAddress {
             ->concat($dragonflies)
             ->concat($clickhouses)
             ->concat($sqlites)
-            ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
+            ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }
 
     public function applications()
@@ -2014,6 +2124,30 @@ $siteAddress {
         return true;
     }
 
+    /**
+     * Marks a proxy start or restart as running, so status checks do not start a second proxy meanwhile.
+     * ProxyStatusChangedNotification clears the mark when the start or restart finishes.
+     */
+    public function markProxyTransitionStarted(): void
+    {
+        Cache::put($this->proxyTransitionCacheKey(), true, now()->addMinutes(5));
+    }
+
+    public function markProxyTransitionFinished(): void
+    {
+        Cache::forget($this->proxyTransitionCacheKey());
+    }
+
+    public function isProxyTransitionInProgress(): bool
+    {
+        return Cache::has($this->proxyTransitionCacheKey());
+    }
+
+    private function proxyTransitionCacheKey(): string
+    {
+        return "proxy-transition:{$this->uuid}";
+    }
+
     public function skipServer()
     {
         if ($this->hasPlaceholderIp()) {
@@ -2110,7 +2244,7 @@ $siteAddress {
 
         try {
             $output = instant_remote_process([
-                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true) && echo "---GPUS---" && (nvidia-smi --query-gpu=index,uuid,memory.total,name --format=csv,noheader,nounits 2>/dev/null || true) && echo "---NVIDIA_TOOLKIT---" && (command -v nvidia-container-runtime-hook nvidia-ctk 2>/dev/null || true)',
             ], $this, false);
 
             if (! $output) {
@@ -2118,6 +2252,7 @@ $siteAddress {
             }
 
             $sections = [];
+            $sectionLines = [];
             $currentKey = null;
             foreach (explode("\n", trim($output)) as $line) {
                 $line = trim($line);
@@ -2125,6 +2260,9 @@ $siteAddress {
                     $currentKey = $m[1];
                 } elseif ($currentKey) {
                     $sections[$currentKey] = $line;
+                    if ($line !== '') {
+                        $sectionLines[$currentKey][] = $line;
+                    }
                 }
             }
 
@@ -2135,6 +2273,8 @@ $siteAddress {
                 'cpus' => (int) ($sections['CPUS'] ?? 0),
                 'memory_bytes' => (int) ($sections['MEMORY'] ?? 0),
                 'uptime_since' => $sections['UPTIME_SINCE'] ?? null,
+                'gpus' => self::parseNvidiaSmiGpus($sectionLines['GPUS'] ?? []),
+                'nvidia_container_toolkit' => ($sectionLines['NVIDIA_TOOLKIT'] ?? []) !== [],
                 'collected_at' => now()->toIso8601String(),
             ];
 
@@ -2172,6 +2312,38 @@ $siteAddress {
 
             return null;
         }
+    }
+
+    /**
+     * Parse `nvidia-smi --query-gpu=index,uuid,memory.total,name --format=csv,noheader,nounits` lines.
+     * The name is the last column because it can contain commas.
+     *
+     * @param  list<string>  $lines
+     * @return list<array{index: string, uuid: string, memory_mb: int, name: string}>
+     */
+    public static function parseNvidiaSmiGpus(array $lines): array
+    {
+        $gpus = [];
+        foreach ($lines as $line) {
+            $columns = array_map('trim', explode(',', $line, 4));
+            if (count($columns) !== 4 || ! ctype_digit($columns[0])) {
+                continue;
+            }
+            [$index, $uuid, $memory, $name] = $columns;
+            $gpus[] = ['index' => $index, 'uuid' => $uuid, 'memory_mb' => (int) $memory, 'name' => $name];
+        }
+
+        return $gpus;
+    }
+
+    /**
+     * GPUs found when the server details were last collected, or null when they were never checked.
+     *
+     * @return list<array{index: string, uuid: string, memory_mb: int, name: string}>|null
+     */
+    public function detectedGpus(): ?array
+    {
+        return data_get($this->server_metadata, 'gpus');
     }
 
     public function isTerminalEnabled()
@@ -2282,7 +2454,9 @@ $siteAddress {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            instant_remote_process(['ls /'], $this, disableMultiplexing: true);
+            // One attempt only: retries would repeat failed logins on a host that may not belong to the user.
+            instant_remote_process(['ls /'], $this, disableMultiplexing: true, maxAttempts: 1);
+            $this->refundValidationAttempt();
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
@@ -2417,13 +2591,11 @@ $siteAddress {
     public function validateDockerEngineVersion()
     {
         $dockerVersionRaw = instant_remote_process(['docker version --format json'], $this, false);
-        $dockerVersionJson = json_decode($dockerVersionRaw, true);
-        $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
-        $this->rememberDockerVersion(is_string($dockerVersion) ? $dockerVersion : null);
+        $dockerVersion = dockerEngineVersionFromJson($dockerVersionRaw);
+        $this->rememberDockerVersion($dockerVersion);
         $composeVersionRaw = instant_remote_process(['docker compose version --short'], $this, false);
         $this->rememberComposeVersion(is_string($composeVersionRaw) ? $composeVersionRaw : null);
-        $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-        if (is_null($dockerVersion)) {
+        if (is_null(checkMinimumDockerEngineVersion($dockerVersion))) {
             $this->settings->is_usable = false;
             $this->settings->save();
 
@@ -2435,6 +2607,25 @@ $siteAddress {
         ServerReachabilityChanged::dispatch($this);
 
         return true;
+    }
+
+    /**
+     * Explains why validateDockerEngineVersion() failed: the version could not be read, or it is too old.
+     */
+    public function dockerEngineVersionError(): string
+    {
+        $requiredVersion = str(config('constants.docker.minimum_required_version'))->before('.');
+        $documentation = '<a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>';
+        $dockerVersion = $this->dockerVersion();
+
+        if (is_null($dockerVersion)) {
+            $command = $this->isNonRoot() ? 'sudo docker version --format json' : 'docker version --format json';
+            $user = e($this->user);
+
+            return "Coolify could not read the Docker Engine version. Run \"{$command}\" on the server as the {$user} user. It must exit without an error and print only JSON. Text from shell startup files (for example ~/.bashrc) breaks the output.";
+        }
+
+        return "Docker Engine {$dockerVersion} is installed, but Coolify needs version {$requiredVersion} or newer. Please upgrade Docker: {$documentation}.";
     }
 
     public function validateCoolifyNetwork($isSwarm = false, $isBuildServer = false)

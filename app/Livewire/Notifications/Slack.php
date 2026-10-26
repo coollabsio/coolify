@@ -27,7 +27,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:slackEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]

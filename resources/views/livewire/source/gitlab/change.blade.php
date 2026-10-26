@@ -33,11 +33,11 @@
             </div>
         </header>
 
-        <form wire:submit="submit" class="application-settings-form">
+        <form wire:submit="submit" class="application-settings-form flex flex-col gap-6">
             <x-unsaved-bar action="submit" />
 
             <x-application.settings-section title="General"
-                description="Connection and authentication settings for this private GitLab source.">
+                description="Name, visibility, and webhook of this source.">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$gitlab_app" id="name" label="Name" />
 
@@ -58,54 +58,56 @@
                         @endif
                     @endif
                 </div>
-            </x-application.settings-section>
-
-            <x-application.settings-section title="OAuth credentials"
-                description="Application credentials from your GitLab OAuth application.">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientId"
-                        label="Application ID" />
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientSecretInput"
-                        label="Application secret" type="password"
-                        helper="Stored encrypted. Leave empty to keep the existing secret." />
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="groupName" label="Group name"
-                        helper="Comma-separated group names to filter visible repositories." />
-                </div>
-            </x-application.settings-section>
-
-            <x-application.settings-section title="Self-hosted / advanced"
-                description="Override endpoints and SSH settings for self-hosted GitLab.">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="htmlUrl"
-                        label="GitLab URL" />
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="apiUrl" label="API URL" />
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="customUser"
-                        label="SSH user" />
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" type="number" id="customPort"
-                        label="SSH port" />
-                    <div class="lg:col-span-2">
-                        <x-forms.listbox canGate="update" :canResource="$gitlab_app" id="privateKeyId" label="SSH private key (optional)"
-                            :options="collect($privateKeys)->map(fn ($key) => [
-                                'value' => $key->id,
-                                'label' => $key->name,
-                            ])->prepend(['value' => null, 'label' => 'None'])->values()->all()"
-                            :disabled="! auth()->user()->can('update', $gitlab_app)" />
+                <x-application.settings-subsection title="Webhook"
+                    helper="Configure this webhook URL in your GitLab project settings (Settings → Webhooks). On self-managed GitLab, an admin can instead add the same URL and token once as a system hook (Admin Area → System hooks) with Push events and Merge request events enabled.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <div class="lg:col-span-2">
+                            <x-forms.input readonly label="Webhook URL"
+                                value="{{ rtrim($this->resolvePublicBaseUrl(), '/') }}/webhooks/source/gitlab/events" />
+                        </div>
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="webhookToken"
+                            label="Webhook secret token" type="password"
+                            helper="Set this same token in your GitLab webhook's Secret token field. Stored encrypted." />
                     </div>
-                </div>
+                </x-application.settings-subsection>
             </x-application.settings-section>
 
-            <x-application.settings-section title="Webhook"
-                description="Configure this webhook URL in your GitLab project settings (Settings → Webhooks). On self-managed GitLab, an admin can instead add the same URL and token once as a system hook (Admin Area → System hooks) with Push events and Merge request events enabled.">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <div class="lg:col-span-2">
-                        <x-forms.input readonly label="Webhook URL"
-                            value="{{ rtrim($this->resolvePublicBaseUrl(), '/') }}/webhooks/source/gitlab/events" />
+            <x-application.settings-section id="connection-section" title="Connection"
+                helper="OAuth credentials and the endpoints Coolify uses to reach this source.">
+                <x-application.settings-subsection first title="OAuth credentials"
+                    helper="Application credentials from your GitLab OAuth application.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientId"
+                            label="Application ID" />
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientSecretInput"
+                            label="Application secret" type="password"
+                            helper="Stored encrypted. Leave empty to keep the existing secret." />
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="groupName" label="Group name"
+                            helper="Comma-separated group names to filter visible repositories." />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="webhookToken"
-                        label="Webhook secret token" type="password"
-                        helper="Set this same token in your GitLab webhook's Secret token field. Stored encrypted." />
-                </div>
+                </x-application.settings-subsection>
+                <x-application.settings-subsection title="Self-hosted / advanced"
+                    helper="Override endpoints and SSH settings for self-hosted GitLab.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="htmlUrl"
+                            label="GitLab URL" />
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="apiUrl" label="API URL" />
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" id="customUser"
+                            label="SSH user" />
+                        <x-forms.input canGate="update" :canResource="$gitlab_app" type="number" id="customPort"
+                            label="SSH port" />
+                        <div class="lg:col-span-2">
+                            <x-forms.listbox canGate="update" :canResource="$gitlab_app" id="privateKeyId" label="SSH private key (optional)"
+                                :options="collect($privateKeys)->map(fn ($key) => [
+                                    'value' => $key->id,
+                                    'label' => $key->name,
+                                ])->prepend(['value' => null, 'label' => 'None'])->values()->all()"
+                                :disabled="! auth()->user()->can('update', $gitlab_app)" />
+                        </div>
+                    </div>
+                </x-application.settings-subsection>
             </x-application.settings-section>
+
         </form>
 
         <div x-data="{ search: '' }" class="application-settings-form mt-6">

@@ -123,10 +123,22 @@ export function createTerminalUpgradeHandler({ wss, authenticate, onRejected = (
 
 const DEFAULT_TERMINAL_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
 
+// Variables passed to the SSH process besides PATH. `cloudflared access ssh` reads the
+// Access service token from them in the ProxyCommand of Cloudflare Tunnel servers.
+const ALLOWED_TERMINAL_ENV = ['TUNNEL_SERVICE_TOKEN_ID', 'TUNNEL_SERVICE_TOKEN_SECRET'];
+
 export function getTerminalProcessEnv(environment = process.env) {
-    return {
+    const env = {
         PATH: environment.PATH || DEFAULT_TERMINAL_PATH,
     };
+
+    for (const name of ALLOWED_TERMINAL_ENV) {
+        if (environment[name]) {
+            env[name] = environment[name];
+        }
+    }
+
+    return env;
 }
 
 export function getTerminalSessionTimeout() {

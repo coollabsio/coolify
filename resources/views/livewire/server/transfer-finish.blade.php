@@ -87,11 +87,11 @@
                                                     class="listbox-panel top-full! right-0! left-auto! z-[90]! mt-1! w-40! min-w-40!">
                                                     @unless ($manualOnly)
                                                         <button type="button" class="listbox-option justify-start!" role="menuitem"
-                                                            wire:click="checkStep('{{ $step['key'] }}')" @click="menu = false">Check now</button>
+                                                            wire:click="checkStep({{ \Illuminate\Support\Js::from($step['key']) }})" @click="menu = false">Check now</button>
                                                     @endunless
                                                     @if (! $manualOnly || $link)
                                                         <button type="button" class="listbox-option justify-start!" role="menuitem"
-                                                            wire:click="markStepDone('{{ $step['key'] }}')" @click="menu = false">Mark as done</button>
+                                                            wire:click="markStepDone({{ \Illuminate\Support\Js::from($step['key']) }})" @click="menu = false">Mark as done</button>
                                                     @endif
                                                     @if ($fixLabel && $link)
                                                         <a href="{{ $link }}" {!! $linkAttributes !!} class="listbox-option justify-start!"
@@ -101,11 +101,11 @@
                                             </div>
                                             @endif
                                             @if ($fixLabel)
-                                                <x-forms.button wire:click="fixStep('{{ $step['key'] }}')">{{ $fixLabel }}</x-forms.button>
+                                                <x-forms.button wire:click="fixStep({{ \Illuminate\Support\Js::from($step['key']) }})">{{ $fixLabel }}</x-forms.button>
                                             @elseif ($link)
                                                 <a href="{{ $link }}" {!! $linkAttributes !!} class="button">{{ $linkLabel }}</a>
                                             @elseif ($manualOnly)
-                                                <x-forms.button wire:click="markStepDone('{{ $step['key'] }}')">Mark as done</x-forms.button>
+                                                <x-forms.button wire:click="markStepDone({{ \Illuminate\Support\Js::from($step['key']) }})">Mark as done</x-forms.button>
                                             @endif
                                         </div>
                                     @endcan

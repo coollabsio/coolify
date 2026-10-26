@@ -1,4 +1,5 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
+import { initializeNumberStepperComponent } from './number-stepper.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
@@ -48,6 +49,7 @@ document.addEventListener('livewire:navigated', () => {
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
+document.addEventListener('alpine:init', initializeNumberStepperComponent);
 document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
 
 /**

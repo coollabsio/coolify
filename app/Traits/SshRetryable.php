@@ -90,11 +90,12 @@ trait SshRetryable
      * @param  callable  $callback  The operation to execute
      * @param  array  $context  Context for logging (server, command, etc.)
      * @param  bool  $throwError  Whether to throw error on final failure
+     * @param  int|null  $maxAttempts  Attempts in total, defaults to constants.ssh.max_retries
      * @return mixed The result from the callback
      */
-    protected function executeWithSshRetry(callable $callback, array $context = [], bool $throwError = true)
+    protected function executeWithSshRetry(callable $callback, array $context = [], bool $throwError = true, ?int $maxAttempts = null)
     {
-        $maxRetries = config('constants.ssh.max_retries');
+        $maxRetries = $maxAttempts ?? config('constants.ssh.max_retries');
         $lastError = null;
         $lastErrorMessage = '';
         // Randomly fail the command with a key exchange error for testing

@@ -57,6 +57,16 @@ abstract class RestActionTool extends Tool
         return array_filter($this->actions(), fn (array $action): bool => $this->currentTokenCan($action['ability']));
     }
 
+    /**
+     * Names of the actions that the current token has the ability for.
+     *
+     * @return array<int, string>
+     */
+    public function availableActionNames(): array
+    {
+        return array_keys($this->availableActions());
+    }
+
     public function shouldRegister(): bool
     {
         return $this->availableActions() !== [];

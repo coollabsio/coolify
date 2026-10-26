@@ -116,6 +116,23 @@ it('archives locally and uploads to every destination instead of streaming', fun
         ]);
 });
 
+it('signs each upload with the region of its destination', function () {
+    [$backup, $first] = createMultiDestinationVolumeBackup();
+    $first->update(['region' => 'ru-central-1']);
+    fakeMultiDestinationS3Disks();
+    Process::fake([
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
+        && str_contains($process->command, 'temporary/first-bucket/'));
+    Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=us-east-1'")
+        && str_contains($process->command, 'temporary/second-bucket/'));
+});
+
 it('keeps the local archive and cleans the partial upload when one destination fails', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
     fakeMultiDestinationS3Disks();

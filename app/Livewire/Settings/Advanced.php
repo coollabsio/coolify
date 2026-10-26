@@ -66,6 +66,12 @@ class Advanced extends Component
 
     public string $file_download_storage = 'stream';
 
+    public int $server_validation_rate_limit_seconds = 600;
+
+    public int $server_validation_max_failures_per_ip = 10;
+
+    public int $server_validation_max_failures_per_team = 30;
+
     public function rules()
     {
         return [
@@ -85,6 +91,9 @@ class Advanced extends Component
             'webhook_allow_localhost' => 'boolean',
             'domain_connect_private_key' => 'nullable|string',
             'image_cdn_url' => 'nullable|url|max:255',
+            'server_validation_rate_limit_seconds' => 'required|integer|min:60|max:86400',
+            'server_validation_max_failures_per_ip' => 'required|integer|min:1|max:1000',
+            'server_validation_max_failures_per_team' => 'required|integer|min:1|max:10000',
         ];
     }
 
@@ -114,6 +123,9 @@ class Advanced extends Component
             ? 's3:'.$this->settings->avatar_s3_storage_id
             : 'local';
         $this->image_cdn_url = $this->settings->image_cdn_url;
+        $this->server_validation_rate_limit_seconds = $this->settings->server_validation_rate_limit_seconds;
+        $this->server_validation_max_failures_per_ip = $this->settings->server_validation_max_failures_per_ip;
+        $this->server_validation_max_failures_per_team = $this->settings->server_validation_max_failures_per_team;
         $this->avatar_storage_options = [
             ['value' => 'local', 'label' => 'Local storage'],
             ...S3Storage::query()
@@ -198,6 +210,12 @@ class Advanced extends Component
             $webhookAllowedInternalHosts = $this->normalizeWebhookAllowedInternalHosts();
             if ($webhookAllowedInternalHosts === false) {
                 return;
+            }
+
+            if (isCloud()) {
+                $this->settings->server_validation_rate_limit_seconds = $this->server_validation_rate_limit_seconds;
+                $this->settings->server_validation_max_failures_per_ip = $this->server_validation_max_failures_per_ip;
+                $this->settings->server_validation_max_failures_per_team = $this->server_validation_max_failures_per_team;
             }
 
             if (isCloud() && filled($this->domain_connect_private_key)) {

@@ -72,7 +72,7 @@ it('generates a compose file that passes the database files to the image', funct
     $service = Yaml::parse(base64_decode($matches[1]))['services'][$this->database->uuid];
 
     expect($service)->not->toHaveKey('command')
-        ->and($service['environment'])->toBe(['SQLITE_DATABASES=app.db,jobs.db'])
+        ->and($service['environment'])->toContain('SQLITE_DATABASES=app.db,jobs.db', 'COOLIFY_RESOURCE_UUID='.$this->database->uuid)
         ->and($service['healthcheck']['test'])->toBe(['CMD', 'healthcheck.sh'])
         ->and($service['volumes'])->toBe(['sqlite-data-'.$this->database->uuid.':/var/lib/sqlite']);
 });

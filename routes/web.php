@@ -125,6 +125,7 @@ use App\Livewire\SharedVariables\Project\Show as ProjectSharedVariablesShow;
 use App\Livewire\SharedVariables\Server\Index as ServerSharedVariablesIndex;
 use App\Livewire\SharedVariables\Server\Show as ServerSharedVariablesShow;
 use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
+use App\Livewire\Source\Gitea\Change as GiteaChange;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Source\Gitlab\Change as GitLabChange;
 use App\Livewire\Storage\Index as StorageIndex;
@@ -139,6 +140,7 @@ use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
+use App\Livewire\TwoFactorRequired;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -192,6 +194,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
+    Route::get('/two-factor-required', TwoFactorRequired::class)->name('two-factor.required');
 
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::middleware('access.team-wide')->group(function () {
@@ -206,6 +209,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
         Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:write']);
         Route::get('/projects/canvas', [ProjectCanvasController::class, 'index'])->middleware(['api.ability:read']);
+        Route::patch('/projects/canvas/positions', [ProjectCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
         Route::get('/projects/{uuid}/canvas', [ProjectCanvasController::class, 'show'])->middleware(['api.ability:read']);
         Route::get('/projects/{uuid}/environments', [ProjectController::class, 'get_environments'])->middleware(['api.ability:read']);
         Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
@@ -225,7 +229,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/shared-variables/{scope}/{uuid}/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
         Route::get('/servers', [ServersController::class, 'servers'])->middleware(['access.team-wide', 'api.ability:read']);
         Route::get('/servers/canvas', [ServerCanvasController::class, 'index'])->middleware(['access.team-wide', 'api.ability:read']);
+        Route::patch('/servers/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['access.team-wide', 'api.ability:write']);
         Route::get('/dashboard/canvas', [ServerCanvasController::class, 'dashboard'])->middleware(['access.team-wide', 'api.ability:read']);
+        Route::patch('/dashboard/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['access.team-wide', 'api.ability:write']);
         Route::get('/servers/{uuid}/canvas', [ServerCanvasController::class, 'show'])->middleware(['access.team-wide', 'api.ability:read']);
         Route::get('/servers/{uuid}/canvas/containers', [ServerCanvasController::class, 'containers'])->middleware(['access.team-wide', 'api.ability:read']);
         Route::get('/servers/{uuid}/canvas/usage', [ServerCanvasController::class, 'usage'])->middleware(['access.team-wide', 'api.ability:read']);
@@ -562,6 +568,7 @@ Route::middleware(['auth', 'access.team-wide'])->group(function () {
     Route::get('/source/github/{github_app_uuid}/permissions', GitHubChange::class)->name('source.github.permissions');
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
     Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');
+    Route::get('/source/gitea/{gitea_app_uuid}', GiteaChange::class)->name('source.gitea.show');
 });
 
 Route::middleware(['auth'])->group(function () {

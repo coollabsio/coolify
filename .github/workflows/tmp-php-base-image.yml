@@ -1,0 +1,134 @@
+# Temporary: builds PHP from the signed php.net release and rebuilds serversideup/php v4.5.1 on it for the 4.x security fixes.
+# Delete this workflow and docker/tmp-php once 4.5 ships on serversideup/php v5.
+name: TMP Build Patched PHP Base
+run-name: tmp php ${{ inputs.php_version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      php_version:
+        description: Patched PHP 8.4 release, for example 8.4.27
+        required: true
+        type: string
+      php_sha256:
+        description: SHA256 of php-<version>.tar.xz from https://www.php.net/downloads.php
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: tmp-php-base-image
+  cancel-in-progress: false
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  PHP_IMAGE: ghcr.io/coollabsio/php
+  BASE_IMAGE: ghcr.io/coollabsio/serversideup-php
+  # serversideup/docker-php v4.5.1
+  SERVERSIDEUP_CONTEXT: https://github.com/serversideup/docker-php.git#92b16c9ee63bde4f75cdcc7ebe96aee36a896f88
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Validate inputs
+        env:
+          PHP_VERSION: ${{ inputs.php_version }}
+          PHP_SHA256: ${{ inputs.php_sha256 }}
+        run: |
+          if [[ ! "${PHP_VERSION}" =~ ^8\.4\.[0-9]+$ ]]; then
+            echo "Unsupported PHP version: ${PHP_VERSION}"
+            exit 1
+          fi
+          if [[ ! "${PHP_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Invalid SHA256: ${PHP_SHA256}"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build PHP from the signed release (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/tmp-php
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            PHP_VERSION=${{ inputs.php_version }}
+            PHP_SHA256=${{ inputs.php_sha256 }}
+          tags: ${{ env.PHP_IMAGE }}:${{ inputs.php_version }}-fpm-alpine3.24-${{ matrix.arch }}
+
+      - name: Rebuild serversideup/php v4.5.1 on it (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.SERVERSIDEUP_CONTEXT }}
+          file: src/variations/fpm-nginx/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.PHP_IMAGE }}:${{ inputs.php_version }}-fpm-alpine3.24-${{ matrix.arch }}
+            PHP_VERSION=8.4
+            BASE_OS_VERSION=alpine3.24
+            PHP_VARIATION=fpm-nginx
+            NGINX_VERSION=1.30.4-r1
+            REPOSITORY_BUILD_VERSION=v4.5.1-php${{ inputs.php_version }}
+          tags: ${{ env.BASE_IMAGE }}:${{ inputs.php_version }}-fpm-nginx-alpine-v4.5.1-${{ matrix.arch }}
+
+      - name: Check the PHP version (${{ matrix.arch }})
+        env:
+          IMAGE: ${{ env.BASE_IMAGE }}:${{ inputs.php_version }}-fpm-nginx-alpine-v4.5.1-${{ matrix.arch }}
+          PHP_VERSION: ${{ inputs.php_version }}
+        run: |
+          BUILT_VERSION=$(docker run --rm --entrypoint php "${IMAGE}" -r 'echo PHP_VERSION;')
+          if [ "${BUILT_VERSION}" != "${PHP_VERSION}" ]; then
+            echo "The base image runs PHP ${BUILT_VERSION}, expected ${PHP_VERSION}."
+            exit 1
+          fi
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish multi-arch images
+        env:
+          PHP_VERSION: ${{ inputs.php_version }}
+        run: |
+          docker buildx imagetools create \
+            "${PHP_IMAGE}:${PHP_VERSION}-fpm-alpine3.24-amd64" \
+            "${PHP_IMAGE}:${PHP_VERSION}-fpm-alpine3.24-aarch64" \
+            --tag "${PHP_IMAGE}:${PHP_VERSION}-fpm-alpine3.24"
+          docker buildx imagetools create \
+            "${BASE_IMAGE}:${PHP_VERSION}-fpm-nginx-alpine-v4.5.1-amd64" \
+            "${BASE_IMAGE}:${PHP_VERSION}-fpm-nginx-alpine-v4.5.1-aarch64" \
+            --tag "${BASE_IMAGE}:${PHP_VERSION}-fpm-nginx-alpine-v4.5.1" \
+            --tag "${BASE_IMAGE}:8.4-fpm-nginx-alpine-v4.5.1-hotfix"

@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -45,7 +46,6 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Process\Pool;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -702,14 +702,8 @@ function get_route_parameters(): array
 
 function get_latest_sentinel_version(): string
 {
-    try {
-        $response = Http::get(config('constants.coolify.versions_url'));
-        $versions = $response->json();
-
-        return data_get($versions, 'coolify.sentinel.version');
-    } catch (Throwable) {
-        return '0.0.0';
-    }
+    // Read the local versions.json, which CheckForUpdatesJob refreshes every hour. Do not ask the CDN for each server.
+    return data_get(get_versions_data(), 'coolify.sentinel.version') ?? '0.0.0';
 }
 function get_latest_version_of_coolify(): string
 {
@@ -2454,7 +2448,7 @@ function isCloudflareIp(string $ip): bool
     $cloudflareIps = [
         '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
         '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
-        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14',
         '172.64.0.0/13', '131.0.72.0/22', '2400:cb00::/32', '2606:4700::/32',
         '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29',
         '2c0f:f248::/32',
@@ -2738,15 +2732,21 @@ function get_public_ips(): void
 function detect_public_ips(array $columns = ['public_ipv4', 'public_ipv6']): array
 {
     $versions = array_intersect_key(['public_ipv4' => 4, 'public_ipv6' => 6], array_flip($columns));
-    $results = Process::concurrently(function (Pool $pool) use ($versions) {
-        foreach ($versions as $column => $version) {
-            $pool->as($column)->path(__DIR__)->command("curl -{$version}s https://ifconfig.io");
-        }
-    });
+
+    // Start the lookups together, but wait for each one alone, so a timeout of one family does not discard the other.
+    $processes = [];
+    foreach ($versions as $column => $version) {
+        $processes[$column] = Process::path(__DIR__)->start("curl -{$version}s --max-time 10 https://ifconfig.io");
+    }
 
     $detected = [];
-    foreach ($versions as $column => $version) {
-        $ip = trim($results[$column]->output());
+    foreach ($processes as $column => $process) {
+        try {
+            $ip = trim($process->wait()->output());
+        } catch (Throwable) {
+            continue;
+        }
+        $version = $versions[$column];
         if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) !== false) {
             $detected[$column] = $ip;
         }
@@ -3537,6 +3537,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
                                         is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                        is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3555,6 +3556,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
                                         is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                        is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3575,6 +3577,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
                                 is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3591,6 +3594,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
                                 is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -4342,6 +4346,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             generate_unique_uuid: $resource->build_pack === 'dockercompose',
                                             image: data_get($service, 'image'),
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                            is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                             onlyPort: $onlyPort,
@@ -4362,6 +4367,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             image: data_get($service, 'image'),
                                             service_name: $serviceName,
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                            is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                             onlyPort: $onlyPort,
@@ -4383,6 +4389,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     generate_unique_uuid: $resource->build_pack === 'dockercompose',
                                     image: data_get($service, 'image'),
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                    is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     onlyPort: $onlyPort,
@@ -4401,6 +4408,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     image: data_get($service, 'image'),
                                     service_name: $serviceName,
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                    is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     onlyPort: $onlyPort,
@@ -4620,7 +4628,7 @@ function wireNavigate(): string
 }
 
 /**
- * Registers a resource menu that the main sidebar shows in place of its main menu on wide screens
+ * Registers a resource menu that the main sidebar and the mobile drawer show in place of their main menu
  * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
  * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
  */
@@ -4915,7 +4923,7 @@ function gitRepositorySlug(?string $gitRepository): string
     return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
 }
 
-function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|null $source = null): array
+function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|GiteaApp|null $source = null): array
 {
     $repository = $gitRepository;
     $providerInfo = [
@@ -4935,6 +4943,7 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         switch ($source->getMorphClass()) {
             case GithubApp::class:
             case GitlabApp::class:
+            case GiteaApp::class:
                 $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
                 $providerInfo['port'] = $source->custom_port;
                 $providerInfo['user'] = $source->custom_user;
@@ -5639,6 +5648,80 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
     }
 
     return str($value)->value();
+}
+
+/**
+ * Replace locked values in the generated compose file of a resource, for display only.
+ *
+ * The compose parsers write resolved values into `docker_compose`: environment variables, database
+ * overrides, and shared variable references. Deployments need those values, so only the displayed
+ * copy is redacted. Covered: the resource's locked variables (also variables that reference a locked
+ * shared variable) and locked team, project, and environment variables that the raw compose references.
+ * Values shorter than 4 characters are not replaced, because they would match unrelated text.
+ * A parsed compose (array or collection) gets the same replacement in every string value.
+ *
+ * @template T of string|array|Collection|null
+ *
+ * @param  T  $compose
+ * @return T
+ */
+function redactLockedValuesInGeneratedCompose(string|array|Collection|null $compose, Application|Service $resource): string|array|Collection|null
+{
+    if (blank($compose)) {
+        return $compose;
+    }
+
+    $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
+
+    preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
+    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], ['team', 'project', 'environment'], true));
+    $teamId = $resource->team()?->id;
+    if ($references->isNotEmpty() && $teamId !== null) {
+        $scopeIds = [
+            'team' => $teamId,
+            'project' => $resource->environment?->project_id,
+            'environment' => $resource->environment_id,
+        ];
+        $values = SharedEnvironmentVariable::query()
+            ->where('team_id', $teamId)
+            ->where('is_shown_once', true)
+            ->whereIn('key', $references->pluck(2)->unique()->values())
+            ->get()
+            ->filter(fn (SharedEnvironmentVariable $shared): bool => $references->contains(fn (array $match): bool => $match[1] === $shared->type && $match[2] === $shared->key)
+                && $scopeIds[$shared->type] !== null
+                && (int) $shared->{"{$shared->type}_id"} === (int) $scopeIds[$shared->type])
+            ->pluck('value')
+            ->merge($values)
+            ->all();
+    }
+
+    $variants = collect($values)
+        ->filter(fn (mixed $value): bool => is_string($value))
+        ->flatMap(fn (string $value): array => [
+            $value,
+            escapeDollarSign($value),
+            str_replace("'", "''", $value),
+            substr((string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 1, -1),
+        ])
+        ->filter(fn (string $value): bool => mb_strlen($value) >= 4)
+        ->unique()
+        ->mapWithKeys(fn (string $value): array => [$value => '<locked>']);
+
+    if ($variants->isEmpty()) {
+        return $compose;
+    }
+
+    // strtr() replaces the longest match first and does not search the replaced text again.
+    $redact = function (mixed $value) use (&$redact, $variants): mixed {
+        return match (true) {
+            is_string($value) => strtr($value, $variants->all()),
+            is_array($value) => array_map($redact, $value),
+            $value instanceof Collection => $value->map($redact),
+            default => $value,
+        };
+    };
+
+    return $redact($compose);
 }
 
 /**
