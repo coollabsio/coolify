@@ -18,7 +18,7 @@ class ManageDestination extends RestActionTool
         return [
             'create' => ['method' => 'POST', 'path' => 'servers/{server_uuid}/destinations', 'ability' => 'write', 'description' => 'create a destination on a server (data: network, name, type standalone|swarm)'],
             'update' => ['method' => 'PATCH', 'path' => 'destinations/{uuid}', 'ability' => 'write', 'description' => 'rename a destination (data: name)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'destinations/{uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete a destination without resources and remove its Docker network'],
+            'delete' => ['method' => 'DELETE', 'path' => 'destinations/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a destination without resources and remove its Docker network'],
         ];
     }
 

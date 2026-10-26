@@ -264,6 +264,7 @@
             @endif
         </section>
 
+        @if ($showsTeamSections)
         <section class="@container mb-0! min-w-0" x-data="{
             viewMode: @js($this->listView('dashboard_servers', 'table')),
             setViewMode(mode) {
@@ -404,6 +405,7 @@
                 </div>
             @endif
         </section>
+        @endif
         </div>
         </div>
     </div>

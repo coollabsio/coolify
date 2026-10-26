@@ -17,11 +17,11 @@ class ManageApplication extends RestActionTool
     {
         return [
             'update' => ['method' => 'PATCH', 'path' => 'applications/{uuid}', 'ability' => 'write', 'description' => 'update application settings (data: same fields as the REST update, e.g. name, domains, git_branch, ports_exposes, build_command)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete the application and its containers (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
+            'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete the application and its containers (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
             'clone' => ['method' => 'POST', 'path' => 'applications/{uuid}/clone', 'ability' => 'write', 'description' => 'clone the application to a destination of the team (data: destination_uuid, name, clone_volumes)'],
             'move' => ['method' => 'POST', 'path' => 'applications/{uuid}/move', 'ability' => 'write', 'confirm' => true, 'description' => 'move the application to another environment of the team (data: environment_uuid)'],
             'add_server' => ['method' => 'POST', 'path' => 'applications/{uuid}/destinations', 'ability' => 'write', 'description' => 'attach an additional destination on another server (data: destination_uuid)'],
-            'remove_server' => ['method' => 'DELETE', 'path' => 'applications/{uuid}/destinations/{destination_uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'detach an additional destination'],
+            'remove_server' => ['method' => 'DELETE', 'path' => 'applications/{uuid}/destinations/{destination_uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'detach an additional destination'],
         ];
     }
 

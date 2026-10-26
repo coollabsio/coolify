@@ -38,7 +38,7 @@
                     <x-reicon name="variables" class="size-3.5" />
                     Shared variables
                 </a>
-                @can('createAnyResource')
+                @can('createAnyResource', [$environment])
                     <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                         {{ wireNavigate() }}
                         class="button whitespace-nowrap button-highlighted">
@@ -50,7 +50,7 @@
         </header>
 
         @if ($environment->isEmpty())
-            @can('createAnyResource')
+            @can('createAnyResource', [$environment])
                 <x-empty title="No resources yet"
                     description="Add an application, database, or service to this environment."
                     icon-name="layers">

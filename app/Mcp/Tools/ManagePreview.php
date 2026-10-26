@@ -18,7 +18,7 @@ class ManagePreview extends RestActionTool
         return [
             'create' => ['method' => 'POST', 'path' => 'applications/{uuid}/previews', 'ability' => 'deploy', 'description' => 'open or redeploy a preview (data: pull_request_id, pull_request_html_url, git_type, commit, docker_tag, force, instant_deploy)'],
             'update' => ['method' => 'PATCH', 'path' => 'applications/{uuid}/previews/{pull_request_id}', 'ability' => 'write', 'description' => 'replace preview domains (data: domains, or docker_compose_domains for compose apps, force_domain_override)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}/previews/{pull_request_id}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete the preview and its containers'],
+            'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}/previews/{pull_request_id}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete the preview and its containers'],
         ];
     }
 
