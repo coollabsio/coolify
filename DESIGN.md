@@ -1171,6 +1171,30 @@ history filter in
 Do not represent the empty state as a selectable `All` option. The footer reset
 action is the single way to return the multi-select to its unfiltered state.
 
+#### Inherited listbox option
+
+A setting that inherits through levels (for example instance → team → server
+→ app for image scan rules) uses `x-forms.inherited-listbox`. It wraps
+`x-forms.listbox` and prepends one option with the value `''`:
+
+```blade
+<x-forms.inherited-listbox id="alertLevel" label="Alert on"
+    inheritLabel="Use team default (High or critical with a fix)" :options="$options" />
+```
+
+- the label is `Use {level} default ({value})`: `{level}` is the level the
+  inherited value comes from (`Coolify` for the instance level, then `team`,
+  `server`), and `{value}` is that value's option label;
+- choosing it stores `null`, so the field follows later changes of the level
+  above. Do not copy the inherited value into the row;
+- the top level has concrete values and no inherit option (pass no
+  `inheritLabel`), and the server rejects an empty value for it;
+- it saves instantly (`onChange`), like the other instant-save listboxes;
+- a related choice that is not inheritance, such as "Detect automatically",
+  uses a plain listbox with its own first option instead.
+
+The reference is `resources/views/livewire/image-scan/scan-settings.blade.php`.
+
 ### Standard table controls
 
 Dense tables use the shared `x-table.*` components so search, filters, sorting,

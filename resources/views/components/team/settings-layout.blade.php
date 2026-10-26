@@ -18,6 +18,12 @@
             'active' => request()->routeIs('team.audit-log'),
             'icon' => 'time-back',
         ] : null,
+        instanceSettings()->is_image_scanning_allowed ? [
+            'label' => 'Image Scanning',
+            'route' => 'team.image-scanning',
+            'active' => request()->routeIs('team.image-scanning'),
+            'icon' => 'shield-alert',
+        ] : null,
         isInstanceAdmin() ? [
             'label' => 'Admin View',
             'route' => 'team.admin-view',

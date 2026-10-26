@@ -30,13 +30,6 @@ class ImageScanPolicyResolver
         $isApplication = $resource instanceof Application;
         $scanServer = $server ?? self::mainServer($resource);
 
-        $values = [
-            'alert_level' => ImageScanAlertLevel::Critical,
-            'gate_enabled' => false,
-            'on_scan_error' => ImageScanOnError::Deploy,
-        ];
-        $sources = array_fill_keys(self::FIELDS, 'instance');
-
         $levels = [['instance', self::instanceRow()]];
         $team = method_exists($resource, 'team') ? $resource->team() : null;
         if ($team instanceof Model) {
@@ -49,19 +42,9 @@ class ImageScanPolicyResolver
             $levels[] = ['app', self::scopeRow($resource)];
         }
 
-        foreach ($levels as [$source, $row]) {
-            if (! $row instanceof ImageScanPolicy) {
-                continue;
-            }
-            foreach (self::FIELDS as $field) {
-                $value = $row->{$field};
-                if ($value === null) {
-                    continue;
-                }
-                $values[$field] = $value;
-                $sources[$field] = $source;
-            }
-        }
+        $resolved = self::resolveLevels($levels);
+        $values = array_map(fn (array $field) => $field['value'], $resolved);
+        $sources = array_map(fn (array $field) => $field['source'], $resolved);
 
         $gateEnabled = $isApplication && $values['gate_enabled'] === true;
 
@@ -88,6 +71,59 @@ class ImageScanPolicyResolver
             'scope_type' => $scope->getMorphClass(),
             'scope_id' => $scope->getKey(),
         ]);
+    }
+
+    /**
+     * The values a level inherits from the levels above it, each with the level it comes from.
+     *
+     * @param  Model  $scope  Team, Server or Application.
+     * @return array{alert_level: array{value: ImageScanAlertLevel, source: string}, gate_enabled: array{value: bool, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
+     */
+    public static function inheritedFor(Model $scope): array
+    {
+        $levels = [['instance', self::instanceRow()]];
+        $team = match (true) {
+            $scope instanceof Server => $scope->team,
+            method_exists($scope, 'team') => $scope->team(),
+            default => null,
+        };
+        if ($team instanceof Model) {
+            $levels[] = ['team', self::scopeRow($team)];
+        }
+        if ($scope instanceof Application) {
+            $server = self::mainServer($scope);
+            if ($server instanceof Server) {
+                $levels[] = ['server', self::scopeRow($server)];
+            }
+        }
+
+        return self::resolveLevels($levels);
+    }
+
+    /**
+     * @param  list<array{0: string, 1: ?ImageScanPolicy}>  $levels  From the top level down.
+     * @return array{alert_level: array{value: ImageScanAlertLevel, source: string}, gate_enabled: array{value: bool, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
+     */
+    private static function resolveLevels(array $levels): array
+    {
+        $resolved = [
+            'alert_level' => ['value' => ImageScanAlertLevel::Critical, 'source' => 'instance'],
+            'gate_enabled' => ['value' => false, 'source' => 'instance'],
+            'on_scan_error' => ['value' => ImageScanOnError::Deploy, 'source' => 'instance'],
+        ];
+
+        foreach ($levels as [$source, $row]) {
+            if (! $row instanceof ImageScanPolicy) {
+                continue;
+            }
+            foreach (self::FIELDS as $field) {
+                if ($row->{$field} !== null) {
+                    $resolved[$field] = ['value' => $row->{$field}, 'source' => $source];
+                }
+            }
+        }
+
+        return $resolved;
     }
 
     private static function instanceRow(): ?ImageScanPolicy

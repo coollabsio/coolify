@@ -813,6 +813,13 @@ class GlobalSearch extends Component
                 'link' => route('team.audit-log'),
                 'search_text' => 'team audit log activity history events',
             ] : null,
+            instanceSettings()->is_image_scanning_allowed ? [
+                'name' => 'Team Image Scanning',
+                'type' => 'navigation',
+                'description' => 'Scan rules and ignored vulnerabilities of the team',
+                'link' => route('team.image-scanning'),
+                'search_text' => 'team image scanning vulnerabilities cve scan rules alert block deploys ignored security',
+            ] : null,
             isInstanceAdmin() ? [
                 'name' => 'Team Admin View',
                 'type' => 'navigation',
@@ -922,6 +929,13 @@ class GlobalSearch extends Component
                     'description' => 'Configure Coolify auto updates',
                     'link' => route('settings.updates'),
                     'search_text' => 'settings updates auto update upgrade version frequency',
+                ],
+                [
+                    'name' => 'Image Scanning Settings',
+                    'type' => 'navigation',
+                    'description' => 'Allow image scanning, the vulnerability database, and default scan rules',
+                    'link' => route('settings.image-scanning'),
+                    'search_text' => 'settings image scanning vulnerabilities cve scan rules grype database mirror alert block deploys security',
                 ],
                 [
                     'name' => 'Instance Backup',

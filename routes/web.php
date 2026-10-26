@@ -34,7 +34,9 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\ImageScan\InstanceImageScanning;
 use App\Livewire\ImageScan\ServerImageScanning;
+use App\Livewire\ImageScan\TeamImageScanning;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
@@ -270,6 +272,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', SettingsIndex::class)->name('settings.index');
         Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
         Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+        Route::get('/settings/image-scanning', InstanceImageScanning::class)->name('settings.image-scanning');
 
         Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
         Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
@@ -325,6 +328,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index')->middleware('access.team-wide');
         Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
         Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log')->middleware('access.team-wide');
+        Route::get('/image-scanning', TeamImageScanning::class)->name('team.image-scanning')->middleware('access.team-wide');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view')->middleware('access.team-wide');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone')->middleware('access.team-wide');
     });

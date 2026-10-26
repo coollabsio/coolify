@@ -95,6 +95,11 @@
                     </div>
                 @endif
             </x-application.settings-section>
+
+            @if ($allowed)
+                <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid"
+                    :key="'server-image-scan-settings-'.$server->uuid" />
+            @endif
         </div>
     </div>
 </div>
