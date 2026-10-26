@@ -79,7 +79,7 @@ it('starts the proxy without entering proxy directories as the SSH user', functi
     $lines = nonRootProxyScriptLines();
     expectNoUnprivilegedProxyFileAccess($lines);
     expect($lines)
-        ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml pull")
+        ->toContain("sudo DOCKER_CONTEXT=default DOCKER_CONFIG=\"\$(sudo find \"\$HOME/.docker/config.json\" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)\" docker compose -f {$proxyPath}/docker-compose.yml pull")
         ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml up -d --wait --remove-orphans")
         // The backfill reads a stored configuration in an `else` branch, which must run through sudo too.
         ->and(implode("\n", $lines))->toMatch("/^sudo\\s+head -c \\d+ '\\S+\\/docker-compose\\.yml'$/m");
@@ -123,7 +123,7 @@ it('builds restart commands without entering proxy directories as the SSH user',
 
     expectNoUnprivilegedProxyFileAccess($lines);
     expect($lines)
-        ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml pull")
+        ->toContain("sudo DOCKER_CONTEXT=default DOCKER_CONFIG=\"\$(sudo find \"\$HOME/.docker/config.json\" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)\" docker compose -f {$proxyPath}/docker-compose.yml pull")
         ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml up -d --wait --remove-orphans");
 })->with([
     'traefik' => [ProxyTypes::TRAEFIK->value, '/data/coolify/proxy'],

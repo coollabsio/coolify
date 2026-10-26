@@ -709,7 +709,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry("Pulling image ({$this->production_image_name}) that the main server pushed. Build step skipped.");
         $this->execute_remote_command(
             [
-                "docker pull {$image}",
+                serverDockerConfigPrefix($this->server)."docker pull {$image}",
                 'hidden' => true,
             ],
             [
@@ -1032,7 +1032,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->write_deployment_configurations();
             $this->server = $this->mainServer;
             $workdir = $this->application->workdir();
-            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
+            $command = serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
         } else {
             $workdir = $this->workdir;
             $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}");
@@ -1705,7 +1705,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
             $this->application_deployment_queue->addLogEntry("Image ({$this->production_image_name}) not found on the server. Pulling it from the Docker registry.");
             $this->execute_remote_command([
-                'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
+                serverDockerConfigPrefix($this->server).'docker pull '.escapeshellarg($this->production_image_name).' 2>/dev/null',
                 'ignore_errors' => true,
                 'hidden' => true,
             ]);
@@ -3124,7 +3124,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             : "-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx";
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
-                throw new DeploymentException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
+                throw new DeploymentException("Docker config file (~/.docker/config.json) of the SSH user ({$this->server->user}) not found on the build server ({$this->server->name}). Log in to your registry under Server → Docker Registries on the build server. On a non-root server, a login made with \"sudo docker login\" is saved for root and is not used for builds.");
             }
             $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
@@ -5256,7 +5256,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->use_build_server) {
                     $this->execute_remote_command(
-                        ["{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --pull always --build -d", 'hidden' => true],
+                        [serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --pull always --build -d", 'hidden' => true],
                     );
                 } else {
                     $this->execute_remote_command(

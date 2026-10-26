@@ -121,7 +121,7 @@ class StartClickhouse
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        $this->commands[] = serverDockerConfigPrefix($this->database->destination->server)."docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
