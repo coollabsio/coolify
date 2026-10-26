@@ -272,6 +272,7 @@ class Server extends BaseModel
             $server->settings()->delete();
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
+            ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->delete();
         });
 
         static::deleted(function (Server $server) {

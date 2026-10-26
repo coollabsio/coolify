@@ -106,6 +106,48 @@ class ScanImage
         }
     }
 
+    /**
+     * Rescans one local image for every resource that runs it on the server (spec 4.5): one SBOM and one Grype run,
+     * then the row of each resource, with its own summary. Never throws for scan problems; a failure is recorded per
+     * resource like in handle(), and completed rows keep their results.
+     *
+     * @param  list<array{0: Model, 1: string}>  $targets  Each resource with the image ref of its container.
+     * @return list<ImageScan>
+     */
+    public function rescan(Server $server, string $imageId, array $targets, int $lockWaitSeconds = 0): array
+    {
+        $this->runId = Str::lower(Str::random(24));
+        $this->startedAt = CarbonImmutable::now();
+        $context = ['server' => (string) $server->name];
+
+        if ($server->isTransferredAway()) {
+            return [];
+        }
+
+        $targets = array_values(array_filter(
+            array_map(fn (array $target): array => [...$target, ImageScanPolicyResolver::for($target[0], $server)], $targets),
+            fn (array $target): bool => $target[2]->scanEnabled,
+        ));
+        if ($targets === []) {
+            return [];
+        }
+
+        if (preg_match('/\Asha256:[a-f0-9]{64}\z/', $imageId) !== 1) {
+            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], null, ImageScanErrorCode::Unknown, $context), $targets);
+        }
+
+        $lock = Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
+        if (! $this->acquire($lock, $lockWaitSeconds)) {
+            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], $imageId, ImageScanErrorCode::LockBusy, $context), $targets);
+        }
+
+        try {
+            return $this->scanShared($server, $imageId, $targets, $context);
+        } finally {
+            $lock->release();
+        }
+    }
+
     public static function progressCacheKey(Model $resource): string
     {
         return "image-scan:progress:{$resource->getMorphClass()}:{$resource->getKey()}";
@@ -131,9 +173,9 @@ class ScanImage
             $this->progress($resource, 'inspect');
             $image = $this->inspect($commands, $imageRef);
             $this->progress($resource, 'sbom');
-            [$sbom, $grype] = $this->sbomAndReport($commands, $resource, $imageRef, $image);
+            [$sbom, $grype] = $this->sbomAndReport($commands, [$resource], $imageRef, $image);
 
-            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $grype, $image, $databaseBuiltAt, $isBaseline);
+            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($sbom, $grype), $image, $databaseBuiltAt, $isBaseline);
         } catch (ScanFailed $e) {
             $errorContext = [...$context, ...$e->context];
 
@@ -146,6 +188,58 @@ class ScanImage
             throw $e;
         } finally {
             Cache::forget(self::progressCacheKey($resource));
+            instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
+        }
+    }
+
+    /**
+     * @param  list<array{0: Model, 1: string, 2: ResolvedImageScanPolicy}>  $targets
+     * @param  array{server: string}  $context
+     * @return list<ImageScan>
+     */
+    private function scanShared(Server $server, string $imageId, array $targets, array $context): array
+    {
+        $commands = new ScannerCommands($server, $this->runId);
+        $resources = array_map(fn (array $target): Model => $target[0], $targets);
+        $isBaseline = array_map(fn (Model $resource): bool => ! $this->resourceScans($resource)->where('status', ImageScanStatus::Completed)->exists(), $resources);
+        $image = null;
+
+        try {
+            $this->progressAll($resources, 'database');
+            $databaseBuiltAt = $this->databaseBuiltAt($commands);
+            $this->progressAll($resources, 'inspect');
+            // By ID, not by a tag that can point to another image by now.
+            $image = $this->inspect($commands, $imageId);
+            if ($image['id'] !== $imageId) {
+                $image = null;
+
+                throw new ScanFailed(ImageScanErrorCode::ImageMissing);
+            }
+            $this->progressAll($resources, 'sbom');
+            [$sbom, $grype] = $this->sbomAndReport($commands, $resources, $imageId, $image);
+            $report = $this->report($sbom, $grype);
+
+            return array_map(
+                fn (array $target, int $index) => $this->complete($server, $target[0], $target[1], null, $target[2], $sbom, $report, $image, $databaseBuiltAt, $isBaseline[$index]),
+                $targets,
+                array_keys($targets),
+            );
+        } catch (ScanFailed $e) {
+            $errorContext = [...$context, ...$e->context];
+
+            return array_map(fn (array $target) => $image === null
+                ? $this->failBeforeRow($server, $target[0], $target[1], null, $e->errorCode, $errorContext)
+                : $this->failAfterInspect($server, $target[0], $target[1], null, $image, $e->errorCode, $errorContext), $targets);
+        } catch (Throwable $e) {
+            foreach ($resources as $resource) {
+                $this->rememberError($resource, ImageScanErrorCode::Unknown, $context);
+            }
+
+            throw $e;
+        } finally {
+            foreach ($resources as $resource) {
+                Cache::forget(self::progressCacheKey($resource));
+            }
             instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         }
     }
@@ -181,6 +275,16 @@ class ScanImage
             'started_at' => $this->startedAt->toIso8601String(),
         ], self::LOCK_TTL);
         $this->broadcast($resource, $this->runId);
+    }
+
+    /**
+     * @param  list<Model>  $resources
+     */
+    private function progressAll(array $resources, string $stage): void
+    {
+        foreach ($resources as $resource) {
+            $this->progress($resource, $stage);
+        }
     }
 
     /**
@@ -281,15 +385,16 @@ class ScanImage
      * Reuses the SBOM of the image on this server. When its file is gone, Grype cannot mount it: the file is
      * created once more and the row is updated in place (scans of other resources keep their link).
      *
+     * @param  list<Model>  $resources
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
      * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}}
      */
-    private function sbomAndReport(ScannerCommands $commands, Model $resource, string $imageRef, array $image): array
+    private function sbomAndReport(ScannerCommands $commands, array $resources, string $imageRef, array $image): array
     {
         $sbom = ImageSbom::query()->where('server_id', $commands->server->id)->where('image_id', $image['id'])->first();
 
         if ($sbom !== null) {
-            $this->progress($resource, 'vulnerabilities');
+            $this->progressAll($resources, 'vulnerabilities');
             $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
@@ -299,11 +404,11 @@ class ScanImage
                 return [$sbom, $grype];
             }
 
-            $this->progress($resource, 'sbom');
+            $this->progressAll($resources, 'sbom');
         }
 
         $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
-        $this->progress($resource, 'vulnerabilities');
+        $this->progressAll($resources, 'vulnerabilities');
         $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
         $this->assertSucceeded($grype['code']);
 
@@ -348,15 +453,28 @@ class ScanImage
     }
 
     /**
+     * Findings of the Grype output, with their layer, sorted by risk.
+     *
      * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}  $grype
-     * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
+     * @return array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}
      */
-    private function complete(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, ImageSbom $sbom, array $grype, array $image, CarbonImmutable $databaseBuiltAt, bool $isBaseline): ImageScan
+    private function report(ImageSbom $sbom, array $grype): array
     {
         [$payload, $cut] = $this->readPayload($grype);
         $report = (new GrypeReportParser)->parse($payload);
         $findings = $this->withLayers($report['findings'], $sbom);
         usort($findings, fn (Finding $a, Finding $b) => ($b->risk ?? 0.0) <=> ($a->risk ?? 0.0));
+
+        return ['findings' => $findings, 'eol' => $report['eol'], 'truncated' => $report['truncated'] || $cut];
+    }
+
+    /**
+     * @param  array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}  $report
+     * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
+     */
+    private function complete(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment, ResolvedImageScanPolicy $policy, ImageSbom $sbom, array $report, array $image, CarbonImmutable $databaseBuiltAt, bool $isBaseline): ImageScan
+    {
+        $findings = $report['findings'];
 
         $buildsImage = $this->buildsImage($resource, $imageRef);
         $classifierScan = $this->resourceScans($resource)->where('image_id', $image['id'])->first() ?? new ImageScan;
@@ -368,7 +486,7 @@ class ScanImage
             IgnoreMatcher::forResource($resource),
             $policy->alertLevel,
             $report['eol'],
-            $report['truncated'] || $cut,
+            $report['truncated'],
         );
 
         $scan = $this->upsert($resource, $image['id'], [

@@ -310,6 +310,48 @@ class ScannerCommands
     }
 
     /**
+     * Prints `coolify-scan-exit containers {code}`, then one JSON line per running container as payload:
+     * `{"id": image ID, "ref": image ref, "labels": {…}}`.
+     *
+     * @return list<string>
+     */
+    public function runningContainers(): array
+    {
+        $format = escapeshellarg('{"id":{{json .Image}},"ref":{{json .Config.Image}},"labels":{{json .Config.Labels}}}');
+
+        return [
+            $this->removeContainer(),
+            $this->shell('ids=$(docker ps -q --no-trunc 2>/dev/null); rc=$?; echo "'.self::MARKER.' containers $rc"; echo '.self::PAYLOAD_SEPARATOR.'; if [ -n "$ids" ]; then docker inspect --format '.$format.' $ids 2>/dev/null | head -c '.(self::OUTPUT_LIMIT + 1).'; fi'),
+        ];
+    }
+
+    /**
+     * Removes the SBOM files of the given image IDs (`sha256:{hex}`) and prints `coolify-scan-exit sbom-delete {code}`.
+     *
+     * @param  list<string>  $imageIds
+     * @return list<string>
+     */
+    public function deleteSboms(array $imageIds): array
+    {
+        if ($imageIds === []) {
+            throw new InvalidArgumentException('No SBOM to delete.');
+        }
+
+        $paths = array_map(function (string $imageId): string {
+            if (preg_match('/\Asha256:([a-f0-9]{64})\z/', $imageId, $id) !== 1) {
+                throw new InvalidArgumentException('Invalid image ID.');
+            }
+
+            return escapeshellarg($this->sbomPath($id[1]));
+        }, $imageIds);
+
+        return [
+            $this->removeContainer(),
+            $this->shell('rm -f '.implode(' ', $paths).'; echo "'.self::MARKER.' sbom-delete $?"'),
+        ];
+    }
+
+    /**
      * Splits batch output into the marker lines before `coolify-scan-payload` and the payload after it.
      *
      * @return array{exit_codes: array<string, int>, sizes: array<string, int>, payload: string}

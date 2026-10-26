@@ -47,6 +47,8 @@ function scannerCommandLists(ScannerCommands $commands): array
         'digest with platform and auth' => $commands->digest('ghcr.io/a/b:1', 'linux/amd64', $auth),
         'cleanup' => $commands->cleanup(),
         'deleteScannerData' => $commands->deleteScannerData(),
+        'runningContainers' => $commands->runningContainers(),
+        'deleteSboms' => $commands->deleteSboms(['sha256:'.SCANNER_TEST_HEX]),
     ];
 }
 
@@ -392,3 +394,32 @@ it('runs the disk usage check as one sudo shell script per line for a non-root S
             ->and(substr_count($line, 'sudo'))->toBe(1);
     }
 });
+
+it('lists the image ID, the image ref, and the labels of every running container as JSON lines', function () {
+    $commands = $this->commands->runningContainers();
+    $script = scannerUnwrapped($commands)[1];
+
+    expect($commands)->toHaveCount(2)
+        ->and($script)->toContain('docker ps -q --no-trunc')
+        ->toContain('coolify-scan-exit containers')
+        ->toContain('echo coolify-scan-payload')
+        ->toContain('{"id":{{json .Image}},"ref":{{json .Config.Image}},"labels":{{json .Config.Labels}}}')
+        ->toContain('head -c '.(ScannerCommands::OUTPUT_LIMIT + 1));
+});
+
+it('deletes SBOM files by image ID in one command', function () {
+    $other = str_repeat('1', 64);
+    $commands = $this->commands->deleteSboms(['sha256:'.SCANNER_TEST_HEX, 'sha256:'.$other]);
+    $script = scannerUnwrapped($commands)[1];
+
+    expect($commands)->toHaveCount(2)
+        ->and($script)->toBe("rm -f '/data/coolify/image-scans/sboms/".SCANNER_TEST_HEX.".json' '/data/coolify/image-scans/sboms/{$other}.json'; echo \"coolify-scan-exit sbom-delete \$?\"");
+});
+
+it('refuses to delete an SBOM by an invalid image ID', function (string $imageId) {
+    $this->commands->deleteSboms([$imageId]);
+})->with([
+    'path' => ['sha256:../../etc/passwd'],
+    'short' => ['sha256:abc'],
+    'no prefix' => [SCANNER_TEST_HEX],
+])->throws(InvalidArgumentException::class);
