@@ -992,6 +992,11 @@ class General extends Component
 
     public function getDetectedPortInfoProperty(): ?array
     {
+        // With readonly labels disabled, Ports Exposes is read-only and custom labels control proxy routing.
+        if (! $this->application->settings->is_container_label_readonly_enabled) {
+            return null;
+        }
+
         $detectedPort = $this->application->detectPortFromEnvironment();
 
         if (! $detectedPort) {
