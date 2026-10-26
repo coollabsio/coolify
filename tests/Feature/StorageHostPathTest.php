@@ -436,7 +436,7 @@ test('changing the content of a mount outside the resource directory needs deplo
     $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin, ['read', 'write'])])
         ->patchJson($url, ['type' => 'file', 'uuid' => $storage->uuid, 'content' => 'ssh-ed25519 AAAA'])
         ->assertForbidden()
-        ->assertJsonPath('message', 'Missing required permissions: deploy. A mount outside the resource directory needs a token with the deploy permission.');
+        ->assertJsonPath('message', 'Missing required permissions: deploy. Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
     expect($storage->fresh()->content)->toBe('listen 8080;');
 
     $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin, ['read', 'write'])])
