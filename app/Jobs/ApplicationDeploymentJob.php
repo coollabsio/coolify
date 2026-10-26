@@ -5270,8 +5270,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return '';
         }
 
-        $secrets_hash = $this->generate_secrets_hash($variables);
-
         // Get database env vars to check for multiline flag
         $env_vars = $this->pull_request_id === 0
             ? $this->application->environment_variables()->where('is_buildtime', true)->get()
@@ -5289,10 +5287,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ];
         });
 
-        $env_flags = generateDockerEnvFlags($vars_array);
-        $env_flags .= ' -e '.escapeshellarg("COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
-
-        return $env_flags;
+        return generateDockerEnvFlags($vars_array);
     }
 
     private function generate_build_secrets(Collection $variables)
@@ -5311,7 +5306,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             })
             ->implode(' ');
 
-        $this->build_secrets .= ' --secret id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
+        // Docker ignores secret values for the build cache, so the hash goes in as a build arg
+        $this->build_secrets .= ' --build-arg '.escapeshellarg('COOLIFY_BUILD_SECRETS_HASH='.$this->generate_secrets_hash($variables));
     }
 
     private function generate_secrets_hash($variables)
@@ -5344,18 +5340,66 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return hash_hmac('sha256', $secrets_string, $this->secrets_hash_key);
     }
 
+    /**
+     * Returns the last line of each FROM instruction, so stage ARGs can go directly after it.
+     */
     protected function findFromInstructionLines($dockerfile): array
     {
-        $fromLines = [];
+        return collect($this->dockerfileInstructions($dockerfile))
+            ->where('keyword', 'FROM')
+            ->pluck('end')
+            ->all();
+    }
+
+    /**
+     * Splits a Dockerfile into instructions with their first and last line. Comments, continuation
+     * lines, and heredoc bodies are part of an instruction, so text such as "from app import x"
+     * in a heredoc is not read as an instruction.
+     *
+     * @return list<array{keyword: string, start: int, end: int}>
+     */
+    protected function dockerfileInstructions(iterable $dockerfile): array
+    {
+        $escape = '\\';
+        $instructions = [];
+        $continues = false;
+        $heredocTerminators = [];
+
         foreach ($dockerfile as $index => $line) {
-            $trimmedLine = trim($line);
-            // Check if line starts with FROM (case-insensitive)
-            if (preg_match('/^FROM\s+/i', $trimmedLine)) {
-                $fromLines[] = $index;
+            $trimmed = trim($line);
+
+            if ($heredocTerminators !== []) {
+                $instructions[array_key_last($instructions)]['end'] = $index;
+                if ($trimmed === $heredocTerminators[0]) {
+                    array_shift($heredocTerminators);
+                }
+
+                continue;
+            }
+
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                if ($instructions === [] && preg_match('/^#\s*escape\s*=\s*([\\\\`])\s*$/i', $trimmed, $matches) === 1) {
+                    $escape = $matches[1];
+                }
+
+                continue;
+            }
+
+            if ($continues) {
+                $instructions[array_key_last($instructions)]['end'] = $index;
+            } else {
+                $instructions[] = ['keyword' => strtoupper(strtok($trimmed, " \t")), 'start' => $index, 'end' => $index];
+            }
+            $continues = str_ends_with($trimmed, $escape);
+
+            $keyword = $instructions[array_key_last($instructions)]['keyword'];
+            if (in_array($keyword, ['RUN', 'COPY', 'ADD'], true)
+                && preg_match_all('/(?<!<)<<-?(["\']?)([A-Za-z_][A-Za-z0-9_]*)\1/', $line, $matches) > 0) {
+                $heredocTerminators = $matches[2];
             }
         }
 
-        return $fromLines;
+        return $instructions;
     }
 
     private function add_build_env_variables_to_dockerfile()
@@ -5516,23 +5560,27 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return "--mount=type=secret,id={$key},env={$key}";
         })->implode(' ');
 
-        // Add mount for the secrets hash to ensure cache invalidation
-        $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
+        $instructions = collect($this->dockerfileInstructions($dockerfile));
+        $runLines = $instructions->where('keyword', 'RUN')->pluck('start')->all();
+        $fromEndLines = $instructions->where('keyword', 'FROM')->pluck('end')->all();
 
         $modified = false;
-        $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
-            $trimmed = ltrim($line);
-
-            // Skip lines that already have secret mounts or are not RUN commands
-            if (str_contains($line, '--mount=type=secret') || ! str_starts_with($trimmed, 'RUN')) {
-                return $line;
+        $dockerfile = $dockerfile->flatMap(function ($line, $index) use ($mountStrings, $runLines, $fromEndLines, &$modified) {
+            // Add mount strings to RUN commands that do not have secret mounts yet
+            if (in_array($index, $runLines, true) && ! str_contains($line, '--mount=type=secret')) {
+                $originalCommand = trim(substr(ltrim($line), 3));
+                $line = "RUN {$mountStrings} {$originalCommand}";
+                $modified = true;
             }
 
-            // Add mount strings to RUN command
-            $originalCommand = trim(substr($trimmed, 3));
-            $modified = true;
+            // A RUN step reads every ARG of its stage, so a changed hash rebuilds it
+            if (in_array($index, $fromEndLines, true)) {
+                $modified = true;
 
-            return "RUN {$mountStrings} {$originalCommand}";
+                return [$line, 'ARG COOLIFY_BUILD_SECRETS_HASH'];
+            }
+
+            return [$line];
         });
 
         if ($modified) {
@@ -5617,12 +5665,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             $dockerfile_lines = collect(str($dockerfileContent)->trim()->explode("\n"));
 
-            $fromIndices = [];
-            $dockerfile_lines->each(function ($line, $index) use (&$fromIndices) {
-                if (str($line)->trim()->startsWith('FROM')) {
-                    $fromIndices[] = $index;
-                }
-            });
+            $fromIndices = $this->findFromInstructionLines($dockerfile_lines);
 
             if (empty($fromIndices)) {
                 $this->application_deployment_queue->addLogEntry("No FROM instruction found in Dockerfile for service {$serviceName}, skipping.");
@@ -5795,6 +5838,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'environment' => $key,
             ];
         }
+        $secretsHash = $this->generate_secrets_hash($variables);
 
         $services = data_get($composeFile, 'services', []);
         foreach ($services as $serviceName => &$service) {
@@ -5812,6 +5856,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $service['build']['secrets'][] = $key;
                     }
                 }
+
+                // Docker ignores secret values for the build cache, so the hash goes in as a build arg
+                $args = $service['build']['args'] ?? [];
+                if ($args instanceof Collection) {
+                    $args = $args->toArray();
+                }
+                if ($args !== [] && array_is_list($args)) {
+                    $args[] = "COOLIFY_BUILD_SECRETS_HASH={$secretsHash}";
+                } else {
+                    $args['COOLIFY_BUILD_SECRETS_HASH'] = $secretsHash;
+                }
+                $service['build']['args'] = $args;
             }
         }
 
