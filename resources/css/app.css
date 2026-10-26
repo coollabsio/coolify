@@ -3703,6 +3703,73 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(10rem, 1.2fr) minmax(12rem, 2fr) 6.5rem 9rem 5rem;
 }
 
+.image-scan-packages-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 8rem;
+}
+
+.image-scan-packages-grid.has-image {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 8rem;
+    min-width: 52rem;
+}
+
+.image-scan-findings-grid {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+}
+
+.image-scan-findings-grid.has-image {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+    min-width: 52rem;
+}
+
+.image-scan-findings-grid.is-nested {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+    padding-left: 2.75rem;
+}
+
+.image-scan-sbom-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) 6rem minmax(8rem, 1fr);
+}
+
+.image-scan-sbom-grid.has-image {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) 6rem minmax(8rem, 1fr) minmax(8rem, 1fr);
+    min-width: 46rem;
+}
+
+@media (max-width: 600px) {
+    .image-scan-packages-grid,
+    .image-scan-packages-grid.has-image,
+    .image-scan-findings-grid,
+    .image-scan-findings-grid.has-image,
+    .image-scan-findings-grid.is-nested {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 0.375rem;
+        min-width: 0;
+    }
+
+    .image-scan-severity-cell {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .data-table-header > .image-scan-severity-cell {
+        display: none;
+    }
+
+    .image-scan-findings-grid.is-nested {
+        padding-left: 1rem;
+    }
+
+    .image-scan-sbom-grid,
+    .image-scan-sbom-grid.has-image {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+        min-width: 0;
+    }
+
+    .image-scan-secondary {
+        display: none;
+    }
+}
+
 .fleet-servers-table-grid {
     grid-template-columns: minmax(9rem, 1.4fr) 8rem 8rem 8rem 5rem 8rem 5.5rem;
 }

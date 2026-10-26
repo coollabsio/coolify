@@ -7,6 +7,8 @@
         'service_uuid' => $service->uuid,
     ];
 
+    $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
+
     $configurationItems = collect([
         ['label' => 'General', 'route' => 'project.service.configuration', 'icon' => 'settings'],
         ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
@@ -21,6 +23,8 @@
         ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'webhook'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
+        ['label' => 'Vulnerabilities', 'route' => 'project.service.vulnerabilities', 'icon' => 'shield-alert', 'visible' => $imageScanningAllowed,
+            'count' => $imageScanningAllowed ? \App\Services\ImageScan\ResourceScans::fixableNowCount($service) : null, 'countLabel' => 'fixable now'],
         ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
@@ -37,7 +41,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics', 'Vulnerabilities'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
         'Operations' => ['Resource Operations', 'Tags'],
         'Danger Zone' => ['Danger Zone'],
@@ -68,6 +72,7 @@
                     @if ($menuItem['label'] === 'Files')
                         <x-beta-badge class="ml-auto shrink-0" />
                     @endif
+                    <x-menu-count :count="$menuItem['count'] ?? null" :label="$menuItem['countLabel'] ?? ''" />
                     @if ($menuItem['hasWarning'] ?? false)
                         <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                     @endif

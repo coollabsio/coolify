@@ -50,6 +50,11 @@
                     <livewire:project.shared.resource-operations :resource="$database" />
                 @elseif ($currentRoute === 'project.database.metrics')
                     <livewire:project.shared.metrics :resource="$database" />
+                @elseif ($currentRoute === 'project.database.vulnerabilities')
+                    <div class="flex flex-col gap-6">
+                        <livewire:image-scan.vulnerabilities resource-type="database" :resource-uuid="$database->uuid" />
+                        <livewire:image-scan.packages resource-type="database" :resource-uuid="$database->uuid" />
+                    </div>
                 @elseif ($currentRoute === 'project.database.tags')
                     <livewire:project.shared.tags :resource="$database" />
                 @elseif ($currentRoute === 'project.database.danger')

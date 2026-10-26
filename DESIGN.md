@@ -926,6 +926,13 @@ The shared workspace grid is:
 
 Instance Settings uses `x-settings.layout` with the same full-width workspace.
 
+A sidebar item can show a count pill at its end: set `'count' => int|null` and
+`'countLabel'` on the item, and the sidebar renders `<x-menu-count>`. The pill is
+neutral, renders nothing for null or 0, and puts `{count} {countLabel}` in a
+tooltip and in screen reader text. The Vulnerabilities item uses it for the
+fixable-now count. Status that needs live updates keeps its own component
+(the application Servers item uses the `badge` server status badge).
+
 **Page titles (global):** `x-dashboard.navbar` H1s (`titleOnDesktop="false"`,
 the default) hide at **lg+** only when the page renders a fixed tab strip or
 actions; otherwise they stay visible. Collection indexes (Servers, Projects, …)
@@ -1213,6 +1220,30 @@ Tables continue to own their filter options, sort choices, headers, rows,
 queries, permissions, and empty states. Backend-filtered or paginated tables
 must use `x-table.loading`; frontend-only Alpine tables reuse the same toolbar
 and control anatomy but do not show an artificial loading state.
+
+### Fix-state switch
+
+The Vulnerabilities page splits findings by what the user can do about them:
+"Fixable now", "Fix not released yet", and "No fix". This is a view switch, not
+a filter, so it is not in the `x-table.filter` menu and "Reset filters" keeps its
+meaning:
+
+- a segmented control in the table toolbar, after the search: a 4px-padded
+  neutral track (`bg-neutral-100`, dark `white/4%`) with 28px, 6px-radius
+  buttons; the current one is the raised white pill (dark `white/9%`) with a
+  hairline ring;
+- `role="group"` with an `aria-label`, and `aria-pressed` on each button;
+- each label has its count in parentheses: `Fixable now (5)`. The counts follow
+  the search and the filters, so a switch never hides results without saying how
+  many;
+- "Fixable now" is the default. When it is empty, the empty state says "Nothing
+  to fix now." and links to the other two states with their counts;
+- the same segmented anatomy is used for the "By package / By CVE" grouping
+  toggle on the right of the toolbar;
+- ignored findings are not a fourth state. The table footer has an "{n} ignored"
+  link that opens the ignored list.
+
+The reference is `resources/views/livewire/image-scan/vulnerabilities.blade.php`.
 
 ### Buttons
 

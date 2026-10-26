@@ -1,0 +1,313 @@
+<?php
+
+namespace App\Services\ImageScan;
+
+use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\ImageScanStatus;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ImageScan;
+use App\Models\Service;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use InvalidArgumentException;
+
+/**
+ * The current scan results of a resource page: what the Vulnerabilities page, the sidebar count, and the SBOM
+ * download read. A service shows the results of its applications and databases.
+ */
+final class ResourceScans
+{
+    private const ADVISORY_ID_PATTERN = '/\A[A-Za-z0-9][A-Za-z0-9._:-]{0,63}\z/';
+
+    public const RESOURCE_TYPES = ['application', 'service', 'database'];
+
+    /**
+     * Finds a resource page's resource by type and uuid, only in the given teams.
+     *
+     * @param  list<int>  $teamIds
+     */
+    public static function find(string $type, string $uuid, array $teamIds): ?Model
+    {
+        $resource = match ($type) {
+            'application' => Application::query()->where('uuid', $uuid)->first(),
+            'service' => Service::query()->where('uuid', $uuid)->first(),
+            'database' => collect(STANDALONE_DATABASE_MODELS)
+                ->map(fn (string $class) => $class::query()->where('uuid', $uuid)->first())
+                ->first(fn ($database) => $database !== null),
+            default => null,
+        };
+
+        $teamId = $resource?->team()?->id;
+
+        return $resource !== null && $teamId !== null && in_array($teamId, $teamIds, true) ? $resource : null;
+    }
+
+    /**
+     * The resources that own scan rows: the applications and databases of a service, else the resource itself.
+     *
+     * @return Collection<int, Model>
+     */
+    public static function owners(Model $resource): Collection
+    {
+        if ($resource instanceof Service) {
+            return $resource->applications()->get()->concat($resource->databases()->get())->values();
+        }
+
+        return collect([$resource]);
+    }
+
+    /**
+     * The current scans of every owner of the resource.
+     *
+     * @param  Collection<int, Model>|null  $owners
+     * @param  list<string>  $columns
+     * @return Collection<int, ImageScan>
+     */
+    public static function current(Model $resource, ?Collection $owners = null, array $columns = ['*']): Collection
+    {
+        return ($owners ?? self::owners($resource))
+            ->flatMap(fn (Model $owner): Collection => self::currentFor($owner, $columns))
+            ->values();
+    }
+
+    /**
+     * The latest completed scan that is not a preview. The other images scanned by the same deployment (a compose
+     * application builds several) are current too.
+     *
+     * @param  list<string>  $columns
+     * @return Collection<int, ImageScan>
+     */
+    public static function currentFor(Model $owner, array $columns = ['*']): Collection
+    {
+        $query = fn (): Builder => ImageScan::query()
+            ->select($columns)
+            ->where('resource_type', $owner->getMorphClass())
+            ->where('resource_id', $owner->getKey())
+            ->where('status', ImageScanStatus::Completed)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('deployment_queue_id')
+                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id');
+
+        $latest = $query()->first();
+        if (! $latest instanceof ImageScan) {
+            return collect();
+        }
+
+        $scans = $latest->deployment_queue_id === null
+            ? collect([$latest])
+            : $query()->where('deployment_queue_id', $latest->deployment_queue_id)->get();
+
+        return $scans->each(fn (ImageScan $scan) => $scan->setRelation('resource', $owner))->values();
+    }
+
+    /**
+     * Fixable now at the alert level, from the stored summaries: the sidebar count.
+     */
+    public static function fixableNowCount(Model $resource): int
+    {
+        return (int) self::current($resource, null, ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'summary', 'scanned_at'])
+            ->sum(fn (ImageScan $scan): int => (int) data_get($scan->summary, 'fixable_now_at_level', 0));
+    }
+
+    /**
+     * Writes the summaries again, for example after an ignore, so the counts match the findings.
+     *
+     * @param  Collection<int, ImageScan>  $scans  Loaded with their resource.
+     */
+    public static function refreshSummaries(Collection $scans): void
+    {
+        foreach ($scans as $scan) {
+            $owner = $scan->resource;
+            if (! $owner instanceof Model) {
+                continue;
+            }
+
+            $summary = (array) $scan->summary;
+            $scan->summary = ScanSummary::build(
+                array_map(fn ($row): Finding => Finding::fromArray((array) $row), (array) $scan->findings),
+                ImageScanGate::classifierFor($scan),
+                IgnoreMatcher::forResource($owner),
+                ImageScanPolicyResolver::for($owner)->alertLevel,
+                is_array($summary['eol_distro'] ?? null) ? $summary['eol_distro'] : null,
+                (bool) ($summary['truncated'] ?? false),
+            );
+            $scan->save();
+        }
+    }
+
+    /**
+     * Whether the resource now runs another image than the scanned one. Decided from the configuration and the
+     * deployments, without a call to the server.
+     */
+    public static function runsOtherImage(ImageScan $scan, Model $owner): bool
+    {
+        if ($owner instanceof Application) {
+            return match ($owner->build_pack) {
+                'dockercompose' => false,
+                'dockerimage' => ! self::sameImage(self::dockerImageRef($owner), (string) $scan->image_ref),
+                default => self::builtCommitChanged($owner, $scan),
+            };
+        }
+
+        return ! self::sameImage(trim((string) $owner->getAttribute('image')), (string) $scan->image_ref);
+    }
+
+    /**
+     * The image an application runs now, named like the deploy job names it. Null when Coolify cannot tell, for
+     * example before the first deploy.
+     */
+    public static function currentImageRef(Application $application): ?string
+    {
+        $ref = match (true) {
+            $application->build_pack === 'dockercompose' => null,
+            $application->build_pack === 'dockerimage' => self::dockerImageRef($application),
+            filled($application->dockerfile) => ($application->docker_registry_image_name ?: $application->uuid).':latest',
+            default => self::builtImageRef($application),
+        };
+
+        if ($ref === null) {
+            return null;
+        }
+
+        try {
+            ImageRef::parse($ref);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $ref;
+    }
+
+    /**
+     * A link to the advisory, built by Coolify: NVD for CVE IDs, GitHub for GHSA IDs, else none.
+     */
+    public static function advisoryUrl(string $id): ?string
+    {
+        if (! self::isAdvisoryId($id)) {
+            return null;
+        }
+
+        return match (true) {
+            str_starts_with($id, 'CVE-') => 'https://nvd.nist.gov/vuln/detail/'.$id,
+            str_starts_with($id, 'GHSA-') => 'https://github.com/advisories/'.$id,
+            default => null,
+        };
+    }
+
+    public static function isAdvisoryId(string $id): bool
+    {
+        return preg_match(self::ADVISORY_ID_PATTERN, $id) === 1;
+    }
+
+    /**
+     * "low", "medium", or "high" from the EPSS score. Null without a score.
+     */
+    public static function exploitLikelihood(?float $epss): ?string
+    {
+        return match (true) {
+            $epss === null => null,
+            $epss < 0.1 => 'low',
+            $epss < 0.5 => 'medium',
+            default => 'high',
+        };
+    }
+
+    private static function dockerImageRef(Application $application): ?string
+    {
+        $name = trim((string) $application->docker_registry_image_name);
+        if ($name === '') {
+            return null;
+        }
+
+        $tag = trim((string) $application->docker_registry_image_tag) ?: 'latest';
+
+        return str_starts_with($tag, 'sha256-')
+            ? $name.'@sha256:'.substr($tag, strlen('sha256-'))
+            : $name.':'.$tag;
+    }
+
+    private static function builtImageRef(Application $application): ?string
+    {
+        $commit = self::latestDeployedCommit($application);
+
+        return $commit === null ? null : ($application->docker_registry_image_name ?: $application->uuid).':'.mb_substr($commit, 0, 128);
+    }
+
+    private static function latestDeployedCommit(Application $application): ?string
+    {
+        $commit = ApplicationDeploymentQueue::query()
+            ->where('application_id', (string) $application->getKey())
+            ->where('pull_request_id', 0)
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->orderByDesc('id')
+            ->value('commit');
+
+        return self::usableCommit($commit);
+    }
+
+    private static function builtCommitChanged(Application $application, ImageScan $scan): bool
+    {
+        $deployed = self::latestDeployedCommit($application);
+        $scanned = self::usableCommit($scan->deploymentQueue?->commit) ?? self::tagOf((string) $scan->image_ref);
+
+        if ($deployed === null || $scanned === null || $scanned === 'latest') {
+            return false;
+        }
+
+        return ! str_starts_with($deployed, $scanned) && ! str_starts_with($scanned, $deployed);
+    }
+
+    private static function usableCommit(mixed $commit): ?string
+    {
+        $commit = trim((string) $commit);
+
+        return $commit === '' || $commit === 'HEAD' ? null : $commit;
+    }
+
+    private static function tagOf(string $ref): ?string
+    {
+        try {
+            return ImageRef::parse($ref)->tag;
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /**
+     * Same repository and tag. A scan of a pinned digest matches any tag of the repository, because the tag it
+     * came from is not stored.
+     */
+    private static function sameImage(?string $configured, string $scanned): bool
+    {
+        $configured = trim((string) $configured);
+        $scanned = trim($scanned);
+        if ($configured === '' || $scanned === '') {
+            return true;
+        }
+
+        try {
+            $running = ImageRef::parse($configured);
+            $result = ImageRef::parse($scanned);
+        } catch (InvalidArgumentException) {
+            return $configured === $scanned;
+        }
+
+        if ($running->qualifiedName() !== $result->qualifiedName()) {
+            return false;
+        }
+
+        if ($result->digest !== null) {
+            return $running->digest === null || $running->digest === $result->digest;
+        }
+
+        if ($running->digest !== null) {
+            return false;
+        }
+
+        return ($running->tag ?? 'latest') === ($result->tag ?? 'latest');
+    }
+}

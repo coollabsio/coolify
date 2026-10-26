@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\SharedVariableCanvasController;
 use App\Http\Controllers\Api\TagCanvasController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FileBrowserDownloadController;
+use App\Http\Controllers\ImageScanSbomController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
@@ -421,6 +422,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
+        Route::get('/vulnerabilities', ApplicationConfiguration::class)->name('project.application.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.application.vulnerabilities.sbom');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -443,6 +446,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
         Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
         Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/vulnerabilities', DatabaseConfiguration::class)->name('project.database.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.database.vulnerabilities.sbom');
         Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
@@ -462,6 +467,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
+        Route::get('/vulnerabilities', ServiceConfiguration::class)->name('project.service.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.service.vulnerabilities.sbom');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
         Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');

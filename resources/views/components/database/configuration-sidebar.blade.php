@@ -7,6 +7,8 @@
         'database_uuid' => $database->uuid,
     ];
 
+    $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
+
     $configurationItems = collect([
         ['label' => 'General', 'route' => 'project.database.configuration', 'icon' => 'settings'],
         ['label' => 'Environment Variables', 'route' => 'project.database.environment-variables', 'icon' => 'variables'],
@@ -22,6 +24,8 @@
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
         ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
+        ['label' => 'Vulnerabilities', 'route' => 'project.database.vulnerabilities', 'icon' => 'shield-alert', 'visible' => $imageScanningAllowed,
+            'count' => $imageScanningAllowed ? \App\Services\ImageScan\ResourceScans::fixableNowCount($database) : null, 'countLabel' => 'fixable now'],
         ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
@@ -34,7 +38,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics', 'Vulnerabilities'],
         'Deploy' => ['Servers'],
         'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
         'Operations' => ['Resource Operations', 'Resource Limits', 'Tags'],
@@ -88,6 +92,7 @@
                     @if ($menuItem['label'] === 'Files')
                         <x-beta-badge class="ml-auto shrink-0" />
                     @endif
+                    <x-menu-count :count="$menuItem['count'] ?? null" :label="$menuItem['countLabel'] ?? ''" />
                 </a>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
                     <div class="nav-children flex flex-col gap-0.5 py-1"

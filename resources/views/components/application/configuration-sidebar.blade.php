@@ -7,6 +7,8 @@
             'application_uuid' => $application->uuid,
         ];
 
+        $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
+
         $configurationMenuItems = [
             [
                 'label' => 'General',
@@ -127,6 +129,14 @@
                 'active' => $currentRoute === 'project.application.analytics',
             ],
             [
+                'label' => 'Vulnerabilities',
+                'route' => 'project.application.vulnerabilities',
+                'active' => $currentRoute === 'project.application.vulnerabilities',
+                'visible' => $imageScanningAllowed,
+                'count' => $imageScanningAllowed ? \App\Services\ImageScan\ResourceScans::fixableNowCount($application) : null,
+                'countLabel' => 'fixable now',
+            ],
+            [
                 'label' => 'Tags',
                 'route' => 'project.application.tags',
                 'active' => $currentRoute === 'project.application.tags',
@@ -167,6 +177,7 @@
             'Resource Operations' => 'server-update',
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
+            'Vulnerabilities' => 'shield-alert',
             'Tags' => 'tags',
             'Danger Zone' => 'danger',
         ];
@@ -174,7 +185,7 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Vulnerabilities'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
@@ -266,6 +277,7 @@
                                     @if ($menuItem['label'] === 'Files')
                                         <x-beta-badge class="ml-auto shrink-0" />
                                     @endif
+                                    <x-menu-count :count="$menuItem['count'] ?? null" :label="$menuItem['countLabel'] ?? ''" />
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
                                             <livewire:project.application.server-status-badge :application="$application"
