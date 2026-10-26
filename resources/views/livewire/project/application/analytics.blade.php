@@ -62,7 +62,7 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
             <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-5 dark:bg-white/[0.07]">
                 <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['requests'] ?? 0) }} requests">{{ compactNumber($overview['requests'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-requests',
@@ -80,7 +80,7 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
                             {!! $approxBadge('Summed across services; visitors of more than one service may be double-counted.') !!}
                         @endif
                     </span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['uniqueVisitors'] ?? 0) }} unique visitors">{{ compactNumber($overview['uniqueVisitors'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-visitors',
@@ -124,7 +124,7 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
                             {!! $approxBadge('Highest p95 latency across services; not a true merged percentile.') !!}
                         @endif
                     </span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatLatency($overview['latencyP95'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-latency',
