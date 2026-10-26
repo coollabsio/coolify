@@ -17,11 +17,13 @@ use App\Support\ResourceStartActivity;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 /**
  * Switches a resource to a candidate image that fixes vulnerabilities (spec 7.3). Only a better candidate of the
@@ -55,7 +57,7 @@ class UpdateResourceImage
         }
 
         if ($resource instanceof Application && $resource->build_pack !== 'dockerimage') {
-            throw new ImageUpdateRefused('Coolify builds the image of this app. Update the base image in your Dockerfile.');
+            throw new ImageUpdateRefused('Coolify builds the image of this app, so there is no image to update.');
         }
         if (! $resource instanceof Application && $service === null && ! in_array($resource::class, STANDALONE_DATABASE_MODELS, true)) {
             throw new ImageUpdateRefused('Coolify cannot update the image of this resource.');
@@ -108,8 +110,9 @@ class UpdateResourceImage
                     if ($entry['ref'] !== $newRef) {
                         continue;
                     }
-                    if (ResourceScans::runsOtherImage($scan, $owner)) {
-                        throw new ImageUpdateRefused('The running image is not the scanned image. Scan it again first.');
+                    $blocked = self::blockedReason($scan, $owner);
+                    if ($blocked !== null) {
+                        throw new ImageUpdateRefused($blocked);
                     }
 
                     return [$owner, $scan, $entry];
@@ -118,6 +121,22 @@ class UpdateResourceImage
         }
 
         throw new ImageUpdateRefused('This version is not one that fixes vulnerabilities of the current image.');
+    }
+
+    /**
+     * Why Coolify cannot switch the image of a scan, even with a better candidate. Null when it can.
+     */
+    public static function blockedReason(ImageScan $scan, Model $owner): ?string
+    {
+        if (str_contains((string) $owner->getAttribute('image'), '$')) {
+            return 'The compose file sets this image with a variable. Change the version in the compose file.';
+        }
+
+        if (ResourceScans::runsOtherImage($scan, $owner)) {
+            return 'The running image is not the scanned image. Scan it again to check for newer versions.';
+        }
+
+        return null;
     }
 
     /**
@@ -131,12 +150,24 @@ class UpdateResourceImage
             $application->save();
         }
 
-        $result = queue_application_deployment(application: $application, deployment_uuid: new_public_id());
-        if (($result['status'] ?? null) !== 'queued') {
+        $restore = function () use ($application, $oldTag, $sameTag): void {
             if (! $sameTag) {
                 $application->docker_registry_image_tag = $oldTag;
                 $application->save();
             }
+        };
+
+        try {
+            $result = queue_application_deployment(application: $application, deployment_uuid: new_public_id());
+        } catch (Throwable $e) {
+            $restore();
+            report($e);
+
+            throw new ImageUpdateRefused('The deploy could not start. Coolify kept the old image.', previous: $e);
+        }
+
+        if (($result['status'] ?? null) !== 'queued') {
+            $restore();
 
             throw new ImageUpdateRefused(($result['status'] ?? null) === 'skipped'
                 ? 'A deploy of this app is already queued. Try again when it is done.'
@@ -157,12 +188,24 @@ class UpdateResourceImage
             $database->save();
         }
 
-        $result = RestartDatabase::run($database);
-        if (is_string($result)) {
+        $restore = function () use ($database, $oldImage, $sameTag): void {
             if (! $sameTag) {
                 $database->setAttribute('image', $oldImage);
                 $database->save();
             }
+        };
+
+        try {
+            $result = RestartDatabase::run($database);
+        } catch (Throwable $e) {
+            $restore();
+            report($e);
+
+            throw new ImageUpdateRefused('The restart failed. Coolify kept the old image.', previous: $e);
+        }
+
+        if (is_string($result)) {
+            $restore();
 
             throw new ImageUpdateRefused($result);
         }
@@ -179,23 +222,41 @@ class UpdateResourceImage
             throw new ImageUpdateRefused('A start of this service is running. Try again when it is done.');
         }
 
-        $updated = [];
-        if (! $sameTag) {
-            $subResources = $this->subResourcesUsing($service, $oldRef);
-            $compose = $this->composeWithImages($service, $subResources, $newTag);
+        $subResources = $sameTag ? collect() : self::subResourcesUsing($service, $oldRef);
+        $oldCompose = $service->docker_compose_raw;
+        $oldImages = $subResources->mapWithKeys(fn (Model $subResource): array => [$subResource->getMorphClass().':'.$subResource->getKey() => $subResource->image])->all();
 
-            $service->docker_compose_raw = Yaml::dump($compose, 10, 2);
-            $service->save();
-            foreach ($subResources as $subResource) {
-                $subResource->image = $this->withTag((string) $subResource->image, $newTag);
-                $subResource->save();
-                $updated[] = (string) $subResource->uuid;
-            }
+        if (! $sameTag) {
+            $compose = $this->composeWithImages($service, $subResources, $newTag);
+            DB::transaction(function () use ($service, $compose, $subResources, $newTag): void {
+                $service->docker_compose_raw = Yaml::dump($compose, 10, 2);
+                $service->save();
+                foreach ($subResources as $subResource) {
+                    $subResource->image = $this->withTag((string) $subResource->image, $newTag);
+                    $subResource->save();
+                }
+            });
         }
 
-        RestartService::run($service, true);
+        try {
+            RestartService::run($service, true);
+        } catch (Throwable $e) {
+            if (! $sameTag) {
+                DB::transaction(function () use ($service, $oldCompose, $subResources, $oldImages): void {
+                    $service->docker_compose_raw = $oldCompose;
+                    $service->save();
+                    foreach ($subResources as $subResource) {
+                        $subResource->image = $oldImages[$subResource->getMorphClass().':'.$subResource->getKey()];
+                        $subResource->save();
+                    }
+                });
+            }
+            report($e);
 
-        return $updated;
+            throw new ImageUpdateRefused('The restart failed. Coolify kept the old image.', previous: $e);
+        }
+
+        return $subResources->map(fn (Model $subResource): string => (string) $subResource->getAttribute('uuid'))->values()->all();
     }
 
     /**

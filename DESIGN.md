@@ -1378,7 +1378,9 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   `x-modal-confirmation` with the change as `old → new` (each service
   application or database on its own line), what restarts, and the warning for
   the resource type. Without Write access the sentence stays and the button is
-  hidden. When there is no version to update to, the row explains why (no
+  hidden. When the running image is not the scanned one, or a compose variable
+  sets the image, the row explains that instead of offering the action. When
+  the update moves off an end-of-life distro, the sentence says so. When there is no version to update to, the row explains why (no
   better version, cannot compare + Docker Hub link, login needed + registry
   logins link). A newer major version is never an action: it sits in a
   collapsed "Newer major version" detail with a warning callout. The panel is

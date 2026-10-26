@@ -21,6 +21,7 @@ use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ImageUpdateRefused;
 use App\Services\ImageScan\ResourceScans;
 use App\Traits\ListensToTeamChannel;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -34,6 +35,8 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 /**
  * The findings of the images a resource runs (spec 6.2). The resource is reloaded and authorized on every request.
@@ -242,8 +245,16 @@ class Vulnerabilities extends Component
             $this->dispatch('error', $e->getMessage());
 
             return true;
+        } catch (AuthorizationException|HttpExceptionInterface $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
+            $this->dispatch('error', 'The update could not start.');
+
+            return true;
         }
 
+        $this->loadedOwners = null;
         $this->scans = null;
         $this->rows = null;
         $this->dispatch('success', 'Update started.');

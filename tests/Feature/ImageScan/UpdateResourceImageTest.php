@@ -197,6 +197,15 @@ describe('standalone database', function () {
         expect($this->database->fresh()->image)->toBe('postgres:15.0-alpine');
     });
 
+    it('puts the old image back when the restart throws', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
+        RestartDatabase::shouldRun()->once()->andThrow(new RuntimeException('ssh: connect to host failed'));
+
+        expect(fn () => UpdateResourceImage::run($this->database, 'postgres:15.15-alpine', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The restart failed. Coolify kept the old image.');
+        expect($this->database->fresh()->image)->toBe('postgres:15.0-alpine');
+    });
+
     it('pulls the newest build of the same tag and restarts', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.0-alpine', 'same_tag')]);
         RestartDatabase::shouldRun()->once()->andReturn(new Activity);
@@ -315,6 +324,44 @@ describe('docker image app', function () {
             ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1);
     });
 
+    it('puts the old tag back when the deploy queue is full', function () {
+        $application = updateImageApplication();
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        $this->server->settings->forceFill(['deployment_queue_limit' => 0])->saveQuietly();
+
+        expect(fn () => UpdateResourceImage::run($application, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'Deployment queue is full.');
+        expect($application->fresh()->docker_registry_image_tag)->toBe('1.27');
+    });
+
+    it('puts the old tag back when a deploy is already queued', function () {
+        $application = updateImageApplication();
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        ApplicationDeploymentQueue::query()->create([
+            'application_id' => $application->id,
+            'deployment_uuid' => 'queued-deploy',
+            'server_id' => $this->server->id,
+            'commit' => 'HEAD',
+            'pull_request_id' => 0,
+            'status' => 'queued',
+        ]);
+
+        expect(fn () => UpdateResourceImage::run($application, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'A deploy of this app is already queued.');
+        expect($application->fresh()->docker_registry_image_tag)->toBe('1.27')
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1);
+    });
+
+    it('refuses an app that Coolify builds', function () {
+        $application = updateImageApplication();
+        $application->forceFill(['build_pack' => 'dockerfile'])->save();
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+
+        expect(fn () => UpdateResourceImage::run($application, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'Coolify builds the image of this app, so there is no image to update.');
+        expect($application->fresh()->docker_registry_image_tag)->toBe('1.27');
+    });
+
     it('redeploys without a change for a newer build of the same tag', function () {
         $application = updateImageApplication();
         updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.27', 'same_tag')]);
@@ -349,15 +396,45 @@ describe('service', function () {
             ->and(data_get($compose, 'services.db.image'))->toBe('postgres:16');
     });
 
-    it('refuses when the compose file sets the image another way', function () {
+    it('refuses an image that the compose file sets with a variable', function () {
         $service = updateImageService(['web' => 'nginx:${NGINX_VERSION:-1.27}']);
+        $web = updateImageSubResource($service, 'web', 'nginx:${NGINX_VERSION:-1.27}');
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->never();
+
+        expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The compose file sets this image with a variable. Change the version in the compose file.');
+        expect($web->fresh()->image)->toBe('nginx:${NGINX_VERSION:-1.27}');
+
+        updateImagePage($this->admin, $service, 'service')
+            ->assertSee('The compose file sets this image with a variable. Change the version in the compose file.')
+            ->assertDontSee('Update to 1.29');
+    });
+
+    it('refuses when the compose file names another image than the application', function () {
+        $service = updateImageService(['web' => 'nginx:1.26']);
         $web = updateImageSubResource($service, 'web', 'nginx:1.27');
         updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
         RestartService::shouldRun()->never();
 
         expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
             ->toThrow(ImageUpdateRefused::class, 'The compose file sets the image of web in another way.');
-        expect($web->fresh()->image)->toBe('nginx:1.27');
+    });
+
+    it('restores the compose file and the images when the restart fails', function () {
+        $service = updateImageService(['web' => 'nginx:1.27', 'worker' => 'nginx:1.27']);
+        $raw = $service->docker_compose_raw;
+        $web = updateImageSubResource($service, 'web', 'nginx:1.27');
+        $worker = updateImageSubResource($service, 'worker', 'nginx:1.27');
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->once()->andThrow(new RuntimeException('ssh: connect to host failed'));
+
+        expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The restart failed. Coolify kept the old image.');
+        expect($service->fresh()->docker_compose_raw)->toBe($raw)
+            ->and($web->fresh()->image)->toBe('nginx:1.27')
+            ->and($worker->fresh()->image)->toBe('nginx:1.27')
+            ->and(AuditEvent::query()->where('event', 'ui.image_scan.image_updated')->exists())->toBeFalse();
     });
 
     it('pulls and restarts the service for a newer build of the same tag', function () {
@@ -469,8 +546,31 @@ describe('fix panel', function () {
             ->assertDontSeeHtml('data-image-scan-fix-panel');
     });
 
+    it('names the distro that the update moves off', function () {
+        $scan = updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
+        $scan->forceFill(['summary' => [...$scan->summary, 'eol_distro' => ['name' => 'alpine', 'version' => '3.16']]])->save();
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->assertSee('waiting for a fix from the image maintainer. It moves off Alpine 3.16, which no longer gets security fixes.');
+    });
+
+    it('offers no update while the database runs another image than the scanned one', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
+        $this->database->forceFill(['image' => 'postgres:15.15-alpine'])->save();
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->assertSet('view', 'package')
+            ->assertSee('The running image is not the scanned image. Scan it again to check for newer versions.')
+            ->assertDontSee('Update to 15.15-alpine')
+            ->assertDontSeeHtml('updateImage(');
+    });
+
     it('phrases the counts for the alert level', function () {
-        expect(FixPanel::levelWords(ImageScanAlertLevel::Medium))->toBe('critical, high, and medium')
+        expect(FixPanel::fixesPhrase(['critical' => 0, 'high' => 1, 'medium' => 3], ImageScanAlertLevel::High))->toBe('fixes 1 high vulnerability.')
+            ->and(FixPanel::fixesPhrase(['critical' => 1, 'high' => 0, 'medium' => 0], ImageScanAlertLevel::Critical))->toBe('fixes 1 critical vulnerability.')
+            ->and(FixPanel::fixesPhrase(['critical' => 2, 'high' => 15, 'medium' => 4], ImageScanAlertLevel::High))->toBe('fixes 17 critical and high.')
+            ->and(FixPanel::fixesPhrase(['critical' => 2, 'high' => 15, 'medium' => 4], ImageScanAlertLevel::Medium))->toBe('fixes 21 critical, high, and medium.')
+            ->and(FixPanel::levelWords(ImageScanAlertLevel::Medium))->toBe('critical, high, and medium')
             ->and(FixPanel::levelWords(ImageScanAlertLevel::Critical))->toBe('critical')
             ->and(FixPanel::leftSentence(['critical' => 3, 'high' => 2, 'medium' => 1], ImageScanAlertLevel::Medium))
             ->toBe('3 critical, 2 high, and 1 medium are left, waiting for a fix from the image maintainer.')
@@ -488,7 +588,9 @@ describe('updateImage action', function () {
 
         updateImagePage($this->admin, $this->database, 'database')
             ->call('updateImage', 'postgres:15.15-alpine', '', '')
-            ->assertDispatched('success', 'Update started.');
+            ->assertDispatched('success', 'Update started.')
+            ->assertSee('The running image is not the scanned image. Scan it again to check for newer versions.')
+            ->assertDontSeeHtml('updateImage(');
 
         expect($this->database->fresh()->image)->toBe('postgres:15.15-alpine');
     });
@@ -500,6 +602,28 @@ describe('updateImage action', function () {
         updateImagePage($this->admin, $this->database, 'database')
             ->call('updateImage', 'postgres:16.4-alpine', '')
             ->assertDispatched('error');
+    });
+
+    it('shows an error instead of failing when the update throws', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
+        UpdateResourceImage::shouldRun()->once()->andThrow(new RuntimeException('unexpected'));
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->call('updateImage', 'postgres:15.15-alpine', '')
+            ->assertOk()
+            ->assertDispatched('error', 'The update could not start.');
+    });
+
+    it('shows the restart failure as an error', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
+        RestartDatabase::shouldRun()->once()->andThrow(new RuntimeException('ssh: connect to host failed'));
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->call('updateImage', 'postgres:15.15-alpine', '')
+            ->assertOk()
+            ->assertDispatched('error', 'The restart failed. Coolify kept the old image.');
+
+        expect($this->database->fresh()->image)->toBe('postgres:15.0-alpine');
     });
 
     it('forbids a read-only member', function () {
