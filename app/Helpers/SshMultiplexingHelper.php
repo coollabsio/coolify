@@ -125,9 +125,17 @@ class SshMultiplexingHelper
 
         $stopProcess = self::runMuxControlCommand($server, 'stop');
 
-        if ($pid !== null && ! $stopProcess?->successful()) {
+        if ($stopProcess?->successful()) {
+            return;
+        }
+
+        if ($pid !== null) {
             self::unmarkMuxProcessAsRetiring($pid, self::muxSocket($server));
         }
+
+        // A master that does not stop must not stay reusable under the old user, IP, or port.
+        // Without its socket it is an orphan, and the cleanup job reaps it.
+        File::delete(self::muxSocket($server));
     }
 
     public static function markMuxProcessAsRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): void

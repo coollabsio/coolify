@@ -548,6 +548,33 @@ it('does not mark a mux process as retiring when stop fails', function () {
     expect(SshMultiplexingHelper::isMuxProcessRetiring('444', "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}"))->toBeFalse();
 });
 
+it('removes the control socket when the mux master does not stop', function (bool $stopTimesOut) {
+    $server = makeMuxServer();
+    File::partialMock()->shouldReceive('delete')->once()->with("/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}");
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=888)', exitCode: 0),
+        '*-O stop*' => $stopTimesOut ? muxProcessTimeout() : Process::result(exitCode: 255),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    expect(SshMultiplexingHelper::isMuxProcessRetiring('888', "/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}"))->toBeFalse();
+})->with([
+    'stop fails' => false,
+    'stop times out' => true,
+]);
+
+it('keeps the control socket untouched when the mux master stops', function () {
+    $server = makeMuxServer();
+    File::partialMock()->shouldNotReceive('delete');
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=999)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+});
+
 it('kills only old cloudflared proxies whose stdin pipe no live ssh holds', function () {
     config(['constants.ssh.mux_orphan_reap_enabled' => true]);
 
