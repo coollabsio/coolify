@@ -487,6 +487,38 @@ describe('GitHub App Webhook HMAC', function () {
         $response->assertOk();
         expect($response->getContent())->toContain('Invalid signature');
     });
+
+    test('rejects push with forged hash when APP_ENV is local', function () {
+        config()->set('app.env', 'local');
+
+        $team = Team::factory()->create();
+        GithubApp::create([
+            'uuid' => (string) str()->uuid(),
+            'name' => 'github-app-webhook-local-test',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 1234567890,
+            'webhook_secret' => 'app-secret',
+            'team_id' => $team->id,
+        ]);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['id' => 987654321],
+            'after' => 'abc1234',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-GitHub-Hook-Installation-Target-Id' => '1234567890',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, 'wrong-secret'),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Invalid signature');
+    });
 });
 
 describe('GitLab Manual Webhook HMAC', function () {
