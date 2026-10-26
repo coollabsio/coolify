@@ -117,7 +117,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         $commands = new ScannerCommands($server, Str::lower(Str::random(24)));
 
         $this->setState($server, self::STATE_PULLING);
-        $pulled = $this->run($commands->prepare(), $server, self::TIMEOUT_PREPARE);
+        $pulled = self::run($commands->prepare(), $server, self::TIMEOUT_PREPARE);
         foreach (['pull-syft', 'pull-grype', 'pull-regctl'] as $step) {
             if (($pulled['exit_codes'][$step] ?? null) !== 0) {
                 $this->setState($server, self::STATE_FAILED);
@@ -131,7 +131,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         }
 
         $this->setState($server, self::STATE_UPDATING_DATABASE);
-        $updated = $this->run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
+        $updated = self::run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
         if (($updated['exit_codes']['db-update'] ?? null) !== 0) {
             $this->setState($server, self::STATE_FAILED);
 
@@ -142,7 +142,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
             return;
         }
 
-        $this->storeDetails($server, $commands);
+        self::storeDetails($server, $commands);
         $this->setState($server, self::STATE_READY);
     }
 
@@ -150,18 +150,21 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
      * @param  list<string>  $commands
      * @return array{exit_codes: array<string, int>, sizes: array<string, int>, payload: string}
      */
-    private function run(array $commands, Server $server, int $timeout): array
+    private static function run(array $commands, Server $server, int $timeout): array
     {
         return ScannerCommands::parseOutput(instant_remote_process($commands, $server, throwError: false, timeout: $timeout));
     }
 
-    private function storeDetails(Server $server, ScannerCommands $commands): void
+    /**
+     * Caches the database build date and the disk use of the scanner data that the server page shows.
+     */
+    public static function storeDetails(Server $server, ScannerCommands $commands): void
     {
         Cache::forget(self::builtAtCacheKey($server));
         Cache::forget(self::diskUsedCacheKey($server));
 
         try {
-            $status = $this->run($commands->dbStatus(), $server, self::TIMEOUT_DB_STATUS);
+            $status = self::run($commands->dbStatus(), $server, self::TIMEOUT_DB_STATUS);
             $report = ($status['exit_codes']['db-status'] ?? null) === 0 ? json_decode($status['payload'], true) : null;
             $built = is_array($report) && ($report['valid'] ?? false) === true ? ($report['built'] ?? null) : null;
             if (is_string($built)) {
@@ -172,7 +175,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         }
 
         try {
-            $usage = $this->run($commands->diskUsage(), $server, self::TIMEOUT_DB_STATUS);
+            $usage = self::run($commands->diskUsage(), $server, self::TIMEOUT_DB_STATUS);
             if (isset($usage['sizes']['disk-db']) || isset($usage['sizes']['disk-sboms'])) {
                 Cache::put(self::diskUsedCacheKey($server), ($usage['sizes']['disk-db'] ?? 0) + ($usage['sizes']['disk-sboms'] ?? 0), now()->addDays(7));
             }

@@ -94,7 +94,7 @@ class ScanImage
             return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $context);
         }
 
-        $lock = Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
+        $lock = self::serverLock($server);
         if (! $this->acquire($lock, $lockWaitSeconds)) {
             return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::LockBusy, $context);
         }
@@ -136,7 +136,7 @@ class ScanImage
             return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], null, ImageScanErrorCode::Unknown, $context), $targets);
         }
 
-        $lock = Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
+        $lock = self::serverLock($server);
         if (! $this->acquire($lock, $lockWaitSeconds)) {
             return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], $imageId, ImageScanErrorCode::LockBusy, $context), $targets);
         }
@@ -146,6 +146,14 @@ class ScanImage
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * One scan or scan data change at a time per server (spec 4.1).
+     */
+    public static function serverLock(Server $server): Lock
+    {
+        return Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
     }
 
     public static function progressCacheKey(Model $resource): string

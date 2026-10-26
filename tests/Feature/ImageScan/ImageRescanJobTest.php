@@ -4,6 +4,7 @@ use App\Actions\ImageScan\ScanImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
 use App\Jobs\ImageRescanJob;
+use App\Jobs\PrepareImageScannerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -21,6 +22,7 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,9 +87,9 @@ function rescanTestContainer(string $hex, string $ref, array $labels): void
     test()->containers = [...test()->containers, json_encode(['id' => 'sha256:'.$hex, 'ref' => $ref, 'labels' => $labels])];
 }
 
-function rescanTestApplicationContainer(Application $application, string $hex = RESCAN_TEST_HEX, int $pullRequestId = 0): void
+function rescanTestApplicationContainer(Application $application, string $hex = RESCAN_TEST_HEX, int $pullRequestId = 0, string $tag = 'abc123'): void
 {
-    rescanTestContainer($hex, "{$application->uuid}:abc123", [
+    rescanTestContainer($hex, "{$application->uuid}:{$tag}", [
         'coolify.managed' => 'true',
         'coolify.type' => 'application',
         'coolify.applicationId' => (string) $application->id,
@@ -115,6 +117,7 @@ function rescanTestFake(array $overrides = []): void
         'packages' => rescanTestPayload('packages', file_get_contents(base_path('tests/Fixtures/image-scan/syft-packages.ndjson'))),
         'grype' => rescanTestPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/grype.ndjson'))),
         'sbom-delete' => 'coolify-scan-exit sbom-delete 0',
+        'disk-usage' => '',
     ], $overrides);
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
@@ -147,6 +150,7 @@ function rescanTestCommandKey(string $command): ?string
         str_contains($command, 'coolify-scan-exit db-status') => 'db-status',
         str_contains($command, 'coolify-scan-exit containers') => 'containers',
         str_contains($command, 'coolify-scan-exit sbom-delete') => 'sbom-delete',
+        str_contains($command, 'coolify-scan-exit disk-db') => 'disk-usage',
         str_contains($command, 'docker image inspect') => 'inspect',
         str_contains($command, 'df -P') => 'disk',
         str_contains($command, 'docker save') => 'sbom',
@@ -354,7 +358,21 @@ describe('rescan', function () {
 
         rescanTestRun();
 
-        expect($this->application->imageScans()->sole()->status)->toBe(ImageScanStatus::Completed);
+        expect($this->application->imageScans()->sole()->status)->toBe(ImageScanStatus::Completed)
+            ->and(Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server)))->toBeNull();
+    });
+
+    it('refreshes the database date and the disk use on the server page after a database update', function () {
+        $builtAt = now()->subHours(3)->startOfSecond();
+        rescanTestFake([
+            'db-status' => fn () => rescanTestDatabaseStatus($builtAt),
+            'disk-usage' => "coolify-scan-exit disk-db 0 1000\ncoolify-scan-exit disk-sboms 0 24",
+        ]);
+
+        rescanTestRun();
+
+        expect(Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server)))->toBe($builtAt->toIso8601ZuluString())
+            ->and(Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server)))->toBe(1024);
     });
 
     it('keeps the results and records the error for each resource when the database is too old', function () {
@@ -405,6 +423,82 @@ describe('retention', function () {
         $kept = [$running->id, $rollbackByDeployment->id, $rollbackByTag->id, ...$latest->pluck('id'), $otherResource->id, $otherServer->id];
         expect(ImageScan::query()->pluck('id')->sort()->values()->all())->toBe(collect($kept)->sort()->values()->all())
             ->and(ImageScan::query()->whereKey([$tooOld->id, $old->id])->exists())->toBeFalse();
+    });
+
+    it('keeps the CleanupDocker rollback images: the latest images to keep besides the running one', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subDays(8))]);
+        $this->application->settings->forceFill(['docker_images_to_keep' => 2])->save();
+        $rows = collect(['c4', 'c3', 'c2', 'c1'])->mapWithKeys(function (string $commit, int $index) {
+            $deployment = rescanTestDeployment($this->application, $commit, ApplicationDeploymentStatus::FINISHED, attributes: ['created_at' => now()->subDays(4 - $index)]);
+
+            return [$commit => rescanTestScan($this->application, [
+                'image_id' => $commit === 'c1' ? 'sha256:'.RESCAN_TEST_HEX : 'sha256:'.str_repeat((string) $index, 64),
+                'deployment_queue_id' => $deployment->id,
+                'scanned_at' => now()->subDays(40 + $index),
+            ])];
+        });
+        collect(range(1, 5))->each(fn (int $days) => rescanTestScan($this->application, ['scanned_at' => now()->subDays($days)]));
+        rescanTestApplicationContainer($this->application, tag: 'c1');
+
+        rescanTestRun();
+
+        expect(ImageScan::query()->whereKey([$rows['c1']->id, $rows['c2']->id, $rows['c3']->id])->count())->toBe(3)
+            ->and(ImageScan::query()->whereKey($rows['c4']->id)->exists())->toBeFalse();
+    });
+
+    it('keeps no rollback images when the server turned off image retention', function () {
+        rescanTestFake();
+        $this->server->settings->forceFill(['disable_application_image_retention' => true])->saveQuietly();
+        $deployment = rescanTestDeployment($this->application, 'c1', ApplicationDeploymentStatus::FINISHED);
+        $rollback = rescanTestScan($this->application, ['deployment_queue_id' => $deployment->id, 'scanned_at' => now()->subDays(40)]);
+        collect(range(1, 5))->each(fn (int $days) => rescanTestScan($this->application, ['scanned_at' => now()->subDays($days)]));
+
+        rescanTestRun();
+
+        expect(ImageScan::query()->whereKey($rollback->id)->exists())->toBeFalse();
+    });
+
+    it('keeps the scan of an image that production runs when a closed preview shared it', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subDays(8))]);
+        $shared = rescanTestScan($this->application, [
+            'image_id' => 'sha256:'.RESCAN_TEST_HEX,
+            'deployment_queue_id' => rescanTestDeployment($this->application, 'p9', ApplicationDeploymentStatus::FINISHED, 9)->id,
+            'scanned_at' => now()->subDays(40),
+        ]);
+        collect(range(1, 5))->each(fn (int $days) => rescanTestScan($this->application, ['scanned_at' => now()->subDays($days)]));
+        rescanTestApplicationContainer($this->application);
+
+        rescanTestRun();
+
+        expect(ImageScan::query()->whereKey($shared->id)->exists())->toBeTrue();
+    });
+
+    it('deletes nothing when the container list was cut at the output cap', function () {
+        rescanTestFake(['containers' => fn () => "coolify-scan-exit containers 0\ncoolify-scan-payload\n".str_repeat('x', ScannerCommands::OUTPUT_LIMIT + 1)]);
+        collect(range(1, 7))->each(fn (int $days) => rescanTestScan($this->application, ['scanned_at' => now()->subDays($days)]));
+        $unused = ImageSbom::factory()->create(['server_id' => $this->server->id, 'last_used_at' => now()->subDays(31)]);
+
+        rescanTestRun();
+
+        expect(ImageScan::query()->count())->toBe(7)
+            ->and(ImageSbom::query()->whereKey($unused->id)->exists())->toBeTrue()
+            ->and(rescanTestRanCommand('coolify-scan-exit sbom-delete'))->toBe(0);
+    });
+
+    it('skips retention while a scan holds the server lock', function () {
+        rescanTestFake();
+        collect(range(1, 7))->each(fn (int $days) => rescanTestScan($this->application, ['scanned_at' => now()->subDays($days)]));
+        $unused = ImageSbom::factory()->create(['server_id' => $this->server->id, 'last_used_at' => now()->subDays(31)]);
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+        $job = new ImageRescanJob($this->server);
+        $job->retentionLockWaitSeconds = 0;
+
+        $job->handle();
+        $lock->release();
+
+        expect(ImageScan::query()->count())->toBe(7)
+            ->and(ImageSbom::query()->whereKey($unused->id)->exists())->toBeTrue();
     });
 
     it('deletes the scans of a preview that no longer exists', function () {

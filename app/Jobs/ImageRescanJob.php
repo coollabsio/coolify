@@ -13,6 +13,7 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,6 +47,9 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     private const TIMEOUT_DB_UPDATE = 960;
 
     private const TIMEOUT_DEFAULT = 120;
+
+    /** Retention and SBOM deletion wait at most this long for the scan lock of the server, else they skip a day. */
+    public int $retentionLockWaitSeconds = 120;
 
     public $tries = 1;
 
@@ -85,12 +89,12 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         $commands = new ScannerCommands($server, Str::lower(Str::random(24)));
         $this->updateDatabase($server, $commands);
 
-        $containers = $this->runningContainers($server, $commands);
-        if ($containers === null) {
+        $listing = $this->runningContainers($server, $commands);
+        if ($listing === null) {
             return;
         }
 
-        $targets = $this->targets($server, $containers);
+        [$targets, $runningRefs] = $this->targets($server, $listing['containers']);
         foreach ($targets as $imageId => $imageTargets) {
             try {
                 ScanImage::make()->rescan($server, $imageId, $imageTargets, self::LOCK_WAIT_SECONDS);
@@ -99,11 +103,36 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             }
         }
 
+        // A cut list would make running images look stopped.
+        if (! $listing['truncated']) {
+            $this->cleanUp($server, $commands, $targets, $runningRefs);
+        }
+    }
+
+    /**
+     * Retention and SBOM deletion under the scan lock, so a scan that starts meanwhile keeps its SBOM and rows.
+     *
+     * @param  array<string, list<array{0: Model, 1: string}>>  $targets
+     * @param  array<string, list<string>>  $runningRefs
+     */
+    private function cleanUp(Server $server, ScannerCommands $commands, array $targets, array $runningRefs): void
+    {
+        $lock = ScanImage::serverLock($server);
         try {
-            $this->applyRetention($server, $targets);
+            if (! $lock->block($this->retentionLockWaitSeconds)) {
+                return;
+            }
+        } catch (LockTimeoutException) {
+            return;
+        }
+
+        try {
+            $this->applyRetention($server, $targets, $runningRefs);
             $this->deleteUnusedSboms($server, $commands);
         } catch (Throwable $e) {
             report($e);
+        } finally {
+            $lock->release();
         }
     }
 
@@ -115,16 +144,19 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         $url = InstanceSettings::get()->image_scan_db_url;
 
         try {
-            instant_remote_process($commands->dbUpdate(is_string($url) && trim($url) !== '' ? trim($url) : null), $server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
+            $output = instant_remote_process($commands->dbUpdate(is_string($url) && trim($url) !== '' ? trim($url) : null), $server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
+            if ((ScannerCommands::parseOutput($output)['exit_codes']['db-update'] ?? null) === 0) {
+                PrepareImageScannerJob::storeDetails($server, $commands);
+            }
         } catch (Throwable $e) {
             report($e);
         }
     }
 
     /**
-     * The running containers, or null when they could not be listed.
+     * The running containers, or null when they could not be listed. `truncated`: the list was cut at the output cap.
      *
-     * @return list<array{id: string, ref: string, labels: Collection<string, mixed>}>|null
+     * @return array{containers: list<array{id: string, ref: string, labels: Collection<string, mixed>}>, truncated: bool}|null
      */
     private function runningContainers(Server $server, ScannerCommands $commands): ?array
     {
@@ -140,7 +172,8 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         }
 
         $payload = $parsed['payload'];
-        if (strlen($payload) > ScannerCommands::OUTPUT_LIMIT) {
+        $truncated = strlen($payload) > ScannerCommands::OUTPUT_LIMIT;
+        if ($truncated) {
             $payload = substr($payload, 0, (int) strrpos(substr($payload, 0, ScannerCommands::OUTPUT_LIMIT), "\n"));
         }
 
@@ -162,15 +195,16 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ];
         }
 
-        return $containers;
+        return ['containers' => $containers, 'truncated' => $truncated];
     }
 
     /**
-     * The resources of this server that run each image ID, with the image ref of their container. Containers of
-     * resources on other servers, of previews that no longer exist, and of no resource are skipped.
+     * The resources of this server that run each image ID, with the image ref of their container, and the image
+     * refs each resource runs. Containers of resources on other servers, of previews that no longer exist, and of
+     * no resource are skipped.
      *
      * @param  list<array{id: string, ref: string, labels: Collection<string, mixed>}>  $containers
-     * @return array<string, list<array{0: Model, 1: string}>>
+     * @return array{0: array<string, list<array{0: Model, 1: string}>>, 1: array<string, list<string>>}
      */
     private function targets(Server $server, array $containers): array
     {
@@ -178,6 +212,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         $databases = $server->databases();
         $services = $server->services()->with(['applications', 'databases'])->get();
         $targets = [];
+        $runningRefs = [];
 
         foreach ($containers as $container) {
             $labels = $container['labels'];
@@ -197,9 +232,10 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
             $key = $resource->getMorphClass().':'.$resource->getKey();
             $targets[$container['id']][$key] ??= [$resource, $container['ref'] !== '' ? $container['ref'] : $container['id']];
+            $runningRefs[$key][] = $container['ref'];
         }
 
-        return array_map('array_values', $targets);
+        return [array_map('array_values', $targets), $runningRefs];
     }
 
     /**
@@ -227,8 +263,9 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
      * deletes scans of previews that no longer exist (spec 4.3). Only rows of this server.
      *
      * @param  array<string, list<array{0: Model, 1: string}>>  $targets
+     * @param  array<string, list<string>>  $runningRefs
      */
-    private function applyRetention(Server $server, array $targets): void
+    private function applyRetention(Server $server, array $targets, array $runningRefs): void
     {
         $running = [];
         foreach ($targets as $imageId => $imageTargets) {
@@ -242,7 +279,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->select(['resource_type', 'resource_id'])
             ->distinct()
             ->get()
-            ->each(function (ImageScan $group) use ($server, $running) {
+            ->each(function (ImageScan $group) use ($server, $running, $runningRefs) {
                 $scans = ImageScan::query()
                     ->where('server_id', $server->id)
                     ->where('resource_type', $group->resource_type)
@@ -255,18 +292,21 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
                 $application = $group->resource_type === (new Application)->getMorphClass()
                     ? Application::withTrashed()->with('settings')->find($group->resource_id)
                     : null;
-                $rollback = $application !== null ? $this->rollbackList($application) : ['deployments' => [], 'refs' => []];
+                $rollback = $application !== null
+                    ? $this->rollbackList($server, $application, $runningRefs[$group->resource_type.':'.$group->resource_id] ?? [])
+                    : ['deployments' => [], 'refs' => []];
                 $previews = $application !== null ? $this->existingPreviews($application) : [];
 
                 $delete = [];
                 foreach ($scans as $index => $scan) {
                     $pullRequestId = $this->previewPullRequestId($scan, $application);
                     $previewGone = $pullRequestId !== null && ! in_array($pullRequestId, $previews, true);
+                    $isRunning = isset($running[$scan->resource_type.':'.$scan->resource_id.':'.$scan->image_id]);
                     $keep = $index < self::KEEP_LATEST_SCANS
-                        || isset($running[$scan->resource_type.':'.$scan->resource_id.':'.$scan->image_id])
                         || in_array((int) $scan->deployment_queue_id, $rollback['deployments'], true)
                         || in_array($scan->image_ref, $rollback['refs'], true);
-                    if ($previewGone || ! $keep) {
+                    // A row is per image, so a preview and production can share it: a running image always stays.
+                    if (! $isRunning && ($previewGone || ! $keep)) {
                         $delete[] = $scan->id;
                     }
                 }
@@ -278,14 +318,16 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * The deployments and image refs of the latest finished deployments, as many as the application keeps images
-     * for rollbacks (`docker_images_to_keep`).
+     * The deployments and image refs of the images that CleanupDocker keeps for rollbacks besides the running ones:
+     * the latest `docker_images_to_keep` finished deployments whose image is not running, none when the server
+     * turned off image retention.
      *
+     * @param  list<string>  $runningRefs
      * @return array{deployments: list<int>, refs: list<string>}
      */
-    private function rollbackList(Application $application): array
+    private function rollbackList(Server $server, Application $application, array $runningRefs): array
     {
-        $keep = max(0, (int) ($application->settings?->docker_images_to_keep ?? 2));
+        $keep = $server->settings?->disable_application_image_retention ? 0 : max(0, (int) ($application->settings?->docker_images_to_keep ?? 2));
         if ($keep === 0) {
             return ['deployments' => [], 'refs' => []];
         }
@@ -298,8 +340,13 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->orderByDesc('id')
             ->get(['id', 'commit']);
 
-        $commits = $deployments->pluck('commit')->filter(fn ($commit) => filled($commit))->unique()->take($keep)->values();
         $repository = $application->docker_registry_image_name ?: $application->uuid;
+        $commits = $deployments->pluck('commit')
+            ->filter(fn ($commit) => filled($commit))
+            ->unique()
+            ->reject(fn (string $commit) => in_array($repository.':'.substr($commit, 0, 128), $runningRefs, true))
+            ->take($keep)
+            ->values();
 
         return [
             'deployments' => $deployments->whereIn('commit', $commits->all())->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
