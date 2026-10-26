@@ -2029,3 +2029,24 @@ it('keeps heredoc bodies unchanged when it adds build secrets to a Dockerfile', 
         "RUN --mount=type=secret,id=API_URL,env=API_URL python -c 'print(1)'",
     ]);
 });
+
+it('warns in the deployment log when PORT does not match ports_exposes', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['ports_exposes' => '80']);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable (3000)')))->toBeTrue();
+});
+
+it('does not warn about a PORT mismatch when readonly labels are disabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['ports_exposes' => '80']);
+    $application->settings()->update(['is_container_label_readonly_enabled' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable')))->toBeFalse();
+});

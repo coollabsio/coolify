@@ -1927,8 +1927,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
-            // Check for PORT environment variable mismatch with ports_exposes
-            if ($this->build_pack !== 'dockercompose') {
+            // Check for PORT environment variable mismatch with ports_exposes.
+            // With readonly labels disabled, custom labels control proxy routing, so skip the check.
+            if ($this->build_pack !== 'dockercompose' && $this->application->settings->is_container_label_readonly_enabled) {
                 $detectedPort = $this->application->detectPortFromEnvironment(false);
                 if ($detectedPort && ! empty($ports) && ! in_array($detectedPort, $ports)) {
                     $this->application_deployment_queue->addLogEntry(

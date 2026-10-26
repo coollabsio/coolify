@@ -5064,8 +5064,8 @@ function formatBytes(?int $bytes, int $precision = 2): string
 }
 
 /**
- * Compact human-readable count (e.g. 26_360 -> "26.36k", 1_200_000 -> "1.2M").
- * Trailing zeros are trimmed so round values read cleanly ("1k", not "1.00k").
+ * Compact human-readable count (e.g. 26_360 -> "26.36K", 1_200_000 -> "1.2M").
+ * Trailing zeros are trimmed so round values read cleanly ("1K", not "1.00K").
  * Used for the dense metric columns in the traffic-analytics lists.
  */
 function compactNumber(?int $n): string
@@ -5079,10 +5079,25 @@ function compactNumber(?int $n): string
     [$divisor, $suffix] = match (true) {
         $n >= 1_000_000_000 => [1_000_000_000, 'B'],
         $n >= 1_000_000 => [1_000_000, 'M'],
-        default => [1000, 'k'],
+        default => [1000, 'K'],
     };
 
     return rtrim(rtrim(number_format($n / $divisor, 2, '.', ''), '0'), '.').$suffix;
+}
+
+/**
+ * Compact response time for the traffic-analytics latency figures
+ * (e.g. 85.4 -> "85.4 ms", 2_450 -> "2.5 s", 312_000 -> "5.2 min").
+ */
+function formatLatency(float|int|null $ms): string
+{
+    $ms = (float) $ms;
+
+    return match (true) {
+        $ms >= 60_000 => number_format($ms / 60_000, 1).' min',
+        $ms >= 1000 => number_format($ms / 1000, 1).' s',
+        default => number_format($ms, 1).' ms',
+    };
 }
 
 /**

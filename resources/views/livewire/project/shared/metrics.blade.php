@@ -235,6 +235,8 @@
                 (() => {
                     checkTheme();
 
+                    const formatMemory = value => value >= 1024 ? `${Number((value / 1024).toFixed(1))} GB` : `${Math.round(value)} MB`;
+
                     const memoryChart = new ApexCharts(document.getElementById('{!! $chartId !!}-memory'), {
                         chart: {
                             height: 240,
@@ -294,7 +296,7 @@
                                 style: {
                                     colors: textColor,
                                 },
-                                formatter: value => `${Math.round(value)} MB`,
+                                formatter: formatMemory,
                             },
                         },
                         noData: {
@@ -354,7 +356,7 @@
                                     style: {
                                         colors: textColor,
                                     },
-                                    formatter: value => `${Math.round(value)} MB`,
+                                    formatter: formatMemory,
                                 },
                             },
                             noData: {
@@ -368,7 +370,7 @@
                             name: 'Memory',
                             color: ramColor,
                             data: chartData[0].seriesData,
-                            formatter: value => `${Math.round(value)} MB`,
+                            formatter: formatMemory,
                         }]);
                     });
                 })();

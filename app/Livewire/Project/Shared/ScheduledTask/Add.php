@@ -39,6 +39,9 @@ class Add extends Component
 
     public int $timeout = 300;
 
+    #[Locked]
+    public string $serverTimezone = 'UTC';
+
     protected $rules = [
         'name' => 'required|string',
         'command' => 'required|string',
@@ -73,6 +76,8 @@ class Add extends Component
             default:
                 throw new \Exception('Invalid resource type');
         }
+
+        $this->serverTimezone = getServerTimezone($this->resource->destination?->server);
 
         if ($this->containerNames->count() > 0) {
             $this->container = $this->containerNames->first();

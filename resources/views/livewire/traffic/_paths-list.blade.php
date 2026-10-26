@@ -81,7 +81,7 @@
                         title="Combined 4xx and 5xx response rate">{{ $errorRate }}%</span>
                     <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($bytesOut) }}</span>
                     <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 md:inline dark:text-fg-faint"
-                        title="p95 latency">{{ number_format($p95, 1) }} ms</span>
+                        title="p95 latency: {{ number_format($p95, 1) }} ms">{{ formatLatency($p95) }}</span>
                 </div>
             @endforeach
         </div>
