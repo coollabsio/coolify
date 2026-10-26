@@ -3103,7 +3103,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $sshCommand .= " -i {$identityFile} -o IdentitiesOnly=yes";
         }
 
-        return 'GIT_SSH_COMMAND="'.$sshCommand.'" git ls-remote '.escapeshellarg($this->fullRepoUrl).' '.escapeshellarg($lsRemoteRef);
+        $gitConfigOption = $this->application->gitHttpsCredentialConfigOption();
+        $gitCommand = $gitConfigOption ? "git {$gitConfigOption}" : 'git';
+
+        return 'GIT_SSH_COMMAND="'.$sshCommand.'" '.$gitCommand.' ls-remote '.escapeshellarg($this->fullRepoUrl).' '.escapeshellarg($lsRemoteRef);
     }
 
     private function check_git_if_build_needed()
