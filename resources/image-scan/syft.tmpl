@@ -1,0 +1,7 @@
+{{- range .artifacts }}
+{{- $lic := list }}{{- range .licenses }}{{- $lic = append $lic .value }}{{- end }}
+{{- $layer := "" }}{{- range .locations }}{{- if and (not $layer) .layerID }}{{- $layer = .layerID }}{{- end }}{{- end }}
+{{ dict "id" .id "name" .name "version" .version "type" .type "licenses" $lic "purl" .purl "layer" $layer | toJson }}
+{{- end }}
+{{- $layers := list }}{{- range .source.metadata.layers }}{{- $layers = append $layers .digest }}{{- end }}
+{{ dict "layers" $layers | toJson }}
