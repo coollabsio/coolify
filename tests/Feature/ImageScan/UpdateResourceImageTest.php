@@ -10,6 +10,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\ImageScan;
+use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -670,7 +671,8 @@ describe('updateImage action', function () {
 
 describe('base image of a Dockerfile build', function () {
     /**
-     * A Dockerfile build from node:20.11-alpine. The base check found 7 findings that the current base image has too.
+     * A Dockerfile build from node:20.11-alpine. The base check found 7 findings at the alert level that the current
+     * base image has too (2 critical, 5 high); CVE-2026-0030 comes from a package the Dockerfile added.
      *
      * @param  array<string, mixed>|null  $base
      */
@@ -689,16 +691,21 @@ describe('base image of a Dockerfile build', function () {
             'image_ref' => $application->uuid.':abc123',
             'base_image_ref' => $baseImageRef,
             'builds_image' => true,
-            'findings' => [[
-                'id' => 'CVE-2026-0001', 'aliases' => [], 'severity' => 'critical', 'package' => 'openssl', 'version' => '3.1.4-r0',
-                'type' => 'apk', 'artifactId' => 'a1', 'fixedIn' => '3.1.7-r0', 'fixState' => 'fixed', 'kev' => false,
+            'findings' => array_map(fn (array $row) => [
+                'id' => $row[0], 'aliases' => [], 'severity' => $row[1], 'package' => 'openssl', 'version' => '3.1.4-r0',
+                'type' => 'apk', 'artifactId' => $row[0], 'fixedIn' => '3.1.7-r0', 'fixState' => 'fixed', 'kev' => false,
                 'epss' => null, 'risk' => 1.0, 'summary' => '', 'layer' => 'app',
-            ]],
+            ], [
+                ['CVE-2026-0001', 'critical'], ['CVE-2026-0002', 'critical'], ['CVE-2026-0011', 'high'], ['CVE-2026-0012', 'high'],
+                ['CVE-2026-0013', 'high'], ['CVE-2026-0014', 'high'], ['CVE-2026-0015', 'high'], ['CVE-2026-0030', 'critical'],
+            ]),
             'summary' => ['fixable_now_at_level' => 1, 'truncated' => false, 'eol_distro' => null],
             'candidates' => ['status' => 'skipped', 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => [],
                 ...($base === null ? [] : ['base' => [
                     'image' => $baseImageRef, 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false,
-                    'attributable' => 7, 'current_digest' => 'sha256:'.str_repeat('c', 64), ...$base,
+                    'attributable' => 7, 'current_digest' => 'sha256:'.str_repeat('c', 64),
+                    'attributable_ids' => ['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014', 'CVE-2026-0015'],
+                    ...$base,
                 ]])],
             'scanned_at' => now(),
         ]);
@@ -709,7 +716,7 @@ describe('base image of a Dockerfile build', function () {
     function updateImageBaseEntry(array $overrides = []): array
     {
         return updateImageEntry('node:20.18-alpine', 'line', true, [
-            'fixed_ids' => ['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014'],
+            'fixed_ids' => ['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014', 'CVE-2026-0030'],
             'fixes' => ['critical' => 1, 'high' => 4, 'medium' => 0],
             ...$overrides,
         ]);
@@ -726,8 +733,23 @@ describe('base image of a Dockerfile build', function () {
             ->assertDontSeeHtml('updateImage(');
     });
 
+    it('counts what the newer base image fixes on the findings that are not ignored now', function (array $ignored, ?string $text) {
+        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
+        foreach ($ignored as $id) {
+            ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => $application->getMorphClass(), 'resource_id' => $application->id, 'vulnerability_id' => $id]);
+        }
+
+        $page = updateImagePage($this->admin, $application, 'application');
+        $text === null ? $page->assertDontSee('Change FROM') : $page->assertSeeText($text);
+    })->with([
+        'one not fixed ignored' => [['CVE-2026-0002'], 'Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 6.'],
+        'one fixed ignored' => [['CVE-2026-0011'], 'Change FROM node:20.11-alpine to node:20.18-alpine: fixes 4 of 6.'],
+        'all fixed ignored' => [['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014'], null],
+        'all attributable ignored' => [['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014', 'CVE-2026-0015'], null],
+    ]);
+
     it('keeps the name of the base image as the Dockerfile writes it', function () {
-        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageEntry('node:20.18-alpine', 'line', true, ['fixes' => ['critical' => 0, 'high' => 2, 'medium' => 0]])]], 'docker.io/library/node:20.11-alpine');
+        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageEntry('node:20.18-alpine', 'line', true, ['fixed_ids' => ['CVE-2026-0011', 'CVE-2026-0012']])]], 'docker.io/library/node:20.11-alpine');
 
         updateImagePage($this->admin, $application, 'application')
             ->assertSeeText('Change FROM docker.io/library/node:20.11-alpine to docker.io/library/node:20.18-alpine: fixes 2 of 7.')
@@ -749,7 +771,7 @@ describe('base image of a Dockerfile build', function () {
         'daily limit' => [['status' => 'failed', 'error' => 'daily_limit', 'entries' => []]],
         'login needed' => [['status' => 'auth_required', 'error' => 'registry_auth', 'entries' => []]],
         'cannot compare' => [['status' => 'cannot_compare', 'entries' => [], 'attributable' => null]],
-        'nothing attributable' => [['status' => 'ok', 'attributable' => 0, 'entries' => [updateImageBaseEntry(['fixes' => ['critical' => 0, 'high' => 0, 'medium' => 0]])]]],
-        'fixes nothing' => [['status' => 'ok', 'entries' => [updateImageBaseEntry(['fixed_ids' => [], 'fixes' => ['critical' => 0, 'high' => 0, 'medium' => 0]])]]],
+        'nothing attributable' => [['status' => 'ok', 'attributable' => 0, 'attributable_ids' => [], 'entries' => [updateImageBaseEntry()]]],
+        'fixes only a finding the base image does not have' => [['status' => 'ok', 'entries' => [updateImageBaseEntry(['fixed_ids' => ['CVE-2026-0030']])]]],
     ]);
 });

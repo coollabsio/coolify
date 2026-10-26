@@ -147,8 +147,9 @@ final class FixPanel
 
     /**
      * A better base image for the final `FROM` of a Dockerfile build (spec 7.4): of the findings at the alert level
-     * that the current base image has too (m), how many the newer tag no longer has (n). Null without a better line
-     * candidate that fixes one; failures of the base check are not shown.
+     * that the current base image has too (m), how many the newer tag no longer has (n). Both are counted on the
+     * current findings and ignores, with the IDs stored by the last check. Null without a better line candidate that
+     * fixes one; failures of the base check are not shown.
      *
      * @return array{from: string, to: string, fixed: int, total: int}|null
      */
@@ -177,9 +178,18 @@ final class FixPanel
             return null;
         }
 
-        $total = (int) ($base['attributable'] ?? 0);
-        $fixed = min($total, array_sum(array_map('intval', array_intersect_key((array) ($entry['fixes'] ?? []), array_flip(self::SEVERITIES)))));
-        if ($total <= 0 || $fixed <= 0) {
+        $owner = $scan->resource;
+        if (! $owner instanceof Model) {
+            return null;
+        }
+
+        $attributableIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($base['attributable_ids'] ?? [])));
+        $fixedIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($entry['fixed_ids'] ?? [])));
+        $has = fn (Finding $finding, array $ids): bool => collect([$finding->id, ...$finding->aliases])->contains(fn (string $id): bool => isset($ids[mb_strtolower($id)]));
+        $attributable = array_filter(RefreshCandidates::alertFindings($scan, $owner), fn (Finding $finding): bool => $has($finding, $attributableIds));
+        $total = count($attributable);
+        $fixed = count(array_filter($attributable, fn (Finding $finding): bool => $has($finding, $fixedIds)));
+        if ($total === 0 || $fixed === 0) {
             return null;
         }
 

@@ -38,9 +38,9 @@ use Throwable;
  * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`, with status `skipped` when
  * only the base image was checked. The base image of a Dockerfile build (spec 7.4) is scanned from the registry with the
  * newest tag of its line; the result is under `base`: `{image, status, checked_at, error, tags_truncated, attributable,
- * current_digest, entries}`. A finding of the app is attributable to the base image when the current base image has it
- * too; the line candidate fixes the attributable findings it does not have. Base entries never make a finding fixable now. Never throws for registry or scan problems: they become the status.
- * Registry credentials are read only after an anonymous request failed, only for the registry of the image, and are
+ * attributable_ids, current_digest, entries}`. A finding of the app is attributable to the base image when the current
+ * base image has it too; the line candidate fixes the attributable findings it does not have. Base entries never make a
+ * finding fixable now. Never throws for registry or scan problems: they become the status. Registry credentials are read only after an anonymous request failed, only for the registry of the image, and are
  * never stored or logged.
  */
 class RefreshCandidates
@@ -143,7 +143,7 @@ class RefreshCandidates
             $result = $check();
         } catch (Throwable $e) {
             report($e);
-            $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => [], 'attributable' => null, 'current_digest' => null];
+            $result = ['status' => 'failed', 'error' => 'unknown', 'entries' => [], 'attributable' => null, 'attributable_ids' => [], 'current_digest' => null];
         }
 
         return [...$result, 'tags_truncated' => $this->tagsTruncated];
@@ -200,7 +200,7 @@ class RefreshCandidates
      *
      * @return list<Finding>
      */
-    private static function alertFindings(ImageScan $scan, Model $resource): array
+    public static function alertFindings(ImageScan $scan, Model $resource): array
     {
         $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
         $ignores = IgnoreMatcher::forResource($resource);
@@ -354,18 +354,23 @@ class RefreshCandidates
      * with the usual lock, disk, reuse, and daily rules. Only a different tag can change the `FROM` line, so a newer
      * build of the same tag is not checked.
      *
-     * @return array{status: string, error: ?string, entries: list<array<string, mixed>>, attributable: ?int, current_digest: ?string}
+     * @return array{status: string, error: ?string, entries: list<array<string, mixed>>, attributable: ?int,
+     *     attributable_ids: list<string>, current_digest: ?string}
      */
     private function checkBase(ImageScan $scan, Model $resource, int $lockWaitSeconds, bool &$ranOnServer): array
     {
-        $result = fn (string $status, array $entries = [], ?int $attributable = null, ?string $currentDigest = null): array => [
+        $result = fn (string $status, array $entries = [], ?array $attributable = null, ?string $currentDigest = null): array => [
             'status' => $status,
             'error' => $status === 'cannot_compare' ? null : $this->error,
             'entries' => $entries,
-            'attributable' => $attributable,
+            'attributable' => $attributable === null ? null : count($attributable),
+            'attributable_ids' => $attributable === null ? [] : array_values(array_unique(array_map(fn (Finding $finding) => $finding->id, $attributable))),
             'current_digest' => $currentDigest,
         ];
-        $failure = fn (?int $attributable = null, ?string $currentDigest = null): array => [...$this->failure(), 'attributable' => $attributable, 'current_digest' => $currentDigest];
+        $failure = fn (?array $attributable = null, ?string $currentDigest = null): array => [
+            ...$result('failed', [], $attributable, $currentDigest),
+            ...$this->failure(),
+        ];
 
         try {
             $this->image = ImageRef::parse((string) $scan->base_image_ref);
@@ -387,6 +392,9 @@ class RefreshCandidates
         }
 
         $ranOnServer = true;
+        // The disk check of the registry scans uses the size of the app image, an upper bound of its base image.
+        $this->currentImageId = $scan->image_id;
+        $this->currentImageSize = null;
         $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
         if ($tags === null) {
             return $failure();
@@ -421,7 +429,7 @@ class RefreshCandidates
 
         $candidate = $this->scanCandidate($lineDigest, $platform, $lockWaitSeconds);
         if ($candidate === null) {
-            return $failure(count($attributable), $currentDigest);
+            return $failure($attributable, $currentDigest);
         }
 
         $candidateFindings = $notIgnored($candidate['findings']);
@@ -439,7 +447,7 @@ class RefreshCandidates
             'scanned_at' => now()->toIso8601String(),
         ];
 
-        return $result($better ? 'ok' : 'no_better', [$entry], count($attributable), $currentDigest);
+        return $result($better ? 'ok' : 'no_better', [$entry], $attributable, $currentDigest);
     }
 
     /**
@@ -730,7 +738,8 @@ class RefreshCandidates
      * the user does not build fixable now (spec 7.5).
      *
      * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool}  $result
-     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool, attributable: ?int, current_digest: ?string}|null  $base
+     * @param  array{status: string, error: ?string, entries: list<array<string, mixed>>, tags_truncated: bool,
+     *     attributable: ?int, attributable_ids: list<string>, current_digest: ?string}|null  $base
      */
     private function store(ImageScan $scan, array $result, ?array $base): void
     {
@@ -753,6 +762,7 @@ class RefreshCandidates
                 'error' => $base['error'],
                 'tags_truncated' => $base['tags_truncated'],
                 'attributable' => $base['attributable'],
+                'attributable_ids' => $base['attributable_ids'],
                 'current_digest' => $base['current_digest'],
                 'entries' => $base['entries'],
             ]]),

@@ -580,6 +580,8 @@ it('attributes findings to the base image from a registry scan of the current ba
         ->and($scan->candidateEntries())->toBe([])
         ->and($base)->toMatchArray(['image' => 'postgres:15.0-alpine', 'status' => 'ok', 'tags_truncated' => false, 'current_digest' => CANDIDATES_REPO_DIGEST])
         ->and($base['attributable'])->toBe(candidatesAttributableCount())
+        ->and($base['attributable_ids'])->not->toContain('CVE-2099-0001')
+        ->and($base['attributable_ids'])->toHaveCount(collect(candidatesFindings())->filter(fn (Finding $finding) => in_array(strtolower($finding->severity), ['critical', 'high'], true))->pluck('id')->unique()->count())
         ->and($base['checked_at'])->not->toBeNull()
         ->and($base['entries'])->toHaveCount(1)
         ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 3, 'high' => 32, 'medium' => 0]])
@@ -684,6 +686,19 @@ it('reuses the SBOM of the current base image on the server and does not count i
     expect($scan->fresh()->candidates['base']['status'])->toBe('ok')
         ->and(candidatesRan("'registry:"))->toBe(1)
         ->and(candidatesScansToday())->toBe(1);
+});
+
+it('checks the disk space for the app image size before the base image registry scans', function () {
+    candidatesFake();
+    $this->diskFree = '4000000000 50000000000';
+    $scan = candidatesDockerfileScan();
+
+    RefreshCandidates::run($scan);
+
+    expect(candidatesRan("'registry:"))->toBe(0)
+        ->and(candidatesRan('docker image inspect'))->toBe(1)
+        ->and($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'failed', 'error' => 'disk'])
+        ->and(candidatesScansToday())->toBe(0);
 });
 
 it('cannot compare a base image without a version tag', function () {
