@@ -204,8 +204,8 @@ class Show extends Component
             ->where('resource_type', $this->application->getMorphClass())
             ->where('resource_id', $this->application->id)
             ->where('deployment_queue_id', $deployment->id)
-            ->pluck('candidates')
-            ->flatten(1)
+            ->get(['id', 'candidates'])
+            ->flatMap(fn (ImageScan $scan): array => $scan->candidateEntries())
             ->first(fn ($candidate): bool => is_array($candidate) && ($candidate['better'] ?? false) === true && is_string($candidate['ref'] ?? null));
         if (! $candidate) {
             return null;

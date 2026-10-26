@@ -53,6 +53,33 @@ class ImageScan extends BaseModel
         ];
     }
 
+    /**
+     * Entries of `candidates`. Written as `{status, checked_at, entries}`; older rows hold a bare list of entries.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function candidateEntries(): array
+    {
+        $candidates = $this->candidates;
+        if (! is_array($candidates)) {
+            return [];
+        }
+
+        $entries = array_is_list($candidates) ? $candidates : ($candidates['entries'] ?? []);
+
+        return is_array($entries) ? array_values(array_filter($entries, 'is_array')) : [];
+    }
+
+    /**
+     * Result of the last candidate check: ok, no_better, cannot_compare, auth_required, or failed. Null before the first check.
+     */
+    public function candidateStatus(): ?string
+    {
+        $status = is_array($this->candidates) && ! array_is_list($this->candidates) ? ($this->candidates['status'] ?? null) : null;
+
+        return is_string($status) ? $status : null;
+    }
+
     public function resource(): MorphTo
     {
         return $this->morphTo('resource');

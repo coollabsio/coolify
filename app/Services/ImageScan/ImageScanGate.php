@@ -175,8 +175,8 @@ final class ImageScanGate
     {
         $ids = [];
 
-        foreach ((array) ($scan->candidates ?? []) as $candidate) {
-            if (is_array($candidate) && ($candidate['better'] ?? false) === true) {
+        foreach ($scan->candidateEntries() as $candidate) {
+            if (($candidate['better'] ?? false) === true) {
                 foreach ((array) ($candidate['fixed_ids'] ?? []) as $id) {
                     $ids[] = (string) $id;
                 }

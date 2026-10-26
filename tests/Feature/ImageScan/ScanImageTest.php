@@ -6,6 +6,7 @@ use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanOnError;
 use App\Enums\ImageScanStatus;
 use App\Events\ImageScanUpdated;
+use App\Jobs\RefreshCandidatesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -27,6 +28,7 @@ use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
@@ -621,4 +623,45 @@ it('keeps the deployment of a scan when a later rescan has none', function () {
 
     expect($scan->deployment_queue_id)->toBe($deployment->id)
         ->and(ImageScan::query()->count())->toBe(1);
+});
+
+describe('candidate check', function () {
+    beforeEach(function () {
+        Queue::fake();
+        ImageScanPolicy::factory()->create([
+            'scope_type' => $this->server->getMorphClass(),
+            'scope_id' => $this->server->id,
+            'alert_level' => ImageScanAlertLevel::High,
+        ]);
+        $this->application->forceFill(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'postgres', 'docker_registry_image_tag' => '15.0-alpine'])->save();
+    });
+
+    it('queues a candidate check after a scan of an image with a package fix at the alert level', function () {
+        scanImageTestFake();
+
+        $scan = scanImageTestRun($this->application->fresh());
+
+        Queue::assertPushed(RefreshCandidatesJob::class, fn (RefreshCandidatesJob $job) => $job->scan->is($scan));
+        expect(Cache::lock("image-scan:{$this->server->id}", 10)->get())->toBeTrue();
+    });
+
+    it('queues no candidate check for an image that Coolify builds', function () {
+        scanImageTestFake();
+        $this->application->forceFill(['build_pack' => 'dockerfile'])->save();
+
+        scanImageTestRun($this->application->fresh());
+
+        Queue::assertNotPushed(RefreshCandidatesJob::class);
+    });
+
+    it('queues no candidate check when the last check is recent', function () {
+        scanImageTestFake();
+        $scan = scanImageTestRun($this->application->fresh());
+        $scan->update(['candidates' => ['status' => 'no_better', 'checked_at' => now()->subHour()->toIso8601String(), 'error' => null, 'entries' => []]]);
+        Queue::fake();
+
+        scanImageTestRun($this->application->fresh());
+
+        Queue::assertNotPushed(RefreshCandidatesJob::class);
+    });
 });

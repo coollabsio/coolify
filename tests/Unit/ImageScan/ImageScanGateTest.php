@@ -199,6 +199,32 @@ it('uses candidate images for images the team does not build', function () {
     expect((new ImageScanGate)->evaluate($scan, gatePolicy(), gateIgnores())->blocked)->toBeFalse();
 });
 
+it('reads candidate entries from the wrapped shape and from a bare list', function (array $candidates) {
+    $scan = gateScan([gateFinding('CVE-1'), gateFinding('CVE-2')], ['builds_image' => false, 'candidates' => $candidates]);
+
+    $result = (new ImageScanGate)->evaluate($scan, gatePolicy(), gateIgnores());
+
+    expect($result->count)->toBe(1)
+        ->and(array_column($result->top, 'id'))->toBe(['CVE-1']);
+})->with([
+    'wrapped' => [['status' => 'ok', 'checked_at' => '2026-10-26T00:00:00+00:00', 'entries' => [
+        ['ref' => 'postgres:15-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-1']],
+        ['ref' => 'postgres:16-alpine', 'kind' => 'major', 'better' => false, 'fixed_ids' => ['CVE-2']],
+    ]]],
+    'bare list' => [[
+        ['ref' => 'postgres:15-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-1']],
+        ['ref' => 'postgres:16-alpine', 'kind' => 'major', 'better' => false, 'fixed_ids' => ['CVE-2']],
+    ]],
+]);
+
+it('uses no candidate of a wrapped result without entries', function () {
+    $scan = gateScan([gateFinding('CVE-1')], ['builds_image' => false, 'candidates' => ['status' => 'auth_required', 'checked_at' => null, 'entries' => []]]);
+
+    expect((new ImageScanGate)->evaluate($scan, gatePolicy(), gateIgnores())->blocked)->toBeFalse()
+        ->and($scan->candidateEntries())->toBe([])
+        ->and($scan->candidateStatus())->toBe('auth_required');
+});
+
 it('does not block on a scan error when the policy is to deploy', function () {
     $result = (new ImageScanGate)->evaluate(null, gatePolicy(), gateIgnores(), ImageScanErrorCode::Timeout);
 

@@ -392,6 +392,31 @@ describe('rescan', function () {
             ->and(Cache::get(ScanImage::lastErrorCacheKey($this->otherApplication))['code'])->toBe('db_too_old')
             ->and(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(0);
     });
+
+    it('checks for newer versions of a running image with a package fix at the alert level', function () {
+        rescanTestFake();
+        ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high']);
+        $database = StandalonePostgresql::forceCreate([
+            'name' => 'pg',
+            'postgres_password' => 'secret',
+            'image' => 'postgres:15.0-alpine',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        rescanTestContainer(RESCAN_TEST_HEX, 'postgres:15.0-alpine', [
+            'coolify.type' => 'database',
+            'coolify.databaseId' => (string) $database->id,
+            'coolify.databaseUuid' => $database->uuid,
+        ]);
+        rescanTestApplicationContainer($this->application, RESCAN_TEST_OTHER_HEX);
+
+        rescanTestRun();
+
+        expect(ImageScan::query()->where('resource_type', $database->getMorphClass())->sole()->candidateStatus())->not->toBeNull()
+            ->and(ImageScan::query()->where('resource_type', $this->application->getMorphClass())->sole()->candidates)->toBeNull()
+            ->and(rescanTestRanCommand("'tag'\\'' '\\''ls'\\'' '\\''docker.io/library/postgres'"))->toBe(1);
+    });
 });
 
 describe('retention', function () {

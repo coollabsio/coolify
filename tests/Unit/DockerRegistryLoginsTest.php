@@ -85,3 +85,34 @@ it('reads IPv6 registries from the docker config and image references', function
         ->toBe(['[2a01:4f8::1]:5000' => ['source' => 'auths', 'username' => null]])
         ->and(DockerRegistryLogins::registryFromImage('[2a01:4f8::1]:5000/team/app:1'))->toBe('[2a01:4f8::1]:5000');
 });
+
+it('builds a Docker config with only the login of one registry', function (string $registry, string $key, string $auth) {
+    $config = json_encode([
+        'auths' => [
+            'https://index.docker.io/v1/' => ['auth' => base64_encode('hub:HUB_SECRET')],
+            'ghcr.io' => ['auth' => base64_encode('gh:GH_SECRET')],
+            'registry.example.com:5000' => ['username' => 'me', 'password' => 'PRIVATE_SECRET'],
+        ],
+        'credHelpers' => ['123456789.dkr.ecr.eu-west-1.amazonaws.com' => 'ecr-login'],
+    ]);
+
+    $result = DockerRegistryLogins::singleRegistryConfig($config, $registry);
+
+    expect($result['status'])->toBe('ok')
+        ->and(json_decode(base64_decode($result['config']), true))->toBe(['auths' => [$key => ['auth' => $auth]]]);
+})->with([
+    'Docker Hub' => ['docker.io', 'https://index.docker.io/v1/', base64_encode('hub:HUB_SECRET')],
+    'GHCR' => ['ghcr.io', 'ghcr.io', base64_encode('gh:GH_SECRET')],
+    'registry with a port and a username and password' => ['registry.example.com:5000', 'registry.example.com:5000', base64_encode('me:PRIVATE_SECRET')],
+]);
+
+it('reports a credential helper login as unusable for one registry', function (array $config) {
+    expect(DockerRegistryLogins::singleRegistryConfig(json_encode($config), 'ghcr.io'))->toBe(['status' => 'helper', 'config' => null]);
+})->with([
+    'credHelpers' => [['credHelpers' => ['ghcr.io' => 'gh'], 'auths' => ['docker.io' => ['auth' => base64_encode('a:b')]]]],
+    'credsStore' => [['credsStore' => 'desktop', 'auths' => ['ghcr.io' => []]]],
+]);
+
+it('reports no login for a registry that is not in the config', function (?string $config) {
+    expect(DockerRegistryLogins::singleRegistryConfig($config, 'ghcr.io'))->toBe(['status' => 'none', 'config' => null]);
+})->with([null, '', 'not json', '{"auths":{"docker.io":{"auth":"YTpi"}}}', '{"auths":{"ghcr.io":{"auth":"not base64 with colon"}}}']);

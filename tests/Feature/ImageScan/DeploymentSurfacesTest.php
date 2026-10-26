@@ -208,6 +208,12 @@ describe('log toolbar', function () {
         ]]);
 
         surfacesShow($this->admin, $deployment)->assertSee('Update to 16.4-alpine');
+
+        $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
+            ['ref' => 'postgres:16.5-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+        ]]]);
+
+        surfacesShow($this->admin, $deployment)->assertSee('Update to 16.5-alpine');
     });
 });
 

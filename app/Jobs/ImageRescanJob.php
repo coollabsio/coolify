@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
@@ -97,7 +98,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         [$targets, $runningRefs] = $this->targets($server, $listing['containers']);
         foreach ($targets as $imageId => $imageTargets) {
             try {
-                ScanImage::make()->rescan($server, $imageId, $imageTargets, self::LOCK_WAIT_SECONDS);
+                $this->refreshCandidates(ScanImage::make()->rescan($server, $imageId, $imageTargets, self::LOCK_WAIT_SECONDS));
             } catch (Throwable $e) {
                 report($e);
             }
@@ -106,6 +107,25 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         // A cut list would make running images look stopped.
         if (! $listing['truncated']) {
             $this->cleanUp($server, $commands, $targets, $runningRefs);
+        }
+    }
+
+    /**
+     * Looks for newer versions of each rescanned image that has a package fix at the alert level (spec 4.5, 7.1).
+     * The rescan released the lock; each candidate scan takes it again.
+     *
+     * @param  list<ImageScan>  $scans
+     */
+    private function refreshCandidates(array $scans): void
+    {
+        foreach ($scans as $scan) {
+            try {
+                if (RefreshCandidates::shouldRefresh($scan)) {
+                    RefreshCandidates::run($scan, self::LOCK_WAIT_SECONDS);
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
         }
     }
 

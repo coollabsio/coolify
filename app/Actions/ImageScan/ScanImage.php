@@ -5,6 +5,7 @@ namespace App\Actions\ImageScan;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
 use App\Events\ImageScanUpdated;
+use App\Jobs\RefreshCandidatesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageSbom;
@@ -100,9 +101,27 @@ class ScanImage
         }
 
         try {
-            return $this->scan($server, $resource, $imageRef, $deployment, $policy, $context);
+            $scan = $this->scan($server, $resource, $imageRef, $deployment, $policy, $context);
         } finally {
             $lock->release();
+        }
+
+        $this->queueCandidateCheck($scan);
+
+        return $scan;
+    }
+
+    /**
+     * Looks for a newer version that fixes the findings in a queued job, after the lock is released, so a deploy never waits for it (spec 7.1).
+     */
+    private function queueCandidateCheck(ImageScan $scan): void
+    {
+        try {
+            if (RefreshCandidates::shouldRefresh($scan)) {
+                RefreshCandidatesJob::dispatch($scan);
+            }
+        } catch (Throwable $e) {
+            report($e);
         }
     }
 
