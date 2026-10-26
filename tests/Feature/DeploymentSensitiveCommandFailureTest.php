@@ -457,7 +457,8 @@ it('streams the compose file over stdin so its content stays out of commands, er
         return Process::result();
     });
 
-    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'generate_compose_file'));
+    invokeSensitiveFailureJobMethod($job, $reflection, 'generate_compose_file');
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'write_compose_file_to_workdir'));
 
     $compose = (string) readSensitiveFailureJobProperty($job, $reflection, 'docker_compose');
     expect($composeWrite)->not->toBeNull()
