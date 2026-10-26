@@ -292,6 +292,8 @@ class Application extends BaseModel
             'container_present' => 'boolean',
             'last_restart_at' => 'datetime',
             'is_maintenance_enabled' => 'boolean',
+            'health_check_enabled' => 'boolean',
+            'custom_healthcheck_found' => 'boolean',
         ];
     }
 
