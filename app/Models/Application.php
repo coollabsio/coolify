@@ -399,8 +399,11 @@ class Application extends BaseModel
             }
         });
         static::created(function ($application) {
+            // New applications keep build-time values out of image layers. Clones and server transfer
+            // imports overwrite this row with the settings of their source application.
             ApplicationSetting::create([
                 'application_id' => $application->id,
+                'use_build_secrets' => true,
             ]);
             $application->compose_parsing_version = self::$parserVersion;
             $application->save();

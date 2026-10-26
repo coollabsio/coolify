@@ -634,6 +634,25 @@ it('mounts underscore nixpacks secrets on RUN lines when build secrets are enabl
         ->toContain('printenv SAFE_FROM_TOML');
 });
 
+it('warns when a Dockerfile in build secrets mode cannot read build variables', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerfile']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'env_args' => collect(['NODE_VERSION' => '22']),
+        'build_secrets' => '--secret id=NODE_VERSION,env=NODE_VERSION',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "# syntax=docker/dockerfile:1.4\nARG NODE_VERSION\nFROM node:\${NODE_VERSION}\nRUN node --version",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/Dockerfile');
+
+    $logs = implode("\n", $job->recordedLogEntries);
+    expect($logs)
+        ->toContain('docker/dockerfile:1.4')
+        ->toContain('NODE_VERSION');
+});
+
 it('skips unsafe reserved Nixpacks plan variable keys before validation', function (string $key) {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',

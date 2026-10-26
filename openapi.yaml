@@ -563,7 +563,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -1001,7 +1001,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -1439,7 +1439,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -1814,7 +1814,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -2175,7 +2175,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean

@@ -1330,6 +1330,21 @@ test('transfer keeps the Traefik certificate resolver of applications and servic
         ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
 });
 
+test('transfer keeps the build secrets setting and the dismissed recommendations of an application', function () {
+    $this->application->settings->update([
+        'use_build_secrets' => false,
+        'dismissed_recommendations' => ['use-build-secrets'],
+    ]);
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    removeTransferSourceResources($this);
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $settings = Application::where('uuid', $this->application->uuid)->sole()->settings;
+    expect($settings->use_build_secrets)->toBeFalse()
+        ->and($settings->dismissed_recommendations)->toBe(['use-build-secrets']);
+});
+
 test('transfer keeps the cloud provider instance id of the server', function () {
     $this->server->forceFill(['hetzner_server_id' => 4242, 'vultr_instance_id' => 'vultr-7'])->save();
     $bundle = $this->exporter->export($this->server->fresh());

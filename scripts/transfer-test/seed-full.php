@@ -80,6 +80,7 @@ $app->settings->forceFill([
     'include_coolify_default_variables' => false, 'traefik_certificate_resolver' => 'custom', 'connect_to_docker_network' => true,
     'custom_internal_name' => 'whoami-two', 'is_permanent_redirect_enabled' => true, 'is_log_drain_enabled' => false,
     'is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true, 'is_auto_deploy_enabled' => false,
+    'use_build_secrets' => false, 'dismissed_recommendations' => ['use-build-secrets'],
 ])->save();
 
 // Variables of every kind, and references to every shared scope

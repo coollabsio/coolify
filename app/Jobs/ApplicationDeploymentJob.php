@@ -5478,6 +5478,35 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ]);
     }
 
+    /**
+     * Build secrets reach a build only as environment variables inside RUN, and the env= mount
+     * option needs Dockerfile frontend 1.10+. Warn about the two cases that then build without values.
+     *
+     * @param  Collection<int, string>  $dockerfile
+     * @param  Collection<string, mixed>  $variables
+     */
+    private function warnAboutDockerfileBuildSecretsCompatibility(Collection $dockerfile, Collection $variables): void
+    {
+        if (preg_match('~^#\s*syntax\s*=\s*\S*docker/dockerfile:1\.(\d+)~i', (string) $dockerfile->first(), $matches) === 1 && (int) $matches[1] < 10) {
+            $this->application_deployment_queue->addLogEntry("⚠️ The Dockerfile pins docker/dockerfile:1.{$matches[1]}. Build secrets need docker/dockerfile:1.10 or later. Remove the syntax line or update it, or switch Build secrets off.", 'stderr');
+        }
+
+        $keysUsedOutsideRun = $variables->keys()
+            ->map(fn ($key): string => (string) $key)
+            ->filter(fn (string $key): bool => ValidationPatterns::isValidEnvironmentVariableKey($key))
+            ->filter(fn (string $key): bool => $dockerfile->contains(function (string $line) use ($key): bool {
+                $trimmed = ltrim($line);
+
+                return preg_match('/^(RUN|ARG|ENV|#)/i', $trimmed) !== 1
+                    && preg_match('/\$\{?'.preg_quote($key, '/').'\b/', $trimmed) === 1;
+            }))
+            ->values();
+
+        if ($keysUsedOutsideRun->isNotEmpty()) {
+            $this->application_deployment_queue->addLogEntry('⚠️ The Dockerfile uses build-time variables outside RUN instructions: '.$keysUsedOutsideRun->implode(', ').'. With build secrets, these values are only available inside RUN, so these instructions get empty values. Switch Build secrets off on the Environment Variables page if the build needs them.', 'stderr');
+        }
+    }
+
     private function modify_dockerfile_for_secrets($dockerfile_path)
     {
         // Only process if build secrets are enabled and we have secrets to mount
@@ -5521,6 +5550,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // Add mount for the secrets hash to ensure cache invalidation
         $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
+
+        $this->warnAboutDockerfileBuildSecretsCompatibility($dockerfile, $variables);
 
         $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
