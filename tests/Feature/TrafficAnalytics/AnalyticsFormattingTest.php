@@ -73,3 +73,13 @@ it('distinguishes a missing response status from numeric values in other dimensi
     'overflow status' => ['status', '__other__', 'Other'],
     'zero in another dimension' => ['path', '0', '0'],
 ]);
+
+it('detects container tooling user agents', function () {
+    expect(isContainerToolingUserAgent('buildkit/v0.33'))->toBeTrue();
+    expect(isContainerToolingUserAgent('docker/29.6.2 go/go1.26.5 git-commit/3d80467 kernel/6.1.0-51-amd64 os/linux arch/amd64 UpstreamClient(compose/v5.3.1)'))->toBeTrue();
+    expect(isContainerToolingUserAgent('containerd/2.3.3+unknown'))->toBeTrue();
+    expect(isContainerToolingUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:156.0) Gecko/20100101 Firefox/156.0'))->toBeFalse();
+    expect(isContainerToolingUserAgent('curl/8.5.0'))->toBeFalse();
+    expect(isContainerToolingUserAgent('__other__'))->toBeFalse();
+    expect(isContainerToolingUserAgent(null))->toBeFalse();
+});
