@@ -2922,14 +2922,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                     return;
                 }
-                if ($this->application->custom_healthcheck_found) {
-                    $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
+                if ($this->application->isHealthcheckDisabled()) {
+                    $this->application_deployment_queue->addLogEntry('Using the custom healthcheck from the Dockerfile.');
                 }
                 if ($this->container_name) {
                     $escapedContainerName = escapeshellarg($this->container_name);
                     $counter = 1;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
-                    if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
+                    if ($this->full_healthcheck_url) {
                         $healthcheckLabel = $this->application->health_check_type === 'cmd' ? 'Healthcheck command' : 'Healthcheck URL';
                         $this->application_deployment_queue->addLogEntry("{$healthcheckLabel} (inside the container): {$this->full_healthcheck_url}");
                     }
@@ -3344,6 +3344,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+        $this->resolve_bitbucket_pull_request_commit();
         $this->generate_git_import_commands();
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
@@ -3424,6 +3425,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Restarting helper container with actual SOURCE_COMMIT value.');
             $this->restart_builder_container_with_actual_commit();
         }
+    }
+
+    /**
+     * Bitbucket Cloud has no pull request refs over git, so a preview deployment without a webhook
+     * commit (a manual redeploy) builds the commit of the latest earlier deployment of the pull request.
+     * Without such a commit the clone checks out the base branch, so the deployment fails instead.
+     */
+    private function resolve_bitbucket_pull_request_commit(): void
+    {
+        if ($this->pull_request_id === 0 || $this->git_type !== 'bitbucket' || ! $this->shouldResolveBranchHeadCommit()) {
+            return;
+        }
+
+        $commit = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', $this->pull_request_id)
+            ->whereKeyNot($this->application_deployment_queue->id)
+            ->whereNotIn('commit', ['HEAD', ''])
+            ->latest('id')
+            ->value('commit');
+
+        if (blank($commit)) {
+            throw new DeploymentException("Coolify cannot find the commit of Bitbucket pull request #{$this->pull_request_id}, because Bitbucket Cloud has no pull request refs over git. Push a commit to the pull request to deploy it with the webhook, or deploy the preview with a commit SHA through the API.");
+        }
+
+        $this->commit = $commit;
+        $this->application_deployment_queue->commit = $commit;
+        $this->application_deployment_queue->save();
+        $this->application_deployment_queue->addLogEntry("Using commit {$commit} of the latest deployment of Bitbucket pull request #{$this->pull_request_id}.");
     }
 
     /**
@@ -4418,10 +4448,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $docker_compose['services'][$this->container_name]['stop_grace_period'] = $this->application->settings->stopGracePeriodSeconds().'s';
         }
 
-        // Only add Coolify healthcheck if no custom HEALTHCHECK found in Dockerfile
-        // If custom_healthcheck_found is true, the Dockerfile's HEALTHCHECK will be used
-        // If healthcheck is disabled, no healthcheck will be added
-        if (! $this->application->custom_healthcheck_found && ! $this->application->isHealthcheckDisabled()) {
+        // An enabled Coolify healthcheck replaces any HEALTHCHECK from the image or Dockerfile.
+        // When it is disabled, the container keeps the HEALTHCHECK of the image (if any).
+        if (! $this->application->isHealthcheckDisabled()) {
             $healthcheck_command = $this->generate_healthcheck_commands();
             if ($healthcheck_command !== null) {
                 $docker_compose['services'][$this->container_name]['healthcheck'] = [
