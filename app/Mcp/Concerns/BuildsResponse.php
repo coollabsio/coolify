@@ -46,7 +46,7 @@ trait BuildsResponse
         'clickhouse_admin_password',
 
         // app/env secrets
-        'value', 'real_value', 'http_basic_auth_password',
+        'value', 'real_value', 'http_basic_auth_password', 'git_https_password',
 
         // free-form commands / configurations can embed credentials
         'git_full_url',
