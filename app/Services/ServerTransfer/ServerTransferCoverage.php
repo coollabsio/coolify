@@ -21,6 +21,10 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\GitlabApp;
+use App\Models\ImageSbom;
+use App\Models\ImageScan;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
@@ -107,6 +111,8 @@ final class ServerTransferCoverage
             'projects.*.environments.*.services.*.secret_manager_link',
         ],
         SslCertificate::class => ['ssl_certificates.*'],
+        ImageScanPolicy::class => ['image_scan_policies.*'],
+        ImageScanIgnore::class => ['image_scan_ignores.*'],
         GithubApp::class => ['github_apps.*'],
         GithubRunnerConfig::class => ['github_runner_config'],
         GitlabApp::class => ['gitlab_apps.*'],
@@ -195,6 +201,7 @@ final class ServerTransferCoverage
             'sentinel_custom_url' => 'The target sets its own URL when it claims the server.',
             'cloudflare_tunnel_integration_token_id' => 'Exported as cloudflare_tunnel_integration_token_uuid. '.self::LINKED,
             'patch_check_result' => self::RUNTIME, 'patch_check_error' => self::RUNTIME, 'patch_checked_at' => self::RUNTIME,
+            'image_candidate_scans_today' => self::RUNTIME, 'image_candidate_scans_date' => self::RUNTIME,
         ],
         PrivateKey::class => ['team_id' => self::TEAM],
         StandaloneDocker::class => ['server_id' => self::LINKED],
@@ -209,6 +216,18 @@ final class ServerTransferCoverage
         ],
         SecretManagerLink::class => ['resourceable_type' => self::LINKED, 'resourceable_id' => self::LINKED, 'integration_token_id' => self::LINKED],
         SslCertificate::class => ['server_id' => self::LINKED, 'resource_type' => self::LINKED, 'resource_id' => self::LINKED],
+        ImageScanPolicy::class => [
+            'uuid' => 'The target makes its own ID.',
+            'scope_type' => 'Exported as scope_kind and scope_uuid. '.self::LINKED,
+            'scope_id' => 'Exported as scope_kind and scope_uuid. '.self::LINKED,
+        ],
+        ImageScanIgnore::class => [
+            'uuid' => 'The target makes its own ID.',
+            'team_id' => self::TEAM,
+            'resource_type' => 'Exported as resource_kind and resource_uuid. '.self::LINKED,
+            'resource_id' => 'Exported as resource_kind and resource_uuid. '.self::LINKED,
+            'created_by' => 'A user of the source instance; the target leaves it empty.',
+        ],
         GithubApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         GithubRunnerConfig::class => [
             'server_id' => self::LINKED,
@@ -342,6 +361,8 @@ final class ServerTransferCoverage
         CloudInitScript::class => 'Team server-creation templates, not server data.',
         ProjectSetting::class => 'Created with the project on the target; it has no settings of its own yet.',
         ApplicationDeploymentQueue::class => 'Deployment history.',
+        ImageScan::class => 'Rebuilt by the next rescan.',
+        ImageSbom::class => 'Rebuilt by the next rescan.',
         ScheduledTaskExecution::class => 'Execution history.',
         ScheduledDatabaseBackupExecution::class => 'Execution history.',
         ScheduledVolumeBackupExecution::class => 'Execution history.',

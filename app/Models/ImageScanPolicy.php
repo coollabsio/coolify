@@ -6,6 +6,7 @@ use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanOnError;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Validation\Rule;
 
 /**
  * Scan rules at one level (instance, team, server or application). A null field inherits.
@@ -29,6 +30,20 @@ class ImageScanPolicy extends BaseModel
             'alert_level' => ImageScanAlertLevel::class,
             'gate_enabled' => 'boolean',
             'on_scan_error' => ImageScanOnError::class,
+        ];
+    }
+
+    /**
+     * Rules for the editable fields of a policy. A null field inherits.
+     *
+     * @return array<string, list<mixed>>
+     */
+    public static function validationRules(): array
+    {
+        return [
+            'alert_level' => ['nullable', Rule::enum(ImageScanAlertLevel::class)],
+            'gate_enabled' => ['nullable', 'boolean'],
+            'on_scan_error' => ['nullable', Rule::enum(ImageScanOnError::class)],
         ];
     }
 

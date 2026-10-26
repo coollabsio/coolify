@@ -32,6 +32,21 @@ class ImageScanIgnore extends BaseModel
         ];
     }
 
+    /**
+     * Rules for the editable fields of an ignore. A vulnerability ID or a package is required.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function validationRules(): array
+    {
+        return [
+            'vulnerability_id' => ['nullable', 'regex:/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/', 'required_without:package'],
+            'package' => ['nullable', 'string', 'max:214', 'required_without:vulnerability_id'],
+            'reason' => ['required', 'string', 'max:500'],
+            'expires_at' => ['nullable', 'date'],
+        ];
+    }
+
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);

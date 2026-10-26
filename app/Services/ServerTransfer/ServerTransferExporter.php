@@ -12,6 +12,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -68,6 +70,9 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // The daily candidate scan counter of the source; the target counts its own.
+        'image_candidate_scans_today',
+        'image_candidate_scans_date',
     ];
 
     /**
@@ -150,6 +155,9 @@ class ServerTransferExporter
 
         $warnings = $this->buildWarnings($applications, $dependencies);
         $warnings = array_merge($warnings, $managedDns['warnings'], $projectWarnings);
+        if (ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNull('resource_type')->exists()) {
+            $warnings[] = 'Team-wide vulnerability ignores stay on this instance.';
+        }
         if ($leftOutLinks > 0) {
             $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
                 .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
@@ -176,6 +184,8 @@ class ServerTransferExporter
             'dns_zones' => $managedDns['records']->pluck('zone')->unique('id')->map(fn (DnsProviderZone $zone) => $this->exportDnsZone($zone))->values()->all(),
             'managed_dns_records' => $managedDns['records']->map(fn (ManagedDnsRecord $record) => $this->exportManagedDnsRecord($record, $managedDns['resource_keys']))->values()->all(),
             'ssl_certificates' => $this->exportSslCertificates($server),
+            'image_scan_policies' => $this->exportImageScanPolicies($server, $applications),
+            'image_scan_ignores' => $this->exportImageScanIgnores($server, $applications, $databases, $services),
             'volume_backups' => $this->exportVolumeBackups($applications, $databases, $services),
             'server' => $this->exportServer($server),
             'destinations' => $this->exportDestinations($server),
@@ -1618,6 +1628,85 @@ class ServerTransferExporter
                 'is_ca_certificate' => (bool) $cert->is_ca_certificate,
                 'resource_kind' => $resourceKind,
                 'resource_uuid' => $resourceUuid,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Scan rules of the server and of its applications. Team and instance rules stay on the source.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @return list<array<string, mixed>>
+     */
+    private function exportImageScanPolicies(Server $server, Collection $applications): array
+    {
+        $out = [];
+        $policies = ImageScanPolicy::query()
+            ->where(fn ($query) => $query
+                ->where(fn ($query) => $query->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id))
+                ->orWhere(fn ($query) => $query->where('scope_type', (new Application)->getMorphClass())->whereIn('scope_id', $applications->pluck('id')->all())))
+            ->orderBy('id')
+            ->get();
+        foreach ($policies as $policy) {
+            $isServer = $policy->scope_type === $server->getMorphClass();
+            $scope = $isServer ? $server : $applications->firstWhere('id', $policy->scope_id);
+            if ($scope === null) {
+                continue;
+            }
+            $out[] = [
+                'scope_kind' => $isServer ? 'server' : 'application',
+                'scope_uuid' => $scope->uuid,
+                'alert_level' => $policy->alert_level?->value,
+                'gate_enabled' => $policy->gate_enabled,
+                'on_scan_error' => $policy->on_scan_error?->value,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Ignores of the resources on the server. Team-wide ignores stay on the source.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $databases
+     * @param  Collection<int, Service>  $services
+     * @return list<array<string, mixed>>
+     */
+    private function exportImageScanIgnores(Server $server, Collection $applications, Collection $databases, Collection $services): array
+    {
+        $resources = [];
+        foreach ($applications as $application) {
+            $resources[$application->getMorphClass().':'.$application->id] = ['application', $application->uuid];
+        }
+        foreach ($databases as $database) {
+            $resources[$database->getMorphClass().':'.$database->id] = ['database', $database->uuid];
+        }
+        foreach ($services as $service) {
+            foreach ($service->applications as $serviceApplication) {
+                $resources[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['service_application', $serviceApplication->uuid];
+            }
+            foreach ($service->databases as $serviceDatabase) {
+                $resources[$serviceDatabase->getMorphClass().':'.$serviceDatabase->id] = ['service_database', $serviceDatabase->uuid];
+            }
+        }
+
+        $out = [];
+        $ignores = ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNotNull('resource_type')->orderBy('id')->get();
+        foreach ($ignores as $ignore) {
+            [$kind, $uuid] = $resources[$ignore->resource_type.':'.$ignore->resource_id] ?? [null, null];
+            if ($kind === null) {
+                continue;
+            }
+            $out[] = [
+                'resource_kind' => $kind,
+                'resource_uuid' => $uuid,
+                'vulnerability_id' => $ignore->vulnerability_id,
+                'package' => $ignore->package,
+                'reason' => $ignore->reason,
+                'expires_at' => $ignore->expires_at?->toIso8601String(),
             ];
         }
 

@@ -6,6 +6,8 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
 use App\Models\ResourceLink;
@@ -62,6 +64,14 @@ $check('apps on the other server are not moved', ! Application::whereIn('name', 
 $check('team shared variable created', SharedEnvironmentVariable::where('type', 'team')->where('key', 'FAKE_TEAM_VAR')->value('value') === 'team-value');
 $check('app variable that uses it moved', $app?->environment_variables()->where('key', 'USES_TEAM')->value('value') === '{{team.FAKE_TEAM_VAR}}');
 $check('maintenance mode moved', $app?->is_maintenance_enabled === true && $app?->maintenance_page === '<h1>fake maintenance</h1>');
+
+$check('image scan opt-in of the server moved', $server?->settings?->is_image_scan_enabled === true);
+$serverPolicy = ImageScanPolicy::where('scope_type', $server?->getMorphClass())->where('scope_id', $server?->id)->first();
+$check('server scan rules moved', $serverPolicy?->alert_level?->value === 'high' && $serverPolicy->gate_enabled === true);
+$check('app scan rules moved', ImageScanPolicy::where('scope_type', $app?->getMorphClass())->where('scope_id', $app?->id)->first()?->on_scan_error?->value === 'block');
+$check('app scan switch and image builds by team moved', $app?->settings?->is_image_scan_enabled === false && $app->settings->image_builds_by_team === true);
+$check('team-wide ignore stays on the source', ! ImageScanIgnore::where('vulnerability_id', 'CVE-2024-0002')->exists());
+$check('app ignore moved', ImageScanIgnore::where('resource_type', $app?->getMorphClass())->where('resource_id', $app?->id)->where('vulnerability_id', 'CVE-2024-0001')->exists());
 
 $gitShop = Application::where('name', 'git-shop')->first();
 $check('git-shop moved without its system-wide source', $gitShop !== null && $gitShop->source_id === null);

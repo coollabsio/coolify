@@ -54,6 +54,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Second standalone destination | extra Docker network, one resource on it |
 | ✅ | Server shared variables | 2 variables, one multiline, one literal, one with a comment |
 | ✅ | SSL certificates | CA certificate (created automatically) + a database with SSL on (creates a server certificate) |
+| ✅ | Image vulnerability scanning | server opt-in on, server scan rules (alert level `high`, block deploys on), application scan rules (if the scan cannot run: block), one ignore of a vulnerability on an application, one team-wide ignore (stays on the source, the export warns), application scan switch off and "images built by team" on. A scan, its SBOM, and the daily candidate scan counter are not moved: the next rescan rebuilds them |
 | ✅ | GitHub runner config | labels, max runners 2, docker mode `dind`, image, CPU/memory limits, 3 timeouts, PR jobs off, dedicated on, uses the team GitHub App (see 4). Expected: on the target it is **disabled** and the checklist says to enable it |
 
 ## 4. Team credentials the server uses
