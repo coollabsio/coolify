@@ -29,7 +29,7 @@ Docker Compose-based dev setup with services: coolify (app, which also runs Reve
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. To pass the host NVIDIA GPU through to the KVM localhost VM (`ubuntu-root` only), start with `COOLIFY_DEV_GPU=1 ./scripts/dev start` (or `php artisan dev:qemu ubuntu-root --as-localhost --gpu`). This attaches every PCI function of the GPU, gives the VM 4 GiB, stops `nvidia-persistenced` on the host, and installs the NVIDIA driver and container toolkit in the VM. The host cannot use the GPU while the VM runs. Remove it with `--fresh` without `--gpu`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 
@@ -191,6 +191,22 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
 - **Proxy** — Traefik reverse proxy managed per server.
 
+### Server transfer (keep it complete)
+
+A server transfer moves a server and every record that belongs to it to another Coolify instance: `ServerTransferExporter` writes the bundle, `ServerTransferImporter` reads it (`app/Services/ServerTransfer/`). `ServerTransferCoverage` records the transfer decision for every model and every column.
+
+- When you add a model, a column, or a relation that belongs to a server or to a resource on a server (application, preview, database, service, volume, environment variable, backup, scheduled task, tag, or setting), decide whether a transfer moves it:
+  - **Moved:** export and import it, and add a round-trip assertion to `tests/Unit/ServerTransfer/ServerTransferExporterImporterTest.php`. For a new model, also add it to `ServerTransferCoverage::TRANSFERRED`.
+  - **Not moved:** add the model to `ServerTransferCoverage::NOT_TRANSFERRED`, or the column to `NOT_EXPORTED_COLUMNS`, with the reason. If the data is lost for the user, also add an export warning.
+- `tests/Unit/ServerTransfer/ServerTransferCoverageTest.php` exports a server with one record of every transferred model. It fails when a model or a column has no decision. When you add a transferred model, add a record of it to the fixture of that test.
+- `docs/server-transfer-full-coverage.md` lists what to set up on a source server for a manual transfer test that covers every transferred model and setting. Add new transferred models and settings to it.
+- `scripts/transfer-test/` has live end-to-end transfer tests between two dev instances (see its README). Run them after a change to the transfer flow. When you add transferred data that the unit tests cannot prove (remote commands, provider calls, queue behavior), add a check to `extras-e2e.sh`.
+- Application, Service, and the standalone databases export their `$fillable` columns, plus hand-written lists for hidden columns. A column that is not fillable is lost unless you add it to those lists.
+- Do not copy a foreign key as a raw ID. IDs are different on the target. Link the record by UUID, or leave the column out with a reason.
+- Team credentials that a moved record needs (integration tokens, S3 storages, git sources, private keys, cloud provider tokens) move with it.
+- When the user must do a step after the transfer (for example, change a webhook URL at GitHub), add an item type to `TransferFinishChecklist`: the "Finish the transfer" list on the server page of the instance that manages the server now. Give it a check where Coolify can verify the step, and a fix where it can do the step. Also add it to the `post_transfer_checklist` of the bundle (`{target_url}` stands for the URL of the target), which the source shows as text.
+- On the source, a transferred server (`Server::isTransferredAway()`) is only an archive, because another instance manages the host. Do not run remote commands, cloud provider calls, or DNS provider calls for it, also not when the archive is deleted.
+
 ### Instance sentinels (`id = 0`)
 
 Coolify seeds **instance-owned** rows at primary key `0`. That value is a sentinel meaning “this is the Coolify instance itself”, not a normal autoincrement id. Do not migrate, resequence, or “fix” these to a positive id.
@@ -246,13 +262,14 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- Nixpacks is deprecated. Never recommend it to users (issue replies, docs, UI copy, workarounds). Recommend the Dockerfile build pack, or Railpack where it fits.
 - When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 
 - Production branch: `main`
-- Development branch: `release/v4.x`, where `x` is the next minor release (for example, `release/v4.5` while production is `4.4.x`). Do not use `next`.
-- Fix PRs should target the current production branch; feature PRs should target the current `release/v4.x` branch
+- Development branch: `next`. Do not create `release/v*` branches.
+- Fix PRs should target the current production branch; feature PRs should target `next`
 
 <laravel-boost-guidelines>
 === foundation rules ===

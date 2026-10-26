@@ -12,7 +12,8 @@
         <div class="hidden" aria-hidden="true" wire:poll.keep-alive.30s="keepTerminalPageAlive"></div>
     @endif
 
-    @if (!$hasShell)
+    {{-- Attach (console) mode does not need a shell, so only warn while Shell mode is active. --}}
+    @if (!$hasShell && $terminalMode === 'shell')
         @if ($isApplicationConsole)
             <div class="flex h-full min-h-[32rem] items-center justify-center">
                 <x-empty size="lg" title="Shell unavailable"
@@ -79,7 +80,7 @@
             </div>
         @endif
 
-        <div id="terminal" wire:ignore data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
+        <div id="terminal" wire:ignore @mouseup="focusConsoleFromOutput()" data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
             :class="fullscreen
                 ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent'
                 : @js($isApplicationConsole
@@ -87,7 +88,40 @@
                     : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')">
         </div>
 
-        <div x-show="terminalActive" x-cloak class="sm:hidden"
+        {{-- Command box for console (attach) mode — a terminal input line, never raw keystrokes. --}}
+        <div x-cloak x-show="terminalActive && $wire.terminalMode === 'attach'"
+            class="terminal-console-input relative z-[2] mt-2 shrink-0 border-t pt-2"
+            :class="fullscreen ? 'mx-1 mb-1' : ''"
+            :style="`--console-fg: ${consoleForegroundColor}`">
+            <div x-show="consolePendingLines.length > 0" x-cloak
+                class="console-command-pending mb-1 flex items-center gap-2 pl-2 text-xs">
+                <span x-text="`${consolePendingLines.length} pasted lines ready to send`"></span>
+                <span class="opacity-60">· Enter to send · Esc to cancel</span>
+            </div>
+            <div class="console-command-row flex min-h-9 cursor-text items-center gap-3 rounded-md pr-1 pl-2"
+                @click="$refs.consoleInput?.focus()">
+                <span class="console-command-prompt shrink-0 font-mono text-sm leading-none select-none"
+                    :data-sent="consoleSentFlash ? '' : null" aria-hidden="true">&gt;</span>
+                <input type="text" x-ref="consoleInput" x-model="consoleCommand"
+                    @keydown.enter.prevent="submitConsoleCommand()"
+                    @keydown.escape.prevent.stop="cancelConsoleInput()"
+                    @keydown.ctrl.l.prevent="clearConsoleOutput()"
+                    @keydown.arrow-up.prevent="recallConsoleCommand(-1)"
+                    @keydown.arrow-down.prevent="recallConsoleCommand(1)"
+                    @paste="pasteConsoleText($event)"
+                    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send"
+                    aria-label="Console command" placeholder="Send a command to the process…"
+                    class="console-command-field min-w-0 flex-1 border-0! bg-transparent! px-0! py-1.5! font-mono text-[16px]! shadow-none! ring-0! outline-none! focus:border-0! focus:shadow-none! focus:ring-0! focus:outline-none! sm:text-[13px]!" />
+                <button type="button" @click.stop="submitConsoleCommand()" :disabled="!canSubmitConsoleCommand()"
+                    title="Send (Enter) · Clear input (Esc) · Clear output (Ctrl+L)"
+                    class="console-command-send inline-flex h-7 shrink-0 items-center gap-2 rounded px-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-40">
+                    Send
+                    <span class="font-mono text-sm opacity-60" aria-hidden="true">↵</span>
+                </button>
+            </div>
+        </div>
+
+        <div x-show="terminalActive && $wire.terminalMode !== 'attach'" x-cloak class="sm:hidden"
             :class="fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2' : 'relative z-[2] mt-2 shrink-0')"
             :style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : ''"
             data-terminal-mobile-toolbar>

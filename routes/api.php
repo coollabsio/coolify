@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\HostingerController;
 use App\Http\Controllers\Api\InstanceEmailSettingsController;
 use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
@@ -40,7 +41,6 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
 use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
-use App\Http\Middleware\ApiIpAllowed;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -54,12 +54,10 @@ Route::post('/feedback', [OtherController::class, 'feedback'])
     ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.token.team', ApiIpAllowed::class, 'api.ability:write'],
+    'middleware' => ['api.ip.allowed', 'auth:sanctum', 'api.token.team', 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
-    Route::get('/enable', [OtherController::class, 'post_required']);
     Route::get('/disable', [OtherController::class, 'post_required']);
-    Route::post('/enable', [OtherController::class, 'enable_api']);
     Route::post('/disable', [OtherController::class, 'disable_api']);
     Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
     Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
@@ -205,9 +203,9 @@ Route::group([
     Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:deploy']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
+    Route::get('/servers/import/check', [ServerTransferController::class, 'check'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::post('/servers/import', [ServerTransferController::class, 'import'])->middleware(['api.ability:write', 'api.ability:deploy']);
-    Route::get('/servers/{uuid}/export', [ServerTransferController::class, 'export'])->middleware(['api.ability:read']);
-    Route::post('/servers/{uuid}/export/mailbox', [ServerTransferController::class, 'writeMailbox'])->middleware(['api.ability:write']);
+    Route::get('/servers/{uuid}/transfer', [ServerTransferController::class, 'status'])->middleware(['api.ability:read,write']);
     Route::post('/servers/{uuid}/transfer/complete', [ServerTransferController::class, 'complete'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/migrate', [ServerTransferController::class, 'migrate'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
@@ -232,6 +230,13 @@ Route::group([
     Route::get('/digitalocean/images', [DigitalOceanController::class, 'images'])->middleware(['api.ability:read']);
     Route::get('/digitalocean/ssh-keys', [DigitalOceanController::class, 'sshKeys'])->middleware(['api.ability:read']);
     Route::post('/servers/digitalocean', [DigitalOceanController::class, 'createServer'])->middleware(['api.ability:write']);
+
+    Route::get('/hostinger/data-centers', [HostingerController::class, 'dataCenters'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/catalog', [HostingerController::class, 'catalog'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/templates', [HostingerController::class, 'templates'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/ssh-keys', [HostingerController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/post-install-scripts', [HostingerController::class, 'postInstallScripts'])->middleware(['api.ability:read']);
+    Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
 

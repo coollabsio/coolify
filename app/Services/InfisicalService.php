@@ -14,7 +14,7 @@ class InfisicalService
     /** @var array<string, mixed> */
     private array $httpClientOptions;
 
-    public function __construct(string $baseUrl, private string $clientId, private string $clientSecret)
+    public function __construct(string $baseUrl, private string $clientId, private string $clientSecret, private ?int $timeout = null)
     {
         $this->baseUrl = rtrim($baseUrl, '/');
         Validator::make(['base_url' => $this->baseUrl], ['base_url' => new SafeExternalUrl])->validate();
@@ -46,6 +46,7 @@ class InfisicalService
             'projectId' => $projectId,
             'environment' => $environment,
             'secretPath' => $secretPath,
+            'includeImports' => 'true',
             ...$valueOptions,
         ]);
 
@@ -55,6 +56,7 @@ class InfisicalService
                 'workspaceId' => $projectId,
                 'environment' => $environment,
                 'secretPath' => $secretPath,
+                'include_imports' => 'true',
                 ...$valueOptions,
             ]);
         }
@@ -63,7 +65,20 @@ class InfisicalService
             throw new \RuntimeException('Infisical API error: '.($response->json('message') ?? 'HTTP '.$response->status()));
         }
 
-        return collect($response->json('secrets', []))
+        // Like `infisical export`: later imports override earlier ones, and the folder's own secrets override all imports.
+        return collect($response->json('imports', []))
+            ->pluck('secrets')
+            ->push($response->json('secrets', []))
+            ->reduce(fn (array $merged, ?array $secrets) => array_replace($merged, $this->keyValues($secrets ?? [])), []);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $secrets
+     * @return array<string, string>
+     */
+    private function keyValues(array $secrets): array
+    {
+        return collect($secrets)
             ->mapWithKeys(fn ($secret) => [(string) data_get($secret, 'secretKey') => (string) data_get($secret, 'secretValue', '')])
             ->all();
     }
@@ -87,7 +102,7 @@ class InfisicalService
     {
         return Http::acceptJson()
             ->withOptions($this->httpClientOptions)
-            ->connectTimeout(5)
-            ->timeout(10);
+            ->connectTimeout($this->timeout ?? 5)
+            ->timeout($this->timeout ?? 10);
     }
 }

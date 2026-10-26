@@ -41,6 +41,7 @@ beforeEach(function () {
     ]);
     $this->server->proxy->set('type', ProxyTypes::TRAEFIK->value);
     $this->server->save();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
 function serverDeployAbilityHeaders(User $user, int $teamId, array $abilities): array

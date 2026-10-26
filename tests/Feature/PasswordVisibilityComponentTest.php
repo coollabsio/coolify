@@ -74,3 +74,24 @@ it('renders env var password input before visibility toggle in tab order', funct
 
     expect(strpos($html, '<input'))->toBeLessThan(strpos($html, 'aria-label="Toggle password visibility"'));
 });
+
+it('adds a copy button that reads the live field value to password inputs by default', function () {
+    $html = Blade::render('<x-forms.input type="password" name="secret" value="s3cret" />');
+
+    expect($html)
+        ->toContain('Copy to clipboard')
+        ->toContain('input-with-copy-and-peek')
+        ->toContain('$el.parentElement.querySelector(&#039;input&#039;).value');
+});
+
+it('omits the copy button when a password input opts out', function () {
+    $html = Blade::render('<x-forms.input type="password" name="password" :copyable="false" />');
+
+    expect($html)
+        ->toContain('Toggle password visibility')
+        ->not->toContain('Copy to clipboard');
+});
+
+it('keeps text inputs without a copy button unless they opt in', function () {
+    expect(Blade::render('<x-forms.input name="plain" value="x" />'))->not->toContain('Copy to clipboard');
+});

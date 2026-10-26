@@ -110,6 +110,17 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            $activeDeployment = $this->manualCleanup ? null : CleanupDocker::activeDeployment($this->server);
+            if ($activeDeployment) {
+                $this->execution_log->update([
+                    'status' => 'success',
+                    'message' => 'Docker cleanup skipped: deployment '.$activeDeployment->deployment_uuid.' is queued or running on this server. The next scheduled cleanup runs as usual.',
+                ]);
+                event(new DockerCleanupDone($this->execution_log));
+
+                return;
+            }
+
             $this->usageBefore = $this->server->getDiskUsage();
 
             if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {
@@ -189,14 +200,15 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             $failed = true;
+            $errorMessage = remove_iip($e->getMessage());
             if ($this->execution_log) {
                 $this->execution_log->update([
                     'status' => 'failed',
-                    'message' => $e->getMessage(),
+                    'message' => $errorMessage,
                 ]);
                 event(new DockerCleanupDone($this->execution_log));
             }
-            $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$e->getMessage()));
+            $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$errorMessage));
             throw $e;
         } finally {
             if (! $failed && $this->occurrenceUuid) {
@@ -282,7 +294,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $message = $exception?->getMessage() ?? 'Docker cleanup job failed without an exception.';
+        $message = remove_iip($exception?->getMessage() ?? 'Docker cleanup job failed without an exception.');
 
         $updated = DockerCleanupExecution::query()
             ->whereKey($execution->id)

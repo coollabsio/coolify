@@ -71,7 +71,6 @@ Thank you so much!
 
 ### Huge Sponsors
 
-* [CubePath](https://cubepath.com/coolify) - Premium dedicated servers and cloud VPS hosting
 * [Context.dev](https://www.context.dev/) - Web scraping API for AI agents
 * [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
 * [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
@@ -116,7 +115,6 @@ Thank you so much!
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
-* [QuickSrv](https://quicksrv.io/) - Fast and reliable server hosting
 * [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
 
 ### Small Sponsors
@@ -159,7 +157,6 @@ Thank you so much!
 <a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://cdn.coollabs.io/sponsors/web3jobs.png"/></a>
 <a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://cdn.coollabs.io/sponsors/linkdr.svg"/></a>
 <a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://cdn.coollabs.io/sponsors/arvensis.png"/></a>
-<a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://cdn.coollabs.io/sponsors/reshotai.png"/></a>
 <a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://cdn.coollabs.io/sponsors/runpod.svg"/></a>
 <a href="http://gravitywiz.com/?utm_source=coolify.io"><img width="60px" alt="Gravity Wiz" src="https://github.com/gravitywiz.png"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>

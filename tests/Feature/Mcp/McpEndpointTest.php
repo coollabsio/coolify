@@ -143,6 +143,30 @@ test('MCP endpoint accepts a token from an IP inside the allow-list', function (
     mcpListTools($token)->assertOk();
 });
 
+test('MCP endpoint checks the allow-list against the client IP behind Cloudflare', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '160.79.104.0/21']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    test()->withServerVariables(['REMOTE_ADDR' => '10.0.1.5'])
+        ->withHeaders(['X-Forwarded-For' => '172.71.194.182', 'CF-Connecting-IP' => '160.79.104.10']);
+
+    mcpListTools($token)->assertOk();
+});
+
+test('MCP endpoint ignores a CF-Connecting-IP header that does not come from Cloudflare', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '160.79.104.0/21']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    test()->withServerVariables(['REMOTE_ADDR' => '10.0.1.5'])
+        ->withHeaders(['X-Forwarded-For' => '198.51.100.7', 'CF-Connecting-IP' => '160.79.104.10']);
+
+    mcpListTools($token)
+        ->assertForbidden()
+        ->assertJson(['message' => 'You are not allowed to access the API.']);
+});
+
 test('MCP endpoint lists tools for an authenticated token', function () {
     $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
 
@@ -164,7 +188,6 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_service',
         'get_project',
         'list_deployments',
-        'get_logs',
         'list_env_keys',
     );
     expect($toolNames)->not->toContain(
@@ -172,7 +195,61 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'create_storage',
         'update_storage',
     );
-    expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
+    expect($toolNames)->toContain('coolify_help')
+        ->and($toolNames)->not->toContain('control', 'deploy', 'get_logs', 'manage_project');
+});
+
+test('MCP tools/list shows write tools only to tokens with the ability', function () {
+    $names = fn (array $abilities): array => collect(mcpListTools($this->user->createToken('t', $abilities)->plainTextToken)->assertOk()->json('result.tools'))->pluck('name')->all();
+
+    app('auth')->forgetGuards();
+    $read = $names(['read']);
+    app('auth')->forgetGuards();
+    $deploy = $names(['read', 'deploy']);
+    app('auth')->forgetGuards();
+    $root = $names(['root']);
+
+    expect($read)->not->toContain('control', 'manage_project', 'create_application', 'get_logs', 'get_env_values')
+        ->and($deploy)->toContain('control', 'deploy', 'rollback_application')
+        ->and($deploy)->not->toContain('manage_project', 'get_logs')
+        ->and($root)->toContain('control', 'manage_project', 'get_logs', 'get_env_values')
+        ->and(count($read))->toBeLessThan(count($root));
+});
+
+test('MCP grouped tools only list the actions the token can use', function () {
+    $token = $this->user->createToken('read', ['read'])->plainTextToken;
+
+    $proxy = collect(mcpListTools($token)->json('result.tools'))->firstWhere('name', 'manage_proxy');
+
+    expect($proxy['inputSchema']['properties']['action']['enum'])->toBe(['get']);
+});
+
+test('MCP hidden tools cannot be called', function () {
+    $project = Project::create(['name' => 'Mine', 'team_id' => $this->team->id]);
+    $token = $this->user->createToken('read', ['read'])->plainTextToken;
+
+    $response = mcpCallTool($token, 'manage_project', ['action' => 'delete', 'uuid' => $project->uuid, 'confirm' => true]);
+
+    expect($response->json('error.message'))->toBe('Tool [manage_project] not found.')
+        ->and($project->fresh())->not->toBeNull();
+});
+
+test('MCP tools declare read-only and destructive annotations', function () {
+    $token = $this->user->createToken('mcp-root', ['root'])->plainTextToken;
+
+    $tools = collect(mcpListTools($token)->assertOk()->json('result.tools'))->keyBy('name');
+    $writePrefixes = ['manage_', 'create_', 'rollback_', 'docker_cleanup', 'cloud_provider', 'control', 'deploy', 'cancel_deployment'];
+
+    foreach ($tools as $name => $tool) {
+        $isWriteTool = collect($writePrefixes)->contains(fn (string $prefix): bool => str_starts_with($name, $prefix));
+
+        expect($tool['annotations'])->toHaveKey('readOnlyHint', ! $isWriteTool);
+        if ($isWriteTool) {
+            expect($tool['annotations'])->toHaveKey('destructiveHint', true);
+        }
+    }
+    expect($tools->has('list_projects'))->toBeTrue()
+        ->and($tools->has('manage_project'))->toBeTrue();
 });
 
 test('MCP endpoint accepts the legacy initialize handshake', function () {
@@ -191,6 +268,25 @@ test('MCP endpoint accepts the legacy initialize handshake', function () {
 
     $response->assertOk();
     expect($response->json('result.protocolVersion'))->toBe('2025-06-18');
+});
+
+test('MCP initialize negotiates when the client requests an unsupported protocol version', function () {
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = mcpPost([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2026-07-28',
+            'capabilities' => (object) [],
+            'clientInfo' => ['name' => 'test', 'version' => '1'],
+        ],
+    ], $token);
+
+    $response->assertOk();
+    expect($response->json('error'))->toBeNull();
+    expect($response->json('result.protocolVersion'))->toBe('2025-11-25');
 });
 
 test('MCP endpoint serves 2026-07-28 protocol requests with MCP headers', function () {

@@ -151,12 +151,43 @@ it('adds mux options to ssh commands only after the explicit master is ready', f
 
     expect($command)
         ->toContain('-o ControlMaster=auto')
-        ->toContain("-o ControlPath=/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}")
+        ->toContain("-o ControlPath='/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}'")
         ->toContain('-o ControlPersist=3600')
         ->toContain("'sh -c \"if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi\"' << \\")
         ->not->toContain('<< $delimiter');
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+});
+
+it('quotes the mux socket and key paths in every local ssh command', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = makeMuxServer();
+    // Ids with shell syntax, as an import bundle could have had them before ids were validated.
+    $server->forceFill(['uuid' => 'x;touch /tmp/pwn;#'])->saveQuietly();
+    $server->privateKey->forceFill(['uuid' => 'a $(id)'])->saveQuietly();
+    $server = Server::find($server->id);
+    Storage::disk('ssh-keys')->put('ssh_key@a $(id)', $server->privateKey->private_key);
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 1),
+        '*-fN *' => Process::result(exitCode: 0),
+    ]);
+
+    $socket = escapeshellarg('/var/www/html/storage/app/ssh/mux/mux_x;touch /tmp/pwn;#');
+    $key = escapeshellarg($server->privateKey->getKeyLocation());
+
+    $sshCommand = SshMultiplexingHelper::generateSshCommand($server, 'echo ok');
+    $scpCommand = SshMultiplexingHelper::generateScpCommand($server, '/tmp/source', '/tmp/dest');
+
+    foreach ([$sshCommand, $scpCommand] as $command) {
+        expect($command)->toContain("-o ControlPath={$socket} ")->toContain("-i {$key} ");
+    }
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN ')
+        && str_contains($process->command, "-o ControlPath={$socket} ")
+        && str_contains($process->command, "-i {$key} "));
+    Process::assertRan(fn ($process) => str_contains($process->command, "ssh -O check -o ControlPath={$socket} "));
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'mux_x;touch /tmp/pwn;# ')
+        || str_contains($process->command, '-i /') || str_contains($process->command, 'ControlPath=/'));
 });
 
 it('can generate terminal ssh commands without a hard command timeout', function () {
@@ -200,7 +231,7 @@ it('adds mux options to scp commands only after the explicit master is ready', f
 
     expect($command)
         ->toContain('-o ControlMaster=auto')
-        ->toContain("-o ControlPath=/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}")
+        ->toContain("-o ControlPath='/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}'")
         ->toContain('-o ControlPersist=3600');
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));

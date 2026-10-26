@@ -1,10 +1,22 @@
-<div class="flex flex-col gap-6">
-    <form wire:submit="submit" class="application-settings-form flex flex-col">
+<div x-data="{ activeSection: 'general' }" class="flex min-w-0 flex-col gap-6">
+    <nav aria-label="Scheduled task sections"
+        class="flex min-w-0 flex-wrap gap-1 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
+        @foreach (['general' => 'General', 'executions' => 'Executions', ...(auth()->user()->can('update', $resource) ? ['danger' => 'Danger Zone'] : [])] as $sectionKey => $sectionLabel)
+            <button type="button" @click="activeSection = '{{ $sectionKey }}'"
+                :class="activeSection === '{{ $sectionKey }}'
+                    ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25'
+                    : 'text-neutral-500 hover:bg-black/5 hover:text-neutral-900 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                class="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md px-3 text-[13px] font-medium transition-colors">
+                {{ $sectionLabel }}
+            </button>
+        @endforeach
+    </nav>
+
+    <form x-show="activeSection === 'general'" wire:submit="submit" class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit" />
         <x-application.settings-section id="task-configuration-section" title="Task configuration"
             helper="Configure when this task runs and which command Coolify executes.">
             <x-slot:actions>
-                <x-status-badge :status="$isEnabled ? 'Enabled' : 'Disabled'" :type="$isEnabled ? 'success' : 'neutral'" />
                 @if ($resource->isRunning())
                     @can('update', $resource)
                         <x-forms.button type="button" wire:click="executeNow">
@@ -16,13 +28,6 @@
                     <x-forms.button type="button" wire:click="toggleEnabled" :isHighlighted="!$isEnabled">
                         {{ $isEnabled ? 'Disable' : 'Enable' }}
                     </x-forms.button>
-                    <x-modal-confirmation title="Delete scheduled task?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete({{ $task->id }})"
-                        :actions="['The selected scheduled task will be permanently deleted.']"
-                        confirmationText="{{ $task->name }}"
-                        confirmationLabel="Enter the scheduled task name to confirm deletion"
-                        shortConfirmationLabel="Task name" :confirmWithPassword="false"
-                        step2ButtonText="Permanently delete" />
                 @endcan
             </x-slot:actions>
 
@@ -47,8 +52,28 @@
         </x-application.settings-section>
     </form>
 
-    <x-application.settings-section id="task-executions-section" title="Recent executions"
+    <x-application.settings-section x-show="activeSection === 'executions'" x-cloak id="task-executions-section" title="Recent executions"
         helper="Execution history refreshes automatically while a task is running." flush>
         <livewire:project.shared.scheduled-task.executions :taskId="$task->id" />
     </x-application.settings-section>
+
+    @can('update', $resource)
+        <div x-show="activeSection === 'danger'" x-cloak class="application-settings-form">
+            <x-application.settings-section title="Delete scheduled task"
+                description="Permanently remove this task and its execution history.">
+                <x-danger-zone title="This action cannot be undone.">
+                    <p>The task stops running and cannot be restored.</p>
+                    <x-slot:action>
+                        <x-modal-confirmation title="Delete scheduled task?" isErrorButton buttonTitle="Delete task"
+                            submitAction="delete({{ $task->id }})"
+                            :actions="['The selected scheduled task will be permanently deleted.']"
+                            confirmationText="{{ $task->name }}"
+                            confirmationLabel="Enter the scheduled task name to confirm deletion"
+                            shortConfirmationLabel="Task name" :confirmWithPassword="false"
+                            step2ButtonText="Permanently delete" />
+                    </x-slot:action>
+                </x-danger-zone>
+            </x-application.settings-section>
+        </div>
+    @endcan
 </div>

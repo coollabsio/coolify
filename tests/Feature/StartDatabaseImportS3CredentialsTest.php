@@ -157,3 +157,35 @@ test('s3 import activity stores the cleanup names and paths but no credential va
 
     Queue::assertPushed(CoolifyTask::class, fn (CoolifyTask $job) => $job->call_event_data === $stored);
 });
+
+test('s3 import helper signs requests with the storage region', function () {
+    $storage = S3Storage::create([
+        'name' => 'Import S3',
+        'region' => 'ru-central-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://8.8.8.8',
+        'is_usable' => true,
+        'team_id' => $this->team->id,
+    ]);
+
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('exists')->andReturn(true);
+    $disk->shouldReceive('size')->andReturn(1024);
+    $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
+    $filesystem->shouldReceive('build')->andReturn($disk);
+    Storage::swap($filesystem);
+
+    Process::fake();
+    Queue::fake();
+
+    app(StartDatabaseImport::class)->handle(
+        $this->database,
+        new DatabaseImportSource('s3', path: 'backups/restore.sql', s3StorageUuid: $storage->uuid),
+        $this->team->id,
+    );
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
+        && str_contains($process->command, '-e S3_ENDPOINT='));
+});

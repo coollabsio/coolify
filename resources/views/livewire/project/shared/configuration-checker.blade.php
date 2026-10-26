@@ -18,7 +18,7 @@
                 <span>
                     {{ implode(', ', $missingRequiredEnvironmentVariableNames) }} must be set before this service can be deployed.
                     <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
-                        class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80">
+                        class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-brand-light dark:hover:text-brand-light/80">
                         Open environment variables
                         <x-reicon name="arrow-right" class="size-2.5" />
                     </a>

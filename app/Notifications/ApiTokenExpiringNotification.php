@@ -50,7 +50,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             color: DiscordMessage::warningColor(),
         );
 
-        $message->addField('Manage tokens', "[Open Security settings]({$this->manageUrl})");
+        $message->addField('Manage tokens', "[Open API Tokens]({$this->manageUrl})");
 
         return $message;
     }
