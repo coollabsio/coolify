@@ -161,7 +161,8 @@ class EnvironmentVariable extends BaseModel
                         // The preview copy is part of the same change, so it gets no audit rows of its own.
                         $preview = new ModelsEnvironmentVariable([
                             'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
+                            // Without production values, the copy only shows which keys the previews need.
+                            'value' => $application->settings?->use_production_values_in_previews === false ? '' : $environment_variable->value,
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
