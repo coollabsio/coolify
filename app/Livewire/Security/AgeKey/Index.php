@@ -55,7 +55,7 @@ class Index extends Component
 
             $keyPair = AgeKey::generateNewKeyPair();
 
-            // Shown to the user exactly once — never persisted or sent back to the server.
+            // Shown to the user once and never saved; only the public key is stored.
             $this->generatedPrivateKey = $keyPair['private_key'];
             $this->generatedPublicKey = $keyPair['public_key'];
             $this->generatedName = $keyPair['name'];

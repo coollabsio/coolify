@@ -27,5 +27,10 @@ class UpdateUserPassword implements UpdatesUserPasswords
         $user->fill([
             'password' => Hash::make($input['password']),
         ])->save();
+        auditLog('ui.user.password_changed', [
+            'team_id' => $user->currentTeam()?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+        ]);
     }
 }

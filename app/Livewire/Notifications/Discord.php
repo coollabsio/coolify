@@ -110,7 +110,9 @@ class Discord extends Component
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->discordEnabled = $this->settings->discord_enabled;
@@ -141,13 +143,12 @@ class Discord extends Component
     public function instantSaveDiscordPingEnabled()
     {
         try {
-            $original = $this->discordPingEnabled;
             $this->validate([
                 'discordPingEnabled' => 'required',
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordPingEnabled = $original;
+            $this->discordPingEnabled = (bool) $this->settings->refresh()->discord_ping_enabled;
 
             return handleError($e, $this);
         }
@@ -156,7 +157,6 @@ class Discord extends Component
     public function instantSaveDiscordEnabled()
     {
         try {
-            $original = $this->discordEnabled;
             $this->validate([
                 'discordWebhookUrl' => 'required',
             ], [
@@ -164,7 +164,7 @@ class Discord extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordEnabled = $original;
+            $this->discordEnabled = (bool) $this->settings->refresh()->discord_enabled;
 
             return handleError($e, $this);
         }
@@ -239,5 +239,12 @@ class Discord extends Component
     public function render()
     {
         return view('livewire.notifications.discord');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.discord.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

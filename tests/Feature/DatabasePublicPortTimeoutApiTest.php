@@ -14,7 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -138,7 +138,7 @@ describe('POST /api/v1/databases/postgresql', function () {
             'instant_deploy' => false,
         ]);
 
-        $response->assertStatus(200);
+        $response->assertStatus(201);
         $uuid = $response->json('uuid');
         $database = StandalonePostgresql::whereUuid($uuid)->first();
         expect($database)->not->toBeNull();

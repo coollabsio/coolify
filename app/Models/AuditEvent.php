@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use JsonSerializable;
+use stdClass;
 use Throwable;
 
 class AuditEvent extends Model
@@ -17,11 +20,35 @@ class AuditEvent extends Model
 
     public const UPDATED_AT = null;
 
+    /**
+     * Raw commands and configurations can contain credentials without sensitive field names.
+     *
+     * @var array<int, string>
+     */
+    private const SENSITIVE_VALUE_FIELDS = [
+        'git_full_url',
+        'install_command', 'build_command', 'start_command',
+        'health_check_command', 'health_check_response_text',
+        'custom_docker_run_options', 'pre_deployment_command', 'post_deployment_command',
+        'docker_compose_custom_start_command', 'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+        'postgres_conf', 'mysql_conf', 'mariadb_conf', 'mongo_conf', 'redis_conf', 'keydb_conf',
+        'internal_db_url', 'external_db_url', 'init_scripts',
+        'dockerfile', 'docker_compose', 'docker_compose_raw', 'custom_labels',
+        'last_saved_proxy_configuration',
+        'environment_variables', 'environment_variables_preview',
+        'validation_logs', 'server_metadata', 'logs',
+        'configuration_snapshot', 'configuration_diff', 'content', 'file_storage_content',
+    ];
+
+    private const PRUNE_BATCH_SIZE = 1000;
+
     protected $fillable = [
         'team_id',
         'event',
         'source',
         'action',
+        'level',
         'actor_type',
         'actor_id',
         'actor_name',
@@ -33,6 +60,7 @@ class AuditEvent extends Model
         'resource_name',
         'description',
         'metadata',
+        'changes',
         'ip_address',
         'user_agent',
         'created_at',
@@ -42,6 +70,7 @@ class AuditEvent extends Model
     {
         return [
             'metadata' => 'array',
+            'changes' => 'encrypted:array',
             'created_at' => 'datetime',
         ];
     }
@@ -83,10 +112,28 @@ class AuditEvent extends Model
     /**
      * @param  array<string, mixed>  $context
      */
-    public static function record(string $event, array $context = []): void
+    public static function record(string $event, array $context = [], string $level = 'info'): void
+    {
+        self::recordWithChanges($event, $context, level: $level);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, array{old: mixed, new: mixed}>  $changes
+     */
+    public static function recordModelMutation(string $event, array $context, array $changes): void
+    {
+        self::recordWithChanges($event, $context, $changes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, array{old: mixed, new: mixed}>|null  $changes
+     */
+    private static function recordWithChanges(string $event, array $context, ?array $changes = null, string $level = 'info'): void
     {
         try {
-            $attributes = self::attributesFor($event, $context);
+            $attributes = self::attributesFor($event, $context, $changes, $level);
 
             DB::afterCommit(function () use ($attributes): void {
                 defer(function () use ($attributes): void {
@@ -112,12 +159,12 @@ class AuditEvent extends Model
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private static function attributesFor(string $event, array $context): array
+    private static function attributesFor(string $event, array $context, ?array $changes, string $level): array
     {
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
-            ?? data_get($context, 'team_id')
-            ?? currentTeam()?->id
-            ?? self::teamIdFromContext($context);
+            ?? (array_key_exists('team_id', $context)
+                ? $context['team_id']
+                : currentTeam()?->id ?? self::teamIdFromContext($context));
 
         $parts = explode('.', $event);
         $source = $parts[0] ?? 'system';
@@ -139,10 +186,11 @@ class AuditEvent extends Model
             'event' => $event,
             'source' => $source,
             'action' => $action,
+            'level' => self::normalizeLevel($level),
             'actor_type' => $actorType,
-            'actor_id' => $user?->id,
-            'actor_name' => $user?->name,
-            'actor_email' => $user?->email,
+            'actor_id' => data_get($context, 'actor_id', $user?->id),
+            'actor_name' => data_get($context, 'actor_name', $user?->name),
+            'actor_email' => data_get($context, 'actor_email', $user?->email),
             'actor_token_id' => $token?->id,
             'actor_token_name' => $token?->name,
             'resource_type' => $resourceType,
@@ -150,10 +198,21 @@ class AuditEvent extends Model
             'resource_name' => $resourceName,
             'description' => data_get($context, 'audit_description')
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
-            'metadata' => self::redact($context),
+            'metadata' => self::redact(Arr::except($context, ['audit_changes'])),
+            'changes' => $changes,
             'ip_address' => app()->bound('request') ? request()->ip() : null,
             'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
         ];
+    }
+
+    public static function normalizeLevel(string $level): string
+    {
+        return in_array($level, ['info', 'warning', 'error'], true) ? $level : 'info';
+    }
+
+    public static function redactContext(array $context): array
+    {
+        return self::redact($context);
     }
 
     /**
@@ -171,11 +230,23 @@ class AuditEvent extends Model
             ->first()?->team()?->id;
     }
 
+    /**
+     * Deletes in batches, so a large table is not locked by one long DELETE.
+     */
     public static function pruneExpired(): int
     {
-        return self::query()
-            ->where('created_at', '<', now()->subDays(90))
-            ->delete();
+        $olderThan = now()->subDays(90);
+        $total = 0;
+
+        do {
+            $deleted = self::query()
+                ->where('created_at', '<', $olderThan)
+                ->limit(self::PRUNE_BATCH_SIZE)
+                ->delete();
+            $total += $deleted;
+        } while ($deleted > 0);
+
+        return $total;
     }
 
     /**
@@ -192,10 +263,28 @@ class AuditEvent extends Model
         return $key ? data_get($context, $key) : null;
     }
 
-    private static function redact(mixed $value, ?string $key = null): mixed
+    public static function isSensitiveField(string $field): bool
     {
-        if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie/i', $key)) {
+        return in_array($field, self::SENSITIVE_VALUE_FIELDS, true)
+            || preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie|license_key/i', $field) === 1;
+    }
+
+    public static function redact(mixed $value, ?string $key = null): mixed
+    {
+        if ($key !== null && (in_array($key, self::SENSITIVE_VALUE_FIELDS, true) || self::isSensitiveKey($key))) {
             return '[REDACTED]';
+        }
+
+        if ($value instanceof Arrayable) {
+            $value = $value->toArray();
+        } elseif ($value instanceof JsonSerializable) {
+            $value = $value->jsonSerialize();
+        } elseif ($value instanceof stdClass) {
+            $value = (array) $value;
+        }
+
+        if (is_string($value)) {
+            return self::stripUrlCredentials($value);
         }
 
         if (! is_array($value)) {
@@ -207,5 +296,22 @@ class AuditEvent extends Model
                 $itemKey => self::redact($item, (string) $itemKey),
             ])
             ->all();
+    }
+
+    /**
+     * Removes the user info of URLs (https://user:token@host), so the audit keeps the URL without credentials.
+     */
+    private static function stripUrlCredentials(string $value): string
+    {
+        return preg_replace('#\b([a-z][a-z0-9+.-]*://)[^/?\#\s]+@#i', '$1', $value) ?? $value;
+    }
+
+    private static function isSensitiveKey(string $key): bool
+    {
+        if (preg_match('/_(id|uuid|name)$/i', $key)) {
+            return false;
+        }
+
+        return (bool) preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie|license_key/i', $key);
     }
 }

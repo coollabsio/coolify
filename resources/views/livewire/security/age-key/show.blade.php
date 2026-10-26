@@ -36,10 +36,7 @@
             @can('delete', $age_key)
                 <x-modal-confirmation title="Confirm Age Key Deletion?" isErrorButton buttonTitle="Delete"
                     submitAction="delete" :disabled="$isInUse"
-                    :disabledTooltip="$deleteDisabledReason" :actions="[
-                        'This age key will be permanently deleted.',
-                        'Backup schedules using it will have encryption disabled.',
-                    ]"
+                    :disabledTooltip="$deleteDisabledReason" :actions="['This age key will be permanently deleted.']"
                     confirmationText="{{ $age_key->name }}"
                     confirmationLabel="Enter the age key name to confirm deletion"
                     shortConfirmationLabel="Age key name" :confirmWithPassword="false"

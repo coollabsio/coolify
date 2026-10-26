@@ -3,6 +3,7 @@
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -16,6 +17,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Queue::fake();
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -131,6 +133,12 @@ test('it rejects docker_tag for non docker image applications', function () {
         'destination_id' => $this->destination->id,
         'destination_type' => StandaloneDocker::class,
         'build_pack' => 'nixpacks',
+    ]);
+
+    ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => '',
     ]);
 
     $response = $this->withHeaders([

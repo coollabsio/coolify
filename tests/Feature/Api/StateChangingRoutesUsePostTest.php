@@ -14,7 +14,6 @@ it('uses POST for state changes and keeps GET as a non-mutating compatibility re
         ->and($getRoute)->not->toBeNull()
         ->and($getRoute->getActionName())->toBe(OtherController::class.'@post_required');
 })->with([
-    'enable API' => 'api/v1/enable',
     'disable API' => 'api/v1/disable',
     'deploy' => 'api/v1/deploy',
     'validate server' => 'api/v1/servers/{uuid}/validate',

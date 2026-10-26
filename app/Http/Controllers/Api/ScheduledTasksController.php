@@ -21,8 +21,16 @@ class ScheduledTasksController extends Controller
             'application_id',
             'service_id',
         ]);
+        if (! $this->canReadSensitive()) {
+            $task->makeHidden(['command']);
+        }
 
         return serializeApiResponse($task);
+    }
+
+    private function canReadSensitive(): bool
+    {
+        return request()->attributes->get('can_read_sensitive', false) === true;
     }
 
     private function resolveApplication(Request $request, int $teamId): ?Application
@@ -62,7 +70,7 @@ class ScheduledTasksController extends Controller
             'command' => 'required|string',
             'frequency' => 'required|string',
             'container' => 'string|nullable',
-            'timeout' => 'integer|min:1',
+            'timeout' => 'integer|min:1|max:36000',
             'enabled' => 'boolean',
         ]);
 
@@ -138,7 +146,7 @@ class ScheduledTasksController extends Controller
             'command' => 'string',
             'frequency' => 'string',
             'container' => 'string|nullable',
-            'timeout' => 'integer|min:1',
+            'timeout' => 'integer|min:1|max:36000',
             'enabled' => 'boolean',
         ]);
 
@@ -218,6 +226,9 @@ class ScheduledTasksController extends Controller
 
         $executions = $task->executions()->get()->map(function ($execution) {
             $execution->makeHidden(['id', 'scheduled_task_id']);
+            if (! $this->canReadSensitive()) {
+                $execution->makeHidden(['message']);
+            }
 
             return serializeApiResponse($execution);
         });
@@ -339,7 +350,7 @@ class ScheduledTasksController extends Controller
                         'command' => ['type' => 'string', 'description' => 'The command to execute.'],
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
-                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300],
+                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
                     ],
                 ),
@@ -426,7 +437,7 @@ class ScheduledTasksController extends Controller
                         'command' => ['type' => 'string', 'description' => 'The command to execute.'],
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
-                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300],
+                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
                     ],
                 ),
@@ -702,7 +713,7 @@ class ScheduledTasksController extends Controller
                         'command' => ['type' => 'string', 'description' => 'The command to execute.'],
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
-                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300],
+                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
                     ],
                 ),
@@ -789,7 +800,7 @@ class ScheduledTasksController extends Controller
                         'command' => ['type' => 'string', 'description' => 'The command to execute.'],
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
-                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300],
+                        'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled.', 'default' => true],
                     ],
                 ),

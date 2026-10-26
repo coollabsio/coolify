@@ -1,4 +1,4 @@
-@props(['database', 'currentRoute'])
+@props(['database', 'currentRoute', 'navOnly' => false])
 
 @php
     $databaseRouteParameters = [
@@ -16,13 +16,14 @@
         ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
         ['label' => 'Runtime Logs', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.database.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
-        ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
+        ['label' => 'Files', 'route' => 'project.database.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
+        ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'webhook'],
         ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
         ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
         ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
-        ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'shield-alert'],
+        ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->map(fn (array $item): array => [
             ...$item,
@@ -33,10 +34,11 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics'],
         'Deploy' => ['Servers'],
         'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
-        'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone'],
+        'Operations' => ['Resource Operations', 'Resource Limits', 'Tags'],
+        'Danger Zone' => ['Danger Zone'],
     ];
 
     $groupedItems = collect($menuGroups)
@@ -60,20 +62,40 @@
         : [];
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start">
+@php
+    // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+@endphp
+
+{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
+     navOnly renders only the sidebar copy, as the parent menu of a deeper page (e.g. a backup). --}}
+@foreach ($navOnly ? ['main-nav'] : ['page', 'main-nav'] as $placement)
+@if ($placement === 'main-nav')
+@teleport('#main-nav-context-0')
+<div class="nav-context-menu">
+@else
+<aside class="application-settings-navigation in-main-nav min-w-0 xl:self-start"
+    data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $databaseRouteParameters, ['project.database.configuration' => $pageSections])) }}">
+@endif
     <nav aria-label="Database settings"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        @class([
+            'grid gap-0.5',
+            'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
+            'grid-cols-1' => $placement === 'main-nav',
+        ])>
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
-            <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
             @foreach ($groupItems as $menuItem)
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                    @if ($menuItem['label'] === 'Files')
+                        <x-beta-badge class="ml-auto shrink-0" />
+                    @endif
                 </a>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
                     <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
@@ -96,4 +118,10 @@
             @endforeach
         @endforeach
     </nav>
+@if ($placement === 'main-nav')
+</div>
+@endteleport
+@else
 </aside>
+@endif
+@endforeach

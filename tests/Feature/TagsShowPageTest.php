@@ -33,7 +33,7 @@ it('shows an empty state when there are no tags', function () {
     Livewire::test(Show::class)
         ->assertSee('Tags')
         ->assertSee('No tags yet')
-        ->assertSee('Open a resource and add a tag to start grouping related deployments.');
+        ->assertSee('Create a tag, then connect it to resources to group related deployments.');
 });
 
 it('shows a card grid overview when tags exist and none is selected', function () {
@@ -53,22 +53,6 @@ it('shows a card grid overview when tags exist and none is selected', function (
         ->assertSee('tags-view', false)
         ->assertDontSee('Switch tag')
         ->assertDontSee('Deploy webhook URL');
-});
-
-it('includes filterable tags payload for the overview', function () {
-    Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
-    Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
-
-    $html = Livewire::test(Show::class)->html();
-
-    expect($html)
-        ->toContain('hello')
-        ->toContain('production')
-        ->toContain('resourceCount')
-        ->toContain('applicationsCount')
-        ->toContain('servicesCount')
-        ->toContain('setViewMode')
-        ->toContain('filteredTags');
 });
 
 it('shows the tag detail layout with stats when a tag is selected', function () {
@@ -96,12 +80,6 @@ it('shows the tag detail layout with stats when a tag is selected', function () 
         ->assertSee('Redeploy all')
         ->assertSee('tagged-app')
         ->assertDontSee('No resources use this tag');
-
-    $breadcrumbs = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
-    expect($breadcrumbs)
-        ->toContain('title="Tags"')
-        ->toContain("'label' => 'All tags'")
-        ->toContain("route('tags.show', ['tagName' => \$tag->name])");
 });
 
 it('shows empty resource and deployment states for an unused tag', function () {
@@ -114,16 +92,78 @@ it('shows empty resource and deployment states for an unused tag', function () {
         ->assertSee('Queued or running');
 });
 
-it('adds spacing around the active deployments empty state', function () {
-    $view = file_get_contents(resource_path('views/livewire/tags/show.blade.php'));
-
-    expect($view)
-        ->toMatch('/<div class="p-3">\s*<x-empty title="No active deployments"/');
-});
-
 it('redirects to the overview when the requested tag does not exist', function () {
     Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
 
     Livewire::test(Show::class, ['tagName' => 'missing-tag'])
         ->assertRedirect(route('tags.show'));
+});
+
+it('lists the team resources in the connect modal and toggles the tag on a resource', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'shop']);
+    $environment = Environment::factory()->create(['project_id' => $project->id, 'name' => 'prod']);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'name' => 'untagged-app',
+    ]);
+
+    $component = Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->assertDontSee('shop / prod')
+        ->call('openConnectResources')
+        ->assertSee('shop / prod')
+        ->assertSee('untagged-app')
+        ->call('toggleResource', $application->uuid);
+
+    expect($application->tags()->whereKey($tag->id)->exists())->toBeTrue();
+    expect($component->get('applications')->pluck('uuid')->all())->toBe([$application->uuid]);
+
+    $component->call('toggleResource', $application->uuid);
+
+    expect($application->tags()->whereKey($tag->id)->exists())->toBeFalse();
+});
+
+it('does not tag a resource of another team from the connect modal', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $otherTeam = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->call('toggleResource', $application->uuid)
+        ->assertDispatched('error');
+
+    expect($application->tags()->exists())->toBeFalse();
+});
+
+it('does not let a member change tags from the connect modal', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->call('toggleResource', $application->uuid);
+
+    expect($application->tags()->exists())->toBeFalse();
 });

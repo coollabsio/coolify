@@ -16,7 +16,13 @@
         $traefikUpdateAvailable => 'Update available',
         default => str($proxyStatus ?: 'unknown')->headline(),
     };
-    $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelNeedsAttention = $showSentinelStatus && $sentinelStatus === 'out_of_sync';
+    $sentinelStatusLabel = match ($sentinelStatus) {
+        'waiting' => 'Waiting for first report',
+        'in_sync' => 'In sync',
+        default => 'Out of sync',
+    };
 
     [$summaryLabel, $summaryType] = match (true) {
         ! $serverReady => ['Unavailable', 'error'],
@@ -41,8 +47,8 @@
         </span>
     </x-status-badge>
 
-    <div x-cloak x-show="open" x-transition.origin.top.right
-        class="listbox-panel top-8! right-0! left-auto! z-[90]! w-64! min-w-64!" role="menu">
+    <div x-cloak x-show="open" x-transition.origin.top.left
+        class="listbox-panel top-8! right-auto! left-0! z-[90]! w-64! min-w-64!" role="menu">
         <div class="flex items-center gap-1 px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">
             <span>System status</span>
             @if ($server->proxySet())
@@ -80,11 +86,12 @@
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
-                    'bg-success' => ! $sentinelNeedsAttention,
-                    'bg-warning' => $sentinelNeedsAttention,
+                    'bg-success' => $sentinelStatus === 'in_sync',
+                    'bg-neutral-400 dark:bg-fg-faint' => $sentinelStatus === 'waiting',
+                    'bg-warning' => $sentinelStatus === 'out_of_sync',
                 ])></span>
                 <span class="flex-1">Sentinel</span>
-                <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
+                <span>{{ $sentinelStatusLabel }}</span>
             </a>
         @endif
     </div>

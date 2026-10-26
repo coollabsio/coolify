@@ -2,24 +2,23 @@
 
 use App\Events\RestoreJobFinished;
 use App\Events\S3RestoreJobFinished;
-use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 /**
  * Tests for RestoreJobFinished and S3RestoreJobFinished events to ensure they handle
  * null server scenarios gracefully (when server is deleted during operation).
  */
 describe('RestoreJobFinished null server handling', function () {
-    afterEach(function () {
-        Mockery::close();
+    beforeEach(function () {
+        Process::fake();
     });
 
     it('handles null server gracefully in RestoreJobFinished event', function () {
-        // Mock Server::find to return null (server was deleted)
-        $mockServer = Mockery::mock('alias:'.Server::class);
-        $mockServer->shouldReceive('find')
-            ->with(999)
-            ->andReturn(null);
-
+        // Server 999 does not exist (it was deleted during the restore)
         $data = [
             'scriptPath' => '/tmp/script.sh',
             'tmpPath' => '/tmp/backup.sql',
@@ -29,15 +28,11 @@ describe('RestoreJobFinished null server handling', function () {
 
         // Should not throw an error when server is null
         expect(fn () => new RestoreJobFinished($data))->not->toThrow(\Throwable::class);
+        Process::assertNothingRan();
     });
 
     it('handles null server gracefully in S3RestoreJobFinished event', function () {
-        // Mock Server::find to return null (server was deleted)
-        $mockServer = Mockery::mock('alias:'.Server::class);
-        $mockServer->shouldReceive('find')
-            ->with(999)
-            ->andReturn(null);
-
+        // Server 999 does not exist (it was deleted during the restore)
         $data = [
             'containerName' => 'helper-container',
             'serverTmpPath' => '/tmp/downloaded.sql',
@@ -49,6 +44,7 @@ describe('RestoreJobFinished null server handling', function () {
 
         // Should not throw an error when server is null
         expect(fn () => new S3RestoreJobFinished($data))->not->toThrow(\Throwable::class);
+        Process::assertNothingRan();
     });
 
     it('handles empty serverId in RestoreJobFinished event', function () {

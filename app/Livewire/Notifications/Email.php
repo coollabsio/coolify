@@ -77,6 +77,9 @@ class Email extends Component
     public bool $deploymentFailureEmailNotifications = true;
 
     #[Validate(['boolean'])]
+    public bool $deploymentCommitDetailsEmailNotifications = false;
+
+    #[Validate(['boolean'])]
     public bool $statusChangeEmailNotifications = false;
 
     #[Validate(['boolean'])]
@@ -156,6 +159,7 @@ class Email extends Component
 
             $this->settings->deployment_success_email_notifications = $this->deploymentSuccessEmailNotifications;
             $this->settings->deployment_failure_email_notifications = $this->deploymentFailureEmailNotifications;
+            $this->settings->deployment_commit_details_email_notifications = $this->deploymentCommitDetailsEmailNotifications;
             $this->settings->status_change_email_notifications = $this->statusChangeEmailNotifications;
             $this->settings->restart_limit_reached_email_notifications = $this->restartLimitReachedEmailNotifications;
             $this->settings->backup_success_email_notifications = $this->backupSuccessEmailNotifications;
@@ -169,7 +173,9 @@ class Email extends Component
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
             $this->settings->server_patch_email_notifications = $this->serverPatchEmailNotifications;
             $this->settings->traefik_outdated_email_notifications = $this->traefikOutdatedEmailNotifications;
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
 
         } else {
             $this->smtpEnabled = $this->settings->smtp_enabled;
@@ -195,6 +201,7 @@ class Email extends Component
 
             $this->deploymentSuccessEmailNotifications = $this->settings->deployment_success_email_notifications;
             $this->deploymentFailureEmailNotifications = $this->settings->deployment_failure_email_notifications;
+            $this->deploymentCommitDetailsEmailNotifications = $this->settings->deployment_commit_details_email_notifications;
             $this->statusChangeEmailNotifications = $this->settings->status_change_email_notifications;
             $this->restartLimitReachedEmailNotifications = $this->settings->restart_limit_reached_email_notifications;
             $this->backupSuccessEmailNotifications = $this->settings->backup_success_email_notifications;
@@ -227,6 +234,18 @@ class Email extends Component
 
         $this->syncData(true);
         $this->dispatch('success', 'Email notifications settings updated.');
+    }
+
+    public function instantSaveDeploymentCommitDetails()
+    {
+        try {
+            $this->resetErrorBag();
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->deploymentCommitDetailsEmailNotifications = $this->settings->deployment_commit_details_email_notifications;
+
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave(?string $type = null)
@@ -327,7 +346,9 @@ class Email extends Component
             $this->settings->smtp_timeout = $this->smtpTimeout;
             $this->settings->smtp_ehlo_domain = $this->smtpEhloDomain;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             $this->dispatch('success', 'SMTP settings updated.');
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
@@ -352,7 +373,9 @@ class Email extends Component
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             $this->dispatch('success', 'Resend settings updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -431,6 +454,7 @@ class Email extends Component
     {
         $this->authorize('update', $this->settings);
         $settings = instanceSettings();
+        $this->authorize('view', $settings);
         $this->smtpFromAddress = $settings->smtp_from_address;
         $this->smtpFromName = $settings->smtp_from_name;
 
@@ -460,5 +484,15 @@ class Email extends Component
     public function render()
     {
         return view('livewire.notifications.email');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.email.updated', [
+                'team_id' => $this->team->id,
+                'changed_fields' => array_values(array_diff($changedFields, ['smtp_password', 'resend_api_key'])),
+            ]);
+        }
     }
 }

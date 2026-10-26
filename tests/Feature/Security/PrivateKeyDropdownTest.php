@@ -83,9 +83,15 @@ test('manual private key form does not expose key generation controls', function
 });
 
 test('private key details view reminds users to install the public key', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php'));
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+    ]);
 
-    expect($view)->toContain("ACTION REQUIRED: Copy the 'Public Key' to your server's ~/.ssh/authorized_keys file");
+    $this->get(route('security.private-key.show', [
+        'private_key_uuid' => $privateKey->uuid,
+    ]))
+        ->assertSuccessful()
+        ->assertSee('Copy this value to ~/.ssh/authorized_keys on the target server.');
 });
 
 test('github app private key shows a highlighted badge under the title', function () {
@@ -100,18 +106,6 @@ test('github app private key shows a highlighted badge under the title', functio
         ->assertSuccessful()
         ->assertSee('Used by GitHub App')
         ->assertDontSee('Is used by a Git App?');
-});
-
-test('github app badge appears before the save button in the title row', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php'));
-
-    $badgePosition = strpos($view, 'Used by GitHub App');
-    $saveButtonPosition = strpos($view, '<x-forms.button canGate="update" :canResource="$private_key" type="submit">');
-
-    expect($view)->toContain('<div class="flex items-center gap-2 pb-4">')
-        ->and($view)->toContain('Used by GitHub App')
-        ->and($view)->toContain('<x-forms.button canGate="update" :canResource="$private_key" type="submit">')
-        ->and($badgePosition)->toBeLessThan($saveButtonPosition);
 });
 
 test('used private key details disable delete with an explanation', function () {

@@ -8,7 +8,9 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 
@@ -45,7 +47,7 @@ beforeEach(function () {
 
 test('server private key page shows highlighted add dropdown actions', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('+ Add')
+        ->assertSee('Add')
         ->assertSee('Generate ED25519')
         ->assertSee('Generate RSA')
         ->assertSee('Add manually')
@@ -70,18 +72,10 @@ test('generating a server private key stores it and refreshes the current view',
         ->assertSee($privateKey->name);
 });
 
-test('server private key page copies generated public keys and shows a copied hint', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/private-key/show.blade.php'));
-
-    expect($view)->toContain('copyPublicKeyToClipboard')
-        ->and($view)->toContain('navigator.clipboard.writeText')
-        ->and($view)->toContain('Public key copied to clipboard.');
-});
-
 test('server private key cards include a copy public key button', function () {
     $keyData = PrivateKey::generateNewKeyPair('rsa');
 
-    PrivateKey::createAndStore([
+    $alternativeKey = PrivateKey::createAndStore([
         'team_id' => $this->team->id,
         'name' => 'Alternative SSH Key',
         'description' => 'Created by test',
@@ -90,11 +84,55 @@ test('server private key cards include a copy public key button', function () {
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->assertSee('Copy public key')
-        ->assertSee('Alternative SSH Key');
+        ->assertSee('Alternative SSH Key')
+        ->assertSeeHtml('copyPublicKeyToClipboard('.Js::from($alternativeKey->public_key)->toHtml().')');
+});
 
-    $view = file_get_contents(resource_path('views/livewire/server/private-key/show.blade.php'));
+describe('after the user switches the session team', function () {
+    beforeEach(function () {
+        Process::fake();
+        Storage::fake('ssh-mux');
 
-    expect($view)->toContain('Copy public key')
-        ->and($view)->toContain('$private_key->public_key')
-        ->and($view)->toContain('Public key copied to clipboard.');
+        $this->otherTeam = Team::factory()->create();
+        $this->otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        $this->otherTeamKey = PrivateKey::factory()->create([
+            'team_id' => $this->otherTeam->id,
+            'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+        ]);
+        $this->sameTeamKey = PrivateKey::factory()->create([
+            'team_id' => $this->team->id,
+            'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+        ]);
+
+        $this->component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid]);
+        session(['currentTeam' => $this->otherTeam]);
+        Once::flush();
+    });
+
+    test('lists only keys of the server team', function () {
+        $keyIds = $this->component->call('generatePrivateKey', 'ed25519')->get('privateKeys')->pluck('id');
+
+        expect($keyIds)->toContain($this->sameTeamKey->id)
+            ->not->toContain($this->otherTeamKey->id);
+    });
+
+    test('generates the key in the server team', function () {
+        $this->component->call('generatePrivateKey', 'ed25519');
+
+        expect(PrivateKey::query()->latest('id')->firstOrFail()->team_id)->toBe($this->team->id);
+    });
+
+    test('rejects a key of the session team', function () {
+        $this->component->call('setPrivateKey', $this->otherTeamKey->id)
+            ->assertDispatched('error', 'You are not allowed to use this private key.');
+
+        expect($this->server->fresh()->private_key_id)->toBe($this->currentPrivateKey->id);
+    });
+
+    test('accepts a key of the server team', function () {
+        $this->component->call('setPrivateKey', $this->sameTeamKey->id)
+            ->assertDispatched('success');
+
+        expect($this->server->fresh()->private_key_id)->toBe($this->sameTeamKey->id);
+    });
 });

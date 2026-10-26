@@ -1,0 +1,15 @@
+1_deploy:
+  applications: {}
+  databases: {}
+  environment_variables: {}
+  compose: {}
+2_custom_domains:
+  applications: {}
+  databases: {}
+  environment_variables: {}
+  compose: {}
+3_domain_on_applications_without_one:
+  applications: {}
+  databases: {}
+  environment_variables: {}
+  compose: {}

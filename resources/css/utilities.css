@@ -59,7 +59,7 @@
 
 /*  input, select before */
 @utility input-select {
-    @apply block h-9 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-[var(--coollabs-recessed)] dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
+    @apply block h-8 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-[var(--coollabs-recessed)] dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
     box-shadow: none;
 
     &:where(.dark, .dark *) {
@@ -419,15 +419,25 @@
 }
 
 @media (min-width: 1024px) {
-    .sidebar-collapsed .menu-item {
+    /* Collapsed rail keeps every nav icon at its expanded x-position (left-aligned,
+       same 10px inset) so muscle memory holds when the sidebar is toggled; only the
+       label is hidden. Unlayered rule outranks the inline lg:justify-center/lg:px-0
+       utilities on each row. The footer collapse toggle keeps its own centered
+       square via the .sidebar-toggle exclusion. */
+    .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        justify-content: flex-start;
+        padding-left: 0.625rem;
+        padding-right: 0.625rem;
+    }
+
+    /* Flat rows show their own fill, so make it a 2rem square (same as the h-8
+       height) with the icon centered, in line with the footer controls. */
+    html[data-nav-items="flat"] .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        width: 2rem;
+        margin-left: 0.1875rem;
         justify-content: center;
-        width: var(--button-h, 2rem);
-        height: var(--button-h, 2rem);
-        min-height: var(--button-h, 2rem);
         padding-left: 0;
         padding-right: 0;
-        gap: 0;
-        margin-inline: auto;
     }
 
     .sidebar-collapsed .sidebar-collapsed-label {

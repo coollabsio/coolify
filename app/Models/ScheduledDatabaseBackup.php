@@ -2,12 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Destinations;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
+    use HasS3Destinations;
+
     protected function casts(): array
     {
         return [
@@ -16,7 +21,6 @@ class ScheduledDatabaseBackup extends BaseModel
             'database_backup_retention_max_storage_locally' => 'float',
             'database_backup_retention_max_storage_s3' => 'float',
             'missing_backup_notification_days' => 'integer',
-            'missing_backup_notification_sent_at' => 'datetime',
             'last_execution_at' => 'datetime',
         ];
     }
@@ -82,9 +86,24 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
     }
 
-    public function ageKey()
+    public function s3Storages(): BelongsToMany
     {
-        return $this->belongsTo(AgeKey::class, 'age_key_id');
+        return $this->belongsToMany(S3Storage::class, 'scheduled_database_backup_s3_storage')->withTimestamps();
+    }
+
+    public function ageKey(): BelongsTo
+    {
+        return $this->belongsTo(AgeKey::class);
+    }
+
+    /**
+     * The age public key that encrypts this schedule's backups. Only a key of the schedule's team counts.
+     */
+    public function encryptionRecipient(): ?string
+    {
+        $ageKey = $this->ageKey;
+
+        return $ageKey && $ageKey->team_id === $this->team_id ? $ageKey->public_key : null;
     }
 
     public function get_last_days_backup_status($days = 7)
@@ -94,7 +113,7 @@ class ScheduledDatabaseBackup extends BaseModel
 
     public function executionsPaginated(int $skip = 0, int $take = 10)
     {
-        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->orderBy('created_at', 'desc');
+        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->with('s3Replicas.s3')->orderBy('created_at', 'desc');
         $count = $executions->count();
         $executions = $executions->skip($skip)->take($take)->get();
 

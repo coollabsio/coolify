@@ -8,6 +8,7 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Rules\ValidGitBranch;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -39,6 +40,18 @@ class Source extends Component
     #[Locked]
     public $sources;
 
+    #[Validate(['nullable', 'string', 'max:255', 'regex:/^[^:\r\n]*$/'])]
+    public ?string $gitHttpsUsername = null;
+
+    /**
+     * Write-only: the saved password or token is never sent to the browser.
+     */
+    #[Validate(['nullable', 'string', 'max:2048', 'regex:/^[^\r\n]*$/'])]
+    public ?string $gitHttpsPassword = null;
+
+    #[Locked]
+    public bool $hasGitHttpsPassword = false;
+
     public function mount()
     {
         try {
@@ -69,12 +82,19 @@ class Source extends Component
     {
         if ($toModel) {
             $this->validate();
-            $this->application->update([
+            $this->application->fill([
                 'git_repository' => $this->gitRepository,
                 'git_branch' => $this->gitBranch,
                 'git_commit_sha' => $this->gitCommitSha,
                 'private_key_id' => $this->privateKeyId,
             ]);
+            if (filled($this->gitHttpsPassword)) {
+                $this->application->git_https_username = $this->gitHttpsUsername;
+                $this->application->git_https_password = $this->gitHttpsPassword;
+            } elseif ($this->hasGitHttpsPassword) {
+                $this->application->git_https_username = $this->gitHttpsUsername;
+            }
+            $this->application->save();
             // Refresh to get the trimmed values from the model
             $this->application->refresh();
             $this->syncData(false);
@@ -84,19 +104,22 @@ class Source extends Component
             $this->gitCommitSha = $this->application->git_commit_sha;
             $this->privateKeyId = $this->application->private_key_id;
             $this->privateKeyName = data_get($this->application, 'private_key.name');
+            $this->gitHttpsUsername = $this->application->git_https_username;
+            $this->gitHttpsPassword = null;
+            $this->hasGitHttpsPassword = filled($this->application->git_https_password);
         }
     }
 
     private function getPrivateKeys()
     {
-        $this->privateKeys = PrivateKey::whereTeamId(currentTeam()->id)->get()->reject(function ($key) {
+        $this->privateKeys = PrivateKey::where('team_id', $this->application->team()->id)->get()->reject(function ($key) {
             return $key->id == $this->privateKeyId;
         });
     }
 
     private function getSources()
     {
-        $this->sources = currentTeam()->sources()->filter(function ($source) {
+        $this->sources = $this->application->team()->sources()->filter(function ($source) {
             if ($source->id === $this->application->source_id
                 && $source->getMorphClass() === $this->application->source_type) {
                 return false;
@@ -116,7 +139,7 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $key = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
+            $key = PrivateKey::where('team_id', $this->application->team()->id)->findOrFail($privateKeyId);
             $this->privateKeyId = $key->id;
             $this->syncData(true);
             $this->getPrivateKeys();
@@ -137,8 +160,27 @@ class Source extends Component
             if (str($this->gitCommitSha)->isEmpty()) {
                 $this->gitCommitSha = 'HEAD';
             }
+            if (filled($this->gitHttpsUsername) && blank($this->gitHttpsPassword) && ! $this->hasGitHttpsPassword) {
+                throw ValidationException::withMessages(['gitHttpsPassword' => 'Enter the password or token for this username.']);
+            }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function removeGitHttpsCredential()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->application->forceFill([
+                'git_https_username' => null,
+                'git_https_password' => null,
+            ])->save();
+            $this->syncData();
+            $this->dispatch('success', 'HTTPS credentials removed.');
             $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -151,7 +193,10 @@ class Source extends Component
             $this->authorize('update', $this->application);
             $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
             abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
-            $source = $sourceType::ownedByCurrentTeam()->findOrFail($sourceId);
+            $teamId = $this->application->team()->id;
+            $source = $sourceType::query()
+                ->where(fn ($query) => $query->where('team_id', $teamId)->orWhere('is_system_wide', true))
+                ->findOrFail($sourceId);
             $this->application->update([
                 'source_id' => $source->id,
                 'source_type' => $sourceType,

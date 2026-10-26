@@ -21,6 +21,65 @@ beforeEach(function () {
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
 });
 
+it('uses the latest stable traefik branch for new proxy configurations', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    $config = Yaml::parse(generateDefaultProxyConfiguration($server->fresh()));
+
+    expect($config['services']['traefik']['image'])->toBe('traefik:v3.7');
+});
+
+it('does not expose the proxy container through its own docker provider', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    $config = Yaml::parse(generateDefaultProxyConfiguration($server->fresh()));
+    $labels = $config['services']['traefik']['labels'];
+
+    expect($labels)->toContain('traefik.enable=false')
+        ->not->toContain('traefik.enable=true')
+        ->and(collect($labels)->contains(fn (string $label): bool => str_starts_with($label, 'traefik.http.routers.traefik.')))->toBeFalse();
+});
+
+it('preserves intentional self-router labels when updating an existing proxy configuration', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    $configuration = applyTrafficAnalyticsToProxyConfiguration($server->fresh(), <<<'YAML'
+services:
+  traefik:
+    command: []
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.entrypoints=http
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.services.traefik.loadbalancer.server.port=8080
+      - coolify.managed=true
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.traefik.entrypoints=http
+        - traefik.http.routers.traefik.service=api@internal
+        - traefik.http.services.traefik.loadbalancer.server.port=8080
+        - coolify.proxy=true
+YAML);
+    $traefik = Yaml::parse($configuration)['services']['traefik'];
+
+    expect($traefik['labels'])->toContain(
+        'traefik.enable=true',
+        'traefik.http.routers.traefik.service=api@internal',
+        'coolify.managed=true',
+    )->and($traefik['deploy']['labels'])->toContain(
+        'traefik.enable=true',
+        'traefik.http.routers.traefik.service=api@internal',
+        'coolify.proxy=true',
+    );
+});
+
 it('does not add a traefik-logrotate sidecar when traffic analytics is disabled', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
     $server->proxy->set('type', 'TRAEFIK');
@@ -36,7 +95,7 @@ it('does not add a traefik-logrotate sidecar when traffic analytics is disabled'
     expect($config['services'])->not->toHaveKey('traefik-logrotate');
 });
 
-it('adds a traefik-logrotate sidecar with copytruncate and the proxy mount when enabled', function () {
+it('adds a traefik-logrotate sidecar with the proxy mount when enabled', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
     $server->proxy->set('type', 'TRAEFIK');
     $server->save();
@@ -46,15 +105,52 @@ it('adds a traefik-logrotate sidecar with copytruncate and the proxy mount when 
     $server = $server->fresh();
     $yaml = generateDefaultProxyConfiguration($server);
 
-    expect($yaml)->toContain('traefik-logrotate')
-        ->toContain('copytruncate');
+    expect($yaml)->toContain('traefik-logrotate');
 
     $config = Yaml::parse($yaml);
     $sidecar = $config['services']['traefik-logrotate'];
 
-    expect($sidecar['image'])->toBe('alpine:3.20');
+    expect($sidecar['container_name'])->toBe('coolify-proxy-logrotate');
+    expect($sidecar['image'])->toBe('alpine:3.24');
+    expect($sidecar['network_mode'])->toBe('none');
     expect($sidecar['volumes'])->toContain($server->proxyPath().':/traefik');
     expect($sidecar['labels'])->toContain('coolify.managed=true');
-    expect($sidecar['entrypoint'])->toContain('copytruncate');
-    expect($sidecar['entrypoint'])->toContain('logrotate');
+    expect($sidecar['entrypoint'])->toHaveCount(3)
+        ->and($sidecar['entrypoint'][0])->toBe('/bin/sh')
+        ->and($sidecar['entrypoint'][1])->toBe('-c');
+});
+
+it('rotates the access log with busybox tools only, without installing packages', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    $yaml = generateDefaultProxyConfiguration($server->fresh());
+    $script = Yaml::parse($yaml)['services']['traefik-logrotate']['entrypoint'][2];
+
+    expect($yaml)->not->toContain('apk add')
+        ->not->toContain('apk ')
+        ->not->toContain('logrotate -s');
+
+    expect($script)->toContain('while true; do')
+        ->toContain('stat -c %s')
+        ->toContain('20971520')
+        ->toContain('keep=5')
+        ->toContain('gzip -f')
+        ->toContain(': > "$$log"');
+});
+
+it('escapes every dollar sign in the rotation script from docker compose interpolation', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    $script = Yaml::parse(generateDefaultProxyConfiguration($server->fresh()))['services']['traefik-logrotate']['entrypoint'][2];
+
+    expect(str_replace('$$', '', $script))->not->toContain('$')
+        ->and(str_replace('$$', '$', $script))->toBe(traefikAccessLogRotationScript());
 });

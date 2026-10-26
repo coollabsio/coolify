@@ -42,6 +42,30 @@
                     :canResource="$application" />
             </div>
         </x-application.settings-section>
+
+        @if ($application->deploymentType() === 'other')
+            <x-application.settings-section title="HTTPS credentials"
+                description="The username and password or access token Coolify uses to clone a private repository from a custom Git host (Azure DevOps, Bitbucket, Gitea, and others) over HTTP(S). Coolify sends them only to the host of the repository URL and never shows the saved password or token.">
+                @if ($hasGitHttpsPassword)
+                    @can('update', $application)
+                        <x-slot:actions>
+                            <x-forms.button type="button" isError wire:click="removeGitHttpsCredential">
+                                Remove credentials
+                            </x-forms.button>
+                        </x-slot:actions>
+                    @endcan
+                @endif
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input id="gitHttpsUsername" label="Username" autocomplete="off"
+                        helper="Some hosts accept any username with an access token (for example Azure DevOps)."
+                        canGate="update" :canResource="$application" />
+                    <x-forms.input id="gitHttpsPassword" type="password" label="Password or token"
+                        autocomplete="new-password"
+                        placeholder="{{ $hasGitHttpsPassword ? 'Saved. Enter a new value to replace it.' : '' }}"
+                        canGate="update" :canResource="$application" />
+                </div>
+            </x-application.settings-section>
+        @endif
     </form>
 
     @if (filled($privateKeyId))
@@ -104,7 +128,7 @@
                                 </p>
                             </div>
                             <x-reicon name="check"
-                                class="size-4 shrink-0 text-coollabs dark:text-warning" />
+                                class="size-4 shrink-0 text-black dark:text-fg" />
                         </div>
                     @endif
 

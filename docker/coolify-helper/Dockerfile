@@ -12,9 +12,9 @@ ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases
 ARG NIXPACKS_VERSION=1.41.0
 # https://github.com/railwayapp/railpack/releases
-ARG RAILPACK_VERSION=0.23.0
-# https://github.com/jdx/mise/releases — must match railpack's pinned version (https://raw.githubusercontent.com/railwayapp/railpack/refs/heads/main/core/mise/version.txt)
-ARG MISE_VERSION=2026.3.17
+ARG RAILPACK_VERSION=0.40.1
+# https://github.com/jdx/mise/releases — must match the version pinned at that railpack tag (https://raw.githubusercontent.com/railwayapp/railpack/v${RAILPACK_VERSION}/core/mise/version.txt)
+ARG MISE_VERSION=2026.9.15
 FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 
 FROM ${BASE_IMAGE} AS base
@@ -36,7 +36,7 @@ RUN apk upgrade --no-cache && \
 RUN mkdir -p ~/.docker/cli-plugins
 
 # Install mise (musl build) at the path railpack expects (/tmp/railpack/mise/mise-VERSION).
-# Railpack hardcodes a glibc mise download that fails on Alpine, so we pre-place a musl binary.
+# Railpack skips its own mise download when this file exists.
 RUN mkdir -p /tmp/railpack/mise && \
     if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
         curl -sSL "https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-x64-musl.tar.gz" | tar xz && \

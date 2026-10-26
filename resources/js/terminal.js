@@ -6,6 +6,13 @@ import {
     TERMINAL_SESSION_WARNING_SECONDS,
     formatTerminalSessionRemainingTime,
 } from './terminal-session-timer.js';
+import {
+    TERMINAL_CONNECT_TIMEOUT_MS,
+    TERMINAL_CONNECTION_ERRORS,
+    classifyTerminalServerMessage,
+    resolveTerminalCloseOutcome,
+    terminalSessionStartMethods,
+} from './terminal-connection.js';
 import { FitAddon } from '@xterm/addon-fit';
 
 const terminalDebugParameter = new URLSearchParams(window.location.search).get('terminal-debug');
@@ -178,6 +185,11 @@ export function initializeTerminalComponent() {
             maxReconnectDelay: 30000,
             connectionTimeout: 10000,
             connectionTimeoutId: null,
+            // Shown instead of "connecting…" once a connection or session start failed.
+            connectionError: null,
+            // Set when the server rejected authentication; disables automatic reconnects.
+            authRejected: false,
+            sessionStartTimeoutId: null,
             lastPingTime: null,
             pingTimeout: 35000, // 5 seconds longer than ping interval
             pingTimeoutId: null,
@@ -185,10 +197,6 @@ export function initializeTerminalComponent() {
             maxHeartbeatMisses: 3,
             // Command buffering for race condition prevention
             pendingCommand: null,
-            // Last successfully sent SSH command — replayed after a transient reconnect
-            // so the PTY respawns automatically. Cleared on intentional terminations
-            // (pty-exited, unprocessable).
-            lastSentCommand: null,
             // Resize handling
             resizeObserver: null,
             resizeTimeout: null,
@@ -197,6 +205,15 @@ export function initializeTerminalComponent() {
             wasConnectedBeforeHidden: false,
             mobileToolbarCollapsed: false,
             terminalModifier: null,
+            // Console (attach) mode — line-oriented command input, like a game-server panel.
+            consoleCommand: '',
+            consoleHistory: [],
+            consoleHistoryIndex: -1,
+            // Lines from a multi-line paste, waiting for the user to confirm with Enter.
+            consolePendingLines: [],
+            consoleSentFlash: false,
+            consoleSentFlashTimeout: null,
+            consoleForegroundColor: '#ffffff',
             keyboardInset: 0,
             keyboardAnchorTop: 0,
             keyboardViewportHeight: 0,
@@ -218,8 +235,15 @@ export function initializeTerminalComponent() {
                 ? localStorage.getItem('coolify-console-theme')
                 : 'system',
 
+            ...terminalSessionStartMethods,
+
             init() {
                 this.starting = this.$el.dataset.autoStart === 'true';
+                // Auto-start requests a token without a user action. If no token or error
+                // arrives, the session-start timeout ends "connecting…" with an error.
+                if (this.starting) {
+                    this.armTerminalSessionStartTimeout();
+                }
                 this.updateKeyboardInset = () => {
                     const viewport = window.visualViewport;
                     const viewportWidth = viewport?.width ?? window.innerWidth;
@@ -290,15 +314,33 @@ export function initializeTerminalComponent() {
 
                 this.setupTerminalEventListeners();
 
-                this.$wire.on('send-back-command', (command) => {
-                    this.sendCommandWhenReady({ command: command });
+                this.$wire.on('send-terminal-token', ([token]) => {
+                    // A token requested before the rejection arrived must not reconnect;
+                    // only a user-initiated start (terminal-starting) retries.
+                    if (this.authRejected) {
+                        logTerminal('warn', '[Terminal] Ignoring terminal token after authentication was rejected.');
+                        return;
+                    }
+                    this.applyConsoleMode();
+                    this.beginTerminalSessionStart();
+                    this.sendCommandWhenReady({ terminalToken: token });
+                });
+
+                // Coolify did not issue a token (container stopped, no shell, access denied).
+                this.$wire.on('terminal-session-failed', ({ message }) => {
+                    this.failTerminalSessionStart(message);
+                });
+
+                // The page shows a container picker; nothing starts until the user chooses.
+                this.$wire.on('terminal-auto-start-cancelled', () => {
+                    this.cancelTerminalAutoStart();
                 });
 
                 this.$wire.on('terminal-should-focus', () => {
                     // Wait for terminal to be ready, then focus
                     const focusWhenReady = () => {
                         if (this.terminalActive && this.term) {
-                            this.term.focus();
+                            this.focusActiveInput();
                         } else {
                             setTimeout(focusWhenReady, 100);
                         }
@@ -369,6 +411,7 @@ export function initializeTerminalComponent() {
                 clearTimeout(this.keyboardInsetSettleTimeout);
                 this.checkIfProcessIsRunningAndKillIt();
                 this.clearAllTimers();
+                this.clearSessionStartTimeout();
                 this.connectionState = 'disconnected';
                 this.pendingCommand = null;
                 this.resetTerminalSessionCountdown();
@@ -482,6 +525,7 @@ export function initializeTerminalComponent() {
                     const cursorBlink = this.term.options.cursorBlink;
                     this.term.options.cursorBlink = false;
                     this.term.options.theme = { ...applicationTerminalThemes[themeName] };
+                    this.syncConsoleForeground();
                     this.term.refresh(0, Math.max(0, this.term.rows - 1));
 
                     requestAnimationFrame(() => {
@@ -491,7 +535,7 @@ export function initializeTerminalComponent() {
 
                         this.term.options.cursorBlink = cursorBlink;
                         this.term.refresh(0, Math.max(0, this.term.rows - 1));
-                        this.term.focus();
+                        this.focusActiveInput();
                         logTerminal('log', '[Terminal Theme] Theme applied', this.terminalThemeDebugSnapshot(themeName));
                     });
                 }
@@ -547,7 +591,7 @@ export function initializeTerminalComponent() {
                     // Force a refresh
                     this.$nextTick(() => {
                         this.resizeTerminal();
-                        this.term.focus();
+                        this.focusActiveInput();
                     });
                 }
             },
@@ -574,6 +618,7 @@ export function initializeTerminalComponent() {
                             ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes.system
                             : undefined
                     });
+                    this.syncConsoleForeground();
                     this.fitAddon = new FitAddon();
                     this.term.loadAddon(this.fitAddon);
                     this.$nextTick(() => {
@@ -625,12 +670,15 @@ export function initializeTerminalComponent() {
                     this.socket = new WebSocket(url);
 
                     // Set connection timeout - increased for initial connection
-                    const timeoutMs = this.reconnectAttempts === 0 ? 15000 : this.connectionTimeout;
+                    const timeoutMs = this.reconnectAttempts === 0 ? TERMINAL_CONNECT_TIMEOUT_MS : this.connectionTimeout;
                     this.connectionTimeoutId = setTimeout(() => {
                         if (this.connectionState === 'connecting') {
                             logTerminal('error', `[Terminal] Connection timeout after ${timeoutMs}ms`);
+                            if (this.isTerminalSessionPending()) {
+                                this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout);
+                            }
+                            // The resulting close event schedules the (bounded) reconnect.
                             this.socket.close();
-                            this.handleConnectionError('Connection timeout');
                         }
                     }, timeoutMs);
 
@@ -658,15 +706,13 @@ export function initializeTerminalComponent() {
                     this.connectionTimeoutId = null;
                 }
 
-                // Flush any buffered command from before WebSocket was ready, otherwise
-                // replay the last command so a transient reconnect respawns the PTY
-                // automatically without requiring the user to click Connect again.
+                // Flush a token that was issued before the WebSocket was ready. Issued
+                // tokens are single-use and must never be replayed after a reconnect.
                 if (this.pendingCommand) {
                     this.sendMessage(this.pendingCommand);
                     this.pendingCommand = null;
-                } else if (this.lastSentCommand) {
-                    logTerminal('log', '[Terminal] Replaying last command after reconnect.');
-                    this.sendMessage(this.lastSentCommand);
+                    this.connectionError = null;
+                    this.starting = true;
                 }
 
                 // (Re)start application-level keepalive on every successful connect.
@@ -687,7 +733,11 @@ export function initializeTerminalComponent() {
                 logTerminal('error', '[Terminal] WebSocket error:', error);
                 logTerminal('error', '[Terminal] WebSocket state:', this.socket ? this.socket.readyState : 'No socket');
                 logTerminal('error', '[Terminal] Connection attempt:', this.reconnectAttempts + 1);
-                this.handleConnectionError('WebSocket error occurred');
+                // Browsers always follow an error event with a close event, which
+                // schedules the reconnect. Only surface the failure here.
+                if (this.isTerminalSessionPending()) {
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
+                }
             },
 
             handleSocketClose(event) {
@@ -695,9 +745,30 @@ export function initializeTerminalComponent() {
                 logTerminal('log', '[Terminal] Was clean close:', event.code === 1000);
                 logTerminal('log', '[Terminal] Connection attempt:', this.reconnectAttempts + 1);
 
+                const outcome = resolveTerminalCloseOutcome({
+                    code: event.code,
+                    sessionPending: this.isTerminalSessionPending(),
+                    reconnectAttempts: this.reconnectAttempts,
+                    maxReconnectAttempts: this.maxReconnectAttempts,
+                });
+
                 this.connectionState = 'disconnected';
                 this.clearAllTimers();
                 this.resetTerminalSessionCountdown();
+
+                if (outcome.authRejected) {
+                    // Reconnecting would be rejected again; wait for a reload or a new session request.
+                    logTerminal('error', '[Terminal] Server rejected terminal authentication:', event.reason);
+                    this.authRejected = true;
+                    this.pendingCommand = null;
+                    if (this.terminalActive) {
+                        this.exitFullscreen();
+                        this.terminalActive = false;
+                        this.$wire.dispatch('terminalDisconnected');
+                    }
+                    this.failTerminalConnection(outcome.error, { override: true });
+                    return;
+                }
 
                 // Only reset terminal and reconnect if it wasn't a clean close
                 if (event.code !== 1000) {
@@ -707,6 +778,9 @@ export function initializeTerminalComponent() {
                         this.message = '(connection closed)';
                         this.terminalActive = false;
                     }
+                    if (outcome.error) {
+                        this.failTerminalConnection(outcome.error);
+                    }
                     this.scheduleReconnect();
                 }
             },
@@ -715,19 +789,45 @@ export function initializeTerminalComponent() {
                 logTerminal('error', `[Terminal] Connection error: ${reason} (attempt ${this.reconnectAttempts + 1})`);
                 this.connectionState = 'disconnected';
 
-                // Only dispatch error to UI after a few failed attempts to avoid immediate error on page load
-                if (this.reconnectAttempts >= 2) {
-                    this.$wire.dispatch('error', `Terminal connection error: ${reason}`);
+                if (this.isTerminalSessionPending() || this.reconnectAttempts >= 2) {
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
                 }
 
                 this.scheduleReconnect();
             },
 
+            /** Reconnect immediately for a user-requested session if the socket is closed. */
+            ensureWebSocketConnection() {
+                if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+                    return;
+                }
+
+                if (this.reconnectInterval) {
+                    clearTimeout(this.reconnectInterval);
+                    this.reconnectInterval = null;
+                }
+                this.reconnectAttempts = 0;
+                this.initializeWebSocket();
+            },
+
+            reloadTerminalPage() {
+                window.location.reload();
+            },
+
             scheduleReconnect() {
+                if (this.authRejected) {
+                    return;
+                }
+
                 if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                     logTerminal('error', '[Terminal] Max reconnection attempts reached');
                     this.message = '(connection failed - max retries exceeded)';
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
                     return;
+                }
+
+                if (this.reconnectInterval) {
+                    return; // A reconnect is already scheduled.
                 }
 
                 this.connectionState = 'reconnecting';
@@ -741,6 +841,7 @@ export function initializeTerminalComponent() {
                 logTerminal('warn', `[Terminal] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
 
                 this.reconnectInterval = setTimeout(() => {
+                    this.reconnectInterval = null;
                     this.reconnectAttempts++;
                     this.initializeWebSocket();
                 }, delay);
@@ -749,9 +850,6 @@ export function initializeTerminalComponent() {
             sendMessage(message) {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.socket.send(JSON.stringify(message));
-                    if (message && message.command) {
-                        this.lastSentCommand = message;
-                    }
                 } else {
                     logTerminal('warn', '[Terminal] WebSocket not ready, message not sent:', message);
                 }
@@ -763,6 +861,169 @@ export function initializeTerminalComponent() {
                 } else {
                     this.pendingCommand = message;
                 }
+            },
+
+            isConsoleMode() {
+                return this.$wire?.terminalMode === 'attach';
+            },
+
+            // Focus the console command box in attach mode, otherwise the xterm.
+            focusActiveInput() {
+                if (this.isConsoleMode()) {
+                    this.$refs.consoleInput?.focus();
+                } else {
+                    this.term?.focus();
+                }
+            },
+
+            // Keep the xterm read-only while in console mode and load its command history.
+            applyConsoleMode() {
+                const consoleMode = this.isConsoleMode();
+                if (this.term) {
+                    this.term.options.disableStdin = consoleMode;
+                    this.term.options.cursorBlink = !consoleMode;
+                    // The output cannot take input, so do not draw a cursor in it.
+                    this.term.options.cursorInactiveStyle = consoleMode ? 'none' : 'outline';
+                }
+                if (consoleMode) {
+                    this.loadConsoleHistory();
+                    this.$nextTick(() => this.$refs.consoleInput?.focus());
+                }
+                // Let the header mode selector reflect the container's current state.
+                window.dispatchEvent(new CustomEvent('terminal-mode-updated', {
+                    detail: {
+                        attachAvailable: Boolean(this.$wire?.attachAvailable),
+                        hasShell: this.$wire?.hasShell ?? true,
+                        mode: this.$wire?.terminalMode ?? 'shell',
+                    },
+                }));
+            },
+
+            loadConsoleHistory() {
+                // Keep commands in this connection only: names can be reused, and
+                // localStorage is shared by users and teams on the same browser.
+                this.consoleHistory = [];
+                this.consoleHistoryIndex = -1;
+                this.consoleCommand = '';
+                this.consolePendingLines = [];
+                try {
+                    for (let index = localStorage.length - 1; index >= 0; index--) {
+                        const key = localStorage.key(index);
+                        if (key?.startsWith('coolify-console-history:')) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                } catch (_) {
+                    // History does not depend on browser storage being available.
+                }
+            },
+
+            // Text colour for the command box: the active terminal theme's foreground.
+            syncConsoleForeground() {
+                this.consoleForegroundColor = this.term?.options.theme?.foreground || '#ffffff';
+            },
+
+            canSubmitConsoleCommand() {
+                return this.consolePendingLines.length > 0 || this.consoleCommand.trim() !== '';
+            },
+
+            // Send one printable command line to the process stdin, never terminal control bytes.
+            sendConsoleLine(command) {
+                if (command.trim() === '' || /[\x00-\x1f\x7f]/.test(command)) {
+                    return false;
+                }
+                // Send the whole line plus a newline to the process stdin.
+                this.sendMessage({ message: `${command}\n` });
+
+                if (this.consoleHistory[this.consoleHistory.length - 1] !== command) {
+                    this.consoleHistory.push(command);
+                    this.consoleHistory = this.consoleHistory.slice(-50);
+                }
+
+                return true;
+            },
+
+            submitConsoleCommand() {
+                if (!this.terminalActive || !this.isConsoleMode()) {
+                    return;
+                }
+
+                const lines = this.consolePendingLines.length > 0 ? this.consolePendingLines : [this.consoleCommand];
+                const sent = lines.filter((line) => this.sendConsoleLine(line)).length;
+
+                this.consolePendingLines = [];
+                this.consoleHistoryIndex = -1;
+                if (sent > 0) {
+                    this.consoleCommand = '';
+                    this.flashConsoleSent();
+                    // Show the response even when the user scrolled up to read older output.
+                    this.term?.scrollToBottom();
+                }
+                // Clicking Send moves focus to the button; return it to the input.
+                this.$refs.consoleInput?.focus();
+            },
+
+            flashConsoleSent() {
+                clearTimeout(this.consoleSentFlashTimeout);
+                this.consoleSentFlash = true;
+                this.consoleSentFlashTimeout = setTimeout(() => {
+                    this.consoleSentFlash = false;
+                }, 300);
+            },
+
+            // A multi-line paste waits for confirmation, so pasted logs are not sent to the process by mistake.
+            pasteConsoleText(event) {
+                const text = event.clipboardData?.getData('text') ?? '';
+                if (!/[\r\n]/.test(text)) {
+                    return;
+                }
+                event.preventDefault();
+
+                const lines = text.split(/\r?\n|\r/).filter((line) => line.trim() !== '');
+                if (lines.length === 1) {
+                    this.consoleCommand += lines[0];
+                    return;
+                }
+                if (this.consoleCommand.trim() !== '') {
+                    lines[0] = this.consoleCommand + lines[0];
+                }
+                this.consolePendingLines = lines;
+                this.consoleCommand = '';
+            },
+
+            // Esc cancels a pending paste first, then clears the input.
+            cancelConsoleInput() {
+                if (this.consolePendingLines.length > 0) {
+                    this.consolePendingLines = [];
+                    return;
+                }
+                this.consoleCommand = '';
+                this.consoleHistoryIndex = -1;
+            },
+
+            // Ctrl+L clears the visible output only; nothing is sent to the process.
+            clearConsoleOutput() {
+                this.term?.clear();
+            },
+
+            // Clicking the read-only output moves focus to the command box, unless the user is selecting text.
+            focusConsoleFromOutput() {
+                if (this.isConsoleMode() && !this.term?.hasSelection()) {
+                    this.$refs.consoleInput?.focus();
+                }
+            },
+
+            recallConsoleCommand(direction) {
+                if (this.consoleHistory.length === 0) {
+                    return;
+                }
+                if (this.consoleHistoryIndex === -1) {
+                    this.consoleHistoryIndex = this.consoleHistory.length;
+                }
+                let index = this.consoleHistoryIndex + direction;
+                index = Math.max(0, Math.min(this.consoleHistory.length, index));
+                this.consoleHistoryIndex = index;
+                this.consoleCommand = index >= this.consoleHistory.length ? '' : this.consoleHistory[index];
             },
 
             handleSocketMessage(event) {
@@ -779,7 +1040,7 @@ export function initializeTerminalComponent() {
                 }
 
                 if (event.data === 'pty-ready') {
-                    this.starting = false;
+                    this.completeTerminalSessionStart();
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
@@ -796,7 +1057,9 @@ export function initializeTerminalComponent() {
                     }
                     this.terminalActive = true;
                     this.startTerminalSessionCountdown();
-                    this.term.focus();
+                    // In console (attach) mode the user types into the command box, not the
+                    // read-only xterm, so keep focus on that input instead of the terminal.
+                    this.focusActiveInput();
                     document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
 
                     // Initial resize after terminal is ready
@@ -807,22 +1070,22 @@ export function initializeTerminalComponent() {
                         this.resizeTerminal();
                     }, 200);
 
-                    // Ensure terminal gets focus after connection with multiple attempts
+                    // Ensure focus after connection with multiple attempts
                     setTimeout(() => {
-                        this.term.focus();
+                        this.focusActiveInput();
                     }, 100);
-                    
+
                     setTimeout(() => {
-                        this.term.focus();
+                        this.focusActiveInput();
                     }, 500);
 
                     // Notify parent component that terminal is connected
                     this.$wire.dispatch('terminalConnected');
                 } else if (event.data === 'unprocessable') {
                     this.starting = false;
+                    this.clearSessionStartTimeout();
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
-                    this.lastSentCommand = null;
                     this.resetTerminalSessionCountdown();
                     this.message = '(sorry, something went wrong, please try again)';
 
@@ -836,18 +1099,21 @@ export function initializeTerminalComponent() {
                     this.resetTerminalSessionCountdown();
                     this.term.reset();
                     this.commandBuffer = '';
-                    this.lastSentCommand = null;
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
-                } else if (
-                    typeof event.data === 'string' &&
-                    (event.data.startsWith('Unauthorized:') || event.data.startsWith('Invalid SSH command:'))
-                ) {
+                } else if (classifyTerminalServerMessage(event.data) !== null) {
                     logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
-                    this.$wire.dispatch('error', event.data);
+                    this.pendingCommand = null;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
+                    // Newer servers follow an auth rejection with a 4401/4403 close.
+                    this.failTerminalConnection(
+                        classifyTerminalServerMessage(event.data) === 'auth-rejected'
+                            ? TERMINAL_CONNECTION_ERRORS.authRejected
+                            : event.data,
+                        { override: true },
+                    );
                 } else {
                     try {
                         this.pendingWrites++;
@@ -883,6 +1149,11 @@ export function initializeTerminalComponent() {
                 if (!this.term) return;
 
                 this.term.onData((data) => {
+                    // Console (attach) mode is read-only: commands go through the input box,
+                    // so raw keystrokes (including Ctrl-C) are never sent to the process.
+                    if (this.isConsoleMode()) {
+                        return;
+                    }
                     this.sendMessage({ message: data });
                     if (data === '\r') {
                         this.commandBuffer = '';
@@ -893,6 +1164,14 @@ export function initializeTerminalComponent() {
 
                 // Copy and paste functionality
                 this.term.attachCustomKeyEventHandler((arg) => {
+                    // The console output is read-only: move typed characters to the command box.
+                    if (this.isConsoleMode() && arg.type === 'keydown' && arg.key.length === 1
+                        && !arg.ctrlKey && !arg.metaKey && !arg.altKey) {
+                        // Moving focus during keydown makes the browser type this key into the input.
+                        this.$refs.consoleInput?.focus();
+                        return false;
+                    }
+
                     if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
                         return false;
                     }
@@ -909,6 +1188,7 @@ export function initializeTerminalComponent() {
             },
 
             destroy() {
+                this.clearSessionStartTimeout();
                 this.themeObserver?.disconnect();
                 window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset);
                 window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset);
@@ -919,6 +1199,11 @@ export function initializeTerminalComponent() {
 
             sendTerminalInput(data) {
                 if (!this.term || !this.terminalActive) {
+                    return;
+                }
+
+                // Console (attach) mode only accepts commands from the input box.
+                if (this.isConsoleMode()) {
                     return;
                 }
 
@@ -998,7 +1283,7 @@ export function initializeTerminalComponent() {
             keepAlive() {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.sendMessage({ ping: true });
-                } else if (this.connectionState === 'disconnected') {
+                } else if (this.connectionState === 'disconnected' && !this.authRejected) {
                     // Attempt to reconnect if we're disconnected
                     this.initializeWebSocket();
                 }
@@ -1038,7 +1323,7 @@ export function initializeTerminalComponent() {
                                 // ignore — close handler will run on its own
                             }
                         }, 5000);
-                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
+                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected' && !this.authRejected) {
                         // Was connected before but now disconnected - attempt reconnection
                         this.reconnectAttempts = 0;
                         this.initializeWebSocket();

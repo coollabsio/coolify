@@ -2,20 +2,24 @@
 
 use App\Livewire\Server\Show;
 use App\Livewire\Server\ValidateAndInstall;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+
     $user = User::factory()->create();
     $this->team = Team::factory()->create();
-    $user->teams()->attach($this->team);
+    $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
     session(['currentTeam' => $this->team]);
 
@@ -124,6 +128,35 @@ it('stores a parsed docker version when gathering server metadata', function () 
         ->and($this->server->fresh()->composeVersion())->toBe('2.32.4');
 });
 
+it('keeps transfer and migration state when gathering server metadata', function () {
+    $this->server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+    // Loaded before the transfer state is written, like a validation that runs during a transfer.
+    $staleServer = Server::find($this->server->id);
+
+    $this->server->update(['server_metadata' => [
+        'os' => 'Old OS',
+        'transfer' => ['status' => 'claimed', 'export_id' => 'export-1'],
+        'migration' => ['status' => 'succeeded', 'export_id' => 'export-1'],
+    ]]);
+
+    Process::fake([
+        '*' => Process::result(output: "---PRETTY_NAME---\nDebian GNU/Linux 12 (bookworm)\n---CPUS---\n2", exitCode: 0),
+    ]);
+
+    $staleServer->gatherServerMetadata();
+
+    expect($this->server->fresh()->server_metadata)
+        ->toMatchArray([
+            'os' => 'Debian GNU/Linux 12 (bookworm)',
+            'cpus' => 2,
+            'transfer' => ['status' => 'claimed', 'export_id' => 'export-1'],
+            'migration' => ['status' => 'succeeded', 'export_id' => 'export-1'],
+        ]);
+});
+
 it('shows the stored docker version in remote server details', function () {
     $this->server->update([
         'server_metadata' => [
@@ -160,14 +193,19 @@ it('can overwrite server_metadata with new values', function () {
 });
 
 it('calls gatherServerMetadata during ValidateAndInstall when docker version is valid', function () {
+    Queue::fake();
+
     $serverMock = Mockery::mock($this->server)->makePartial();
     $serverMock->shouldReceive('isSwarm')->andReturn(false);
     $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn('24.0.0');
     $serverMock->shouldReceive('gatherServerMetadata')->once();
     $serverMock->shouldReceive('isBuildServer')->andReturn(false);
 
+    // Call the action on the mounted instance: a Livewire request round trip
+    // would rehydrate the server from the database and drop the mock.
     Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->call('validateDockerVersion');
+        ->instance()
+        ->validateDockerVersion();
 });
 
 it('does not call gatherServerMetadata when docker version validation fails', function () {
@@ -176,6 +214,9 @@ it('does not call gatherServerMetadata when docker version validation fails', fu
     $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn(false);
     $serverMock->shouldNotReceive('gatherServerMetadata');
 
+    // Call the action on the mounted instance: a Livewire request round trip
+    // would rehydrate the server from the database and drop the mock.
     Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->call('validateDockerVersion');
+        ->instance()
+        ->validateDockerVersion();
 });

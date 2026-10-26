@@ -16,7 +16,9 @@ use Illuminate\Support\Collection;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetInfrastructureOverview extends Tool
 {
     protected string $name = 'get_infrastructure_overview';
@@ -72,6 +74,7 @@ class GetInfrastructureOverview extends Tool
                 'keydbs',
                 'dragonflies',
                 'clickhouses',
+                'sqlites',
             ])
             ->get();
 
@@ -92,6 +95,7 @@ class GetInfrastructureOverview extends Tool
                 + $project->keydbs_count
                 + $project->dragonflies_count
                 + $project->clickhouses_count
+                + $project->sqlites_count
             );
 
             $appCount += $apps;

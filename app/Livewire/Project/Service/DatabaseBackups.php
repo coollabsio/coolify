@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
@@ -27,8 +28,6 @@ class DatabaseBackups extends Component
     public string $section = 'index';
 
     public $s3s;
-
-    public $ageKeys;
 
     protected $listeners = ['refreshScheduledBackups' => '$refresh'];
 
@@ -79,12 +78,12 @@ class DatabaseBackups extends Component
                 $this->backup = $this->serviceDatabase->scheduledBackups()
                     ->where('uuid', request()->route('backup_uuid'))
                     ->firstOrFail();
-                $this->s3s = currentTeam()->s3s;
-                $this->ageKeys = currentTeam()->ageKeys;
+                $this->s3s = S3Storage::query()
+                    ->where('team_id', $this->service->team()->id)
+                    ->where('is_usable', true)
+                    ->get();
                 $this->backupParameters = [...$this->parameters, 'backup_uuid' => $this->backup->uuid];
                 $this->section = match (request()->route()?->getName()) {
-                    'project.service.database.backup.s3' => 's3',
-                    'project.service.database.backup.retention' => 'retention',
                     'project.service.database.backup.executions' => 'executions',
                     'project.service.database.backup.danger' => 'danger',
                     default => 'general',

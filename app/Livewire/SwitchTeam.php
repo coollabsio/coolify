@@ -9,6 +9,8 @@ class SwitchTeam extends Component
 {
     public string $selectedTeamId = 'default';
 
+    protected $listeners = ['team-avatar-updated' => '$refresh'];
+
     public function mount()
     {
         $this->selectedTeamId = auth()->user()->currentTeam()->id;
@@ -19,7 +21,7 @@ class SwitchTeam extends Component
         $this->switch_to($this->selectedTeamId);
     }
 
-    public function switch_to($team_id, ?string $currentUrl = null)
+    public function switch_to($team_id)
     {
         if (! auth()->user()->teams->contains($team_id)) {
             return;
@@ -30,12 +32,6 @@ class SwitchTeam extends Component
         }
         refreshSession($team_to_switch_to);
 
-        $parsedUrl = parse_url($currentUrl ?? '/dashboard');
-        $redirectUrl = data_get($parsedUrl, 'path', '/dashboard');
-        if ($query = data_get($parsedUrl, 'query')) {
-            $redirectUrl .= '?'.$query;
-        }
-
-        return redirect($redirectUrl);
+        return redirect()->route('dashboard');
     }
 }

@@ -26,6 +26,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Subscription;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
@@ -86,6 +87,8 @@ it('creates Server with all fillable attributes', function () {
         'hetzner_server_status' => 'running',
         'digitalocean_droplet_id' => 987654,
         'digitalocean_droplet_status' => 'active',
+        'hostinger_virtual_machine_id' => 17923,
+        'hostinger_virtual_machine_status' => 'running',
         'is_validating' => false,
         'detected_traefik_version' => 'v2.10.0',
         'traefik_outdated_info' => 'Up to date',
@@ -105,6 +108,8 @@ it('creates Server with all fillable attributes', function () {
     expect($server->hetzner_server_status)->toBe('running');
     expect($server->digitalocean_droplet_id)->toBe(987654);
     expect($server->digitalocean_droplet_status)->toBe('active');
+    expect($server->hostinger_virtual_machine_id)->toBe(17923);
+    expect($server->hostinger_virtual_machine_status)->toBe('running');
     expect($server->ip_previous)->toBe('10.0.0.1');
 });
 
@@ -834,6 +839,40 @@ it('creates StandaloneDragonfly with all fillable attributes', function () {
     expect($db->exists)->toBeTrue();
     expect($db->uuid)->toBe('custom-dragonfly-uuid');
     expect($db->dragonfly_password)->toBe('dragonflypass123');
+    expect($db->environment_id)->toBe($this->environment->id);
+});
+
+it('creates StandaloneSqlite with all fillable attributes', function () {
+    $db = StandaloneSqlite::create([
+        'uuid' => 'custom-sqlite-uuid',
+        'name' => 'Full Fillable SQLite',
+        'description' => 'SQLite with all attrs',
+        'sqlite_databases' => 'app.db,jobs.db',
+        'is_log_drain_enabled' => false,
+        'is_include_timestamps' => false,
+        'status' => 'running',
+        'image' => 'peakimages/sqlite:3.53.4-v0.1.0',
+        'limits_memory' => '1g',
+        'limits_memory_swap' => '2g',
+        'limits_memory_swappiness' => 30,
+        'limits_memory_reservation' => '512m',
+        'limits_cpus' => '2',
+        'limits_cpuset' => '0-1',
+        'limits_cpu_shares' => 512,
+        'started_at' => now()->subDay()->toISOString(),
+        'restart_count' => 0,
+        'last_restart_at' => null,
+        'last_restart_type' => null,
+        'last_online_at' => now()->toISOString(),
+        'custom_docker_run_options' => '',
+        'destination_type' => $this->destination->getMorphClass(),
+        'destination_id' => $this->destination->id,
+        'environment_id' => $this->environment->id,
+    ]);
+
+    expect($db->exists)->toBeTrue();
+    expect($db->uuid)->toBe('custom-sqlite-uuid');
+    expect($db->sqlite_databases)->toBe('app.db,jobs.db');
     expect($db->environment_id)->toBe($this->environment->id);
 });
 

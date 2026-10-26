@@ -20,6 +20,7 @@ class AuditEventFactory extends Factory
             'event' => 'ui.application.updated',
             'source' => 'ui',
             'action' => 'updated',
+            'level' => 'info',
             'actor_type' => 'user',
             'description' => 'Application updated',
             'metadata' => [],

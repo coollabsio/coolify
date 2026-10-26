@@ -1,10 +1,11 @@
-<form wire:submit="submit">
+<form wire:submit="submit" class="flex flex-col gap-6">
     <x-unsaved-bar action="submit" />
 
     <x-application.settings-section title="Backup schedule"
         description="Choose what to back up, when it runs, and how long it may run.">
         <x-slot:actions>
-            <div class="flex items-center gap-2">
+            {{-- Below xl the header bar is hidden, so keep the buttons here. --}}
+            <div @class(['flex items-center gap-2', 'xl:hidden' => $actionsInHeader])>
                 @if (! $backupEnabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
                         wire:target="toggleEnabled" isHighlighted>
@@ -79,6 +80,10 @@
                 <x-forms.input label="Databases to back up"
                     helper="Comma-separated database names. Leave empty to include the default database."
                     id="databasesToBackup" />
+            @elseif ($backup->database_type === 'App\Models\StandaloneSqlite')
+                <x-forms.input label="Database files to back up"
+                    helper="Comma-separated file names inside the data volume. Leave empty to back up every configured file."
+                    id="databasesToBackup" />
             @endif
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -94,4 +99,7 @@
             </div>
         </div>
     </x-application.settings-section>
+
+    @include('livewire.project.database.backup-edit.s3')
+    @include('livewire.project.database.backup-edit.retention')
 </form>

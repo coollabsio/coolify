@@ -31,7 +31,11 @@ class Show extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'publicKeyValue' => 'required|string',
+            'publicKeyValue' => ['required', 'string', function ($attribute, $value, $fail) {
+                if (! AgeKey::isValidPublicKey($value)) {
+                    $fail('Invalid age public key. It should look like age1...');
+                }
+            }],
         ];
     }
 

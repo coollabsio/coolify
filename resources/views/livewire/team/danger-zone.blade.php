@@ -15,47 +15,39 @@
         <div class="application-settings-form">
             <x-application.settings-section id="team-danger-zone" title="Danger zone"
                 helper="Destructive actions for this team cannot be undone.">
-                <div
-                    class="rounded-lg border border-red-300 bg-red-50 p-4 ring-1 ring-inset ring-red-200/60 dark:border-error/30 dark:bg-error/[0.08] dark:ring-error/10">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h4 class="text-sm font-semibold text-red-700 dark:text-error">Delete team</h4>
-                                <x-status-badge status="Permanent" type="error" />
-                            </div>
-
+                <x-danger-zone title="Delete team">
                             @if (auth()->user()->roleInTeam(currentTeam()->id) !== 'owner')
-                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     Only team owners can delete this team.
                                 </p>
                             @elseif (session('currentTeam.id') === 0)
-                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     The default team cannot be deleted.
                                 </p>
                             @elseif(auth()->user()->teams()->count() === 1 || auth()->user()->currentTeam()->personal_team)
-                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     Your last or personal team cannot be deleted.
                                 </p>
                             @elseif(currentTeam()->subscription)
-                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     Cancel your <a class="font-medium text-coollabs hover:underline dark:text-warning"
                                         {{ wireNavigate() }} href="{{ route('subscription.show') }}">subscription</a>
                                     before deleting this team.
                                 </p>
                             @elseif($deletionBlockers === [])
-                                <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     Permanently delete <strong class="font-semibold text-black dark:text-fg">{{ currentTeam()->name }}</strong>
                                     from Coolify. This action cannot be undone.
                                 </p>
-                                <ul class="mt-3 space-y-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                <ul class="space-y-1 text-xs">
                                     <li>• All members will lose access to this team.</li>
                                     <li>• This team cannot be restored from Coolify after deletion.</li>
                                 </ul>
                             @else
-                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     This team still owns:
                                 </p>
-                                <ul class="mt-2 space-y-1 text-[13px] text-neutral-600 dark:text-fg-dim">
+                                <ul class="space-y-1">
                                     @foreach ($deletionBlockers as $type => $count)
                                         <li>
                                             <a class="font-medium text-coollabs hover:underline dark:text-warning"
@@ -65,13 +57,11 @@
                                         </li>
                                     @endforeach
                                 </ul>
-                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                <p>
                                     Remove or move these resources before deleting the team.
                                 </p>
                             @endif
-                        </div>
-
-                        <div class="shrink-0">
+                        <x-slot:action>
                             @if (
                                 session('currentTeam.id') !== 0 &&
                                     auth()->user()->roleInTeam(currentTeam()->id) === 'owner' &&
@@ -92,9 +82,8 @@
                                     Delete team
                                 </x-forms.button>
                             @endif
-                        </div>
-                    </div>
-                </div>
+                        </x-slot:action>
+                </x-danger-zone>
 
                 @if (session('currentTeam.id') !== 0 && !currentTeam()->subscription && (currentTeam()->projects->isNotEmpty() || currentTeam()->servers->isNotEmpty()))
                     <div class="mt-4 overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.08]">

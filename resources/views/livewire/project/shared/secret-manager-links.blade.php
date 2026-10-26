@@ -7,8 +7,14 @@
 
         @if (! $link && $availableTokens->isEmpty())
             <x-empty title="No secret manager tokens"
-                description="Add a Doppler, Infisical, or HashiCorp Vault token under Keys & Tokens > Integration Tokens first."
-                icon-name="keys" size="sm" />
+                description="Add a Doppler, Infisical, or HashiCorp Vault token first."
+                icon-name="keys" size="sm">
+                <x-slot:actions>
+                    <a class="button" href="{{ route('security.integration-tokens') }}" {{ wireNavigate() }}>
+                        Integration tokens
+                    </a>
+                </x-slot:actions>
+            </x-empty>
         @else
             @can('update', $resource)
                 <div class="application-settings-form flex w-full flex-col gap-4">
@@ -89,10 +95,16 @@
                                                     <span class="font-mono text-[12px] text-black dark:text-fg">{{ $key }}</span>
                                                     <span class="font-mono text-[11px] text-neutral-400 dark:text-fg-dim">{{ '{{vault.'.$key.'}'.'}' }}</span>
                                                 </div>
-                                                <x-forms.button wire:click="addReference({{ \Illuminate\Support\Js::from($key) }})"
-                                                    wire:target="addReference({{ \Illuminate\Support\Js::from($key) }})">
-                                                    Add as variable
-                                                </x-forms.button>
+                                                @if (isset($invalidKeys[$key]))
+                                                    <span class="shrink-0 text-[11px] text-neutral-500 dark:text-fg-dim">
+                                                        Not a valid variable name
+                                                    </span>
+                                                @else
+                                                    <x-forms.button wire:click="addReference({{ \Illuminate\Support\Js::from($key) }})"
+                                                        wire:target="addReference({{ \Illuminate\Support\Js::from($key) }})">
+                                                        Add as variable
+                                                    </x-forms.button>
+                                                @endif
                                             </div>
                                         @empty
                                             <div class="px-3 py-2 text-[12px] text-neutral-500 dark:text-fg-dim">

@@ -1,0 +1,2529 @@
+1_deploy:
+  applications:
+    api:
+      fqdn: 'http://api-referenceservice00000001.10.0.0.1.sslip.io/api'
+      required_port: 3000
+      exclude_from_status: false
+      ports: '3000:3000,3001:3001/tcp'
+      files:
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/api-data
+          mount_path: /data
+          is_directory: true
+    blog:
+      fqdn: 'http://blog-referenceservice00000001.10.0.0.1.sslip.io/blog'
+      required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    gateway:
+      fqdn: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
+      exclude_from_status: false
+      ports: ''
+    gateway-ws:
+      fqdn: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io/ws'
+      exclude_from_status: false
+      ports: ''
+    my-app:
+      fqdn: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
+      required_port: 80
+      exclude_from_status: false
+      ports: ''
+    scheduler:
+      required_port: 8080
+      exclude_from_status: true
+      ports: ''
+    sidecar:
+      exclude_from_status: true
+      ports: ''
+    web:
+      fqdn: 'http://web-referenceservice00000001.10.0.0.1.sslip.io'
+      required_port: 8080
+      exclude_from_status: false
+      ports: ''
+      volumes:
+        - 'referenceservice00000001_web-data:/usr/share/nginx/html'
+      files:
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/web-init.sh
+          mount_path: /docker-entrypoint.d/init.sh
+          is_directory: false
+          content: |
+            #!/bin/sh
+            echo "reference fixture"
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/config
+          mount_path: /etc/nginx/conf.d
+          is_directory: true
+    worker:
+      required_port: 8080
+      exclude_from_status: false
+      ports: ''
+    www:
+      fqdn: 'http://www-referenceservice00000001.10.0.0.1.sslip.io'
+      exclude_from_status: false
+      ports: ''
+  databases:
+    db:
+      exclude_from_status: false
+      volumes:
+        - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+  environment_variables:
+    API_URL: '${SERVICE_URL_API}'
+    APP_URL: '${SERVICE_URL_WEB}'
+    BARE_PASSTHROUGH: null
+    BASE64: '${SERVICE_BASE64_WEB}'
+    BASE64_64: '${SERVICE_BASE64_64_WEB}'
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    GHOST_URL: '${SERVICE_URL_GHOST}'
+    HEX_128: '${SERVICE_HEX_128_WEB}'
+    HEX_32: '${SERVICE_HEX_32_WEB}'
+    INTERPOLATED_HOST: null
+    LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_VALUE: null
+    PASSWORD: '${SERVICE_PASSWORD_WEB}'
+    PASSWORD_64: '${SERVICE_PASSWORD_64_WEB}'
+    PASSWORD_SYMBOLS: '${SERVICE_PASSWORDWITHSYMBOLS_WEB}'
+    PASSWORD_SYMBOLS_64: '${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}'
+    POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+    POSTGRES_USER: '${SERVICE_USER_DB}'
+    REALBASE64_128: '${SERVICE_REALBASE64_128_WEB}'
+    REALBASE64_64: '${SERVICE_REALBASE64_64_WEB}'
+    REQUIRED:
+      value: 'REQUIRED must be set'
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_BASE64_WEB: '<generated:SERVICE_BASE64_WEB:32>'
+    SERVICE_FOO_WEB: null
+    SERVICE_FQDN_API: api-referenceservice00000001.10.0.0.1.sslip.io/api
+    SERVICE_FQDN_BLOG: blog-referenceservice00000001.10.0.0.1.sslip.io/blog
+    SERVICE_FQDN_BLOG_2368: 'blog-referenceservice00000001.10.0.0.1.sslip.io/blog:2368'
+    SERVICE_FQDN_DB: db-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_DB_5432: 'db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+    SERVICE_FQDN_GATEWAY: gateway-referenceservice00000001.10.0.0.1.sslip.io/ws
+    SERVICE_FQDN_GHOST: ghost-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MY_APP: my_app-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MY_APP_80: 'my_app-referenceservice00000001.10.0.0.1.sslip.io:80'
+    SERVICE_FQDN_WEB: web-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_WEB_8080: 'web-referenceservice00000001.10.0.0.1.sslip.io:8080'
+    SERVICE_FQDN_WWW: www-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_HEX_128_WEB: '<generated:SERVICE_HEX_128_WEB:128>'
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_LOWERCASEUSER_WEB: '<generated:SERVICE_LOWERCASEUSER_WEB:16>'
+    SERVICE_PASSWORDWITHSYMBOLS_64_WEB: '<generated:SERVICE_PASSWORDWITHSYMBOLS_64_WEB:64>'
+    SERVICE_PASSWORDWITHSYMBOLS_WEB: '<generated:SERVICE_PASSWORDWITHSYMBOLS_WEB:32>'
+    SERVICE_PASSWORD_64_WEB: '<generated:SERVICE_PASSWORD_64_WEB:64>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_REALBASE64_128_WEB: '<generated:SERVICE_REALBASE64_128_WEB:172>'
+    SERVICE_REALBASE64_64_WEB: '<generated:SERVICE_REALBASE64_64_WEB:88>'
+    SERVICE_SUPABASEANON_KEY: null
+    SERVICE_URL_API: 'http://api-referenceservice00000001.10.0.0.1.sslip.io/api'
+    SERVICE_URL_BLOG: 'http://blog-referenceservice00000001.10.0.0.1.sslip.io/blog'
+    SERVICE_URL_BLOG_2368: 'http://blog-referenceservice00000001.10.0.0.1.sslip.io/blog:2368'
+    SERVICE_URL_DB: 'http://db-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+    SERVICE_URL_GATEWAY: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io/ws'
+    SERVICE_URL_GHOST: 'http://ghost-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MY_APP: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MY_APP_80: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io:80'
+    SERVICE_URL_WEB: 'http://web-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_WEB_8080: 'http://web-referenceservice00000001.10.0.0.1.sslip.io:8080'
+    SERVICE_URL_WWW: 'http://www-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
+    UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
+    USER: '${SERVICE_USER_WEB}'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web:
+        image: 'nginx:alpine'
+        environment:
+          SERVICE_URL_WEB_8080: 'http://web-referenceservice00000001.10.0.0.1.sslip.io:8080'
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          SELF_REF: '${SELF_REF}'
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          SHARED: shared-value
+          SHARED_MISSING: '{{environment.NOT_DEFINED}}'
+          INTERPOLATED: 'http://${INTERPOLATED_HOST:-localhost}/path'
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          PASSWORD_64: '${SERVICE_PASSWORD_64_WEB}'
+          PASSWORD_SYMBOLS: '${SERVICE_PASSWORDWITHSYMBOLS_WEB}'
+          BASE64: '${SERVICE_BASE64_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          REALBASE64_64: '${SERVICE_REALBASE64_64_WEB}'
+          PASSWORD_SYMBOLS_64: '${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}'
+          REALBASE64_128: '${SERVICE_REALBASE64_128_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          HEX_128: '${SERVICE_HEX_128_WEB}'
+          SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
+          USER: '${SERVICE_USER_WEB}'
+          LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+          UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          NO_BRACES_VALUE: null
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: web-referenceservice00000001
+          COOLIFY_FQDN: web-referenceservice00000001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://web-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$$5
+          - traefik.http.middlewares.reference-headers.headers.customresponseheaders.X-Reference=1
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=web-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=web
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:web>'
+          - coolify.service.subType=application
+          - coolify.service.subName=web
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://web-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        volumes:
+          - 'referenceservice00000001_web-data:/usr/share/nginx/html'
+          - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/web-init.sh
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        healthcheck:
+          test:
+            - CMD
+            - wget
+            - '-qO-'
+            - 'http://127.0.0.1:8080'
+          interval: 10s
+        depends_on:
+          db:
+            condition: service_healthy
+        env_file:
+          - custom.env
+          - .env
+        container_name: web-referenceservice00000001
+        restart: unless-stopped
+        networks:
+          referenceservice00000001: null
+      api:
+        image: 'node:22-alpine'
+        build:
+          context: .
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          GHOST_URL: '${SERVICE_URL_GHOST}'
+          DB_URL: 'postgres://${SERVICE_USER_DB}:${SERVICE_PASSWORD_DB}@db:5432/app'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: api-referenceservice00000001
+          COOLIFY_FQDN: api-referenceservice00000001.10.0.0.1.sslip.io/api
+          COOLIFY_URL: 'http://api-referenceservice00000001.10.0.0.1.sslip.io/api'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        ports:
+          - '3000:3000'
+          -
+            target: 3001
+            published: 3001
+            protocol: tcp
+        volumes:
+          - 'nfs-data:/mnt/nfs'
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/api-data
+            target: /data
+            bind:
+              create_host_path: true
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/optional
+            target: /optional
+            bind:
+              create_host_path: false
+        expose:
+          - 3000
+        container_name: api-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=api-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=api
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:api>'
+          - coolify.service.subType=application
+          - coolify.service.subName=api
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
+          - 'caddy_0.handle_path=/api*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://api-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      my-app:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io:80'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: my-app-referenceservice00000001
+          COOLIFY_FQDN: my_app-referenceservice00000001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: my-app-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=my-app-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=my-app
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:my-app>'
+          - coolify.service.subType=application
+          - coolify.service.subName=my-app
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      www:
+        image: 'nginx:alpine'
+        environment:
+          SERVICE_URL_WWW: 'http://www-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: www-referenceservice00000001
+          COOLIFY_FQDN: www-referenceservice00000001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://www-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: www-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=www-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=www
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:www>'
+          - coolify.service.subType=application
+          - coolify.service.subName=www
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://www-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      blog:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: blog-referenceservice00000001
+          COOLIFY_FQDN: blog-referenceservice00000001.10.0.0.1.sslip.io/blog
+          COOLIFY_URL: 'http://blog-referenceservice00000001.10.0.0.1.sslip.io/blog'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: blog-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=blog-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=blog
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:blog>'
+          - coolify.service.subType=application
+          - coolify.service.subName=blog
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
+          - 'caddy_0.handle_path=/blog*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://blog-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      gateway:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_GATEWAY: /
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: gateway-referenceservice00000001
+          COOLIFY_FQDN: gateway-referenceservice00000001.10.0.0.1.sslip.io
+          COOLIFY_URL: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: gateway-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=gateway-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=gateway
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:gateway>'
+          - coolify.service.subType=application
+          - coolify.service.subName=gateway
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      gateway-ws:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_GATEWAY: /ws
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: gateway-ws-referenceservice00000001
+          COOLIFY_FQDN: gateway-referenceservice00000001.10.0.0.1.sslip.io/ws
+          COOLIFY_URL: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io/ws'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: gateway-ws-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=gateway-ws-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=gateway-ws
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:gateway-ws>'
+          - coolify.service.subType=application
+          - coolify.service.subName=gateway-ws
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/ws*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      worker:
+        image: 'nginx:alpine'
+        command:
+          - sleep
+          - infinity
+        environment:
+          SERVICE_URL_WEB_8080: 'http://web-referenceservice00000001.10.0.0.1.sslip.io:8080'
+          APP_URL: '${SERVICE_URL_WEB}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: worker-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: worker-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=worker-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=worker
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:worker>'
+          - coolify.service.subType=application
+          - coolify.service.subName=worker
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      scheduler:
+        image: 'nginx:alpine'
+        command:
+          - sleep
+          - infinity
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: scheduler-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: scheduler-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=scheduler-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=scheduler
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:scheduler>'
+          - coolify.service.subType=application
+          - coolify.service.subName=scheduler
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      db:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: db-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        volumes:
+          - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+          - 'shared-external:/backups'
+        networks:
+          internal: null
+          referenceservice00000001: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=db-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=db
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:db>'
+          - coolify.service.subType=database
+          - coolify.service.subName=db
+        env_file:
+          - .env
+      sidecar:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceservice00000001
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=sidecar-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=sidecar
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:sidecar>'
+          - coolify.service.subType=application
+          - coolify.service.subName=sidecar
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      shared-external:
+        external: true
+      nfs-data:
+        driver_opts:
+          type: nfs
+          o: 'addr=10.0.0.2,rw'
+          device: ':/exports/data'
+      referenceservice00000001_web-data:
+        name: referenceservice00000001_web-data
+      referenceservice00000001_db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+        name: referenceservice00000001_db-data
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceservice00000001:
+        name: referenceservice00000001
+        external: true
+2_custom_domains:
+  applications:
+    api:
+      fqdn: 'https://api.example.com/api'
+      required_port: 3000
+      exclude_from_status: false
+      ports: '3000:3000,3001:3001/tcp'
+      files:
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/api-data
+          mount_path: /data
+          is_directory: true
+    blog:
+      fqdn: 'https://blog.example.com/blog'
+      required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    gateway:
+      fqdn: 'https://gateway.example.com'
+      exclude_from_status: false
+      ports: ''
+    gateway-ws:
+      fqdn: 'https://gateway.example.com/ws'
+      exclude_from_status: false
+      ports: ''
+    my-app:
+      fqdn: 'https://my_app.example.com'
+      required_port: 80
+      exclude_from_status: false
+      ports: ''
+    scheduler:
+      required_port: 8080
+      exclude_from_status: true
+      ports: ''
+    sidecar:
+      exclude_from_status: true
+      ports: ''
+    web:
+      fqdn: 'https://web.example.com'
+      required_port: 8080
+      exclude_from_status: false
+      ports: ''
+      volumes:
+        - 'referenceservice00000001_web-data:/usr/share/nginx/html'
+      files:
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/web-init.sh
+          mount_path: /docker-entrypoint.d/init.sh
+          is_directory: false
+          content: |
+            #!/bin/sh
+            echo "reference fixture"
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/config
+          mount_path: /etc/nginx/conf.d
+          is_directory: true
+    worker:
+      required_port: 8080
+      exclude_from_status: false
+      ports: ''
+    www:
+      fqdn: 'https://www.example.com'
+      exclude_from_status: false
+      ports: ''
+  databases:
+    db:
+      exclude_from_status: false
+      volumes:
+        - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+  environment_variables:
+    API_URL: '${SERVICE_URL_API}'
+    APP_URL: '${SERVICE_URL_WEB}'
+    BARE_PASSTHROUGH: null
+    BASE64: '${SERVICE_BASE64_WEB}'
+    BASE64_64: '${SERVICE_BASE64_64_WEB}'
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    GHOST_URL: '${SERVICE_URL_GHOST}'
+    HEX_128: '${SERVICE_HEX_128_WEB}'
+    HEX_32: '${SERVICE_HEX_32_WEB}'
+    INTERPOLATED_HOST: null
+    LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_VALUE: null
+    PASSWORD: '${SERVICE_PASSWORD_WEB}'
+    PASSWORD_64: '${SERVICE_PASSWORD_64_WEB}'
+    PASSWORD_SYMBOLS: '${SERVICE_PASSWORDWITHSYMBOLS_WEB}'
+    PASSWORD_SYMBOLS_64: '${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}'
+    POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+    POSTGRES_USER: '${SERVICE_USER_DB}'
+    REALBASE64_128: '${SERVICE_REALBASE64_128_WEB}'
+    REALBASE64_64: '${SERVICE_REALBASE64_64_WEB}'
+    REQUIRED:
+      value: 'REQUIRED must be set'
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_BASE64_WEB: '<generated:SERVICE_BASE64_WEB:32>'
+    SERVICE_FOO_WEB: null
+    SERVICE_FQDN_API: api.example.com/api
+    SERVICE_FQDN_BLOG: blog.example.com/blog
+    SERVICE_FQDN_BLOG_2368: 'blog.example.com/blog:2368'
+    SERVICE_FQDN_DB: db-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_DB_5432: 'db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+    SERVICE_FQDN_GATEWAY: gateway.example.com/ws
+    SERVICE_FQDN_GHOST: ghost-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MY_APP: my_app.example.com
+    SERVICE_FQDN_MY_APP_80: 'my_app.example.com:80'
+    SERVICE_FQDN_WEB: web.example.com
+    SERVICE_FQDN_WEB_8080: 'web.example.com:8080'
+    SERVICE_FQDN_WWW: www.example.com
+    SERVICE_HEX_128_WEB: '<generated:SERVICE_HEX_128_WEB:128>'
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_LOWERCASEUSER_WEB: '<generated:SERVICE_LOWERCASEUSER_WEB:16>'
+    SERVICE_PASSWORDWITHSYMBOLS_64_WEB: '<generated:SERVICE_PASSWORDWITHSYMBOLS_64_WEB:64>'
+    SERVICE_PASSWORDWITHSYMBOLS_WEB: '<generated:SERVICE_PASSWORDWITHSYMBOLS_WEB:32>'
+    SERVICE_PASSWORD_64_WEB: '<generated:SERVICE_PASSWORD_64_WEB:64>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_REALBASE64_128_WEB: '<generated:SERVICE_REALBASE64_128_WEB:172>'
+    SERVICE_REALBASE64_64_WEB: '<generated:SERVICE_REALBASE64_64_WEB:88>'
+    SERVICE_SUPABASEANON_KEY: null
+    SERVICE_URL_API: 'https://api.example.com/api'
+    SERVICE_URL_BLOG: 'https://blog.example.com/blog'
+    SERVICE_URL_BLOG_2368: 'https://blog.example.com/blog:2368'
+    SERVICE_URL_DB: 'http://db-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+    SERVICE_URL_GATEWAY: 'https://gateway.example.com/ws'
+    SERVICE_URL_GHOST: 'http://ghost-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MY_APP: 'https://my_app.example.com'
+    SERVICE_URL_MY_APP_80: 'https://my_app.example.com:80'
+    SERVICE_URL_WEB: 'https://web.example.com'
+    SERVICE_URL_WEB_8080: 'https://web.example.com:8080'
+    SERVICE_URL_WWW: 'https://www.example.com'
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
+    UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
+    USER: '${SERVICE_USER_WEB}'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web:
+        image: 'nginx:alpine'
+        environment:
+          SERVICE_URL_WEB_8080: 'https://web.example.com:8080'
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          SELF_REF: '${SELF_REF}'
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          SHARED: shared-value
+          SHARED_MISSING: '{{environment.NOT_DEFINED}}'
+          INTERPOLATED: 'http://${INTERPOLATED_HOST:-localhost}/path'
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          PASSWORD_64: '${SERVICE_PASSWORD_64_WEB}'
+          PASSWORD_SYMBOLS: '${SERVICE_PASSWORDWITHSYMBOLS_WEB}'
+          BASE64: '${SERVICE_BASE64_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          REALBASE64_64: '${SERVICE_REALBASE64_64_WEB}'
+          PASSWORD_SYMBOLS_64: '${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}'
+          REALBASE64_128: '${SERVICE_REALBASE64_128_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          HEX_128: '${SERVICE_HEX_128_WEB}'
+          SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
+          USER: '${SERVICE_USER_WEB}'
+          LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+          UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          NO_BRACES_VALUE: null
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: web-referenceservice00000001
+          COOLIFY_FQDN: web.example.com
+          COOLIFY_URL: 'https://web.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$$5
+          - traefik.http.middlewares.reference-headers.headers.customresponseheaders.X-Reference=1
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=web-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=web
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:web>'
+          - coolify.service.subType=application
+          - coolify.service.subName=web
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://web.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        volumes:
+          - 'referenceservice00000001_web-data:/usr/share/nginx/html'
+          - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/web-init.sh
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        healthcheck:
+          test:
+            - CMD
+            - wget
+            - '-qO-'
+            - 'http://127.0.0.1:8080'
+          interval: 10s
+        depends_on:
+          db:
+            condition: service_healthy
+        env_file:
+          - custom.env
+          - .env
+        container_name: web-referenceservice00000001
+        restart: unless-stopped
+        networks:
+          referenceservice00000001: null
+      api:
+        image: 'node:22-alpine'
+        build:
+          context: .
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          GHOST_URL: '${SERVICE_URL_GHOST}'
+          DB_URL: 'postgres://${SERVICE_USER_DB}:${SERVICE_PASSWORD_DB}@db:5432/app'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: api-referenceservice00000001
+          COOLIFY_FQDN: api.example.com/api
+          COOLIFY_URL: 'https://api.example.com/api'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        ports:
+          - '3000:3000'
+          -
+            target: 3001
+            published: 3001
+            protocol: tcp
+        volumes:
+          - 'nfs-data:/mnt/nfs'
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/api-data
+            target: /data
+            bind:
+              create_host_path: true
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/optional
+            target: /optional
+            bind:
+              create_host_path: false
+        expose:
+          - 3000
+        container_name: api-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=api-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=api
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:api>'
+          - coolify.service.subType=application
+          - coolify.service.subName=api
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
+          - 'caddy_0.handle_path=/api*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://api.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      my-app:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: 'https://my_app.example.com:80'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: my-app-referenceservice00000001
+          COOLIFY_FQDN: my_app.example.com
+          COOLIFY_URL: 'https://my_app.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: my-app-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=my-app-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=my-app
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:my-app>'
+          - coolify.service.subType=application
+          - coolify.service.subName=my-app
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://my_app.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      www:
+        image: 'nginx:alpine'
+        environment:
+          SERVICE_URL_WWW: 'https://www.example.com'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: www-referenceservice00000001
+          COOLIFY_FQDN: www.example.com
+          COOLIFY_URL: 'https://www.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: www-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=www-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=www
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:www>'
+          - coolify.service.subType=application
+          - coolify.service.subName=www
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://www.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      blog:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: blog-referenceservice00000001
+          COOLIFY_FQDN: blog.example.com/blog
+          COOLIFY_URL: 'https://blog.example.com/blog'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: blog-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=blog-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=blog
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:blog>'
+          - coolify.service.subType=application
+          - coolify.service.subName=blog
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
+          - 'caddy_0.handle_path=/blog*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://blog.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      gateway:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_GATEWAY: /
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: gateway-referenceservice00000001
+          COOLIFY_FQDN: gateway.example.com
+          COOLIFY_URL: 'https://gateway.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: gateway-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=gateway-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=gateway
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:gateway>'
+          - coolify.service.subType=application
+          - coolify.service.subName=gateway
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://gateway.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      gateway-ws:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_GATEWAY: /ws
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: gateway-ws-referenceservice00000001
+          COOLIFY_FQDN: gateway.example.com/ws
+          COOLIFY_URL: 'https://gateway.example.com/ws'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: gateway-ws-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=gateway-ws-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=gateway-ws
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:gateway-ws>'
+          - coolify.service.subType=application
+          - coolify.service.subName=gateway-ws
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/ws*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://gateway.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      worker:
+        image: 'nginx:alpine'
+        command:
+          - sleep
+          - infinity
+        environment:
+          SERVICE_URL_WEB_8080: 'https://web.example.com:8080'
+          APP_URL: '${SERVICE_URL_WEB}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: worker-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: worker-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=worker-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=worker
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:worker>'
+          - coolify.service.subType=application
+          - coolify.service.subName=worker
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      scheduler:
+        image: 'nginx:alpine'
+        command:
+          - sleep
+          - infinity
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: scheduler-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: scheduler-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=scheduler-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=scheduler
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:scheduler>'
+          - coolify.service.subType=application
+          - coolify.service.subName=scheduler
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      db:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: db-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        volumes:
+          - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+          - 'shared-external:/backups'
+        networks:
+          internal: null
+          referenceservice00000001: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=db-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=db
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:db>'
+          - coolify.service.subType=database
+          - coolify.service.subName=db
+        env_file:
+          - .env
+      sidecar:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceservice00000001
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=sidecar-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=sidecar
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:sidecar>'
+          - coolify.service.subType=application
+          - coolify.service.subName=sidecar
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      shared-external:
+        external: true
+      nfs-data:
+        driver_opts:
+          type: nfs
+          o: 'addr=10.0.0.2,rw'
+          device: ':/exports/data'
+      referenceservice00000001_web-data:
+        name: referenceservice00000001_web-data
+      referenceservice00000001_db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+        name: referenceservice00000001_db-data
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceservice00000001:
+        name: referenceservice00000001
+        external: true
+3_domain_on_applications_without_one:
+  applications:
+    api:
+      fqdn: 'https://api.example.com/api'
+      required_port: 3000
+      exclude_from_status: false
+      ports: '3000:3000,3001:3001/tcp'
+      files:
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/api-data
+          mount_path: /data
+          is_directory: true
+    blog:
+      fqdn: 'https://blog.example.com/blog'
+      required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    gateway:
+      fqdn: 'https://gateway.example.com'
+      exclude_from_status: false
+      ports: ''
+    gateway-ws:
+      fqdn: 'https://gateway.example.com/ws'
+      exclude_from_status: false
+      ports: ''
+    my-app:
+      fqdn: 'https://my_app.example.com'
+      required_port: 80
+      exclude_from_status: false
+      ports: ''
+    scheduler:
+      fqdn: 'https://scheduler-extra.example.com'
+      required_port: 8080
+      exclude_from_status: true
+      ports: ''
+    sidecar:
+      fqdn: 'https://sidecar-extra.example.com'
+      exclude_from_status: true
+      ports: ''
+    web:
+      fqdn: 'https://web.example.com'
+      required_port: 8080
+      exclude_from_status: false
+      ports: ''
+      volumes:
+        - 'referenceservice00000001_web-data:/usr/share/nginx/html'
+      files:
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/web-init.sh
+          mount_path: /docker-entrypoint.d/init.sh
+          is_directory: false
+          content: |
+            #!/bin/sh
+            echo "reference fixture"
+        -
+          fs_path: /data/coolify/services/referenceservice00000001/config
+          mount_path: /etc/nginx/conf.d
+          is_directory: true
+    worker:
+      fqdn: 'https://worker-extra.example.com'
+      required_port: 8080
+      exclude_from_status: false
+      ports: ''
+    www:
+      fqdn: 'https://www.example.com'
+      exclude_from_status: false
+      ports: ''
+  databases:
+    db:
+      exclude_from_status: false
+      volumes:
+        - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+  environment_variables:
+    API_URL: '${SERVICE_URL_API}'
+    APP_URL: '${SERVICE_URL_WEB}'
+    BARE_PASSTHROUGH: null
+    BASE64: '${SERVICE_BASE64_WEB}'
+    BASE64_64: '${SERVICE_BASE64_64_WEB}'
+    BUILD_VERSION: null
+    DASH_DEFAULT_VAR: null
+    GHOST_URL: '${SERVICE_URL_GHOST}'
+    HEX_128: '${SERVICE_HEX_128_WEB}'
+    HEX_32: '${SERVICE_HEX_32_WEB}'
+    INTERPOLATED_HOST: null
+    LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAP_NULL: null
+    NESTED_INNER: null
+    NESTED_NO_DEFAULT_INNER: null
+    NESTED_NO_DEFAULT_OUTER: null
+    NESTED_OUTER: null
+    NO_BRACES_DEFAULT_VAR: null
+    NO_BRACES_VALUE: null
+    PASSWORD: '${SERVICE_PASSWORD_WEB}'
+    PASSWORD_64: '${SERVICE_PASSWORD_64_WEB}'
+    PASSWORD_SYMBOLS: '${SERVICE_PASSWORDWITHSYMBOLS_WEB}'
+    PASSWORD_SYMBOLS_64: '${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}'
+    POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+    POSTGRES_USER: '${SERVICE_USER_DB}'
+    REALBASE64_128: '${SERVICE_REALBASE64_128_WEB}'
+    REALBASE64_64: '${SERVICE_REALBASE64_64_WEB}'
+    REQUIRED:
+      value: 'REQUIRED must be set'
+      required: true
+    SELF_REF: null
+    SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
+    SERVICE_BASE64_WEB: '<generated:SERVICE_BASE64_WEB:32>'
+    SERVICE_FOO_WEB: null
+    SERVICE_FQDN_API: api.example.com/api
+    SERVICE_FQDN_BLOG: blog.example.com/blog
+    SERVICE_FQDN_BLOG_2368: 'blog.example.com/blog:2368'
+    SERVICE_FQDN_DB: db-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_DB_5432: 'db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+    SERVICE_FQDN_GATEWAY: gateway.example.com/ws
+    SERVICE_FQDN_GHOST: ghost-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MY_APP: my_app.example.com
+    SERVICE_FQDN_MY_APP_80: 'my_app.example.com:80'
+    SERVICE_FQDN_WEB: web.example.com
+    SERVICE_FQDN_WEB_8080: 'web.example.com:8080'
+    SERVICE_FQDN_WWW: www.example.com
+    SERVICE_HEX_128_WEB: '<generated:SERVICE_HEX_128_WEB:128>'
+    SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
+    SERVICE_LOWERCASEUSER_WEB: '<generated:SERVICE_LOWERCASEUSER_WEB:16>'
+    SERVICE_PASSWORDWITHSYMBOLS_64_WEB: '<generated:SERVICE_PASSWORDWITHSYMBOLS_64_WEB:64>'
+    SERVICE_PASSWORDWITHSYMBOLS_WEB: '<generated:SERVICE_PASSWORDWITHSYMBOLS_WEB:32>'
+    SERVICE_PASSWORD_64_WEB: '<generated:SERVICE_PASSWORD_64_WEB:64>'
+    SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
+    SERVICE_PASSWORD_WEB: '<generated:SERVICE_PASSWORD_WEB:32>'
+    SERVICE_REALBASE64_128_WEB: '<generated:SERVICE_REALBASE64_128_WEB:172>'
+    SERVICE_REALBASE64_64_WEB: '<generated:SERVICE_REALBASE64_64_WEB:88>'
+    SERVICE_SUPABASEANON_KEY: null
+    SERVICE_URL_API: 'https://api.example.com/api'
+    SERVICE_URL_BLOG: 'https://blog.example.com/blog'
+    SERVICE_URL_BLOG_2368: 'https://blog.example.com/blog:2368'
+    SERVICE_URL_DB: 'http://db-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+    SERVICE_URL_GATEWAY: 'https://gateway.example.com/ws'
+    SERVICE_URL_GHOST: 'http://ghost-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MY_APP: 'https://my_app.example.com'
+    SERVICE_URL_MY_APP_80: 'https://my_app.example.com:80'
+    SERVICE_URL_WEB: 'https://web.example.com'
+    SERVICE_URL_WEB_8080: 'https://web.example.com:8080'
+    SERVICE_URL_WWW: 'https://www.example.com'
+    SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
+    SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
+    UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
+    USER: '${SERVICE_USER_WEB}'
+    WITH_DEFAULT: null
+  compose:
+    services:
+      web:
+        image: 'nginx:alpine'
+        environment:
+          SERVICE_URL_WEB_8080: 'https://web.example.com:8080'
+          LITERAL: plain-value
+          BARE_PASSTHROUGH: ''
+          SELF_REF: '${SELF_REF}'
+          WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
+          REQUIRED: '${REQUIRED:?REQUIRED must be set}'
+          NO_BRACES: $NO_BRACES_VALUE
+          NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
+          NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
+          NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
+          SHARED: shared-value
+          SHARED_MISSING: '{{environment.NOT_DEFINED}}'
+          INTERPOLATED: 'http://${INTERPOLATED_HOST:-localhost}/path'
+          PASSWORD: '${SERVICE_PASSWORD_WEB}'
+          PASSWORD_64: '${SERVICE_PASSWORD_64_WEB}'
+          PASSWORD_SYMBOLS: '${SERVICE_PASSWORDWITHSYMBOLS_WEB}'
+          BASE64: '${SERVICE_BASE64_WEB}'
+          BASE64_64: '${SERVICE_BASE64_64_WEB}'
+          REALBASE64_64: '${SERVICE_REALBASE64_64_WEB}'
+          PASSWORD_SYMBOLS_64: '${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}'
+          REALBASE64_128: '${SERVICE_REALBASE64_128_WEB}'
+          HEX_32: '${SERVICE_HEX_32_WEB}'
+          HEX_128: '${SERVICE_HEX_128_WEB}'
+          SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
+          USER: '${SERVICE_USER_WEB}'
+          LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+          UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
+          API_URL: '${SERVICE_URL_API}'
+          NO_BRACES_VALUE: null
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: web-referenceservice00000001
+          COOLIFY_FQDN: web.example.com
+          COOLIFY_URL: 'https://web.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        labels:
+          - com.example.team=platform
+          - com.example.dollar=price-$$5
+          - traefik.http.middlewares.reference-headers.headers.customresponseheaders.X-Reference=1
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=web-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=web
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:web>'
+          - coolify.service.subType=application
+          - coolify.service.subName=web
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://web.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        volumes:
+          - 'referenceservice00000001_web-data:/usr/share/nginx/html'
+          - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
+          - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/web-init.sh
+            target: /docker-entrypoint.d/init.sh
+            read_only: true
+            bind:
+              create_host_path: true
+        healthcheck:
+          test:
+            - CMD
+            - wget
+            - '-qO-'
+            - 'http://127.0.0.1:8080'
+          interval: 10s
+        depends_on:
+          db:
+            condition: service_healthy
+        env_file:
+          - custom.env
+          - .env
+        container_name: web-referenceservice00000001
+        restart: unless-stopped
+        networks:
+          referenceservice00000001: null
+      api:
+        image: 'node:22-alpine'
+        build:
+          context: .
+          args:
+            - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
+        environment:
+          MAP_LITERAL: map-value
+          MAP_NULL: null
+          GHOST_URL: '${SERVICE_URL_GHOST}'
+          DB_URL: 'postgres://${SERVICE_USER_DB}:${SERVICE_PASSWORD_DB}@db:5432/app'
+          BUILD_VERSION: '${BUILD_VERSION:-1.0.0}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: api-referenceservice00000001
+          COOLIFY_FQDN: api.example.com/api
+          COOLIFY_URL: 'https://api.example.com/api'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        ports:
+          - '3000:3000'
+          -
+            target: 3001
+            published: 3001
+            protocol: tcp
+        volumes:
+          - 'nfs-data:/mnt/nfs'
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/api-data
+            target: /data
+            bind:
+              create_host_path: true
+          -
+            type: bind
+            source: /data/coolify/services/referenceservice00000001/optional
+            target: /optional
+            bind:
+              create_host_path: false
+        expose:
+          - 3000
+        container_name: api-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=api-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=api
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:api>'
+          - coolify.service.subType=application
+          - coolify.service.subName=api
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
+          - 'caddy_0.handle_path=/api*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://api.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      my-app:
+        image: 'httpd:2.4-alpine'
+        environment:
+          SERVICE_URL_MY_APP_80: 'https://my_app.example.com:80'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: my-app-referenceservice00000001
+          COOLIFY_FQDN: my_app.example.com
+          COOLIFY_URL: 'https://my_app.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: my-app-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=my-app-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=my-app
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:my-app>'
+          - coolify.service.subType=application
+          - coolify.service.subName=my-app
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://my_app.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      www:
+        image: 'nginx:alpine'
+        environment:
+          SERVICE_URL_WWW: 'https://www.example.com'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: www-referenceservice00000001
+          COOLIFY_FQDN: www.example.com
+          COOLIFY_URL: 'https://www.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: www-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=www-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=www
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:www>'
+          - coolify.service.subType=application
+          - coolify.service.subName=www
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://www.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      blog:
+        image: 'ghost:5-alpine'
+        environment:
+          SERVICE_URL_BLOG_2368: /blog
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: blog-referenceservice00000001
+          COOLIFY_FQDN: blog.example.com/blog
+          COOLIFY_URL: 'https://blog.example.com/blog'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: blog-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=blog-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=blog
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:blog>'
+          - coolify.service.subType=application
+          - coolify.service.subName=blog
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
+          - 'caddy_0.handle_path=/blog*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://blog.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      gateway:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_GATEWAY: /
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: gateway-referenceservice00000001
+          COOLIFY_FQDN: gateway.example.com
+          COOLIFY_URL: 'https://gateway.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: gateway-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=gateway-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=gateway
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:gateway>'
+          - coolify.service.subType=application
+          - coolify.service.subName=gateway
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://gateway.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      gateway-ws:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_GATEWAY: /ws
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: gateway-ws-referenceservice00000001
+          COOLIFY_FQDN: gateway.example.com/ws
+          COOLIFY_URL: 'https://gateway.example.com/ws'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: gateway-ws-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=gateway-ws-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=gateway-ws
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:gateway-ws>'
+          - coolify.service.subType=application
+          - coolify.service.subName=gateway-ws
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/ws*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://gateway.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      worker:
+        image: 'nginx:alpine'
+        command:
+          - sleep
+          - infinity
+        environment:
+          SERVICE_URL_WEB_8080: 'https://web.example.com:8080'
+          APP_URL: '${SERVICE_URL_WEB}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: worker-referenceservice00000001
+          COOLIFY_FQDN: worker-extra.example.com
+          COOLIFY_URL: 'https://worker-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: worker-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=worker-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=worker
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:worker>'
+          - coolify.service.subType=application
+          - coolify.service.subName=worker
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://worker-extra.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      scheduler:
+        image: 'nginx:alpine'
+        command:
+          - sleep
+          - infinity
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: scheduler-referenceservice00000001
+          COOLIFY_FQDN: scheduler-extra.example.com
+          COOLIFY_URL: 'https://scheduler-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        container_name: scheduler-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=scheduler-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=scheduler
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:scheduler>'
+          - coolify.service.subType=application
+          - coolify.service.subName=scheduler
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://scheduler-extra.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .env
+      db:
+        image: 'postgres:16-alpine'
+        environment:
+          POSTGRES_USER: '${SERVICE_USER_DB}'
+          POSTGRES_PASSWORD: '${SERVICE_PASSWORD_DB}'
+          POSTGRES_DB: app
+          SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: db-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        volumes:
+          - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+          - 'shared-external:/backups'
+        networks:
+          internal: null
+          referenceservice00000001: null
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - 'pg_isready -U $${POSTGRES_USER}'
+          interval: 5s
+        container_name: db-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=db-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=db
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:db>'
+          - coolify.service.subType=database
+          - coolify.service.subName=db
+        env_file:
+          - .env
+      sidecar:
+        image: busybox
+        restart: 'no'
+        network_mode: 'service:web'
+        command:
+          - 'true'
+        container_name: sidecar-referenceservice00000001
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=sidecar-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=sidecar
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:sidecar>'
+          - coolify.service.subType=application
+          - coolify.service.subName=sidecar
+          - 'caddy_0.encode=zstd gzip'
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - caddy_0.log.format=json
+          - caddy_0.log.output.roll_keep=5
+          - caddy_0.log.output.roll_keep_for=168h
+          - caddy_0.log.output.roll_size=20MiB
+          - 'caddy_0.log.output=file /traffic/access.log'
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://sidecar-extra.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: sidecar-referenceservice00000001
+          COOLIFY_FQDN: sidecar-extra.example.com
+          COOLIFY_URL: 'https://sidecar-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+        env_file:
+          - .env
+    volumes:
+      db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+      shared-external:
+        external: true
+      nfs-data:
+        driver_opts:
+          type: nfs
+          o: 'addr=10.0.0.2,rw'
+          device: ':/exports/data'
+      referenceservice00000001_web-data:
+        name: referenceservice00000001_web-data
+      referenceservice00000001_db-data:
+        driver_opts:
+          type: none
+          o: bind
+          device: /srv/db
+        name: referenceservice00000001_db-data
+    networks:
+      internal: null
+      default: null
+      aliased:
+        aliases:
+          - alias-name
+      referenceservice00000001:
+        name: referenceservice00000001
+        external: true

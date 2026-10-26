@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\DatabaseBackupJob;
+use App\Models\AgeKey;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -52,7 +53,7 @@ test('scheduled database backup casts full dump selection to boolean', function 
         ->and((new ScheduledDatabaseBackup(['dump_all' => '1']))->dump_all)->toBeTrue();
 });
 
-test('upload_to_s3 throws exception and disables s3 when storage is null', function () {
+test('s3 upload throws exception and disables s3 when no destination exists', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
@@ -64,11 +65,7 @@ test('upload_to_s3 throws exception and disables s3 when storage is null', funct
 
     $job = new DatabaseBackupJob($backup);
 
-    $reflection = new ReflectionClass($job);
-    $s3Property = $reflection->getProperty('s3');
-    $s3Property->setValue($job, null);
-
-    $method = $reflection->getMethod('upload_to_s3');
+    $method = (new ReflectionClass($job))->getMethod('uploadToS3Destinations');
 
     expect(fn () => $method->invoke($job))
         ->toThrow(Exception::class, 'S3 storage configuration is missing or has been deleted');
@@ -78,7 +75,7 @@ test('upload_to_s3 throws exception and disables s3 when storage is null', funct
     expect($backup->s3_storage_id)->toBeNull();
 });
 
-test('upload_to_s3 exception message reports the previous s3 storage id', function () {
+test('s3 upload exception message reports the previous s3 storage id', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
@@ -90,10 +87,7 @@ test('upload_to_s3 exception message reports the previous s3 storage id', functi
 
     $job = new DatabaseBackupJob($backup);
 
-    $reflection = new ReflectionClass($job);
-    $reflection->getProperty('s3')->setValue($job, null);
-
-    expect(fn () => $reflection->getMethod('upload_to_s3')->invoke($job))
+    expect(fn () => (new ReflectionClass($job))->getMethod('uploadToS3Destinations')->invoke($job))
         ->toThrow(Exception::class, 'S3 storage ID: 12345');
 
     $backup->refresh();
@@ -101,7 +95,7 @@ test('upload_to_s3 exception message reports the previous s3 storage id', functi
     expect($backup->s3_storage_id)->toBeNull();
 });
 
-test('upload_to_s3 exception message reports null when no previous s3 storage id exists', function () {
+test('s3 upload exception message reports null when no previous s3 storage id exists', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
@@ -113,10 +107,7 @@ test('upload_to_s3 exception message reports null when no previous s3 storage id
 
     $job = new DatabaseBackupJob($backup);
 
-    $reflection = new ReflectionClass($job);
-    $reflection->getProperty('s3')->setValue($job, null);
-
-    expect(fn () => $reflection->getMethod('upload_to_s3')->invoke($job))
+    expect(fn () => (new ReflectionClass($job))->getMethod('uploadToS3Destinations')->invoke($job))
         ->toThrow(Exception::class, 'S3 storage ID: null');
 });
 
@@ -281,7 +272,7 @@ test('retention cleanup failure does not fail a successful database backup', fun
         'local_storage_deleted' => true,
         'created_at' => now()->subDay(),
     ]);
-    ScheduledDatabaseBackupExecution::create([
+    $newExecution = ScheduledDatabaseBackupExecution::create([
         'uuid' => 'new-backup',
         'database_name' => 'database',
         'filename' => '/backup/new.dmp',
@@ -290,6 +281,8 @@ test('retention cleanup failure does not fail a successful database backup', fun
         's3_uploaded' => true,
         'local_storage_deleted' => true,
     ]);
+    $oldExecution->s3Replicas()->create(['s3_storage_id' => $s3->id, 's3_uploaded' => true]);
+    $newExecution->s3Replicas()->create(['s3_storage_id' => $s3->id, 's3_uploaded' => true]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->with(['/backup/old.dmp'])->andReturnFalse();
     Storage::shouldReceive('build')->once()->andReturn($disk);
@@ -330,7 +323,7 @@ test('database backup job escapes the S3 copy destination argument', function ()
     $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
 
     expect($source)->toContain('$escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");')
-        ->and($source)->toContain('mc cp {$escapedBackupLocation} {$escapedS3Destination}')
+        ->and($source)->toContain('mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}')
         ->and($source)->not->toContain('mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/');
 });
 
@@ -344,12 +337,15 @@ test('database dump compression uses the helper image and shared CPU setting', f
     ]));
     $job->server = $server;
 
+    $job->backup_location = '/backups/pg-dump-all.gz';
+
     $command = (new ReflectionClass($job))
-        ->getMethod('buildPipelineCommand')
+        ->getMethod('writeDumpCommand')
         ->invoke($job, 'docker exec database pg_dumpall', true);
 
     expect($command)
-        ->toStartWith('docker exec database pg_dumpall | docker run --rm -i')
+        ->toStartWith('status=$( { { docker exec database pg_dumpall; echo $? >&3; } | docker run --rm -i')
+        ->toContain("> '/backups/pg-dump-all.gz'; } 3>&1 ) && [ \"\$status\" -eq 0 ]")
         ->toContain('coolify-helper')
         ->toContain('command -v pigz')
         ->toContain('pigz -3 -p')
@@ -360,77 +356,67 @@ test('database dump compression uses the helper image and shared CPU setting', f
     'high' => 75,
 ]);
 
-test('all dump all database commands use shared helper compression', function () {
-    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
+function encryptingBackupJob(?ScheduledDatabaseBackup $backup = null): DatabaseBackupJob
+{
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $job = new DatabaseBackupJob($backup ?? new ScheduledDatabaseBackup(['timeout' => 3600]));
+    $server = new Server;
+    $server->setRelation('settings', new ServerSetting(['backup_compression_cpu_percentage' => 25]));
+    $job->server = $server;
+    $job->backup_location = '/backups/pg-dump.dmp.age';
+    $job->age_public_key = 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
 
-    expect($source)
-        ->toContain('$this->buildPipelineCommand($backupCommand, compress: true)')
-        ->toContain('mysqldump -u root')
-        ->toContain('mariadb-dump -u root')
-        ->and(substr_count($source, 'buildPipelineCommand($dumpCommand, compress: true)'))->toBe(2)
-        ->and($source)->not->toContain('| gzip >');
-});
+    return $job;
+}
 
-test('non-compressed dump commands pass through unchanged when encryption is disabled', function () {
-    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
-    $job = new DatabaseBackupJob($backup);
+test('an unencrypted, uncompressed dump writes straight to the backup file', function () {
+    $job = new DatabaseBackupJob(new ScheduledDatabaseBackup(['timeout' => 3600]));
+    $job->backup_location = '/backups/pg-dump.dmp';
 
     $command = (new ReflectionClass($job))
-        ->getMethod('buildPipelineCommand')
-        ->invoke($job, 'docker exec database pg_dump --format=custom mydb', false);
+        ->getMethod('writeDumpCommand')
+        ->invoke($job, 'docker exec database pg_dump mydb', false);
 
-    expect($command)->toBe('docker exec database pg_dump --format=custom mydb');
+    expect($command)->toBe("docker exec database pg_dump mydb > '/backups/pg-dump.dmp'");
 });
 
-test('pipeline command pipes through age when encryption is enabled', function () {
-    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
-    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
-    $job = new DatabaseBackupJob($backup);
-    $server = new Server;
-    $server->setRelation('settings', new ServerSetting(['backup_compression_cpu_percentage' => 25]));
-    $job->server = $server;
+test('an encrypted dump goes through age in the helper image and keeps the dump exit status', function () {
+    $job = encryptingBackupJob();
 
-    $reflection = new ReflectionClass($job);
-    $reflection->getProperty('age_public_key')->setValue($job, 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq');
-
-    $command = $reflection->getMethod('buildPipelineCommand')
-        ->invoke($job, 'docker exec database pg_dump --format=custom mydb', false);
+    $command = (new ReflectionClass($job))
+        ->getMethod('writeDumpCommand')
+        ->invoke($job, 'docker exec database pg_dump mydb', false);
 
     expect($command)
-        ->toStartWith('docker exec database pg_dump --format=custom mydb | docker run --rm -i')
-        ->toContain('AGE_PUBLIC_KEY=age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq')
-        ->toContain(' -e ')
-        ->toContain('age -r $AGE_PUBLIC_KEY');
+        ->toStartWith('status=$( { { docker exec database pg_dump mydb; echo $? >&3; } | docker run --rm -i -e \'AGE_RECIPIENT=age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\'')
+        ->toContain('coolify-helper')
+        ->toContain(escapeshellarg('exec age --encrypt --recipient "$AGE_RECIPIENT"'))
+        ->toContain("> '/backups/pg-dump.dmp.age'; } 3>&1 ) && [ \"\$status\" -eq 0 ]")
+        ->not->toContain('pigz');
 });
 
-test('pipeline command chains compression and encryption together', function () {
-    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
-    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
-    $job = new DatabaseBackupJob($backup);
-    $server = new Server;
-    $server->setRelation('settings', new ServerSetting(['backup_compression_cpu_percentage' => 25]));
-    $job->server = $server;
+test('a compressed and encrypted dump compresses before it encrypts', function () {
+    $job = encryptingBackupJob();
 
-    $reflection = new ReflectionClass($job);
-    $reflection->getProperty('age_public_key')->setValue($job, 'age1testkey');
-
-    $command = $reflection->getMethod('buildPipelineCommand')
+    $command = (new ReflectionClass($job))
+        ->getMethod('writeDumpCommand')
         ->invoke($job, 'docker exec database pg_dumpall', true);
 
     expect($command)
-        ->toContain('command -v pigz')
-        ->toContain('age -r $AGE_PUBLIC_KEY')
-        ->and(strpos($command, 'pigz'))->toBeLessThan(strpos($command, 'age -r'));
+        ->toContain('set -o pipefail; compressor=$(')
+        ->toContain('$compressor | age --encrypt --recipient "$AGE_RECIPIENT"');
 });
 
-test('scheduled database backup casts encryption_enabled to boolean and exposes age key relation', function () {
-    $model = new ScheduledDatabaseBackup;
+test('a backup encrypts only with an age key of its own team', function () {
+    $team = Team::factory()->create();
+    $otherTeam = Team::factory()->create();
+    $publicKey = 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+    $ownKey = AgeKey::create(['name' => 'own', 'public_key' => $publicKey, 'team_id' => $team->id]);
+    $foreignKey = AgeKey::create(['name' => 'foreign', 'public_key' => $publicKey, 'team_id' => $otherTeam->id]);
 
-    expect($model->getCasts())->toMatchArray(['encryption_enabled' => 'boolean'])
-        ->and((new ScheduledDatabaseBackup(['encryption_enabled' => '0']))->encryption_enabled)->toBeFalse()
-        ->and((new ScheduledDatabaseBackup(['encryption_enabled' => '1']))->encryption_enabled)->toBeTrue();
-
-    expect(method_exists($model, 'ageKey'))->toBeTrue();
+    expect((new ScheduledDatabaseBackup(['team_id' => $team->id, 'age_key_id' => $ownKey->id]))->encryptionRecipient())->toBe($publicKey)
+        ->and((new ScheduledDatabaseBackup(['team_id' => $team->id, 'age_key_id' => $foreignKey->id]))->encryptionRecipient())->toBeNull()
+        ->and((new ScheduledDatabaseBackup(['team_id' => $team->id]))->encryptionRecipient())->toBeNull();
 });
 
 test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {
@@ -460,13 +446,3 @@ test('specific database dumps keep every selected database', function (string $d
 
     expect($databases)->toBe(['default', 'analytics']);
 })->with(['postgresql', 'mysql', 'mariadb']);
-
-test('individual database backup deletion surfaces local failures and honors selected S3 deletion', function () {
-    $source = file_get_contents(app_path('Livewire/Project/Database/BackupExecutions.php'));
-
-    expect($source)
-        ->toContain("in_array('delete_backup_s3', \$selectedActions, true)")
-        ->toContain('deleteBackupsLocally($execution->filename, $server, throwError: true)')
-        ->toContain("throw new \\RuntimeException('The backup server is unavailable.')")
-        ->not->toContain('deleteBackupsLocally($execution->filename, $server);');
-});

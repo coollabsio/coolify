@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Server;
+use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
@@ -15,7 +17,7 @@ use Tests\TestCase;
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
+uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
 
 /*
 |--------------------------------------------------------------------------
@@ -27,6 +29,7 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
 */
 
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
+require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -69,20 +72,23 @@ function loadLazy(Testable $component): Testable
 | Test Hooks
 |--------------------------------------------------------------------------
 |
-| Global hooks that run before/after each test.
+| Global hooks that run before/after each test. A bare beforeEach() in this file
+| only applies to tests in this file, so register them with uses()->in().
 |
 */
-beforeEach(function () {
+uses()->beforeEach(function () {
     // Flush the Once memoization cache to ensure tests get fresh data
     Once::flush();
 
     // Flush the Server identity map cache to ensure tests get fresh data
     Server::flushIdentityMap();
 
-    // Browser Livewire actions often dispatch events; the Soketi host is not
-    // resolvable from host-side Pest runs (docker DNS name coolify-realtime).
+})->in('Feature', 'Unit', 'v4');
+
+uses()->beforeEach(function () {
+    // Browser Livewire actions often dispatch events; disable broadcasting for host-side runs.
     config(['broadcasting.default' => 'null']);
-});
+})->in('v4/Browser');
 
 function loginAndSkipBoarding(string $email = 'test@example.com', string $password = 'password'): mixed
 {
@@ -137,3 +143,39 @@ function loginAndSkipBoarding(string $email = 'test@example.com', string $passwo
 // {
 //     // ..
 // }
+
+/**
+ * Fakes all processes and keeps the content of every file that Server::uploadProxyFile()
+ * copies with scp, keyed by the remote upload path.
+ */
+function fakeProxyFileUploads(): void
+{
+    $GLOBALS['proxyFileUploads'] = [];
+    Process::fake(function (PendingProcess $process) {
+        if (preg_match("#'(/[^']*coolify-proxy-file-[^']+)'.*'(/tmp/coolify-upload-[0-9a-f]+)'#", (string) $process->command, $matches)) {
+            $GLOBALS['proxyFileUploads'][$matches[2]] = file_get_contents($matches[1]);
+        }
+
+        return Process::result();
+    });
+}
+
+/**
+ * The last content written to $file on the server, with Server::uploadProxyFile() or with
+ * `echo '<base64>' | base64 -d | tee $file`.
+ *
+ * @param  array<int, string>  $lines  remote script lines (see Process::assertRan)
+ */
+function writtenProxyFile(array $lines, string $file): ?string
+{
+    $content = null;
+    foreach ($lines as $line) {
+        if (preg_match('#mv -f (/tmp/coolify-upload-[0-9a-f]+) '.preg_quote($file, '#').'$#', $line, $matches)) {
+            $content = $GLOBALS['proxyFileUploads'][$matches[1]] ?? null;
+        } elseif (str_contains($line, "tee $file") && preg_match("/echo '([A-Za-z0-9+\/=]+)'/", $line, $matches)) {
+            $content = base64_decode($matches[1]);
+        }
+    }
+
+    return $content;
+}

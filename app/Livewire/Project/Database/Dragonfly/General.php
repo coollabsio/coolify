@@ -7,14 +7,15 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneDragonfly;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?Server $server = null;
 
@@ -44,18 +45,9 @@ class General extends Component
 
     public function getListeners(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return [];
-        }
-        $team = $user->currentTeam();
-        if (! $team) {
-            return [];
-        }
-
-        return [
-            "echo-private:team.{$team->id},DatabaseProxyStopped" => 'databaseProxyStopped',
-        ];
+        return $this->teamChannelListeners([
+            'DatabaseProxyStopped' => 'databaseProxyStopped',
+        ]);
     }
 
     public function mount()
@@ -74,9 +66,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->dragonflyPassword = '';
-        }
     }
 
     protected function rules(): array
@@ -121,7 +110,10 @@ class General extends Component
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->dragonfly_password = $this->dragonflyPassword;
+            // After the first start the password is read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->dragonfly_password = $this->dragonflyPassword;
+            }
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
@@ -133,7 +125,8 @@ class General extends Component
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->dragonflyPassword = $this->database->dragonfly_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->dragonflyPassword = $canSeeCredentials ? $this->database->dragonfly_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;

@@ -173,6 +173,22 @@ test('member cannot update application general settings', function () {
     expect($this->member->can('update', $this->application))->toBeFalse();
 });
 
+test('application config download is not callable through Livewire', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+    $this->application->update([
+        'static_image' => 'nginx:alpine',
+        'base_directory' => '/',
+        'is_http_basic_auth_enabled' => false,
+        'redirect' => 'no',
+    ]);
+
+    $component = Livewire::test(ApplicationGeneral::class, ['application' => $this->application]);
+
+    expect(fn () => $component->call('downloadConfig'))
+        ->toThrow(MethodNotFoundException::class);
+});
+
 test('member cannot reset application labels', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -300,6 +316,14 @@ test('member does not see terminal link for application', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
+    // The terminal link lives in the application settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />',
+        ['application' => $this->application]
+    )
+        ->assertSee('application-settings-link-general', false)
+        ->assertDontSee('application-settings-link-terminal', false);
+
     Livewire::test(ApplicationHeading::class, ['application' => $this->application])
         ->assertDontSee('Terminal');
 });
@@ -308,8 +332,12 @@ test('admin sees terminal link for application', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
-        ->assertSee('Terminal');
+    // The terminal link lives in the application settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />',
+        ['application' => $this->application]
+    )
+        ->assertSee('application-settings-link-terminal', false);
 });
 
 // --- Cross-team isolation ---

@@ -35,7 +35,7 @@
                                         :aria-selected="resourceType === option.value"
                                         @click="resourceType = option.value; close()">
                                         <span x-text="option.label"></span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check" class="size-3.5 text-black dark:text-fg"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
@@ -71,7 +71,7 @@
                                         :aria-selected="selectedCategory === ''"
                                         @click="selectedCategory = ''; categorySearch = ''; categoryOpen = false">
                                         <span>All categories</span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check" class="size-3.5 text-black dark:text-fg"
                                             x-show="selectedCategory === ''" />
                                     </button>
                                     <template
@@ -81,7 +81,7 @@
                                             :aria-selected="selectedCategory === category"
                                             @click="selectedCategory = category; categorySearch = ''; categoryOpen = false">
                                             <span class="truncate" x-text="category"></span>
-                                            <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                            <x-reicon name="check" class="size-3.5 text-black dark:text-fg"
                                                 x-show="selectedCategory === category" />
                                         </button>
                                     </template>
@@ -92,8 +92,31 @@
                 </div>
             </x-application.settings-section>
 
-            <div x-show="loading" class="flex items-center justify-center py-8">
-                <x-loading text="Loading resources..." />
+            {{-- A full page load: the canvas uses the minimal layout. --}}
+            <a href="{{ route('deploy-canvas', ['project' => data_get($parameters, 'project_uuid'), 'environment' => data_get($parameters, 'environment_uuid')]) }}"
+                x-show="search === ''"
+                class="mt-6 flex items-center gap-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-none dark:hover:border-white/[0.14]">
+                <div
+                    class="flex size-11 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                    <x-reicon name="deploy-canvas" class="size-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-[14px]! leading-5! font-semibold! text-black! dark:text-fg!">Deploy canvas</h2>
+                        <x-beta-badge />
+                    </div>
+                    <p class="mt-0.5 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim">
+                        Connect a server, a source, and its settings step by step, then deploy every resource at once.
+                    </p>
+                </div>
+                <span class="button button-highlighted shrink-0 max-sm:hidden">
+                    Try it
+                    <x-reicon name="arrow-right" class="size-3.5" />
+                </span>
+            </a>
+
+            <div x-show="loading" class="mt-6">
+                <x-skeleton.cards :count="6" label="Loading resources" />
             </div>
             <div x-show="!loading" class="mt-6 flex flex-col gap-6">
                 <section
@@ -227,9 +250,12 @@
                                             </span>
                                         </template>
                                     </div>
-                                    <div class="min-w-0 flex-1">
+                                    <div class="flex min-w-0 flex-1 items-center gap-2">
                                         <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
                                             x-text="database.name"></h3>
+                                        <template x-if="database.experimental">
+                                            <x-status-badge status="Experimental" type="warning" class="shrink-0" />
+                                        </template>
                                     </div>
                                 </div>
 
@@ -314,7 +340,7 @@
                                             class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
                                             Docs
                                         </a>
-                                        <a x-show="serviceWebsiteUrl(service)" :href="serviceWebsiteUrl(service)"
+                                        <a x-show="service.website" :href="service.website"
                                             target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
@@ -415,6 +441,10 @@
                             clickhouse: {
                                 docs: 'https://clickhouse.com/docs',
                                 website: 'https://clickhouse.com/'
+                            },
+                            sqlite: {
+                                docs: 'https://sqlite.org/docs.html',
+                                website: 'https://sqlite.org/'
                             }
                         },
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }
@@ -463,16 +493,6 @@
                         },
                         databaseWebsiteUrl(database) {
                             return this.databaseLinks[database.id]?.website;
-                        },
-                        serviceWebsiteUrl(service) {
-                            const source = service.website || service.homepage || service.documentation;
-                            if (!source) return null;
-
-                            try {
-                                return new URL(source).origin;
-                            } catch (error) {
-                                return null;
-                            }
                         },
                         async checkUrlExists(url) {
                             if (!url) return false;

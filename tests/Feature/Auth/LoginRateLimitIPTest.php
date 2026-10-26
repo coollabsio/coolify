@@ -69,7 +69,7 @@ test('successful login is still possible within rate limit', function () {
     expect($response->status())->not->toBe(429);
 });
 
-test('cloud login rate limits use the Cloudflare client ip', function () {
+test('cloud login rate limits cannot be bypassed with a different Cloudflare client ip', function () {
     config()->set('constants.coolify.self_hosted', false);
 
     foreach (range(1, 5) as $attempt) {
@@ -90,5 +90,5 @@ test('cloud login rate limits use the Cloudflare client ip', function () {
             'email' => 'test@example.com',
             'password' => 'wrong-password',
         ])
-        ->assertRedirect();
+        ->assertStatus(429);
 });

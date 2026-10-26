@@ -45,7 +45,7 @@ it('compresses and stores an uploaded profile picture on the configured local st
         ->and($image[1])->toBeLessThanOrEqual(256)
         ->and($image['mime'])->toBe('image/jpeg')
         ->and(Storage::disk('images')->size($user->avatar_path))->toBeLessThan(100_000);
-});
+})->skip(! extension_loaded('gd'), 'Requires the GD extension to generate and compress the test image.');
 
 it('stores an already compressed browser JPEG without server image extensions', function () {
     Storage::fake('images');
@@ -100,7 +100,7 @@ it('loads an S3 profile picture from the configured CDN', function () {
     expect(profile_avatar_url($user))->toBe("https://avatars.example.com/media/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
 });
 
-it('loads an S3 profile picture directly from S3 when the CDN is not configured', function () {
+it('falls back to the authenticated proxy route for an S3 profile picture when the CDN is not configured', function () {
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -118,7 +118,9 @@ it('loads an S3 profile picture directly from S3 when the CDN is not configured'
         'avatar_s3_storage_id' => $storage->id,
     ]);
 
-    expect(profile_avatar_url($user))->toBe("https://s3.example.com/avatars/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
+    // Direct S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests,
+    // so without a CDN the browser must use the app's authenticated proxy route.
+    expect(profile_avatar_url($user))->toBe(route('profile.avatar', ['v' => $user->updated_at->timestamp]));
 });
 
 it('does not use an unrelated S3 storage URL for a profile picture', function () {
@@ -172,35 +174,40 @@ it('falls back cleanly when the avatars S3 storage no longer exists', function (
         ->assertNotFound();
 });
 
-it('automatically uploads a selected profile picture and keeps the current avatar until it succeeds', function () {
-    $profile = file_get_contents(resource_path('views/livewire/profile/index.blade.php'));
-    $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+it('serves a team members profile picture to other members of the same team', function () {
+    Storage::fake('images');
+    $team = Team::factory()->create();
+    $viewer = User::factory()->create();
+    $member = User::factory()->create([
+        'avatar_path' => 'avatars/2/avatar.jpg',
+        'avatar_storage_type' => 'local',
+    ]);
+    $team->members()->attach($viewer->id, ['role' => 'member']);
+    $team->members()->attach($member->id, ['role' => 'member']);
+    Storage::disk('images')->put($member->avatar_path, 'avatar-content');
 
-    expect($profile)
-        ->toContain("this.\$wire.upload('avatar', compressed")
-        ->toContain('await this.$wire.uploadAvatar()')
-        ->toContain('if (uploaded)')
-        ->toContain('canvas.toBlob')
-        ->toContain('x-ref="avatarInput"')
-        ->toContain('class="hidden"')
-        ->toContain("processing ? 'Uploading…' : 'Browse…'")
-        ->not->toContain('wire:click="uploadAvatar"')
-        ->not->toContain('Upload picture')
-        ->not->toContain('type="file" x-on:change')
-        ->and($menu)
-        ->toContain('profile_avatar_url($user)');
+    $this->actingAs($viewer);
+
+    expect(profile_avatar_url($member))->toBe(route('team.member.avatar', ['user_id' => $member->id, 'v' => $member->updated_at->timestamp]));
+
+    $this->withoutMiddleware()
+        ->get(route('team.member.avatar', ['user_id' => $member->id]))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'image/jpeg');
 });
 
-it('offers runtime local or existing S3 profile picture storage', function () {
-    $component = file_get_contents(app_path('Livewire/Settings/Advanced.php'));
-    $view = file_get_contents(resource_path('views/livewire/settings/advanced.blade.php'));
+it('does not serve the profile picture of a user who shares no team', function () {
+    Storage::fake('images');
+    $viewer = User::factory()->create();
+    $viewer->teams()->attach(Team::factory()->create()->id, ['role' => 'owner']);
+    $stranger = User::factory()->create([
+        'avatar_path' => 'avatars/3/avatar.jpg',
+        'avatar_storage_type' => 'local',
+    ]);
+    $stranger->teams()->attach(Team::factory()->create()->id, ['role' => 'owner']);
+    Storage::disk('images')->put($stranger->avatar_path, 'avatar-content');
 
-    expect($component)
-        ->toContain("['value' => 'local', 'label' => 'Local storage']")
-        ->toContain("'value' => 's3:'.\$storage->id")
-        ->toContain('->whereTeamId(0)')
-        ->toContain("->where('is_usable', true)")
-        ->and($view)
-        ->toContain('id="avatar_storage"')
-        ->toContain('Use S3 for multi-instance or cloud deployments');
+    $this->withoutMiddleware()->actingAs($viewer)
+        ->get(route('team.member.avatar', ['user_id' => $stranger->id]))
+        ->assertNotFound();
 });

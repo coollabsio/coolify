@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Dashboard;
+use App\Livewire\Dashboard\ServerMetricsChart;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -8,12 +9,14 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Queue::fake();
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
 
@@ -64,43 +67,40 @@ it('renders dashboard metrics charts on the server index grid', function () {
         ->assertDontSeeHtml("dashboard-server-metrics-{$disabledServer->uuid}");
 });
 
-it('configures the dashboard chart as a ten minute cpu and memory sparkline with hover details', function () {
-    $chart = file_get_contents(resource_path('views/livewire/dashboard/server-metrics-chart.blade.php'));
-    $component = file_get_contents(app_path('Livewire/Dashboard/ServerMetricsChart.php'));
+it('does not run SSH for an unreachable server when loading dashboard metrics', function () {
+    Process::fake();
 
-    expect($component)
-        ->toContain('$this->server->getCpuMetrics(10)')
-        ->toContain('$this->server->getMemoryMetrics(10)');
-    expect($chart)
-        ->toContain('new ApexCharts')
-        ->toContain('sparkline: { enabled: true }')
-        ->toContain('absolute right-0 bottom-0 h-2/3 w-full')
-        ->toContain('[&_.apexcharts-svg]:overflow-hidden')
-        ->not->toContain('w-full overflow-hidden rounded-b-xl')
-        ->toContain('CPU:')
-        ->toContain('Memory:')
-        ->toContain('formatLocalTimestamp(timestamp)')
-        ->toContain('formatUtcTimestamp(timestamp)')
-        ->toContain("min: 0,\n                            max: 100,")
-        ->toContain('labels: { show: false }');
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $server->settings->update(['is_metrics_enabled' => true, 'is_reachable' => false]);
+
+    Livewire::test(ServerMetricsChart::class, ['server' => $server->fresh()])
+        ->call('loadData')
+        ->assertNotDispatched("dashboard-server-metrics-{$server->uuid}");
+
+    Process::assertNothingRan();
 });
 
-it('refreshes dashboard metrics every minute while visible and after returning from the background', function () {
-    $chart = file_get_contents(resource_path('views/livewire/dashboard/server-metrics-chart.blade.php'));
+it('loads dashboard metrics over SSH for a reachable server', function () {
+    Process::fake(['*' => Process::result(output: '[{"time":1700000000000,"percent":12.5,"usedPercent":40}]')]);
 
-    expect($chart)
-        ->toContain('window.setInterval')
-        ->toContain('60000')
-        ->toContain('document.hidden')
-        ->toContain("document.addEventListener('visibilitychange'")
-        ->toContain('Date.now() - this.hiddenAt >= 60000')
-        ->toContain('$wire.loadData()')
-        ->toContain('window.clearInterval')
-        ->toContain("document.removeEventListener('visibilitychange'");
-});
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $server->settings->update(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true]);
 
-it('keeps the status badge only on server cards without metrics', function () {
-    $dashboard = file_get_contents(resource_path('views/livewire/dashboard.blade.php'));
+    Livewire::test(ServerMetricsChart::class, ['server' => $server->fresh()])
+        ->call('loadData')
+        ->assertDispatched(
+            "dashboard-server-metrics-{$server->uuid}",
+            fn (string $name, array $params) => $params[0] == [
+                'cpu' => [[1700000000000, 12.5]],
+                'memory' => [[1700000000000, 40]],
+            ],
+        );
 
-    expect($dashboard)->toContain('@unless ($server->isMetricsEnabled())');
+    Process::assertRan(fn ($process) => str_contains($process->command, 'coolify-sentinel'));
 });

@@ -2,16 +2,25 @@
 
 namespace App\Livewire\Project;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Project;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use RemembersCanvasView;
+
     public $projects;
 
     public function mount(): void
     {
+        if ($this->prefersCanvasView('projects')) {
+            $this->redirectRoute('project.canvas.index', navigate: true);
+
+            return;
+        }
+
         // Only load what the page renders. Servers/private keys were previously
         // hydrated into public Livewire state but never used by the view.
         $this->projects = Project::ownedByCurrentTeam()
@@ -27,6 +36,7 @@ class Index extends Component
                 'mongodbs',
                 'mysqls',
                 'mariadbs',
+                'sqlites',
             ])
             ->get();
     }
@@ -47,6 +57,7 @@ class Index extends Component
                     $project->mongodbs_count,
                     $project->mysqls_count,
                     $project->mariadbs_count,
+                    $project->sqlites_count,
                 ])->sum();
 
                 return [
@@ -57,6 +68,7 @@ class Index extends Component
                     'href' => $project->navigateTo(),
                     'environmentCount' => $project->environments->count(),
                     'resourceCount' => $resourceCount,
+                    'createdAt' => $project->created_at?->format('M j, Y') ?? '-',
                     'settingsHref' => auth()->user()->can('update', $project)
                         ? route('project.edit', ['project_uuid' => $project->uuid])
                         : null,

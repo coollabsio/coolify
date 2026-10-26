@@ -6,7 +6,6 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -74,7 +73,7 @@ it('retains the server and surfaces a DigitalOcean deletion failure', function (
         digitalOceanDropletId: 987,
         cloudProviderTokenId: $token->id,
         teamId: $team->id,
-    ))->toThrow(RequestException::class, 'status code 500');
+    ))->toThrow(Exception::class, 'DigitalOcean API error: deletion failed');
 
     expect(Server::withTrashed()->find($server->id))->not->toBeNull();
 });

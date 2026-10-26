@@ -85,11 +85,12 @@
     $currentTag = $tags->firstWhere('name', $tagName);
     $dashboardContext = match (true) {
         request()->routeIs('dashboard') => 'Dashboard',
-        request()->routeIs('project.index') => 'Projects',
+        request()->routeIs('project.index', 'project.canvas.index') => 'Projects',
         request()->routeIs('terminal') => 'Terminal',
         request()->routeIs('server.*') => 'Servers',
         request()->routeIs('source.*') => 'Sources',
         request()->routeIs('destination.*') => 'Destinations',
+        request()->routeIs('registries.*') => 'Registries',
         request()->routeIs('storage.*') => 'S3 Storage',
         request()->routeIs('shared-variables.*') => 'Shared Variables',
         request()->routeIs('team.*') => 'Team',
@@ -101,30 +102,6 @@
         request()->routeIs('admin.*') => 'Admin',
         default => null,
     };
-    // Workspace destinations require an active plan on cloud; unsubscribed users
-    // only keep profile/appearance and must not see this switcher.
-    $canUseWorkspaceNav = isSubscribed() || ! isCloud();
-    $pageDestinations = $canUseWorkspaceNav
-        ? collect([
-            ['label' => 'Dashboard', 'href' => url('/')],
-            ['label' => 'Projects', 'href' => url('/projects')],
-            auth()->user()?->can('canAccessTerminal')
-                ? ['label' => 'Terminal', 'href' => route('terminal')]
-                : null,
-            ['label' => 'Servers', 'href' => url('/servers')],
-            ['label' => 'Sources', 'href' => route('source.all')],
-            ['label' => 'Destinations', 'href' => route('destination.index')],
-            ['label' => 'S3 Storage', 'href' => route('storage.index')],
-            ['label' => 'Shared Variables', 'href' => route('shared-variables.index')],
-            ['label' => 'Team', 'href' => route('team.index')],
-            ['label' => 'Notifications', 'href' => route('notifications.email')],
-            ['label' => 'Keys & Tokens', 'href' => route('security.private-key.index')],
-            ['label' => 'Tags', 'href' => route('tags.show')],
-            isInstanceAdmin()
-                ? ['label' => 'Settings', 'href' => route('settings.index')]
-                : null,
-        ])->filter()
-        : collect();
 @endphp
 <div class="flex min-w-0 items-center gap-0.5 text-[13px]">
     {{-- Team --}}
@@ -132,33 +109,7 @@
         <livewire:switch-team />
     </div>
 
-    @if (!$currentProject && $dashboardContext && $canUseWorkspaceNav)
-        <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
-        <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
-            <button type="button" @click="open = !open" @click.outside="open = false" title="Switch page"
-                class="flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
-                <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $dashboardContext }}</span>
-                <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
-                    fill="none">
-                    <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
-                        stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            </button>
-            <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-                class="listbox-panel scrollbar left-0! z-[90]! max-h-80! min-w-52">
-                <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint">
-                    Pages
-                </div>
-                @foreach ($pageDestinations as $destination)
-                    <a href="{{ $destination['href'] }}" {{ wireNavigate() }} @click="open = false"
-                        class="listbox-option {{ $destination['label'] === $dashboardContext ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
-                        <span class="min-w-0 flex-1 truncate">{{ $destination['label'] }}</span>
-                    </a>
-                @endforeach
-            </div>
-        </div>
-    @elseif (!$currentProject && $dashboardContext)
-        {{-- Static context label only — no links to paid workspace pages. --}}
+    @if (!$currentProject && $dashboardContext)
         <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
         <span
             class="flex h-8 min-w-0 items-center truncate px-2 font-semibold text-black opacity-70 dark:text-fg">{{ $dashboardContext }}</span>
@@ -243,7 +194,7 @@
         {{-- Project switcher --}}
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = !open" @click.outside="open = false" title="Switch project"
-                class="flex items-center gap-1.5 min-w-0 h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                class="flex items-center gap-1.5 min-w-0 max-w-full h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
                 <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentProject->name }}</span>
                 <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                     <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
@@ -269,7 +220,7 @@
         {{-- Environment switcher --}}
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = !open" @click.outside="open = false" title="Switch environment"
-                class="flex items-center gap-1.5 min-w-0 h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                class="flex items-center gap-1.5 min-w-0 max-w-full h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
                 <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentEnvironment->name }}</span>
                 <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                     <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />

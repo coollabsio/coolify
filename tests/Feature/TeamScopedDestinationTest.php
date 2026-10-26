@@ -142,6 +142,27 @@ describe('DockerImage destination team scope', function () {
 });
 
 describe('DockerCompose destination + server_id team scope', function () {
+    test('service creation preserves source Compose comments', function () {
+        $source = "# Operator note\nservices:\n  app:\n    image: nginx:alpine # Keep this note\n";
+        $routeParams = [
+            'project_uuid' => $this->projectA->uuid,
+            'environment_uuid' => $this->environmentA->uuid,
+        ];
+
+        Livewire::withUrlParams([
+            'destination' => $this->destinationA->uuid,
+            'server_id' => $this->serverA->id,
+        ])
+            ->test(DockerCompose::class, $routeParams)
+            ->set('parameters', $routeParams)
+            ->set('query', ['destination' => $this->destinationA->uuid])
+            ->set('dockerComposeRaw', $source)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        expect(Service::where('environment_id', $this->environmentA->id)->latest('id')->firstOrFail()->docker_compose_raw)->toBe($source);
+    });
+
     test('submit with other team destination throws and creates no service', function () {
         $routeParams = [
             'project_uuid' => $this->projectA->uuid,
@@ -317,7 +338,7 @@ describe('Destination/Show team scope', function () {
         Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
             ->assertSee('General')
             ->assertSee('Resources')
-            ->assertDontSee('Search resources...')
+            ->assertDontSeeHtml('placeholder="Search resources"')
             ->assertDontSee('No resources use this destination');
     });
 
@@ -344,10 +365,10 @@ describe('Destination/Show team scope', function () {
         ]));
 
         Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
-            ->assertSee('Search resources...')
+            ->assertSeeHtml('placeholder="Search resources"')
             ->assertSee('Project')
             ->assertSee('Environment')
-            ->assertSee('Name')
+            ->assertSee('Resource')
             ->assertSee('Type')
             ->assertSee('application-on-destination')
             ->assertSee('service-on-destination')

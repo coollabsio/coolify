@@ -54,7 +54,9 @@ class Charts extends Component
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
             $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
             $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSentinelUpdate($changedFields);
 
             $this->dispatch('success', 'Metrics settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
@@ -67,7 +69,9 @@ class Charts extends Component
         try {
             $this->authorize('update', $this->server);
             $this->server->settings->is_metrics_enabled = ! $this->server->settings->is_metrics_enabled;
-            $this->server->settings->save();
+            // Saved quietly: Sentinel is started below, so the settings hook must not start it a second time.
+            $this->server->settings->saveQuietly();
+            $this->auditSentinelUpdate(['is_metrics_enabled']);
             $this->server->refresh();
 
             if ($this->server->isMetricsEnabled()) {
@@ -100,13 +104,54 @@ class Charts extends Component
         try {
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
+            // Disk/network/load arrived in a later Sentinel; fetch each optionally so an
+            // older Sentinel (which 404s them) still shows CPU and memory.
+            $diskMetrics = $this->optionalMetric(fn () => $this->server->getDiskMetrics($this->interval));
+            $loadMetrics = $this->optionalMetric(fn () => $this->server->getLoadMetrics($this->interval));
+            $networkMetrics = $this->optionalMetric(fn () => $this->server->getNetworkMetrics($this->interval)) ?? [];
             $this->dispatch("refreshChartData-{$this->chartId}-metrics", [
                 'cpuSeries' => $cpuMetrics,
                 'memorySeries' => $memoryMetrics,
+                'diskSeries' => $diskMetrics,
+                'loadSeries' => $loadMetrics,
+                'networkRxSeries' => $networkMetrics['rx'] ?? [],
+                'networkTxSeries' => $networkMetrics['tx'] ?? [],
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Fetch a metric that may not exist on an older Sentinel; a failure yields null
+     * rather than breaking the whole chart refresh.
+     */
+    private function optionalMetric(callable $fetch): mixed
+    {
+        try {
+            return $fetch();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Metrics settings belong to Sentinel, so they use the same event as the Sentinel page and API.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSentinelUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.sentinel.updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function setInterval()

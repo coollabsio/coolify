@@ -45,9 +45,13 @@ class AgeKey extends BaseModel
         return $this->hasMany(ScheduledDatabaseBackup::class);
     }
 
-    public function isInUse()
+    /**
+     * A key is in use while a backup schedule encrypts with it. Deleting an unused key clears it from
+     * schedules that have encryption disabled.
+     */
+    public function isInUse(): bool
     {
-        return $this->scheduledDatabaseBackups()->exists();
+        return $this->scheduledDatabaseBackups()->where('encryption_enabled', true)->exists();
     }
 
     public function safeDelete()
@@ -63,7 +67,8 @@ class AgeKey extends BaseModel
 
     public static function isValidPublicKey(string $publicKey): bool
     {
-        return (bool) preg_match('/^age1[a-z0-9]{58}$/', trim($publicKey));
+        // Bech32 data characters only; age itself verifies the checksum when it encrypts.
+        return (bool) preg_match('/^age1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}$/', trim($publicKey));
     }
 
     /**

@@ -37,8 +37,6 @@ class Show extends Component
             ->firstOrFail();
         $this->parameters = get_route_parameters();
         $this->section = match (request()->route()?->getName()) {
-            'project.service.volume-backups.s3' => 's3',
-            'project.service.volume-backups.retention' => 'retention',
             'project.service.volume-backups.executions' => 'executions',
             'project.service.volume-backups.danger' => 'danger',
             default => 'general',

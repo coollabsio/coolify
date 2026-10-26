@@ -2,12 +2,17 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Jobs\DatabaseBackupJob;
+use App\Livewire\Concerns\ManagesDatabaseBackup;
+use App\Livewire\Project\Database\Backup\Execution;
 use App\Models\AgeKey;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandalonePostgresql;
+use App\Traits\ListensToTeamChannel;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -18,16 +23,21 @@ use Livewire\Component;
 class BackupEdit extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use ManagesDatabaseBackup;
 
     public ScheduledDatabaseBackup $backup;
 
     public string $section = 'general';
 
+    /** The page shows the backup actions in the top header bar instead. */
+    public bool $actionsInHeader = false;
+
     #[Locked]
     public $availableS3Storages;
 
     #[Locked]
-    public $availableAgeKeys = [];
+    public $availableAgeKeys;
 
     #[Locked]
     public $parameters;
@@ -77,8 +87,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $disableLocalBackup = false;
 
-    #[Validate(['nullable', 'integer'])]
-    public ?int $s3StorageId = null;
+    /** @var array<int, int|string> */
+    #[Validate(['array'])]
+    public array $s3StorageIds = [];
 
     #[Validate(['nullable', 'string'])]
     public ?string $databasesToBackup = null;
@@ -101,7 +112,10 @@ class BackupEdit extends Component
     public function getListeners(): array
     {
         // Keep "Backup Now" in sync when the database starts/stops without a full page refresh.
-        $listeners = ['databaseUpdated' => 'refreshStatus'];
+        $listeners = [
+            'databaseUpdated' => 'refreshStatus',
+            'backupEnabledChanged' => 'syncBackupEnabled',
+        ];
 
         $user = Auth::user();
         if (! $user) {
@@ -110,24 +124,41 @@ class BackupEdit extends Component
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refreshStatus';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refreshStatus';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners([
+                'ServiceChecked' => 'refreshStatus',
+                'ServiceStatusChanged' => 'refreshStatus',
+            ]),
+        ];
     }
 
     public function mount()
     {
         try {
             $this->authorize('view', $this->backup->database);
-            $this->availableAgeKeys = collect($this->availableAgeKeys);
+            $this->availableS3Storages = S3Storage::query()
+                ->whereKey($this->availableS3StorageIds()->all())
+                ->orderBy('name')
+                ->get();
+            $this->availableAgeKeys = AgeKey::query()
+                ->whereKey($this->availableAgeKeyIds()->all())
+                ->orderBy('name')
+                ->get(['id', 'name']);
             $this->parameters = get_route_parameters();
             $this->syncData();
             $this->refreshStatus();
         } catch (Exception $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function hydrate(): void
+    {
+        // Livewire restores a deleted backup as an empty model. Requests that arrive after the delete
+        // (for example status events before the redirect completes) must not render it.
+        if (! $this->backup->exists) {
+            $this->skipRender();
         }
     }
 
@@ -142,7 +173,10 @@ class BackupEdit extends Component
         $this->status = $database->status;
     }
 
-    private function syncData(bool $toModel = false): void
+    /**
+     * @return array<int, string> Names of the backup fields the save changed.
+     */
+    private function syncData(bool $toModel = false): array
     {
         if ($toModel) {
             $this->backup->enabled = $this->backupEnabled;
@@ -155,7 +189,6 @@ class BackupEdit extends Component
             $this->backup->database_backup_retention_max_storage_s3 = $this->databaseBackupRetentionMaxStorageS3;
             $this->backup->save_s3 = $this->saveS3;
             $this->backup->disable_local_backup = $this->disableLocalBackup;
-            $this->backup->s3_storage_id = $this->s3StorageId;
 
             // Validate databases_to_backup to prevent command injection
             // Handles all formats including MongoDB's "db:col1,col2|db2:col3"
@@ -169,8 +202,17 @@ class BackupEdit extends Component
             $this->backup->missing_backup_notification_days = $this->missingBackupNotificationDays;
             $this->backup->encryption_enabled = $this->encryptionEnabled;
             $this->backup->age_key_id = $this->ageKeyId;
-            $this->customValidate();
+            $storageIds = $this->customValidate();
+            $changedFields = auditChangedFields($this->backup);
             $this->backup->save();
+
+            $previousStorageIds = $this->backup->s3Storages()->pluck('s3_storages.id')->sort()->values()->all();
+            $this->backup->syncS3Storages($storageIds->all());
+            if ($previousStorageIds !== $storageIds->sort()->values()->all()) {
+                $changedFields[] = 's3_storages';
+            }
+
+            return $changedFields;
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
@@ -183,7 +225,8 @@ class BackupEdit extends Component
             $this->databaseBackupRetentionMaxStorageS3 = $this->backup->database_backup_retention_max_storage_s3;
             $this->saveS3 = $this->backup->save_s3;
             $this->disableLocalBackup = $this->backup->disable_local_backup ?? false;
-            $this->s3StorageId = $this->backup->s3_storage_id ?? $this->availableS3StorageIds()->first();
+            $selectedIds = $this->backup->selectedS3Storages()->pluck('id');
+            $this->s3StorageIds = ($selectedIds->isNotEmpty() ? $selectedIds : $this->availableS3StorageIds()->take(1))->all();
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
@@ -191,6 +234,8 @@ class BackupEdit extends Component
             $this->encryptionEnabled = $this->backup->encryption_enabled ?? false;
             $this->ageKeyId = $this->backup->age_key_id;
         }
+
+        return [];
     }
 
     public function delete($password, $selectedActions = [])
@@ -222,10 +267,10 @@ class BackupEdit extends Component
                 if ($this->delete_associated_backups_locally && $server) {
                     deleteBackupsLocally($filenames, $server);
                 }
+            }
 
-                if ($this->delete_associated_backups_s3 && $this->backup->s3) {
-                    deleteBackupsS3($filenames, $this->backup->s3);
-                }
+            if ($this->delete_associated_backups_s3) {
+                $this->backup->executions()->each(fn ($execution) => $execution->deleteS3Copies());
             }
 
             $backupUuid = $this->backup->uuid;
@@ -262,50 +307,9 @@ class BackupEdit extends Component
     public function backupNow()
     {
         try {
-            $this->authorize('manageBackups', $this->backup->database);
+            $this->status = $this->backup->database->refresh()->status;
 
-            $database = $this->backup->database->refresh();
-            $this->status = $database->status;
-            if ($database->id !== 0 && ! str($database->status)->startsWith('running')) {
-                $this->dispatch('error', 'The database must be running to start a backup.');
-
-                return;
-            }
-
-            DatabaseBackupJob::dispatch($this->backup);
-            $database = $this->backup->database;
-            auditLog('ui.database.backup_started', [
-                'team_id' => $database->team()?->id,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'backup_uuid' => $this->backup->uuid,
-            ]);
-            $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
-
-            if ($database instanceof ServiceDatabase) {
-                return redirect()->route('project.service.database.backup.executions', [
-                    'project_uuid' => $database->service->project()->uuid,
-                    'environment_uuid' => $database->service->environment->uuid,
-                    'service_uuid' => $database->service->uuid,
-                    'stack_service_uuid' => $database->uuid,
-                    'backup_uuid' => $this->backup->uuid,
-                ]);
-            }
-
-            // Instance databases (e.g. coolify-db) have no project/environment.
-            // Stay on the current page (settings.backup) instead of redirecting.
-            $project = $database->project();
-            $environment = $database->environment;
-            if (! $project || ! $environment) {
-                return null;
-            }
-
-            return redirect()->route('project.database.backup.executions', [
-                'project_uuid' => $project->uuid,
-                'environment_uuid' => $environment->uuid,
-                'database_uuid' => $database->uuid,
-                'backup_uuid' => $this->backup->uuid,
-            ]);
+            return $this->queueDatabaseBackup($this->backup);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -316,7 +320,7 @@ class BackupEdit extends Component
         try {
             $this->authorize('manageBackups', $this->backup->database);
 
-            $this->syncData(true);
+            $this->auditBackupScheduleUpdated($this->syncData(true));
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
@@ -326,24 +330,26 @@ class BackupEdit extends Component
     public function toggleEnabled(): void
     {
         try {
-            $this->authorize('manageBackups', $this->backup->database);
-
-            $this->backupEnabled = ! $this->backupEnabled;
-            $this->backup->update(['enabled' => $this->backupEnabled]);
-            $this->dispatch('success', $this->backupEnabled ? 'Backup enabled.' : 'Backup disabled.');
+            $this->backupEnabled = $this->toggleDatabaseBackup($this->backup);
+            $this->dispatch('backupEnabledChanged')->to(Execution::class);
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
 
-    public function updatedS3StorageId(): void
+    public function syncBackupEnabled(): void
+    {
+        $this->backupEnabled = $this->backup->refresh()->enabled;
+    }
+
+    public function updatedS3StorageIds(): void
     {
         $this->instantSave();
     }
 
     public function toggleS3(): void
     {
-        if (! $this->saveS3 && $this->availableS3StorageIds()->isEmpty()) {
+        if (! $this->saveS3 && $this->selectedAvailableS3StorageIds()->isEmpty()) {
             $this->dispatch('error', 'Select a usable S3 storage before enabling S3 backups.');
 
             return;
@@ -361,59 +367,32 @@ class BackupEdit extends Component
 
     public function toggleEncryption(): void
     {
-        if (! $this->encryptionEnabled) {
-            if ($this->backup->database_type === 'App\Models\StandaloneClickhouse') {
-                $this->dispatch('error', 'Backup encryption is not supported for Clickhouse backups yet.');
+        if (! $this->encryptionEnabled && $this->availableAgeKeyIds()->isEmpty()) {
+            $this->dispatch('error', 'Add an age key before enabling backup encryption.');
 
-                return;
-            }
-            if ($this->availableAgeKeyIds()->isEmpty()) {
-                $this->dispatch('error', 'Add an age key before enabling backup encryption.');
-
-                return;
-            }
+            return;
         }
 
         $this->encryptionEnabled = ! $this->encryptionEnabled;
         $this->instantSave();
     }
 
-    private function availableAgeKeyIds(): Collection
+    /**
+     * @return Collection<int, int> The usable S3 storage IDs to keep as destinations.
+     */
+    private function customValidate(): Collection
     {
-        $keys = collect($this->availableAgeKeys);
-        $keyIds = $keys->pluck('id')->filter()->all();
+        // Only usable S3 storages of the database's team can be destinations; others are dropped.
+        $storageIds = $this->selectedAvailableS3StorageIds();
+        $this->s3StorageIds = $storageIds->all();
 
-        if (empty($keyIds)) {
-            return collect();
-        }
+        if ($this->availableS3StorageIds()->isEmpty()) {
+            $this->backup->save_s3 = $this->saveS3 = false;
+        } elseif ($this->backup->save_s3 && $storageIds->isEmpty()) {
+            $message = 'Select at least one usable S3 storage.';
+            $this->addError('s3StorageIds', $message);
 
-        $teamIds = $keys->pluck('team_id')->reject(fn ($teamId) => $teamId === null)->unique()->values()->all();
-
-        if (empty($teamIds)) {
-            return collect();
-        }
-
-        return AgeKey::query()
-            ->whereKey($keyIds)
-            ->whereIn('team_id', $teamIds)
-            ->pluck('id');
-    }
-
-    private function customValidate()
-    {
-        if (! is_numeric($this->backup->s3_storage_id)) {
-            $this->backup->s3_storage_id = null;
-        }
-
-        // S3 backup cannot be enabled without a valid S3 storage owned by the team
-        $availableS3Ids = $this->availableS3StorageIds();
-        if ($availableS3Ids->isEmpty()) {
-            $this->backup->s3_storage_id = $this->s3StorageId = null;
-            if ($this->backup->save_s3) {
-                $this->backup->save_s3 = $this->saveS3 = false;
-            }
-        } elseif (! $availableS3Ids->contains($this->backup->s3_storage_id)) {
-            $this->backup->s3_storage_id = $this->s3StorageId = $availableS3Ids->first();
+            throw new Exception($message);
         }
 
         // Validate that disable_local_backup can only be true when S3 backup is enabled
@@ -421,50 +400,93 @@ class BackupEdit extends Component
             $this->backup->disable_local_backup = $this->disableLocalBackup = false;
         }
 
-        // Encryption cannot be enabled without a valid age key owned by the team, or for Clickhouse
-        $availableAgeIds = $this->availableAgeKeyIds();
-        if (! is_numeric($this->backup->age_key_id)) {
-            $this->backup->age_key_id = null;
+        // Only an age key of the database's team can encrypt; without one, encryption stays off.
+        $ageKeyIds = $this->availableAgeKeyIds();
+        if (! $ageKeyIds->contains($this->backup->age_key_id)) {
+            $this->backup->age_key_id = $this->backup->encryption_enabled ? $ageKeyIds->first() : null;
         }
-        if ($availableAgeIds->isEmpty() || $this->backup->database_type === 'App\Models\StandaloneClickhouse') {
-            $this->backup->age_key_id = $this->ageKeyId = null;
-            if ($this->backup->encryption_enabled) {
-                $this->backup->encryption_enabled = $this->encryptionEnabled = false;
-            }
-        } elseif (! $availableAgeIds->contains($this->backup->age_key_id)) {
-            if ($this->backup->encryption_enabled) {
-                $this->backup->age_key_id = $this->ageKeyId = $availableAgeIds->first();
-            } else {
-                $this->backup->age_key_id = $this->ageKeyId = null;
-            }
+        if ($this->backup->age_key_id === null) {
+            $this->backup->encryption_enabled = false;
         }
+        $this->ageKeyId = $this->backup->age_key_id;
+        $this->encryptionEnabled = $this->backup->encryption_enabled;
 
         $isValid = validate_cron_expression($this->backup->frequency);
         if (! $isValid) {
             throw new Exception('Invalid Cron / Human expression');
         }
         $this->validate();
+
+        return $storageIds;
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditBackupScheduleUpdated(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        $database = $this->backup->database;
+        auditLog('ui.database.backup_schedule_updated', [
+            'team_id' => $database?->team()?->id,
+            'database_uuid' => $database?->uuid,
+            'database_name' => $database?->name,
+            'backup_uuid' => $this->backup->uuid,
+            'changed_fields' => $changedFields,
+        ]);
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function selectedAvailableS3StorageIds(): Collection
+    {
+        $availableIds = $this->availableS3StorageIds();
+
+        return collect($this->s3StorageIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $availableIds->contains($id))
+            ->unique()
+            ->values();
+    }
+
+    private function databaseTeamId(): ?int
+    {
+        $database = $this->backup->database;
+
+        // The instance database (id 0) has no project and belongs to the root team.
+        return $database instanceof StandalonePostgresql && $database->id === 0 ? 0 : $database?->team()?->id;
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function availableAgeKeyIds(): Collection
+    {
+        $teamId = $this->databaseTeamId();
+        if ($teamId === null || $this->backup->database_type === StandaloneClickhouse::class) {
+            return collect();
+        }
+
+        return AgeKey::query()->where('team_id', $teamId)->pluck('id');
     }
 
     private function availableS3StorageIds(): Collection
     {
-        $storages = collect($this->availableS3Storages);
-        $storageIds = $storages->pluck('id')->filter()->all();
-
-        if (empty($storageIds)) {
+        $teamId = $this->databaseTeamId();
+        if ($teamId === null) {
             return collect();
         }
 
-        $teamIds = $storages->pluck('team_id')->reject(fn ($teamId) => $teamId === null)->unique()->values()->all();
-
-        if (empty($teamIds)) {
-            return collect();
-        }
+        // Current destinations stay selectable while unusable, so saving other settings does not remove them.
+        $selectedIds = $this->backup->selectedS3Storages()->pluck('id')->all();
 
         return S3Storage::query()
-            ->whereKey($storageIds)
-            ->whereIn('team_id', $teamIds)
-            ->where('is_usable', true)
+            ->where('team_id', $teamId)
+            ->where(fn (Builder $query) => $query->where('is_usable', true)->orWhereIn('id', $selectedIds))
             ->pluck('id');
     }
 
@@ -473,7 +495,7 @@ class BackupEdit extends Component
         try {
             $this->authorize('manageBackups', $this->backup->database);
 
-            $this->syncData(true);
+            $this->auditBackupScheduleUpdated($this->syncData(true));
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
@@ -485,7 +507,7 @@ class BackupEdit extends Component
         return view('livewire.project.database.backup-edit', [
             'checkboxes' => [
                 ['id' => 'delete_associated_backups_locally', 'label' => __('database.delete_backups_locally')],
-                ['id' => 'delete_associated_backups_s3', 'label' => 'All backups will be permanently deleted (associated with this backup job) from the selected S3 Storage.'],
+                ['id' => 'delete_associated_backups_s3', 'label' => 'All backups will be permanently deleted (associated with this backup job) from every S3 storage of this schedule.'],
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected SFTP Storage.']
             ],
         ]);

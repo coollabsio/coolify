@@ -1,24 +1,24 @@
-# Events & Notifications Best Practices
+# Events and Notifications Best Practices
 
 ## Rely on Event Discovery
 
-Laravel auto-discovers listeners by reading `handle(EventType $event)` type-hints. No manual registration needed in `AppServiceProvider`.
+Laravel discovers listeners in the configured listener directories by inspecting type-hinted event arguments on `handle()` or `__invoke()` methods. Register listeners manually only when discovery is disabled, the listener is outside those directories, or explicit registration is clearer.
 
-## Run `event:cache` in Production Deploy
+## Cache Event Discovery During Production Deployment
 
-Event discovery scans the filesystem per-request in dev. Cache it in production: `php artisan optimize` or `php artisan event:cache`.
+Cache discovered listeners during production deployment with `php artisan optimize` or `php artisan event:cache`. Rebuild the cache whenever listener definitions change.
 
 ## Use `ShouldDispatchAfterCommit` Inside Transactions
 
-Without it, a queued listener may process before the DB transaction commits, reading data that doesn't exist yet.
+When an event is dispatched inside a database transaction, `ShouldDispatchAfterCommit` delays dispatch until all open database transactions commit. If a transaction rolls back, Laravel discards the event. This affects synchronous and queued listeners; it is not limited to queue timing.
 
 ```php
 class OrderShipped implements ShouldDispatchAfterCommit {}
 ```
 
-## Always Queue Notifications
+## Queue Slow Notifications
 
-Notifications often hit external APIs (email, SMS, Slack). Without `ShouldQueue`, they block the HTTP response.
+Queue notifications that call external services, such as email, text messaging, or Slack, when they do not need to complete before the response. Keep a notification synchronous when immediate completion or failure feedback is part of the operation.
 
 ```php
 class InvoicePaid extends Notification implements ShouldQueue
@@ -27,9 +27,9 @@ class InvoicePaid extends Notification implements ShouldQueue
 }
 ```
 
-## Use `afterCommit()` on Notifications in Transactions
+## Dispatch Queued Notifications After Commit
 
-Same race condition as events — call `afterCommit()` to delay dispatch until the transaction commits.
+A queued notification sent inside a database transaction can run before the transaction commits. Call `afterCommit()` on the queued notification, or enable the queue connection's `after_commit` option, when its delivery depends on committed data. This setting has no scheduling effect on a synchronous notification.
 
 ```php
 $user->notify((new InvoicePaid($invoice))->afterCommit());
@@ -37,7 +37,7 @@ $user->notify((new InvoicePaid($invoice))->afterCommit());
 
 ## Route Notification Channels to Dedicated Queues
 
-Mail and database notifications have different priorities. Use `viaQueues()` to route them to separate queues.
+Different notification channels can have different latency and priority requirements. Implement `viaQueues()` when channels should use separate queues.
 
 ## Use On-Demand Notifications for Non-User Recipients
 
@@ -49,4 +49,4 @@ Notification::route('mail', 'admin@example.com')->notify(new SystemAlert());
 
 ## Implement `HasLocalePreference` on Notifiable Models
 
-Laravel automatically uses the user's preferred locale for all notifications and mailables — no per-call `locale()` needed.
+Implement `HasLocalePreference::preferredLocale()` on a notifiable model when notifications and mailables should use the recipient's locale. Laravel also preserves that locale for queued delivery. An explicit `locale()` call can still override the preference for an individual notification.

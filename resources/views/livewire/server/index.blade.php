@@ -6,16 +6,6 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         <div class="flex flex-wrap items-center gap-2">
-            @if (isDev())
-                @can('create', App\Models\Server::class)
-                    <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
-                        class="button w-fit shrink-0 whitespace-nowrap">
-                        <x-reicon name="upload" class="size-3.5" />
-                        Import transfer
-                        <x-status-badge label="Dev" />
-                    </a>
-                @endcan
-            @endif
             @can('createAnyResource')
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
@@ -35,7 +25,7 @@
                 && ! $isTransferredAway;
             $proxyNeedsAttention = $isReady && $server->proxySet()
                 && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-            $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && ! $server->isSentinelLive();
+            $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
                 $isTransferredAway => 'Transferred away',
@@ -55,17 +45,18 @@
             return [
                 'uuid' => $server->uuid,
                 'name' => $server->name,
-                'description' => $server->description ?: 'No description',
+                'description' => $server->description,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
+                'resourceCount' => $server->definedResources()->count(),
             ];
         })->values();
     @endphp
 
     <div x-data="{
         search: '',
-        viewMode: localStorage.getItem('coolify-servers-view') || 'table',
+        viewMode: @js($this->listView('servers', 'table')),
         servers: @js($serverRows),
         get filteredServers() {
             const query = this.search.trim().toLowerCase();
@@ -77,7 +68,7 @@
         },
         setViewMode(mode) {
             this.viewMode = mode;
-            localStorage.setItem('coolify-servers-view', mode);
+            this.$wire.saveListView('servers', mode);
         }
     }">
         @if ($servers->isEmpty())
@@ -98,31 +89,8 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
-                        <span x-text="filteredServers.length"></span>
-                        <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
-                    </span>
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ? 'control-selected'
-                                : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
-                </div>
+                <x-canvas-view-toggle :list-url="route('server.index')"
+                    :canvas-url="route('server.canvas.index')" />
             </div>
 
             <div x-cloak x-show="viewMode === 'grid'"
@@ -145,13 +113,15 @@
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
-                            <div class="min-w-0 flex-1">
+                            <div class="min-w-0 flex-1 self-center">
                                 <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                     {{ $serverRow['name'] }}
                                 </h2>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    {{ $serverRow['description'] }}
-                                </p>
+                                @if (filled($serverRow['description']))
+                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        {{ $serverRow['description'] }}
+                                    </p>
+                                @endif
                             </div>
                             @if ($serverRow['statusType'] !== 'success')
                                 <span data-tooltip="{{ $serverRow['status'] }}"
@@ -172,13 +142,14 @@
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
-                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Server</div>
+                    <div class="hidden md:block">Resources</div>
                     <div>Status</div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
                     <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[560px] md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -192,12 +163,23 @@
                             </div>
                             <span x-show="server.statusType !== 'success'" :data-tooltip="server.status"
                                 :aria-label="`Server status: ${server.status}`"
-                                class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md"
+                                class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md md:hidden"
                                 :class="server.statusType === 'warning' ? 'text-orange-500 dark:text-warning' : 'text-red-500 dark:text-red-400'">
                                 <x-reicon name="alert-triangle" class="size-4" />
                             </span>
                         </div>
-                        <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
+                        <div class="hidden text-[12px] font-medium text-neutral-600 md:block dark:text-fg-dim">
+                            <span class="inline-flex items-center gap-1" :title="`${server.resourceCount} ${server.resourceCount === 1 ? 'resource' : 'resources'}`">
+                                <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                <span x-text="server.resourceCount"></span>
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2 text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
+                            <span x-show="server.statusType !== 'success'"
+                                class="hidden size-2 shrink-0 rounded-full md:inline-block"
+                                :class="server.statusType === 'warning' ? 'bg-orange-500 dark:bg-warning' : 'bg-red-500 dark:bg-red-400'"></span>
+                            <span x-show="server.statusType === 'success'"
+                                class="hidden size-2 shrink-0 rounded-full bg-green-500 md:inline-block dark:bg-green-400"></span>
                             <span x-text="server.status"></span>
                         </div>
                     </a>

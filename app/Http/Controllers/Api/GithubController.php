@@ -219,8 +219,8 @@ class GithubController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'required|string|max:255',
             'organization' => ['nullable', 'string', 'max:255', 'regex:/\A[^\s\/?#]+\z/'],
-            'api_url' => ['nullable', 'string', 'url', new SafeExternalUrl],
-            'html_url' => ['required', 'string', 'url', new SafeExternalUrl],
+            'api_url' => ['nullable', 'string', 'url', SafeExternalUrl::forGitSource()],
+            'html_url' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
             'custom_user' => 'nullable|string|max:255',
             'custom_port' => 'nullable|integer|min:1|max:65535',
             'app_id' => 'required|integer',
@@ -245,6 +245,10 @@ class GithubController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+
+        if (! isCloud() && $request->boolean('is_system_wide')) {
+            $this->authorize('makeSystemWide', GithubApp::class);
         }
 
         try {
@@ -615,10 +619,10 @@ class GithubController extends Controller
                 $rules['organization'] = ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'];
             }
             if (isset($payload['api_url'])) {
-                $rules['api_url'] = ['url', new SafeExternalUrl];
+                $rules['api_url'] = ['url', SafeExternalUrl::forGitSource()];
             }
             if (isset($payload['html_url'])) {
-                $rules['html_url'] = ['url', new SafeExternalUrl];
+                $rules['html_url'] = ['url', SafeExternalUrl::forGitSource()];
             }
             if (isset($payload['custom_user'])) {
                 $rules['custom_user'] = 'string';
@@ -661,6 +665,10 @@ class GithubController extends Controller
             }
             if (isset($payload['html_url']) && ! filled($payload['api_url'] ?? null)) {
                 $payload['api_url'] = githubApiUrlFromHtmlUrl($payload['html_url']);
+            }
+
+            if (! isCloud() && filter_var($payload['is_system_wide'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! $githubApp->is_system_wide) {
+                $this->authorize('makeSystemWide', GithubApp::class);
             }
 
             // Handle private_key_uuid -> private_key_id conversion

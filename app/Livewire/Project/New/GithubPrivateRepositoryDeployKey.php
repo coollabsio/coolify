@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
+use App\Traits\HasRepositoryDetection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -18,6 +19,7 @@ use Spatie\Url\Url;
 class GithubPrivateRepositoryDeployKey extends Component
 {
     use AuthorizesRequests;
+    use HasRepositoryDetection;
 
     public $current_step = 'private_keys';
 
@@ -84,7 +86,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public function mount()
     {
         if (isDev()) {
-            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/v4.x';
+            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/main';
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
@@ -125,13 +127,30 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function setPrivateKey($private_key_id)
     {
-        $this->private_key_id = $private_key_id;
+        $this->authorize('create', Application::class);
+
+        $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($private_key_id);
+        $this->private_key_id = $privateKey->id;
         $this->current_step = 'repository';
+    }
+
+    protected function applicationForDetection(): Application
+    {
+        $this->get_git_source();
+
+        return $this->unsavedApplicationForDetection(
+            $this->git_repository,
+            $this->branch ?? 'main',
+            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp ? $this->git_source : null,
+            PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id),
+        );
     }
 
     public function submit()
     {
         $this->authorize('create', Application::class);
+
+        $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
         $this->validate();
         try {
@@ -160,7 +179,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'environment_id' => $environment->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
-                    'private_key_id' => $this->private_key_id,
+                    'private_key_id' => $privateKey->id,
                 ];
             } else {
                 $application_init = [
@@ -173,13 +192,16 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'environment_id' => $environment->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
-                    'private_key_id' => $this->private_key_id,
+                    'private_key_id' => $privateKey->id,
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
                 ];
             }
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
+            }
+            if ($this->build_pack === 'dockerfile' && $dockerfileLocation = $this->selectedDockerfileLocation()) {
+                $application_init['dockerfile_location'] = $dockerfileLocation;
             }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
@@ -194,6 +216,8 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->fqdn = $fqdn;
             $application->name = generate_random_name($application->uuid);
             $application->save();
+
+            $this->importDetectedEnvironmentVariables($application);
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
@@ -218,6 +242,15 @@ class GithubPrivateRepositoryDeployKey extends Component
 
         if (($scp = parseScpStyleGitUrl($this->repository_url)) !== null) {
             $this->git_host = $scp['host'];
+            $this->git_repository = $this->repository_url;
+            $this->git_source = 'other';
+
+            return;
+        }
+
+        // Keep ssh:// URLs as-is so a custom SSH port is preserved for deployments.
+        if (str_starts_with($this->repository_url, 'ssh://')) {
+            $this->git_host = parse_url($this->repository_url, PHP_URL_HOST);
             $this->git_repository = $this->repository_url;
             $this->git_source = 'other';
 

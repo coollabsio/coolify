@@ -1,0 +1,4 @@
+# Reference compose for the service parser: a service name with shell metacharacters is rejected.
+services:
+  "web;rm -rf /":
+    image: nginx:alpine

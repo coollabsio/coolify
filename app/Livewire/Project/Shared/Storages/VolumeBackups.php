@@ -4,15 +4,21 @@ namespace App\Livewire\Project\Shared\Storages;
 
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Jobs\VolumeBackupJob;
+use App\Jobs\VolumeBackupRecoveryJob;
+use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
+use App\Traits\PreparesBackupDownloads;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -20,6 +26,8 @@ use Throwable;
 class VolumeBackups extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use PreparesBackupDownloads;
     use WithPagination;
 
     public LocalPersistentVolume|LocalFileVolume $storage;
@@ -29,6 +37,9 @@ class VolumeBackups extends Component
     public ?ScheduledVolumeBackup $backup = null;
 
     public string $section = 'general';
+
+    /** The page shows the backup actions in the top header bar instead. */
+    public bool $actionsInHeader = false;
 
     public string $frequency = 'daily';
 
@@ -40,7 +51,8 @@ class VolumeBackups extends Component
 
     public bool $stopDuringBackup = false;
 
-    public ?int $s3StorageId = null;
+    /** @var array<int, int|string> */
+    public array $s3StorageIds = [];
 
     public int $retentionAmountLocally = 7;
 
@@ -58,7 +70,18 @@ class VolumeBackups extends Component
 
     public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
 
+    public int $missingBackupNotificationDays = 0;
+
     public int $perPage = 10;
+
+    public function getListeners(): array
+    {
+        if ($this->section !== 'executions') {
+            return [];
+        }
+
+        return $this->teamChannelListeners(['BackupCreated' => '$refresh']);
+    }
 
     public function updatedPerPage(): void
     {
@@ -68,6 +91,10 @@ class VolumeBackups extends Component
     }
 
     public bool $delete_backup_s3 = false;
+
+    public bool $delete_associated_backups_locally = false;
+
+    public bool $delete_associated_backups_s3 = false;
 
     public Collection $availableS3Storages;
 
@@ -79,7 +106,7 @@ class VolumeBackups extends Component
             'saveToS3' => ['required', 'boolean'],
             'disableLocalBackup' => ['required', 'boolean'],
             'stopDuringBackup' => ['required', 'boolean'],
-            's3StorageId' => ['nullable', 'integer'],
+            's3StorageIds' => ['array'],
             'retentionAmountLocally' => ['required', 'integer', 'min:0', 'max:10000'],
             'retentionDaysLocally' => ['required', 'integer', 'min:0'],
             'retentionMaxStorageLocally' => ['required', 'numeric', 'min:0'],
@@ -87,16 +114,15 @@ class VolumeBackups extends Component
             'retentionDaysS3' => ['required', 'integer', 'min:0'],
             'retentionMaxStorageS3' => ['required', 'numeric', 'min:0'],
             'timeout' => ['required', 'integer', 'min:60', 'max:36000'],
+            'missingBackupNotificationDays' => ['required', 'integer', 'min:0', 'max:365'],
         ];
     }
 
     public function mount(): void
     {
         $this->authorize('view', $this->resource);
-        $this->availableS3Storages = S3Storage::ownedByCurrentTeam()
-            ->where('is_usable', true)
-            ->get();
         $this->backup = $this->storage->scheduledBackups()->first();
+        $this->availableS3Storages = $this->selectableS3Storages()->orderBy('name')->get();
         $server = $this->backup?->server() ?? data_get($this->resource, 'destination.server');
         $this->timezone = data_get($server, 'settings.server_timezone', 'Instance timezone');
 
@@ -106,7 +132,8 @@ class VolumeBackups extends Component
             $this->saveToS3 = $this->backup->save_s3;
             $this->disableLocalBackup = $this->backup->disable_local_backup;
             $this->stopDuringBackup = $this->backup->stop_during_backup;
-            $this->s3StorageId = $this->backup->s3_storage_id ?? $this->availableS3Storages->first()?->id;
+            $selectedIds = $this->backup->selectedS3Storages()->pluck('id');
+            $this->s3StorageIds = ($selectedIds->isNotEmpty() ? $selectedIds : $this->availableS3Storages->take(1)->pluck('id'))->all();
             $this->retentionAmountLocally = $this->backup->retention_amount_locally;
             $this->retentionDaysLocally = $this->backup->retention_days_locally;
             $this->retentionMaxStorageLocally = $this->backup->retention_max_storage_locally;
@@ -114,8 +141,9 @@ class VolumeBackups extends Component
             $this->retentionDaysS3 = $this->backup->retention_days_s3;
             $this->retentionMaxStorageS3 = $this->backup->retention_max_storage_s3;
             $this->timeout = $this->backup->timeout;
+            $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
         } else {
-            $this->s3StorageId = $this->availableS3Storages->first()?->id;
+            $this->s3StorageIds = $this->availableS3Storages->take(1)->pluck('id')->all();
         }
     }
 
@@ -136,30 +164,24 @@ class VolumeBackups extends Component
         $this->save();
     }
 
-    public function updatedS3StorageId(): void
+    public function updatedS3StorageIds(): void
     {
         $this->authorize('update', $this->resource);
 
-        if (! $this->hasValidS3Storage()) {
-            $this->addError('s3StorageId', 'Select a usable S3 storage owned by your team.');
-
-            return;
-        }
-
-        $this->resetErrorBag('s3StorageId');
         if (! $this->validateSettings()) {
             return;
         }
 
+        $this->resetErrorBag('s3StorageIds');
         $this->backup = $this->persistBackup($this->enabled);
-        $this->dispatch('success', 'S3 storage updated.');
+        $this->dispatch('success', 'S3 storages updated.');
     }
 
     public function toggleS3(): void
     {
         $this->authorize('update', $this->resource);
 
-        if (! $this->saveToS3 && ! $this->hasValidS3Storage()) {
+        if (! $this->saveToS3 && $this->selectedS3StorageIds()->isEmpty()) {
             $this->dispatch('error', 'Select a usable S3 storage before enabling S3 backups.');
 
             return;
@@ -188,7 +210,10 @@ class VolumeBackups extends Component
             $this->backup = $this->persistBackup(true);
         } else {
             $this->enabled = ! $this->enabled;
-            $this->backup->update(['enabled' => $this->enabled]);
+            $this->backup->enabled = $this->enabled;
+            $changedFields = auditChangedFields($this->backup);
+            $this->backup->save();
+            $this->auditScheduleSet($this->backup, $changedFields);
         }
 
         $this->dispatch('success', $this->enabled ? 'Storage backups enabled.' : 'Storage backups disabled.');
@@ -232,14 +257,24 @@ class VolumeBackups extends Component
         }
 
         try {
-            DeleteScheduledVolumeBackup::run($this->backup);
+            $backupUuid = $this->backup->uuid;
+            DeleteScheduledVolumeBackup::run(
+                $this->backup,
+                deleteLocalArchives: in_array('delete_associated_backups_locally', $selectedActions, true),
+                deleteS3Archives: in_array('delete_associated_backups_s3', $selectedActions, true),
+            );
+            auditLog('ui.volume_backup.schedule_deleted', [
+                ...$this->auditContext($backupUuid),
+                'delete_local_archives' => in_array('delete_associated_backups_locally', $selectedActions, true),
+                'delete_s3_archives' => in_array('delete_associated_backups_s3', $selectedActions, true),
+            ]);
             $this->backup = null;
-            $this->dispatch('success', 'Storage backup schedule and archives deleted.');
+            $this->dispatch('success', 'Storage backup schedule deleted.');
             $this->redirectRoute($this->routeName('index'), $this->routeParameters(includeBackup: false), navigate: true);
 
             return true;
         } catch (Throwable $exception) {
-            $this->dispatch('error', 'Could not delete the backup archives: '.$exception->getMessage());
+            $this->dispatch('error', 'Could not delete the backup schedule: '.$exception->getMessage());
 
             return false;
         }
@@ -270,16 +305,66 @@ class VolumeBackups extends Component
 
         $deletedCount = $this->backup?->executions()
             ->where('local_storage_deleted', true)
+            ->where('stop_recovery_pending', false)
+            ->where('s3_cleanup_pending', false)
             ->where(fn ($query) => $query
                 ->where('s3_storage_deleted', true)
                 ->orWhereNull('s3_uploaded')
                 ->orWhere('s3_uploaded', false))
+            ->withoutLiveS3Copies()
             ->delete() ?? 0;
 
         $this->dispatch(
             $deletedCount > 0 ? 'success' : 'info',
             $deletedCount > 0 ? "Cleaned up {$deletedCount} deleted backup entries." : 'No deleted backup entries found.',
         );
+    }
+
+    public function retryRecovery(int $executionId): void
+    {
+        $this->authorize('update', $this->resource);
+
+        $execution = $this->backup?->executions()->whereKey($executionId)->first();
+        if (! $execution || ! $execution->hasPendingRecovery()) {
+            $this->dispatch('error', 'No pending recovery found for this backup execution.');
+
+            return;
+        }
+
+        $execution->update([
+            'recovery_needs_attention' => false,
+        ]);
+        Cache::forget(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id));
+        VolumeBackupRecoveryJob::dispatch($execution);
+        auditLog('ui.volume_backup.recovery_retried', [
+            'team_id' => $this->resource->team()?->id,
+            'resource_uuid' => $this->resource->uuid,
+            'backup_uuid' => $this->backup->uuid,
+            'execution_uuid' => $execution->uuid,
+        ]);
+        $this->dispatch('success', 'Backup recovery queued.');
+    }
+
+    public function downloadBackup(int $executionId): void
+    {
+        $this->authorize('update', $this->resource);
+
+        $execution = $this->backup?->executions()->whereKey($executionId)->first();
+        if (! $execution) {
+            $this->dispatch('error', 'Backup execution not found.');
+
+            return;
+        }
+
+        try {
+            $this->prepareBackupDownload(
+                $execution->local_storage_deleted ? null : $this->backup->server(),
+                $execution->filename,
+                route('download.volume-backup', $execution->id),
+            );
+        } catch (Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function deleteBackup(int $executionId, string $password, array $selectedActions = []): bool|string
@@ -313,12 +398,8 @@ class VolumeBackups extends Component
                 deleteBackupsLocally($execution->filename, $server, throwError: true);
             }
 
-            if ($this->delete_backup_s3 && $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
-                if (! $execution->s3) {
-                    throw new \RuntimeException('The S3 storage is unavailable.');
-                }
-
-                deleteBackupsS3($execution->filename, $execution->s3);
+            if ($this->delete_backup_s3) {
+                $execution->deleteS3Copies();
             }
 
             $execution->delete();
@@ -335,11 +416,16 @@ class VolumeBackups extends Component
 
     public function render()
     {
-        $executions = $this->backup?->executions()->paginate($this->perPage);
+        $executions = $this->backup?->executions()->with('s3Replicas.s3')->paginate($this->perPage);
 
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),
             'latestExecution' => $this->backup?->executions()->first(),
+            's3Downloads' => $this->s3BackupDownloadsEnabled(),
+            'deleteScheduleCheckboxes' => [
+                ['id' => 'delete_associated_backups_locally', 'label' => 'Delete all local archives created by this schedule.'],
+                ['id' => 'delete_associated_backups_s3', 'label' => 'Delete all S3 archives created by this schedule.'],
+            ],
         ]);
     }
 
@@ -353,8 +439,8 @@ class VolumeBackups extends Component
             return false;
         }
 
-        if ($this->saveToS3 && ! $this->hasValidS3Storage()) {
-            $this->addError('s3StorageId', 'Select a usable S3 storage owned by your team.');
+        if ($this->saveToS3 && $this->selectedS3StorageIds()->isEmpty()) {
+            $this->addError('s3StorageIds', 'Select at least one usable S3 storage owned by your team.');
 
             return false;
         }
@@ -366,35 +452,108 @@ class VolumeBackups extends Component
 
     private function persistBackup(bool $enabled): ScheduledVolumeBackup
     {
-        return $this->storage->scheduledBackups()->updateOrCreate(
-            [],
-            [
-                'team_id' => currentTeam()->id,
-                'frequency' => $this->frequency,
-                'enabled' => $enabled,
-                'save_s3' => $this->saveToS3,
-                'disable_local_backup' => $this->disableLocalBackup,
-                'stop_during_backup' => $this->stopDuringBackup,
-                's3_storage_id' => $this->hasValidS3Storage() ? $this->s3StorageId : $this->backup?->s3_storage_id,
-                'retention_amount_locally' => $this->retentionAmountLocally,
-                'retention_days_locally' => $this->retentionDaysLocally,
-                'retention_max_storage_locally' => $this->retentionMaxStorageLocally,
-                'retention_amount_s3' => $this->retentionAmountS3,
-                'retention_days_s3' => $this->retentionDaysS3,
-                'retention_max_storage_s3' => $this->retentionMaxStorageS3,
-                'timeout' => $this->timeout,
-            ],
-        );
+        $backup = $this->storage->scheduledBackups()->firstOrNew();
+        $backup->fill([
+            'team_id' => $this->resourceTeamId(),
+            'frequency' => $this->frequency,
+            'enabled' => $enabled,
+            'save_s3' => $this->saveToS3,
+            'disable_local_backup' => $this->disableLocalBackup,
+            'stop_during_backup' => $this->stopDuringBackup,
+            'retention_amount_locally' => $this->retentionAmountLocally,
+            'retention_days_locally' => $this->retentionDaysLocally,
+            'retention_max_storage_locally' => $this->retentionMaxStorageLocally,
+            'retention_amount_s3' => $this->retentionAmountS3,
+            'retention_days_s3' => $this->retentionDaysS3,
+            'retention_max_storage_s3' => $this->retentionMaxStorageS3,
+            'timeout' => $this->timeout,
+            'missing_backup_notification_days' => $this->missingBackupNotificationDays,
+        ]);
+        $changedFields = auditChangedFields($backup);
+        $backup->save();
+
+        $storageIds = $this->selectedS3StorageIds();
+        $previousStorageIds = $backup->s3Storages()->pluck('s3_storages.id')->sort()->values()->all();
+        $backup->syncS3Storages($storageIds->all());
+        $this->s3StorageIds = $storageIds->all();
+        if (! $backup->wasRecentlyCreated && $previousStorageIds !== $storageIds->sort()->values()->all()) {
+            $changedFields[] = 's3_storages';
+        }
+
+        $this->auditScheduleSet($backup, $changedFields);
+
+        return $backup;
     }
 
-    private function hasValidS3Storage(): bool
+    /**
+     * Record a created schedule, or the changed field names of an updated one.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditScheduleSet(ScheduledVolumeBackup $backup, array $changedFields): void
     {
-        return $this->s3StorageId !== null
-            && S3Storage::query()
-                ->whereKey($this->s3StorageId)
-                ->where('team_id', currentTeam()->id)
-                ->where('is_usable', true)
-                ->exists();
+        if (! $backup->wasRecentlyCreated && $changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.volume_backup.schedule_set', [
+            ...$this->auditContext($backup->uuid),
+            'created' => $backup->wasRecentlyCreated,
+            ...($backup->wasRecentlyCreated ? [] : ['changed_fields' => $changedFields]),
+        ]);
+    }
+
+    /**
+     * @return array{team_id: int|null, resource_type: string, resource_uuid: string, resource_name: string, storage_uuid: string|null, backup_uuid: string}
+     */
+    private function auditContext(string $backupUuid): array
+    {
+        return [
+            'team_id' => $this->resource->team()?->id,
+            'resource_type' => match (true) {
+                $this->resource instanceof Service => 'service',
+                $this->resource instanceof Application => 'application',
+                default => 'database',
+            },
+            'resource_uuid' => $this->resource->uuid,
+            'resource_name' => $this->resource->name,
+            'storage_uuid' => $this->storage->uuid,
+            'backup_uuid' => $backupUuid,
+        ];
+    }
+
+    /**
+     * The submitted destinations that are selectable S3 storages of the resource's team. Others are dropped.
+     *
+     * @return Collection<int, int>
+     */
+    private function selectedS3StorageIds(): Collection
+    {
+        $submittedIds = collect($this->s3StorageIds)->map(fn ($id): int => (int) $id)->filter()->unique();
+
+        return $this->selectableS3Storages()
+            ->whereKey($submittedIds->all())
+            ->pluck('id')
+            ->sortBy(fn (int $id): int|false => $submittedIds->search($id))
+            ->values();
+    }
+
+    /**
+     * Usable storages of the resource's team, plus the current destinations. A destination that is unusable for a
+     * while stays selected, so saving other settings does not remove it.
+     */
+    private function selectableS3Storages(): Builder
+    {
+        $selectedIds = $this->backup?->selectedS3Storages()->pluck('id')->all() ?? [];
+
+        return S3Storage::query()
+            ->where('team_id', $this->resourceTeamId())
+            ->where(fn (Builder $query) => $query->where('is_usable', true)->orWhereIn('id', $selectedIds));
+    }
+
+    private function resourceTeamId(): int
+    {
+        return $this->resource->environment->project->team_id;
     }
 
     private function routeName(string $section): string

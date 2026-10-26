@@ -118,6 +118,8 @@ class RefundSubscription
                 send_internal_notification(
                     "CRITICAL: Refund succeeded but cancel failed for subscription {$subscription->stripe_subscription_id}, team {$team->id}. Manual intervention required."
                 );
+
+                return ['success' => false, 'error' => 'Refund succeeded, but subscription cancellation failed.'];
             }
 
             $subscription->update([

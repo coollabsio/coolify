@@ -1,4 +1,4 @@
-@props(['application', 'currentRoute', 'flush' => false])
+@props(['application', 'currentRoute', 'flush' => false, 'navOnly' => false])
 
 @php
         $applicationRouteParameters = [
@@ -49,6 +49,12 @@
                 'route' => 'project.application.command',
                 'active' => $currentRoute === 'project.application.command',
                 'navigate' => false,
+                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+            ],
+            [
+                'label' => 'Files',
+                'route' => 'project.application.files',
+                'active' => $currentRoute === 'project.application.files',
                 'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
@@ -147,12 +153,13 @@
             'Persistent Storage' => 'storages',
             'Backups' => 'database',
             'Terminal' => 'browser-terminal',
+            'Files' => 'folder',
             'Deployment Logs' => 'time-back',
             'Runtime Logs' => 'unordered-list',
             'Git Source' => 'sources',
             'Servers' => 'servers',
             'Scheduled Tasks' => 'calendar',
-            'Webhooks' => 'notifications',
+            'Webhooks' => 'webhook',
             'Preview Deployments' => 'eye',
             'Healthcheck' => 'feedback',
             'Rollback' => 'time-back',
@@ -161,16 +168,17 @@
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
             'Tags' => 'tags',
-            'Danger Zone' => 'shield-alert',
+            'Danger Zone' => 'danger',
         ];
 
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone'],
+            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
+            'Danger Zone' => ['Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)
             ->map(fn (array $labels) => collect($labels)
@@ -210,9 +218,6 @@
             ],
             'project.application.preview-deployments' => array_values(array_filter([
                 ['id' => 'preview-template-section', 'label' => 'URL template'],
-                $application->is_github_based()
-                    ? ['id' => 'preview-pull-requests-section', 'label' => 'Pull requests']
-                    : null,
                 $application->build_pack === 'dockerimage'
                     ? ['id' => 'manual-preview-section', 'label' => 'Manual preview']
                     : null,
@@ -242,23 +247,43 @@
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
             ],
         ];
+
+        // Pages and in-page sections that the command palette (⌘K) can search on this page
+        $settingsSearchItems = settingsSearchItems($groupedMenuItems, $applicationRouteParameters, $pageSections);
     @endphp
 
+@php
+    // The main sidebar shows this menu on wide screens (see components/navbar.blade.php).
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+@endphp
+
+{{-- Rendered twice: in the page (below xl), and teleported into the main sidebar (xl and up).
+     navOnly renders only the sidebar copy, as the parent menu of a deeper page (e.g. a backup). --}}
+@foreach ($navOnly ? ['main-nav'] : ['page', 'main-nav'] as $placement)
+@if ($placement === 'main-nav')
+@teleport('#main-nav-context-0')
+<div class="nav-context-menu">
+@else
 <aside @class([
-    'application-settings-navigation min-w-0 xl:self-start',
+    'application-settings-navigation in-main-nav min-w-0 xl:self-start',
     'is-flush' => $flush,
-])>
+]) data-settings-search-items="{{ json_encode($settingsSearchItems) }}">
+@endif
                 <nav aria-label="Configuration sections"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                    @class([
+                        'grid gap-0.5',
+                        'grid-cols-2 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]' => $placement === 'page',
+                        'grid-cols-1' => $placement === 'main-nav',
+                    ])>
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
-                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
+                                aria-hidden="true"></div>
                         @endunless
-                        <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
-                            <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}">
-                                <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
+                            <div wire:key="{{ $placement }}-application-settings-group-{{ str($menuItem['label'])->slug() }}">
+                                <a wire:key="{{ $placement }}-application-settings-link-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
                                         'menu-item-active' => $menuItem['active'],
@@ -268,30 +293,27 @@
                                     >
                                     <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                    @if ($menuItem['label'] === 'Files')
+                                        <x-beta-badge class="ml-auto shrink-0" />
+                                    @endif
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
                                             <livewire:project.application.server-status-badge :application="$application"
-                                                :key="'application-server-status-'.$application->uuid" />
+                                                :key="$placement.'-application-server-status-'.$application->uuid" />
                                         </span>
                                     @endif
                                 </a>
-                                @if (filled($sections))
+                                {{-- Sub-sections belong to the current page only; collapse them for
+                                     every other item so the sidebar stays short. --}}
+                                @if ($menuItem['active'] && filled($sections))
                                     <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
                                         x-data="{ activeSection: '' }">
                                         @foreach ($sections as $section)
-                                            @if ($menuItem['active'])
-                                                <button type="button" class="menu-subitem"
-                                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                                    x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </button>
-                                            @else
-                                                <a class="menu-subitem"
-                                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
-                                                    {{ wireNavigate() }}>
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </a>
-                                            @endif
+                                            <button type="button" class="menu-subitem"
+                                                :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                                x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                                <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                            </button>
                                         @endforeach
                                     </div>
                                 @endif
@@ -299,4 +321,10 @@
                         @endforeach
                     @endforeach
                 </nav>
-            </aside>
+            @if ($placement === 'main-nav')
+</div>
+@endteleport
+@else
+</aside>
+@endif
+@endforeach

@@ -29,6 +29,7 @@ beforeEach(function () {
     $this->user->teams()->attach($this->team, ['role' => 'admin']);
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
+    $this->withoutVite();
 });
 
 test('age key index route renders and lists team keys', function () {
@@ -70,7 +71,7 @@ test('age key creation rejects an invalid public key', function () {
 test('generating an age key from the index shows the private key once and does not persist it', function () {
     Process::fake([
         'age-keygen' => Process::result(
-            output: "# public key: ".AGE_MGMT_TEST_PUBLIC_KEY."\n".AGE_MGMT_TEST_PRIVATE_KEY."\n"
+            output: '# public key: '.AGE_MGMT_TEST_PUBLIC_KEY."\n".AGE_MGMT_TEST_PRIVATE_KEY."\n"
         ),
     ]);
 
@@ -92,7 +93,7 @@ test('generating an age key from the index shows the private key once and does n
 test('discarding a generated age key does not persist anything', function () {
     Process::fake([
         'age-keygen' => Process::result(
-            output: "# public key: ".AGE_MGMT_TEST_PUBLIC_KEY."\n".AGE_MGMT_TEST_PRIVATE_KEY."\n"
+            output: '# public key: '.AGE_MGMT_TEST_PUBLIC_KEY."\n".AGE_MGMT_TEST_PRIVATE_KEY."\n"
         ),
     ]);
 
@@ -161,13 +162,4 @@ test('a user from another team cannot view an age key via the show route', funct
     // 404s rather than 403s — matching PrivateKey\Show's identical team-scoping pattern.
     $this->get(route('security.age-key.show', ['age_key_uuid' => $key->uuid]))
         ->assertNotFound();
-});
-
-test('backup edit encryption section links to the dedicated age key management page', function () {
-    $blade = file_get_contents(resource_path('views/livewire/project/database/backup-edit/s3.blade.php'));
-
-    expect($blade)
-        ->toContain("route('security.age-key.index')")
-        ->not->toContain('generateAgeKey')
-        ->not->toContain('addExistingAgeKey');
 });

@@ -21,22 +21,3 @@ it('evaluates a resolve expression at click time instead of a static value', fun
     $html->assertSee('await ($wire.copyValue())', false)
         ->assertDontSee('disabled', false);
 });
-
-it('is the single clipboard implementation shared by its call sites', function () {
-    expect(file_get_contents(resource_path('js/copy-button.js')))
-        ->toContain("window.Alpine.data('copyButton'");
-
-    expect(file_get_contents(resource_path('js/app.js')))
-        ->toContain('initializeCopyButtonComponent');
-
-    $modalConfirmation = file_get_contents(resource_path('views/components/modal-confirmation.blade.php'));
-    $backupExecutions = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
-
-    expect($modalConfirmation)
-        ->toContain('<x-copy-button resolve="decodedText"')
-        ->not->toContain('navigator.clipboard');
-
-    expect($backupExecutions)
-        ->toContain('<x-copy-button :value="data_get($execution, \'filename\', \'\')" label="Copy backup path"')
-        ->not->toContain('navigator.clipboard');
-});

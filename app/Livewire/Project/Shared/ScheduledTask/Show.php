@@ -45,49 +45,19 @@ class Show extends Component
     #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
     public $timeout = 300;
 
-    #[Locked]
-    public ?string $application_uuid;
-
-    #[Locked]
-    public ?string $service_uuid;
-
-    #[Locked]
-    public string $task_uuid;
-
-    public function mount()
+    public function mount(Application|Service $resource, ScheduledTask $task): void
     {
-        try {
-            $task_uuid = request()->route('task_uuid');
-            $project_uuid = request()->route('project_uuid');
-            $environment_uuid = request()->route('environment_uuid');
-            $application_uuid = request()->route('application_uuid');
-            $service_uuid = request()->route('service_uuid');
-
-            $this->task_uuid = $task_uuid;
-            if ($application_uuid) {
-                $this->type = 'application';
-                $this->application_uuid = $application_uuid;
-                $this->resource = Application::ownedByCurrentTeam()->where('uuid', $application_uuid)->firstOrFail();
-            } elseif ($service_uuid) {
-                $this->type = 'service';
-                $this->service_uuid = $service_uuid;
-                $this->resource = Service::ownedByCurrentTeamCached()->where('uuid', $service_uuid)->firstOrFail();
-            }
-            $this->parameters = [
-                'environment_uuid' => $environment_uuid,
-                'project_uuid' => $project_uuid,
-                'application_uuid' => $application_uuid,
-                'service_uuid' => $service_uuid,
-            ];
-
-            $this->task = $this->resource->scheduled_tasks()->where('uuid', $task_uuid)->firstOrFail();
-            $this->syncData();
-        } catch (\Exception $e) {
-            return handleError($e);
-        }
+        $this->resource = $resource;
+        $this->type = $resource->type();
+        $this->parameters = get_route_parameters();
+        $this->task = $resource->scheduled_tasks()->whereKey($task->id)->firstOrFail();
+        $this->syncData();
     }
 
-    private function syncData(bool $toModel = false): void
+    /**
+     * @return array<int, string> Names of the task fields the save changed.
+     */
+    private function syncData(bool $toModel = false): array
     {
         if ($toModel) {
             $this->validate();
@@ -102,15 +72,20 @@ class Show extends Component
             $this->task->frequency = str($this->frequency)->trim()->value();
             $this->task->container = str($this->container)->trim()->value();
             $this->task->timeout = (int) $this->timeout;
+            $changedFields = auditChangedFields($this->task);
             $this->task->save();
+
+            return $changedFields;
         } else {
             $this->isEnabled = $this->task->enabled;
             $this->name = $this->task->name;
-            $this->command = $this->task->command;
+            $this->command = auth()->user()?->can('update', $this->resource) ? $this->task->command : 'Hidden (only admins can view)';
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
             $this->timeout = $this->task->timeout ?? 300;
         }
+
+        return [];
     }
 
     public function toggleEnabled()
@@ -120,7 +95,9 @@ class Show extends Component
             $this->authorize('update', $this->task);
             $this->isEnabled = ! $this->isEnabled;
             $this->task->enabled = $this->isEnabled;
+            $changedFields = auditChangedFields($this->task);
             $this->task->save();
+            $this->auditTaskUpdated($changedFields);
             $this->dispatch('success', $this->isEnabled ? 'Scheduled task enabled.' : 'Scheduled task disabled.');
         } catch (\Exception $e) {
             return handleError($e);
@@ -132,7 +109,7 @@ class Show extends Component
         try {
             $this->authorize('update', $this->resource);
             $this->authorize('update', $this->task);
-            $this->syncData(true);
+            $this->auditTaskUpdated($this->syncData(true));
             $this->dispatch('success', 'Scheduled task updated.');
             $this->refreshTasks();
         } catch (\Exception $e) {
@@ -145,7 +122,7 @@ class Show extends Component
         try {
             $this->authorize('update', $this->resource);
             $this->authorize('update', $this->task);
-            $this->syncData(true);
+            $this->auditTaskUpdated($this->syncData(true));
             $this->dispatch('success', 'Scheduled task updated.');
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -167,12 +144,12 @@ class Show extends Component
             $this->authorize('update', $this->resource);
             $this->authorize('delete', $this->task);
             $this->task->delete();
+            auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());
+            $this->dispatch('success', 'Scheduled task deleted.');
+            $this->dispatch('scheduledTaskDeleted')->to(All::class);
 
-            if ($this->type === 'application') {
-                return redirectRoute($this, 'project.application.scheduled-tasks.show', $this->parameters);
-            } else {
-                return redirectRoute($this, 'project.service.scheduled-tasks.show', $this->parameters);
-            }
+            // Without true, the confirmation modal refreshes this deleted task.
+            return true;
         } catch (\Exception $e) {
             return handleError($e);
         }
@@ -195,5 +172,37 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Record changed task field names only; the command can contain secrets.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditTaskUpdated(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.scheduled_task.updated', [
+            ...$this->taskAuditContext(),
+            'changed_fields' => $changedFields,
+        ]);
+    }
+
+    /**
+     * @return array{team_id: int|null, scheduled_task_uuid: string, scheduled_task_name: string, resource_type: string, resource_uuid: string, resource_name: string}
+     */
+    private function taskAuditContext(): array
+    {
+        return [
+            'team_id' => $this->resource->team()?->id,
+            'scheduled_task_uuid' => $this->task->uuid,
+            'scheduled_task_name' => $this->task->name,
+            'resource_type' => $this->type,
+            'resource_uuid' => $this->resource->uuid,
+            'resource_name' => $this->resource->name,
+        ];
     }
 }
