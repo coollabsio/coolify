@@ -1320,7 +1320,6 @@ it('keeps invalid build-time names out of the helper container so restarts with 
 
     expect($envFlags)
         ->toContain("-e 'SAFE_KEY=safe-build-value'")
-        ->toContain('COOLIFY_BUILD_SECRETS_HASH=')
         ->not->toContain('MY-VAR')
         ->not->toContain('invalid-build-value');
 });
@@ -1939,3 +1938,115 @@ it('includes migrated null Compose overrides in production and preview runtime f
 
     expect(invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables')->contains('LEGACY='.escapeComposeEnvFileValue('')))->toBeTrue();
 })->with([0, 42]);
+
+it('passes the build secrets hash as a build arg so a changed secret value invalidates the Docker cache', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['dockerSecretsSupported' => true]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect(['NEXT_PUBLIC_API_URL' => 'https://old.example.com']));
+    $oldFlags = readDeploymentJobProperty($job, $reflection, 'build_secrets');
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect(['NEXT_PUBLIC_API_URL' => 'https://new.example.com']));
+    $newFlags = readDeploymentJobProperty($job, $reflection, 'build_secrets');
+
+    $hashArg = fn (string $flags): ?string => preg_match("/--build-arg 'COOLIFY_BUILD_SECRETS_HASH=([a-f0-9]{64})'/", $flags, $matches) === 1 ? $matches[1] : null;
+
+    expect($hashArg($oldFlags))->not->toBeNull()
+        ->and($hashArg($newFlags))->not->toBeNull()
+        ->and($hashArg($newFlags))->not->toBe($hashArg($oldFlags))
+        ->and($newFlags)->toContain("--secret 'id=NEXT_PUBLIC_API_URL,env=NEXT_PUBLIC_API_URL'");
+});
+
+it('declares the build secrets hash ARG in every stage when build secrets are used', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['NEXT_PUBLIC_API_URL' => 'https://new.example.com']),
+        'build_secrets' => '--secret id=NEXT_PUBLIC_API_URL,env=NEXT_PUBLIC_API_URL',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "FROM node:22 AS build\nRUN npm run build\nFROM nginx:alpine\nCOPY --from=build /app/dist /usr/share/nginx/html",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/Dockerfile');
+
+    expect(explode("\n", $job->writtenDockerfile))->toBe([
+        '# syntax=docker/dockerfile:1',
+        'FROM node:22 AS build',
+        'ARG COOLIFY_BUILD_SECRETS_HASH',
+        'RUN --mount=type=secret,id=NEXT_PUBLIC_API_URL,env=NEXT_PUBLIC_API_URL npm run build',
+        'FROM nginx:alpine',
+        'ARG COOLIFY_BUILD_SECRETS_HASH',
+        'COPY --from=build /app/dist /usr/share/nginx/html',
+    ]);
+});
+
+it('passes the build secrets hash as a Compose build arg when build secrets are used', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['NEXT_PUBLIC_API_URL' => 'https://new.example.com']),
+    ]);
+
+    $composeFile = invokeDeploymentJobMethod($job, $reflection, 'add_build_secrets_to_compose', [
+        'services' => [
+            'web' => ['build' => '.'],
+            'api' => ['build' => ['context' => './api', 'args' => ['NODE_ENV' => 'production']]],
+            'worker' => ['build' => ['context' => './worker', 'args' => ['NODE_ENV=production']]],
+            'db' => ['image' => 'postgres:17'],
+        ],
+    ]);
+
+    $hash = data_get($composeFile, 'services.web.build.args.COOLIFY_BUILD_SECRETS_HASH');
+
+    expect($hash)->toMatch('/^[a-f0-9]{64}$/')
+        ->and(data_get($composeFile, 'services.api.build.args'))->toBe(['NODE_ENV' => 'production', 'COOLIFY_BUILD_SECRETS_HASH' => $hash])
+        ->and(data_get($composeFile, 'services.worker.build.args'))->toBe(['NODE_ENV=production', "COOLIFY_BUILD_SECRETS_HASH={$hash}"])
+        ->and(data_get($composeFile, 'services.db'))->toBe(['image' => 'postgres:17']);
+});
+
+it('keeps heredoc bodies unchanged when it adds build secrets to a Dockerfile', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['API_URL' => 'https://new.example.com']),
+        'build_secrets' => '--secret id=API_URL,env=API_URL',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "FROM python:3.13\nRUN <<EOF\nfrom app import build\nRUN-like line\nEOF\nRUN python -c 'print(1)'",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/Dockerfile');
+
+    expect(explode("\n", $job->writtenDockerfile))->toBe([
+        '# syntax=docker/dockerfile:1',
+        'FROM python:3.13',
+        'ARG COOLIFY_BUILD_SECRETS_HASH',
+        'RUN --mount=type=secret,id=API_URL,env=API_URL <<EOF',
+        'from app import build',
+        'RUN-like line',
+        'EOF',
+        "RUN --mount=type=secret,id=API_URL,env=API_URL python -c 'print(1)'",
+    ]);
+});
+
+it('warns in the deployment log when PORT does not match ports_exposes', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['ports_exposes' => '80']);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable (3000)')))->toBeTrue();
+});
+
+it('does not warn about a PORT mismatch when readonly labels are disabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['ports_exposes' => '80']);
+    $application->settings()->update(['is_container_label_readonly_enabled' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable')))->toBeFalse();
+});
