@@ -234,6 +234,22 @@ class ApplicationDeploymentQueue extends Model
         };
     }
 
+    /**
+     * The image scan gate stopped this deployment. The status stays failed, the UI shows "Blocked".
+     */
+    public function isImageScanBlocked(): bool
+    {
+        return (bool) data_get($this->scan_gate_result, 'blocked', false);
+    }
+
+    /**
+     * The image scan could not run and the deployment went on without it.
+     */
+    public function isImageScanSkipped(): bool
+    {
+        return ! $this->isImageScanBlocked() && filled(data_get($this->scan_gate_result, 'error'));
+    }
+
     public function commitMessage()
     {
         if (empty($this->commit_message) || is_null($this->commit_message)) {

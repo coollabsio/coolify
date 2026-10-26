@@ -1355,6 +1355,17 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   icon with the count, in the normal text color, not red. `label` is both
   `aria-label` and `data-tooltip`. It renders nothing when the count is 0, so a
   clean or unscanned resource shows no marker.
+- `<x-image-scan.gate-status :result="$deployment->scan_gate_result" />` is the
+  deploy gate state: a `x-status-badge` button ("Blocked" error, or "Not
+  scanned" warning when the scan could not run) that opens a popover with the
+  same anatomy as `x-configuration-warning` (icon tile, headline, links). The
+  popover is `position: fixed` and placed from the trigger, so it escapes the
+  `overflow: hidden` log viewer. It replaces the status dot in the deployment
+  log toolbar when blocked (no card above the log). The application heading
+  teleports it into `#configuration-warning-hud-slot` from `xl` and repeats it
+  in the in-flow heading below `xl`, for the latest non-preview deployment
+  only. "Deploy anyway" shows only where the page can run it and the user has
+  Write access; otherwise "Ask someone with write access to deploy anyway."
 
 ---
 

@@ -30,6 +30,7 @@ class ActiveDeployments extends Component
             'server_name',
             'server_id',
             'status',
+            'scan_gate_result',
             'created_at',
             'finished_at',
         ];

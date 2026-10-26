@@ -227,6 +227,10 @@
                                 'failed' => 'error',
                                 default => 'neutral',
                             };
+                            if ($deployment->isImageScanBlocked()) {
+                                $statusLabel = 'Blocked';
+                                $statusType = 'error';
+                            }
                             $pullRequestId = (int) data_get($deployment, 'pull_request_id', 0);
                             $sourceLabel = match (true) {
                                 (bool) data_get($deployment, 'is_webhook') && $pullRequestId > 0 => 'Webhook · PR #' . $pullRequestId,

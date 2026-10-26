@@ -5,8 +5,12 @@ namespace App\Livewire\Project\Application\Deployment;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
+use App\Models\ImageScan;
+use App\Services\ImageScan\ImageRef;
 use App\Traits\AuditsApplicationSettings;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Throwable;
 
 class Show extends Component
 {
@@ -108,8 +112,109 @@ class Show extends Component
             $this->saveApplicationSettingsWithAudit($this->application);
             $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
             $this->application_deployment_queue->refresh();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Queue the blocked deployment again for the same commit, with the image scan gate bypassed.
+     */
+    public function deployAnyway()
+    {
+        $this->authorize('update', $this->application);
+
+        try {
+            $deployment = ApplicationDeploymentQueue::query()
+                ->whereKey($this->application_deployment_queue->getKey())
+                ->where('application_id', $this->application->id)
+                ->firstOrFail();
+
+            if (! $deployment->isImageScanBlocked()) {
+                $this->dispatch('error', 'This deployment was not blocked.');
+
+                return;
+            }
+
+            $latestDeploymentId = ApplicationDeploymentQueue::query()
+                ->where('application_id', $this->application->id)
+                ->where('pull_request_id', $deployment->pull_request_id)
+                ->max('id');
+            if ((int) $latestDeploymentId !== (int) $deployment->id) {
+                $this->dispatch('error', 'A newer deployment exists.');
+
+                return;
+            }
+
+            $deploymentUuid = new_public_id();
+            $result = queue_application_deployment(
+                application: $this->application,
+                deployment_uuid: $deploymentUuid,
+                pull_request_id: $deployment->pull_request_id,
+                commit: $deployment->commit,
+                force_rebuild: false,
+                git_type: $deployment->git_type,
+                docker_registry_image_tag: $deployment->docker_registry_image_tag,
+                scan_gate_bypassed_by: auth()->id(),
+            );
+            if ($result['status'] !== 'queued') {
+                $this->dispatch('error', 'Deploy did not start.', $result['message']);
+
+                return;
+            }
+
+            $this->dispatch('success', 'Deploy started.');
+
+            return redirectRoute($this, 'project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'environment_uuid' => $this->application->environment->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $deploymentUuid,
+            ]);
+        } catch (Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Gate result of the shown deployment, for the log toolbar. Null when the gate passed or did not run.
+     *
+     * @return array{result: array<string, mixed>, blocked: bool, update_to: ?string}|null
+     */
+    public function getImageScanGateProperty(): ?array
+    {
+        $deployment = $this->application_deployment_queue;
+        if (! $deployment->isImageScanBlocked() && ! $deployment->isImageScanSkipped()) {
+            return null;
+        }
+
+        return [
+            'result' => $deployment->scan_gate_result,
+            'blocked' => $deployment->isImageScanBlocked(),
+            'update_to' => $deployment->isImageScanBlocked() ? $this->betterImageTag($deployment) : null,
+        ];
+    }
+
+    /**
+     * Tag of a newer image version that fixes vulnerabilities, from the scans of this deployment.
+     */
+    private function betterImageTag(ApplicationDeploymentQueue $deployment): ?string
+    {
+        $candidate = ImageScan::query()
+            ->where('resource_type', $this->application->getMorphClass())
+            ->where('resource_id', $this->application->id)
+            ->where('deployment_queue_id', $deployment->id)
+            ->pluck('candidates')
+            ->flatten(1)
+            ->first(fn ($candidate): bool => is_array($candidate) && ($candidate['better'] ?? false) === true && is_string($candidate['ref'] ?? null));
+        if (! $candidate) {
+            return null;
+        }
+
+        try {
+            return ImageRef::parse(Str::before($candidate['ref'], '@'))->tag;
+        } catch (Throwable) {
+            return null;
         }
     }
 

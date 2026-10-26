@@ -1,5 +1,10 @@
 @php
-    $deploymentStatusMeta = function (string $status): array {
+    $deploymentStatusMeta = function (\App\Models\ApplicationDeploymentQueue $deployment): array {
+        $status = (string) $deployment->status;
+        if ($deployment->isImageScanBlocked()) {
+            return ['Blocked', 'error'];
+        }
+
         $label = match ($status) {
             'finished' => 'Success',
             'in_progress' => 'In progress',
@@ -54,7 +59,7 @@
 
                         @foreach ($activeDeployments as $deployment)
                             @php
-                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
                                 $projectName = $deployment->application?->environment?->project?->name;
                                 $environmentName = $deployment->application?->environment?->name;
                                 $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
@@ -114,7 +119,7 @@
 
                         @foreach ($recentDeployments as $deployment)
                             @php
-                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
                                 $projectName = $deployment->application?->environment?->project?->name;
                                 $environmentName = $deployment->application?->environment?->name;
                                 $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
