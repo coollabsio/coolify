@@ -155,6 +155,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         foreach (S3Storage::query()->where('team_id', $this->id)->get() as $s3) {
             $s3->delete();
         }
+
+        ImageScanPolicy::query()->where('scope_type', $this->getMorphClass())->where('scope_id', $this->id)->delete();
+        ImageScanIgnore::query()->where('team_id', $this->id)->delete();
     }
 
     public static function serverLimitReached(?Team $team = null)

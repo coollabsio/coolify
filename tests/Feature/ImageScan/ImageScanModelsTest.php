@@ -18,6 +18,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
@@ -203,4 +204,25 @@ it('builds error messages from their context', function () {
     foreach (ImageScanErrorCode::cases() as $code) {
         expect($code->message([]))->toBeString()->not->toBeEmpty()->not->toContain('{');
     }
+});
+
+it('deletes the team rules and the ignores of a team with the team', function () {
+    $other = Team::factory()->create();
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'alert_level' => ImageScanAlertLevel::High]);
+    $kept = ImageScanPolicy::factory()->create(['scope_type' => $other->getMorphClass(), 'scope_id' => $other->id, 'alert_level' => ImageScanAlertLevel::High]);
+    ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => null, 'resource_id' => null]);
+    $otherIgnore = ImageScanIgnore::factory()->create(['team_id' => $other->id, 'resource_type' => null, 'resource_id' => null]);
+
+    $this->team->deleteOwnedRecords();
+
+    expect(ImageScanPolicy::query()->where('scope_type', $this->team->getMorphClass())->pluck('id')->all())->toBe([$kept->id])
+        ->and(ImageScanIgnore::query()->pluck('id')->all())->toBe([$otherIgnore->id]);
+});
+
+it('keeps one index on the resource of a notification state, the unique key', function () {
+    $indexes = collect(Schema::getIndexes('image_scan_notification_states'))
+        ->filter(fn (array $index) => $index['columns'] === ['resource_type', 'resource_id']);
+
+    expect($indexes)->toHaveCount(1)
+        ->and($indexes->first()['unique'])->toBeTrue();
 });
