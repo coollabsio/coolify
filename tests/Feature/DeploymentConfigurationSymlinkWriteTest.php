@@ -58,10 +58,8 @@ beforeEach(function () {
         SH;
     Process::fake(function (PendingProcess $process) use ($shellPrelude) {
         $command = $process->command;
-        $input = $process->input;
-        if (str_ends_with($command, 'exec sh -se; fi"\'')) {
-            $script = $input;
-            $input = null;
+        if (preg_match('~<< \\\\(\S+)\n(.*)\n\1$~s', $command, $matches)) {
+            $script = $matches[2];
         } elseif (preg_match("~ '((?:[^']|'\\\\'')*)'$~s", $command, $matches)) {
             $script = str_replace("'\\''", "'", $matches[1]);
         } else {
@@ -69,7 +67,7 @@ beforeEach(function () {
         }
 
         $shell = new SymfonyProcess(['bash', '-c', $shellPrelude."\nset -e\n".$script]);
-        $shell->setInput($input);
+        $shell->setInput($process->input);
         $shell->run();
 
         return Process::result(output: $shell->getOutput(), errorOutput: $shell->getErrorOutput(), exitCode: $shell->getExitCode());
