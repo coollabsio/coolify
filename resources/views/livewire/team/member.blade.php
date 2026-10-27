@@ -31,6 +31,13 @@
             class="inline-flex rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium capitalize text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
             {{ data_get($member, 'pivot.role') }}
         </span>
+        @can('manageMembers', currentTeam())
+            @if (data_get($member, 'pivot.role') === 'member')
+                <div class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-dim">
+                    {{ App\Livewire\Team\Member\Access::summary(data_get($member, 'pivot.access')) }}
+                </div>
+            @endif
+        @endcan
     </div>
     @can('manageMembers', currentTeam())
         <div class="flex items-center">
@@ -80,6 +87,12 @@
                                         Make admin
                                     </button>
                                 @endif
+                            @endif
+                            @if (data_get($member, 'pivot.role') === 'member')
+                                <button type="button" class="listbox-option justify-start!"
+                                    wire:click="$dispatch('open-member-access', { memberId: {{ $member->id }} })" @click="open = false">
+                                    Edit access
+                                </button>
                             @endif
                             <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
                             <button type="button" class="listbox-option justify-start! text-error! hover:text-error!"

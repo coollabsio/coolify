@@ -481,6 +481,11 @@ class EnvironmentVariable extends BaseModel
             }
         }
 
+        if ($resource instanceof Application && filled($resource->git_https_password)) {
+            $secrets['locked'][] = $resource->git_https_password;
+            $secrets['locked'][] = $resource->gitHttpsCredentialBasicToken();
+        }
+
         $variables = collect($isDatabase ? $resource->runtime_environment_variables : $resource->environment_variables);
         if ($includePreview && $resource instanceof Application) {
             $variables = $variables->merge($resource->environment_variables_preview ?? []);
