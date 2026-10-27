@@ -126,13 +126,19 @@ function addVaultwardenDatabaseUrl(): void
 
 it('hides extra-field values without a password flag from a member', function () {
     addVaultwardenDatabaseUrl();
+    $ownTeam = Team::factory()->create();
+    $ownTeam->members()->attach($this->member, ['role' => 'owner']);
+
     $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
+    foreach ([$this->team, $ownTeam] as $sessionTeam) {
+        session(['currentTeam' => $sessionTeam]);
 
-    $component = mountStackForm();
-
-    expect($component->get('fields')['DATABASE_URL']['value'])->toBeNull()
-        ->and(json_encode($component->snapshot).$component->html())->not->toContain('vaultwarden-db-secret');
+        $component = mountStackForm();
+        expect($component->get('fields')['DATABASE_URL']['value'])->toBeNull()
+            ->and(json_encode($component->snapshot))->not->toContain('vaultwarden-db-secret')
+            ->and($component->html())->not->toContain('vaultwarden-db-secret')
+            ->and($component->html())->toContain('Hidden (only admins can view)');
+    }
 });
 
 it('does not let a member save overwrite stored extra-field values', function () {
@@ -141,10 +147,12 @@ it('does not let a member save overwrite stored extra-field values', function ()
     session(['currentTeam' => $this->team]);
 
     mountStackForm()
+        ->set('name', 'renamed-by-member')
         ->set('fields.DATABASE_URL.value', 'member-value')
         ->call('submit');
 
-    expect($this->service->environment_variables()->where('key', 'DATABASE_URL')->value('value'))
+    expect($this->service->fresh()->name)->not->toBe('renamed-by-member')
+        ->and($this->service->environment_variables()->where('key', 'DATABASE_URL')->value('value'))
         ->toBe('postgresql://vw:vaultwarden-db-secret@db:5432/vw')
         ->and($this->masterPassword->fresh()->value)->toBe('drizzle-master-secret');
 });
