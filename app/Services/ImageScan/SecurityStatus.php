@@ -605,7 +605,7 @@ final class SecurityStatus
     /**
      * @return array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string}
      */
-    private static function whyFor(Finding $finding, ?string $signal): array
+    public static function whyFor(Finding $finding, ?string $signal): array
     {
         return [
             'title' => $finding->title,
@@ -618,12 +618,12 @@ final class SecurityStatus
     }
 
     /**
-     * `exploited`, then `likely`, then the highest score (no score last), then severity, at most WHY_LIMIT.
+     * `exploited`, then `likely`, then the highest score (no score last), then severity, at most $limit.
      *
      * @param  list<array<string, mixed>>  $entries
      * @return list<array<string, mixed>>
      */
-    private static function topWhy(array $entries): array
+    public static function topWhy(array $entries, int $limit = self::WHY_LIMIT): array
     {
         $signalRank = [SecurityRules::EXPLOITED => 0, SecurityRules::LIKELY => 1];
         $severityRank = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
@@ -639,7 +639,7 @@ final class SecurityStatus
             $b['display_id'],
         ]);
 
-        return array_slice($entries, 0, self::WHY_LIMIT);
+        return array_slice($entries, 0, $limit);
     }
 
     /**

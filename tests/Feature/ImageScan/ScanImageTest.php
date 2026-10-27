@@ -17,7 +17,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
-use App\Notifications\ImageScan\KnownExploitedFound;
+use App\Notifications\ImageScan\ExploitedProblemFound;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\SecurityStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -772,7 +772,7 @@ describe('candidate check', function () {
 });
 
 describe('notifications', function () {
-    it('alerts once for a new known exploited finding after the baseline scan', function () {
+    it('alerts once for a new exploited finding after the baseline scan', function () {
         Notification::fake();
         $this->team->discordNotificationSettings->update([
             'discord_enabled' => true,
@@ -795,7 +795,7 @@ describe('notifications', function () {
         expect($baseline->is_baseline)->toBeTrue()
             ->and($rescan->is_baseline)->toBeFalse()
             ->and(ImageScanNotificationState::query()->sole()->notified_ids)->toContain('CVE-2026-7777');
-        Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
-        Notification::assertSentTo($this->team, KnownExploitedFound::class, fn (KnownExploitedFound $notification) => $notification->count === 1);
+        Notification::assertSentToTimes($this->team, ExploitedProblemFound::class, 1);
+        Notification::assertSentTo($this->team, ExploitedProblemFound::class, fn (ExploitedProblemFound $notification) => $notification->count === 1);
     });
 });

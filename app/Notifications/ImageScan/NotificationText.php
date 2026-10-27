@@ -2,6 +2,9 @@
 
 namespace App\Notifications\ImageScan;
 
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\SecurityRules;
+
 /**
  * Escapes values for each notification channel. Names, image refs, and tags come from users and registries.
  */
@@ -34,6 +37,28 @@ final class NotificationText
     public static function mailMarkdown(?string $value): string
     {
         return preg_replace('/([\\\\`*_{}\[\]()#+\-.!|~=])/u', '\\\\$1', self::plain($value)) ?? '';
+    }
+
+    /**
+     * One row of a why-list in the email, as escaped Markdown: "Title ([CVE-2025-1094](https://nvd…), 8.1 High). Used
+     * by attackers." The ID links only to the advisory Coolify builds for it.
+     *
+     * @param  array{title: string, display_id: string, score: ?float, severity: string, signal: ?string}  $entry
+     */
+    public static function mailWhy(array $entry): string
+    {
+        $id = (string) $entry['display_id'];
+        $link = ResourceScans::advisoryUrl($id);
+        $reference = $link === null ? self::mailMarkdown($id) : '['.self::mailMarkdown($id)."]({$link})";
+        $severity = ucfirst(strtolower(self::plain($entry['severity'])));
+        $score = $entry['score'] === null ? $severity : number_format((float) $entry['score'], 1).' '.$severity;
+        $label = match ($entry['signal']) {
+            SecurityRules::EXPLOITED => ' Used by attackers.',
+            SecurityRules::LIKELY => ' Likely to be exploited.',
+            default => '',
+        };
+
+        return self::mailMarkdown(self::limit($entry['title'], 200))." ({$reference}, ".self::mailMarkdown($score).').'.$label;
     }
 
     /**

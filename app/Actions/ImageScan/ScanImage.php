@@ -129,8 +129,8 @@ class ScanImage
     }
 
     /**
-     * Records what the notifications covered and alerts for a new known exploited finding (spec 8). The alert is a
-     * queued notification, so a deploy never waits for it.
+     * Records what the notifications covered and alerts for new problems that attackers are using or are likely to
+     * use (spec 15.8). The alert is a queued notification, so a deploy never waits for it.
      */
     private function notifyAfterScan(ImageScan $scan, ?int $deploymentId = null): void
     {

@@ -15,14 +15,8 @@
 {{ $resource['summary'] }}
 
 @endif
-@foreach ($resource['ids'] as $id)
-- {{ $id }}
-@endforeach
-@if (count($resource['ids']) > 0 && $resource['more_ids'] > 0)
-- And {{ $resource['more_ids'] }} more.
-@endif
-@foreach ($resource['updates'] as $update)
-- {{ $update }}
+@foreach ($resource['why'] as $why)
+- {{ $why }}
 @endforeach
 
 @endforeach
@@ -45,5 +39,5 @@
 @endif
 ---
 
-See all results on the [Vulnerabilities page]({{ $url }}).
+See all results on the [Security page]({{ $url }}).
 </x-emails.layout>

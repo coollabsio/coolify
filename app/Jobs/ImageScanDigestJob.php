@@ -2,12 +2,16 @@
 
 namespace App\Jobs;
 
+use App\Enums\SecurityStatusType;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\ImageScan\VulnerabilityDigest;
+use App\Services\ImageScan\ResourceSecurity;
 use App\Services\ImageScan\ScanNotifications;
+use App\Services\ImageScan\SecuritySentences;
+use App\Services\ImageScan\SecurityStatus;
 use App\Services\ImageScan\TeamVulnerabilities;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -22,11 +26,15 @@ use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
- * The daily image vulnerability digest of one team (spec 8): new findings that an action fixes and new
- * fixes per scanned resource of the team, ignores that end within 7 days, and servers whose rescans failed 2 days in
- * a row. Sends one VulnerabilityDigest only when something changed, then records what it covered in the
+ * The daily security digest of one team (spec 15.8): resources that became update_available (new problems with an
+ * action, or a new fixing version) or check_needed, ignores that end within 7 days, and servers whose rescans failed
+ * 2 days in a row. Sends one VulnerabilityDigest only when something changed, then records what it covered in the
  * notification state of each scan owner (see ScanNotifications). An ignore is named once per end date (cache); a
  * failing server once per run of failures.
+ *
+ * A resource whose status is check_needed only because its version check did not finish yet (right after a scan) is
+ * skipped until the check finished. While a resource needs a check, its new problems and fixing versions wait for
+ * the next status.
  */
 class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -65,7 +73,7 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
             }
 
             try {
-                $resource = $this->resourceDigest($entry['resource'], $entry['scans'], $marks);
+                $resource = $this->resourceDigest($entry['resource'], $entry['scans'], $entry['security'], $marks);
             } catch (Throwable $e) {
                 report($e);
 
@@ -80,7 +88,8 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
         $servers = $this->failingServers();
 
         if ($resources !== [] || $ignores->isNotEmpty() || $servers->isNotEmpty()) {
-            usort($resources, fn (array $a, array $b): int => [self::rank($b['worst']), $b['total'], $a['name']] <=> [self::rank($a['worst']), $a['total'], $b['name']]);
+            $order = array_flip(TeamVulnerabilities::STATUS_ORDER);
+            usort($resources, fn (array $a, array $b): int => [$order[$a['status']] ?? 99, $a['name']] <=> [$order[$b['status']] ?? 99, $b['name']]);
 
             $this->team->notify(new VulnerabilityDigest([
                 'resources' => $resources,
@@ -119,18 +128,17 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
     }
 
     /**
-     * New findings and fixes of one resource page (a service covers its applications and databases). Each scan owner
-     * has its own notification state; its current scans are decoded one owner at a time, and only counts, IDs, and
-     * the marks to record after sending are kept.
+     * The digest line of one resource page (a service covers its applications and databases), or null. Each scan
+     * owner has its own notification state; its current scans are decoded one owner at a time.
      *
      * @param  Collection<int, ImageScan>  $current  The current scans, with their owner.
      * @param  list<array<string, mixed>>  $marks  Gets the marks of the resource only when its digest succeeded.
-     * @return array<string, mixed>|null
+     * @return array{name: string, uuid: string, url: ?string, status: string, badge: string, action: ?string, why: list<array<string, mixed>>}|null
      */
-    private function resourceDigest(Model $resource, Collection $current, array &$marks): ?array
+    private function resourceDigest(Model $resource, Collection $current, ResourceSecurity $security, array &$marks): ?array
     {
         $resourceMarks = [];
-        $digest = $this->buildResourceDigest($resource, $current, $resourceMarks);
+        $digest = $this->buildResourceDigest($resource, $current, $security, $resourceMarks);
         array_push($marks, ...$resourceMarks);
 
         return $digest;
@@ -139,61 +147,53 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
     /**
      * @param  Collection<int, ImageScan>  $current
      * @param  list<array<string, mixed>>  $marks
-     * @return array<string, mixed>|null
+     * @return array{name: string, uuid: string, url: ?string, status: string, badge: string, action: ?string, why: list<array<string, mixed>>}|null
      */
-    private function buildResourceDigest(Model $resource, Collection $current, array &$marks): ?array
+    private function buildResourceDigest(Model $resource, Collection $current, ResourceSecurity $security, array &$marks): ?array
     {
         $owners = $current->map(fn (ImageScan $scan) => $scan->resource)
             ->filter(fn ($owner): bool => $owner instanceof Model)
             ->unique(fn (Model $owner): string => $owner->getMorphClass().':'.$owner->getKey());
 
-        $counts = [];
-        $total = 0;
-        $knownExploited = 0;
-        $ids = [];
-        $updates = [];
-        $fix = null;
-        foreach ($owners as $owner) {
-            $plan = ScanNotifications::digestPlan($owner);
-            if ($plan === null) {
-                continue;
-            }
-
-            $marks[] = $plan['mark'];
-            $updates = [...$updates, ...$plan['newCandidates']];
-            if ($plan['new'] === []) {
-                continue;
-            }
-
-            $fix ??= $plan['fix'];
-            $total += count($plan['new']);
-            foreach (ScanNotifications::counts($plan['new']) as $severity => $count) {
-                $counts[$severity] = ($counts[$severity] ?? 0) + $count;
-            }
-            foreach ($plan['new'] as $finding) {
-                $knownExploited += $finding->kev ? 1 : 0;
-                $ids[$finding->id] = true;
-            }
-        }
-
-        $updates = array_values(array_unique($updates));
-        if ($total === 0 && $updates === []) {
+        $plans = $owners->map(fn (Model $owner): ?array => ScanNotifications::digestPlan($owner))->filter()->values();
+        if ($plans->isEmpty()) {
             return null;
         }
 
-        $counts = array_filter(array_merge(array_fill_keys(ScanNotifications::SEVERITIES, 0), $counts));
+        $needsCheck = $security->status === SecurityStatusType::CheckNeeded;
+        if ($needsCheck && $security->checkReason === SecurityStatus::REASON_VERSIONS_UNCHECKED && $plans->contains('pending', true)) {
+            return null;
+        }
+
+        $active = $plans->where('baseline', false);
+        $report = match ($security->status) {
+            SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable => $active->contains(fn (array $plan): bool => $plan['newFixable'] !== [] || $plan['newCandidates'] !== []),
+            SecurityStatusType::CheckNeeded => $active->isNotEmpty() && ! $active->contains('checkReported', true),
+            default => false,
+        };
+
+        foreach ($plans as $plan) {
+            $mark = $plan['mark'];
+            $mark['check_reported'] = $needsCheck;
+            if ($needsCheck && ! $plan['baseline']) {
+                $mark['add_digest_ids'] = [];
+                $mark['add_candidates'] = [];
+            }
+            $marks[] = $mark;
+        }
+
+        if (! $report) {
+            return null;
+        }
 
         return [
             'name' => (string) $resource->getAttribute('name'),
             'uuid' => (string) $resource->getAttribute('uuid'),
             'url' => ScanNotifications::link($resource),
-            'counts' => $counts,
-            'total' => $total,
-            'worst' => array_key_first($counts),
-            'known_exploited' => $knownExploited,
-            'fix' => $fix,
-            'ids' => array_slice(array_map('strval', array_keys($ids)), 0, VulnerabilityDigest::MAIL_ID_LIMIT),
-            'updates' => $updates,
+            'status' => $security->status->value,
+            'badge' => (string) SecuritySentences::badge($security->status),
+            'action' => TeamVulnerabilities::action($security)['text'] ?? null,
+            'why' => $needsCheck ? [] : $security->why,
         ];
     }
 
@@ -232,16 +232,5 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
                 && ImageRescanJob::failedDays($server) >= 2
                 && ! ImageRescanJob::isFailureNotified($server))
             ->values();
-    }
-
-    private static function rank(?string $severity): int
-    {
-        return match ($severity) {
-            'critical' => 4,
-            'high' => 3,
-            'medium' => 2,
-            'low' => 1,
-            default => 0,
-        };
     }
 }

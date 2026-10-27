@@ -787,7 +787,7 @@ class RefreshCandidates
         $fresh->setRelation('resource', $scan->resource);
         ResourceScans::refreshSummaries(collect([$fresh]));
 
-        // A newer image can make a known exploited finding fixable now.
+        // The alert for a scan waits for its version check, which can also bring a fix (spec 15.8).
         try {
             ScanNotifications::afterScan($fresh, candidateCheck: true);
         } catch (Throwable $e) {

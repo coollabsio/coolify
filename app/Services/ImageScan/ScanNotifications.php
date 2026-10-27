@@ -13,42 +13,47 @@ use App\Models\ImageScanNotificationState;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\Team;
-use App\Notifications\ImageScan\KnownExploitedFound;
+use App\Notifications\ImageScan\ExploitedProblemFound;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use InvalidArgumentException;
 
 /**
- * What the image vulnerability notifications told a team, kept in one `image_scan_notification_states` row per scan
- * owner (application, service application or database, standalone database) for spec 8.
+ * What the image security notifications told a team (spec 15.8), kept in one `image_scan_notification_states` row
+ * per scan owner (application, service application or database, standalone database).
  *
  * - The current scans of an owner are `ResourceScans::currentFor()`: completed, never previews.
- * - Without a state row the owner is a baseline: the row is created from the current fixable-now IDs at the alert
- *   level and the current better candidates, and nothing is sent. The baseline also records, without notifying, the
- *   other images of the same deployment (Compose) and the candidate checks that follow. It ends with the next scan
- *   that is not part of that deployment, or with the next digest.
- * - A finding is new when none of its ID and aliases is in `notified_ids`; a candidate is new when its key is not in
- *   `notified_candidates`. The known exploited alert and the digest add what they reported.
+ * - `notified_ids`: relevant findings with an exploit signal that an immediate alert named. A finding is new when
+ *   none of its ID and aliases is in it, so an EPSS that moves around the threshold does not alert again.
+ * - `digest_ids`: relevant findings with an action that a digest named, or an alert named with its action.
+ * - `notified_candidates`: better images (and base images) that a digest covered.
+ * - `check_reported`: a digest said that the resource needs a check.
+ * - Without a state row the owner is a baseline: the row is created from what the current scans have, and nothing is
+ *   sent. The baseline also records, without notifying, the other images of the same deployment (Compose) and the
+ *   version checks that follow. It ends with the next scan that is not part of that deployment, or with the next
+ *   digest.
+ * - Right after a scan, before its version check stored a result, the actions of the scan are not known yet. Its
+ *   findings wait for the check (at most PENDING_HOURS), so an alert does not say "no fix yet" for a fixed problem.
  * - The digest removes IDs and candidates that no current scan has any more, so a regression notifies again. It
  *   skips that while a deployment of the application runs (its current scans can be incomplete), and it keeps the
- *   candidates while a candidate check failed.
+ *   candidates while a version check failed.
  * - Every write locks the state row, so the alert and the digest never overwrite each other.
  * - Preview scans never notify and never change the state.
  */
 final class ScanNotifications
 {
-    public const SEVERITIES = ['critical', 'high', 'medium', 'low', 'unknown'];
-
     /** Candidates kept per resource; the oldest go first. */
     public const MAX_NOTIFIED_CANDIDATES = 200;
 
+    /** How long a scan waits for its version check before its findings count without it. */
+    public const PENDING_HOURS = 24;
+
     /**
      * After a scan of the owner completed, outside the scan lock: creates or extends the baseline, or alerts the
-     * team right away for a new known exploited finding that is fixable now.
+     * team right away for new relevant findings with an exploit signal.
      *
      * @param  ?int  $deploymentId  The deployment that ran this scan; null for rescans and scans after a start.
-     * @param  bool  $candidateCheck  Called after a candidate check of the scan instead of the scan itself.
+     * @param  bool  $candidateCheck  Called after a version check of the scan instead of the scan itself.
      */
     public static function afterScan(ImageScan $scan, ?int $deploymentId = null, bool $candidateCheck = false): void
     {
@@ -66,59 +71,65 @@ final class ScanNotifications
         }
 
         // The current scans are read under the lock, so a scan that lands meanwhile is not recorded without notice.
-        [$known, $current] = self::locked($owner, function (?ImageScanNotificationState $state) use ($owner, $teamId, $scan, $deploymentId, $candidateCheck): array {
+        $alert = self::locked($owner, function (?ImageScanNotificationState $state) use ($owner, $teamId, $scan, $deploymentId, $candidateCheck): array {
             $current = self::current($owner);
             if ($current['scans']->isEmpty()) {
-                return [[], $current];
+                return [];
             }
 
             if (! $state instanceof ImageScanNotificationState) {
                 self::createState($owner, $teamId, $current, $deploymentId);
 
-                return [[], $current];
+                return [];
             }
 
-            if ($state->is_baseline && $candidateCheck) {
-                // A candidate check adds only what the checked scan can fix now; a redeploy meanwhile is not part of the baseline.
+            if ($state->is_baseline && ($candidateCheck || ($deploymentId !== null && $deploymentId === $state->baseline_deployment_queue_id))) {
+                // A version check adds only what the checked scan has; a redeploy meanwhile is not part of the baseline.
+                $recorded = $candidateCheck ? self::current($owner, collect([$scan])) : $current;
                 $state->update([
-                    'notified_ids' => self::merge((array) $state->notified_ids, self::ids(self::fixableNow($scan, $owner))),
-                    'notified_candidates' => self::capCandidates([...(array) $state->notified_candidates, ...array_keys(self::betterCandidates($scan, $owner))]),
+                    'notified_ids' => self::merge((array) $state->notified_ids, self::ids(array_column($recorded['signal'], 'finding'))),
+                    'digest_ids' => self::merge((array) $state->digest_ids, self::ids($recorded['fixable'])),
+                    'notified_candidates' => self::capCandidates([...(array) $state->notified_candidates, ...$recorded['candidates']]),
                 ]);
 
-                return [[], $current];
-            }
-
-            if ($state->is_baseline && $deploymentId !== null && $deploymentId === $state->baseline_deployment_queue_id) {
-                $state->update([
-                    'notified_ids' => self::merge((array) $state->notified_ids, self::ids($current['fixable'])),
-                    'notified_candidates' => self::capCandidates([...(array) $state->notified_candidates, ...array_keys($current['candidates'])]),
-                ]);
-
-                return [[], $current];
+                return [];
             }
 
             $notified = self::idSet((array) $state->notified_ids);
-            $known = array_values(array_filter($current['fixable'], fn (Finding $finding): bool => $finding->kev && ! self::isIn($finding, $notified)));
+            $alert = [];
+            foreach ($current['signal'] as $entry) {
+                if ($entry['pending'] || self::isIn($entry['finding'], $notified)) {
+                    continue;
+                }
+                $alert[] = $entry;
+                foreach ([$entry['finding']->id, ...$entry['finding']->aliases] as $id) {
+                    $notified[mb_strtolower($id)] = true;
+                }
+            }
+            $withAction = array_values(array_filter($alert, fn (array $entry): bool => $entry['action'] instanceof SecurityAction));
             $state->update([
                 'is_baseline' => false,
-                'notified_ids' => self::merge((array) $state->notified_ids, self::ids($known)),
+                'notified_ids' => self::merge((array) $state->notified_ids, self::ids(array_column($alert, 'finding'))),
+                'digest_ids' => self::merge((array) $state->digest_ids, self::ids(array_column($withAction, 'finding'))),
             ]);
 
-            return [$known, $current];
+            return $alert;
         });
 
-        $team = $known === [] ? null : Team::query()->find($teamId);
+        $team = $alert === [] ? null : Team::query()->find($teamId);
         if ($team instanceof Team) {
-            $source = $current['scanOf'][$known[0]->id] ?? $scan;
-            $team->notify(new KnownExploitedFound($source, count($known), self::ids($known)));
+            $team->notify(new ExploitedProblemFound($owner, $alert));
         }
     }
 
     /**
-     * What a digest reports for one owner, and what it records after sending (see `applyDigest()`). Nothing is
-     * reported for a baseline or an owner without a state row; the digest records what it sees.
+     * What a digest sees for one owner, and what it records after sending (see `applyDigest()`). Nothing is new for a
+     * baseline or an owner without a state row; the digest records what it sees.
      *
-     * @return array{new: list<Finding>, fix: ?string, newCandidates: list<string>, mark: array<string, mixed>}|null
+     * `newFixable`: relevant findings with an action that no digest named yet. `newCandidates`: better images no
+     * digest named yet. `pending`: a current scan still waits for its version check.
+     *
+     * @return array{baseline: bool, newFixable: list<Finding>, newCandidates: list<string>, pending: bool, checkReported: bool, mark: array<string, mixed>}|null
      */
     public static function digestPlan(Model $owner): ?array
     {
@@ -130,28 +141,33 @@ final class ScanNotifications
 
         $state = self::stateQuery($owner)->first();
         $baseline = ! $state instanceof ImageScanNotificationState || $state->is_baseline;
-        $notified = self::idSet((array) $state?->notified_ids);
+        $reported = self::idSet((array) $state?->digest_ids);
         $named = array_flip((array) $state?->notified_candidates);
-        $new = $baseline ? [] : array_values(array_filter($current['fixable'], fn (Finding $finding): bool => ! self::isIn($finding, $notified)));
-        $newCandidates = $baseline ? [] : array_diff_key($current['candidates'], $named);
+        $newFixable = $baseline ? [] : array_values(array_filter($current['fixable'], fn (Finding $finding): bool => ! self::isIn($finding, $reported)));
+        $newCandidates = $baseline ? [] : array_values(array_filter($current['candidates'], fn (string $key): bool => ! isset($named[$key])));
 
         return [
-            'new' => $new,
-            'fix' => array_values($current['candidates'])[0] ?? null,
-            'newCandidates' => array_values($newCandidates),
+            'baseline' => $baseline,
+            'newFixable' => $newFixable,
+            'newCandidates' => $newCandidates,
+            'pending' => $current['pending'],
+            'checkReported' => (bool) $state?->check_reported,
             'mark' => [
                 'baseline' => $baseline,
                 'owner_type' => $owner->getMorphClass(),
                 'owner_id' => $owner->getKey(),
                 'team_id' => $teamId,
                 'read_ids' => array_values((array) $state?->notified_ids),
+                'read_digest_ids' => array_values((array) $state?->digest_ids),
                 'read_candidates' => array_values((array) $state?->notified_candidates),
-                'add_ids' => self::ids($baseline ? $current['fixable'] : $new),
-                'add_candidates' => array_keys($baseline ? $current['candidates'] : $newCandidates),
+                'add_ids' => $baseline ? self::ids(array_column($current['signal'], 'finding')) : [],
+                'add_digest_ids' => self::ids($baseline ? $current['fixable'] : $newFixable),
+                'add_candidates' => $baseline ? $current['candidates'] : $newCandidates,
                 'present' => array_keys($current['present']),
-                'offered' => array_keys($current['candidates']),
+                'offered' => $current['candidates'],
                 'prune_ids' => ! self::isDeploying($owner),
                 'prune_candidates' => ! self::isDeploying($owner) && $current['candidatesChecked'],
+                'check_reported' => null,
             ],
         ];
     }
@@ -160,7 +176,7 @@ final class ScanNotifications
      * Records what a digest covered under the row lock, and ends a baseline. IDs and candidates that the state had
      * when the digest read it and that no current scan has any more are removed; ones added meanwhile stay.
      *
-     * @param  array<string, mixed>  $mark  From `digestPlan()`.
+     * @param  array<string, mixed>  $mark  From `digestPlan()`; `check_reported` null keeps the stored value.
      */
     public static function applyDigest(array $mark): void
     {
@@ -176,7 +192,9 @@ final class ScanNotifications
                     'resource_id' => $mark['owner_id'],
                     'team_id' => $mark['team_id'],
                     'notified_ids' => json_encode($mark['add_ids']),
+                    'digest_ids' => json_encode($mark['add_digest_ids']),
                     'notified_candidates' => json_encode(self::capCandidates($mark['add_candidates'])),
+                    'check_reported' => (bool) ($mark['check_reported'] ?? false),
                     'is_baseline' => false,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -189,15 +207,19 @@ final class ScanNotifications
             // scan of another deployment), those findings are not added, so they can still be reported.
             if (($mark['baseline'] ?? false) && ! $state->is_baseline) {
                 $mark['add_ids'] = [];
+                $mark['add_digest_ids'] = [];
                 $mark['add_candidates'] = [];
             }
 
             $present = array_flip($mark['present']);
-            $readIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), $mark['read_ids']));
-            $ids = array_filter(
-                self::merge((array) $state->notified_ids, $mark['add_ids']),
-                fn (string $id): bool => ! $mark['prune_ids'] || ! isset($readIds[mb_strtolower($id)]) || isset($present[mb_strtolower($id)]),
-            );
+            $prune = function (array $stored, array $add, array $read) use ($mark, $present): array {
+                $read = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), $read));
+
+                return array_values(array_filter(
+                    self::merge($stored, $add),
+                    fn (string $id): bool => ! $mark['prune_ids'] || ! isset($read[mb_strtolower($id)]) || isset($present[mb_strtolower($id)]),
+                ));
+            };
 
             $offered = array_flip($mark['offered']);
             $readCandidates = array_flip($mark['read_candidates']);
@@ -208,32 +230,18 @@ final class ScanNotifications
 
             $state->update([
                 'is_baseline' => false,
-                'notified_ids' => array_values($ids),
+                'notified_ids' => $prune((array) $state->notified_ids, $mark['add_ids'], $mark['read_ids']),
+                'digest_ids' => $prune((array) $state->digest_ids, $mark['add_digest_ids'], $mark['read_digest_ids'] ?? []),
                 'notified_candidates' => self::capCandidates($candidates),
+                'check_reported' => $mark['check_reported'] ?? $state->check_reported,
             ]);
         });
     }
 
     /**
-     * The relevant findings that an action fixes (spec 15.5): what the stored status counts as fixable.
+     * The keys of the better images the resource can switch to (`ref@digest`), and of a better base image.
      *
-     * @return list<Finding>
-     */
-    public static function fixableNow(ImageScan $scan, Model $owner, ?IgnoreMatcher $ignores = null): array
-    {
-        $scan->setRelation('resource', $owner);
-        $byFinding = SecurityActions::forScan($scan, $ignores ?? IgnoreMatcher::forResource($owner))['byFinding'];
-
-        return array_values(array_filter(
-            ResourceScans::findings($scan),
-            fn (Finding $finding): bool => isset($byFinding[$finding->id]),
-        ));
-    }
-
-    /**
-     * The better images the resource can switch to, as `ref@digest`, with what each fixes.
-     *
-     * @return array<string, string>
+     * @return list<string>
      */
     public static function betterCandidates(ImageScan $scan, Model $owner): array
     {
@@ -244,19 +252,32 @@ final class ScanNotifications
         $candidates = [];
         if (UpdateResourceImage::blockedReason($scan, $owner) === null) {
             foreach ($scan->updateCandidates() as $entry) {
-                $text = self::updateText((string) $scan->image_ref, $entry);
-                if ($text !== null) {
-                    $candidates[$entry['ref'].'@'.($entry['digest'] ?? '')] = $text;
+                if (in_array($entry['kind'] ?? null, ['line', 'same_tag'], true)) {
+                    $candidates[] = $entry['ref'].'@'.($entry['digest'] ?? '');
                 }
             }
         }
 
         $base = BaseImageCheck::baseImage($scan);
         if ($base !== null) {
-            $candidates['base:'.$base['to']] = "Change FROM {$base['from']} to {$base['to']}.";
+            $candidates[] = 'base:'.$base['to'];
         }
 
         return $candidates;
+    }
+
+    /**
+     * The scan waits for its version check: the check is needed and stored no result since the row was created,
+     * less than PENDING_HOURS ago.
+     */
+    public static function versionCheckPending(ImageScan $scan): bool
+    {
+        $created = $scan->created_at ?? $scan->scanned_at;
+
+        return $created !== null
+            && $created->gt(now()->subHours(self::PENDING_HOURS))
+            && ! is_string(data_get($scan->candidates, 'checked_at'))
+            && RefreshCandidates::needsCandidates($scan);
     }
 
     /**
@@ -280,71 +301,50 @@ final class ScanNotifications
     }
 
     /**
-     * @param  list<Finding>  $findings
-     * @return array<string, int> Counts by severity, highest first, without zeros.
-     */
-    public static function counts(array $findings): array
-    {
-        $counts = array_fill_keys(self::SEVERITIES, 0);
-        foreach ($findings as $finding) {
-            $counts[TeamVulnerabilities::severityOf($finding)]++;
-        }
-
-        return array_filter($counts);
-    }
-
-    /**
-     * "2 critical, 1 high"
+     * The current scans of the owner (or $only), decoded once:
+     * - `signal`: relevant findings with an exploit signal, with the action that fixes each (null: none) and whether
+     *   the scan waits for its version check;
+     * - `fixable`: relevant findings that an action fixes;
+     * - `candidates`: keys of better images; `present`: every ID and alias found (lower case);
+     * - `candidatesChecked`: every version check succeeded; `pending`: a scan waits for its version check.
      *
-     * @param  array<string, int>  $counts
+     * @param  Collection<int, ImageScan>|null  $only
+     * @return array{scans: Collection<int, ImageScan>, signal: list<array{finding: Finding, action: ?SecurityAction, pending: bool}>, fixable: list<Finding>, candidates: list<string>, present: array<string, true>, candidatesChecked: bool, pending: bool}
      */
-    public static function countsPhrase(array $counts): string
+    private static function current(Model $owner, ?Collection $only = null): array
     {
-        $parts = [];
-        foreach (self::SEVERITIES as $severity) {
-            if (($counts[$severity] ?? 0) > 0) {
-                $parts[] = $counts[$severity].' '.$severity;
-            }
-        }
-
-        return implode(', ', $parts);
-    }
-
-    /**
-     * The first update Coolify offers: a newer tag, a newer build of the same tag, or a newer base image.
-     */
-    public static function recommendedFix(ImageScan $scan, Model $owner): ?string
-    {
-        return array_values(self::betterCandidates($scan, $owner))[0] ?? null;
-    }
-
-    /**
-     * The current scans of the owner, decoded once: fixable-now findings at the level (with the scan of each ID),
-     * better candidates, every ID and alias found (lower case), and whether all candidate checks succeeded.
-     *
-     * @return array{scans: Collection<int, ImageScan>, fixable: list<Finding>, scanOf: array<string, ImageScan>, candidates: array<string, string>, present: array<string, true>, candidatesChecked: bool}
-     */
-    private static function current(Model $owner): array
-    {
-        $scans = ResourceScans::currentFor($owner);
+        $scans = $only ?? ResourceScans::currentFor($owner);
         $ignores = IgnoreMatcher::forResource($owner);
+        $signal = [];
         $fixable = [];
-        $scanOf = [];
         $candidates = [];
         $present = [];
         $checked = true;
+        $anyPending = false;
 
         foreach ($scans as $scan) {
-            foreach (self::fixableNow($scan, $owner, $ignores) as $finding) {
-                $fixable[] = $finding;
-                $scanOf[$finding->id] ??= $scan;
-            }
-            $candidates += self::betterCandidates($scan, $owner);
+            $scan->setRelation('resource', $owner);
+            $byFinding = SecurityActions::forScan($scan, $ignores)['byFinding'];
+            $pending = self::versionCheckPending($scan);
+            $anyPending = $anyPending || $pending;
             foreach (ResourceScans::findings($scan) as $finding) {
                 foreach ([$finding->id, ...$finding->aliases] as $id) {
                     $present[mb_strtolower($id)] = true;
                 }
+                if (! SecurityRules::isRelevant($finding, $ignores)) {
+                    continue;
+                }
+
+                $action = $byFinding[$finding->id] ?? null;
+                if ($action instanceof SecurityAction) {
+                    $fixable[] = $finding;
+                }
+                if (SecurityRules::exploitSignal($finding) !== null) {
+                    $signal[] = ['finding' => $finding, 'action' => $action, 'pending' => $pending];
+                }
             }
+            $candidates = [...$candidates, ...self::betterCandidates($scan, $owner)];
+
             // A failed check, or one that did not run yet, keeps the candidates the team was told about.
             $status = $scan->candidateStatus();
             if ($status === 'failed' || data_get($scan->candidates, 'base.status') === 'failed'
@@ -353,7 +353,15 @@ final class ScanNotifications
             }
         }
 
-        return ['scans' => $scans, 'fixable' => $fixable, 'scanOf' => $scanOf, 'candidates' => $candidates, 'present' => $present, 'candidatesChecked' => $checked];
+        return [
+            'scans' => $scans,
+            'signal' => $signal,
+            'fixable' => $fixable,
+            'candidates' => array_values(array_unique($candidates)),
+            'present' => $present,
+            'candidatesChecked' => $checked,
+            'pending' => $anyPending,
+        ];
     }
 
     /**
@@ -384,7 +392,7 @@ final class ScanNotifications
     /**
      * The baseline row. A row that another run created at the same time wins.
      *
-     * @param  array{fixable: list<Finding>, candidates: array<string, string>}  $current
+     * @param  array{signal: list<array{finding: Finding}>, fixable: list<Finding>, candidates: list<string>}  $current
      */
     private static function createState(Model $owner, int $teamId, array $current, ?int $deploymentId): void
     {
@@ -392,8 +400,9 @@ final class ScanNotifications
             'resource_type' => $owner->getMorphClass(),
             'resource_id' => $owner->getKey(),
             'team_id' => $teamId,
-            'notified_ids' => json_encode(self::ids($current['fixable'])),
-            'notified_candidates' => json_encode(self::capCandidates(array_keys($current['candidates']))),
+            'notified_ids' => json_encode(self::ids(array_column($current['signal'], 'finding'))),
+            'digest_ids' => json_encode(self::ids($current['fixable'])),
+            'notified_candidates' => json_encode(self::capCandidates($current['candidates'])),
             'is_baseline' => true,
             'baseline_deployment_queue_id' => $deploymentId,
             'created_at' => now(),
@@ -401,6 +410,10 @@ final class ScanNotifications
         ]);
     }
 
+    /**
+     * The team that owns the resource. Coolify's own resources (`id = 0`) belong to the root team, so only it is
+     * notified about them.
+     */
     private static function teamId(Model $owner): ?int
     {
         $team = method_exists($owner, 'team') ? $owner->team() : null;
@@ -429,24 +442,6 @@ final class ScanNotifications
                 ->where('pull_request_id', 0)
                 ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
                 ->exists();
-    }
-
-    /**
-     * @param  array<string, mixed>  $entry
-     */
-    private static function updateText(string $imageRef, array $entry): ?string
-    {
-        try {
-            $tag = ImageRef::parse((string) $entry['ref'])->tag;
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        return match ($entry['kind'] ?? null) {
-            'line' => $tag === null ? null : "Update {$imageRef} to {$tag}.",
-            'same_tag' => "Pull the newest build of {$imageRef}.",
-            default => null,
-        };
     }
 
     /**
