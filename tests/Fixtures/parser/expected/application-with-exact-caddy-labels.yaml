@@ -49,7 +49,7 @@
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
     SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
-    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_ADMIN_8080: 'admin-referenceapplication0001.10.0.0.1.sslip.io:8080'
     SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
     SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
     SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
@@ -63,7 +63,7 @@
     SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
     SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
     SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
-    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_MY_APP_80: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io:80'
     SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
     SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
@@ -240,7 +240,7 @@
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
-          SERVICE_URL_MY_APP_80: ''
+          SERVICE_URL_MY_APP_80: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io:80'
           COOLIFY_BRANCH: '"main"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-20260102T030405
@@ -694,13 +694,13 @@
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
     SERVICE_FQDN_ADMIN: admin.example.com
-    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_ADMIN_8080: 'admin.example.com:8080'
     SERVICE_FQDN_API: www.api.example.com
     SERVICE_FQDN_API_V2: api-v2.example.com
     SERVICE_FQDN_BLOG: blog.example.com
     SERVICE_FQDN_MY_APP: my-app.example.com
     SERVICE_FQDN_WEB: web.example.com
-    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_FQDN_WEB_3000: 'web.example.com:3000'
     SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
     SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
     SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
@@ -710,9 +710,9 @@
     SERVICE_URL_API_V2: 'https://api-v2.example.com'
     SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
     SERVICE_URL_MY_APP: 'https://my-app.example.com'
-    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_MY_APP_80: 'https://my-app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
-    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_URL_WEB_3000: 'https://web.example.com:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
     WITH_DEFAULT: null
@@ -725,7 +725,7 @@
           args:
             - 'BUILD_VERSION=${BUILD_VERSION:-1.0.0}'
         environment:
-          SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+          SERVICE_URL_WEB_3000: 'https://web.example.com:3000'
           LITERAL: plain-value
           BARE_PASSTHROUGH: ''
           WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
@@ -892,7 +892,7 @@
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
-          SERVICE_URL_MY_APP_80: ''
+          SERVICE_URL_MY_APP_80: 'https://my-app.example.com:80'
           COOLIFY_BRANCH: '"main"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: my-app-referenceapplication0001-20260102T030405
@@ -1392,13 +1392,13 @@
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
     SERVICE_FQDN_ADMIN: admin.example.com
-    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_ADMIN_8080: 'admin.example.com:8080'
     SERVICE_FQDN_API: www.api.example.com
     SERVICE_FQDN_API_V2: api-v2.example.com
     SERVICE_FQDN_BLOG: blog.example.com
     SERVICE_FQDN_MY_APP: my-app.example.com
     SERVICE_FQDN_WEB: web.example.com
-    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_FQDN_WEB_3000: 'web.example.com:3000'
     SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
     SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
     SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
@@ -1408,9 +1408,9 @@
     SERVICE_URL_API_V2: 'https://api-v2.example.com'
     SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
     SERVICE_URL_MY_APP: 'https://my-app.example.com'
-    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_MY_APP_80: 'https://my-app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
-    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_URL_WEB_3000: 'https://web.example.com:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
     WITH_DEFAULT: null
@@ -2093,13 +2093,13 @@
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
     SERVICE_FQDN_ADMIN: admin.example.com
-    SERVICE_FQDN_ADMIN_8080: null
+    SERVICE_FQDN_ADMIN_8080: 'admin.example.com:8080'
     SERVICE_FQDN_API: www.api.example.com
     SERVICE_FQDN_API_V2: api-v2.example.com
     SERVICE_FQDN_BLOG: blog.example.com
     SERVICE_FQDN_MY_APP: my-app.example.com
     SERVICE_FQDN_WEB: web.example.com
-    SERVICE_FQDN_WEB_3000: 'web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_FQDN_WEB_3000: 'web.example.com:3000'
     SERVICE_HEX_32_WEB: '<generated:SERVICE_HEX_32_WEB:32>'
     SERVICE_PASSWORD_DB: '<generated:SERVICE_PASSWORD_DB:32>'
     SERVICE_PASSWORD_NOBRACES: '<generated:SERVICE_PASSWORD_NOBRACES:32>'
@@ -2109,9 +2109,9 @@
     SERVICE_URL_API_V2: 'https://api-v2.example.com'
     SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
     SERVICE_URL_MY_APP: 'https://my-app.example.com'
-    SERVICE_URL_MY_APP_80: null
+    SERVICE_URL_MY_APP_80: 'https://my-app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
-    SERVICE_URL_WEB_3000: 'http://web-referenceapplication0001.10.0.0.1.sslip.io:3000'
+    SERVICE_URL_WEB_3000: 'https://web.example.com:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
     WITH_DEFAULT: null
