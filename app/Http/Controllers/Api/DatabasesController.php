@@ -251,6 +251,7 @@ class DatabasesController extends Controller
                 'mysql_root_password',
                 'mariadb_password',
                 'mariadb_root_password',
+                ...$database::CONFIGURATION_ATTRIBUTES,
             ]);
             $this->exposeNestedServerSecrets($database);
         } else {

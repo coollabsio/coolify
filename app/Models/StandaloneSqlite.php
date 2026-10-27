@@ -57,6 +57,23 @@ class StandaloneSqlite extends BaseModel
         'health_check_start_period',
     ];
 
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'custom_docker_run_options',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        ...self::CONFIGURATION_ATTRIBUTES,
+    ];
+
     protected $appends = ['database_type', 'server_status'];
 
     protected $casts = [
