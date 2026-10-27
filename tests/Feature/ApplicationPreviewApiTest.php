@@ -142,17 +142,17 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
         $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
         $this->server->update(['private_key_id' => $privateKey->id]);
         Process::fake(function ($process) {
-            if (str_contains($process->command, 'docker ps -a')) {
+            if (str_contains(remoteProcessScript($process), 'docker ps -a')) {
                 return Process::result(output: json_encode([
                     'ID' => 'preview-container',
                     'Names' => "{$this->application->uuid}-pr-42",
                     'Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId=42",
                 ]));
             }
-            if (str_contains($process->command, 'docker inspect')) {
+            if (str_contains(remoteProcessScript($process), 'docker inspect')) {
                 return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
             }
-            if (str_contains($process->command, 'docker logs')) {
+            if (str_contains(remoteProcessScript($process), 'docker logs')) {
                 return Process::result(output: 'preview runtime log');
             }
 
@@ -455,7 +455,7 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
         $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
         $this->server->update(['private_key_id' => $privateKey->id]);
         Process::fake(function ($process) {
-            if (str_contains($process->command, 'docker ps -a')) {
+            if (str_contains(remoteProcessScript($process), 'docker ps -a')) {
                 return Process::result(output: implode(PHP_EOL, [
                     json_encode([
                         'ID' => 'web-container',
@@ -469,11 +469,11 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
                     ]),
                 ]));
             }
-            if (str_contains($process->command, 'docker inspect')) {
+            if (str_contains(remoteProcessScript($process), 'docker inspect')) {
                 return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
             }
-            if (str_contains($process->command, 'docker logs')) {
-                return Process::result(output: str_contains($process->command, 'worker-container') ? 'worker log' : 'web log');
+            if (str_contains(remoteProcessScript($process), 'docker logs')) {
+                return Process::result(output: str_contains(remoteProcessScript($process), 'worker-container') ? 'worker log' : 'web log');
             }
 
             return Process::result();

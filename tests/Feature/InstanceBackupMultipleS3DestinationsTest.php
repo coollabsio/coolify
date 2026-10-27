@@ -111,7 +111,7 @@ it('saves several S3 destinations for the instance backup and drops storages of 
 it('uploads the instance backup to every selected destination', function () {
     $this->backup->forceFill(['save_s3' => true, 'databases_to_backup' => 'coolify'])->save();
     $this->backup->syncS3Storages([$this->firstStorage->id, $this->secondStorage->id]);
-    Process::fake(fn ($process) => Process::result(output: str_contains(implode(' ', (array) $process->command), 'du -b') ? '128' : ''));
+    Process::fake(fn ($process) => Process::result(output: str_contains(implode(' ', (array) remoteProcessScript($process)), 'du -b') ? '128' : ''));
 
     $uploadedTo = collect();
     $job = Mockery::mock(DatabaseBackupJob::class.'[upload_to_s3]', [$this->backup->fresh()])->shouldAllowMockingProtectedMethods();

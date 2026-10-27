@@ -159,9 +159,9 @@ trait ExecuteRemoteCommand
     }
 
     /**
-     * Execute the actual command with process handling. With $input, the content goes to the command over
-     * SSH stdin, because Linux limits one exec argument to 128 KiB and generateSshCommand() puts the whole
-     * script into one argument.
+     * Execute the actual command with process handling. Without $input, the command goes to the remote shell
+     * over SSH stdin, so its secrets are not in a command line on the Coolify host. With $input, the command
+     * is the SSH argument and the content goes to it over SSH stdin.
      */
     private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false, $skip_command_log = false, ?string $input = null)
     {
@@ -169,9 +169,12 @@ trait ExecuteRemoteCommand
             $this->application_deployment_queue->addLogEntry('[CMD]: '.$this->redact_sensitive_info($command), hidden: true);
         }
 
-        $remote_command = $input === null
-            ? SshMultiplexingHelper::generateSshCommand($this->server, $command)
-            : SshMultiplexingHelper::generateSshStdinCommand($this->server, $command);
+        if ($input === null) {
+            $remote_command = SshMultiplexingHelper::generateSshBatchCommand($this->server);
+            $input = SshMultiplexingHelper::sshBatchInput((string) $command);
+        } else {
+            $remote_command = SshMultiplexingHelper::generateSshStdinCommand($this->server, $command);
+        }
         $addLogEntry = function (string $type, string $output) use ($command, $hidden, $customType, $command_hidden, $skip_command_log): void {
             // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
             $log_output = str(sanitize_utf8_text($output))->trim();

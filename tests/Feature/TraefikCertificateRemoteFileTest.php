@@ -40,7 +40,7 @@ beforeEach(function () {
 
     $this->uploadedContents = null;
     Process::fake(function ($process) {
-        $command = $process->command;
+        $command = remoteProcessScript($process);
         if (str_starts_with($command, 'timeout') && str_contains($command, ' scp ')
             && preg_match("~'(".preg_quote(sys_get_temp_dir(), '~')."/coolify-acme-[^']+)'~", $command, $matches)) {
             $this->uploadedContents = file_get_contents($matches[1]);
@@ -56,8 +56,8 @@ it('reads the ACME file with sudo on non-root servers', function () {
     $certificates = GetTraefikCertificates::run($this->server);
 
     expect($certificates)->toHaveCount(40);
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'if [ ! -f")
-        && str_contains($process->command, 'head -c'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\nsudo sh -c 'if [ ! -f")
+        && str_contains(remoteProcessScript($process), 'head -c'));
 });
 
 it('uploads a large ACME file instead of passing it as a shell argument', function () {
@@ -70,10 +70,10 @@ it('uploads a large ACME file instead of passing it as a shell argument', functi
         ->and($remaining)->toHaveCount(39)
         ->and(collect($remaining)->pluck('domain.main'))->not->toContain('app1.example.com');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'set -e;")
-        && str_contains($process->command, 'umask 077')
-        && str_contains($process->command, 'chmod 600')
-        && str_contains($process->command, 'mv --'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\nsudo sh -c 'set -e;")
+        && str_contains(remoteProcessScript($process), 'umask 077')
+        && str_contains(remoteProcessScript($process), 'chmod 600')
+        && str_contains(remoteProcessScript($process), 'mv --'));
     Process::assertDidntRun(fn ($process) => strlen($process->command) > 128 * 1024);
     expect(glob(sys_get_temp_dir().'/coolify-acme-*'))->toBeEmpty();
 });
@@ -164,7 +164,7 @@ it('does not show or delete certificates of another team', function () {
         ->call('deleteTraefikCertificate', $certificateId)
         ->assertDispatched('error');
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'acme.json'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'acme.json'));
     expect($this->uploadedContents)->toBeNull()
         ->and($this->server->fresh()->hasPendingProxyConfiguration())->toBeFalse();
 });

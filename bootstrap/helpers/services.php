@@ -25,8 +25,7 @@ function service_logo_urls(mixed $logo): array
     ];
 }
 
-use App\Actions\Service\StartService;
-use App\Actions\Service\StopService;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\GithubApp;
@@ -38,8 +37,6 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
@@ -778,22 +775,11 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
 
     $sourceServer = $source->destination?->server;
     $targetServer = $newService->destination?->server;
-    if ($pendingVolumeClones !== [] && $sourceServer && $targetServer) {
-        $chain = [
-            function () use ($source) {
-                StopService::run($source);
-            },
-            ...array_map(
-                fn (array $clone) => new VolumeCloneJob($clone[0], $clone[1]->name, $sourceServer, $targetServer, $clone[1]),
-                $pendingVolumeClones,
-            ),
-            function () use ($source) {
-                StartService::run($source);
-            },
-        ];
-
-        // The jobs load the new volume rows, so they must not run before the transaction of the caller commits.
-        DB::afterCommit(fn () => Bus::chain($chain)->onQueue('high')->dispatch());
+    if ($sourceServer && $targetServer) {
+        CloneVolumeDataWithSourceStopped::run($source, array_map(
+            fn (array $clone) => new VolumeCloneJob($clone[0], $clone[1]->name, $sourceServer, $targetServer, $clone[1]),
+            $pendingVolumeClones,
+        ));
     }
 
     return $newService;

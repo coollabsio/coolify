@@ -93,7 +93,7 @@ function fakeMultiDestinationS3Disks(): void
 it('archives locally and uploads to every destination instead of streaming', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
     fakeMultiDestinationS3Disks();
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);
@@ -101,11 +101,11 @@ it('archives locally and uploads to every destination instead of streaming', fun
     (new VolumeBackupJob($backup))->handle();
 
     $execution = ScheduledVolumeBackupExecution::query()->sole();
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mc pipe'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I') && str_contains($process->command, ' > '));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp') && str_contains($process->command, 'temporary/first-bucket/'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp') && str_contains($process->command, 'temporary/second-bucket/'));
-    Process::assertRan(fn ($process) => preg_match("/rm -f '[^']+\\.tar\\.gz'/", $process->command) === 1);
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'mc pipe'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'tar -I') && str_contains(remoteProcessScript($process), ' > '));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mc cp') && str_contains(remoteProcessScript($process), 'temporary/first-bucket/'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mc cp') && str_contains(remoteProcessScript($process), 'temporary/second-bucket/'));
+    Process::assertRan(fn ($process) => preg_match("/rm -f '[^']+\\.tar\\.gz'/", remoteProcessScript($process)) === 1);
     expect($execution->status)->toBe('success')
         ->and($execution->s3_storage_id)->toBe($first->id)
         ->and($execution->s3_uploaded)->toBeTrue()
@@ -120,23 +120,32 @@ it('signs each upload with the region of its destination', function () {
     [$backup, $first] = createMultiDestinationVolumeBackup();
     $first->update(['region' => 'ru-central-1']);
     fakeMultiDestinationS3Disks();
-    Process::fake([
-        '*du -b*' => '128',
-        '*' => '',
-    ]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push(remoteProcessScript($process));
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'du -b') ? '128' : '');
+    });
 
     (new VolumeBackupJob($backup))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
-        && str_contains($process->command, 'temporary/first-bucket/'));
-    Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=us-east-1'")
-        && str_contains($process->command, 'temporary/second-bucket/'));
+    $regionOfBucket = [];
+    $region = null;
+    foreach ($commands as $command) {
+        if (preg_match("/-e 'MC_REGION=([^']+)'/", $command, $match)) {
+            $region = $match[1];
+        }
+        if (preg_match("#mc cp .*'temporary/([^/']+)/#", $command, $match)) {
+            $regionOfBucket[$match[1]] = $region;
+        }
+    }
+    expect($regionOfBucket)->toBe(['first-bucket' => 'ru-central-1', 'second-bucket' => 'us-east-1']);
 });
 
 it('keeps the local archive and cleans the partial upload when one destination fails', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
     fakeMultiDestinationS3Disks();
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*temporary/second-bucket/*' => Process::result(errorOutput: 'access denied', exitCode: 1),
         '*' => '',
@@ -147,7 +156,7 @@ it('keeps the local archive and cleans the partial upload when one destination f
     $execution = ScheduledVolumeBackupExecution::query()->sole();
     $firstReplica = $execution->s3Replicas()->where('s3_storage_id', $first->id)->sole();
     $secondReplica = $execution->s3Replicas()->where('s3_storage_id', $second->id)->sole();
-    Process::assertNotRan(fn ($process) => preg_match("/rm -f '[^']+\\.tar\\.gz'/", $process->command) === 1);
+    Process::assertNotRan(fn ($process) => preg_match("/rm -f '[^']+\\.tar\\.gz'/", remoteProcessScript($process)) === 1);
     expect($execution->status)->toBe('success')
         ->and($execution->message)->toContain('S3 upload failed: second storage:')
         ->and($execution->s3_uploaded)->toBeFalse()

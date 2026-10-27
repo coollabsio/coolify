@@ -44,7 +44,7 @@ beforeEach(function () {
 function fakeVolumeCloneServer(?array $sourceVolume): void
 {
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'docker volume inspect')
+        output: str_contains(remoteProcessScript($process), 'docker volume inspect')
             ? json_encode($sourceVolume === null ? [] : [$sourceVolume])
             : '',
     ));
@@ -54,7 +54,7 @@ function volumeCloneCommands(): string
 {
     $commands = [];
     Process::assertRan(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return true;
     });

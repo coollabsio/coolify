@@ -391,14 +391,14 @@ function makeRestLogRedactionEndpoint(string $resource, string $envSecret): arra
 
     Process::fake(function ($process) use ($containerName, $envSecret) {
         return match (true) {
-            str_contains($process->command, 'docker ps') => Process::result(output: json_encode([
+            str_contains(remoteProcessScript($process), 'docker ps') => Process::result(output: json_encode([
                 'ID' => 'abc123',
                 'Names' => $containerName,
                 'Labels' => "coolify.name={$containerName}",
                 'State' => 'running',
             ])),
-            str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
-            str_contains($process->command, 'docker logs') => Process::result(output: "booted with {$envSecret}\npassword=coolify-canary-pattern-secret"),
+            str_contains(remoteProcessScript($process), 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+            str_contains(remoteProcessScript($process), 'docker logs') => Process::result(output: "booted with {$envSecret}\npassword=coolify-canary-pattern-secret"),
             default => Process::result(output: ''),
         };
     });

@@ -115,7 +115,7 @@ it('supports skipping command log entries without adding a hidden command entry'
         ->and($logs[0]['command'])->toBeNull()
         ->and($logs[0]['output'])->toBe('materialized '.REDACTED);
     expect($storedLogs)->not->toContain($payload)->not->toContain($command);
-    Process::assertRan(fn ($process) => str_contains($process->command, $command));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $command));
 });
 
 it('writes a deploy key to a per-deployment path and cleans it up for ls-remote on the host', function () use ($keyPath) {

@@ -88,7 +88,7 @@ test('coolify dashboard routes follow the server certificate resolver', function
 
     $command = '';
     Process::assertRan(function ($process) use (&$command) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return str_contains($command, 'coolify.yaml');
     });
@@ -112,7 +112,7 @@ test('the catch-all router follows the server certificate resolver', function (?
 
     $command = '';
     Process::assertRan(function ($process) use (&$command) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return str_contains($command, 'default_redirect_503.yaml') && str_contains($command, 'base64 -d');
     });

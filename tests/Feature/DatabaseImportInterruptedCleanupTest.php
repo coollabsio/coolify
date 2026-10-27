@@ -205,9 +205,9 @@ test('the cleanup runs at most once per import', function () {
     $listener->handle(new DatabaseImportFinished($cleanup));
     $listener->handle(new DatabaseImportFinished([...$cleanup, 'stopRestore' => true]));
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, "s3-restore-{$operation}"), 1);
-    Process::assertRan(fn ($process) => str_contains($process->command, "/tmp/restore_{$operation}")
-        && str_contains($process->command, 'Stopping the database import processes'));
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), "s3-restore-{$operation}"), 1);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "/tmp/restore_{$operation}")
+        && str_contains(remoteProcessScript($process), 'Stopping the database import processes'));
 });
 
 test('the cleanup of an import without an operation id still runs every time', function () {
@@ -218,7 +218,7 @@ test('the cleanup of an import without an operation id still runs every time', f
     $listener->handle(new DatabaseImportFinished($cleanup));
     $listener->handle(new DatabaseImportFinished($cleanup));
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, $cleanup['containerName']), 2);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), $cleanup['containerName']), 2);
 });
 
 it('keeps the stop message when the stopped import process ends afterwards', function () {
@@ -277,7 +277,7 @@ it('keeps the stop message when the stopped import job fails', function () {
 test('an import task may run longer than the SSH command timeout while other remote tasks keep the default timeout', function (int $commandTimeout) {
     config()->set('constants.ssh.command_timeout', $commandTimeout);
     Process::swap(new ProcessFactory);
-    Process::fake([
+    fakeRemoteProcesses([
         '*stat -c %s*' => Process::result('2048'),
         '*od -An -tx1*' => Process::result(' 2d 2d 20 50 6f 73'),
         '*' => Process::result(''),
@@ -314,8 +314,8 @@ test('a failed import task stops the remote restore and blocks the database unti
 
     (new CleanupDatabaseImport)->handle(new DatabaseImportFinished([...$cleanup, 'stopRestore' => true]));
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "/tmp/restore_{$operation}")
-        && str_contains($process->command, 'Stopping the database import processes'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "/tmp/restore_{$operation}")
+        && str_contains(remoteProcessScript($process), 'Stopping the database import processes'));
     $activity->refresh();
     expect(data_get($activity, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
         ->and(data_get($activity, 'properties.error'))->toBe('App\\Jobs\\CoolifyTask has timed out. '.ResourceStartActivity::IMPORT_STOPPED_MESSAGE)
@@ -379,7 +379,7 @@ test('an import whose SSH command ends without the restore result stops the rest
     Process::fake();
     (new CleanupDatabaseImport)->handle(new DatabaseImportFinished([...$cleanup, 'stopRestore' => true]));
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'Stopping the database import processes'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'Stopping the database import processes'));
     $activity->refresh();
     expect(data_get($activity, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
         ->and(data_get($activity, 'properties.error'))->toBe("{$reason} ".ResourceStartActivity::IMPORT_STOPPED_MESSAGE)
@@ -426,7 +426,7 @@ test('a restore that exits like a lost SSH connection or timeout reports a norma
     $this->server->update(['user' => $user]);
     Server::flushIdentityMap();
     Process::swap(new ProcessFactory);
-    Process::fake([
+    fakeRemoteProcesses([
         '*stat -c %s*' => Process::result('2048'),
         '*od -An -tx1*' => Process::result(' 2d 2d 20 50 6f 73'),
         '*' => Process::result(''),

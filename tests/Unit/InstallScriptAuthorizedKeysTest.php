@@ -2,7 +2,7 @@
 
 use Symfony\Component\Process\Process;
 
-it('removes only the previous Coolify key from authorized_keys', function (string $path) {
+it('removes only previous Coolify keys from authorized_keys', function (string $path) {
     $script = file_get_contents(dirname(__DIR__, 2).'/'.$path);
     preg_match('/^\s*(sed -i .*~\/\.ssh\/authorized_keys)$/m', $script, $matches);
     expect($matches)->toHaveKey(1);
@@ -12,9 +12,13 @@ it('removes only the previous Coolify key from authorized_keys', function (strin
     file_put_contents($home.'/.ssh/authorized_keys', implode("\n", [
         'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey coolify-disposable',
         'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey operator-lab',
-        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHostKey root@coolify',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey me@coolify-laptop',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey coolify-ops key',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey admin@root@coolify.example.com',
         'no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOptions deploy@coolify.example.com',
         'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOldCoolifyKey coolify',
+        // Installers before September 2024 generated their key with the comment "root@coolify".
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOlderCoolifyKey root@coolify',
         '',
     ]));
 
@@ -24,7 +28,9 @@ it('removes only the previous Coolify key from authorized_keys', function (strin
     expect(file_get_contents($home.'/.ssh/authorized_keys'))->toBe(implode("\n", [
         'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey coolify-disposable',
         'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey operator-lab',
-        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHostKey root@coolify',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey me@coolify-laptop',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey coolify-ops key',
+        'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOperatorKey admin@root@coolify.example.com',
         'no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOptions deploy@coolify.example.com',
         '',
     ]));

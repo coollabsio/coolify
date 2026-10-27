@@ -776,8 +776,8 @@ class ServersController extends Controller
             'connection_timeout' => 'integer|min:1|max:300',
             'is_terminal_enabled' => 'boolean|nullable',
             'wildcard_domain' => 'nullable|url',
-            'server_timezone' => ['string', function (string $attribute, mixed $value, \Closure $fail): void {
-                if (! validate_timezone($value)) {
+            'server_timezone' => ['bail', 'filled', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value) || ! validate_timezone($value)) {
                     $fail('The server_timezone must be a valid timezone.');
                 }
             }],

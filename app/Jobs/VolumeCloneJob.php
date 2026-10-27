@@ -30,6 +30,22 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         $this->onQueue('high');
     }
 
+    /**
+     * Explicit tags, so Horizon does not compare the models of the job. In a chain, the job is restored
+     * with two copies of one server for a clone on the same server, and comparing them fails on PHP 8.4
+     * ("Nesting level too deep"), which stops the chain before the copy.
+     *
+     * @return array<int, string>
+     */
+    public function tags(): array
+    {
+        return array_values(array_unique([
+            Server::class.':'.$this->sourceServer->id,
+            ...($this->targetServer ? [Server::class.':'.$this->targetServer->id] : []),
+            LocalPersistentVolume::class.':'.$this->persistentVolume->id,
+        ]));
+    }
+
     public function handle(): void
     {
         try {

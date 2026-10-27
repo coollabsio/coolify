@@ -210,7 +210,7 @@ describe('destination create', function () {
             ->assertJsonPath('errors.network.0', 'A Docker network with this name already exists on the server. Use a new network name.');
 
         expect(StandaloneDocker::query()->count())->toBe($countBefore);
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker network ls'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker network ls'));
     });
 
     test('rejects the destination when the server networks cannot be read', function () {

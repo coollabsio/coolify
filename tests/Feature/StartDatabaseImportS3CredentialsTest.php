@@ -12,15 +12,19 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
+use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\RemoteProcessCommand;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\Models\Activity;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 uses(RefreshDatabase::class);
 
@@ -94,7 +98,7 @@ test('s3 import activity command does not contain storage key or secret', functi
         ->not->toContain('.env')
         ->not->toContain('S3_ACCESS_KEY=')
         ->not->toContain('S3_SECRET_KEY=')
-        ->toContain('mc alias set s3temp "$S3_ENDPOINT" "$S3_ACCESS_KEY" "$S3_SECRET_KEY"');
+        ->not->toContain('mc alias set');
 
     Queue::assertPushed(CoolifyTask::class, function (CoolifyTask $job) {
         $cleanup = $job->call_event_data;
@@ -186,6 +190,134 @@ test('s3 import helper signs requests with the storage region', function () {
         $this->team->id,
     );
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
-        && str_contains($process->command, '-e S3_ENDPOINT='));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "-e 'MC_REGION=ru-central-1'")
+        && str_contains(remoteProcessScript($process), 'docker run -d'));
+});
+
+const IMPORT_S3_ARGV_KEY = 'AK/+$x"y';
+const IMPORT_S3_ARGV_SECRET = "s3c/r+e\$t 'q\"uo\\te`d` \\n";
+
+/**
+ * Starts an S3 import against a faked SSH layer and records every SSH process with its stdin.
+ *
+ * @return array{0: Collection<int, array{command: string, input: ?string}>, 1: ?Activity, 2: ?Throwable}
+ */
+function importS3ArgvTestRun(object $test, string $sshUser, bool $aliasFails = false): array
+{
+    $test->server->update(['user' => $sshUser]);
+    $storage = S3Storage::create([
+        'name' => 'Import S3',
+        'region' => 'ru-central-1',
+        'key' => IMPORT_S3_ARGV_KEY,
+        'secret' => IMPORT_S3_ARGV_SECRET,
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://8.8.8.8',
+        'is_usable' => true,
+        'team_id' => $test->team->id,
+    ]);
+
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('exists')->andReturn(true);
+    $disk->shouldReceive('size')->andReturn(1024);
+    $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
+    $filesystem->shouldReceive('build')->andReturn($disk);
+    Storage::swap($filesystem);
+
+    $processes = collect();
+    Process::fake(function ($process) use ($processes, $aliasFails) {
+        $processes->push(['command' => $process->command, 'input' => $process->input]);
+
+        return $aliasFails && str_contains($process->command, 'mc alias set')
+            ? Process::result(errorOutput: 'mc: invalid credentials', exitCode: 1)
+            : Process::result();
+    });
+    Queue::fake();
+
+    $activity = null;
+    $error = null;
+    try {
+        $activity = app(StartDatabaseImport::class)->handle(
+            $test->database->fresh(),
+            new DatabaseImportSource('s3', path: 'backups/restore.sql', s3StorageUuid: $storage->uuid),
+            $test->team->id,
+        );
+    } catch (Throwable $e) {
+        $error = $e;
+    }
+
+    return [$processes, $activity, $error];
+}
+
+/**
+ * Runs the recorded `mc alias set` SSH process in a real shell with its stdin. Stubs for `timeout`, `ssh`
+ * (runs the remote command in `sh -c`, like a login shell), `sudo`, `docker` and `mc` log their arguments.
+ *
+ * @param  array{command: string, input: ?string}  $aliasProcess
+ * @return array{argv: string, mcStdin: string}
+ */
+function importS3ArgvTestRunAliasProcess(array $aliasProcess): array
+{
+    $bin = sys_get_temp_dir().'/import-s3-argv-'.bin2hex(random_bytes(6));
+    mkdir($bin);
+    $log = "{$bin}/argv.log";
+    $stubs = [
+        'timeout' => "shift\nexec \"\$@\"",
+        'ssh' => "for last; do :; done\nexec sh -c \"\$last\"",
+        'sudo' => 'exec "$@"',
+        'docker' => "[ \"\$1\" = exec ] || exit 0\nshift\nwhile [ \"\${1#-}\" != \"\$1\" ]; do shift; done\nshift\nexec \"\$@\"",
+        'mc' => "cat > {$bin}/mc.stdin",
+    ];
+    foreach ($stubs as $name => $body) {
+        file_put_contents("{$bin}/{$name}", "#!/bin/sh\nprintf '%s\\n' \"{$name} \$*\" >> {$log}\n{$body}\n");
+        chmod("{$bin}/{$name}", 0755);
+    }
+
+    try {
+        (new SymfonyProcess(['bash', '-c', $aliasProcess['command']], env: ['PATH' => "{$bin}:/usr/bin:/bin"], input: $aliasProcess['input']))->mustRun();
+
+        return ['argv' => (string) file_get_contents($log), 'mcStdin' => (string) file_get_contents("{$bin}/mc.stdin")];
+    } finally {
+        array_map('unlink', glob("{$bin}/*"));
+        rmdir($bin);
+    }
+}
+
+it('passes the S3 keys of an import to mc on stdin, not in a command line', function (string $sshUser) {
+    [$processes, $activity, $error] = importS3ArgvTestRun($this, $sshUser);
+
+    expect($error)->toBeNull();
+    $commands = $processes->pluck('command')->push((string) RemoteProcessCommand::read($activity));
+    foreach ($commands as $command) {
+        expect($command)
+            ->not->toContain(IMPORT_S3_ARGV_SECRET)
+            ->not->toContain(escapeshellarg(IMPORT_S3_ARGV_SECRET))
+            ->not->toContain(escapeshellarg(IMPORT_S3_ARGV_KEY))
+            ->not->toContain(base64_encode(IMPORT_S3_ARGV_SECRET))
+            ->not->toContain(base64_encode(IMPORT_S3_ARGV_KEY));
+    }
+
+    $aliasProcess = $processes->sole(fn (array $process) => str_contains($process['command'], 'mc alias set'));
+    $run = importS3ArgvTestRunAliasProcess($aliasProcess);
+
+    expect($run['mcStdin'])->toBe(IMPORT_S3_ARGV_KEY."\n".IMPORT_S3_ARGV_SECRET."\n")
+        ->and($run['argv'])->toContain('mc alias set s3temp https://8.8.8.8')
+        ->and($run['argv'])->not->toContain(IMPORT_S3_ARGV_SECRET)
+        ->and($run['argv'])->not->toContain(IMPORT_S3_ARGV_KEY)
+        ->and($processes->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], "-e 'MC_REGION=ru-central-1'")))->toBeTrue()
+        ->and((string) RemoteProcessCommand::read($activity))->toContain('mc cp '.escapeshellarg('s3temp/test-bucket/backups/restore.sql'));
+    if ($sshUser !== 'root') {
+        expect($run['argv'])->toContain('sudo docker exec -i');
+    }
+})->with(['root', 'deploy']);
+
+it('removes the S3 restore helper when the mc alias cannot be set', function () {
+    [$processes, $activity, $error] = importS3ArgvTestRun($this, 'root', aliasFails: true);
+
+    expect($activity)->toBeNull()
+        ->and($error)->toBeInstanceOf(DatabaseImportException::class);
+    $aliasIndex = $processes->search(fn (array $process) => str_contains($process['command'], 'mc alias set'));
+    $removedAfterAlias = $processes->slice($aliasIndex + 1)
+        ->contains(fn (array $process) => preg_match("/docker rm -f '?s3-restore-/", $process['command']."\n".$process['input']) === 1);
+    expect($removedAfterAlias)->toBeTrue();
+    Queue::assertNothingPushed();
 });

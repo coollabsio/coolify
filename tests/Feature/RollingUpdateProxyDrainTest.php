@@ -65,7 +65,7 @@ function createApplicationForRollingUpdateDrainTest(string $proxyType = 'TRAEFIK
 function runRollingUpdateDrainStep(Application $application, bool $newVersionIsHealthy, ?array $oldProxyLabels = ['traefik.enable' => 'true'], array $newProxyLabels = ['traefik.enable' => 'true']): array
 {
     Process::fake(function ($process) use ($application, $oldProxyLabels, $newProxyLabels) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'docker inspect')) {
             return Process::result(output: json_encode(['coolify.name' => 'new', ...$newProxyLabels])."\n".json_encode(['coolify.name' => 'old', ...$oldProxyLabels]));
         }

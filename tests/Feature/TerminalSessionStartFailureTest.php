@@ -55,7 +55,7 @@ beforeEach(function () {
 function fakeTerminalContainer(string $state, bool $hasShell = true, array $runningContainers = []): void
 {
     Process::fake(function ($process) use ($state, $hasShell, $runningContainers) {
-        $command = (string) $process->command;
+        $command = remoteProcessScript($process);
 
         if (str_contains($command, 'docker ps -a')) {
             return Process::result(output: collect($runningContainers)

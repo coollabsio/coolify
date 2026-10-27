@@ -13,9 +13,16 @@ class MetricsMappingDouble
     /** @var array<string, ?array> type => rows */
     public array $rowsByType = [];
 
+    public string $uuid = 'app-uuid';
+
     protected function fetchMetricRows(string $type, int $mins): ?array
     {
         return $this->rowsByType[$type] ?? null;
+    }
+
+    public function endpoint(string $type, int $mins): string
+    {
+        return $this->getMetricsEndpoint($type, '2026-01-01T00:00:00Z', $mins);
     }
 }
 
@@ -67,9 +74,28 @@ it('does not use non-root mounts when root disk samples are missing', function (
     expect($double->getDiskMetrics(5))->toBe([]);
 });
 
+it('uses the Sentinel data mount for disk metrics when no root mount is reported', function () {
+    $double = new MetricsMappingDouble;
+    $double->rowsByType['disk'] = [
+        ['time' => 1000, 'mount' => '/boot', 'usedPercent' => 90],
+        ['time' => 1000, 'mount' => '/app/db', 'usedPercent' => 30],
+    ];
+
+    expect($double->getDiskMetrics(5))->toBe([[1000, 30.0]]);
+});
+
 it('supports older disk rows without a mount field', function () {
     $double = new MetricsMappingDouble;
     $double->rowsByType['disk'] = [['time' => 1000, 'usedPercent' => 40]];
 
     expect($double->getDiskMetrics(5))->toBe([[1000, 40.0]]);
+});
+
+it('asks sentinel to bucket ranges over an hour into at most 1000 whole-minute rows', function () {
+    $double = new MetricsMappingDouble;
+
+    expect($double->endpoint('cpu', 60))->not->toContain('bucket_ms')
+        ->and($double->endpoint('cpu', 720))->toBe('http://localhost:8888/api/container/app-uuid/cpu/history?from=2026-01-01T00:00:00Z&bucket_ms=60000')
+        ->and($double->endpoint('cpu', 10080))->toEndWith('&bucket_ms=660000')
+        ->and($double->endpoint('cpu', 43200))->toEndWith('&bucket_ms=2640000');
 });

@@ -55,6 +55,11 @@ tolower($0) ~ /^[ \t]*create[ \t]+(database|schema)[ \t]/ { if (is_system(databa
 AWK;
 
     /**
+     * Prints a PostgreSQL SQL dump without the table data of its COPY ... FROM stdin blocks.
+     */
+    private const POSTGRES_COPY_DATA_FILTER = 'data { if ($0 == "\\\\.") data = 0; next } { print } /^COPY .* FROM stdin;$/ { data = 1 }';
+
+    /**
      * @param  bool  $keepOwners  PostgreSQL archives: restore object owners and privileges. Off by default,
      *                            because roles from another host (for example RDS) usually do not exist here.
      * @param  string|null  $sqliteDatabase  SQLite: the database file to restore into, validated by the resource.
@@ -135,13 +140,19 @@ SH;
         // Comments are no longer stripped: deleting the rest of a line on "--" also cut
         // inside string literals, which let "SELECT '--'; COPY ... PROGRAM" slip through.
         // A commented-out PROGRAM statement is now blocked too, which is the safer default.
-        $scan = static fn (string $source): string => "{$source} | LC_ALL=C grep -Eiq {$escapedPsqlPattern} || {$source} | tr -d '~' | tr '\\n\\r' '~~' | LC_ALL=C grep -Eiq {$escapedSqlPattern}";
+        // Table data of COPY ... FROM stdin blocks is not scanned: it is data, not SQL, and ordinary
+        // text such as "how to program" matched the patterns. pg_dump writes each block as the line
+        // "COPY ... FROM stdin;", the rows, and the line "\.". When awk is missing or fails, the
+        // scan receives a line that matches, so the restore is blocked.
+        $withoutCopyData = static fn (string $source): string => "{ {$source} | LC_ALL=C awk ".escapeshellarg(self::POSTGRES_COPY_DATA_FILTER)." || echo '\\! from program'; }";
+        $scan = static fn (string $source): string => $withoutCopyData($source)." | LC_ALL=C grep -Eiq {$escapedPsqlPattern} || ".$withoutCopyData($source)." | tr -d '~' | tr '\\n\\r' '~~' | LC_ALL=C grep -Eiq {$escapedSqlPattern}";
         $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
         $sqlScan = $scan($contents);
         $blockedProgram = 'echo \'Blocked PostgreSQL restore: the backup contains a COPY ... PROGRAM, psql shell command, lo_import/lo_export, or ALTER SYSTEM pattern. If you trust this dump, restore it from the database container terminal.\'; exit 1';
         $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
 
         return <<<SH
+command -v awk >/dev/null 2>&1 || { echo 'Blocked PostgreSQL restore: awk is required to scan the backup.'; exit 1; }
 header=\$({$contents} | head -c 5)
 tar_magic=\$({$contents} | head -c 262 | tail -c 5)
 if [ "\$header" = 'PGDMP' ] || [ "\$tar_magic" = 'ustar' ]; then
@@ -270,6 +281,12 @@ SH;
     /**
      * Checks the backup format before any database is dropped, then recreates the
      * target database and restores archives with pg_restore and SQL with psql.
+     * The restore must not stop on the first error: a pg_dumpall dump always creates the
+     * superuser role (and creates the target database) that already exist here, and an
+     * archive with owners references roles this server may not have. Stopping there would
+     * leave the server without the databases that were just dropped.
+     * pg_dumpall does not create the postgres database (it expects it to exist), so it is
+     * recreated too when POSTGRES_DB names another database.
      */
     private function postgresqlDumpAll(): string
     {
@@ -287,10 +304,11 @@ check_superuser
 psql -U "$pg_user" -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" || exit 1
 psql -U "$pg_user" -d template1 -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U "$pg_user" --maintenance-db=template1 --if-exists {} || exit 1
 createdb -U "$pg_user" "$db" || exit 1
+[ "$db" = postgres ] || createdb -U "$pg_user" postgres || exit 1
 if [ "$kind" = archive ]; then
-  stream | pg_restore --exit-on-error -U "$pg_user" -d "$db"
+  stream | pg_restore -U "$pg_user" -d "$db"
 else
-  stream | psql -v ON_ERROR_STOP=1 -U "$pg_user" -d "$db"
+  stream | psql -U "$pg_user" -d "$db"
 fi
 SH;
     }

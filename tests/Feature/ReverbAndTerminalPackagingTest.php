@@ -122,11 +122,13 @@ it('runs Reverb and terminal websocket services inside the Coolify containers', 
 
 it('removes the dedicated realtime service from bundled compose files', function (string $composeFile, bool $hasRuntimeEnvironment) {
     $composeContents = file_get_contents(base_path($composeFile));
-    $soketi = Yaml::parse($composeContents)['services']['soketi'] ?? null;
+    $services = Yaml::parse($composeContents)['services'];
+    $soketi = $services['soketi'] ?? null;
 
     // Production keeps "coolify-realtime" only as a network alias of the coolify container, and "soketi"
-    // only as a placeholder with no replicas for old overrides in docker-compose.custom.yml.
-    expect($soketi === null || $soketi === ['image' => 'busybox:1.37', 'deploy' => ['replicas' => 0]])->toBeTrue();
+    // only as a placeholder with no replicas for old overrides in docker-compose.custom.yml. The placeholder
+    // uses the coolify image, so install and upgrade do not pull an extra image.
+    expect($soketi === null || $soketi === ['image' => $services['coolify']['image'], 'deploy' => ['replicas' => 0]])->toBeTrue();
     expect($composeContents)
         ->not->toContain('container_name: coolify-realtime')
         ->not->toContain('coolify-realtime:')
@@ -335,4 +337,31 @@ it('accepts a soketi override from 4.3.23 in docker-compose.custom.yml with zero
     'production compose, partial override' => ['docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n    ports:\n      - '6001:6001'\n"],
     'production compose, full service' => ['docker-compose.prod.yml', "services:\n  soketi:\n    image: quay.io/soketi/soketi:1.6-16-alpine\n    container_name: coolify-realtime\n    ports:\n      - '6001:6001'\n"],
     'nightly production compose, partial override' => ['other/nightly/docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n"],
+]);
+
+it('does not pull an extra image for the soketi placeholder', function (string $composeFile) {
+    if (! (new ExecutableFinder)->find('docker')) {
+        $this->markTestSkipped('Docker is not installed.');
+    }
+
+    $directory = sys_get_temp_dir().'/coolify-compose-images-'.Str::random(8);
+    mkdir($directory);
+    copy(base_path('docker-compose.yml'), "{$directory}/docker-compose.yml");
+    copy(base_path($composeFile), "{$directory}/docker-compose.prod.yml");
+
+    try {
+        // upgrade.sh pulls every image that "config --images" lists and stops when a pull fails.
+        $result = Process::path($directory)
+            ->env(['REGISTRY_URL' => 'registry.example.com', 'LATEST_IMAGE' => '4.5.1'])
+            ->run('docker compose -f docker-compose.yml -f docker-compose.prod.yml config --no-env-resolution --images');
+    } finally {
+        File::deleteDirectory($directory);
+    }
+
+    expect($result->successful())->toBeTrue($result->errorOutput())
+        ->and(collect(explode("\n", trim($result->output())))->unique()->sort()->values()->all())
+        ->toBe(['postgres:15-alpine', 'redis:7-alpine', 'registry.example.com/coollabsio/coolify:4.5.1']);
+})->with([
+    'production compose' => ['docker-compose.prod.yml'],
+    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
 ]);

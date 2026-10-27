@@ -43,6 +43,11 @@ class CleanupDocker implements ShouldBeUnique
      */
     public const STOP_CLEANUP_COOLDOWN = 3600;
 
+    /**
+     * Cleanup log command of the entry that records a skipped build cache prune.
+     */
+    public const BUILD_CACHE_KEPT_LOG_COMMAND = 'docker builder prune, docker buildx prune';
+
     public int $jobTries = 1;
 
     /**
@@ -87,8 +92,9 @@ class CleanupDocker implements ShouldBeUnique
 
     /**
      * The deployment that is queued or running on the server (as target or build server), if any.
-     * The cleanup prunes the build caches, which fails a build that uses them. A deployment that
-     * wrote no log for longer than the deployment timeout is stuck and does not count.
+     * Pruning the build caches fails a build that uses them, so the cleanup keeps them while such a
+     * deployment exists. A deployment that wrote no log for longer than the deployment timeout is
+     * stuck and does not count.
      */
     public static function activeDeployment(Server $server): ?ApplicationDeploymentQueue
     {
@@ -100,9 +106,16 @@ class CleanupDocker implements ShouldBeUnique
     }
 
     /**
+     * The reason the build cache was kept, read from a cleanup log, if it was kept.
+     */
+    public static function buildCacheKeptReason(array $cleanupLog): ?string
+    {
+        return collect($cleanupLog)->firstWhere('command', self::BUILD_CACHE_KEPT_LOG_COMMAND)['output'] ?? null;
+    }
+
+    /**
      * Cleanup after a resource stop: skipped when a cleanup ran recently, and the queued run
-     * only cleans when the disk usage is at or above the server cleanup threshold and no
-     * deployment is active on the server.
+     * only cleans when the disk usage is at or above the server cleanup threshold.
      */
     public static function dispatchAfterStop(Server $server): void
     {
@@ -137,14 +150,15 @@ class CleanupDocker implements ShouldBeUnique
         ];
     }
 
-    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false, bool $onlyAboveThreshold = false)
+    /**
+     * @param  bool  $pruneBuildCacheDuringDeployment  Also prune the build caches while a deployment is active
+     *                                                 (a manual cleanup). Otherwise they stay until the next run.
+     */
+    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false, bool $onlyAboveThreshold = false, bool $pruneBuildCacheDuringDeployment = false)
     {
         $this->deadline = now()->getTimestamp() + self::REMOTE_COMMANDS_DEADLINE;
 
         if ($onlyAboveThreshold) {
-            if (self::activeDeployment($server)) {
-                return [];
-            }
             $diskUsage = $server->getDiskUsage();
             if (is_numeric($diskUsage) && (int) $diskUsage < $server->settings->docker_cleanup_threshold) {
                 return [];
@@ -177,11 +191,21 @@ class CleanupDocker implements ShouldBeUnique
         $commands = [
             $this->buildContainerPruneCommand(),
             $imagePruneCmd,
-            'docker builder prune -af',
-            // The prune fails on a stopped builder, so start it first.
-            railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, 'docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; docker buildx prune --builder coolify-railpack -af'),
-            $this->buildCoolifyImageCleanupCommand($helperImageVersion),
         ];
+
+        $activeDeployment = $pruneBuildCacheDuringDeployment ? null : self::activeDeployment($server);
+        if (! $activeDeployment) {
+            $commands[] = 'docker builder prune -af';
+            // The prune fails on a stopped builder, so start it first.
+            $commands[] = railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, 'docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; docker buildx prune --builder coolify-railpack -af');
+        } else {
+            $cleanupLog[] = [
+                'command' => self::BUILD_CACHE_KEPT_LOG_COMMAND,
+                'output' => 'Skipped: the build cache was not pruned because deployment '.$activeDeployment->deployment_uuid.' is queued or running on this server.',
+            ];
+        }
+
+        $commands[] = $this->buildCoolifyImageCleanupCommand($helperImageVersion);
 
         if ($deleteUnusedVolumes) {
             $commands[] = 'docker volume prune -af';

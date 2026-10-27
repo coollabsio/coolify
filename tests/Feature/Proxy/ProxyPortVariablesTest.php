@@ -71,7 +71,7 @@ it('starts a proxy whose ports use variables', function (string $port) {
 
     StartProxy::run($this->server, async: false, force: true);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker compose -f /data/coolify/proxy/docker-compose.yml up -d --wait --remove-orphans'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker compose -f /data/coolify/proxy/docker-compose.yml up -d --wait --remove-orphans'));
 })->with('proxy port variables');
 
 it('restarts a proxy whose ports use variables', function (string $port) {
@@ -92,8 +92,8 @@ it('asks to start a stopped proxy whose ports use variables and checks only conc
 
     expect(CheckProxy::run($this->server))->toBeTrue();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "sport = ':8081'"));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'sport = ') && str_contains($process->command, '${'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sport = ':8081'"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'sport = ') && str_contains(remoteProcessScript($process), '${'));
 });
 
 it('asks to start a stopped proxy whose ports all use variables without defaults', function () {
@@ -102,7 +102,7 @@ it('asks to start a stopped proxy whose ports all use variables without defaults
 
     expect(CheckProxy::run($this->server))->toBeTrue();
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'sport = '));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'sport = '));
 });
 
 it('does not ask to start a stopped proxy without published ports', function () {
@@ -119,7 +119,7 @@ it('saves and starts a proxy whose ports key is empty', function () {
     StartProxy::run($this->server->fresh(), async: false, force: true);
 
     expect($this->server->fresh()->proxy->last_saved_proxy_configuration)->toBe($configuration);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker compose -f /data/coolify/proxy/docker-compose.yml up -d --wait --remove-orphans'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker compose -f /data/coolify/proxy/docker-compose.yml up -d --wait --remove-orphans'));
 });
 
 it('configures traffic analytics for a proxy whose ports use variables', function () {
