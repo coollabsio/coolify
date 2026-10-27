@@ -112,14 +112,6 @@ it('publishes the testing host only to Docker Hub', function () {
         ->toContain('dockerfile: ./docker/testing-host/Dockerfile');
 });
 
-it('generates the production changelog from main', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/generate-changelog.yml');
-
-    expect($workflow)
-        ->toContain('branches: [ main ]')
-        ->not->toContain('v4.x');
-});
-
 it('publishes traceable rolling builds from next without creating an exact rc tag', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-next-build.yml');
 

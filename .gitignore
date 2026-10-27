@@ -36,7 +36,6 @@ scripts/load-test/*
 .env.dusk.local
 docker/coolify-terminal/node_modules
 .DS_Store
-CHANGELOG.md
 /.workspaces
 /.superpowers/
 /docs/superpowers/plans/
