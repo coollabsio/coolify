@@ -40,9 +40,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public ?string $publish_directory = null;
 
-    // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
+    // In case of docker compose
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
 
@@ -71,6 +71,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
+            'base_directory' => ValidationPatterns::directoryPathRules(),
             'docker_compose_location' => ValidationPatterns::filePathRules(),
         ];
     }
@@ -82,6 +83,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'is_static' => 'Is static',
         'publish_directory' => 'Publish directory',
         'build_pack' => 'Build pack',
+        'base_directory' => 'Base directory',
     ];
 
     public function mount()
@@ -181,6 +183,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
                     'private_key_id' => $privateKey->id,
+                    'base_directory' => $this->base_directory,
                 ];
             } else {
                 $application_init = [
@@ -196,6 +199,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'private_key_id' => $privateKey->id,
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
+                    'base_directory' => $this->base_directory,
                 ];
             }
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
@@ -206,7 +210,6 @@ class GithubPrivateRepositoryDeployKey extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
             }
             $application = new Application($application_init);
             $application->save();

@@ -209,11 +209,13 @@ class GithubPrivateRepository extends Component
                 'selected_repository_repo' => $this->selected_repository_repo,
                 'selected_branch_name' => $this->selected_branch_name,
                 'docker_compose_location' => $this->docker_compose_location,
+                'base_directory' => $this->base_directory,
             ], [
                 'selected_repository_owner' => 'required|string|regex:/^[a-zA-Z0-9\-_]+$/',
                 'selected_repository_repo' => 'required|string|regex:/^[a-zA-Z0-9\-_\.]+$/',
                 'selected_branch_name' => ['required', 'string', new ValidGitBranch],
                 'docker_compose_location' => ValidationPatterns::filePathRules(),
+                'base_directory' => ValidationPatterns::directoryPathRules(),
             ]);
 
             if ($validator->fails()) {
