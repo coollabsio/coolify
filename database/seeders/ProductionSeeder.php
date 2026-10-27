@@ -82,7 +82,7 @@ class ProductionSeeder extends Seeder
             ]);
         }
 
-        if (! isCloud() && config('constants.coolify.is_windows_docker_desktop') == false) {
+        if (! isCloud()) {
             $coolify_key_name = '@host.docker.internal';
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
@@ -144,63 +144,6 @@ class ProductionSeeder extends Seeder
                 if ($server->isSentinelEnabled()) {
                     CheckAndStartSentinelJob::dispatch($server);
                 }
-            }
-
-            if (StandaloneDocker::find(0) == null) {
-                StandaloneDocker::create([
-                    'id' => 0,
-                    'name' => 'localhost-coolify',
-                    'network' => 'coolify',
-                    'server_id' => 0,
-                ]);
-            }
-        }
-
-        if (config('constants.coolify.is_windows_docker_desktop')) {
-            PrivateKey::updateOrCreate(
-                [
-                    'id' => 0,
-                    'team_id' => 0,
-                ],
-                [
-                    'name' => 'Testing-host',
-                    'description' => 'This is a a docker container with SSH access',
-                    'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
-hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
-AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
-uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
------END OPENSSH PRIVATE KEY-----
-',
-                ]
-            );
-            if (Server::find(0) == null) {
-                $server_details = [
-                    'id' => 0,
-                    'uuid' => 'coolify-testing-host',
-                    'name' => 'localhost',
-                    'description' => "This is the server where Coolify is running on. Don't delete this!",
-                    'user' => 'root',
-                    'ip' => 'coolify-testing-host',
-                    'team_id' => 0,
-                    'private_key_id' => 0,
-                ];
-                $server_details['proxy'] = ServerMetadata::from([
-                    'type' => ProxyTypes::TRAEFIK->value,
-                    'status' => ProxyStatus::EXITED->value,
-                    'last_saved_settings' => null,
-                    'last_applied_settings' => null,
-                ]);
-                $server = Server::create($server_details);
-                $server->settings->is_reachable = true;
-                $server->settings->is_usable = true;
-                $server->settings->save();
-            } else {
-                $server = Server::find(0);
-                $server->settings->is_reachable = true;
-                $server->settings->is_usable = true;
-                $server->settings->save();
             }
 
             if (StandaloneDocker::find(0) == null) {

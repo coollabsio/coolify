@@ -35,21 +35,10 @@ it('builds the development helper image from the coolify-helper repository', fun
         ->and(file_get_contents(dirname(__DIR__, 2).'/app/Livewire/Settings/Index.php'))->toContain('https://github.com/coollabsio/coolify-helper.git#main:src');
 });
 
-it('publishes the testing host only to Docker Hub', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-testing-host.yml');
-    $cleanupWorkflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/cleanup-ghcr-untagged.yml');
-    $windowsCompose = file_get_contents(dirname(__DIR__, 2).'/docker-compose.windows.yml');
+it('builds the testing host only for local development', function () {
     $developmentCompose = file_get_contents(dirname(__DIR__, 2).'/docker-compose.dev.yml');
 
-    expect($workflow)
-        ->toContain('DOCKER_REGISTRY: docker.io')
-        ->toContain('IMAGE_NAME: "coollabsio/coolify-testing-host"')
-        ->toContain('docker/testing-host/Dockerfile')
-        ->not->toContain('ghcr.io')
-        ->not->toContain('GITHUB_REGISTRY')
-        ->and($cleanupWorkflow)->not->toContain('coolify-testing-host')
-        ->and($windowsCompose)->toContain('docker.io/coollabsio/coolify-testing-host:latest')
-        ->and($developmentCompose)->toContain('image: coolify-testing-host:dev')
+    expect($developmentCompose)->toContain('image: coolify-testing-host:dev')
         ->toContain('dockerfile: ./docker/testing-host/Dockerfile');
 });
 
