@@ -1580,6 +1580,8 @@ class Application extends BaseModel
                 : 'GIT_SSH_COMMAND="'.$resolvedGitSshCommand.'"')
             : 'GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"';
 
+        $git_clone_command = $this->gitLfsSkipSmudgePrefix($onlyCheckout).$git_clone_command;
+
         // Use the explicitly passed commit (e.g. from rollback), falling back to the application's git_commit_sha.
         // Invalid refs will cause the git checkout/fetch command to fail on the remote server.
         $commitToUse = $commit ?? $this->git_commit_sha;
@@ -1809,6 +1811,16 @@ class Application extends BaseModel
         ];
     }
 
+    /**
+     * The helper image installs the Git LFS filter system-wide, so every checkout downloads
+     * LFS objects unless the smudge filter is skipped. A checkout that only reads files (the
+     * Compose file) never needs LFS objects.
+     */
+    private function gitLfsSkipSmudgePrefix(bool $onlyCheckout = false): string
+    {
+        return $this->settings->is_git_lfs_enabled && ! $onlyCheckout ? '' : 'export GIT_LFS_SKIP_SMUDGE=1 && ';
+    }
+
     private function gitCommandsAsShellCommand(Collection|array|string $commands): string
     {
         if (is_string($commands)) {
@@ -1922,10 +1934,11 @@ class Application extends BaseModel
 
                     $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOption ?? null);
                     $escapedPrBranch = escapeshellarg($branch);
+                    $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command";
                     if ($exec_in_docker) {
-                        $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command")));
+                        $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_pr_command)));
                     } else {
-                        $commands->push($this->gitCommand("cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command"));
+                        $commands->push($this->gitCommand($git_pr_command));
                     }
                 }
 
