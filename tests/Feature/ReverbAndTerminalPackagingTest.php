@@ -257,7 +257,7 @@ it('stops publishing or preserving the obsolete realtime image', function () {
         ->not->toContain('realtime_image')
         ->and(file_get_contents(app_path('Actions/Server/CleanupDocker.php')))
         ->not->toContain('realtimeImage')
-        ->and(file_get_contents(base_path('versions.json')))
+        ->and(file_get_contents(base_path('upstream.json')))
         ->not->toContain('"realtime"')
         ->and(is_dir(base_path('docker/coolify-realtime')))->toBeFalse()
         ->and(file_exists(base_path('.github/workflows/coolify-realtime.yml')))->toBeFalse()

@@ -51,8 +51,8 @@ select_channel() {
 }
 
 write_versions() {
-	jq --indent 4 --arg version "$VERSION" '.coolify.v4.version = $version' versions.json > "$WORK_DIR/versions.json"
-	ok "versions.json names Coolify $VERSION and the helper, Sentinel and Traefik versions of this commit"
+	jq --indent 4 --arg version "$VERSION" '{coolify: ({v4: {$version}} + del(.traefik)), traefik}' upstream.json > "$WORK_DIR/versions.json"
+	ok "versions.json names Coolify $VERSION and the helper, Sentinel and Traefik versions of upstream.json"
 }
 
 fetch_releases() {

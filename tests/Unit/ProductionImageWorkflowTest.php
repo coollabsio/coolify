@@ -1,11 +1,18 @@
 <?php
 
+it('reads the Coolify and helper versions by key from the versions.json of the CDN in install.sh', function () {
+    $versions = shell_exec("jq --indent 4 --arg version 4.6.0-beta.1 '{coolify: ({v4: {\$version}} + del(.traefik)), traefik}' ".escapeshellarg(dirname(__DIR__, 2).'/upstream.json'));
+    $parse = implode("\n", preg_grep('/^LATEST_(HELPER_)?VERSION=\$\(echo "\$VERSIONS_JSON"/', file(dirname(__DIR__, 2).'/scripts/install.sh')));
+    $output = shell_exec('VERSIONS_JSON='.escapeshellarg($versions).' bash -c '.escapeshellarg($parse."\necho \"\$LATEST_VERSION \$LATEST_HELPER_VERSION\""));
+    $helper = json_decode(file_get_contents(dirname(__DIR__, 2).'/upstream.json'), true)['helper']['version'];
+
+    expect(trim($output))->toBe("4.6.0-beta.1 {$helper}");
+});
+
 it('publishes main builds under rolling and commit sha tags with a traceable internal version', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-main-build.yml');
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $constants = file_get_contents(dirname(__DIR__, 2).'/config/constants.php');
-    $versions = json_decode(file_get_contents(dirname(__DIR__, 2).'/versions.json'), true, flags: JSON_THROW_ON_ERROR);
-    $nightlyVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/nightly/versions.json'), true, flags: JSON_THROW_ON_ERROR);
 
     expect($workflow)
         ->toContain('name: Build Coolify Main')
@@ -30,10 +37,7 @@ it('publishes main builds under rolling and commit sha tags with a traceable int
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '{$versions['coolify']['v4']['version']}'")
-        ->and($versions['coolify']['nightly']['version'])->toMatch('/^\d+\.\d+-rc\.\d+$/')
-        ->and(version_compare($versions['coolify']['v4']['version'], $versions['coolify']['nightly']['version'], '<'))->toBeTrue()
-        ->and($nightlyVersions)->toBe($versions);
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: \$release['stable']['coolify']");
 });
 
 it('orders a maintenance development build before its stable release', function () {
@@ -119,7 +123,7 @@ it('publishes traceable rolling builds from next without creating an exact rc ta
         ->toContain('name: Build Coolify Next')
         ->toContain('branches: [next]')
         ->toContain('group: coolify-next-build')
-        ->toContain("jq -r '.coolify.nightly.version' versions.json")
+        ->toContain("jq -r '.coolify.nightly.version' other/nightly/versions.json")
         ->toContain('VERSION="${RC_VERSION}.${SHORT_SHA}"')
         ->toContain('COOLIFY_VERSION=${{ needs.prepare.outputs.version }}')
         ->toContain('--tag "${IMAGE}:sha-${SHA}"')
@@ -140,7 +144,7 @@ it('requires a reviewed draft prerelease before publishing an exact rc', functio
         ->toContain("github.ref != 'refs/heads/next'")
         ->toContain('group: coolify-rc-release')
         ->toContain('^v[0-9]+\\.[0-9]+-rc\\.[0-9]+$')
-        ->toContain("jq -r '.coolify.nightly.version' versions.json")
+        ->toContain("jq -r '.coolify.nightly.version' other/nightly/versions.json")
         ->toContain('release.draft')
         ->toContain('!release.prerelease')
         ->toContain('release.body?.trim()')
@@ -215,12 +219,13 @@ it('guides issue authors to the correct contribution branch', function () {
         ->toContain('Small fixes should target `main`; larger changes should target `next`');
 });
 
-it('ships versions.json in the production image so version checks work right after an upgrade', function () {
+it('writes versions.json in the production image from upstream.json so version checks work right after an upgrade', function () {
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $dockerignore = file_get_contents(dirname(__DIR__, 2).'/.dockerignore');
 
     expect($dockerfile)
-        ->toContain('COPY --chown=www-data:www-data versions.json ./versions.json')
+        ->toContain('COPY --chown=www-data:www-data release.json upstream.json ./')
+        ->toContain('upstream.json > versions.json')
         ->and($dockerignore)
-        ->not->toMatch('/^\/?versions\.json$/m');
+        ->not->toMatch('/^\/?(release|upstream)\.json$/m');
 });
