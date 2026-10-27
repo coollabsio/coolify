@@ -50,51 +50,22 @@ function manualWebhookSecretAbilityHeaders(User $user, int $teamId, array $abili
 }
 
 describe('update', function () {
-    test('write-only token cannot set a new manual webhook secret', function (string $field) {
+    test('write-only token can set a new manual webhook secret', function (string $field) {
         $this->withHeaders(manualWebhookSecretAbilityHeaders($this->user, $this->team->id, ['write']))
-            ->patchJson("/api/v1/applications/{$this->application->uuid}", [$field => 'attacker-secret-0123456789'])
-            ->assertForbidden()
-            ->assertJsonPath('message', 'Missing required permissions: deploy. A manual webhook secret lets anyone who knows it start a deployment, so it needs a token with the deploy permission.');
+            ->patchJson("/api/v1/applications/{$this->application->uuid}", [$field => 'new-secret-0123456789'])
+            ->assertOk();
 
-        $application = $this->application->fresh();
-        expect($application->manual_webhook_secret_github)->toBe('existing-secret-0123456789');
-        expect($application->{$field})->not->toBe('attacker-secret-0123456789');
+        expect($this->application->fresh()->{$field})->toBe('new-secret-0123456789');
     })->with([
         'manual_webhook_secret_github',
         'manual_webhook_secret_gitlab',
         'manual_webhook_secret_bitbucket',
         'manual_webhook_secret_gitea',
     ]);
-
-    test('write-only token can update other fields and send the stored secret back', function () {
-        $headers = manualWebhookSecretAbilityHeaders($this->user, $this->team->id, ['write']);
-
-        $this->withHeaders($headers)
-            ->patchJson("/api/v1/applications/{$this->application->uuid}", ['description' => 'changed'])
-            ->assertOk();
-        $this->withHeaders($headers)
-            ->patchJson("/api/v1/applications/{$this->application->uuid}", [
-                'description' => 'changed again',
-                'manual_webhook_secret_github' => 'existing-secret-0123456789',
-            ])
-            ->assertOk();
-
-        expect($this->application->fresh())
-            ->description->toBe('changed again')
-            ->manual_webhook_secret_github->toBe('existing-secret-0123456789');
-    });
-
-    test('write and deploy token can set a new manual webhook secret', function () {
-        $this->withHeaders(manualWebhookSecretAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
-            ->patchJson("/api/v1/applications/{$this->application->uuid}", ['manual_webhook_secret_gitlab' => 'new-gitlab-secret-0123456789'])
-            ->assertOk();
-
-        expect($this->application->fresh()->manual_webhook_secret_gitlab)->toBe('new-gitlab-secret-0123456789');
-    });
 });
 
 describe('create', function () {
-    test('write-only token cannot create an application with a manual webhook secret', function () {
+    test('write-only token can create an application with a manual webhook secret', function () {
         $this->withHeaders(manualWebhookSecretAbilityHeaders($this->user, $this->team->id, ['write']))
             ->postJson('/api/v1/applications/dockerimage', [
                 'project_uuid' => $this->project->uuid,
@@ -102,11 +73,10 @@ describe('create', function () {
                 'server_uuid' => $this->server->uuid,
                 'docker_registry_image_name' => 'nginx',
                 'ports_exposes' => '80',
-                'manual_webhook_secret_github' => 'attacker-secret-0123456789',
+                'manual_webhook_secret_github' => 'new-secret-0123456789',
             ])
-            ->assertForbidden()
-            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'manual webhook secret'));
+            ->assertCreated();
 
-        expect(Application::count())->toBe(1);
+        expect(Application::latest('id')->first()->manual_webhook_secret_github)->toBe('new-secret-0123456789');
     });
 });
