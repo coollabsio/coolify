@@ -39,9 +39,9 @@ jobs:
           BRANCH: next
         run: |
           annotations="$(docker buildx imagetools inspect --raw ghcr.io/coollabsio/coolify:nightly | jq -c '.annotations // {}')" || annotations='{}'
-          PUBLISHED_NIGHTLY="$(jq -r '.["org.opencontainers.image.version"] // empty' <<< "$annotations")"
-          PUBLISHED_NIGHTLY_REVISION="$(jq -r '.["org.opencontainers.image.revision"] // empty' <<< "$annotations")"
-          export PUBLISHED_NIGHTLY PUBLISHED_NIGHTLY_REVISION
+          PUBLISHED_VERSION="$(jq -r '.["org.opencontainers.image.version"] // empty' <<< "$annotations")"
+          PUBLISHED_REVISION="$(jq -r '.["org.opencontainers.image.revision"] // empty' <<< "$annotations")"
+          export PUBLISHED_VERSION PUBLISHED_REVISION
           nightly="$(scripts/version.sh --nightly)"
           echo "nightly=$nightly" | tee -a "$GITHUB_OUTPUT"
 

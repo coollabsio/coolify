@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Publish a nightly twice a day, tagged like `4.6.0-alpha.0.20261026.1`, with the moving `nightly` tag and the nightly channel of the CDN, from `next` or from the release branch while one is in progress
+- Build `main` twice a day when it changed and move the `main` tag on ghcr.io to it, versioned like `4.5.0.20261028.1`, to test fixes before their patch release
 - Publish prereleases from `next` and the release branches, tagged like `4.6.0-beta.1`, and the moving `preview` tag
 - Publish the image of every push to a pull request from a branch of this repository as `pr-<number>` on ghcr.io
 - Add the preview channel to the CDN, which takes the betas and release candidates
@@ -36,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Remove the git-cliff workflow that generated `CHANGELOG.md`, it is written by hand
 - Remove the copies of the install and upgrade scripts and the compose files in `other/nightly`, `scripts/sync-cdn.sh` writes the nightly channel from the files of the commit the nightly is built from
 - Remove the temporary hotfix release workflow, patch branches release hotfixes
-- Remove the `next`, `main`, `sha-<commit>` and `<version>-rc.N.<commit>` image tags, prereleases and nightlies take their place
+- Remove the `next`, `sha-<commit>` and `<version>-rc.N.<commit>` image tags, prereleases and nightlies take their place, and the `main` tag on docker.io, it moves on ghcr.io alone
 
 ### Fixed
 

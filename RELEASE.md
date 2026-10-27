@@ -139,6 +139,15 @@ The nightly workflow publishes a nightly twice a day when its branch has a new c
 
 Print what the next run publishes with `scripts/version.sh --nightly`.
 
+## Main builds
+
+The main workflow builds `main` twice a day when it changed since the last build and moves `ghcr.io/coollabsio/coolify:main` to it, to test fixes before their patch release. A main build is versioned `<stable version>.<YYYYMMDD>.<N>`, `4.5.0.20261028.1`, which sorts after `4.5.0` and before `4.5.1`.
+
+- ghcr.io only, no version tag, no git tag, no GitHub release and no channel of the CDN, an instance installs it through the custom channel with the tag `main`
+- The build it replaces is left untagged, the clean manifests workflow deletes it
+
+Print what the next run builds with `scripts/version.sh --main`.
+
 ## Pull requests
 
 Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and its nightlies and before `4.6.0-beta.2`.
