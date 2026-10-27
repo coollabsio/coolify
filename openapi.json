@@ -17172,6 +17172,12 @@
                                                 "null"
                                             ]
                                         },
+                                        "logdrain_axiom_domain": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
                                         "logdrain_axiom_api_key": {
                                             "description": "Only present with read:sensitive.",
                                             "type": "string"
@@ -17268,6 +17274,10 @@
                                         "type": "boolean"
                                     },
                                     "logdrain_axiom_dataset_name": {
+                                        "type": "string"
+                                    },
+                                    "logdrain_axiom_domain": {
+                                        "description": "Base domain of the Axiom edge deployment. Default: us-east-1.aws.edge.axiom.co. Use eu-central-1.aws.edge.axiom.co for EU datasets.",
                                         "type": "string"
                                     },
                                     "logdrain_axiom_api_key": {
@@ -26042,6 +26052,10 @@
                     },
                     "logdrain_axiom_dataset_name": {
                         "type": "string"
+                    },
+                    "logdrain_axiom_domain": {
+                        "type": "string",
+                        "description": "Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co."
                     },
                     "logdrain_cloudwatch_region": {
                         "type": "string"
