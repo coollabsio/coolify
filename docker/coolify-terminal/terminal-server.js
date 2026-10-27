@@ -1,7 +1,6 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import { parseCookie } from 'cookie';
 import 'dotenv/config';
 import {
     TERMINAL_CLOSE_CODES,
@@ -112,25 +111,22 @@ const server = http.createServer((req, res) => {
     }
 });
 
-const getAuthHeaders = (req) => {
-    const cookieHeader = req.headers.cookie || '';
-    return getTerminalAuthHeaders(cookieHeader, parseCookie(cookieHeader)['XSRF-TOKEN']);
-}
-
 const verifyClient = async (req) => {
-    const authHeaders = getAuthHeaders(req);
+    const authHeaderCandidates = getTerminalAuthHeaders(req.headers.cookie);
     const requestContext = {
         remoteAddress: req.socket?.remoteAddress,
         origin: req.headers.origin,
-        hasAuthTokens: Boolean(authHeaders),
+        xsrfTokenCount: authHeaderCandidates.length,
     };
 
     logTerminal('log', 'Verifying websocket client.', requestContext);
 
     // Authenticate with Laravel backend
-    const result = await authenticateTerminalUpgrade(authHeaders, postToCoolify);
+    const result = await authenticateTerminalUpgrade(authHeaderCandidates, postToCoolify);
 
     if (result.authenticated) {
+        // The connection handler sends its requests with the XSRF token that Coolify accepted.
+        req.terminalAuthHeaders = result.authHeaders;
         logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
     } else if (result.error) {
         logTerminal('error', 'Websocket client authentication failed.', {
@@ -162,7 +158,7 @@ wss.on('connection', async (ws, req) => {
 
     const userId = generateUserId();
     ws.userId = userId;
-    const authHeaders = getAuthHeaders(req);
+    const authHeaders = req.terminalAuthHeaders;
     const userSession = {
         ws,
         userId,

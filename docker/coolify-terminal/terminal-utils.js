@@ -1,3 +1,5 @@
+import { parseCookie } from 'cookie';
+
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
 /**
@@ -14,35 +16,54 @@ export const TERMINAL_CLOSE_CODES = Object.freeze({
 export const TERMINAL_REJECTED_SOCKET_TERMINATE_MS = 2000;
 
 /**
- * Builds the headers that authenticate terminal requests to Coolify. The whole
- * browser Cookie header is forwarded, so Laravel finds its session cookie by
- * its own name (SESSION_COOKIE or the slug of APP_NAME).
- *
- * @param {string} cookieHeader
- * @param {string | undefined} xsrfToken
- * @returns {{ 'Cookie': string, 'X-XSRF-TOKEN': string } | null} null when a required value is missing
+ * Limits the Coolify requests that one WebSocket upgrade can cause.
  */
-export function getTerminalAuthHeaders(cookieHeader, xsrfToken) {
-    if (!cookieHeader || !xsrfToken) {
-        return null;
+export const MAX_XSRF_TOKEN_CANDIDATES = 5;
+
+/**
+ * Builds the header sets that can authenticate terminal requests to Coolify, one
+ * for each XSRF-TOKEN cookie. The whole browser Cookie header is forwarded, so
+ * Laravel finds its session cookie by its own name (SESSION_COOKIE or the slug
+ * of APP_NAME).
+ *
+ * The browser sends more than one XSRF-TOKEN cookie when a Laravel app on a
+ * parent domain also sets one (for example SESSION_DOMAIN=.example.com). Their
+ * order in the header does not show which one is Coolify's, so the caller must
+ * try each one.
+ *
+ * @param {string | undefined} cookieHeader
+ * @returns {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string }>} empty when a required value is missing
+ */
+export function getTerminalAuthHeaders(cookieHeader) {
+    if (!cookieHeader) {
+        return [];
     }
 
-    return {
-        'Cookie': cookieHeader,
-        'X-XSRF-TOKEN': xsrfToken,
-    };
+    // parseCookie() keeps only the first cookie of a name, so parse each pair alone.
+    const xsrfTokens = cookieHeader
+        .split(';')
+        .map((pair) => parseCookie(pair)['XSRF-TOKEN'])
+        .filter(Boolean);
+
+    return [...new Set(xsrfTokens)]
+        .slice(0, MAX_XSRF_TOKEN_CANDIDATES)
+        .map((xsrfToken) => ({
+            'Cookie': cookieHeader,
+            'X-XSRF-TOKEN': xsrfToken,
+        }));
 }
 
 /**
  * Authenticates a terminal WebSocket upgrade with the browser's Laravel session
- * cookie and XSRF token.
+ * cookie and XSRF token. Returns the headers that Coolify accepted, for the
+ * requests that follow on the same connection.
  *
- * @param {{ 'Cookie': string, 'X-XSRF-TOKEN': string } | null} authHeaders from getTerminalAuthHeaders()
+ * @param {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string }>} authHeaderCandidates from getTerminalAuthHeaders()
  * @param {(path: string, headers: object) => Promise<{ status: number }>} postToCoolify
- * @returns {Promise<{ authenticated: true } | { authenticated: false, closeCode: number, reason: string, status?: number, error?: Error }>}
+ * @returns {Promise<{ authenticated: true, authHeaders: object } | { authenticated: false, closeCode: number, reason: string, status?: number, error?: Error }>}
  */
-export async function authenticateTerminalUpgrade(authHeaders, postToCoolify) {
-    if (!authHeaders) {
+export async function authenticateTerminalUpgrade(authHeaderCandidates, postToCoolify) {
+    if (authHeaderCandidates.length === 0) {
         return {
             authenticated: false,
             closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
@@ -50,19 +71,18 @@ export async function authenticateTerminalUpgrade(authHeaders, postToCoolify) {
         };
     }
 
+    let status;
+
     try {
-        const response = await postToCoolify('/terminal/auth', authHeaders);
+        for (const authHeaders of authHeaderCandidates) {
+            const response = await postToCoolify('/terminal/auth', authHeaders);
 
-        if (response.status === 200) {
-            return { authenticated: true };
+            if (response.status === 200) {
+                return { authenticated: true, authHeaders };
+            }
+
+            status = response.status;
         }
-
-        return {
-            authenticated: false,
-            closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
-            reason: 'Unauthorized: Invalid credentials',
-            status: response.status,
-        };
     } catch (error) {
         return {
             authenticated: false,
@@ -71,6 +91,13 @@ export async function authenticateTerminalUpgrade(authHeaders, postToCoolify) {
             error,
         };
     }
+
+    return {
+        authenticated: false,
+        closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
+        reason: 'Unauthorized: Invalid credentials',
+        status,
+    };
 }
 
 /**
