@@ -116,6 +116,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public bool $foundLogDrainContainer = false;
 
+    public array $logDrainContainerLabels = [];
+
     private ?array $cachedDestinationIds = null;
 
     public function middleware(): array
@@ -275,6 +277,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $name = data_get($container, 'name');
             if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
                 $this->foundLogDrainContainer = true;
+                $this->logDrainContainerLabels = $labels->all();
             }
             // Containers are matched by owner UUID; numeric ids differ between instances.
             if (isContainerOfType($labels, 'application')) {
@@ -979,7 +982,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function checkLogDrainContainer()
     {
-        if ($this->server->isFluentBitLogDrainEnabled() && $this->foundLogDrainContainer === false) {
+        if (! $this->server->isFluentBitLogDrainEnabled()) {
+            return;
+        }
+        if ($this->foundLogDrainContainer === false || StartLogDrain::claimOutdatedRefresh($this->server, $this->logDrainContainerLabels)) {
             StartLogDrain::dispatch($this->server);
         }
     }

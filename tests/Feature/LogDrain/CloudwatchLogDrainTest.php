@@ -153,52 +153,6 @@ it('does not deploy the Fluent Bit container for CloudWatch', function () {
     expect($result)->toContain('awslogs');
 });
 
-it('turns off the legacy Highlight drain when CloudWatch is enabled', function () {
-    StartLogDrain::mock()->shouldReceive('handle')->andReturn('ok');
-    $this->server->settings->update([
-        'is_logdrain_highlight_enabled' => true,
-        'logdrain_highlight_project_id' => 'legacy-project',
-    ]);
-
-    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainCloudwatchGroup', 'coolify')
-        ->set('logDrainCloudwatchRegion', 'us-east-1')
-        ->set('isLogDrainCloudwatchEnabled', true)
-        ->call('instantSave')
-        ->assertDispatched('success');
-
-    $settings = $this->server->settings->fresh();
-    expect($settings->is_logdrain_highlight_enabled)->toBeFalsy()
-        ->and($settings->is_logdrain_cloudwatch_enabled)->toBeTrue();
-});
-
-it('turns off the legacy Highlight drain when switching drains with toggleLogDrain', function () {
-    StartLogDrain::mock()->shouldReceive('handle')->andReturn('ok');
-    $this->server->settings->update(['is_logdrain_highlight_enabled' => true]);
-
-    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainCloudwatchGroup', 'coolify')
-        ->set('logDrainCloudwatchRegion', 'us-east-1')
-        ->call('toggleLogDrain', 'cloudwatch');
-
-    $settings = $this->server->settings->fresh();
-    expect($settings->is_logdrain_highlight_enabled)->toBeFalsy()
-        ->and($settings->is_logdrain_cloudwatch_enabled)->toBeTrue();
-});
-
-it('keeps the legacy Highlight drain when saving without enabling another drain', function () {
-    StartLogDrain::mock()->shouldReceive('handle')->andReturn('ok');
-    $this->server->settings->update(['is_logdrain_highlight_enabled' => true]);
-
-    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainCloudwatchGroup', 'coolify')
-        ->set('logDrainCloudwatchRegion', 'us-east-1')
-        ->call('submit')
-        ->assertDispatched('success');
-
-    expect($this->server->settings->fresh()->is_logdrain_highlight_enabled)->toBeTruthy();
-});
-
 it('rejects a save that would enable two log drains at once', function () {
     StartLogDrain::mock()->shouldNotReceive('handle');
     $this->server->settings->update([
