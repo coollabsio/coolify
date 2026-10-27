@@ -2,6 +2,7 @@
 
 namespace App\Livewire\ImageScan;
 
+use App\Enums\SecurityStatusType;
 use App\Services\ImageScan\TeamVulnerabilities;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
@@ -12,15 +13,14 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 /**
- * The team Vulnerabilities page (spec 6.5): the resources of the session team the user can see, worst first, and a
- * search by vulnerability ID or package across their current scans.
+ * The team Security page (spec 15.8): the resources of the session team the user can see with their stored security
+ * status, most urgent first, and a search by vulnerability ID or package across their current scans. No buttons and
+ * no bulk actions: the Action column links to the Security card of each resource.
  */
 class FleetVulnerabilities extends Component
 {
     use ListensToTeamChannel;
     use WithPagination;
-
-    private const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 
     #[Url(except: '')]
     public string $search = '';
@@ -31,8 +31,8 @@ class FleetVulnerabilities extends Component
     /** @var list<string> Project UUIDs. */
     public array $projects = [];
 
-    /** @var list<string> */
-    public array $severities = [];
+    /** @var list<string> SecurityStatusType values. */
+    public array $statuses = [];
 
     public int $perPage = 10;
 
@@ -75,10 +75,10 @@ class FleetVulnerabilities extends Component
         $this->projects = $this->toggle($this->projects, $uuid);
     }
 
-    public function toggleSeverity(string $severity): void
+    public function toggleStatus(string $status): void
     {
-        if (in_array($severity, self::SEVERITIES, true)) {
-            $this->severities = $this->toggle($this->severities, $severity);
+        if (in_array($status, TeamVulnerabilities::STATUS_ORDER, true)) {
+            $this->statuses = $this->toggle($this->statuses, $status);
         }
     }
 
@@ -86,7 +86,7 @@ class FleetVulnerabilities extends Component
     {
         $this->servers = [];
         $this->projects = [];
-        $this->severities = [];
+        $this->statuses = [];
         $this->resetPage();
     }
 
@@ -120,37 +120,36 @@ class FleetVulnerabilities extends Component
             ->mapWithKeys(fn ($server) => [$server->uuid => $server->name])->sort(SORT_NATURAL | SORT_FLAG_CASE)->all();
         $projectOptions = $entries->pluck('project')->filter()->unique('id')
             ->mapWithKeys(fn ($project) => [$project->uuid => $project->name])->sort(SORT_NATURAL | SORT_FLAG_CASE)->all();
+        $statusOptions = collect(TeamVulnerabilities::STATUS_ORDER)
+            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status))])
+            ->all();
         $this->servers = array_values(array_intersect($this->servers, array_keys($serverOptions)));
         $this->projects = array_values(array_intersect($this->projects, array_keys($projectOptions)));
-        $this->severities = array_values(array_intersect($this->severities, self::SEVERITIES));
+        $this->statuses = array_values(array_intersect($this->statuses, TeamVulnerabilities::STATUS_ORDER));
 
-        $filtered = $entries->filter(fn (array $entry): bool => ($this->servers === [] || in_array($entry['server']?->uuid, $this->servers, true))
+        $inScope = $entries->filter(fn (array $entry): bool => ($this->servers === [] || in_array($entry['server']?->uuid, $this->servers, true))
             && ($this->projects === [] || in_array($entry['project']?->uuid, $this->projects, true)))->values();
+        $filtered = $inScope->filter(fn (array $entry): bool => $this->statuses === [] || in_array($entry['security']->status->value, $this->statuses, true))->values();
 
-        $notScanned = $filtered->reject(fn (array $entry): bool => $entry['scanned']);
-        $scanned = $filtered->filter(fn (array $entry): bool => $entry['scanned'])->values();
+        $notScanned = $inScope->filter(fn (array $entry): bool => $entry['security']->status === SecurityStatusType::NotChecked);
         $searching = trim($this->search) !== '';
 
         $rows = $searching
-            ? $fleet->search($scanned, $this->search, $this->severities)
-            : $this->worstFirst($scanned);
-        $items = $this->paginate($rows);
-        $packageCounts = $searching ? [] : $fleet->fixablePackageCounts(collect($items->items())
-            ->filter(fn (array $entry): bool => $entry['summary']['count'] > 0 && $entry['summary']['update'] === null));
+            ? $fleet->search($filtered->filter(fn (array $entry): bool => $entry['scanned'])->values(), $this->search)
+            : self::byStatus($filtered);
         $notScannedServers = $notScanned->pluck('server')->filter()->unique('id')->count();
 
         return view('livewire.image-scan.fleet-vulnerabilities', [
             'allowed' => true,
-            'items' => $items,
+            'items' => $this->paginate($rows),
             'searching' => $searching,
-            'packageCounts' => $packageCounts,
             'notScannedLine' => $notScanned->isEmpty() ? null : self::notScannedSentence($notScanned->count(), $notScannedServers),
             'searchCapped' => $searching && $fleet->searchWasCapped(),
             'serversNotScanning' => $user->isAdminOfTeam($team->id) ? TeamVulnerabilities::serversNotScanning($team->id) : 0,
             'serverOptions' => $serverOptions,
             'projectOptions' => $projectOptions,
-            'severityOptions' => self::SEVERITIES,
-            'hasFilters' => $this->servers !== [] || $this->projects !== [] || $this->severities !== [],
+            'statusOptions' => $statusOptions,
+            'hasFilters' => $this->servers !== [] || $this->projects !== [] || $this->statuses !== [],
             'hasResources' => $entries->isNotEmpty(),
             'stateLabels' => TeamVulnerabilities::STATE_LABELS,
         ]);
@@ -171,7 +170,7 @@ class FleetVulnerabilities extends Component
     }
 
     /**
-     * The team's resources and their scan totals, loaded once per request.
+     * The team's resources and their stored statuses, loaded once per request.
      */
     private function fleet(int $teamId): TeamVulnerabilities
     {
@@ -183,27 +182,18 @@ class FleetVulnerabilities extends Component
     }
 
     /**
-     * Known exploited first, then the count of relevant findings that an action fixes, then critical and high counts.
+     * update_now, update_available, no_fix, check_needed, ok, not_checked; then the resource name.
      *
      * @param  Collection<int, array<string, mixed>>  $entries
      * @return Collection<int, array<string, mixed>>
      */
-    private function worstFirst(Collection $entries): Collection
+    public static function byStatus(Collection $entries): Collection
     {
-        if ($this->severities !== []) {
-            $entries = $entries->filter(fn (array $entry): bool => collect($this->severities)
-                ->contains(fn (string $severity): bool => ($entry['summary']['fixable'][$severity] ?? 0) > 0));
-        }
-
-        $rank = fn (array $entry): array => [
-            $entry['summary']['kev'],
-            $entry['summary']['count'],
-            $entry['summary']['fixable']['critical'],
-            $entry['summary']['fixable']['high'],
-        ];
+        $rank = array_flip(TeamVulnerabilities::STATUS_ORDER);
 
         return $entries
-            ->sort(fn (array $a, array $b): int => ($rank($b) <=> $rank($a)) ?: strnatcasecmp((string) $a['resource']->name, (string) $b['resource']->name))
+            ->sort(fn (array $a, array $b): int => ($rank[$a['security']->status->value] <=> $rank[$b['security']->status->value])
+                ?: strnatcasecmp((string) $a['resource']->name, (string) $b['resource']->name))
             ->values();
     }
 

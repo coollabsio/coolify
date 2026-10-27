@@ -30,10 +30,10 @@ class Dashboard extends Component
     public bool $showsTeamSections = true;
 
     /**
-     * Resources the user can see with a relevant finding that an action fixes.
+     * Resources the user can see that need a security update now (update_now).
      */
     #[Locked]
-    public int $fixableResourceCount = 0;
+    public int $securityUpdateNowCount = 0;
 
     public function mount()
     {
@@ -45,7 +45,7 @@ class Dashboard extends Component
             return;
         }
 
-        $this->fixableResourceCount = TeamVulnerabilities::fixableResourceCount(currentTeam()->id);
+        $this->securityUpdateNowCount = TeamVulnerabilities::updateNowResourceCount(currentTeam()->id);
         $this->privateKeys = $this->showsTeamSections ? PrivateKey::ownedByCurrentTeamCached() : collect();
         $this->servers = $this->showsTeamSections ? Server::ownedByCurrentTeamCached() : collect();
         $this->projects = Project::ownedByCurrentTeam()
@@ -71,6 +71,16 @@ class Dashboard extends Component
         return view('livewire.dashboard', [
             'pendingInvitations' => $this->pendingInvitations(),
         ]);
+    }
+
+    /**
+     * "1 resource needs a security update now." / "3 resources need a security update now."
+     */
+    public static function securityCalloutTitle(int $count): string
+    {
+        return $count === 1
+            ? '1 resource needs a security update now.'
+            : "{$count} resources need a security update now.";
     }
 
     /**

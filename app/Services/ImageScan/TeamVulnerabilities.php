@@ -4,6 +4,7 @@ namespace App\Services\ImageScan;
 
 use App\Enums\ImageScanFixState;
 use App\Enums\ImageScanStatus;
+use App\Enums\SecurityStatusType;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\ImageScan;
@@ -20,20 +21,23 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 
 /**
- * The resources of a team and their current scan totals, for the team Vulnerabilities page and the dashboard
- * callout (spec 6.5). Only resources the user can see are loaded: the resource models hide the others for members
- * whose access is limited to some projects.
+ * The resources of a team and their stored security status, for the team Security page and the dashboard callout
+ * (spec 15.8). Only resources the user can see are loaded: the resource models hide the others for members whose
+ * access is limited to some projects. Lists read only stored statuses; only the search decodes findings.
  */
 final class TeamVulnerabilities
 {
+    /** The sort order of the team page. */
+    public const STATUS_ORDER = ['update_now', 'update_available', 'no_fix', 'check_needed', 'ok', 'not_checked'];
+
+    /** The fix state of a search match, in the words of the resource page. */
     public const STATE_LABELS = [
-        'fixable_now' => 'Fixable now',
-        'not_released' => 'Fix not released yet',
-        'no_fix' => 'No fix',
+        'fixed' => 'Fixed by an update',
+        'no_fix' => 'No fix yet',
         'ignored' => 'Ignored',
     ];
 
-    private const STATE_RANK = ['fixable_now' => 0, 'not_released' => 1, 'no_fix' => 2, 'ignored' => 3];
+    private const STATE_RANK = ['fixed' => 0, 'no_fix' => 1, 'ignored' => 2];
 
     private const SEVERITY_RANK = ['critical' => 4, 'high' => 3, 'medium' => 2, 'low' => 1, 'unknown' => 0];
 
@@ -43,25 +47,24 @@ final class TeamVulnerabilities
     private bool $searchCapped = false;
 
     /**
-     * @param  Collection<int, array{key: string, resource: Model, server: ?Server, project: ?Project, environment: ?Environment, link: ?string, scanned: bool, scans: Collection<int, ImageScan>, summary: array<string, mixed>}>  $entries
+     * @param  Collection<int, array{key: string, resource: Model, server: ?Server, project: ?Project, environment: ?Environment, link: ?string, scanned: bool, scans: Collection<int, ImageScan>, security: ResourceSecurity}>  $entries
      */
     private function __construct(public readonly int $teamId, public readonly Collection $entries) {}
 
     public static function load(int $teamId): self
     {
         $resources = self::resources($teamId);
-        ResourceScans::loadScanRelations($resources);
+        $statuses = SecurityStatus::storedMany($resources);
         $scanOn = $resources->filter(fn (Model $resource): bool => ImageScanPolicyResolver::isScanOn($resource))
             ->mapWithKeys(fn (Model $resource): array => [ResourceScans::key($resource) => true]);
         $owners = ResourceScans::ownersOfMany($resources->filter(fn (Model $resource): bool => $scanOn->has(ResourceScans::key($resource)))->values());
         $scans = ResourceScans::currentForMany($owners->flatten(1), VulnerabilityMarkers::SCAN_COLUMNS);
 
-        $entries = $resources->map(function (Model $resource) use ($owners, $scans): array {
+        $entries = $resources->map(function (Model $resource) use ($owners, $scans, $statuses): array {
             $key = ResourceScans::key($resource);
             $resourceScans = $owners->get($key, collect())
                 ->flatMap(fn (Model $owner): Collection => $scans->get(ResourceScans::key($owner), collect()))
                 ->values();
-            $scanned = $resourceScans->isNotEmpty();
 
             return [
                 'key' => $key,
@@ -70,9 +73,9 @@ final class TeamVulnerabilities
                 'project' => $resource->environment?->project,
                 'environment' => $resource->environment,
                 'link' => self::vulnerabilitiesUrl($resource),
-                'scanned' => $scanned,
+                'scanned' => $resourceScans->isNotEmpty(),
                 'scans' => $resourceScans,
-                'summary' => VulnerabilityMarkers::summarize($resource, $resourceScans),
+                'security' => $statuses[$key],
             ];
         })->values();
 
@@ -80,17 +83,44 @@ final class TeamVulnerabilities
     }
 
     /**
-     * How many resources the user can see have a relevant finding that an action fixes. Starts from the current
-     * scans with a count above 0, so only those resources are loaded, not every resource of the team.
+     * The status text of the team page: the badge, "No action needed" for ok, "Not checked" for not_checked.
      */
-    public static function fixableResourceCount(int $teamId): int
+    public static function statusLabel(SecurityStatusType $status): string
+    {
+        return match ($status) {
+            SecurityStatusType::Ok => 'No action needed',
+            SecurityStatusType::NotChecked => 'Not checked',
+            default => (string) SecuritySentences::badge($status),
+        };
+    }
+
+    /**
+     * The sentence of the primary action of an update_now or update_available status, else null.
+     */
+    public static function actionSentence(ResourceSecurity $security): ?string
+    {
+        if (! in_array($security->status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true)) {
+            return null;
+        }
+
+        $sentence = $security->primary()?->sentence;
+
+        return filled($sentence) ? $sentence : null;
+    }
+
+    /**
+     * How many resources the user can see need a security update now (update_now). Starts from the current scans
+     * whose stored status has a fixed finding with an exploit signal, so only those resources are loaded, not every
+     * resource of the team.
+     */
+    public static function updateNowResourceCount(int $teamId): int
     {
         if (! instanceSettings()->is_image_scanning_allowed) {
             return 0;
         }
 
         $owners = ImageScan::query()
-            // Whether a resource is scanned is decided below by the shared rule, not by the server of its scans.
+            // Whether a resource is scanned is decided by the shared rule, not by the server of its scans.
             ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))
             ->where('status', ImageScanStatus::Completed)
             ->select(['resource_type', 'resource_id'])
@@ -104,16 +134,17 @@ final class TeamVulnerabilities
             return 0;
         }
 
-        $fixable = ImageScan::query()
+        // A resource is update_now only when one of its images has a fixed finding with an exploit signal.
+        $candidates = ImageScan::query()
             ->select(['id', 'resource_type', 'resource_id', 'summary'])
             ->whereIn('id', $currentIds)
             ->get()
-            ->filter(fn (ImageScan $scan): bool => ResourceScans::storedFixedCount($scan) > 0)
+            ->filter(fn (ImageScan $scan): bool => (int) data_get($scan->summary, 'security.facts.counts.signal_fixed', 0) > 0)
             ->groupBy('resource_type')
             ->map(fn (Collection $scans): array => $scans->pluck('resource_id')->unique()->values()->all());
 
         $resourceIds = [];
-        foreach ($fixable as $type => $ids) {
+        foreach ($candidates as $type => $ids) {
             $class = Relation::getMorphedModel($type) ?? $type;
             if (in_array($class, [ServiceApplication::class, ServiceDatabase::class], true)) {
                 $resourceIds[Service::class] = [...($resourceIds[Service::class] ?? []), ...$class::query()->whereIn('id', $ids)->pluck('service_id')->all()];
@@ -125,10 +156,12 @@ final class TeamVulnerabilities
         $resources = collect($resourceIds)->flatMap(fn (array $ids, string $class): Collection => $class::query()
             ->whereIn('id', array_values(array_unique($ids)))
             ->whereRelation('environment.project', 'team_id', $teamId)
-            ->get());
-        ResourceScans::loadScanRelations($resources);
+            ->get())
+            ->values();
 
-        return $resources->filter(fn (Model $resource): bool => ImageScanPolicyResolver::isScanOn($resource))->count();
+        return collect(SecurityStatus::storedMany($resources))
+            ->filter(fn (ResourceSecurity $security): bool => $security->status === SecurityStatusType::UpdateNow)
+            ->count();
     }
 
     /**
@@ -146,14 +179,13 @@ final class TeamVulnerabilities
 
     /**
      * Resources of the entries that have a finding with this ID, alias, or package, with the state of the most
-     * actionable match: Fixable now, Fix not released yet, No fix, then Ignored.
+     * actionable match: fixed by an update, no fix yet, then ignored.
      *
      * @param  Collection<int, array<string, mixed>>  $entries
-     * @param  list<string>  $severities  Only findings of these severities, or all when empty.
      * @param  int  $maxScans  At most this many matching scans are decoded; see `searchWasCapped()`.
      * @return Collection<int, array<string, mixed>> The entries with a `match` array.
      */
-    public function search(Collection $entries, string $term, array $severities = [], int $maxScans = self::MAX_DECODED_SCANS): Collection
+    public function search(Collection $entries, string $term, int $maxScans = self::MAX_DECODED_SCANS): Collection
     {
         $this->searchCapped = false;
         $term = self::searchTerm($term);
@@ -180,7 +212,7 @@ final class TeamVulnerabilities
         $ignores = $this->ignores();
 
         return $entries
-            ->map(function (array $entry) use ($term, $severities, $findings, $ignores): ?array {
+            ->map(function (array $entry) use ($term, $findings, $ignores): ?array {
                 $matches = [];
                 foreach ($entry['scans'] as $scan) {
                     $loaded = $findings->get($scan->id);
@@ -192,7 +224,7 @@ final class TeamVulnerabilities
                     $matcher = $this->matcherFor($scan->resource, $ignores);
                     $classify = SecurityActions::fixStates($scan, $matcher);
                     foreach (ResourceScans::findings($scan) as $finding) {
-                        if (! self::matches($finding, $term) || ($severities !== [] && ! in_array(self::severityOf($finding), $severities, true))) {
+                        if (! self::matches($finding, $term)) {
                             continue;
                         }
 
@@ -202,7 +234,11 @@ final class TeamVulnerabilities
                             'version' => $finding->version,
                             'fixedIn' => $finding->fixedIn,
                             'severity' => self::severityOf($finding),
-                            'state' => $matcher->matches($finding) !== null ? 'ignored' : $classify($finding)->value,
+                            'state' => match (true) {
+                                $matcher->matches($finding) !== null => 'ignored',
+                                $classify($finding) === ImageScanFixState::NoFix => 'no_fix',
+                                default => 'fixed',
+                            },
                         ];
                     }
                 }
@@ -223,47 +259,6 @@ final class TeamVulnerabilities
                 fn (array $a, array $b): int => strnatcasecmp((string) $a['resource']->name, (string) $b['resource']->name),
             ])
             ->values();
-    }
-
-    /**
-     * Distinct packages with a fix the user can apply now, per entry key, for the "Fix" column when there is no
-     * version to update to.
-     *
-     * @param  Collection<int, array<string, mixed>>  $entries
-     * @return array<string, int>
-     */
-    public function fixablePackageCounts(Collection $entries): array
-    {
-        $scanIds = $entries->flatMap(fn (array $entry): Collection => $entry['scans']->pluck('id'))->take(self::MAX_DECODED_SCANS);
-        if ($scanIds->isEmpty()) {
-            return [];
-        }
-
-        $findings = ImageScan::query()->select(['id', 'findings'])->whereIn('id', $scanIds)->get()->keyBy('id');
-        $ignores = $this->ignores();
-
-        $counts = [];
-        foreach ($entries as $entry) {
-            $packages = [];
-            foreach ($entry['scans'] as $scan) {
-                $loaded = $findings->get($scan->id);
-                if (! $loaded instanceof ImageScan) {
-                    continue;
-                }
-
-                $scan->setAttribute('findings', $loaded->findings);
-                $matcher = $this->matcherFor($scan->resource, $ignores);
-                $classify = SecurityActions::fixStates($scan, $matcher);
-                foreach (ResourceScans::findings($scan) as $finding) {
-                    if ($matcher->matches($finding) === null && $classify($finding) === ImageScanFixState::FixableNow) {
-                        $packages[$scan->image_ref."\0".$finding->package] = true;
-                    }
-                }
-            }
-            $counts[$entry['key']] = count($packages);
-        }
-
-        return $counts;
     }
 
     /**
@@ -337,7 +332,7 @@ final class TeamVulnerabilities
     }
 
     /**
-     * The Vulnerabilities page of the resource.
+     * The Security page of the resource.
      */
     public static function vulnerabilitiesUrl(Model $resource): ?string
     {

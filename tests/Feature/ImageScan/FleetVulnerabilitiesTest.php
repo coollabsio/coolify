@@ -99,48 +99,53 @@ function fleetFinding(array $overrides = []): array
 }
 
 /**
- * A stored summary with the counts of the stored security status: the relevant findings that an action fixes.
+ * A completed scan of a third-party image with the stored security status of `$status` (update_now, update_available,
+ * no_fix, check_needed, ok). An update fixes the findings of update_now and update_available: the same image with the
+ * tag of `update` (default 1.28).
  *
- * @param  array<string, int>  $fixable  Counts by severity.
- * @return array<string, mixed>
+ * @param  array<string, mixed>  $attributes  Scan attributes, plus `server` and `update`.
  */
-function fleetSummary(array $fixable, int $atLevel, int $kev = 0): array
-{
-    return [
-        'truncated' => false,
-        'eol_distro' => null,
-        'security' => [
-            'status' => $atLevel > 0 ? 'update_available' : 'ok',
-            'facts' => ['counts' => [
-                'relevant_fixed' => $atLevel,
-                'critical_fixed' => $fixable['critical'] ?? 0,
-                'high_fixed' => $fixable['high'] ?? 0,
-                'kev_fixed' => $kev,
-            ]],
-        ],
-    ];
-}
-
-/**
- * @param  array<string, int>  $fixable  Counts of the relevant findings that an action fixes, by severity.
- * @param  array<string, mixed>  $attributes
- */
-function fleetScan(Model $resource, array $fixable = [], int $atLevel = 0, array $attributes = []): ImageScan
+function fleetScan(Model $resource, string $status = 'ok', array $attributes = []): ImageScan
 {
     $server = $attributes['server'] ?? test()->server;
-    unset($attributes['server']);
+    $imageRef = $attributes['image_ref'] ?? 'nginx:1.27';
+    $update = str($imageRef)->beforeLast(':').':'.($attributes['update'] ?? '1.28');
+    unset($attributes['server'], $attributes['update']);
+    $fixes = in_array($status, ['update_now', 'update_available'], true);
 
-    return ImageScan::factory()->create([
+    $scan = ImageScan::factory()->create([
         'server_id' => $server->id,
         'resource_type' => $resource->getMorphClass(),
         'resource_id' => $resource->getKey(),
-        'image_ref' => 'nginx:1.27',
-        'builds_image' => true,
-        'findings' => [fleetFinding()],
-        'summary' => fleetSummary($fixable, $atLevel),
+        'image_ref' => $imageRef,
+        'builds_image' => false,
+        'findings' => match ($status) {
+            'update_now' => [fleetFinding(['kev' => true])],
+            'update_available' => [fleetFinding(['epss' => null])],
+            'no_fix' => [fleetFinding(['kev' => true, 'fixedIn' => null, 'fixState' => 'not-fixed'])],
+            default => [],
+        },
+        'candidates' => [
+            'status' => $fixes ? 'ok' : 'no_better', 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false,
+            'entries' => $fixes ? [['kind' => 'line', 'ref' => $update, 'better' => true, 'fixed_ids' => ['CVE-2024-0001'], 'eol' => null]] : [],
+        ],
+        'summary' => ['truncated' => false, 'eol_distro' => null],
+        'grype_db_built_at' => $status === 'check_needed' ? now()->subDays(6) : now()->subDay(),
         'scanned_at' => now(),
         ...$attributes,
     ]);
+    $scan->setRelation('resource', $resource);
+    ResourceScans::refreshSummaries(collect([$scan]));
+
+    return $scan->fresh();
+}
+
+/**
+ * Livewire embeds list data with @js(), which writes quotes as \u0022.
+ */
+function fleetJsPayload(string $json): string
+{
+    return str_replace('"', '\u0022', $json);
 }
 
 function fleetPage(User $user, ?Team $team = null, array $query = []): Testable
@@ -152,30 +157,79 @@ function fleetPage(User $user, ?Team $team = null, array $query = []): Testable
 }
 
 describe('page', function () {
-    it('opens for a member and lists scanned resources worst first', function () {
-        $quiet = fleetApplication('quiet-app');
-        fleetScan($quiet, ['high' => 1], 1);
-        $worst = fleetApplication('worst-app');
-        fleetScan($worst, ['critical' => 2, 'high' => 1], 3, ['summary' => fleetSummary(['critical' => 2, 'high' => 1], 3, kev: 1)]);
+    it('opens for a member as the Security page and sorts by status, then name', function () {
+        fleetScan(fleetApplication('b-ok-app'), 'ok');
+        fleetScan(fleetApplication('a-ok-app'), 'ok');
+        fleetApplication('never-app');
+        fleetScan(fleetApplication('check-app'), 'check_needed');
+        fleetScan(fleetApplication('nofix-app'), 'no_fix');
+        fleetScan(fleetApplication('available-app'), 'update_available');
+        fleetScan(fleetApplication('now-app'), 'update_now');
 
         $this->actingAs(fleetMember($this->team));
         session(['currentTeam' => $this->team]);
         $this->get(route('vulnerabilities'))
             ->assertOk()
-            ->assertSee('Vulnerabilities')
-            ->assertSee('Fixable vulnerabilities in images across your team.')
-            ->assertSeeInOrder(['worst-app', '2 critical', 'Known exploited', 'quiet-app', '1 high']);
+            ->assertSee('Security | Coolify', false)
+            ->assertSeeInOrder([
+                'now-app', 'Update now', 'available-app', 'Security update', 'nofix-app', 'No fix yet',
+                'check-app', 'Check needed', 'a-ok-app', 'No action needed', 'b-ok-app', 'No action needed',
+                'never-app', 'Not checked',
+            ]);
+    });
+
+    it('shows the primary action as a link to the Security card of the resource, without buttons', function () {
+        $now = fleetApplication('now-app');
+        fleetScan($now, 'update_now');
+        $noFix = fleetApplication('nofix-app');
+        fleetScan($noFix, 'no_fix');
+
+        $page = fleetPage($this->admin)
+            ->assertSee('Update to 1.28.')
+            ->assertSeeHtml('href="'.TeamVulnerabilities::vulnerabilitiesUrl($now).'#security-section"')
+            ->assertDontSeeHtml('<button type="button" class="button');
+
+        expect(substr_count($page->html(), '#security-section'))->toBe(1);
+    });
+
+    it('reads only the stored status, not the findings', function () {
+        $application = fleetApplication('now-app');
+        $scan = fleetScan($application, 'update_now');
+        $scan->forceFill(['findings' => []])->saveQuietly();
+
+        fleetPage($this->admin)->assertSee('Update now')->assertSee('Update to 1.28.');
+    });
+
+    it('filters by status', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('available-app'), 'update_available');
+        fleetScan(fleetApplication('nofix-app'), 'no_fix');
+        fleetApplication('never-app');
+
+        fleetPage($this->admin)
+            ->call('toggleStatus', 'update_now')
+            ->assertSee('now-app')
+            ->assertDontSee('available-app')
+            ->assertDontSee('nofix-app')
+            ->call('toggleStatus', 'no_fix')
+            ->assertSeeInOrder(['now-app', 'nofix-app'])
+            ->assertDontSee('available-app')
+            ->call('toggleStatus', 'update_now')
+            ->assertDontSee('now-app')
+            ->call('toggleStatus', 'not-a-status')
+            ->assertSet('statuses', ['no_fix'])
+            ->call('resetFilters')
+            ->assertSee('never-app');
     });
 
     it('never lists resources of another team', function () {
-        fleetApplication('own-app');
-        fleetScan(Application::query()->where('name', 'own-app')->firstOrFail(), ['high' => 1], 1);
+        fleetScan(fleetApplication('own-app'), 'update_available');
 
         $otherTeam = Team::factory()->create();
         $otherServer = fleetServer($otherTeam, 'other-server');
         $otherEnvironment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $otherTeam->id])->id]);
         $foreign = fleetApplication('foreign-app', $otherEnvironment, StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail());
-        fleetScan($foreign, ['critical' => 1], 1, ['server' => $otherServer, 'findings' => [fleetFinding(['id' => 'CVE-2021-44228'])]]);
+        fleetScan($foreign, 'update_now', ['server' => $otherServer, 'findings' => [fleetFinding(['id' => 'CVE-2021-44228'])]]);
 
         // A member of both teams, with the session on this team.
         $user = fleetMember($this->team);
@@ -190,13 +244,11 @@ describe('page', function () {
     });
 
     it('shows a member with access to one project only the resources of that project', function () {
-        $visible = fleetApplication('visible-app');
-        fleetScan($visible, ['high' => 1], 1);
+        fleetScan(fleetApplication('visible-app'), 'update_available');
         $hiddenEnvironment = Environment::factory()->create([
             'project_id' => Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Secret project'])->id,
         ]);
-        $hidden = fleetApplication('hidden-app', $hiddenEnvironment);
-        fleetScan($hidden, ['critical' => 1], 1);
+        fleetScan(fleetApplication('hidden-app', $hiddenEnvironment), 'update_now');
         fleetApplication('unscanned-hidden-app', $hiddenEnvironment);
 
         $member = fleetMember($this->team, 'member', [['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read']]]);
@@ -214,68 +266,73 @@ describe('page', function () {
 
     it('finds the resource whose finding has the searched ID as an alias', function () {
         $log4j = fleetApplication('log4j-app');
-        fleetScan($log4j, ['critical' => 1], 1, ['findings' => [
+        fleetScan($log4j, 'update_now', ['findings' => [
             fleetFinding(['id' => 'GHSA-jfh8-c2jp-5v3q', 'aliases' => ['CVE-2021-44228'], 'severity' => 'critical', 'package' => 'log4j-core', 'version' => '2.14.1', 'fixedIn' => '2.15.0', 'type' => 'java-archive']),
         ]]);
-        $other = fleetApplication('other-app');
-        fleetScan($other, ['high' => 1], 1);
+        fleetScan(fleetApplication('other-app'), 'update_available');
 
         fleetPage($this->admin, query: ['search' => 'CVE-2021-44228'])
             ->assertSee('log4j-app')
             ->assertSee('GHSA-jfh8-c2jp-5v3q')
-            ->assertSee('Fixable now')
+            ->assertSee('Fixed by an update')
             ->assertDontSee('other-app');
     });
 
     it('shows the state of each match, also when the finding is ignored', function () {
         $ignored = fleetApplication('ignored-app');
-        fleetScan($ignored, [], 0, ['findings' => [fleetFinding(['id' => 'CVE-2024-9999'])]]);
+        fleetScan($ignored, 'ok', ['findings' => [fleetFinding(['id' => 'CVE-2024-9999'])]]);
         ImageScanIgnore::query()->create([
             'team_id' => $this->team->id, 'resource_type' => $ignored->getMorphClass(), 'resource_id' => $ignored->id,
             'vulnerability_id' => 'CVE-2024-9999', 'reason' => 'Not reachable', 'created_by' => $this->admin->id,
         ]);
-        $waiting = fleetApplication('waiting-app');
-        fleetScan($waiting, [], 0, ['builds_image' => false, 'findings' => [fleetFinding(['id' => 'CVE-2024-9999'])]]);
+        fleetScan(fleetApplication('waiting-app'), 'ok', ['findings' => [fleetFinding(['id' => 'CVE-2024-9999', 'fixedIn' => null, 'fixState' => 'not-fixed'])]]);
+        fleetScan(fleetApplication('fixed-app'), 'ok', ['findings' => [fleetFinding(['id' => 'CVE-2024-9999'])]]);
 
         fleetPage($this->admin)
             ->set('search', 'cve-2024-9999')
-            ->assertSeeInOrder(['waiting-app', 'Fix not released yet', 'ignored-app', 'Ignored']);
+            ->assertSeeInOrder(['fixed-app', 'Fixed by an update', 'waiting-app', 'No fix yet', 'ignored-app', 'Ignored']);
     });
 
     it('counts resources that were not scanned, also during a search', function () {
-        fleetScan(fleetApplication('scanned-app'), ['high' => 1], 1);
+        fleetScan(fleetApplication('scanned-app'), 'update_available');
         fleetApplication('never-scanned-app');
         $offServer = fleetServer($this->team, 'off-server', scanning: false);
         $offApp = fleetApplication('off-app', destination: StandaloneDocker::query()->where('server_id', $offServer->id)->firstOrFail());
-        fleetScan($offApp, ['critical' => 1], 1, ['server' => $offServer]);
+        fleetScan($offApp, 'update_now', ['server' => $offServer]);
 
         fleetPage($this->admin)
             ->assertSee('2 resources on 2 servers were not scanned, so Coolify cannot tell.')
-            ->assertDontSee('off-app')
+            ->assertSeeInOrder(['scanned-app', 'Security update', 'off-app', 'Not checked'])
+            ->assertDontSeeHtml('<span class="truncate">Update now</span>')
             ->set('search', 'openssl')
             ->assertSee('scanned-app')
+            ->assertDontSee('off-app')
             ->assertSee('2 resources on 2 servers were not scanned, so Coolify cannot tell.');
     });
 
     it('hides the not scanned line when every resource was scanned', function () {
-        fleetScan(fleetApplication('scanned-app'), ['high' => 1], 1);
+        fleetScan(fleetApplication('scanned-app'), 'update_available');
 
         fleetPage($this->admin)->assertDontSee('not scanned, so Coolify cannot tell.');
     });
 
-    it('filters by server, project, and severity', function () {
-        fleetScan(fleetApplication('high-app'), ['high' => 1], 1);
-        fleetScan(fleetApplication('critical-app'), ['critical' => 1], 1);
+    it('filters by server and project', function () {
+        fleetScan(fleetApplication('shop-app'), 'update_available');
+        $otherProject = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Blog']);
+        $otherServer = fleetServer($this->team, 'blog-server');
+        $blog = fleetApplication('blog-app', Environment::factory()->create(['project_id' => $otherProject->id]), StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail());
+        fleetScan($blog, 'update_available', ['server' => $otherServer]);
 
         fleetPage($this->admin)
-            ->call('toggleSeverity', 'critical')
-            ->assertSee('critical-app')
-            ->assertDontSee('high-app')
-            ->call('resetFilters')
             ->call('toggleProject', $this->project->uuid)
-            ->assertSee('high-app')
+            ->assertSee('shop-app')
+            ->assertDontSee('blog-app')
+            ->call('resetFilters')
+            ->call('toggleServer', $otherServer->uuid)
+            ->assertSee('blog-app')
+            ->assertDontSee('shop-app')
             ->call('toggleServer', 'not-a-server')
-            ->assertSee('high-app');
+            ->assertSee('blog-app');
     });
 
     it('shows the servers that do not scan to admins only', function () {
@@ -295,9 +352,9 @@ describe('page', function () {
     });
 
     it('shows the off state when the instance does not allow scanning', function () {
+        fleetScan(fleetApplication('scanned-app'), 'update_available');
         InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
         Once::flush();
-        fleetScan(fleetApplication('scanned-app'), ['high' => 1], 1);
 
         fleetPage($this->admin)
             ->assertSee('Image scanning is off for this Coolify instance.')
@@ -306,14 +363,14 @@ describe('page', function () {
 
     it('never shows a server that runs only resources a limited member cannot see', function () {
         $visible = fleetApplication('visible-app');
-        fleetScan($visible, ['high' => 1], 1, ['findings' => [fleetFinding(['package' => 'shared-lib'])]]);
+        fleetScan($visible, 'update_available', ['findings' => [fleetFinding(['package' => 'shared-lib'])]]);
         $hiddenServer = fleetServer($this->team, 'hidden-server');
         $hiddenEnvironment = Environment::factory()->create([
             'project_id' => Project::factory()->create(['team_id' => $this->team->id])->id,
         ]);
         $hiddenDestination = StandaloneDocker::query()->where('server_id', $hiddenServer->id)->firstOrFail();
         $hidden = fleetApplication('hidden-app', $hiddenEnvironment, $hiddenDestination);
-        fleetScan($hidden, ['critical' => 1], 1, ['server' => $hiddenServer, 'findings' => [fleetFinding(['package' => 'shared-lib'])]]);
+        fleetScan($hidden, 'update_now', ['server' => $hiddenServer, 'findings' => [fleetFinding(['package' => 'shared-lib'])]]);
         fleetApplication('unscanned-hidden-app', $hiddenEnvironment, $hiddenDestination);
 
         $member = fleetMember($this->team, 'member', [['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read']]]);
@@ -329,8 +386,8 @@ describe('page', function () {
     });
 
     it('searches package names with slashes and at signs, and escapes LIKE wildcards', function () {
-        fleetScan(fleetApplication('go-app'), [], 0, ['findings' => [fleetFinding(['package' => 'golang.org/x/net', 'type' => 'go-module'])]]);
-        fleetScan(fleetApplication('node-app'), [], 0, ['findings' => [fleetFinding(['package' => '@babel/traverse', 'type' => 'npm'])]]);
+        fleetScan(fleetApplication('go-app'), 'ok', ['findings' => [fleetFinding(['package' => 'golang.org/x/net', 'type' => 'go-module'])]]);
+        fleetScan(fleetApplication('node-app'), 'ok', ['findings' => [fleetFinding(['package' => '@babel/traverse', 'type' => 'npm'])]]);
 
         fleetPage($this->admin)
             ->set('search', 'Golang.org/x/net')
@@ -348,7 +405,7 @@ describe('page', function () {
 
     it('decodes at most the capped number of scans and says so', function () {
         foreach (['first-app', 'second-app'] as $name) {
-            fleetScan(fleetApplication($name), [], 0, ['findings' => [fleetFinding(['package' => 'zlib'])]]);
+            fleetScan(fleetApplication($name), 'ok', ['findings' => [fleetFinding(['package' => 'zlib'])]]);
         }
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
@@ -362,19 +419,6 @@ describe('page', function () {
             ->and($fleet->searchWasCapped())->toBeFalse();
     });
 
-    it('names the packages to update for an image whose update is blocked', function () {
-        $application = fleetApplication('third-party-app', attributes: ['docker_registry_image_tag' => '1.28']);
-        fleetScan($application, ['high' => 1], 1, [
-            'image_ref' => 'nginx:1.27',
-            'builds_image' => false,
-            'candidates' => ['status' => 'ok', 'entries' => [[
-                'ref' => 'nginx:1.27.5', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2024-0001'],
-            ]]],
-        ]);
-
-        fleetPage($this->admin)->assertSee('third-party-app')->assertSee('1 package')->assertDontSee('Update to');
-    });
-
     it('words the not scanned line for one resource and resources without a server', function () {
         expect(FleetVulnerabilities::notScannedSentence(1, 1))->toBe('1 resource on 1 server was not scanned, so Coolify cannot tell.')
             ->and(FleetVulnerabilities::notScannedSentence(1, 0))->toBe('1 resource was not scanned, so Coolify cannot tell.')
@@ -383,35 +427,53 @@ describe('page', function () {
 });
 
 describe('markers', function () {
-    it('labels the count by severity and names the update to a fixing version', function () {
+    it('marks only update now (with the primary action) and no fix yet', function () {
         $database = StandalonePostgresql::forceCreate([
             'name' => 'pg', 'postgres_password' => 'secret', 'image' => 'postgres:16.3-alpine',
             'environment_id' => $this->environment->id,
             'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass(),
         ]);
-        fleetScan($database, ['critical' => 1], 1, [
-            'image_ref' => 'postgres:16.3-alpine',
-            'builds_image' => false,
-            'candidates' => ['status' => 'ok', 'entries' => [[
-                'ref' => 'postgres:16.4-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2024-0001'],
-            ]]],
+        fleetScan($database, 'update_now', ['image_ref' => 'postgres:16.3-alpine', 'update' => '16.4-alpine']);
+        $noFix = fleetApplication('nofix-app');
+        fleetScan($noFix, 'no_fix');
+        $others = collect(['update_available', 'check_needed', 'ok'])->map(function (string $status): Application {
+            $application = fleetApplication("{$status}-app");
+            fleetScan($application, $status);
+
+            return $application;
+        });
+        $never = fleetApplication('never-app');
+
+        $markers = VulnerabilityMarkers::for(collect([$database, $noFix, $never, ...$others]));
+
+        expect($markers)->toBe([
+            ResourceScans::key($database) => ['status' => 'update_now', 'text' => 'Update now', 'label' => 'Security: update now. Update to 16.4-alpine.', 'tooltip' => 'Update to 16.4-alpine.'],
+            ResourceScans::key($noFix) => ['status' => 'no_fix', 'text' => 'No fix yet', 'label' => 'Security: no fix yet', 'tooltip' => null],
         ]);
-        $application = fleetApplication('app');
-        fleetScan($application, ['critical' => 2, 'high' => 5, 'medium' => 3], 7);
+    });
 
-        $markers = VulnerabilityMarkers::for(collect([$database, $application]));
+    it('renders update now in the error color and no fix yet in the neutral color, with visible text', function () {
+        $html = (string) $this->blade('<x-image-scan.marker status="update_now" text="Update now" label="Security: update now. Update to 1.28." tooltip="Update to 1.28." />');
+        expect($html)->toContain('text-error')
+            ->toContain('>Update now</span>')
+            ->toContain('aria-label="Security: update now. Update to 1.28."')
+            ->toContain('data-tooltip="Update to 1.28."');
 
-        expect($markers[ResourceScans::key($database)])->toBe(['count' => 1, 'label' => '1 critical with a fix. Update to 16.4-alpine.'])
-            ->and($markers[ResourceScans::key($application)])->toBe(['count' => 7, 'label' => '2 critical, 5 high with a fix.']);
+        $html = (string) $this->blade('<x-image-scan.marker status="no_fix" text="No fix yet" label="Security: no fix yet" />');
+        expect($html)->not->toContain('text-error')
+            ->toContain('>No fix yet</span>')
+            ->not->toContain('data-tooltip');
+
+        expect(trim((string) $this->blade('<x-image-scan.marker status="update_available" text="Security update" label="x" />')))->toBe('');
     });
 
     it('reads the markers with the same number of queries for more resources', function () {
         $count = function (int $resources): int {
-            $models = collect(range(1, $resources))->map(function (int $index) {
-                $application = fleetApplication("app-{$index}");
-                fleetScan($application, ['high' => 1], 1);
+            $models = collect(range(1, $resources))->map(function (int $index) use ($resources) {
+                $application = fleetApplication("app-{$resources}-{$index}");
+                fleetScan($application, 'update_now');
 
-                return $application;
+                return $application->fresh();
             });
             $models->push(Service::factory()->create([
                 'environment_id' => test()->environment->id, 'server_id' => test()->server->id,
@@ -430,9 +492,9 @@ describe('markers', function () {
         expect($count(6))->toBe($count(2));
     });
 
-    it('adds the marker to the environment list only when something is fixable now', function () {
-        fleetScan(fleetApplication('marked-app'), ['critical' => 2, 'high' => 5], 7);
-        fleetScan(fleetApplication('clean-app'), [], 0);
+    it('adds the marker to the environment list', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('available-app'), 'update_available');
 
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
@@ -440,59 +502,78 @@ describe('markers', function () {
             'project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'view' => 'list',
         ]))->assertOk();
 
-        $response->assertSee('2 critical, 5 high with a fix.', false);
-        expect(substr_count($response->getContent(), 'with a fix.'))->toBe(1);
+        $content = $response->getContent();
+        expect($content)->toContain(fleetJsPayload('"security":{"status":"update_now","text":"Update now","label":"Security: update now. Update to 1.28.","tooltip":"Update to 1.28."}'))
+            ->and(substr_count($content, fleetJsPayload('"security":{')))->toBe(1);
+    });
+
+    it('adds the marker to the server resources tab', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('available-app'), 'update_available');
+
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $this->get(route('server.resources', ['server_uuid' => $this->server->uuid]))
+            ->assertOk()
+            ->assertSee('data-tooltip="Update to 1.28."', false)
+            ->assertSee('>Update now</span>', false)
+            ->assertDontSee('Security update');
     });
 
     it('adds the marker to canvas cards', function () {
         $application = fleetApplication('marked-app');
-        fleetScan($application, ['high' => 3], 3);
+        fleetScan($application, 'no_fix');
 
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
         $payload = app(EnvironmentCanvas::class)->payload($this->environment, true, true);
 
-        expect(collect($payload['nodes'])->firstWhere('id', $application->uuid)['vulnerabilities'])
-            ->toBe(['count' => 3, 'label' => '3 high with a fix.']);
+        expect(collect($payload['nodes'])->firstWhere('id', $application->uuid)['security'])
+            ->toBe(['status' => 'no_fix', 'text' => 'No fix yet', 'label' => 'Security: no fix yet', 'tooltip' => null]);
     });
 
     it('hides markers when the instance does not allow scanning', function () {
+        $application = fleetApplication('marked-app');
+        fleetScan($application, 'update_now');
         InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
         Once::flush();
-        $application = fleetApplication('marked-app');
-        fleetScan($application, ['high' => 3], 3);
 
-        expect(VulnerabilityMarkers::for(collect([$application])))->toBe([]);
+        expect(VulnerabilityMarkers::for(collect([$application->fresh()])))->toBe([]);
     });
 });
 
 describe('dashboard and search', function () {
-    it('shows one dashboard callout while something is fixable now', function () {
+    it('shows the dashboard callout only for resources that need an update now', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
+        fleetScan(fleetApplication('available-app'), 'update_available');
+        fleetScan(fleetApplication('nofix-app'), 'no_fix');
 
-        Livewire::test(Dashboard::class)->assertDontSee('vulnerabilities you can fix now.');
+        Livewire::test(Dashboard::class)->assertDontSee('a security update now.');
 
-        $application = fleetApplication('marked-app');
-        $scan = fleetScan($application, ['high' => 3], 3);
-        fleetScan(fleetApplication('other-app'), ['critical' => 1], 1);
+        $scan = fleetScan(fleetApplication('now-app'), 'update_now');
 
         Livewire::test(Dashboard::class)
-            ->assertSee('2 resources have vulnerabilities you can fix now.')
+            ->assertSee('1 resource needs a security update now.')
             ->assertSee('Review')
-            ->assertSeeHtml('coolify.image-scan.dashboard-dismissed.2');
+            ->assertSeeHtml('window.securityCallout?.(1')
+            ->assertSeeHtml('href="'.route('vulnerabilities').'"');
 
-        $scan->forceFill(['summary' => fleetSummary([], 0)])->save();
+        fleetScan(fleetApplication('other-now-app'), 'update_now');
 
-        Livewire::test(Dashboard::class)->assertSee('1 resource has vulnerabilities you can fix now.');
+        Livewire::test(Dashboard::class)->assertSee('2 resources need a security update now.');
+
+        expect(Dashboard::securityCalloutTitle(1))->toBe('1 resource needs a security update now.')
+            ->and(Dashboard::securityCalloutTitle(3))->toBe('3 resources need a security update now.');
     });
 
-    it('offers the Vulnerabilities page and a search for a vulnerability ID', function () {
+    it('offers the Security page and a search for a vulnerability ID', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
 
         $search = Livewire::test(GlobalSearch::class)->call('openSearchModal');
-        expect(collect($search->get('allSearchableItems'))->pluck('link'))->toContain(route('vulnerabilities'));
+        $entry = collect($search->get('allSearchableItems'))->firstWhere('link', route('vulnerabilities'));
+        expect($entry['name'])->toBe('Security');
 
         // The palette builds the vulnerability ID entry in the browser (resources/js/vulnerability-search.js, tested
         // with node --test) from this URL.
@@ -505,12 +586,15 @@ describe('dashboard and search', function () {
         Livewire::test(GlobalSearch::class)->assertSeeHtml('vulnerabilitiesUrl: null');
     });
 
-    it('lists the page in the navbar only when the instance allows scanning', function () {
+    it('lists the Security page in the navbar only when the instance allows scanning', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
         app()->instance('request', Request::create('/vulnerabilities'));
 
-        expect((string) $this->blade('<x-navbar desktop />'))->toContain('href="'.route('vulnerabilities').'"');
+        $navbar = (string) $this->blade('<x-navbar desktop />');
+        expect($navbar)->toContain('href="'.route('vulnerabilities').'"')
+            ->and($navbar)->toMatch('/href="'.preg_quote(route('vulnerabilities'), '/').'"[^>]*>.*?Security/s')
+            ->and($navbar)->not->toContain('Vulnerabilities');
 
         InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
         Once::flush();
@@ -522,7 +606,7 @@ describe('dashboard and search', function () {
 describe('one scanned rule', function () {
     it('treats a resource on a server with scanning off as not scanned everywhere', function () {
         $application = fleetApplication('marked-app');
-        fleetScan($application, ['high' => 3], 3);
+        fleetScan($application, 'update_now');
         $this->server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
         $application = $application->fresh();
 
@@ -531,7 +615,7 @@ describe('one scanned rule', function () {
 
     it('treats an application with its own scan off as not scanned everywhere', function () {
         $application = fleetApplication('marked-app');
-        fleetScan($application, ['high' => 3], 3);
+        fleetScan($application, 'update_now');
         $application->settings->forceFill(['is_image_scan_enabled' => false])->save();
         $application = $application->fresh();
 
@@ -540,10 +624,10 @@ describe('one scanned rule', function () {
 
     it('counts the dashboard resources without loading every resource of the team', function () {
         $count = function (int $resources): int {
-            collect(range(1, $resources))->each(fn (int $index) => fleetScan(fleetApplication('clean-'.$resources.'-'.$index), [], 0));
+            collect(range(1, $resources))->each(fn (int $index) => fleetScan(fleetApplication('clean-'.$resources.'-'.$index), 'update_available'));
             DB::flushQueryLog();
             DB::enableQueryLog();
-            TeamVulnerabilities::fixableResourceCount(test()->team->id);
+            TeamVulnerabilities::updateNowResourceCount(test()->team->id);
             $queries = count(DB::getQueryLog());
             DB::disableQueryLog();
 
@@ -552,22 +636,30 @@ describe('one scanned rule', function () {
 
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
-        fleetScan(fleetApplication('marked-app'), ['high' => 1], 1);
+        fleetScan(fleetApplication('marked-app'), 'update_now');
 
         expect($count(2))->toBe($count(6))
-            ->and(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
+            ->and(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(1);
+    });
+
+    it('does not count a resource whose update now result needs a check', function () {
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        fleetScan(fleetApplication('stale-app'), 'update_now', ['scanned_at' => now()->subDays(3)]);
+
+        expect(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(0);
     });
 
     it('counts a resource scanned on a build server that does not scan like the markers do', function () {
         $application = fleetApplication('built-app');
         $buildServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id]);
-        fleetScan($application, ['high' => 2], 2, ['server_id' => $buildServer->id]);
+        fleetScan($application, 'update_now', ['server_id' => $buildServer->id]);
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
 
         expect($buildServer->settings->is_image_scan_enabled)->toBeFalse()
             ->and(VulnerabilityMarkers::for(collect([$application->fresh()])))->not->toBe([])
-            ->and(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
+            ->and(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(1);
     });
 
     it('does not reload the page for progress updates of a running scan', function () {
@@ -581,18 +673,18 @@ describe('one scanned rule', function () {
     });
 
     it('counts only the dashboard resources a limited member can see', function () {
-        fleetScan(fleetApplication('visible-app'), ['high' => 1], 1);
+        fleetScan(fleetApplication('visible-app'), 'update_now');
         $hiddenEnvironment = Environment::factory()->create([
             'project_id' => Project::factory()->create(['team_id' => $this->team->id])->id,
         ]);
-        fleetScan(fleetApplication('hidden-app', $hiddenEnvironment), ['critical' => 1], 1);
+        fleetScan(fleetApplication('hidden-app', $hiddenEnvironment), 'update_now');
 
         $this->actingAs(fleetMember($this->team, 'member', [['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read']]]));
         session(['currentTeam' => $this->team]);
-        expect(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(1);
+        expect(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(1);
 
         $this->actingAs($this->admin);
-        expect(TeamVulnerabilities::fixableResourceCount($this->team->id))->toBe(2);
+        expect(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(2);
     });
 });
 
@@ -602,11 +694,11 @@ function fleetExpectNotScannedEverywhere(mixed $test, Application $application):
     session(['currentTeam' => $test->team]);
 
     expect(VulnerabilityMarkers::for(collect([$application])))->toBe([])
-        ->and(ResourceScans::fixableNowCount($application))->toBe(0)
-        ->and(TeamVulnerabilities::fixableResourceCount($test->team->id))->toBe(0)
+        ->and(TeamVulnerabilities::updateNowResourceCount($test->team->id))->toBe(0)
         ->and(ImageScanPolicyResolver::offState($application))->not->toBeNull();
 
     fleetPage($test->admin)
-        ->assertDontSee('marked-app')
+        ->assertSeeInOrder(['marked-app', 'Not checked'])
+        ->assertDontSeeHtml('<span class="truncate">Update now</span>')
         ->assertSee('1 resource on 1 server was not scanned, so Coolify cannot tell.');
 }

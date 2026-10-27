@@ -101,7 +101,7 @@
             return item.search_text.toLowerCase().includes(query);
         }).slice(0, 20);
 
-        // A vulnerability ID opens the Vulnerabilities page with that search (resources/js/vulnerability-search.js).
+        // A vulnerability ID opens the Security page with that search (resources/js/vulnerability-search.js).
         const vulnerability = window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl);
         if (vulnerability) {
             return [vulnerability, ...results].slice(0, 20);

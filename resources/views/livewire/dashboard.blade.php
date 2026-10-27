@@ -64,19 +64,19 @@
             </div>
         @endif
 
-        @if ($fixableResourceCount > 0)
-            {{-- Dismissed until the count changes: the key holds the count. --}}
-            @php
-                $vulnerabilitiesKey = 'coolify.image-scan.dashboard-dismissed.'.$fixableResourceCount;
-            @endphp
-            <div x-data="{ hidden: localStorage.getItem(@js($vulnerabilitiesKey)) === '1' }" x-show="!hidden" x-cloak
-                wire:key="dashboard-vulnerabilities-{{ $fixableResourceCount }}">
-                <x-callout type="warning" dismissible
-                    :title="$fixableResourceCount === 1 ? '1 resource has vulnerabilities you can fix now.' : $fixableResourceCount.' resources have vulnerabilities you can fix now.'"
-                    on-dismiss="localStorage.setItem({{ \Illuminate\Support\Js::from($vulnerabilitiesKey) }}, '1'); hidden = true">
-                    <a href="{{ route('vulnerabilities') }}" {{ wireNavigate() }}
-                        class="font-medium underline-offset-2 hover:underline">Review</a>
-                </x-callout>
+        @if (instanceSettings()->is_image_scanning_allowed)
+            {{-- Dismissed until the number goes up (resources/js/security-callout.js). It also renders for 0, so a
+                 lower number is remembered and the next rise shows the callout again. --}}
+            <div x-data="{ state: window.securityCallout?.({{ $securityUpdateNowCount }}, localStorage.getItem(window.SECURITY_CALLOUT_KEY)) ?? { visible: {{ $securityUpdateNowCount > 0 ? 'true' : 'false' }}, dismissed: null } }"
+                x-init="if (state.dismissed !== null && window.SECURITY_CALLOUT_KEY) localStorage.setItem(window.SECURITY_CALLOUT_KEY, String(state.dismissed))"
+                x-show="state.visible" x-cloak wire:key="dashboard-security-{{ $securityUpdateNowCount }}">
+                @if ($securityUpdateNowCount > 0)
+                    <x-callout type="danger" dismissible :title="\App\Livewire\Dashboard::securityCalloutTitle($securityUpdateNowCount)"
+                        on-dismiss="if (window.SECURITY_CALLOUT_KEY) localStorage.setItem(window.SECURITY_CALLOUT_KEY, '{{ $securityUpdateNowCount }}'); state.visible = false">
+                        <a href="{{ route('vulnerabilities') }}" {{ wireNavigate() }}
+                            class="font-medium underline-offset-2 hover:underline">Review</a>
+                    </x-callout>
+                @endif
             </div>
         @endif
 

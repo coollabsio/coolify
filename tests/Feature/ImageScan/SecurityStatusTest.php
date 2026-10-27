@@ -23,7 +23,9 @@ use App\Services\ImageScan\SecuritySentences;
 use App\Services\ImageScan\SecurityStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
@@ -731,6 +733,52 @@ describe('stored status', function () {
         $security = SecurityStatus::forResource($this->application);
 
         expect(ResourceSecurity::fromArray($security->toArray())->toArray())->toBe($security->toArray());
+    });
+
+    it('reads the stored status of many Compose apps with the same number of queries', function () {
+        $composeApps = function (int $count): Collection {
+            return collect(range(1, $count))->map(function (int $index) use ($count): Application {
+                $application = statusTestApplication(['build_pack' => 'dockercompose', 'name' => "compose-{$count}-{$index}"]);
+                $deployment = ApplicationDeploymentQueue::create([
+                    'deployment_uuid' => Str::random(12),
+                    'application_id' => $application->id,
+                    'server_id' => $this->server->id,
+                    'status' => ApplicationDeploymentStatus::FINISHED->value,
+                    'pull_request_id' => 0,
+                ]);
+                $application->forceFill(['docker_compose' => Yaml::dump(['services' => [
+                    'web' => ['image' => 'nginx:1.27'],
+                    'db' => ['image' => 'postgres:16'],
+                ]])])->save();
+                statusTestScan($application, [], ['deployment_queue_id' => $deployment->id]);
+                if ($index % 2 === 0) {
+                    statusTestScan($application, [], ['deployment_queue_id' => $deployment->id, 'image_ref' => 'postgres:16']);
+                }
+                ResourceScans::refreshSummaries(ResourceScans::currentFor($application));
+
+                return $application->fresh();
+            });
+        };
+        $queries = function (Collection $applications): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            SecurityStatus::storedMany($applications);
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $one = $composeApps(1);
+        $four = $composeApps(4);
+
+        expect($queries($one))->toBe($queries($four));
+
+        $stored = SecurityStatus::storedMany($four);
+        expect($four->map(fn (Application $application): string => $stored[ResourceScans::key($application)]->status->value)->all())
+            ->toBe(['check_needed', 'ok', 'check_needed', 'ok'])
+            ->and($stored[ResourceScans::key($four[0])]->checkContext)->toBe(['checked' => 1, 'total' => 2])
+            ->and($stored[ResourceScans::key($four[0])]->toArray())->toBe(SecurityStatus::stored($four[0])->toArray());
     });
 
     it('refreshes the stored status of every team once after the upgrade', function () {

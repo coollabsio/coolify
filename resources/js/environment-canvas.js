@@ -37,7 +37,7 @@ const storedPositions = graph => (graph?.positions && !Array.isArray(graph.posit
 export function estimateNodeHeight(node) {
   let height = 58; // padding + icon/name row
   if (node?.urls?.length) height += 20;
-  if (node?.extra_zones?.length || node?.vulnerabilities?.count > 0) height += 28;
+  if (node?.extra_zones?.length || node?.security?.text) height += 28;
   const children = node?.children?.length || 0;
   if (children) height += 12 + Math.min(children, MAX_CHILDREN) * 20 + (children > MAX_CHILDREN ? 20 : 0);
   return height;

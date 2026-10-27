@@ -115,7 +115,7 @@ final class SecurityStatus
     }
 
     /**
-     * `stored()` for many resources with a fixed number of queries.
+     * `stored()` for many resources with a fixed number of queries, also for many Compose applications.
      *
      * @param  Collection<int, Model>  $resources
      * @return array<string, ResourceSecurity> Keyed by `ResourceScans::key()`.
@@ -132,6 +132,7 @@ final class SecurityStatus
         $scanned = $resources->filter(fn (Model $resource): bool => $offStates[ResourceScans::key($resource)] === null)->values();
         $owners = ResourceScans::ownersOfMany($scanned);
         $scans = ResourceScans::currentForMany($owners->flatten(1), self::STORED_COLUMNS);
+        $composeRows = ResourceScans::composeDeploymentRows($owners->flatten(1), $scans);
 
         $result = [];
         foreach ($resources as $resource) {
@@ -143,14 +144,14 @@ final class SecurityStatus
             }
 
             $images = self::statusOwners($resource, $owners->get($key, collect()))
-                ->map(function (Model $owner) use ($scans): array {
+                ->map(function (Model $owner) use ($scans, $composeRows): array {
                     $ownerScans = $scans->get(ResourceScans::key($owner), collect());
 
                     return [
                         'parts' => $ownerScans->map(fn (ImageScan $scan): ?ResourceSecurity => is_array(data_get($scan->summary, 'security'))
                             ? ResourceSecurity::fromArray(data_get($scan->summary, 'security'))
                             : null)->all(),
-                        'unchecked' => ResourceScans::uncheckedComposeImages($owner, $ownerScans),
+                        'unchecked' => ResourceScans::uncheckedComposeImages($owner, $ownerScans, $composeRows),
                     ];
                 })
                 ->all();

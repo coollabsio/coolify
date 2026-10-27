@@ -120,13 +120,13 @@ test('estimates taller cards for urls, chips, and children', () => {
   assert.equal(capped, six, 'children beyond the cap add one "+N more" row');
 });
 
-test('the vulnerability marker shares the chip row with the extra servers chip', () => {
+test('the security marker shares the chip row with the extra servers chip', () => {
   const plain = estimateNodeHeight(node('a', 'application', 's1'));
-  const marked = estimateNodeHeight(node('b', 'application', 's1', { vulnerabilities: { count: 2, label: '2 critical with a fix.' } }));
-  const both = estimateNodeHeight(node('c', 'application', 's1', { extra_zones: ['s2'], vulnerabilities: { count: 2, label: '2 critical with a fix.' } }));
+  const marked = estimateNodeHeight(node('b', 'application', 's1', { security: { status: 'update_now', text: 'Update now', label: 'Security: update now', tooltip: null } }));
+  const both = estimateNodeHeight(node('c', 'application', 's1', { extra_zones: ['s2'], security: { status: 'update_now', text: 'Update now', label: 'Security: update now', tooltip: null } }));
   assert.equal(marked, plain + 28);
   assert.equal(both, marked);
-  assert.equal(estimateNodeHeight(node('d', 'application', 's1', { vulnerabilities: null })), plain);
+  assert.equal(estimateNodeHeight(node('d', 'application', 's1', { security: null })), plain);
 });
 
 test('zone boxes wrap their cards with padding and header', () => {

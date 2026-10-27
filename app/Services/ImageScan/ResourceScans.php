@@ -152,27 +152,70 @@ final class ResourceScans
      * with a variable are left out. 0 for other resources.
      *
      * @param  Collection<int, ImageScan>  $currentScans  The current scans of the application (see `currentFor()`).
+     * @param  Collection<string, Collection<int, ImageScan>>|null  $deploymentRows  The rows of `composeDeploymentRows()`
+     *                                                                               for lists, else one query here.
      */
-    public static function uncheckedComposeImages(Model $owner, Collection $currentScans): int
+    public static function uncheckedComposeImages(Model $owner, Collection $currentScans, ?Collection $deploymentRows = null): int
     {
-        if (! $owner instanceof Application || $owner->build_pack !== 'dockercompose') {
+        if (! self::isCompose($owner)) {
             return 0;
         }
 
         $deploymentId = $currentScans->first()?->deployment_queue_id;
-        $rows = $deploymentId === null
-            ? $currentScans
-            : ImageScan::query()
-                ->select(['id', 'image_ref', 'status'])
-                ->where('resource_type', $owner->getMorphClass())
+        $rows = match (true) {
+            $deploymentId === null => $currentScans,
+            $deploymentRows?->has(self::key($owner)) === true => $deploymentRows->get(self::key($owner)),
+            default => self::deploymentRowsQuery(collect([$deploymentId]))
                 ->where('resource_id', $owner->getKey())
-                ->where('deployment_queue_id', $deploymentId)
-                ->get();
+                ->get(),
+        };
 
         $unfinished = $rows->filter(fn (ImageScan $row): bool => $row->status !== ImageScanStatus::Completed)->count();
         $rowNames = $rows->map(fn (ImageScan $row): string => ScanImage::imageName((string) $row->image_ref))->unique()->all();
 
         return $unfinished + count(array_diff(self::composeImageNames($owner), $rowNames));
+    }
+
+    /**
+     * The scan rows of the current deployment of each Compose application among the owners, with one query, for
+     * `uncheckedComposeImages()` in lists.
+     *
+     * @param  Collection<int, Model>  $owners
+     * @param  Collection<string, Collection<int, ImageScan>>  $currentScans  Keyed by `key()` of the owner (see `currentForMany()`).
+     * @return Collection<string, Collection<int, ImageScan>> Keyed by `key()` of the owner.
+     */
+    public static function composeDeploymentRows(Collection $owners, Collection $currentScans): Collection
+    {
+        $deployments = $owners
+            ->filter(fn (Model $owner): bool => self::isCompose($owner))
+            ->mapWithKeys(fn (Model $owner): array => [self::key($owner) => $currentScans->get(self::key($owner))?->first()?->deployment_queue_id])
+            ->filter(fn ($deploymentId): bool => $deploymentId !== null);
+        if ($deployments->isEmpty()) {
+            return collect();
+        }
+
+        $rows = self::deploymentRowsQuery($deployments->values()->unique())->get();
+
+        return $deployments->map(fn ($deploymentId, string $key): Collection => $rows
+            ->filter(fn (ImageScan $row): bool => $row->resource_type.':'.$row->resource_id === $key && (int) $row->deployment_queue_id === (int) $deploymentId)
+            ->values());
+    }
+
+    private static function isCompose(Model $owner): bool
+    {
+        return $owner instanceof Application && $owner->build_pack === 'dockercompose';
+    }
+
+    /**
+     * @param  Collection<int, int|string>  $deploymentIds
+     * @return Builder<ImageScan>
+     */
+    private static function deploymentRowsQuery(Collection $deploymentIds): Builder
+    {
+        return ImageScan::query()
+            ->select(['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_ref', 'status'])
+            ->where('resource_type', (new Application)->getMorphClass())
+            ->whereIn('deployment_queue_id', $deploymentIds->values()->all());
     }
 
     /**
@@ -340,20 +383,6 @@ final class ResourceScans
     public static function key(Model $resource): string
     {
         return $resource->getMorphClass().':'.$resource->getKey();
-    }
-
-    /**
-     * The relevant findings that an action fixes (spec 15.5), from the stored security status: the sidebar count. 0
-     * while the resource is not scanned.
-     */
-    public static function fixableNowCount(Model $resource): int
-    {
-        if (! ImageScanPolicyResolver::isScanOn($resource)) {
-            return 0;
-        }
-
-        return (int) self::current($resource, null, ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'summary', 'scanned_at'])
-            ->sum(fn (ImageScan $scan): int => self::storedFixedCount($scan));
     }
 
     /**

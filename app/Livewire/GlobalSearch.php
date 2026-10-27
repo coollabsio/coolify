@@ -814,9 +814,9 @@ class GlobalSearch extends Component
                 'search_text' => 'team audit log activity history events',
             ] : null,
             instanceSettings()->is_image_scanning_allowed ? [
-                'name' => 'Vulnerabilities',
+                'name' => 'Security',
                 'type' => 'navigation',
-                'description' => 'Fixable vulnerabilities in images across your team',
+                'description' => 'What each resource of your team needs, from its last image scan',
                 'link' => route('vulnerabilities'),
                 'search_text' => 'vulnerabilities cve ghsa image scanning fixable packages security',
             ] : null,

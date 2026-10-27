@@ -9,13 +9,13 @@
 
 <div class="flex w-full min-w-0 flex-col gap-6">
     <x-slot:title>
-        Vulnerabilities | Coolify
+        Security | Coolify
     </x-slot>
 
     <div class="min-w-0">
-        <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Vulnerabilities</h1>
+        <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Security</h1>
         <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-            Fixable vulnerabilities in images across your team.
+            What each resource of your team needs, from its last image scan.
         </p>
     </div>
 
@@ -45,7 +45,26 @@
                         wire:model.live.debounce.300ms="search" />
                 </x-slot:search>
 
-                <x-table.filter :active-count="count($servers) + count($projects) + count($severities)" reset-action="resetFilters">
+                <x-table.filter :active-count="count($statuses) + count($servers) + count($projects)" reset-action="resetFilters">
+                    <span class="{{ $groupLabel }}">Status</span>
+                    @foreach ($statusOptions as $option => $optionLabel)
+                        @php
+                            $selected = in_array($option, $statuses, true);
+                        @endphp
+                        <button type="button" class="listbox-option" role="option" wire:key="status-option-{{ $option }}"
+                            aria-selected="{{ $selected ? 'true' : 'false' }}"
+                            wire:click="toggleStatus('{{ $option }}')">
+                            <span>{{ $optionLabel }}</span>
+                            <span class="{{ $checkbox($selected) }}">
+                                @if ($selected)
+                                    <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                        <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor" stroke-width="1.8"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                @endif
+                            </span>
+                        </button>
+                    @endforeach
                     @if ($serverOptions !== [])
                         <span class="{{ $groupLabel }}">Server</span>
                         @foreach ($serverOptions as $uuid => $name)
@@ -88,30 +107,11 @@
                             </button>
                         @endforeach
                     @endif
-                    <span class="{{ $groupLabel }}">Severity</span>
-                    @foreach ($severityOptions as $option)
-                        @php
-                            $selected = in_array($option, $severities, true);
-                        @endphp
-                        <button type="button" class="listbox-option" role="option"
-                            aria-selected="{{ $selected ? 'true' : 'false' }}"
-                            wire:click="toggleSeverity('{{ $option }}')">
-                            <span>{{ ucfirst($option) }}</span>
-                            <span class="{{ $checkbox($selected) }}">
-                                @if ($selected)
-                                    <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                        <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor" stroke-width="1.8"
-                                            stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                @endif
-                            </span>
-                        </button>
-                    @endforeach
                 </x-table.filter>
             </x-table.toolbar>
 
             <div class="relative">
-                <x-table.loading target="search,toggleServer,toggleProject,toggleSeverity,resetFilters,previousPage,nextPage,gotoPage,perPage" />
+                <x-table.loading target="search,toggleStatus,toggleServer,toggleProject,resetFilters,previousPage,nextPage,gotoPage,perPage" />
 
                 @if ($items->isEmpty())
                     @if ($searching)
@@ -120,26 +120,24 @@
                     @elseif ($hasFilters)
                         <x-empty size="sm" title="No matching resources" description="Try other filters, or reset them." />
                     @elseif (! $hasResources)
-                        <x-empty size="sm" title="No resources yet" description="Scanned resources of your team show here." />
-                    @else
-                        <x-empty size="sm" title="No scanned images yet"
-                            description="Turn on image scanning for a server. The next deploy scans the image." />
+                        <x-empty size="sm" title="No resources yet" description="The resources of your team show here." />
                     @endif
                 @else
                     <div class="data-table">
                         <div class="data-table-header image-scan-fleet-grid">
                             <span>Resource</span>
-                            <span class="image-scan-secondary image-scan-fleet-tertiary">Project / environment</span>
+                            <span>{{ $searching ? 'Match' : 'Status' }}</span>
+                            <span class="image-scan-fleet-action">{{ $searching ? 'State' : 'Action' }}</span>
                             <span class="image-scan-secondary">Server</span>
-                            <span class="image-scan-severity-cell">{{ $searching ? 'Match' : 'Fixable now' }}</span>
-                            <span class="image-scan-secondary">{{ $searching ? 'State' : 'Fix' }}</span>
-                            <span class="image-scan-secondary image-scan-fleet-tertiary">Last scan</span>
+                            <span class="image-scan-secondary image-scan-fleet-tertiary">Checked</span>
                         </div>
                         @foreach ($items as $entry)
                             @php
                                 $resource = $entry['resource'];
-                                $summary = $entry['summary'];
-                                $scannedAt = $entry['scans']->max('scanned_at');
+                                $security = $entry['security'];
+                                $status = $security->status;
+                                $checkedAt = $security->checkedAt ?? $entry['scans']->max('scanned_at');
+                                $action = $searching ? null : \App\Services\ImageScan\TeamVulnerabilities::actionSentence($security);
                             @endphp
                             <div wire:key="fleet-{{ $entry['key'] }}"
                                 class="data-table-row image-scan-fleet-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
@@ -147,23 +145,24 @@
                                     <span class="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded text-neutral-500 dark:text-fg-dim">
                                         <x-resource-logo :resource="$resource" icon-class="size-3.5" />
                                     </span>
-                                    @if ($entry['link'])
-                                        <a href="{{ $entry['link'] }}" {{ wireNavigate() }}
-                                            class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
-                                            title="{{ $resource->name }}">{{ $resource->name }}</a>
-                                    @else
-                                        <span class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 dark:text-fg">{{ $resource->name }}</span>
-                                    @endif
+                                    <div class="min-w-0">
+                                        @if ($entry['link'])
+                                            <a href="{{ $entry['link'] }}" {{ wireNavigate() }}
+                                                class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
+                                                title="{{ $resource->name }}">{{ $resource->name }}</a>
+                                        @else
+                                            <span class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 dark:text-fg">{{ $resource->name }}</span>
+                                        @endif
+                                        <span class="block truncate {{ $muted }}"
+                                            title="{{ $entry['project']?->name }} / {{ $entry['environment']?->name }}">{{ $entry['project']?->name }} / {{ $entry['environment']?->name }}</span>
+                                    </div>
                                 </div>
-                                <span class="image-scan-secondary image-scan-fleet-tertiary {{ $secondary }}"
-                                    title="{{ $entry['project']?->name }} / {{ $entry['environment']?->name }}">{{ $entry['project']?->name }} / {{ $entry['environment']?->name }}</span>
-                                <span class="image-scan-secondary {{ $secondary }}" title="{{ $entry['server']?->name }}">{{ $entry['server']?->name }}</span>
 
                                 @if ($searching)
                                     @php
                                         $match = $entry['match'];
                                     @endphp
-                                    <div class="image-scan-severity-cell flex min-w-0 flex-wrap items-center gap-1.5">
+                                    <div class="flex min-w-0 flex-wrap items-center gap-1.5">
                                         <x-image-scan.severity-badge :severity="$match['severity']" />
                                         <span class="min-w-0 truncate font-mono text-[11px] text-neutral-700 dark:text-fg"
                                             title="{{ $match['id'] }} {{ $match['package'] }} {{ $match['version'] }}">{{ $match['id'] }} · {{ $match['package'] }} {{ $match['version'] }}</span>
@@ -171,37 +170,48 @@
                                             <span class="{{ $muted }}">+{{ $match['more'] }} more</span>
                                         @endif
                                     </div>
-                                    <span class="image-scan-secondary text-[12px] text-neutral-700 dark:text-fg">
-                                        {{ $stateLabels[$match['state']] }}@if ($match['state'] === 'fixable_now' && filled($match['fixedIn']))<span class="{{ $muted }}"> → {{ $match['fixedIn'] }}</span>@endif
+                                    <span class="image-scan-fleet-action text-[12px] text-neutral-700 dark:text-fg">
+                                        {{ $stateLabels[$match['state']] }}@if ($match['state'] === 'fixed' && filled($match['fixedIn']))<span class="{{ $muted }}"> → {{ $match['fixedIn'] }}</span>@endif
                                     </span>
                                 @else
-                                    <div class="image-scan-severity-cell flex min-w-0 flex-wrap items-center gap-1">
-                                        @if (array_sum($summary['fixable']) === 0)
-                                            <span class="{{ $muted }}">Nothing to fix now.</span>
-                                        @else
-                                            @foreach ($severityOptions as $severity)
-                                                @if ($summary['fixable'][$severity] > 0)
-                                                    <x-image-scan.severity-badge :severity="$severity" :count="$summary['fixable'][$severity]" />
-                                                @endif
-                                            @endforeach
-                                            @if ($summary['kev'] > 0)
-                                                <span data-tooltip="Attackers are using this vulnerability, according to CISA.">
-                                                    <x-status-badge type="error" label="Known exploited" />
-                                                </span>
-                                            @endif
+                                    @php
+                                        $statusLabel = \App\Services\ImageScan\TeamVulnerabilities::statusLabel($status);
+                                        $statusTooltip = in_array($status, [\App\Enums\SecurityStatusType::CheckNeeded, \App\Enums\SecurityStatusType::NotChecked], true)
+                                            ? \App\Services\ImageScan\SecuritySentences::headline($security)
+                                            : null;
+                                    @endphp
+                                    <div class="flex min-w-0 items-center">
+                                        <span class="inline-flex max-w-full" @if ($statusTooltip) data-tooltip="{{ $statusTooltip }}" @endif>
+                                            @switch($status)
+                                                @case(\App\Enums\SecurityStatusType::UpdateNow)
+                                                    <x-status-badge type="error" :label="$statusLabel" />
+                                                @break
+                                                @case(\App\Enums\SecurityStatusType::UpdateAvailable)
+                                                    <x-status-badge type="warning" :label="$statusLabel" />
+                                                @break
+                                                @case(\App\Enums\SecurityStatusType::NoFix)
+                                                @case(\App\Enums\SecurityStatusType::CheckNeeded)
+                                                    <x-status-badge type="neutral" :label="$statusLabel" />
+                                                @break
+                                                @default
+                                                    <span class="{{ $muted }}">{{ $statusLabel }}</span>
+                                            @endswitch
+                                        </span>
+                                    </div>
+                                    <div class="image-scan-fleet-action min-w-0">
+                                        @if ($action !== null && $entry['link'])
+                                            <a href="{{ $entry['link'] }}#security-section" {{ wireNavigate() }}
+                                                class="line-clamp-2 text-[12px] text-neutral-700 hover:underline dark:text-fg"
+                                                title="{{ $action }}">{{ $action }}</a>
+                                        @elseif ($action !== null)
+                                            <span class="line-clamp-2 text-[12px] text-neutral-700 dark:text-fg">{{ $action }}</span>
                                         @endif
                                     </div>
-                                    <span class="image-scan-secondary {{ $secondary }}">
-                                        @if ($summary['update'] !== null)
-                                            Update to {{ $summary['update'] }}
-                                        @elseif (($packageCounts[$entry['key']] ?? 0) > 0)
-                                            {{ $packageCounts[$entry['key']] }} {{ str('package')->plural($packageCounts[$entry['key']]) }}
-                                        @endif
-                                    </span>
                                 @endif
 
+                                <span class="image-scan-secondary {{ $secondary }}" title="{{ $entry['server']?->name }}">{{ $entry['server']?->name }}</span>
                                 <span class="image-scan-secondary image-scan-fleet-tertiary {{ $muted }}"
-                                    @if ($scannedAt) title="{{ $scannedAt->toDayDateTimeString() }}" @endif>{{ $scannedAt?->diffForHumans() }}</span>
+                                    @if ($checkedAt) title="{{ $checkedAt->toDayDateTimeString() }}" @endif>{{ $checkedAt?->diffForHumans() }}</span>
                             </div>
                         @endforeach
                     </div>

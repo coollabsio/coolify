@@ -47,7 +47,7 @@ class Index extends Component
 
     protected Collection $services;
 
-    /** @var array<string, array{count: int, label: string}> */
+    /** @var array<string, array{status: string, text: string, label: string, tooltip: ?string}> */
     private array $markers = [];
 
     public function mount(): void
@@ -231,7 +231,7 @@ class Index extends Component
                 'id' => $tag->id,
                 'name' => $tag->name,
             ])->values()->toArray(),
-            'vulnerabilities' => $this->markers[ResourceScans::key($item)] ?? null,
+            'security' => $this->markers[ResourceScans::key($item)] ?? null,
         ])->values()->toArray();
     }
 }

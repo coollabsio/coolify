@@ -1330,7 +1330,7 @@ Relevant classes:
 Create a page-specific grid class when columns differ. Add responsive rules
 that hide secondary columns before allowing horizontal overflow.
 
-### Severity badge, vulnerability marker, gate status, and the Security main card
+### Severity badge, security marker, gate status, and the Security main card
 
 Image scan findings use shared pieces in
 `resources/views/components/image-scan/`. They keep the status badge rule:
@@ -1356,42 +1356,62 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   `x-status-badge` with the types `severity-critical`, `severity-high`,
   `severity-medium`, or `severity-low` (unknown is neutral). The label is
   `2 critical`, or `Critical` (sentence case) when `count` is null.
-- `<x-image-scan.marker :count="2" :label="'2 critical, 5 high with a fix.'" />`
-  is the resource vulnerability marker for lists and headers: a `shield-alert`
-  icon with the count, in the normal text color, not red. `label` is both
-  `aria-label` and `data-tooltip`. It renders nothing when the count is 0, so a
-  clean or unscanned resource shows no marker.
-  - The count is "fixable now" at the alert level. The label names the
-    severities and, when Coolify can update the image, the version:
-    `2 critical, 5 high with a fix.` or `1 critical with a fix. Update to
-    16.4-alpine.`
+- `<x-image-scan.marker status="update_now" text="Update now" label="…" tooltip="Update to 15.15." />`
+  is the security marker for lists: a `shield-alert` icon with visible text,
+  never a tooltip-only count, so it works on touch screens.
+  - Only two statuses get one: update_now ("Update now", icon and text in
+    `text-error`) and no_fix ("No fix yet", neutral text). Every other status
+    renders nothing.
+  - `tooltip` (`data-tooltip`) is the sentence of the primary action, when
+    update_now has one. `label` (`aria-label`) names the status and that
+    action: "Security: update now. Update to 15.15."
   - It sits right after the resource name: the environment list (table and
     cards), the server Resources tab, and the canvas cards (in the chip row,
-    before the extra servers chip; `Card.svelte` draws the same anatomy).
+    before the extra servers chip; `Card.svelte` draws the same anatomy from
+    the node's `security` value).
   - Lists rendered by Alpine pass an expression instead of values:
-    `<x-image-scan.marker bind="item.vulnerabilities" class="relative" />`.
-    Add `relative` when the row has a full-row link overlay, so the tooltip
-    still opens.
+    `<x-image-scan.marker bind="item.security" class="relative" />`. Add
+    `relative` when the row has a full-row link overlay, so the tooltip still
+    opens.
   - Compute the markers of a whole list at once with
-    `VulnerabilityMarkers::for($resources)`: a fixed number of queries, never
-    one per row. A resource that is not scanned now (instance does not allow
-    scanning, its server has scanning off, or an app turned its scan off; one
-    rule in `ImageScanPolicyResolver::offState()`) has no marker, no sidebar
-    count, no dashboard count, and counts as not scanned on the team page.
-- The team Vulnerabilities page (Monitoring > Vulnerabilities,
+    `VulnerabilityMarkers::for($resources)`. It reads the stored statuses
+    (`SecurityStatus::storedMany()`) with a fixed number of queries, never one
+    per row, and never reads findings. A resource that is not scanned now
+    (instance does not allow scanning, its server has scanning off, or an app
+    turned its scan off; one rule in `ImageScanPolicyResolver::offState()`) is
+    not_checked: no marker, no sidebar dot, and no dashboard count.
+- The team Security page (Monitoring > Security,
   `livewire/image-scan/fleet-vulnerabilities.blade.php`) is a top-level
-  destination: title and summary, one dense table (Resource, Project /
-  environment, Server, Fixable now as severity badges, Fix, Last scan), worst
-  first, with Server, Project, and Severity in one `x-table.filter`. A search
-  by CVE, GHSA, or package switches the last columns to the match and its state
-  ("Fixable now", "Fix not released yet", "No fix", "Ignored"). Resources that
-  were not scanned are never hidden silently: a muted line under the table
-  says "{n} resources on {m} servers were not scanned, so Coolify cannot tell."
-- Fleet callouts are dismissible until their number changes: the
-  `localStorage` key holds the number, so a new number shows the callout again.
-  The dashboard shows at most one ("{n} resources have vulnerabilities you can
-  fix now." + Review); the Vulnerabilities page shows admins "{n} servers do
-  not scan images." Nothing else about vulnerabilities goes on the dashboard.
+  destination: title and summary, one dense table with every resource the
+  user can see.
+  - Columns: Resource (with project / environment under the name), Status,
+    Action, Server, Checked.
+  - Status: the badge of the main card ("Update now" error, "Security update"
+    warning, "No fix yet" and "Check needed" neutral), or muted text "No action
+    needed" (ok) and "Not checked". Check needed and Not checked carry the
+    reason in a tooltip.
+  - Action: the sentence of the primary action (update_now and
+    update_available only), as a link to the resource's Security card
+    (`#security-section`). No buttons and no bulk actions.
+  - Sort: update_now, update_available, no_fix, check_needed, ok,
+    not_checked, then the resource name. Filters: Status, Server, and Project
+    in one `x-table.filter`.
+  - A search by CVE, GHSA, or package lists the resources with a matching
+    finding and switches the Status and Action columns to the match and its
+    state ("Fixed by an update", "No fix yet", "Ignored", the words of the
+    resource page). Only the search decodes findings.
+  - Resources that were not scanned are never hidden silently: a muted line
+    under the table says "{n} resources on {m} servers were not scanned, so
+    Coolify cannot tell."
+- Fleet callouts:
+  - The dashboard shows one callout, only for update_now: "{n} {resource
+    needs/resources need} a security update now." + Review (danger). After a
+    dismiss it shows again only when the number goes up:
+    `resources/js/security-callout.js` keeps the dismissed number in
+    `localStorage` and lowers it when the number goes down. Nothing else about
+    security goes on the dashboard.
+  - The Security page shows admins "{n} servers do not scan images." Its
+    `localStorage` key holds the number, so a new number shows it again.
 - `<x-image-scan.gate-status :result="$deployment->scan_gate_result" />` is the
   deploy gate state: a `x-status-badge` button ("Blocked" error, or "Not
   scanned" warning when the scan could not run) that opens a popover with the
@@ -1598,7 +1618,8 @@ Use these as implementation references:
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
 | Empty state | `resources/views/components/empty.blade.php` |
 | Status pill | `resources/views/components/status-badge.blade.php` |
-| Severity badge, vulnerability marker, gate status, security dot | `resources/views/components/image-scan/` |
+| Severity badge, security marker, gate status, security dot | `resources/views/components/image-scan/` |
+| Team Security page | `resources/views/livewire/image-scan/fleet-vulnerabilities.blade.php` |
 | Security main card | `resources/views/livewire/image-scan/vulnerabilities.blade.php` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |

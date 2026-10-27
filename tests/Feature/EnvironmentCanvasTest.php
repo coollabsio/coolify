@@ -136,7 +136,7 @@ describe('GET canvas', function () {
                 'link' => $application->link(),
                 'logo' => ['src' => resource_logo_url('public-repo'), 'dark' => null, 'fallback' => null, 'padded' => false, 'favicon' => 'https://web.example.com/favicon.ico'],
                 'saved' => ['x' => 10, 'y' => -20],
-                'vulnerabilities' => null,
+                'security' => null,
             ])
             ->and($nodes[$service->uuid])->toEqual([
                 'id' => $service->uuid,
@@ -155,7 +155,7 @@ describe('GET canvas', function () {
                 'link' => $service->link(),
                 'logo' => null,
                 'saved' => null,
-                'vulnerabilities' => null,
+                'security' => null,
             ])
             ->and($nodes[$database->uuid])->toMatchArray([
                 'type' => 'database',
