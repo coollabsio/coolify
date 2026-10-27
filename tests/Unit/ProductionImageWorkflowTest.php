@@ -9,30 +9,9 @@ it('reads the Coolify and helper versions by key from the versions.json of the C
     expect(trim($output))->toBe("4.6.0-beta.1 {$helper}");
 });
 
-it('runs support image workflows from main', function (string $workflowFile) {
-    $workflow = file_get_contents(dirname(__DIR__, 2)."/.github/workflows/{$workflowFile}");
-
-    expect($workflow)
-        ->toContain('branches: [ "main" ]')
-        ->not->toContain('v4.x');
-})->with([
-    'helper' => 'coolify-helper.yml',
-]);
-
-it('prevents the stable helper workflow from publishing an existing version', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-helper.yml');
-
-    expect($workflow)
-        ->toContain('workflow_dispatch:')
-        ->toContain('check-version:')
-        ->toContain('needs: check-version')
-        ->toContain('VERSION="${BASE_VERSION}"')
-        ->toContain('docker buildx imagetools inspect "$IMAGE"')
-        ->toContain('Version $VERSION already exists in $registry')
-        ->toContain('Version $VERSION is available in both registries')
-        ->toContain('Could not verify $IMAGE')
-        ->toContain('cancel-in-progress: false');
-});
+it('builds the development helper image from the coolify-helper repository', function (string $file) {
+    expect(file_get_contents(dirname(__DIR__, 2)."/{$file}"))->toContain('https://github.com/coollabsio/coolify-helper.git#main:src');
+})->with(['scripts/dev-helper', 'docker-compose.dev.yml', 'docker-compose.dev-multi.yml']);
 
 it('publishes the testing host only to Docker Hub', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-testing-host.yml');
