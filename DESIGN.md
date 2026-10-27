@@ -1359,8 +1359,9 @@ value in `.dark`. They are OKLCH only and never follow the accent or
 - `<x-image-scan.marker status="update_now" text="Update now" label="…" tooltip="Update to 15.15." />`
   is the security marker for lists: a `shield-alert` icon with visible text,
   never a tooltip-only count, so it works on touch screens.
-  - Only two statuses get one: update_now ("Update now", icon and text in
-    `text-error`) and no_fix ("No fix yet", neutral text). Every other status
+  - Only two statuses get one: update_now ("Update now", the icon in
+    `text-error`) and no_fix ("No fix yet", a neutral icon). The color is on
+    the icon only; the text keeps the normal foreground. Every other status
     renders nothing.
   - `tooltip` (`data-tooltip`) is the sentence of the primary action, when
     update_now has one. `label` (`aria-label`) names the status and that
@@ -1388,30 +1389,36 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     Action, Server, Checked.
   - Status: the badge of the main card ("Update now" error, "Security update"
     warning, "No fix yet" and "Check needed" neutral), or muted text "No action
-    needed" (ok) and "Not checked". Check needed and Not checked carry the
-    reason in a tooltip.
+    needed" (ok) and "Not checked".
   - Action: the sentence of the primary action (update_now and
-    update_available only), as a link to the resource's Security card
-    (`#security-section`). No buttons and no bulk actions.
+    update_available), as a link to the resource's Security card
+    (`#security-section`); muted "Check again: {reason}." as the same link
+    for check_needed; muted, unlinked "why not checked" text for not_checked.
+    No buttons and no bulk actions.
   - Sort: update_now, update_available, no_fix, check_needed, ok,
-    not_checked, then the resource name. Filters: Status, Server, and Project
-    in one `x-table.filter`.
+    not_checked, then the resource name. Filters: Status (with a count per
+    status, "Update now (3)", and in the URL as `statuses[]`), Server, and
+    Project in one `x-table.filter`. 25 rows per page by default.
   - A search by CVE, GHSA, or package lists the resources with a matching
     finding and switches the Status and Action columns to the match and its
     state ("Fixed by an update", "No fix yet", "Ignored", the words of the
-    resource page). Only the search decodes findings.
+    resource page). A small status badge stays next to the resource name.
+    Only the search decodes findings.
   - Resources that were not scanned are never hidden silently: a muted line
     under the table says "{n} resources on {m} servers were not scanned, so
     Coolify cannot tell."
 - Fleet callouts:
   - The dashboard shows one callout, only for update_now: "{n} {resource
-    needs/resources need} a security update now." + Review (danger). After a
-    dismiss it shows again only when the number goes up:
-    `resources/js/security-callout.js` keeps the dismissed number in
-    `localStorage` and lowers it when the number goes down. Nothing else about
-    security goes on the dashboard.
+    needs/resources need} a security update now." + Review (danger), which
+    opens the Security page filtered to update_now. After a dismiss it shows
+    again only when a resource that was not dismissed needs an update now:
+    `resources/js/security-callout.js` keeps the dismissed resource UUIDs in
+    `localStorage` and clears them when no resource needs an update now.
+    Nothing else about security goes on the dashboard.
   - The Security page shows admins "{n} servers do not scan images." Its
     `localStorage` key holds the number, so a new number shows it again.
+  - Callout keys are per team (`….dismissed.{teamId}`): a dismiss in one team
+    never hides the callout of another.
 - `<x-image-scan.gate-status :result="$deployment->scan_gate_result" />` is the
   deploy gate state: a `x-status-badge` button ("Blocked" error, or "Not
   scanned" warning when the scan could not run) that opens a popover with the

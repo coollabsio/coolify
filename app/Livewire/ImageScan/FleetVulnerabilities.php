@@ -32,9 +32,10 @@ class FleetVulnerabilities extends Component
     public array $projects = [];
 
     /** @var list<string> SecurityStatusType values. */
+    #[Url(except: [])]
     public array $statuses = [];
 
-    public int $perPage = 10;
+    public int $perPage = 25;
 
     private ?TeamVulnerabilities $fleet = null;
 
@@ -120,15 +121,16 @@ class FleetVulnerabilities extends Component
             ->mapWithKeys(fn ($server) => [$server->uuid => $server->name])->sort(SORT_NATURAL | SORT_FLAG_CASE)->all();
         $projectOptions = $entries->pluck('project')->filter()->unique('id')
             ->mapWithKeys(fn ($project) => [$project->uuid => $project->name])->sort(SORT_NATURAL | SORT_FLAG_CASE)->all();
-        $statusOptions = collect(TeamVulnerabilities::STATUS_ORDER)
-            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status))])
-            ->all();
         $this->servers = array_values(array_intersect($this->servers, array_keys($serverOptions)));
         $this->projects = array_values(array_intersect($this->projects, array_keys($projectOptions)));
-        $this->statuses = array_values(array_intersect($this->statuses, TeamVulnerabilities::STATUS_ORDER));
+        $this->statuses = array_values(array_intersect(array_map('strval', $this->statuses), TeamVulnerabilities::STATUS_ORDER));
 
         $inScope = $entries->filter(fn (array $entry): bool => ($this->servers === [] || in_array($entry['server']?->uuid, $this->servers, true))
             && ($this->projects === [] || in_array($entry['project']?->uuid, $this->projects, true)))->values();
+        $statusCounts = $inScope->countBy(fn (array $entry): string => $entry['security']->status->value);
+        $statusOptions = collect(TeamVulnerabilities::STATUS_ORDER)
+            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status)).' ('.($statusCounts[$status] ?? 0).')'])
+            ->all();
         $filtered = $inScope->filter(fn (array $entry): bool => $this->statuses === [] || in_array($entry['security']->status->value, $this->statuses, true))->values();
 
         $notScanned = $inScope->filter(fn (array $entry): bool => $entry['security']->status === SecurityStatusType::NotChecked);

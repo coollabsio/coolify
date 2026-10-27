@@ -7,7 +7,7 @@ import './traffic-table.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
-import { SECURITY_CALLOUT_KEY, securityCallout } from './security-callout.js';
+import { dismissSecurityCallout, securityCallout } from './security-callout.js';
 import { vulnerabilitySearchItem } from './vulnerability-search.js';
 
 // The canvases (Svelte, Svelte Flow) load only on pages that have one. After the
@@ -38,7 +38,7 @@ window.vulnerabilitySearchItem = vulnerabilitySearchItem;
 
 // Used by the dashboard security callout (dashboard.blade.php).
 window.securityCallout = securityCallout;
-window.SECURITY_CALLOUT_KEY = SECURITY_CALLOUT_KEY;
+window.dismissSecurityCallout = dismissSecurityCallout;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);

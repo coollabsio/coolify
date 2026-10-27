@@ -25,7 +25,7 @@
     @else
         @if ($serversNotScanning > 0)
             @php
-                $serversKey = 'coolify.image-scan.servers-not-scanning-dismissed.'.$serversNotScanning;
+                $serversKey = 'coolify.image-scan.servers-not-scanning-dismissed.'.currentTeam()->id.'.'.$serversNotScanning;
             @endphp
             <div x-data="{ hidden: localStorage.getItem(@js($serversKey)) === '1' }" x-show="!hidden" x-cloak
                 wire:key="servers-not-scanning-{{ $serversNotScanning }}">
@@ -137,7 +137,14 @@
                                 $security = $entry['security'];
                                 $status = $security->status;
                                 $checkedAt = $security->checkedAt ?? $entry['scans']->max('scanned_at');
-                                $action = $searching ? null : \App\Services\ImageScan\TeamVulnerabilities::actionSentence($security);
+                                $action = $searching ? null : \App\Services\ImageScan\TeamVulnerabilities::action($security);
+                                $statusLabel = \App\Services\ImageScan\TeamVulnerabilities::statusLabel($status);
+                                $badgeType = match ($status) {
+                                    \App\Enums\SecurityStatusType::UpdateNow => 'error',
+                                    \App\Enums\SecurityStatusType::UpdateAvailable => 'warning',
+                                    \App\Enums\SecurityStatusType::NoFix, \App\Enums\SecurityStatusType::CheckNeeded => 'neutral',
+                                    default => null,
+                                };
                             @endphp
                             <div wire:key="fleet-{{ $entry['key'] }}"
                                 class="data-table-row image-scan-fleet-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
@@ -146,13 +153,18 @@
                                         <x-resource-logo :resource="$resource" icon-class="size-3.5" />
                                     </span>
                                     <div class="min-w-0">
-                                        @if ($entry['link'])
-                                            <a href="{{ $entry['link'] }}" {{ wireNavigate() }}
-                                                class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
-                                                title="{{ $resource->name }}">{{ $resource->name }}</a>
-                                        @else
-                                            <span class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 dark:text-fg">{{ $resource->name }}</span>
-                                        @endif
+                                        <div class="flex min-w-0 items-center gap-1.5">
+                                            @if ($entry['link'])
+                                                <a href="{{ $entry['link'] }}" {{ wireNavigate() }}
+                                                    class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
+                                                    title="{{ $resource->name }}">{{ $resource->name }}</a>
+                                            @else
+                                                <span class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 dark:text-fg">{{ $resource->name }}</span>
+                                            @endif
+                                            @if ($searching && $badgeType !== null)
+                                                <x-status-badge :type="$badgeType" :label="$statusLabel" class="h-5! px-1.5! text-[10px]!" />
+                                            @endif
+                                        </div>
                                         <span class="block truncate {{ $muted }}"
                                             title="{{ $entry['project']?->name }} / {{ $entry['environment']?->name }}">{{ $entry['project']?->name }} / {{ $entry['environment']?->name }}</span>
                                     </div>
@@ -174,37 +186,25 @@
                                         {{ $stateLabels[$match['state']] }}@if ($match['state'] === 'fixed' && filled($match['fixedIn']))<span class="{{ $muted }}"> → {{ $match['fixedIn'] }}</span>@endif
                                     </span>
                                 @else
-                                    @php
-                                        $statusLabel = \App\Services\ImageScan\TeamVulnerabilities::statusLabel($status);
-                                        $statusTooltip = in_array($status, [\App\Enums\SecurityStatusType::CheckNeeded, \App\Enums\SecurityStatusType::NotChecked], true)
-                                            ? \App\Services\ImageScan\SecuritySentences::headline($security)
-                                            : null;
-                                    @endphp
                                     <div class="flex min-w-0 items-center">
-                                        <span class="inline-flex max-w-full" @if ($statusTooltip) data-tooltip="{{ $statusTooltip }}" @endif>
-                                            @switch($status)
-                                                @case(\App\Enums\SecurityStatusType::UpdateNow)
-                                                    <x-status-badge type="error" :label="$statusLabel" />
-                                                @break
-                                                @case(\App\Enums\SecurityStatusType::UpdateAvailable)
-                                                    <x-status-badge type="warning" :label="$statusLabel" />
-                                                @break
-                                                @case(\App\Enums\SecurityStatusType::NoFix)
-                                                @case(\App\Enums\SecurityStatusType::CheckNeeded)
-                                                    <x-status-badge type="neutral" :label="$statusLabel" />
-                                                @break
-                                                @default
-                                                    <span class="{{ $muted }}">{{ $statusLabel }}</span>
-                                            @endswitch
-                                        </span>
+                                        @if ($badgeType !== null)
+                                            <x-status-badge :type="$badgeType" :label="$statusLabel" />
+                                        @else
+                                            <span class="{{ $muted }}">{{ $statusLabel }}</span>
+                                        @endif
                                     </div>
                                     <div class="image-scan-fleet-action min-w-0">
-                                        @if ($action !== null && $entry['link'])
-                                            <a href="{{ $entry['link'] }}#security-section" {{ wireNavigate() }}
-                                                class="line-clamp-2 text-[12px] text-neutral-700 hover:underline dark:text-fg"
-                                                title="{{ $action }}">{{ $action }}</a>
-                                        @elseif ($action !== null)
-                                            <span class="line-clamp-2 text-[12px] text-neutral-700 dark:text-fg">{{ $action }}</span>
+                                        @if ($action !== null)
+                                            @php
+                                                $actionClass = $action['muted'] ? 'text-[12px] text-neutral-500 dark:text-fg-faint' : 'text-[12px] text-neutral-700 dark:text-fg';
+                                            @endphp
+                                            @if ($action['link'] && $entry['link'])
+                                                <a href="{{ $entry['link'] }}#security-section" {{ wireNavigate() }}
+                                                    class="line-clamp-2 hover:underline {{ $actionClass }}"
+                                                    title="{{ $action['text'] }}">{{ $action['text'] }}</a>
+                                            @else
+                                                <span class="line-clamp-2 {{ $actionClass }}">{{ $action['text'] }}</span>
+                                            @endif
                                         @endif
                                     </div>
                                 @endif
@@ -222,7 +222,7 @@
                 :current-page="$items->currentPage()" :last-page="$items->lastPage()"
                 wire-target="previousPage,nextPage,perPage" previous-action="previousPage" next-action="nextPage">
                 <x-slot:pageSize>
-                    <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.image-scan-fleet" />
+                    <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.image-scan-fleet" :selected="$perPage" />
                 </x-slot:pageSize>
             </x-table-pagination>
 

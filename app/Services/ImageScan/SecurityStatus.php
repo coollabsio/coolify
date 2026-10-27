@@ -64,7 +64,7 @@ final class SecurityStatus
     /** Results of a version or base check that count as checked. */
     private const CHECKED_STATUSES = ['ok', 'no_better', 'cannot_compare'];
 
-    private const STORED_COLUMNS = ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_ref', 'summary', 'scanned_at'];
+    public const STORED_COLUMNS = ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_ref', 'summary', 'scanned_at'];
 
     private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'relevant_fixed', 'builder_unfixed'];
 
@@ -118,9 +118,12 @@ final class SecurityStatus
      * `stored()` for many resources with a fixed number of queries, also for many Compose applications.
      *
      * @param  Collection<int, Model>  $resources
+     * @param  Collection<string, Collection<int, ImageScan>>|null  $scans  The current scans of the owners of the scanned
+     *                                                                      resources (`ResourceScans::currentForMany()` with
+     *                                                                      at least STORED_COLUMNS), when the caller has them.
      * @return array<string, ResourceSecurity> Keyed by `ResourceScans::key()`.
      */
-    public static function storedMany(Collection $resources): array
+    public static function storedMany(Collection $resources, ?Collection $scans = null): array
     {
         $resources = $resources->values();
         if ($resources->isEmpty()) {
@@ -131,7 +134,7 @@ final class SecurityStatus
         $offStates = $resources->mapWithKeys(fn (Model $resource): array => [ResourceScans::key($resource) => ImageScanPolicyResolver::offState($resource)]);
         $scanned = $resources->filter(fn (Model $resource): bool => $offStates[ResourceScans::key($resource)] === null)->values();
         $owners = ResourceScans::ownersOfMany($scanned);
-        $scans = ResourceScans::currentForMany($owners->flatten(1), self::STORED_COLUMNS);
+        $scans ??= ResourceScans::currentForMany($owners->flatten(1), self::STORED_COLUMNS);
         $composeRows = ResourceScans::composeDeploymentRows($owners->flatten(1), $scans);
 
         $result = [];

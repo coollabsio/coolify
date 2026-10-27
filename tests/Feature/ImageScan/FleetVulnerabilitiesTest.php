@@ -222,6 +222,42 @@ describe('page', function () {
             ->assertSee('never-app');
     });
 
+    it('opens filtered by the statuses in the URL and counts each status in the filter', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('other-now-app'), 'update_now');
+        fleetScan(fleetApplication('available-app'), 'update_available');
+
+        fleetPage($this->admin, query: ['statuses' => ['update_now']])
+            ->assertSet('statuses', ['update_now'])
+            ->assertSet('perPage', 25)
+            ->assertSee('now-app')
+            ->assertDontSee('available-app')
+            ->assertSee('Update now (2)')
+            ->assertSee('Security update (1)')
+            ->assertSee('Not checked (0)');
+    });
+
+    it('explains a check needed and a resource that is not checked in the Action column', function () {
+        $check = fleetApplication('check-app');
+        fleetScan($check, 'check_needed');
+        $offServer = fleetServer($this->team, 'off-server', scanning: false);
+        fleetApplication('off-app', destination: StandaloneDocker::query()->where('server_id', $offServer->id)->firstOrFail());
+
+        fleetPage($this->admin)
+            ->assertSee('Check again: the vulnerability database is out of date.')
+            ->assertSeeHtml('href="'.TeamVulnerabilities::vulnerabilitiesUrl($check).'#security-section"')
+            ->assertSee('Image scanning is off for this server.')
+            ->assertSeeInOrder(['Check needed', 'Check again:', 'off-app', 'Not checked', 'Image scanning is off for this server.']);
+    });
+
+    it('shows the status next to the resource name in search mode', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+
+        fleetPage($this->admin)
+            ->set('search', 'openssl')
+            ->assertSeeInOrder(['now-app', 'Update now', 'CVE-2024-0001', 'Fixed by an update']);
+    });
+
     it('never lists resources of another team', function () {
         fleetScan(fleetApplication('own-app'), 'update_available');
 
@@ -348,7 +384,7 @@ describe('page', function () {
 
         fleetPage($this->admin)
             ->assertSee('2 servers do not scan images.')
-            ->assertSeeHtml('coolify.image-scan.servers-not-scanning-dismissed.2');
+            ->assertSeeHtml('coolify.image-scan.servers-not-scanning-dismissed.'.$this->team->id.'.2');
     });
 
     it('shows the off state when the instance does not allow scanning', function () {
@@ -419,6 +455,23 @@ describe('page', function () {
             ->and($fleet->searchWasCapped())->toBeFalse();
     });
 
+    it('reads the current scans once for the statuses and the search', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('ok-app'), 'ok');
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $fleet = TeamVulnerabilities::load($this->team->id);
+        $scanQueries = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'from "image_scans"'))->count();
+        DB::disableQueryLog();
+
+        // One query finds the current scan IDs, one reads those scans.
+        expect($scanQueries)->toBe(2)
+            ->and($fleet->entries->firstWhere('resource.name', 'now-app')['security']->status->value)->toBe('update_now');
+    });
+
     it('words the not scanned line for one resource and resources without a server', function () {
         expect(FleetVulnerabilities::notScannedSentence(1, 1))->toBe('1 resource on 1 server was not scanned, so Coolify cannot tell.')
             ->and(FleetVulnerabilities::notScannedSentence(1, 0))->toBe('1 resource was not scanned, so Coolify cannot tell.')
@@ -454,7 +507,8 @@ describe('markers', function () {
 
     it('renders update now in the error color and no fix yet in the neutral color, with visible text', function () {
         $html = (string) $this->blade('<x-image-scan.marker status="update_now" text="Update now" label="Security: update now. Update to 1.28." tooltip="Update to 1.28." />');
-        expect($html)->toContain('text-error')
+        expect($html)->toMatch('/<svg[^>]*text-error/')
+            ->not->toMatch('/<span role="img"[^>]*text-error/')
             ->toContain('>Update now</span>')
             ->toContain('aria-label="Security: update now. Update to 1.28."')
             ->toContain('data-tooltip="Update to 1.28."');
@@ -553,11 +607,13 @@ describe('dashboard and search', function () {
 
         $scan = fleetScan(fleetApplication('now-app'), 'update_now');
 
+        $now = Application::query()->where('name', 'now-app')->firstOrFail();
         Livewire::test(Dashboard::class)
             ->assertSee('1 resource needs a security update now.')
             ->assertSee('Review')
-            ->assertSeeHtml('window.securityCallout?.(1')
-            ->assertSeeHtml('href="'.route('vulnerabilities').'"');
+            ->assertSeeHtml($now->uuid)
+            ->assertSeeHtml('coolify.image-scan.dashboard-update-now-dismissed.'.$this->team->id)
+            ->assertSeeHtml('href="'.e(route('vulnerabilities', ['statuses' => ['update_now']])).'"');
 
         fleetScan(fleetApplication('other-now-app'), 'update_now');
 
@@ -627,7 +683,7 @@ describe('one scanned rule', function () {
             collect(range(1, $resources))->each(fn (int $index) => fleetScan(fleetApplication('clean-'.$resources.'-'.$index), 'update_available'));
             DB::flushQueryLog();
             DB::enableQueryLog();
-            TeamVulnerabilities::updateNowResourceCount(test()->team->id);
+            TeamVulnerabilities::updateNowResources(test()->team->id);
             $queries = count(DB::getQueryLog());
             DB::disableQueryLog();
 
@@ -639,7 +695,7 @@ describe('one scanned rule', function () {
         fleetScan(fleetApplication('marked-app'), 'update_now');
 
         expect($count(2))->toBe($count(6))
-            ->and(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(1);
+            ->and(TeamVulnerabilities::updateNowResources($this->team->id))->toHaveCount(1);
     });
 
     it('does not count a resource whose update now result needs a check', function () {
@@ -647,7 +703,7 @@ describe('one scanned rule', function () {
         session(['currentTeam' => $this->team]);
         fleetScan(fleetApplication('stale-app'), 'update_now', ['scanned_at' => now()->subDays(3)]);
 
-        expect(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(0);
+        expect(TeamVulnerabilities::updateNowResources($this->team->id))->toBe([]);
     });
 
     it('counts a resource scanned on a build server that does not scan like the markers do', function () {
@@ -659,7 +715,7 @@ describe('one scanned rule', function () {
 
         expect($buildServer->settings->is_image_scan_enabled)->toBeFalse()
             ->and(VulnerabilityMarkers::for(collect([$application->fresh()])))->not->toBe([])
-            ->and(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(1);
+            ->and(TeamVulnerabilities::updateNowResources($this->team->id))->toBe([$application->uuid]);
     });
 
     it('does not reload the page for progress updates of a running scan', function () {
@@ -681,10 +737,10 @@ describe('one scanned rule', function () {
 
         $this->actingAs(fleetMember($this->team, 'member', [['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read']]]));
         session(['currentTeam' => $this->team]);
-        expect(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(1);
+        expect(TeamVulnerabilities::updateNowResources($this->team->id))->toHaveCount(1);
 
         $this->actingAs($this->admin);
-        expect(TeamVulnerabilities::updateNowResourceCount($this->team->id))->toBe(2);
+        expect(TeamVulnerabilities::updateNowResources($this->team->id))->toHaveCount(2);
     });
 });
 
@@ -694,7 +750,7 @@ function fleetExpectNotScannedEverywhere(mixed $test, Application $application):
     session(['currentTeam' => $test->team]);
 
     expect(VulnerabilityMarkers::for(collect([$application])))->toBe([])
-        ->and(TeamVulnerabilities::updateNowResourceCount($test->team->id))->toBe(0)
+        ->and(TeamVulnerabilities::updateNowResources($test->team->id))->toBe([])
         ->and(ImageScanPolicyResolver::offState($application))->not->toBeNull();
 
     fleetPage($test->admin)

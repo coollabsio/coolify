@@ -114,14 +114,14 @@
   {#if extra || security}
     <div class="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 overflow-hidden h-5">
       {#if security}
-        <!-- The security marker: "Update now" (error color) or "No fix yet" (neutral), same as x-image-scan.marker. -->
+        <!-- The security marker, same as x-image-scan.marker: the icon is error (update_now) or neutral (no_fix). -->
         <span
-          class="inline-flex h-5 shrink-0 items-center gap-1 text-xs leading-none font-medium {security.status === 'update_now' ? 'text-error' : 'text-neutral-600 dark:text-fg-dim'} {security.tooltip ? 'cursor-help' : ''}"
+          class="inline-flex h-5 shrink-0 items-center gap-1 text-xs leading-none font-medium text-neutral-700 dark:text-white {security.tooltip ? 'cursor-help' : ''}"
           role="img"
           aria-label={security.label}
           data-tooltip={security.tooltip || undefined}
         >
-          <Icon name="shieldAlert" class="size-4" />
+          <Icon name="shieldAlert" class="size-4 {security.status === 'update_now' ? 'text-error' : 'text-neutral-500 dark:text-fg-dim'}" />
           <span aria-hidden="true">{security.text}</span>
         </span>
       {/if}

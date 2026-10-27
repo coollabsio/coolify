@@ -30,10 +30,12 @@ class Dashboard extends Component
     public bool $showsTeamSections = true;
 
     /**
-     * Resources the user can see that need a security update now (update_now).
+     * UUIDs of the resources the user can see that need a security update now (update_now).
+     *
+     * @var list<string>
      */
     #[Locked]
-    public int $securityUpdateNowCount = 0;
+    public array $securityUpdateNow = [];
 
     public function mount()
     {
@@ -45,7 +47,7 @@ class Dashboard extends Component
             return;
         }
 
-        $this->securityUpdateNowCount = TeamVulnerabilities::updateNowResourceCount(currentTeam()->id);
+        $this->securityUpdateNow = TeamVulnerabilities::updateNowResources(currentTeam()->id);
         $this->privateKeys = $this->showsTeamSections ? PrivateKey::ownedByCurrentTeamCached() : collect();
         $this->servers = $this->showsTeamSections ? Server::ownedByCurrentTeamCached() : collect();
         $this->projects = Project::ownedByCurrentTeam()

@@ -54,11 +54,10 @@ final class TeamVulnerabilities
     public static function load(int $teamId): self
     {
         $resources = self::resources($teamId);
-        $statuses = SecurityStatus::storedMany($resources);
-        $scanOn = $resources->filter(fn (Model $resource): bool => ImageScanPolicyResolver::isScanOn($resource))
-            ->mapWithKeys(fn (Model $resource): array => [ResourceScans::key($resource) => true]);
-        $owners = ResourceScans::ownersOfMany($resources->filter(fn (Model $resource): bool => $scanOn->has(ResourceScans::key($resource)))->values());
+        ResourceScans::loadScanRelations($resources);
+        $owners = ResourceScans::ownersOfMany($resources->filter(fn (Model $resource): bool => ImageScanPolicyResolver::isScanOn($resource))->values());
         $scans = ResourceScans::currentForMany($owners->flatten(1), VulnerabilityMarkers::SCAN_COLUMNS);
+        $statuses = SecurityStatus::storedMany($resources, $scans);
 
         $entries = $resources->map(function (Model $resource) use ($owners, $scans, $statuses): array {
             $key = ResourceScans::key($resource);
@@ -95,28 +94,49 @@ final class TeamVulnerabilities
     }
 
     /**
-     * The sentence of the primary action of an update_now or update_available status, else null.
+     * The Action column: the sentence of the primary action (update_now, update_available), "Check again: {reason}."
+     * (check_needed, muted), or why the resource is not checked (not_checked, muted, no link). Null for the others.
+     *
+     * @return array{text: string, link: bool, muted: bool}|null
      */
-    public static function actionSentence(ResourceSecurity $security): ?string
+    public static function action(ResourceSecurity $security): ?array
     {
-        if (! in_array($security->status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true)) {
-            return null;
-        }
-
-        $sentence = $security->primary()?->sentence;
-
-        return filled($sentence) ? $sentence : null;
+        return match ($security->status) {
+            SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable => filled($security->primary()?->sentence)
+                ? ['text' => (string) $security->primary()->sentence, 'link' => true, 'muted' => false]
+                : null,
+            SecurityStatusType::CheckNeeded => ['text' => 'Check again: '.self::checkReason($security).'.', 'link' => true, 'muted' => true],
+            SecurityStatusType::NotChecked => ['text' => SecuritySentences::headline($security), 'link' => false, 'muted' => true],
+            default => null,
+        };
     }
 
     /**
-     * How many resources the user can see need a security update now (update_now). Starts from the current scans
-     * whose stored status has a fixed finding with an exploit signal, so only those resources are loaded, not every
-     * resource of the team.
+     * The check_needed reason, with the time of the oldest result for a stale one.
      */
-    public static function updateNowResourceCount(int $teamId): int
+    private static function checkReason(ResourceSecurity $security): string
+    {
+        $context = $security->checkContext;
+        if (($context['time'] ?? null) === null && $security->checkedAt !== null) {
+            $context['time'] = $security->checkedAt->toIso8601String();
+        }
+
+        return $security->checkReason === null
+            ? 'the last check is incomplete'
+            : SecuritySentences::checkReason($security->checkReason, $context);
+    }
+
+    /**
+     * The UUIDs of the resources the user can see that need a security update now (update_now), sorted. Starts from
+     * the current scans whose stored status has a fixed finding with an exploit signal, so only those resources are
+     * loaded, not every resource of the team.
+     *
+     * @return list<string>
+     */
+    public static function updateNowResources(int $teamId): array
     {
         if (! instanceSettings()->is_image_scanning_allowed) {
-            return 0;
+            return [];
         }
 
         $owners = ImageScan::query()
@@ -131,7 +151,7 @@ final class TeamVulnerabilities
             ->map(fn (Collection $rows): array => $rows->pluck('resource_id')->unique()->values()->all())
             ->all());
         if ($currentIds === []) {
-            return 0;
+            return [];
         }
 
         // A resource is update_now only when one of its images has a fixed finding with an exploit signal.
@@ -159,9 +179,14 @@ final class TeamVulnerabilities
             ->get())
             ->values();
 
-        return collect(SecurityStatus::storedMany($resources))
-            ->filter(fn (ResourceSecurity $security): bool => $security->status === SecurityStatusType::UpdateNow)
-            ->count();
+        $statuses = SecurityStatus::storedMany($resources);
+
+        return $resources
+            ->filter(fn (Model $resource): bool => $statuses[ResourceScans::key($resource)]->status === SecurityStatusType::UpdateNow)
+            ->map(fn (Model $resource): string => (string) $resource->getAttribute('uuid'))
+            ->sort()
+            ->values()
+            ->all();
     }
 
     /**
