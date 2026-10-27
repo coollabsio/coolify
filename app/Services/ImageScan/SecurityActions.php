@@ -199,7 +199,7 @@ final class SecurityActions
      * third_party: Coolify pulls it. docker_image: a Docker image app the team builds itself. dockerfile, compose,
      * builder (Nixpacks, Railpack, static): Coolify builds it.
      */
-    private static function imageKind(ImageScan $scan, Model $owner): string
+    public static function imageKind(ImageScan $scan, Model $owner): string
     {
         if (! (bool) $scan->builds_image || ! $owner instanceof Application) {
             return 'third_party';

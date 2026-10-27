@@ -324,6 +324,7 @@ final class SecurityStatus
             eol: $eol,
             checkedAt: $scan->scanned_at === null ? null : CarbonImmutable::instance($scan->scanned_at),
             facts: ['reasons' => $reasons, 'counts' => $counts, 'action_stats' => $stats, 'unfixed_why' => self::topWhy($unfixed)],
+            builderImage: SecurityActions::imageKind($scan, $owner) === 'builder',
         )], null, false);
     }
 
@@ -342,8 +343,12 @@ final class SecurityStatus
         $eol = null;
         $checkedAt = null;
         $unknownTime = false;
+        $unfixedParts = [];
         foreach ($parts as $part) {
             $facts = $part->facts;
+            if ((int) data_get($facts, 'counts.signal_unfixed', 0) > 0) {
+                $unfixedParts[] = $part;
+            }
             foreach ($part->actions as $index => $action) {
                 $entries[] = ['action' => $action, 'stats' => self::stats(data_get($facts, "action_stats.{$index}"))];
             }
@@ -440,6 +445,7 @@ final class SecurityStatus
                 'action_stats' => array_map(fn (array $entry): array => $entry['stats'], $entries),
                 'unfixed_why' => self::topWhy($unfixed),
             ],
+            builderImage: $unfixedParts !== [] && collect($unfixedParts)->every(fn (ResourceSecurity $part): bool => $part->builderImage),
         );
     }
 

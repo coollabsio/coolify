@@ -24,6 +24,9 @@ use Throwable;
  * An action that leaves an end-of-life OS counts it as one critical relevant fix (`problemCount`, `criticalCount`,
  * `fixedByPrimary`, `primaryCritical`); `eol.fixed` says so. It is not in `why` or `moreFixed`.
  *
+ * `builderImage`: every image whose findings drive no_fix is built by a builder (Nixpacks, Railpack, static), so the
+ * no_fix text is the builder text.
+ *
  * `checkedAt` is the time of the oldest current scan of the resource (null when one has no time); `stale` uses it.
  *
  * `checkReason` is the check_needed reason (`images_unchecked` {checked, total}, `stale` {time}, `db_outdated`,
@@ -65,6 +68,7 @@ final readonly class ResourceSecurity
         public ?array $eol = null,
         public ?CarbonImmutable $checkedAt = null,
         public array $facts = [],
+        public bool $builderImage = false,
     ) {}
 
     public function primary(): ?SecurityAction
@@ -96,6 +100,7 @@ final readonly class ResourceSecurity
             'eol' => $this->eol,
             'checked_at' => $this->checkedAt?->toIso8601String(),
             'facts' => $this->facts,
+            'builder_image' => $this->builderImage,
         ];
     }
 
@@ -139,6 +144,7 @@ final readonly class ResourceSecurity
             eol: $eol === null ? null : ['name' => (string) ($eol['name'] ?? ''), 'version' => (string) ($eol['version'] ?? ''), 'fixed' => (bool) ($eol['fixed'] ?? false)],
             checkedAt: self::time($data['checked_at'] ?? null),
             facts: $facts,
+            builderImage: (bool) ($data['builder_image'] ?? false),
         );
     }
 

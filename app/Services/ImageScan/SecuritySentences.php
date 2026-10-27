@@ -13,15 +13,14 @@ use Throwable;
 final class SecuritySentences
 {
     /**
-     * The sentence under the status line. `$builderImage`: Coolify builds the image with a builder (Nixpacks,
-     * Railpack, static), which changes the no_fix text.
+     * The sentence under the status line.
      */
-    public static function headline(ResourceSecurity $security, bool $builderImage = false): string
+    public static function headline(ResourceSecurity $security): string
     {
         return match ($security->status) {
             SecurityStatusType::UpdateNow => self::updateNow($security),
             SecurityStatusType::UpdateAvailable => self::updateAvailable($security),
-            SecurityStatusType::NoFix => $builderImage ? SecurityActions::BUILDER_TEXT : self::noFix($security),
+            SecurityStatusType::NoFix => $security->builderImage ? SecurityActions::BUILDER_TEXT : self::noFix($security),
             SecurityStatusType::Ok => 'No action needed.',
             SecurityStatusType::CheckNeeded => 'Coolify needs to check this image again: '.self::checkReason((string) $security->checkReason, self::checkContext($security)).'.',
             SecurityStatusType::NotChecked => self::checkReason((string) ($security->checkReason ?? 'not_scanned'), $security->checkContext),
@@ -152,8 +151,9 @@ final class SecuritySentences
     private static function noFix(ResourceSecurity $security): string
     {
         $problems = self::problems($security->problemCount);
+        $use = $security->anyExploited ? 'are using' : 'are likely to use';
 
-        return "This image has {$problems} that attackers are using, and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or ignore the problem if the affected part is not used.";
+        return "This image has {$problems} that attackers {$use}, and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or ignore the problem if the affected part is not used.";
     }
 
     private static function problems(int $count): string

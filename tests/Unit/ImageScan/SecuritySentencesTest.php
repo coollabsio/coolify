@@ -137,6 +137,13 @@ it('writes no extra line without the exploited_without_fix flag or for other sta
         ->and(SecuritySentences::lines(sentenceSecurity(SecurityStatusType::Ok)))->toBe([]);
 });
 
+it('says "likely to use" for a no_fix image when no problem is a known exploited one', function () {
+    $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2, 'anyExploited' => false]);
+
+    expect(SecuritySentences::headline($security))
+        ->toStartWith('This image has 2 security problems that attackers are likely to use, and no fixed version exists yet. Coolify checks every day');
+});
+
 it('writes the no_fix headline', function () {
     $tail = ', and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or ignore the problem if the affected part is not used.';
 
@@ -147,9 +154,11 @@ it('writes the no_fix headline', function () {
 });
 
 it('uses the builder text for a no_fix image that a builder builds', function () {
-    $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true]);
+    $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true, 'builderImage' => true]);
 
-    expect(SecuritySentences::headline($security, builderImage: true))->toBe(SecurityActions::BUILDER_TEXT);
+    expect(SecuritySentences::headline($security))->toBe(SecurityActions::BUILDER_TEXT)
+        ->and(SecuritySentences::headline(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true])))
+        ->not->toBe(SecurityActions::BUILDER_TEXT);
 });
 
 it('writes the ok headline', function () {
@@ -247,7 +256,7 @@ it('never writes an em dash, "safe" or "secure" in any sentence', function () {
     }
     foreach ($securities as $security) {
         $all[] = SecuritySentences::headline($security);
-        $all[] = SecuritySentences::headline($security, builderImage: true);
+        $all[] = SecuritySentences::headline(sentenceSecurity($security->status, [...get_object_vars($security), 'builderImage' => true]));
         array_push($all, ...SecuritySentences::lines($security));
         $all[] = (string) SecuritySentences::badge($security->status);
     }

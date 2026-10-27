@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ResourceSecurity;
+use App\Services\ImageScan\SecuritySentences;
 use App\Services\ImageScan\SecurityStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -289,6 +290,52 @@ describe('status rules', function () {
             ->and($security->anyExploited)->toBeTrue()
             ->and($security->exploitedWithoutFix)->toBeFalse()
             ->and(array_column($security->why, 'display_id'))->toBe(['CVE-2024-0001']);
+    });
+
+    it('knows that every image that drives no_fix is built by a builder', function () {
+        $builder = statusTestApplication(['build_pack' => 'nixpacks']);
+        statusTestScan($builder, [statusTestFinding('CVE-2024-0001', ['kev' => true])], ['builds_image' => true]);
+        $dockerfile = statusTestApplication(['build_pack' => 'dockerfile']);
+        statusTestScan($dockerfile, [statusTestFinding('CVE-2024-0001', ['kev' => true])], ['builds_image' => true]);
+
+        $builderSecurity = SecurityStatus::forResource($builder);
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($builder));
+
+        expect($builderSecurity->status)->toBe(SecurityStatusType::NoFix)
+            ->and($builderSecurity->builderImage)->toBeTrue()
+            ->and(SecurityStatus::stored($builder)->builderImage)->toBeTrue()
+            ->and(ResourceSecurity::fromArray($builderSecurity->toArray())->builderImage)->toBeTrue()
+            ->and(SecurityStatus::forResource($dockerfile)->builderImage)->toBeFalse()
+            ->and(SecurityStatus::forResource($this->application)->builderImage)->toBeFalse();
+    });
+
+    it('does not call a no_fix image a builder image unless every image that drives it is', function () {
+        $service = statusTestService();
+        $web = statusTestServiceApplication($service, 'web', 'nginx:1.27');
+        $worker = statusTestServiceApplication($service, 'worker', 'nginx:1.27');
+        statusTestScan($web, [statusTestFinding('CVE-2024-0001', ['kev' => true])]);
+        statusTestScan($worker, []);
+
+        $security = SecurityStatus::forResource($service);
+
+        expect($security->status)->toBe(SecurityStatusType::NoFix)
+            ->and($security->builderImage)->toBeFalse();
+    });
+
+    it('says whether a problem without a fix is a known exploited one', function () {
+        statusTestScan($this->application, [statusTestFinding('CVE-2024-0001', ['epss' => 0.4, 'cvssScore' => 8.1])]);
+
+        $likely = SecurityStatus::forResource($this->application);
+
+        expect($likely->status)->toBe(SecurityStatusType::NoFix)
+            ->and($likely->anyExploited)->toBeFalse()
+            ->and(SecuritySentences::headline($likely))->toStartWith('This image has a security problem that attackers are likely to use, and no fixed version exists yet.');
+
+        $other = statusTestApplication();
+        statusTestScan($other, [statusTestFinding('CVE-2024-0001', ['epss' => 0.4, 'cvssScore' => 8.1]), statusTestFinding('CVE-2024-0002', ['kev' => true])]);
+
+        expect(SecuritySentences::headline(SecurityStatus::forResource($other)))
+            ->toStartWith('This image has 2 security problems that attackers are using, and no fixed version exists yet.');
     });
 
     it('is ok when no relevant finding has an exploit signal or an action', function () {
