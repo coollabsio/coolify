@@ -16,9 +16,10 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Maps each relevant finding of a scanned image to the one action that fixes it, or to none (spec 15.5).
  *
- * Reads only stored data: the findings, the version and base checks in `candidates`, and, for a Dockerfile app whose
- * deployment rebuilt without cache, one query for the previous scan of the app. A finding that is still there after a
- * rebuild without cache gets `upgrade_in_dockerfile` instead of another `rebuild`.
+ * Reads only stored data: the findings, the version and base checks in `candidates`, and, for a Dockerfile app with
+ * OS findings that have a fix, two queries for the latest rebuild without cache of the app and the scan before it. A
+ * finding that a rebuild without cache did not remove gets `upgrade_in_dockerfile` instead of another `rebuild`, also
+ * in the scans of later deploys.
  */
 final class SecurityActions
 {
@@ -268,24 +269,35 @@ final class SecurityActions
     }
 
     /**
-     * The IDs of the previous completed scan of the app that is not a preview, when the deployment of this scan rebuilt
-     * without cache. Empty otherwise.
+     * The IDs that survived the latest rebuild without cache of the app (up to this scan): the findings of that
+     * rebuild's scan that the completed scan before it, not a preview, had too. A later deploy with cache keeps them,
+     * so `rebuild` is not offered again for a finding a rebuild did not fix. Empty before the first such rebuild.
      *
      * @return array<string, true>
      */
     private static function idsBeforeForcedRebuild(ImageScan $scan, Model $owner): array
     {
-        if (! $owner instanceof Application || ! $scan->exists || $scan->deployment_queue_id === null
-            || ! (bool) $scan->deploymentQueue?->force_rebuild) {
+        if (! $owner instanceof Application || ! $scan->exists) {
             return [];
         }
 
-        $previous = ImageScan::query()
+        $scans = fn (): Builder => ImageScan::query()
             ->select(['id', 'findings'])
             ->where('resource_type', $owner->getMorphClass())
             ->where('resource_id', $owner->getKey())
-            ->where('status', ImageScanStatus::Completed)
-            ->where('id', '<', $scan->getKey())
+            ->where('status', ImageScanStatus::Completed);
+
+        $rebuilt = $scans()
+            ->where('id', '<=', $scan->getKey())
+            ->whereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)->where('force_rebuild', true))
+            ->orderByDesc('id')
+            ->first();
+        if ($rebuilt === null) {
+            return [];
+        }
+
+        $previous = $scans()
+            ->where('id', '<', $rebuilt->getKey())
             ->where(fn (Builder $query) => $query
                 ->whereNull('deployment_queue_id')
                 ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
@@ -295,12 +307,21 @@ final class SecurityActions
             return [];
         }
 
-        $ids = [];
+        $before = [];
         foreach (ResourceScans::findings($previous) as $finding) {
-            $ids = [...$ids, ...self::ids($finding)];
+            $before = [...$before, ...self::ids($finding)];
+        }
+        $before = self::idSet($before);
+
+        $survived = [];
+        foreach (ResourceScans::findings($rebuilt) as $finding) {
+            $ids = self::ids($finding);
+            if (self::hits($ids, $before)) {
+                $survived = [...$survived, ...$ids];
+            }
         }
 
-        return self::idSet($ids);
+        return self::idSet($survived);
     }
 
     private static function isCoolifyResource(Model $owner): bool

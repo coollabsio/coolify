@@ -93,6 +93,29 @@ it('switches to an upgrade in the Dockerfile when a finding survives a rebuild w
         ->and($result['byFinding']['CVE-2']->type)->toBe(SecurityActionType::Rebuild);
 });
 
+it('keeps the upgrade in the Dockerfile in later deploys with cache after a rebuild without cache did not fix it', function () {
+    rebuildLoopScan(['CVE-1'], forceRebuild: false);
+    rebuildLoopScan(['CVE-1'], forceRebuild: true);
+    rebuildLoopScan(['CVE-1', 'CVE-3'], forceRebuild: false);
+    $scan = rebuildLoopScan(['CVE-1', 'CVE-3', 'CVE-4'], forceRebuild: false);
+
+    expect(rebuildLoopAction($scan, 'CVE-1'))->toBe(SecurityActionType::UpgradeInDockerfile)
+        ->and(rebuildLoopAction($scan, 'CVE-3'))->toBe(SecurityActionType::Rebuild)
+        ->and(rebuildLoopAction($scan, 'CVE-4'))->toBe(SecurityActionType::Rebuild);
+});
+
+it('uses the latest rebuild without cache of the app', function () {
+    rebuildLoopScan(['CVE-1'], forceRebuild: false);
+    rebuildLoopScan(['CVE-1'], forceRebuild: true);
+    rebuildLoopScan(['CVE-2'], forceRebuild: false);
+    // The newest rebuild without cache removed CVE-1 and kept CVE-2.
+    rebuildLoopScan(['CVE-2'], forceRebuild: true);
+    $scan = rebuildLoopScan(['CVE-1', 'CVE-2'], forceRebuild: false);
+
+    expect(rebuildLoopAction($scan, 'CVE-1'))->toBe(SecurityActionType::Rebuild)
+        ->and(rebuildLoopAction($scan, 'CVE-2'))->toBe(SecurityActionType::UpgradeInDockerfile);
+});
+
 it('keeps the rebuild when the deployment did not rebuild without cache', function () {
     rebuildLoopScan(['CVE-1'], forceRebuild: false);
     $scan = rebuildLoopScan(['CVE-1'], forceRebuild: false);
