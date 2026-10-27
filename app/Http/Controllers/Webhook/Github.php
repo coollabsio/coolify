@@ -735,7 +735,6 @@ class Github extends Controller
         $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
-            ->connectTimeout(5)
             ->post("$api_url/app-manifests/$code/conversions")
             ->throw()
             ->json();
@@ -841,7 +840,6 @@ class Github extends Controller
                 'Accept' => 'application/vnd.github+json',
             ])
                 ->timeout(10)
-                ->connectTimeout(5)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
         } catch (\Throwable $e) {
             return strip_tags(str_replace('<br>', ' ', $e->getMessage()));

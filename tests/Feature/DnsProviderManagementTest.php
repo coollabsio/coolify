@@ -945,7 +945,7 @@ test('cloudflare dns reads are retried after a connection failure but record cre
     expect(fn () => app(CloudflareDnsProvider::class)->createRecord($zone, 'app.example.com', '203.0.113.10'))
         ->toThrow(ConnectionException::class);
 
-    Http::assertSentCount(3);
-    Http::assertSent(fn ($request) => $request->method() === 'POST');
+    Http::assertSequencesAreEmpty();
+    expect(collect(Http::recorded())->filter(fn (array $pair) => $pair[0]->method() === 'POST'))->toHaveCount(1);
     expect(ManagedDnsRecord::query()->count())->toBe(0);
 });

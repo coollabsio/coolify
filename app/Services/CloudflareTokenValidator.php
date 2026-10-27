@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Http;
+
 class CloudflareTokenValidator
 {
     public function validate(string $token, array $capabilities): bool
     {
-        $client = CloudflareHttp::client($token);
+        $client = Http::withToken($token)->acceptJson();
         $verification = $client->get('https://api.cloudflare.com/client/v4/user/tokens/verify');
 
         if (! $verification->successful() || $verification->json('result.status') !== 'active') {

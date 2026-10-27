@@ -11,13 +11,13 @@ use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
 use App\Models\Server;
 use App\Models\ServiceApplication;
-use App\Services\CloudflareHttp;
 use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
 
@@ -512,6 +512,6 @@ class CloudflareDnsProvider
 
     private function client(IntegrationToken $token): PendingRequest
     {
-        return CloudflareHttp::client($token->token);
+        return Http::withToken($token->token)->acceptJson();
     }
 }
