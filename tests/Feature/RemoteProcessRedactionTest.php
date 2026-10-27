@@ -141,7 +141,7 @@ it('redacts a database start secret that is split across output chunks', functio
     $activity = remote_process(['echo ok'], $this->server);
     // The process fake ends every output chunk with a newline, so the chunks are sent by hand.
     $invoked = Mockery::mock(InvokedProcess::class);
-    Process::shouldReceive('timeout->idleTimeout->input->start')->andReturnUsing(function (string $command, Closure $output) use ($invoked) {
+    Process::shouldReceive('timeout->idleTimeout->start')->andReturnUsing(function (string $command, Closure $output) use ($invoked) {
         $invoked->shouldReceive('wait')->andReturnUsing(function () use ($output) {
             foreach (['value is split-sec', "ret-value\nnext ", 'line split-secret-value'] as $chunk) {
                 $output('out', $chunk);
@@ -169,7 +169,7 @@ function runRemoteProcessWithChunks(Activity $activity, array $chunks, ?Throwabl
     // The process fake ends every output chunk with a newline, so the chunks are sent by hand.
     $invoked = Mockery::mock(InvokedProcess::class);
     $invoked->shouldReceive('id')->andReturn(123);
-    Process::shouldReceive('timeout->input->start')->andReturnUsing(function (string $command, Closure $output) use ($invoked, $chunks, $failure) {
+    Process::shouldReceive('timeout->start')->andReturnUsing(function (string $command, Closure $output) use ($invoked, $chunks, $failure) {
         $invoked->shouldReceive('wait')->andReturnUsing(function () use ($output, $chunks, $failure) {
             foreach ($chunks as [$type, $chunk]) {
                 $output($type, $chunk);

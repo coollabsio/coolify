@@ -23,8 +23,7 @@ class DatabaseStartCommandExecutor
         $secrets = method_exists($database, 'resolvedSecretManagerValuesForRedaction')
             ? $database->resolvedSecretManagerValuesForRedaction()
             : [];
-        // The commands go to ssh on stdin, so the database passwords in them are not in a command line on the Coolify host.
-        $remoteCommand = SshMultiplexingHelper::generateSshBatchCommand($server);
+        $remoteCommand = SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands));
 
         $activity->properties = $activity->properties->merge(['status' => ProcessStatus::IN_PROGRESS->value]);
         $activity->save();
@@ -35,7 +34,6 @@ class DatabaseStartCommandExecutor
         try {
             $process = Process::timeout($timeout)
                 ->idleTimeout(3600)
-                ->input(SshMultiplexingHelper::sshBatchInput(implode("\n", $commands)))
                 ->start($remoteCommand, function (string $type, string $output) use ($activity, $secrets, &$pending): void {
                     $pending[$type] = ($pending[$type] ?? '').$output;
                     $end = max(strrpos($pending[$type], "\n"), strrpos($pending[$type], "\r"));

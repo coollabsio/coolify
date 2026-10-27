@@ -496,11 +496,10 @@ class GetLogs extends Component
      */
     private function executeLogCommand(Server $server, string $command, int $maxBytes): array
     {
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $this->boundedLogCommand($command, $maxBytes));
+
         // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
-        $output = Process::timeout(config('constants.ssh.command_timeout'))
-            ->input(SshMultiplexingHelper::sshBatchInput($this->boundedLogCommand($command, $maxBytes)))
-            ->run(SshMultiplexingHelper::generateSshBatchCommand($server))
-            ->output();
+        $output = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand)->output();
         $truncated = strlen($output) > $maxBytes;
         $logs = rtrim(removeAnsiColors($truncated ? substr($output, 0, $maxBytes) : $output), "\n");
 

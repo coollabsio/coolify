@@ -461,13 +461,13 @@ it('streams the remote command output to the writer in chunks', function () {
     $server = fsServer();
     $svc = new class($server, 'app-123') extends ContainerFilesystemService
     {
-        public string $stdinFile;
+        public ?string $remoteCommand = null;
 
-        protected function sshCommand(): string
+        protected function sshCommand(string $command): string
         {
-            $this->stdinFile = tempnam(sys_get_temp_dir(), 'fs-stream-');
+            $this->remoteCommand = $command;
 
-            return 'cat > '.escapeshellarg($this->stdinFile).'; head -c 200000 /dev/zero';
+            return 'head -c 200000 /dev/zero';
         }
     };
     $received = '';
@@ -478,9 +478,7 @@ it('streams the remote command output to the writer in chunks', function () {
         $chunks++;
     });
 
-    $remoteCommand = file_get_contents($svc->stdinFile);
-    unlink($svc->stdinFile);
-    expect($remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'\n");
+    expect($svc->remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'");
     expect(strlen($received))->toBe(200000);
     expect($chunks)->toBeGreaterThan(1);
 });

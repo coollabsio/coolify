@@ -402,15 +402,12 @@ class ContainerFilesystemService
             $command = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
         }
 
-        $process = proc_open($this->sshCommand(), [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        $process = proc_open($this->sshCommand($command), [1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
         if (! is_resource($process)) {
             throw new \RuntimeException('Could not start the download.');
         }
 
         try {
-            // The command goes to ssh on stdin, so it is not in a command line on the Coolify host.
-            fwrite($pipes[0], SshMultiplexingHelper::sshBatchInput($command));
-            fclose($pipes[0]);
             while (! feof($pipes[1])) {
                 $chunk = fread($pipes[1], 64 * 1024);
                 if ($chunk === false || connection_aborted()) {
@@ -453,9 +450,9 @@ class ContainerFilesystemService
         instant_remote_process([$this->buildS3UploadCommand($path, $isDir, $url, $headers)], $this->server, timeout: 3600);
     }
 
-    protected function sshCommand(): string
+    protected function sshCommand(string $command): string
     {
-        return SshMultiplexingHelper::generateSshBatchCommand($this->server);
+        return SshMultiplexingHelper::generateSshCommand($this->server, $command);
     }
 
     protected function escapePath(string $path, string $label): string

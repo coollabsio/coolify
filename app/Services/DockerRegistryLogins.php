@@ -216,9 +216,10 @@ class DockerRegistryLogins
     /**
      * Run docker login on the server, writing to the same config file that deployments mount.
      *
-     * The script goes to the server's shell on ssh stdin, and the shell builtin echo passes the secret to docker
-     * on stdin, so it is not a process argument on the Coolify host or on the server. It is kept out of SSH error
-     * logs and exception messages.
+     * The SSH wrapper sends this script to the server's shell on stdin, and the shell builtin echo passes the
+     * secret to docker on stdin, so it is not a process argument on the server. On the Coolify host it is still
+     * in the command line of the local shell that runs ssh, because SshMultiplexingHelper::generateSshCommand()
+     * embeds the script in a heredoc. It is kept out of SSH error logs and exception messages.
      */
     public static function login(Server $server, string $registry, string $username, string $password): void
     {
@@ -276,9 +277,7 @@ class DockerRegistryLogins
     {
         $commands = $server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $server) : [$command];
         try {
-            $process = Process::timeout(60)
-                ->input(SshMultiplexingHelper::sshBatchInput(implode("\n", $commands)))
-                ->run(SshMultiplexingHelper::generateSshBatchCommand($server));
+            $process = Process::timeout(60)->run(SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands)));
         } catch (ProcessTimedOutException|SymfonyProcessTimedOutException) {
             // The timeout message contains the full SSH command, including the registry password.
             throw new RuntimeException('The command on the server timed out after 60 seconds.', 124);
