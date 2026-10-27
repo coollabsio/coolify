@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 function get_versions_data(): ?array
 {
     return Cache::remember('coolify:versions:all', 3600, function () {
-        $versionsPath = base_path('versions.json');
+        $versionsPath = File::exists(storage_path('app/versions.json')) ? storage_path('app/versions.json') : base_path('versions.json');
 
         if (! File::exists($versionsPath)) {
             return null;
@@ -89,18 +89,81 @@ function cdn_retry_delay_ms(int $attempt, Throwable $exception): int
 }
 
 /**
- * Fetch versions.json from the CDN and write it to the local file of this node.
- * The Coolify version never goes below the cached or the running version.
- * When the CDN fails, the local file stays as it is.
+ * @return array{versions: array, upgrade_script_url: string}|null
+ */
+function fetch_latest_versions(int $tries = 3): ?array
+{
+    $settings = instanceSettings();
+    $cdnUrl = dirname(config('constants.coolify.versions_url'));
+    $channel = 'stable';
+    if ($settings->update_channel !== 'stable' || $settings->previous_update_channel !== null) {
+        $response = cdn_http($tries)->get("{$cdnUrl}/release.json");
+        $release = $response->json();
+        if ($response->failed() || ! is_array($release)) {
+            return null;
+        }
+        $channel = newest_update_channel(array_map(fn ($channel) => data_get($channel, 'coolify'), $release));
+    }
+
+    $channelUrl = $channel === 'stable' ? null : "{$cdnUrl}/{$channel}";
+    $response = cdn_http($tries)->get($channelUrl ? "{$channelUrl}/versions.json" : config('constants.coolify.versions_url'));
+    $versions = $response->json();
+    if ($response->failed() || ! is_string(data_get($versions, 'coolify.v4.version'))) {
+        return null;
+    }
+
+    return [
+        'versions' => $versions,
+        'upgrade_script_url' => $channelUrl ? "{$channelUrl}/upgrade.sh" : config('constants.coolify.upgrade_script_url'),
+    ];
+}
+
+/**
+ * The channel of the newest Coolify version this instance takes: its update channel and the more stable ones.
+ * After a switch to a more stable channel, also the channel it left, below the stable release of the running version,
+ * so an instance on a nightly of 4.6.0 gets the nightlies of 4.6.0 until 4.6.0 is released.
+ *
+ * @param  array<string, mixed>  $versions  The Coolify version of each channel
+ */
+function newest_update_channel(array $versions): string
+{
+    $settings = instanceSettings();
+    $channels = ['stable', 'preview', 'nightly'];
+    $follows = (int) array_search($settings->update_channel, $channels, true);
+    $followsUntilRelease = $settings->previous_update_channel ? (int) array_search($settings->previous_update_channel, $channels, true) : -1;
+    $release = preg_replace('/^(\d+\.\d+\.\d+).*/', '$1', config('constants.coolify.version'));
+    $newest = 'stable';
+    foreach ($channels as $rank => $channel) {
+        $version = $versions[$channel] ?? null;
+        if (! is_string($version) || version_compare($version, (string) ($versions[$newest] ?? ''), '<=')) {
+            continue;
+        }
+        if ($rank <= $follows || ($rank <= $followsUntilRelease && version_compare($version, $release, '<'))) {
+            $newest = $channel;
+        }
+    }
+
+    return $newest;
+}
+
+/**
+ * Fetch versions.json from the CDN and replace the local file of this node with it in one step.
+ * The Coolify version never goes below the running version, or below the cached one while the channel stays.
+ * When the CDN fails, the local file stays as it is. After a channel change it is removed instead,
+ * so the versions of the image apply until the next check and not the version of the old channel.
  *
  * @return array|null The written versions data, or null if the CDN fetch failed
  */
-function refresh_versions_file(int $tries = 3): ?array
+function refresh_versions_file(int $tries = 3, bool $channelChanged = false): ?array
 {
-    $response = cdn_http($tries)->get(config('constants.coolify.versions_url'));
-    $versions = $response->json();
-    if ($response->failed() || ! is_array($versions)) {
-        Log::warning('Could not fetch versions.json from the CDN, using the local file', ['status' => $response->status()]);
+    $versionsPath = storage_path('app/versions.json');
+    $versions = fetch_latest_versions($tries)['versions'] ?? null;
+    if ($versions === null) {
+        Log::warning('Could not fetch versions.json from the CDN, using the local file');
+        if ($channelChanged) {
+            File::delete($versionsPath);
+            invalidate_versions_cache();
+        }
 
         return null;
     }
@@ -109,8 +172,8 @@ function refresh_versions_file(int $tries = 3): ?array
     $currentVersion = config('constants.coolify.version');
 
     $existingCoolifyVersion = null;
-    if (File::exists(base_path('versions.json'))) {
-        $existingVersions = json_decode(File::get(base_path('versions.json')), true);
+    if (! $channelChanged && File::exists($versionsPath)) {
+        $existingVersions = json_decode(File::get($versionsPath), true);
         $existingCoolifyVersion = data_get($existingVersions, 'coolify.v4.version');
     }
 
@@ -138,7 +201,7 @@ function refresh_versions_file(int $tries = 3): ?array
 
     data_set($versions, 'coolify.v4.version', $bestVersion);
 
-    File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
+    File::replace($versionsPath, json_encode($versions, JSON_PRETTY_PRINT));
     invalidate_versions_cache();
     update_helper_version($versions);
 

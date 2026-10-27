@@ -33,7 +33,7 @@ it('uses a newer helper version from the local versions file without asking the 
 });
 
 it('stores the helper version when the update check refreshes versions.json from the CDN', function () {
-    File::partialMock()->shouldReceive('put')->once()->with(base_path('versions.json'), Mockery::type('string'));
+    File::partialMock()->shouldReceive('replace')->once()->with(storage_path('app/versions.json'), Mockery::type('string'));
     config(['constants.coolify.version' => '4.0.0']);
     Http::preventStrayRequests();
     Http::fake([
