@@ -30,29 +30,9 @@ it('points the scripts at the stable channel of the CDN, which scripts/sync-cdn.
     expect(file_get_contents(dirname(__DIR__, 2)."/{$script}"))->toMatch('/^CDN="https:\/\/cdn\.coollabs\.io\/coolify"$/m');
 })->with(['scripts/install.sh', 'scripts/upgrade.sh']);
 
-it('runs support image workflows from main', function (string $workflowFile) {
-    $workflow = file_get_contents(dirname(__DIR__, 2)."/.github/workflows/{$workflowFile}");
-
-    expect($workflow)
-        ->toContain('branches: [ "main" ]')
-        ->not->toContain('v4.x');
-})->with([
-    'helper' => 'coolify-helper.yml',
-]);
-
-it('prevents the stable helper workflow from publishing an existing version', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-helper.yml');
-
-    expect($workflow)
-        ->toContain('workflow_dispatch:')
-        ->toContain('check-version:')
-        ->toContain('needs: check-version')
-        ->toContain('VERSION="${BASE_VERSION}"')
-        ->toContain('docker buildx imagetools inspect "$IMAGE"')
-        ->toContain('Version $VERSION already exists in $registry')
-        ->toContain('Version $VERSION is available in both registries')
-        ->toContain('Could not verify $IMAGE')
-        ->toContain('cancel-in-progress: false');
+it('builds the development helper image from the coolify-helper repository', function () {
+    expect(file_get_contents(dirname(__DIR__, 2).'/scripts/dev-helper'))->toContain('https://github.com/coollabsio/coolify-helper.git#main:src')
+        ->and(file_get_contents(dirname(__DIR__, 2).'/app/Livewire/Settings/Index.php'))->toContain('https://github.com/coollabsio/coolify-helper.git#main:src');
 });
 
 it('publishes the testing host only to Docker Hub', function () {

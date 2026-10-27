@@ -57,7 +57,7 @@ build_helper() {
     image=$(image_for "$tag")
 
     echo "Building $image"
-    docker build --progress=plain -f "$ROOT_DIR/docker/coolify-helper/Dockerfile" -t "$image" "$ROOT_DIR"
+    docker build --progress=plain --build-arg IMAGE_VERSION="$tag" -t "$image" "${HELPER_CONTEXT:-https://github.com/coollabsio/coolify-helper.git#main:src}"
 }
 
 use_helper() {
