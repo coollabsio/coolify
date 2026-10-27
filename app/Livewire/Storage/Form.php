@@ -195,6 +195,7 @@ class Form extends Component
                 // Update local property to reflect success
                 $this->isUsable = true;
             });
+            $this->dispatch('name-changed', uuid: $this->storage->uuid, name: $this->storage->name);
 
             $this->dispatch('success', 'Storage settings updated and connection verified.');
         } catch (\Throwable $e) {

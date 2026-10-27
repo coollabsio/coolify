@@ -39,6 +39,7 @@
             ->sortBy(fn ($item) => strtolower($item['resource']->name))
             ->map(fn ($item) => [
                 'label' => $item['resource']->name,
+                'uuid' => $item['resource']->uuid,
                 'href' => match ($item['type']) {
                     'application' => route('project.application.configuration', [
                         'project_uuid' => $currentProject->uuid,
@@ -107,6 +108,10 @@
 <div class="flex min-w-0 items-center gap-0.5 text-[13px]" data-page-context="{{ $dashboardContext }}"
     x-data="{
         titleRepeats: false,
+        renamed: {},
+        nameOf(uuid, name) {
+            return this.renamed[uuid] ?? name;
+        },
         syncTitle() {
             const expected = this.$el.dataset.pageContext || '';
             const heading = document.querySelector('.app-main h1');
@@ -116,7 +121,8 @@
             this.titleRepeats = expected !== '' && title === expected;
         },
     }"
-    x-init="syncTitle()" x-on:livewire:navigated.window="$nextTick(() => syncTitle())">
+    x-init="syncTitle()" x-on:livewire:navigated.window="$nextTick(() => syncTitle())"
+    x-on:name-changed.window="renamed[$event.detail.uuid] = $event.detail.name">
     {{-- Team --}}
     <div class="shrink-0" x-data="{ collapsed: false }">
         <livewire:switch-team />
@@ -129,8 +135,9 @@
     @endif
 
     @if ($currentStorage)
-        <x-breadcrumb-switcher title="S3 Storage" :label="$currentStorage->name" :items="$storages->map(fn ($storage) => [
+        <x-breadcrumb-switcher title="S3 Storage" :label="$currentStorage->name" :uuid="$currentStorage->uuid" :items="$storages->map(fn ($storage) => [
             'label' => $storage->name,
+            'uuid' => $storage->uuid,
             'href' => route('storage.show', ['storage_uuid' => $storage->uuid]),
             'active' => $storage->uuid === $currentStorage->uuid,
         ])">
@@ -151,8 +158,9 @@
                 ? filled($currentSource->installation_id)
                 : filled($currentSource->access_token);
         @endphp
-        <x-breadcrumb-switcher title="Sources" :label="$currentSource->name ?: 'Source'" :items="$sources->map(fn ($source) => [
+        <x-breadcrumb-switcher title="Sources" :label="$currentSource->name ?: 'Source'" :uuid="$currentSource->uuid" :items="$sources->map(fn ($source) => [
             'label' => $source->name ?: class_basename($source),
+            'uuid' => $source->uuid,
             'href' => match (true) {
                 $source instanceof \App\Models\GithubApp => route('source.github.show', ['github_app_uuid' => $source->uuid]),
                 $source instanceof \App\Models\GiteaApp => route('source.gitea.show', ['gitea_app_uuid' => $source->uuid]),
@@ -174,8 +182,9 @@
     @endif
 
     @if ($currentDestination)
-        <x-breadcrumb-switcher title="Destinations" :label="$currentDestination->name" :items="$destinations->map(fn ($destination) => [
+        <x-breadcrumb-switcher title="Destinations" :label="$currentDestination->name" :uuid="$currentDestination->uuid" :items="$destinations->map(fn ($destination) => [
             'label' => $destination->name,
+            'uuid' => $destination->uuid,
             'href' => route('destination.show', ['destination_uuid' => $destination->uuid]),
             'active' => $destination->getMorphClass() === $currentDestination->getMorphClass() && $destination->uuid === $currentDestination->uuid,
         ])">
@@ -210,7 +219,8 @@
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = !open" @click.outside="open = false" title="Switch project"
                 class="flex items-center gap-1.5 min-w-0 max-w-full h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
-                <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentProject->name }}</span>
+                <span class="min-w-0 truncate font-semibold text-black dark:text-fg"
+                    x-text="nameOf(@js($currentProject->uuid), @js($currentProject->name))">{{ $currentProject->name }}</span>
                 <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                     <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
@@ -223,7 +233,7 @@
                 @foreach ($projects as $p)
                     <a href="{{ route($projectDestinationRoute, ['project_uuid' => $p->uuid]) }}" {{ wireNavigate() }} @click="open = false"
                         class="listbox-option {{ $p->uuid === $currentProject->uuid ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
-                        <span class="min-w-0 flex-1 truncate">{{ $p->name }}</span>
+                        <span class="min-w-0 flex-1 truncate" x-text="nameOf(@js($p->uuid), @js($p->name))">{{ $p->name }}</span>
                     </a>
                 @endforeach
             </div>
@@ -257,7 +267,7 @@
     @endif
 
     @if ($currentResource)
-        <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :items="$resourceItems">
+        <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :uuid="$currentResource->uuid" :items="$resourceItems">
             <x-slot:meta>
                 {{-- Below xl, the page heading shows the status. --}}
                 <div class="hidden xl:flex">

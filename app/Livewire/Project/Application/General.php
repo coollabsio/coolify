@@ -973,6 +973,7 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
+            $this->dispatch('name-changed', uuid: $this->application->uuid, name: $this->application->name);
             $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
             $this->syncData();
             if ($oldPortsExposes !== $this->application->ports_exposes || $oldCustomNetworkAliases !== $this->application->custom_network_aliases) {

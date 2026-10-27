@@ -199,6 +199,7 @@ class StackForm extends Component
             // Refresh and write files after a successful commit
             $this->service->refresh();
             $this->service->saveComposeConfigs();
+            $this->dispatch('name-changed', uuid: $this->service->uuid, name: $this->service->name);
 
             $this->dispatch('refreshEnvs')->to(EditCompose::class);
             $this->dispatch('refreshEnvs')->to(All::class);
