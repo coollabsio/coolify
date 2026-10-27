@@ -6,6 +6,8 @@ BRANCH="${BRANCH:-}"
 PULL_REQUEST="${PULL_REQUEST:-}"
 NIGHTLY_VERSION="${NIGHTLY_VERSION:-}"
 NIGHTLY_REVISION="${NIGHTLY_REVISION:-}"
+MAIN_VERSION="${MAIN_VERSION:-}"
+MAIN_REVISION="${MAIN_REVISION:-}"
 VERSION_FILE=release.json
 ARTIFACT=coolify
 UPSTREAM_FILE=upstream.json
@@ -24,11 +26,11 @@ die() {
 cd "$(dirname "$0")/.."
 
 main() {
-	[[ "$OPTION" =~ ^(--build|--release|--tags|--nightly)?$ ]] || die "'$OPTION' is not an option, expected --build, --release, --tags, --nightly or none"
+	[[ "$OPTION" =~ ^(--build|--release|--tags|--nightly|--main)?$ ]] || die "'$OPTION' is not an option, expected --build, --release, --tags, --nightly, --main or none"
 	read_version
 	fetch_origin
 	print_tags
-	print_next_nightly
+	print_next_build
 	check_branch
 	check_version
 	select_releases
@@ -69,14 +71,33 @@ print_tags() {
 	exit 0
 }
 
-print_next_nightly() {
-	[ "$OPTION" = --nightly ] || return 0
-	select_nightly_branch
-	[ "$revision" != "$NIGHTLY_REVISION" ] || exit 0
-	select_nightly_version
+print_next_build() {
+	local build current_version current_revision
+	[[ "$OPTION" =~ ^--(nightly|main)$ ]] || return 0
+	if [ "$OPTION" = --main ]; then
+		branch=main
+		revision="$(git rev-parse origin/main)"
+		current_version="$MAIN_VERSION" current_revision="$MAIN_REVISION"
+	else
+		select_nightly_branch
+		current_version="$NIGHTLY_VERSION" current_revision="$NIGHTLY_REVISION"
+	fi
+	[ "$revision" != "$current_revision" ] || exit 0
+	if [ "$OPTION" = --main ]; then
+		base="$(artifact_version stable <(git show "$revision:$VERSION_FILE" 2> /dev/null))"
+		[ -n "$base" ] || die "main has no stable version of $ARTIFACT in $VERSION_FILE, expected the release process there"
+	else
+		select_nightly_base
+	fi
+	build="$base.$(date -u +%Y%m%d)"
+	if [[ "$current_version" == "$build".* ]]; then
+		build+=".$((${current_version##*.} + 1))"
+	else
+		build+=".1"
+	fi
 	upstream_lines <(git show "$revision:$UPSTREAM_FILE") | while read -r name upstream; do
-		jq -nc --arg name "$name" --arg version "$upstream" --arg tag "${upstream:+$upstream-}v$nightly" '{$name, $version, $tag}'
-	done | jq -sc --arg branch "$branch" --arg revision "$revision" --arg image "$nightly" '{$branch, $revision, $image, lines: .}'
+		jq -nc --arg name "$name" --arg version "$upstream" --arg tag "${upstream:+$upstream-}v$build" '{$name, $version, $tag}'
+	done | jq -sc --arg branch "$branch" --arg revision "$revision" --arg image "$build" '{$branch, $revision, $image, lines: .}'
 	exit 0
 }
 
@@ -90,8 +111,7 @@ select_nightly_branch() {
 	revision="$(git rev-parse "origin/$branch")"
 }
 
-select_nightly_version() {
-	local base number=1
+select_nightly_base() {
 	version="$(artifact_version preview <(git show "$revision:$VERSION_FILE"))"
 	if [ -n "$line" ]; then
 		base="$line.0-alpha.0"
@@ -101,9 +121,6 @@ select_nightly_version() {
 	else
 		base="$(next_version "$stable" minor)-alpha.0"
 	fi
-	nightly="$base.$(date -u +%Y%m%d)"
-	[[ "$NIGHTLY_VERSION" != "$nightly".* ]] || number=$((${NIGHTLY_VERSION##*.} + 1))
-	nightly+=".$number"
 }
 
 check_branch() {
