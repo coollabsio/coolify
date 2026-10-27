@@ -22,8 +22,8 @@ cd "$(dirname "$0")/.."
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 main() {
-	[[ "$OPTION" =~ ^(--stable [0-9]+\.[0-9]+\.[0-9]+|--preview [0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?|--purge)$ ]] \
-		|| die "'$OPTION' is not an option, expected --stable or --preview with the version of the channel, or --purge"
+	[[ "$OPTION" =~ ^(--stable [0-9]+\.[0-9]+\.[0-9]+|--preview [0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?|--nightly [0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+\.[0-9]{8}\.[0-9]+|--purge)$ ]] \
+		|| die "'$OPTION' is not an option, expected --stable, --preview or --nightly with the version of the channel, or --purge"
 	if [ "$OPTION" = --purge ]; then
 		purge_cache
 		return
@@ -44,7 +44,7 @@ select_channel() {
 		channel_path+="/$channel" channel_url+="/$channel"
 	fi
 	if [[ "$channel:$VERSION" == preview:*-alpha.* ]]; then
-		info "the preview channel takes no alphas, Coolify $VERSION is not synced"
+		info "the preview channel takes no alphas, Coolify $VERSION reaches the nightly channel only"
 		exit 0
 	fi
 	info "syncing $channel_url to Coolify $BOLD$VERSION$RESET"
@@ -68,7 +68,7 @@ clone_cdn() {
 write_release() {
 	local release="$WORK_DIR/cdn/json/coolify/release.json"
 	[ -f "$release" ] || echo '{}' > "$release"
-	jq --tab --arg channel "$channel" --arg version "$VERSION" '.[$channel].coolify = $version | {stable, preview} | with_entries(select(.value))' \
+	jq --tab --arg channel "$channel" --arg version "$VERSION" '.[$channel].coolify = $version | {stable, preview, nightly} | with_entries(select(.value))' \
 		"$release" > "$WORK_DIR/release.json"
 	cp "$WORK_DIR/release.json" "$release"
 	ok "release.json sets the $channel version $BOLD$VERSION$RESET"

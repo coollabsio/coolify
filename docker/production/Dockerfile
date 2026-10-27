@@ -220,5 +220,10 @@ RUN mkdir -p /etc/nginx/conf.d && \
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
+ARG GIT_SHA
+
+LABEL org.opencontainers.image.version="${COOLIFY_VERSION}" \
+    org.opencontainers.image.revision="${GIT_SHA}"
+
 # Switch to non-root user
 USER www-data
