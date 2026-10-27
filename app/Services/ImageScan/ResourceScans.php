@@ -253,7 +253,8 @@ final class ResourceScans
     }
 
     /**
-     * Writes the summaries again, for example after an ignore, so the counts match the findings.
+     * Writes the summaries again, for example after an ignore or a version check, so the counts and the stored
+     * security status match the findings.
      *
      * @param  Collection<int, ImageScan>  $scans  Loaded with their resource.
      */
@@ -274,6 +275,7 @@ final class ResourceScans
                 is_array($summary['eol_distro'] ?? null) ? $summary['eol_distro'] : null,
                 (bool) ($summary['truncated'] ?? false),
             );
+            SecurityStatus::store($scan);
             $scan->save();
         }
     }

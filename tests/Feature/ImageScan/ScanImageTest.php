@@ -25,6 +25,7 @@ use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
 use App\Services\ImageScan\ScannerCommands;
+use App\Services\ImageScan\SecurityStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
@@ -145,7 +146,8 @@ it('stores the findings, the summary, and the package list of a completed scan',
         ->and($scan->findings)->toHaveCount(166)
         ->and($scan->summary['eol_distro'])->toBe(['name' => 'alpine', 'version' => '3.16.2'])
         ->and($scan->summary['truncated'])->toBeFalse()
-        ->and(array_sum(array_map('array_sum', $scan->summary['counts'])))->toBe(166);
+        ->and(array_sum(array_map('array_sum', $scan->summary['counts'])))->toBe(166)
+        ->and($scan->fresh()->summary['security']['status'])->toBe(SecurityStatus::forScan($scan->fresh())->status->value);
 
     $sbom = ImageSbom::query()->sole();
     expect($scan->image_sbom_id)->toBe($sbom->id)

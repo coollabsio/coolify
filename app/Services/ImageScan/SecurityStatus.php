@@ -1,0 +1,620 @@
+<?php
+
+namespace App\Services\ImageScan;
+
+use App\Enums\ImageScanStatus;
+use App\Enums\SecurityActionType;
+use App\Enums\SecurityStatusType;
+use App\Models\Application;
+use App\Models\ImageScan;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use InvalidArgumentException;
+use Throwable;
+
+/**
+ * Decides one security status per image and per resource (spec 15.6) from stored data only: the findings, the
+ * version and base checks, the scan times, and the resource's configuration. No remote calls.
+ *
+ * Each completed scan that is not a preview stores its status in `summary['security']` (`store()`), written by the
+ * scan and by every summary refresh. `stored()` combines the stored statuses of the current scans of a resource
+ * without reading the findings: it adds the counts and the per-action data, merges the actions (and, for a service,
+ * the updates of images of one repository to one tag), keeps the check reasons that do not depend on the time
+ * (database age, running image, version check), adds the age of the oldest current result and the images without a
+ * stored status, and then applies the rules again. `forResource()` does the same with statuses computed now.
+ */
+final class SecurityStatus
+{
+    public const STALE_AFTER_DAYS = 2;
+
+    public const DATABASE_MAX_AGE_DAYS = 5;
+
+    public const WHY_LIMIT = 3;
+
+    public const REASON_IMAGES_UNCHECKED = 'images_unchecked';
+
+    public const REASON_STALE = 'stale';
+
+    public const REASON_DB_OUTDATED = 'db_outdated';
+
+    public const REASON_IMAGE_CHANGED = 'image_changed';
+
+    public const REASON_VERSIONS_UNCHECKED = 'versions_unchecked';
+
+    public const NOT_SCANNED = 'not_scanned';
+
+    /** The check_needed reasons in the order they are shown. */
+    private const REASON_ORDER = [
+        self::REASON_IMAGES_UNCHECKED,
+        self::REASON_STALE,
+        self::REASON_DB_OUTDATED,
+        self::REASON_IMAGE_CHANGED,
+        self::REASON_VERSIONS_UNCHECKED,
+    ];
+
+    /** Results of a version or base check that count as checked. */
+    private const CHECKED_STATUSES = ['ok', 'no_better', 'cannot_compare'];
+
+    private const STORED_COLUMNS = ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'summary', 'scanned_at'];
+
+    private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'relevant_fixed'];
+
+    /**
+     * The status of one scanned image, with the age of the result.
+     */
+    public static function forScan(ImageScan $scan): ResourceSecurity
+    {
+        if ($scan->status !== ImageScanStatus::Completed || ! $scan->resource instanceof Model) {
+            return self::notChecked(self::NOT_SCANNED);
+        }
+
+        return self::evaluate($scan);
+    }
+
+    /**
+     * The status of a resource from its current scans, computed now. A service combines the images of its
+     * applications and databases.
+     */
+    public static function forResource(Model $resource): ResourceSecurity
+    {
+        $off = ImageScanPolicyResolver::offState($resource);
+        if ($off !== null) {
+            return self::notChecked($off);
+        }
+
+        $images = ResourceScans::owners($resource)
+            ->map(fn (Model $owner): array => ResourceScans::currentFor($owner)->map(fn (ImageScan $scan): ResourceSecurity => self::evaluate($scan))->all())
+            ->all();
+
+        return self::combineImages($images, $resource instanceof Service);
+    }
+
+    /**
+     * The status of a resource from the stored statuses of its current scans. A scan without a stored status counts
+     * as an image that is not checked.
+     */
+    public static function stored(Model $resource): ResourceSecurity
+    {
+        return self::storedMany(collect([$resource]))[ResourceScans::key($resource)];
+    }
+
+    /**
+     * `stored()` for many resources with a fixed number of queries.
+     *
+     * @param  Collection<int, Model>  $resources
+     * @return array<string, ResourceSecurity> Keyed by `ResourceScans::key()`.
+     */
+    public static function storedMany(Collection $resources): array
+    {
+        $resources = $resources->values();
+        if ($resources->isEmpty()) {
+            return [];
+        }
+
+        ResourceScans::loadScanRelations($resources);
+        $offStates = $resources->mapWithKeys(fn (Model $resource): array => [ResourceScans::key($resource) => ImageScanPolicyResolver::offState($resource)]);
+        $scanned = $resources->filter(fn (Model $resource): bool => $offStates[ResourceScans::key($resource)] === null)->values();
+        $owners = ResourceScans::ownersOfMany($scanned);
+        $scans = ResourceScans::currentForMany($owners->flatten(1), self::STORED_COLUMNS);
+
+        $result = [];
+        foreach ($resources as $resource) {
+            $key = ResourceScans::key($resource);
+            if ($offStates[$key] !== null) {
+                $result[$key] = self::notChecked($offStates[$key]);
+
+                continue;
+            }
+
+            $images = $owners->get($key, collect())
+                ->map(fn (Model $owner): array => $scans->get(ResourceScans::key($owner), collect())
+                    ->map(fn (ImageScan $scan): ?ResourceSecurity => is_array(data_get($scan->summary, 'security'))
+                        ? ResourceSecurity::fromArray(data_get($scan->summary, 'security'))
+                        : null)
+                    ->all())
+                ->all();
+            $result[$key] = self::combineImages($images, $resource instanceof Service);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Adds the status of a completed scan to its summary (not saved). Preview scans get none: their actions would
+     * compare with the scans of the application.
+     */
+    public static function store(ImageScan $scan): void
+    {
+        if ($scan->status !== ImageScanStatus::Completed || ! $scan->resource instanceof Model) {
+            return;
+        }
+
+        $summary = (array) $scan->summary;
+        unset($summary['security']);
+        if ($scan->deployment_queue_id === null || (int) ($scan->deploymentQueue?->pull_request_id ?? 0) === 0) {
+            try {
+                $summary['security'] = self::evaluate($scan)->toArray();
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+        $scan->summary = $summary;
+    }
+
+    private static function notChecked(string $reason): ResourceSecurity
+    {
+        return new ResourceSecurity(status: SecurityStatusType::NotChecked, checkReason: $reason);
+    }
+
+    /**
+     * @param  list<list<?ResourceSecurity>>  $images  Per scan owner its current scans (null: no stored status). An
+     *                                                 owner without a current scan is one image that is not checked.
+     */
+    private static function combineImages(array $images, bool $isService): ResourceSecurity
+    {
+        $total = 0;
+        $parts = [];
+        foreach ($images as $ownerImages) {
+            $total += max(1, count($ownerImages));
+            foreach ($ownerImages as $part) {
+                if ($part instanceof ResourceSecurity) {
+                    $parts[] = $part;
+                }
+            }
+        }
+
+        if ($parts === []) {
+            return self::notChecked(self::NOT_SCANNED);
+        }
+
+        return self::resolve($parts, ['checked' => count($parts), 'total' => $total], $isService);
+    }
+
+    /**
+     * The status of one scan before it is combined with other images.
+     */
+    private static function evaluate(ImageScan $scan): ResourceSecurity
+    {
+        /** @var Model $owner */
+        $owner = $scan->resource;
+        $ignores = IgnoreMatcher::forResource($owner);
+        $result = SecurityActions::forScan($scan, $ignores);
+        $actions = $result['actions'];
+        $indexes = [];
+        foreach ($actions as $index => $action) {
+            $indexes[spl_object_id($action)] = $index;
+        }
+
+        $ownerName = self::ownerName($owner);
+        $stats = array_map(fn (): array => self::emptyStats($ownerName), $actions);
+        $counts = array_fill_keys(self::COUNT_KEYS, 0);
+        $unfixed = [];
+        $seen = [];
+        $hasRelevant = false;
+        foreach (ResourceScans::findings($scan) as $finding) {
+            $key = mb_strtolower($finding->id);
+            if (isset($seen[$key]) || ! SecurityRules::isRelevant($finding, $ignores)) {
+                continue;
+            }
+            $seen[$key] = true;
+            $hasRelevant = true;
+
+            $signal = SecurityRules::exploitSignal($finding);
+            $severity = strtolower($finding->severity);
+            $action = $result['byFinding'][$finding->id] ?? null;
+            $why = self::whyFor($finding, $signal);
+
+            if (! $action instanceof SecurityAction) {
+                if ($signal !== null) {
+                    $counts['signal_unfixed']++;
+                    $counts['kev_unfixed'] += $signal === SecurityRules::EXPLOITED ? 1 : 0;
+                    $unfixed[] = $why;
+                }
+
+                continue;
+            }
+
+            $index = $indexes[spl_object_id($action)];
+            $stats[$index]['relevant']++;
+            $stats[$index]['why'][] = $why;
+            $counts['relevant_fixed']++;
+            if ($signal !== null) {
+                $stats[$index]['signal']++;
+                $counts['signal_fixed']++;
+            }
+            if ($signal === SecurityRules::EXPLOITED) {
+                $stats[$index]['kev']++;
+                $counts['kev_fixed']++;
+            }
+            if (in_array($severity, ['critical', 'high'], true)) {
+                $stats[$index][$severity]++;
+                $counts[$severity.'_fixed']++;
+            }
+        }
+
+        if ($result['eol'] instanceof SecurityAction) {
+            $stats[$indexes[spl_object_id($result['eol'])]]['eol'] = true;
+        }
+        foreach ($stats as $index => $entry) {
+            $stats[$index]['why'] = self::topWhy($entry['why']);
+        }
+
+        $eolDistro = data_get($scan->summary, 'eol_distro');
+        $eol = is_array($eolDistro)
+            ? ['name' => (string) ($eolDistro['name'] ?? ''), 'version' => (string) ($eolDistro['version'] ?? ''), 'fixed' => $result['eol'] !== null]
+            : null;
+
+        $reasons = [];
+        if (self::databaseWasOld($scan)) {
+            $reasons[] = self::REASON_DB_OUTDATED;
+        }
+        if (ResourceScans::runsOtherImage($scan, $owner)) {
+            $reasons[] = self::REASON_IMAGE_CHANGED;
+        }
+        if (($hasRelevant || $eol !== null) && ! self::versionsChecked($scan, $owner)) {
+            $reasons[] = self::REASON_VERSIONS_UNCHECKED;
+        }
+
+        return self::resolve([new ResourceSecurity(
+            status: SecurityStatusType::Ok,
+            actions: $actions,
+            eol: $eol,
+            checkedAt: $scan->scanned_at === null ? null : CarbonImmutable::instance($scan->scanned_at),
+            facts: ['reasons' => $reasons, 'counts' => $counts, 'action_stats' => $stats, 'unfixed_why' => self::topWhy($unfixed)],
+        )], null, false);
+    }
+
+    /**
+     * Combines the statuses of images (or the raw data of one image) and applies the rules of spec 15.6.
+     *
+     * @param  non-empty-list<ResourceSecurity>  $parts
+     * @param  array{checked: int, total: int}|null  $images
+     */
+    private static function resolve(array $parts, ?array $images, bool $isService): ResourceSecurity
+    {
+        $entries = [];
+        $counts = array_fill_keys(self::COUNT_KEYS, 0);
+        $reasons = [];
+        $unfixed = [];
+        $eol = null;
+        $checkedAt = null;
+        $unknownTime = false;
+        foreach ($parts as $part) {
+            $facts = $part->facts;
+            foreach ($part->actions as $index => $action) {
+                $entries[] = ['action' => $action, 'stats' => self::stats(data_get($facts, "action_stats.{$index}"))];
+            }
+            foreach (self::COUNT_KEYS as $key) {
+                $counts[$key] += (int) data_get($facts, "counts.{$key}", 0);
+            }
+            $reasons = [...$reasons, ...array_filter((array) ($facts['reasons'] ?? []), 'is_string')];
+            $unfixed = [...$unfixed, ...array_map(fn ($entry): array => ResourceSecurity::whyEntry((array) $entry), (array) ($facts['unfixed_why'] ?? []))];
+            if ($part->eol !== null && ($eol === null || ($eol['fixed'] && ! $part->eol['fixed']))) {
+                $eol = $part->eol;
+            }
+            if ($part->checkedAt === null) {
+                $unknownTime = true;
+            } elseif ($checkedAt === null || $part->checkedAt->lt($checkedAt)) {
+                $checkedAt = $part->checkedAt;
+            }
+        }
+        if ($unknownTime) {
+            $checkedAt = null;
+        }
+
+        if ($isService) {
+            $entries = self::mergeUpdates($entries);
+        }
+        $entries = self::sortEntries($entries);
+        $eolFixed = collect($entries)->contains(fn (array $entry): bool => $entry['stats']['eol']);
+
+        $actionStatus = match (true) {
+            $counts['signal_fixed'] > 0 => SecurityStatusType::UpdateNow,
+            $counts['relevant_fixed'] > 0 || $eolFixed => SecurityStatusType::UpdateAvailable,
+            $counts['signal_unfixed'] > 0 => SecurityStatusType::NoFix,
+            default => SecurityStatusType::Ok,
+        };
+
+        $storedReasons = array_values(array_unique($reasons));
+        $allReasons = $storedReasons;
+        if ($checkedAt === null || $checkedAt->lt(now()->subDays(self::STALE_AFTER_DAYS))) {
+            $allReasons[] = self::REASON_STALE;
+        }
+        if ($images !== null && $images['checked'] < $images['total']) {
+            $allReasons[] = self::REASON_IMAGES_UNCHECKED;
+        }
+        $reason = collect(self::REASON_ORDER)->first(fn (string $code): bool => in_array($code, $allReasons, true));
+        $status = $reason === null ? $actionStatus : SecurityStatusType::CheckNeeded;
+
+        $primary = $entries[0]['stats'] ?? null;
+        $why = [];
+        $moreFixed = 0;
+        if ($primary !== null && in_array($actionStatus, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true)) {
+            $why = $primary['why'];
+            $moreFixed = max(0, $primary['relevant'] - count($why));
+        } elseif ($actionStatus === SecurityStatusType::NoFix) {
+            $why = self::topWhy($unfixed);
+        }
+
+        return new ResourceSecurity(
+            status: $status,
+            checkReason: $reason,
+            checkContext: match ($reason) {
+                self::REASON_IMAGES_UNCHECKED => $images,
+                self::REASON_STALE => ['time' => $checkedAt?->toIso8601String()],
+                default => [],
+            },
+            actions: array_map(fn (array $entry): SecurityAction => $entry['action'], $entries),
+            why: $why,
+            moreFixed: $moreFixed,
+            exploitedWithoutFix: $counts['signal_unfixed'] > 0 && in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true),
+            problemCount: match ($actionStatus) {
+                SecurityStatusType::UpdateNow => $counts['signal_fixed'],
+                SecurityStatusType::UpdateAvailable => $counts['critical_fixed'] + $counts['high_fixed'],
+                SecurityStatusType::NoFix => $counts['signal_unfixed'],
+                default => 0,
+            },
+            exploitedCount: $counts['signal_fixed'] + $counts['signal_unfixed'],
+            anyExploited: match ($actionStatus) {
+                SecurityStatusType::UpdateNow => $counts['kev_fixed'] > 0,
+                SecurityStatusType::NoFix => $counts['kev_unfixed'] > 0,
+                default => false,
+            },
+            criticalCount: $counts['critical_fixed'],
+            highCount: $counts['high_fixed'],
+            fixedByPrimary: match ($actionStatus) {
+                SecurityStatusType::UpdateNow => (int) ($primary['signal'] ?? 0),
+                SecurityStatusType::UpdateAvailable => (int) ($primary['critical'] ?? 0) + (int) ($primary['high'] ?? 0),
+                default => 0,
+            },
+            eol: $eol,
+            checkedAt: $checkedAt,
+            facts: [
+                'action_status' => $actionStatus->value,
+                'reasons' => $storedReasons,
+                'counts' => $counts,
+                'action_stats' => array_map(fn (array $entry): array => $entry['stats'], $entries),
+                'unfixed_why' => self::topWhy($unfixed),
+            ],
+        );
+    }
+
+    /**
+     * Images of one service with the same repository that update to the same tag get one action: "Update n8n and
+     * n8n worker to 2.10.4."
+     *
+     * @param  list<array{action: SecurityAction, stats: array<string, mixed>}>  $entries
+     * @return list<array{action: SecurityAction, stats: array<string, mixed>}>
+     */
+    private static function mergeUpdates(array $entries): array
+    {
+        $groups = [];
+        foreach ($entries as $index => $entry) {
+            $key = self::updateKey($entry);
+            $groups[$key ?? 'single:'.$index][] = $index;
+        }
+
+        $merged = [];
+        foreach ($groups as $indexes) {
+            $group = array_map(fn (int $index): array => $entries[$index], $indexes);
+            $names = array_values(array_unique(array_map(fn (array $entry): string => (string) $entry['stats']['owner'], $group)));
+            if (count($group) === 1 || count($names) < 2) {
+                $merged = [...$merged, ...$group];
+
+                continue;
+            }
+
+            $first = $group[0]['action'];
+            $last = array_pop($names);
+            $stats = self::emptyStats(null);
+            foreach ($group as $entry) {
+                foreach (['signal', 'kev', 'critical', 'high', 'relevant'] as $key) {
+                    $stats[$key] += $entry['stats'][$key];
+                }
+                $stats['eol'] = $stats['eol'] || $entry['stats']['eol'];
+                $stats['why'] = [...$stats['why'], ...$entry['stats']['why']];
+            }
+            $stats['why'] = self::topWhy($stats['why']);
+
+            $merged[] = [
+                'action' => new SecurityAction(
+                    type: SecurityActionType::UpdateImage,
+                    sentence: 'Update '.implode(', ', $names).' and '.$last.' to '.$first->target.'.',
+                    target: $first->target,
+                    copy: null,
+                    fixedIds: array_values(array_unique(array_merge(...array_map(fn (array $entry): array => $entry['action']->fixedIds, $group)))),
+                    button: collect($group)->every(fn (array $entry): bool => $entry['action']->button),
+                    image: $first->image,
+                    ref: $first->ref,
+                ),
+                'stats' => $stats,
+            ];
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Repository and target tag of an update of a service image that can be merged, else null.
+     *
+     * @param  array{action: SecurityAction, stats: array<string, mixed>}  $entry
+     */
+    private static function updateKey(array $entry): ?string
+    {
+        $action = $entry['action'];
+        if ($action->type !== SecurityActionType::UpdateImage || $action->sentence === SecurityActions::COOLIFY_TEXT
+            || blank($action->target) || blank($action->image) || blank($entry['stats']['owner'])) {
+            return null;
+        }
+
+        try {
+            return ImageRef::parse((string) $action->image)->qualifiedName().'|'.$action->target;
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /**
+     * Most fixes with an exploit signal first, then most critical and high fixes (an end-of-life OS counts as one),
+     * then the order of the action types.
+     *
+     * @param  list<array{action: SecurityAction, stats: array<string, mixed>}>  $entries
+     * @return list<array{action: SecurityAction, stats: array<string, mixed>}>
+     */
+    private static function sortEntries(array $entries): array
+    {
+        $order = array_flip(array_map(fn (SecurityActionType $type): string => $type->value, SecurityActionType::cases()));
+        $keyed = array_map(fn (array $entry, int $index): array => [...$entry, 'index' => $index], $entries, array_keys($entries));
+        usort($keyed, fn (array $a, array $b): int => [
+            -$a['stats']['signal'],
+            -($a['stats']['critical'] + $a['stats']['high'] + ($a['stats']['eol'] ? 1 : 0)),
+            $order[$a['action']->type->value],
+            $a['index'],
+        ] <=> [
+            -$b['stats']['signal'],
+            -($b['stats']['critical'] + $b['stats']['high'] + ($b['stats']['eol'] ? 1 : 0)),
+            $order[$b['action']->type->value],
+            $b['index'],
+        ]);
+
+        return array_map(fn (array $entry): array => ['action' => $entry['action'], 'stats' => $entry['stats']], $keyed);
+    }
+
+    /**
+     * @return array{owner: ?string, signal: int, kev: int, critical: int, high: int, relevant: int, eol: bool, why: list<array<string, mixed>>}
+     */
+    private static function emptyStats(?string $owner): array
+    {
+        return ['owner' => $owner, 'signal' => 0, 'kev' => 0, 'critical' => 0, 'high' => 0, 'relevant' => 0, 'eol' => false, 'why' => []];
+    }
+
+    /**
+     * @return array{owner: ?string, signal: int, kev: int, critical: int, high: int, relevant: int, eol: bool, why: list<array<string, mixed>>}
+     */
+    private static function stats(mixed $data): array
+    {
+        $data = is_array($data) ? $data : [];
+
+        return [
+            'owner' => isset($data['owner']) ? (string) $data['owner'] : null,
+            'signal' => (int) ($data['signal'] ?? 0),
+            'kev' => (int) ($data['kev'] ?? 0),
+            'critical' => (int) ($data['critical'] ?? 0),
+            'high' => (int) ($data['high'] ?? 0),
+            'relevant' => (int) ($data['relevant'] ?? 0),
+            'eol' => (bool) ($data['eol'] ?? false),
+            'why' => array_map(fn ($entry): array => ResourceSecurity::whyEntry((array) $entry), (array) ($data['why'] ?? [])),
+        ];
+    }
+
+    /**
+     * @return array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string}
+     */
+    private static function whyFor(Finding $finding, ?string $signal): array
+    {
+        return [
+            'title' => $finding->title,
+            'display_id' => $finding->displayId,
+            'link' => ResourceScans::advisoryUrl($finding->displayId),
+            'score' => $finding->cvssScore,
+            'severity' => strtolower($finding->severity),
+            'signal' => $signal,
+        ];
+    }
+
+    /**
+     * `exploited`, then `likely`, then the highest score (no score last), then severity, at most WHY_LIMIT.
+     *
+     * @param  list<array<string, mixed>>  $entries
+     * @return list<array<string, mixed>>
+     */
+    private static function topWhy(array $entries): array
+    {
+        $signalRank = [SecurityRules::EXPLOITED => 0, SecurityRules::LIKELY => 1];
+        $severityRank = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
+        usort($entries, fn (array $a, array $b): int => [
+            $signalRank[$a['signal'] ?? ''] ?? 2,
+            -($a['score'] ?? -1.0),
+            $severityRank[$a['severity']] ?? 4,
+            $a['display_id'],
+        ] <=> [
+            $signalRank[$b['signal'] ?? ''] ?? 2,
+            -($b['score'] ?? -1.0),
+            $severityRank[$b['severity']] ?? 4,
+            $b['display_id'],
+        ]);
+
+        return array_slice($entries, 0, self::WHY_LIMIT);
+    }
+
+    /**
+     * The vulnerability database was more than DATABASE_MAX_AGE_DAYS old when the image was scanned. Unknown for rows
+     * without the build time, which every completed scan records.
+     */
+    private static function databaseWasOld(ImageScan $scan): bool
+    {
+        $builtAt = $scan->grype_db_built_at;
+        $scannedAt = $scan->scanned_at;
+
+        return $builtAt !== null && $scannedAt !== null && $builtAt->lt($scannedAt->copy()->subDays(self::DATABASE_MAX_AGE_DAYS));
+    }
+
+    /**
+     * The version check (images the user does not build) and the base check (Dockerfile apps with a base image) have
+     * a result. `cannot_compare` and `no_better` count as checked. A Dockerfile app also needs to know which
+     * findings come from its current base image.
+     */
+    private static function versionsChecked(ImageScan $scan, Model $owner): bool
+    {
+        $needsImageCheck = ! $owner instanceof Application
+            || $owner->build_pack === 'dockerimage'
+            || ($owner->build_pack === 'dockercompose' && $scan->builds_image === false);
+        if ($needsImageCheck && ! in_array($scan->candidateStatus(), self::CHECKED_STATUSES, true)) {
+            return false;
+        }
+
+        if ($owner instanceof Application && $owner->build_pack === 'dockerfile' && filled($scan->base_image_ref)) {
+            $base = data_get($scan->candidates, 'base');
+
+            return is_array($base)
+                && ($base['image'] ?? null) === $scan->base_image_ref
+                && in_array($base['status'] ?? null, self::CHECKED_STATUSES, true)
+                && is_int($base['attributable'] ?? null);
+        }
+
+        return true;
+    }
+
+    private static function ownerName(Model $owner): ?string
+    {
+        $name = $owner instanceof ServiceApplication || $owner instanceof ServiceDatabase
+            ? ($owner->human_name ?: $owner->name)
+            : $owner->getAttribute('name');
+
+        return filled($name) ? (string) $name : null;
+    }
+}

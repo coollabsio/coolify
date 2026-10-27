@@ -28,4 +28,45 @@ final readonly class SecurityAction
         public ?string $image,
         public ?string $ref = null,
     ) {}
+
+    /**
+     * @return array{type: string, sentence: string, target: ?string, copy: ?string, fixed_ids: list<string>, button: bool, image: ?string, ref: ?string}
+     */
+    public function toArray(): array
+    {
+        return [
+            'type' => $this->type->value,
+            'sentence' => $this->sentence,
+            'target' => $this->target,
+            'copy' => $this->copy,
+            'fixed_ids' => $this->fixedIds,
+            'button' => $this->button,
+            'image' => $this->image,
+            'ref' => $this->ref,
+        ];
+    }
+
+    /**
+     * Null for data that is not an action.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromArray(array $data): ?self
+    {
+        $type = SecurityActionType::tryFrom((string) ($data['type'] ?? ''));
+        if ($type === null) {
+            return null;
+        }
+
+        return new self(
+            type: $type,
+            sentence: (string) ($data['sentence'] ?? ''),
+            target: isset($data['target']) ? (string) $data['target'] : null,
+            copy: isset($data['copy']) ? (string) $data['copy'] : null,
+            fixedIds: array_values(array_map('strval', (array) ($data['fixed_ids'] ?? []))),
+            button: (bool) ($data['button'] ?? false),
+            image: isset($data['image']) ? (string) $data['image'] : null,
+            ref: isset($data['ref']) ? (string) $data['ref'] : null,
+        );
+    }
 }

@@ -25,6 +25,7 @@ use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\ScanNotifications;
 use App\Services\ImageScan\ScanSummary;
+use App\Services\ImageScan\SecurityStatus;
 use App\Services\ImageScan\SyftPackageParser;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Lock;
@@ -628,6 +629,8 @@ class ScanImage
             'scanned_at' => now(),
         ]);
         $scan->setRelation('resource', $resource);
+        SecurityStatus::store($scan);
+        $scan->save();
 
         Cache::forget(self::lastErrorCacheKey($resource));
         $this->forgetProgress($resource);
