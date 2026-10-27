@@ -198,6 +198,17 @@ use OpenApi\Attributes as OA;
                     new OA\Property(property: 'message', type: 'string', example: 'Rate limit exceeded. Please try again later.'),
                 ]
             )),
+        new OA\Response(
+            response: 502,
+            description: 'The cloud provider API rejected the request.',
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Failed to create Hetzner server. The Hetzner API token does not have permission for this request. Use a token with read and write access.'),
+                    new OA\Property(property: 'provider_status', type: 'integer', description: 'The HTTP status from the cloud provider API.', example: 403),
+                    new OA\Property(property: 'provider_error_code', type: 'string', nullable: true, description: 'The error code from the cloud provider API, if it has one.', example: 'forbidden'),
+                ]
+            )),
     ],
 )]
 class OpenApi

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
@@ -193,6 +194,7 @@ class VultrController extends Controller
             new OA\Response(response: 403, description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'Vultr API rate limit exceeded.'),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function createServer(Request $request): JsonResponse
@@ -403,12 +405,13 @@ class VultrController extends Controller
             }
 
             return $response;
-        } catch (\Throwable $e) {
+        } catch (CloudProviderApiException $e) {
             $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
 
-            logger()->error('Failed to create Vultr server', [
-                'error' => $e->getMessage(),
-            ]);
+            return $e->toJsonResponse('Failed to create Vultr server.');
+        } catch (\Throwable $e) {
+            $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
+            report($e);
 
             return response()->json(['message' => 'Failed to create Vultr server.'], 500);
         }

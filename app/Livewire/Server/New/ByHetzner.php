@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Exceptions\CloudProviderApiException;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -12,7 +13,6 @@ use App\Rules\ValidCloudInitYaml;
 use App\Rules\ValidHostname;
 use App\Services\HetznerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
@@ -358,20 +358,11 @@ class ByHetzner extends Component
             $this->loading_data = false;
         } catch (\Throwable $e) {
             $this->loading_data = false;
-            $this->provider_data_error = $this->providerDataErrorMessage('Hetzner', $e, 'error.message');
+            $this->provider_data_error = $e instanceof CloudProviderApiException
+                ? $e->getMessage()
+                : 'Hetzner API error: '.$e->getMessage();
             $this->dispatch('error', $this->provider_data_error);
         }
-    }
-
-    private function providerDataErrorMessage(string $providerName, \Throwable $e, string $jsonMessageKey): string
-    {
-        $details = $e->getMessage();
-
-        if ($e instanceof RequestException && $e->response) {
-            $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
-        }
-
-        return "{$providerName} API error: {$details}";
     }
 
     private function getCpuVendorInfo(array $serverType): ?string
@@ -766,17 +757,28 @@ class ByHetzner extends Component
             if (! isset($e->errors()['server'])) {
                 throw $e;
             }
-            if (isset($hetznerService, $hetznerServer['id'])) {
-                try {
-                    $hetznerService->deleteServer((int) $hetznerServer['id']);
-                } catch (\Throwable $cleanupError) {
-                    report($cleanupError);
-                }
-            }
+            $this->deleteUntrackedHetznerServer($hetznerService ?? null, $hetznerServer['id'] ?? null);
 
             return $this->dispatch('error', 'You have reached the server limit for your subscription.');
         } catch (\Throwable $e) {
+            if (! isset($server)) {
+                $this->deleteUntrackedHetznerServer($hetznerService ?? null, $hetznerServer['id'] ?? null);
+            }
+
             return handleError($e, $this);
+        }
+    }
+
+    private function deleteUntrackedHetznerServer(?HetznerService $hetznerService, ?int $hetznerServerId): void
+    {
+        if (! $hetznerService || ! $hetznerServerId) {
+            return;
+        }
+
+        try {
+            $hetznerService->deleteServer($hetznerServerId);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

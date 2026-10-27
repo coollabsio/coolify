@@ -11529,6 +11529,9 @@
                     },
                     "429": {
                         "description": "DigitalOcean rate limit exceeded."
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12567,6 +12570,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12678,6 +12684,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12758,6 +12767,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12829,6 +12841,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12894,6 +12909,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12962,6 +12980,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -13122,6 +13143,9 @@
                     },
                     "429": {
                         "$ref": "#\/components\/responses\/429"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -24009,6 +24033,9 @@
                     },
                     "429": {
                         "description": "Vultr API rate limit exceeded."
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -26419,6 +26446,35 @@
                                 "message": {
                                     "type": "string",
                                     "example": "Rate limit exceeded. Please try again later."
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "502": {
+                "description": "The cloud provider API rejected the request.",
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Failed to create Hetzner server. The Hetzner API token does not have permission for this request. Use a token with read and write access."
+                                },
+                                "provider_status": {
+                                    "description": "The HTTP status from the cloud provider API.",
+                                    "type": "integer",
+                                    "example": 403
+                                },
+                                "provider_error_code": {
+                                    "description": "The error code from the cloud provider API, if it has one.",
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "example": "forbidden"
                                 }
                             },
                             "type": "object"

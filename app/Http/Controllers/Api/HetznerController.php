@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
@@ -90,6 +91,7 @@ class HetznerController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function locations(Request $request)
@@ -127,7 +129,11 @@ class HetznerController extends Controller
             $locations = $hetznerService->getLocations();
 
             return response()->json($locations);
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to fetch Hetzner locations.');
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(['message' => 'Failed to fetch Hetzner locations.'], 500);
         }
     }
@@ -212,6 +218,7 @@ class HetznerController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function serverTypes(Request $request)
@@ -249,7 +256,11 @@ class HetznerController extends Controller
             $serverTypes = $hetznerService->getServerTypes();
 
             return response()->json($serverTypes);
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to fetch Hetzner server types.');
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(['message' => 'Failed to fetch Hetzner server types.'], 500);
         }
     }
@@ -312,6 +323,7 @@ class HetznerController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function images(Request $request)
@@ -362,7 +374,11 @@ class HetznerController extends Controller
             });
 
             return response()->json(array_values($filtered));
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to fetch Hetzner images.');
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(['message' => 'Failed to fetch Hetzner images.'], 500);
         }
     }
@@ -422,6 +438,7 @@ class HetznerController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function sshKeys(Request $request)
@@ -459,7 +476,11 @@ class HetznerController extends Controller
             $sshKeys = $hetznerService->getSshKeys();
 
             return response()->json($sshKeys);
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to fetch Hetzner SSH keys.');
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(['message' => 'Failed to fetch Hetzner SSH keys.'], 500);
         }
     }
@@ -517,6 +538,7 @@ class HetznerController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function firewalls(Request $request)
@@ -553,7 +575,11 @@ class HetznerController extends Controller
             $hetznerService = new HetznerService($token->token);
 
             return response()->json($hetznerService->getFirewalls());
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to fetch Hetzner firewalls.');
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(['message' => 'Failed to fetch Hetzner firewalls.'], 500);
         }
     }
@@ -612,6 +638,7 @@ class HetznerController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function networks(Request $request)
@@ -648,7 +675,11 @@ class HetznerController extends Controller
             $hetznerService = new HetznerService($token->token);
 
             return response()->json($hetznerService->getNetworks());
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to fetch Hetzner networks.');
         } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(['message' => 'Failed to fetch Hetzner networks.'], 500);
         }
     }
@@ -728,6 +759,7 @@ class HetznerController extends Controller
                 response: 429,
                 ref: '#/components/responses/429',
             ),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function createServer(Request $request)
@@ -1012,7 +1044,18 @@ class HetznerController extends Controller
             }
 
             return $response;
+        } catch (CloudProviderApiException $e) {
+            return $e->toJsonResponse('Failed to create Hetzner server.');
         } catch (\Throwable $e) {
+            report($e);
+            if (isset($hetznerService, $hetznerServer['id'])) {
+                try {
+                    $hetznerService->deleteServer((int) $hetznerServer['id']);
+                } catch (\Throwable $cleanupError) {
+                    report($cleanupError);
+                }
+            }
+
             return response()->json(['message' => 'Failed to create Hetzner server.'], 500);
         }
     }
