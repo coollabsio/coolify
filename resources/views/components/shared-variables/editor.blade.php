@@ -156,8 +156,12 @@
                     @endforeach
                 </div>
             @endif
-            <form wire:submit="submit" class="p-4">
+            <form wire:submit="submit" class="flex flex-col gap-4 p-4">
                 <x-unsaved-bar action="submit" />
+                <x-callout type="info" title="Note">
+                    To make a variable literal, put <code class="font-mono"># coolify: literal</code> directly above
+                    its line. Without this line, the flag does not change.
+                </x-callout>
                 <x-forms.textarea canGate="update" :canResource="$resource" rows="20"
                     class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
                     :label="$variablesLabel" />
