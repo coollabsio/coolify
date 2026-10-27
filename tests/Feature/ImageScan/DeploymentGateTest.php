@@ -908,31 +908,74 @@ it('queues the check of newer versions for an image the team builds', function (
     Queue::assertPushed(RefreshCandidatesJob::class, fn (RefreshCandidatesJob $refresh) => $refresh->scan->base_image_ref === 'node:20.11-alpine');
 });
 
-it('links a reused scan to the deployment that passed the gate so unchanged images stay current', function () {
+/**
+ * A Compose redeploy (D3) after the finished D2 that ran web:1, cache:1, and worker:1. D3 changes web to web:2 and
+ * reuses the scans of cache:1 and worker:1.
+ *
+ * @param  list<array<string, mixed>>  $webFindings  The findings of web:2.
+ * @return array{job: DeploymentGateTestJob, previous: ApplicationDeploymentQueue, reused: list<int>}
+ */
+function deployGateComposeRedeploy(array $webFindings = []): array
+{
     deployGatePolicy();
-    $this->application->update(['build_pack' => 'dockercompose']);
+    test()->application->update(['build_pack' => 'dockercompose']);
     $previous = deployGatePreviousDeployment('gate-previous', ApplicationDeploymentStatus::FINISHED);
     // The deployment that runs now is newer than the one before it.
-    $this->queue = deployGatePreviousDeployment('gate-deployment-2', ApplicationDeploymentStatus::IN_PROGRESS);
+    test()->queue = deployGatePreviousDeployment('gate-deployment-2', ApplicationDeploymentStatus::IN_PROGRESS);
     $idOf = fn (string $char) => 'sha256:'.str_repeat($char, 64);
     deployGateStoredScan([], ['image_ref' => 'web:1', 'image_id' => $idOf('1'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
-    deployGateStoredScan([], ['image_ref' => 'cache:1', 'image_id' => $idOf('2'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
-    deployGateStoredScan([], ['image_ref' => 'worker:1', 'image_id' => $idOf('3'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
+    $reused = [
+        deployGateStoredScan([], ['image_ref' => 'cache:1', 'image_id' => $idOf('2'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()])->id,
+        deployGateStoredScan([], ['image_ref' => 'worker:1', 'image_id' => $idOf('3'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()])->id,
+    ];
     ScanImage::shouldRun()->once()
         ->withArgs(fn ($server, $resource, $ref) => $ref === 'web:2')
-        ->andReturnUsing(fn () => deployGateStoredScan([], ['image_ref' => 'web:2', 'image_id' => $idOf('4'), 'deployment_queue_id' => test()->queue->id, 'scanned_at' => now()]));
+        ->andReturnUsing(fn () => deployGateStoredScan($webFindings, ['image_ref' => 'web:2', 'image_id' => $idOf('4'), 'deployment_queue_id' => test()->queue->id, 'scanned_at' => now()]));
     $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => [
-        'web' => ['image' => 'web:2'],
         'cache' => ['image' => 'cache:1'],
         'worker' => ['image' => 'worker:1'],
+        'web' => ['image' => 'web:2'],
     ]], 10)]);
     $job->outputs = ["'web:2'" => $idOf('4').' ', "'cache:1'" => $idOf('2').' ', "'worker:1'" => $idOf('3').' '];
 
-    deployGateCall($job, 'checkComposeImageScanGate');
-    test()->queue->update(['status' => ApplicationDeploymentStatus::FINISHED->value]);
+    return ['job' => $job, 'previous' => $previous, 'reused' => $reused];
+}
 
-    expect(ResourceScans::currentFor($this->application->fresh())->pluck('image_ref')->sort()->values()->all())
-        ->toBe(['cache:1', 'web:2', 'worker:1']);
+function deployGateCurrentImages(): array
+{
+    return ResourceScans::currentFor(test()->application->fresh())->pluck('image_ref')->sort()->values()->all();
+}
+
+it('keeps the images of the finished deployment current while a Compose redeploy runs', function () {
+    ['job' => $job, 'previous' => $previous, 'reused' => $reused] = deployGateComposeRedeploy();
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+
+    expect(deployGateCurrentImages())->toBe(['cache:1', 'web:1', 'worker:1'])
+        ->and(ImageScan::query()->whereKey($reused)->pluck('deployment_queue_id')->unique()->all())->toBe([$previous->id]);
+});
+
+it('keeps the images of the finished deployment current when the redeploy is blocked', function () {
+    ['job' => $job, 'previous' => $previous, 'reused' => $reused] = deployGateComposeRedeploy([deployGateFindingRow()]);
+
+    expect(fn () => deployGateCall($job, 'checkComposeImageScanGate'))->toThrow(DeploymentException::class);
+    $job->failed(new DeploymentException('blocked'));
+
+    expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
+        ->and(deployGateCurrentImages())->toBe(['cache:1', 'web:1', 'worker:1'])
+        ->and(ImageScan::query()->whereKey($reused)->pluck('deployment_queue_id')->unique()->all())->toBe([$previous->id]);
+});
+
+it('links the reused scans to the redeploy when it finished so they stay current', function () {
+    Queue::fake();
+    ['job' => $job, 'reused' => $reused] = deployGateComposeRedeploy();
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateCall($job, 'post_deployment');
+
+    expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value)
+        ->and(ImageScan::query()->whereKey($reused)->pluck('deployment_queue_id')->unique()->all())->toBe([test()->queue->id])
+        ->and(deployGateCurrentImages())->toBe(['cache:1', 'web:2', 'worker:1']);
 });
 
 it('keeps the link of a reused scan for a preview deployment', function () {
@@ -1019,9 +1062,11 @@ it('starts a redeploy of the running image when the gate is on', function () {
     deployGatePolicy();
     ScanImage::shouldRun()->never();
     $scan = deployGateRunningScan([deployGateFindingRow()], imageId: GATE_IMAGE_ID);
+    $runningDeploymentId = $scan->deployment_queue_id;
 
+    // The reused scan joins this deployment only when it finishes.
     expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
-        ->and($scan->fresh()->deployment_queue_id)->toBe(test()->queue->id);
+        ->and($scan->fresh()->deployment_queue_id)->toBe($runningDeploymentId);
 });
 
 it('does not count the image of a blocked deployment as running', function () {

@@ -270,6 +270,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /** @var array<string, true> Compose images that the gate checked on the server. */
     private array $imageScanCheckedImages = [];
 
+    /** @var array<int, true> IDs of stored scans that the gate reused; they join this deployment when it finishes. */
+    private array $imageScanReusedScans = [];
+
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -700,13 +703,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * The gate scanned the new image while the deployment was in progress, so its stored security status compared it
-     * with the image of the previous deployment. Now that this deployment finished, the status is stored again.
+     * with the image of the previous deployment. Now that this deployment finished, the scans it reused join it and
+     * the status is stored again.
      */
     private function refreshImageScanSecurity(): void
     {
         if ($this->pull_request_id !== 0) {
             return;
         }
+
+        $this->linkReusedImageScans();
 
         try {
             ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
@@ -3007,7 +3013,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->applyImageScanGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, running: $running);
 
         if ($reused !== null) {
-            $this->linkReusedImageScan($reused);
+            $this->imageScanReusedScans[(int) $reused->id] = true;
         }
     }
 
@@ -3056,17 +3062,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * A stored scan that the gate reused belongs to this deployment now, so the current scans of the application
-     * (all images of a Compose deployment) include it. Preview deployments keep the link of the application.
+     * The stored scans that the gate reused belong to this deployment once it finished, so the current scans of the
+     * application (all images of a Compose deployment) include them. Until then they stay with the deployment that
+     * ran them: a deployment that is running or failed never takes them over. Preview deployments keep the link of
+     * the application.
      */
-    private function linkReusedImageScan(ImageScan $scan): void
+    private function linkReusedImageScans(): void
     {
-        if ($this->pull_request_id !== 0 || (int) $scan->deployment_queue_id === (int) $this->application_deployment_queue->id) {
+        if ($this->pull_request_id !== 0 || $this->imageScanReusedScans === []) {
             return;
         }
 
         try {
-            $scan->forceFill(['deployment_queue_id' => $this->application_deployment_queue->id])->save();
+            ImageScan::query()
+                ->whereKey(array_keys($this->imageScanReusedScans))
+                ->where(fn ($query) => $query
+                    ->whereNull('deployment_queue_id')
+                    ->orWhere('deployment_queue_id', '!=', $this->application_deployment_queue->id))
+                ->update(['deployment_queue_id' => $this->application_deployment_queue->id]);
+            $this->imageScanReusedScans = [];
         } catch (Throwable $e) {
             report($e);
         }
