@@ -6,6 +6,7 @@ import {
     authenticateTerminalUpgrade,
     createTerminalUpgradeHandler,
     extractSshArgs,
+    getTerminalAuthHeaders,
     extractTargetHost,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
@@ -308,18 +309,29 @@ function createFakeWebSocketServer({ handles = true } = {}) {
 
 const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
 
-test('authenticateTerminalUpgrade rejects missing session cookies with the auth close code without calling Coolify', async () => {
+test('getTerminalAuthHeaders forwards the whole cookie header so Laravel reads its own session cookie name', () => {
+    // APP_NAME="Coolify - Prod" gives the Laravel cookie "coolify_prod_session";
+    // the terminal server must not guess that name (issue #10549).
+    const cookieHeader = 'theme=dark; coolify_prod_session=session-value; XSRF-TOKEN=xsrf-value';
+
+    assert.deepEqual(getTerminalAuthHeaders(cookieHeader, 'xsrf-value'), {
+        'Cookie': cookieHeader,
+        'X-XSRF-TOKEN': 'xsrf-value',
+    });
+});
+
+test('authenticateTerminalUpgrade rejects missing cookies with the auth close code without calling Coolify', async () => {
     let requests = 0;
     const postToCoolify = async () => {
         requests++;
         return { status: 200 };
     };
 
-    for (const session of [
-        { sessionCookieName: 'coolify_session', laravelSession: undefined, xsrfToken: 'xsrf' },
-        { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: undefined },
+    for (const authHeaders of [
+        getTerminalAuthHeaders('', 'xsrf'),
+        getTerminalAuthHeaders('coolify_session=session', undefined),
     ]) {
-        assert.deepEqual(await authenticateTerminalUpgrade(session, postToCoolify), {
+        assert.deepEqual(await authenticateTerminalUpgrade(authHeaders, postToCoolify), {
             authenticated: false,
             closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
             reason: 'Unauthorized: Missing required tokens',
@@ -334,7 +346,7 @@ test('authenticateTerminalUpgrade rejects missing session cookies with the auth 
 test('authenticateTerminalUpgrade checks the Laravel session exactly like the previous verifyClient', async () => {
     const requests = [];
     const result = await authenticateTerminalUpgrade(
-        { sessionCookieName: 'coolify_session', laravelSession: 'session-value', xsrfToken: 'xsrf-value' },
+        getTerminalAuthHeaders('coolify_session=session-value; XSRF-TOKEN=xsrf-value', 'xsrf-value'),
         async (path, headers) => {
             requests.push([path, headers]);
             return { status: 200 };
@@ -344,14 +356,14 @@ test('authenticateTerminalUpgrade checks the Laravel session exactly like the pr
     assert.deepEqual(result, { authenticated: true });
     assert.deepEqual(requests, [[
         '/terminal/auth',
-        { 'Cookie': 'coolify_session=session-value', 'X-XSRF-TOKEN': 'xsrf-value' },
+        { 'Cookie': 'coolify_session=session-value; XSRF-TOKEN=xsrf-value', 'X-XSRF-TOKEN': 'xsrf-value' },
     ]]);
 });
 
 test('authenticateTerminalUpgrade rejects every non-200 Coolify response', async () => {
     for (const status of [201, 204, 302, 401, 403, 419, 500]) {
         const result = await authenticateTerminalUpgrade(
-            { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: 'xsrf' },
+            getTerminalAuthHeaders('coolify_session=session; XSRF-TOKEN=xsrf', 'xsrf'),
             async () => ({ status }),
         );
 
@@ -363,7 +375,7 @@ test('authenticateTerminalUpgrade rejects every non-200 Coolify response', async
 
 test('authenticateTerminalUpgrade does not authenticate when Coolify is unreachable', async () => {
     const result = await authenticateTerminalUpgrade(
-        { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: 'xsrf' },
+        getTerminalAuthHeaders('coolify_session=session; XSRF-TOKEN=xsrf', 'xsrf'),
         async () => {
             throw new Error('connect ECONNREFUSED');
         },
@@ -374,18 +386,13 @@ test('authenticateTerminalUpgrade does not authenticate when Coolify is unreacha
     assert.equal(result.error.message, 'connect ECONNREFUSED');
 });
 
-test('rejectTerminalSocket sends the legacy message before closing with a readable code', () => {
+test('rejectTerminalSocket closes with a readable code and sends no text message', () => {
     const ws = createFakeWebSocket();
 
-    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 'Unauthorized: Terminal token was rejected', {
-        message: 'Unauthorized: Terminal token was rejected',
-    });
+    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 'Unauthorized: Terminal token was rejected');
     ws.peerClosed();
 
-    assert.deepEqual(ws.events, [
-        ['send', 'Unauthorized: Terminal token was rejected'],
-        ['close', 4403, 'Unauthorized: Terminal token was rejected'],
-    ]);
+    assert.deepEqual(ws.events, [['close', 4403, 'Unauthorized: Terminal token was rejected']]);
 });
 
 test('rejectTerminalSocket terminates peers that ignore the close handshake', async () => {

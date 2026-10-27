@@ -12,6 +12,7 @@ import {
     extractTargetHost,
     extractTimeout,
     detachPtyProcess,
+    getTerminalAuthHeaders,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
     isAttachCommand,
@@ -111,32 +112,23 @@ const server = http.createServer((req, res) => {
     }
 });
 
-const getSessionCookie = (req) => {
-    const cookies = parseCookie(req.headers.cookie || '');
-    const xsrfToken = cookies['XSRF-TOKEN'];
-    const appName = process.env.APP_NAME || 'laravel';
-    const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
-    return {
-        sessionCookieName,
-        xsrfToken: xsrfToken,
-        laravelSession: cookies[sessionCookieName]
-    }
+const getAuthHeaders = (req) => {
+    const cookieHeader = req.headers.cookie || '';
+    return getTerminalAuthHeaders(cookieHeader, parseCookie(cookieHeader)['XSRF-TOKEN']);
 }
 
 const verifyClient = async (req) => {
-    const sessionCookie = getSessionCookie(req);
+    const authHeaders = getAuthHeaders(req);
     const requestContext = {
         remoteAddress: req.socket?.remoteAddress,
         origin: req.headers.origin,
-        sessionCookieName: sessionCookie.sessionCookieName,
-        hasXsrfToken: Boolean(sessionCookie.xsrfToken),
-        hasLaravelSession: Boolean(sessionCookie.laravelSession),
+        hasAuthTokens: Boolean(authHeaders),
     };
 
     logTerminal('log', 'Verifying websocket client.', requestContext);
 
     // Authenticate with Laravel backend
-    const result = await authenticateTerminalUpgrade(sessionCookie, postToCoolify);
+    const result = await authenticateTerminalUpgrade(authHeaders, postToCoolify);
 
     if (result.authenticated) {
         logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
@@ -170,7 +162,7 @@ wss.on('connection', async (ws, req) => {
 
     const userId = generateUserId();
     ws.userId = userId;
-    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
+    const authHeaders = getAuthHeaders(req);
     const userSession = {
         ws,
         userId,
@@ -180,17 +172,12 @@ wss.on('connection', async (ws, req) => {
         authReady: false,
         pendingMessages: [],
         terminalSessionTimer: null,
-        authHeaders: {
-            'Cookie': `${sessionCookieName}=${laravelSession}`,
-            'X-XSRF-TOKEN': xsrfToken,
-        },
+        authHeaders,
     };
     const connectionContext = {
         userId,
         remoteAddress: req.socket?.remoteAddress,
-        sessionCookieName,
-        hasXsrfToken: Boolean(xsrfToken),
-        hasLaravelSession: Boolean(laravelSession),
+        hasAuthTokens: Boolean(authHeaders),
     };
 
     // Register socket handlers up front so messages sent immediately by the client
@@ -214,17 +201,14 @@ wss.on('connection', async (ws, req) => {
     });
 
     // Verify presence of required tokens
-    if (!laravelSession || !xsrfToken) {
+    if (!authHeaders) {
         logTerminal('warn', 'Closing websocket connection because required auth tokens are missing.', connectionContext);
         rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.AUTH_REJECTED, 'Unauthorized: Missing required tokens');
         return;
     }
 
     try {
-        const response = await postToCoolify('/terminal/auth/ips', {
-            'Cookie': `${sessionCookieName}=${laravelSession}`,
-            'X-XSRF-TOKEN': xsrfToken
-        });
+        const response = await postToCoolify('/terminal/auth/ips', authHeaders);
 
         if (response.status !== 200) {
             throw createHttpError(response);
@@ -464,13 +448,12 @@ async function handleCommand(ws, command, userId) {
     }, terminalSessionTimeout * 1000);
 }
 
-// The text message is kept for clients that predate the close code.
 function rejectTerminalToken(userSession, message) {
     logTerminal('warn', 'Closing websocket connection because the terminal token was rejected.', {
         userId: userSession.userId,
         reason: message,
     });
-    rejectTerminalSocket(userSession.ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, message, { message });
+    rejectTerminalSocket(userSession.ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, message);
 }
 
 async function handleTerminalToken(userSession, token) {
