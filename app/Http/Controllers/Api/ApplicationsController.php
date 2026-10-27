@@ -126,6 +126,7 @@ class ApplicationsController extends Controller
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === true) {
             $application->makeVisible([
+                ...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
                 'custom_labels',
                 'dockerfile',
                 'docker_compose',
@@ -159,21 +160,6 @@ class ApplicationsController extends Controller
         }
 
         return $payload;
-    }
-
-    /**
-     * Setting or changing a manual webhook secret needs the deploy ability. Sending the stored value
-     * again or clearing it does not.
-     */
-    private function manualWebhookSecretForbiddenResponse(Request $request, ?Application $application = null): ?JsonResponse
-    {
-        foreach (['manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea'] as $field) {
-            if ($request->filled($field) && $request->input($field) !== $application?->{$field}) {
-                return $this->deployAbilityForbiddenResponse($request, 'A manual webhook secret lets anyone who knows it start a deployment, so it needs a token with the deploy permission.');
-            }
-        }
-
-        return null;
     }
 
     private function applicationSettingsFromRequest(Request $request): array
@@ -1536,9 +1522,6 @@ class ApplicationsController extends Controller
         }
         if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
             return $internalNameValidation;
-        }
-        if ($forbidden = $this->manualWebhookSecretForbiddenResponse($request)) {
-            return $forbidden;
         }
         if ($type === 'public') {
             $validationRules = [
@@ -3502,10 +3485,6 @@ class ApplicationsController extends Controller
                 'errors' => $errors,
             ], 422);
         }
-        if ($forbidden = $this->manualWebhookSecretForbiddenResponse($request, $application)) {
-            return $forbidden;
-        }
-
         $githubApp = null;
         if ($request->has('github_app_uuid')) {
             if ($application->build_pack === 'dockerimage' || filled($application->dockerfile) || $application->deploymentType() === 'deploy_key') {

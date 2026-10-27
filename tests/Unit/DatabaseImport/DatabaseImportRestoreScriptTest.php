@@ -250,6 +250,7 @@ function restoreScriptRun(string $engine, string $contents, bool $dumpAll = fals
             $escapedStdin = escapeshellarg($dir.'/stdin');
             file_put_contents($dir.'/bin/'.$client, <<<SH
 #!/bin/sh
+if [ "\$*" = '--help' ]; then printf '%s\\n' "\${STUB_HELP:-}"; exit 0; fi
 header=''
 call=\$(wc -l < {$escapedLog} | tr -d ' ')
 if [ ! -t 0 ]; then
@@ -734,6 +735,47 @@ test('rejects unsupported MySQL and MariaDB backups before calling any client', 
     'all-databases dump without dump-all' => ['mysql-cluster', false, 'This backup contains more than one database.'],
     'dump of two databases without dump-all' => ['mysql-two-databases', false, 'This backup contains more than one database.'],
 ]);
+
+test('restores MySQL and MariaDB dumps with client commands disabled when the client supports it', function (string $engine, string $help, string $flag, bool $dumpAll) {
+    $run = restoreScriptRun($engine, restoreScriptFixture('mysql-sql'), $dumpAll, env: ['STUB_HELP' => $help]);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(end($run['calls'])['args'])->toStartWith($flag.' -u ')
+        ->and(end($run['calls'])['stdin'])->toBe(restoreScriptFixture('mysql-sql'));
+})->with(['mysql', 'mariadb'])->with([
+    'MariaDB client' => ['  --sandbox           Disallow commands that access the file system', '--sandbox'],
+    'MySQL client' => ['  --commands          Whether to enable or disable processing of local mysql commands.', '--commands=FALSE'],
+])->with(['single database' => false, 'all databases' => true]);
+
+test('refuses MySQL and MariaDB dumps with client commands before calling any client', function (string $engine, string $command, bool $dumpAll) {
+    $dump = "-- MySQL dump 10.13\n\nCREATE TABLE `items` (`id` int);\n{$command}\nINSERT INTO `items` VALUES (1);\n";
+
+    foreach ([$dump, gzencode($dump)] as $contents) {
+        $run = restoreScriptRun($engine, $contents, $dumpAll);
+
+        expect($run['exit'])->toBe(1)
+            ->and($run['stderr'])->toContain('client command')->toContain('Nothing was changed.')
+            ->and($run['calls'])->toBe([]);
+    }
+})->with(['mysql', 'mariadb'])->with([
+    'system' => 'system id',
+    'indented SYSTEM' => '  SYSTEM id;',
+    '\\!' => '\\! id',
+    '\\! after SQL' => 'SELECT 1; \\! id',
+    'tee' => 'tee /etc/cron.d/x',
+    '\\T' => '\\T /etc/cron.d/x',
+    'pager' => 'pager sh',
+    'source' => 'source /etc/shadow',
+    '\\.' => '\\. /etc/shadow',
+])->with(['single database' => false, 'all databases' => true]);
+
+test('restores MySQL and MariaDB dumps whose data only looks like client commands', function (string $engine) {
+    $dump = "-- MySQL dump 10.13\n/*M!999999\\- enable the sandbox mode */\nCREATE TABLE `items` (`t` text, `system` int);\nINSERT INTO `items` VALUES ('a\\\\! b\\\\\\\\T c\\'s \\\\. \\r\\n',1),('system id',2);\n";
+    $run = restoreScriptRun($engine, $dump);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(end($run['calls'])['stdin'])->toBe($dump);
+})->with(['mysql', 'mariadb']);
 
 test('restores mongodump archives', function (string $fixture, bool $replaceExisting, bool $gzip) {
     $run = restoreScriptRun('mongodb', restoreScriptFixture($fixture), false, $replaceExisting);
