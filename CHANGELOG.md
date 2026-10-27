@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Publish prereleases from `next` and the release branches, tagged like `4.6.0-beta.1`, and the moving `preview` tag
+- Publish the image of every push to a pull request from a branch of this repository as `pr-<number>` on ghcr.io
 - Add the preview channel to the CDN, which takes the betas and release candidates
 
 ### Changed
@@ -23,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Write the notes of the GitHub release from `CHANGELOG.md` instead of git-cliff
     - Merge `main` forward into `next` and the release branches twice a day and after every release, instead of `main` into `next` every 10 minutes
     - Sync the CDN with `scripts/sync-cdn.sh` instead of `php artisan sync:cdn`, from the release workflow when `latest` or `preview` moves, the stable channel opens a pull request, the preview channel pushes to `main`
+    - Skip the build of a pull request from `main`, `next`, a release branch or a patch branch, the release workflow builds their commits
 - Read the helper version and the Coolify version of builds without `COOLIFY_VERSION` from `upstream.json` and `release.json` in `config/constants.php`
 - Read the Coolify and helper versions in `install.sh` by key, `versions.json` has no `nightly` entry anymore
 - Sync the preview channel of the CDN with the install and upgrade scripts and compose files of the commit it releases, pointed at its channel

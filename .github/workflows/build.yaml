@@ -21,6 +21,7 @@ defaults:
 jobs:
   version:
     name: Read the version
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || !(github.head_ref == 'main' || github.head_ref == 'next' || startsWith(github.head_ref, 'release/') || endsWith(github.head_ref, '.x')) }}
     permissions:
       contents: read
     runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
@@ -35,8 +36,9 @@ jobs:
       - id: version
         env:
           BRANCH: ${{ github.base_ref || github.ref_name }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
         run: |
-          coolify="$(scripts/version.sh --build)"
+          coolify="$(scripts/version.sh --build)${PULL_REQUEST:+-pr.$PULL_REQUEST}"
           echo "coolify=$coolify" >> "$GITHUB_OUTPUT"
 
   build:

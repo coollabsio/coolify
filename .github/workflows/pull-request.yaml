@@ -1,0 +1,55 @@
+name: Pull request
+
+on:
+  pull_request:
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build
+    permissions:
+      contents: read
+    uses: $/.github/workflows/build.yaml
+
+  publish:
+    name: Publish pr-${{ github.event.pull_request.number }}
+    needs: build
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    permissions:
+      packages: write # push the image of the pull request to ghcr.io
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # https://github.com/actions/download-artifact/releases/tag/v8.0.2
+        with:
+          pattern: image-*
+          path: ${{ runner.temp }}/images
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the image of the pull request
+        env:
+          TAG: pr-${{ github.event.pull_request.number }}
+          REVISION: ${{ github.event.pull_request.head.sha }}
+        run: |
+          sources=()
+          for index in "$RUNNER_TEMP"/images/*/index.json; do
+            sources+=("oci-layout://${index%/index.json}@$(jq -r '.manifests[0].digest' "$index")")
+          done
+          docker buildx imagetools create --tag "ghcr.io/coollabsio/coolify:$TAG" \
+            --annotation "index:org.opencontainers.image.revision=$REVISION" "${sources[@]}"

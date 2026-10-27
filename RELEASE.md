@@ -118,6 +118,14 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > [!IMPORTANT]
 > Cut `v4.x` from `main`, or bring an existing one up to date with `main`, before `release/v5.0` is merged into `main`. Afterwards `main` is v5 and v4 lives on `v4.x` alone.
 
+## Pull requests
+
+Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and before `4.6.0-beta.2`.
+
+- Pull requests from forks and Dependabot are built, not published
+- Pull requests from `main`, `next`, a release branch or a patch branch are not built, the release workflow builds their commits
+- ghcr.io only, no git tag and no GitHub release, the clean manifests workflow keeps the image while the pull request is open
+
 ## CDN
 
 `scripts/sync-cdn.sh` syncs a channel of `coollabsio/coollabs-cdn` from the commit of the version it syncs: the same install and upgrade scripts, compose files and environment file in every channel, their `CDN` line pointing at the channel, the service templates, the GitHub releases and `versions.json`.
@@ -168,3 +176,4 @@ Git tags carry the `v` prefix, image tags do not.
 | `4.6.0`                    | one release, it never moves                                                             |
 | `latest`                   | the newest stable version                                                               |
 | `preview`                  | the newest prerelease of the lowest version in prerelease above `latest`, else `latest` |
+| `pr-123`                   | the image of the newest push to an open pull request, on ghcr.io only                   |

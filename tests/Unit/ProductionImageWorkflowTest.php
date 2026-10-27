@@ -1,5 +1,12 @@
 <?php
 
+it('orders the image of a pull request after the version of its base branch and before the next version', function () {
+    expect(version_compare('4.5.0', '4.5.0-pr.12', '<'))->toBeTrue()
+        ->and(version_compare('4.5.0-pr.12', '4.5.1', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-beta.1', '4.6.0-beta.1-pr.12', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-beta.1-pr.12', '4.6.0-beta.2', '<'))->toBeTrue();
+});
+
 it('reads the Coolify and helper versions by key from the versions.json scripts/sync-cdn.sh writes', function () {
     $versions = shell_exec("jq --indent 4 --arg version 4.6.0-beta.1 '{coolify: ({v4: {\$version}} + del(.traefik)), traefik}' ".escapeshellarg(dirname(__DIR__, 2).'/upstream.json'));
     $parse = implode("\n", preg_grep('/^LATEST_(HELPER_)?VERSION=\$\(echo "\$VERSIONS_JSON"/', file(dirname(__DIR__, 2).'/scripts/install.sh')));
