@@ -518,6 +518,35 @@ describe('states', function () {
             ->assertSee('Only part of the results is shown, with the problems that attackers are using first.');
     });
 
+    it('says why no newer version is offered when the registry needs a login, with a link for server admins', function () {
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding(['kev' => true])], [
+            'builds_image' => false,
+            'candidates' => ['status' => 'auth_required', 'error' => 'registry_auth', 'entries' => [], 'checked_at' => now()->toIso8601String()],
+        ]);
+        $text = "Coolify cannot read the tags of nginx. Log in to docker.io on {$this->server->name}.";
+        $link = route('server.registries', ['server_uuid' => $this->server->uuid]);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->assertSee('No fix yet')
+            ->assertSee($text)
+            ->assertSeeHtml('href="'.$link.'"');
+
+        vulnerabilitiesPage(vulnerabilitiesMember($this->team), $this->application)
+            ->assertSee($text)
+            ->assertDontSeeHtml('href="'.$link.'"');
+    });
+
+    it('says when the daily limit of version checks was reached', function () {
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding(['kev' => true])], [
+            'builds_image' => false,
+            'candidates' => ['status' => 'failed', 'error' => 'daily_limit', 'entries' => [], 'checked_at' => now()->toIso8601String()],
+        ]);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->assertSee("Coolify reached the daily limit of version checks on {$this->server->name}. It checks again tomorrow.")
+            ->assertDontSee('Registry logins');
+    });
+
     it('says when the running image is not the scanned image', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
         $this->application->forceFill(['docker_registry_image_tag' => '1.28'])->saveQuietly();

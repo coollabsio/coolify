@@ -81,6 +81,14 @@
                         @foreach ($card['lines'] as $line)
                             <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $line }}</p>
                         @endforeach
+                        @foreach ($versionNotes as $note)
+                            <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                {{ $note['text'] }}
+                                @if ($note['link'] !== null)
+                                    <a href="{{ $note['link'] }}" class="underline underline-offset-4 hover:text-neutral-950 dark:hover:text-fg" {{ wireNavigate() }}>Registry logins</a>
+                                @endif
+                            </p>
+                        @endforeach
                     </div>
 
                     @if ($checkNeeded)

@@ -254,23 +254,26 @@ class RefreshCandidates
     }
 
     /**
-     * Fix panel text for a check without a better candidate (spec 7.3, 11). Null when a candidate is better or nothing was checked.
+     * Text for a version check (or, with $base, a base check) without a better candidate (spec 7.3, 11). Null when a
+     * candidate is better or nothing was checked.
      */
-    public static function message(ImageScan $scan): ?string
+    public static function message(ImageScan $scan, bool $base = false): ?string
     {
+        $result = $base ? data_get($scan->candidates, 'base') : $scan->candidates;
+        $status = is_array($result) ? ($result['status'] ?? null) : null;
         try {
-            $image = ImageRef::parse((string) $scan->image_ref);
+            $image = ImageRef::parse((string) ($base ? $scan->base_image_ref : $scan->image_ref));
         } catch (InvalidArgumentException) {
             return null;
         }
         $name = (string) ImageRef::parse($image->qualifiedName());
         $server = (string) ($scan->server?->name ?? 'the server');
 
-        return match ($scan->candidateStatus()) {
+        return match ($status) {
             'no_better' => "No newer version of {$name} is better yet. Coolify checks again every day.",
             'cannot_compare' => 'Coolify cannot compare versions of this image. Check the image page for a newer version.',
             'auth_required' => "Coolify cannot read the tags of {$name}. Log in to {$image->registry} on {$server}.",
-            'failed' => data_get($scan->candidates, 'error') === 'daily_limit'
+            'failed' => data_get($result, 'error') === 'daily_limit'
                 ? "Coolify reached the daily limit of version checks on {$server}. It checks again tomorrow."
                 : "Coolify could not check for newer versions of {$name}. It tries again tomorrow.",
             default => null,

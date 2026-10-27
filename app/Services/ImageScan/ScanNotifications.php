@@ -369,7 +369,7 @@ final class ScanNotifications
 
         return [
             'outstanding' => ! $afterScan && ! RefreshCandidates::isFresh($scan),
-            'incomplete' => ! $afterScan || ! SecurityStatus::versionsChecked($scan, $owner),
+            'incomplete' => ! $afterScan || ! SecurityStatus::versionsChecked($scan, $owner, blockedCounts: false),
         ];
     }
 

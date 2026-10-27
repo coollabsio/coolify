@@ -941,6 +941,7 @@ class Vulnerabilities extends Component
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
             'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $user),
+            'versionNotes' => SecurityCard::versionCheckNotes($scans, $user),
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),
             'truncated' => $scans->contains(fn (ImageScan $scan): bool => (bool) data_get($scan->summary, 'truncated', false)),
             'findingCount' => count($activeRows),

@@ -2,6 +2,7 @@
 
 namespace App\Services\ImageScan;
 
+use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
@@ -10,6 +11,7 @@ use App\Enums\SecurityStatusType;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageScan;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -84,6 +86,47 @@ final class SecurityCard
             'others' => array_slice($others, 0, self::OTHER_ACTIONS_LIMIT),
             'moreActions' => max(0, count($others) - self::OTHER_ACTIONS_LIMIT),
         ];
+    }
+
+    /**
+     * Lines for version and base checks that only the user can unblock (`SecurityStatus::isBlockedCheck()`): they
+     * count as checked, so the card says why no newer version is offered. A registry login links to the server's
+     * registry logins when the user may update the server.
+     *
+     * @param  Collection<int, ImageScan>  $scans  The current scans of the page.
+     * @return list<array{text: string, link: ?string}>
+     */
+    public static function versionCheckNotes(Collection $scans, User $user): array
+    {
+        $notes = [];
+        foreach ($scans as $scan) {
+            $base = data_get($scan->candidates, 'base');
+            $checks = [false => [$scan->candidateStatus(), data_get($scan->candidates, 'error')]];
+            if (filled($scan->base_image_ref) && is_array($base) && ($base['image'] ?? null) === $scan->base_image_ref) {
+                $checks[true] = [$base['status'] ?? null, $base['error'] ?? null];
+            }
+
+            foreach ($checks as $isBase => [$status, $error]) {
+                if (! SecurityStatus::isBlockedCheck($status, $error)) {
+                    continue;
+                }
+
+                $text = RefreshCandidates::message($scan, (bool) $isBase);
+                if ($text === null || isset($notes[$text])) {
+                    continue;
+                }
+
+                $server = $scan->server;
+                $notes[$text] = [
+                    'text' => $text,
+                    'link' => $status === 'auth_required' && $server instanceof Server && $user->can('update', $server)
+                        ? route('server.registries', ['server_uuid' => $server->uuid])
+                        : null,
+                ];
+            }
+        }
+
+        return array_values($notes);
     }
 
     /**

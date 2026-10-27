@@ -21,6 +21,7 @@ use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ResourceSecurity;
 use App\Services\ImageScan\SecuritySentences;
 use App\Services\ImageScan\SecurityStatus;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -511,8 +512,37 @@ describe('check needed reasons', function () {
     })->with([
         'not run' => [null],
         'failed' => [['status' => 'failed', 'error' => 'unknown', 'entries' => []]],
-        'auth required' => [['status' => 'auth_required', 'error' => null, 'entries' => []]],
         'busy' => [['status' => 'failed', 'error' => 'lock_busy', 'entries' => []]],
+    ]);
+
+    it('counts a version check that needs a registry login or hit the daily limit as checked', function (array $candidates) {
+        statusTestScan($this->application, [statusTestFinding('CVE-2024-0001', ['kev' => true])], ['candidates' => $candidates]);
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
+
+        $security = SecurityStatus::forResource($this->application);
+
+        expect($security->status)->toBe(SecurityStatusType::NoFix)
+            ->and($security->checkReason)->toBeNull()
+            ->and(VulnerabilityMarkers::marker(SecurityStatus::stored($this->application->fresh())))
+            ->toMatchArray(['status' => 'no_fix', 'text' => 'No fix yet']);
+    })->with([
+        'auth required' => [['status' => 'auth_required', 'error' => 'registry_auth', 'entries' => []]],
+        'daily limit' => [['status' => 'failed', 'error' => 'daily_limit', 'entries' => []]],
+    ]);
+
+    it('counts a base check that needs a registry login as checked once the base origin is known', function (?int $attributable, SecurityStatusType $expected) {
+        $application = statusTestApplication(['build_pack' => 'dockerfile']);
+        statusTestScan($application, [statusTestFinding('CVE-2024-0001')], [
+            'image_ref' => $application->uuid.':latest',
+            'builds_image' => true,
+            'base_image_ref' => 'node:20-alpine',
+            'candidates' => ['status' => 'skipped', 'entries' => [], 'base' => ['image' => 'node:20-alpine', 'status' => 'auth_required', 'error' => 'registry_auth', 'attributable' => $attributable, 'attributable_ids' => [], 'entries' => []]],
+        ]);
+
+        expect(SecurityStatus::forResource($application)->status)->toBe($expected);
+    })->with([
+        'origin known' => [0, SecurityStatusType::UpdateAvailable],
+        'origin unknown' => [null, SecurityStatusType::CheckNeeded],
     ]);
 
     it('counts versions that cannot be compared as checked', function (string $status) {

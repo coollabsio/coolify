@@ -496,7 +496,16 @@ describe('main card actions', function () {
         updateImagePage($this->admin, $this->database, 'database')
             ->assertSee('Coolify needs to check this image again: Coolify could not check for newer versions.')
             ->assertDontSeeHtml('updateImage(');
-    })->with(['failed', 'auth_required']);
+    })->with(['failed']);
+
+    it('shows the real status and why no version is offered when the registry needs a login', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [], 'auth_required');
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->assertDontSee('Coolify needs to check this image again')
+            ->assertSee("Coolify cannot read the tags of postgres. Log in to docker.io on {$this->server->name}.")
+            ->assertDontSeeHtml('updateImage(');
+    });
 
     it('shows the action without the button to a read-only member', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);

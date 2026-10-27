@@ -662,15 +662,20 @@ final class SecurityStatus
 
     /**
      * The version check (images the user does not build) and the base check (Dockerfile apps with a base image) have
-     * a result. `cannot_compare` and `no_better` count as checked. A Dockerfile app also needs to know which
-     * findings come from its current base image.
+     * a result. `cannot_compare` and `no_better` count as checked, and so do the checks that only the user can unblock
+     * (`isBlockedCheck()`): they have no result, and the card says why. A Dockerfile app also needs to know which
+     * findings come from its current base image. Notifications pass `$blockedCounts = false`: they say that Coolify
+     * could not check for a fixed version instead of "no fix yet".
      */
-    public static function versionsChecked(ImageScan $scan, Model $owner): bool
+    public static function versionsChecked(ImageScan $scan, Model $owner, bool $blockedCounts = true): bool
     {
+        $settled = fn (mixed $status, mixed $error): bool => in_array($status, self::CHECKED_STATUSES, true)
+            || ($blockedCounts && self::isBlockedCheck($status, $error));
+
         $needsImageCheck = ! $owner instanceof Application
             || $owner->build_pack === 'dockerimage'
             || ($owner->build_pack === 'dockercompose' && $scan->builds_image === false);
-        if ($needsImageCheck && ! in_array($scan->candidateStatus(), self::CHECKED_STATUSES, true)) {
+        if ($needsImageCheck && ! $settled($scan->candidateStatus(), data_get($scan->candidates, 'error'))) {
             return false;
         }
 
@@ -679,11 +684,21 @@ final class SecurityStatus
 
             return is_array($base)
                 && ($base['image'] ?? null) === $scan->base_image_ref
-                && in_array($base['status'] ?? null, self::CHECKED_STATUSES, true)
+                && $settled($base['status'] ?? null, $base['error'] ?? null)
                 && is_int($base['attributable'] ?? null);
         }
 
         return true;
+    }
+
+    /**
+     * A version or base check that Coolify cannot finish by itself: the registry needs a login (`auth_required`), or
+     * the server reached the daily limit of checks (`failed` with `daily_limit`). Other failures and a busy lock
+     * (`failed` with `lock_busy`) are tried again, so they stay check_needed.
+     */
+    public static function isBlockedCheck(mixed $status, mixed $error): bool
+    {
+        return $status === 'auth_required' || ($status === 'failed' && $error === 'daily_limit');
     }
 
     private static function ownerName(Model $owner): ?string
