@@ -2,81 +2,70 @@
 
 namespace App\Services\ImageScan;
 
-use App\Enums\ImageScanAlertLevel;
-
 /**
- * Decides whether a candidate image is better than the current image (spec 11, candidate rules).
+ * Decides whether a candidate image is better than the current image (spec 15.4).
  */
 final class CandidateEvaluator
 {
     private const COUNTED_SEVERITIES = ['critical', 'high', 'medium'];
 
     /**
-     * Findings at or above the alert level (fixable or not), their counts, and the IDs of known exploited findings.
+     * Better: fixes at least one relevant finding or leaves an end-of-life distro, and adds no finding with an
+     * exploit signal and no critical finding. Ignores apply to both images.
      *
-     * @param  list<Finding>  $findings
-     * @return array{at_level: int, counts: array{critical: int, high: int, medium: int}, kev_ids: list<string>}
+     * @param  list<Finding>  $currentFindings
+     * @param  list<Finding>  $candidateFindings
+     * @param  array<string, mixed>|null  $currentEol  The end-of-life distro of the current image.
+     * @param  array<string, mixed>|null  $candidateEol  The end-of-life distro of the candidate.
      */
-    public function summarize(array $findings, ImageScanAlertLevel $level): array
+    public function isBetter(array $currentFindings, array $candidateFindings, IgnoreMatcher $ignores, ?array $currentEol, ?array $candidateEol): bool
     {
-        $kevIds = [];
-        foreach ($findings as $finding) {
-            if ($finding->kev) {
-                array_push($kevIds, ...$this->keys($finding));
+        if ($candidateEol !== null && $currentEol === null) {
+            return false;
+        }
+
+        $current = [];
+        foreach ($this->notIgnored($currentFindings, $ignores) as $finding) {
+            foreach ($this->keys($finding) as $key) {
+                $current[$key] = true;
             }
         }
 
-        $atLevel = $this->atLevel($findings, $level);
-
-        return [
-            'at_level' => count($atLevel),
-            'counts' => $this->counts($atLevel),
-            'kev_ids' => array_values(array_unique($kevIds)),
-        ];
-    }
-
-    /**
-     * Better: fewer findings at or above the alert level in total, no new known exploited finding, and not
-     * an end-of-life distro when the current distro still gets fixes.
-     *
-     * @param  array{at_level: int, kev_ids: list<string>}  $currentSummary  From summarize().
-     * @param  list<Finding>  $candidateFindings
-     */
-    public function isBetter(array $currentSummary, array $candidateFindings, ImageScanAlertLevel $level, bool $currentEol, bool $candidateEol): bool
-    {
-        if ($candidateEol && ! $currentEol) {
-            return false;
-        }
-
-        if (count($this->atLevel($candidateFindings, $level)) >= $currentSummary['at_level']) {
-            return false;
-        }
-
-        $currentKev = array_flip(array_map('mb_strtolower', $currentSummary['kev_ids']));
-        foreach ($candidateFindings as $finding) {
-            if ($finding->kev && array_intersect_key(array_flip($this->keys($finding)), $currentKev) === []) {
+        foreach ($this->relevant($candidateFindings, $ignores) as $finding) {
+            $serious = SecurityRules::exploitSignal($finding) !== null || strtolower($finding->severity) === 'critical';
+            if ($serious && array_intersect_key(array_flip($this->keys($finding)), $current) === []) {
                 return false;
             }
         }
 
-        return true;
+        return ($currentEol !== null && $candidateEol === null)
+            || $this->fixed($this->relevant($currentFindings, $ignores), $candidateFindings) !== [];
     }
 
     /**
-     * IDs and aliases of the current findings that the candidate no longer has under any of their IDs.
+     * IDs and aliases of the relevant current findings that the candidate no longer has under any of their IDs.
      *
-     * @param  list<Finding>  $current  The current findings to check, usually those at the alert level.
+     * @param  list<Finding>  $current
      * @param  list<Finding>  $candidate  All findings of the candidate.
      * @return list<string>
      */
-    public function fixedIds(array $current, array $candidate): array
+    public function fixedIds(array $current, array $candidate, IgnoreMatcher $ignores): array
     {
         $fixed = [];
-        foreach ($this->fixed($current, $candidate) as $finding) {
+        foreach ($this->fixed($this->relevant($current, $ignores), $candidate) as $finding) {
             array_push($fixed, ...$this->ids($finding));
         }
 
         return array_values(array_unique($fixed));
+    }
+
+    /**
+     * @param  list<Finding>  $findings
+     * @return list<Finding>
+     */
+    public function relevant(array $findings, IgnoreMatcher $ignores): array
+    {
+        return array_values(array_filter($findings, fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $ignores)));
     }
 
     /**
@@ -114,15 +103,6 @@ final class CandidateEvaluator
 
     /**
      * @param  list<Finding>  $findings
-     * @return list<Finding>
-     */
-    public function atLevel(array $findings, ImageScanAlertLevel $level): array
-    {
-        return array_values(array_filter($findings, fn (Finding $finding) => $level->includes($finding->severity)));
-    }
-
-    /**
-     * @param  list<Finding>  $findings
      * @return array{critical: int, high: int, medium: int}
      */
     public function counts(array $findings): array
@@ -136,6 +116,15 @@ final class CandidateEvaluator
         }
 
         return $counts;
+    }
+
+    /**
+     * @param  list<Finding>  $findings
+     * @return list<Finding>
+     */
+    private function notIgnored(array $findings, IgnoreMatcher $ignores): array
+    {
+        return array_values(array_filter($findings, fn (Finding $finding): bool => $ignores->matches($finding) === null));
     }
 
     /**

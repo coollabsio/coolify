@@ -22,6 +22,7 @@ use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\ScanNotifications;
+use App\Services\ImageScan\SecurityRules;
 use App\Services\ImageScan\SyftPackageParser;
 use App\Services\ImageScan\TagSelector;
 use Illuminate\Database\Eloquent\Model;
@@ -31,16 +32,16 @@ use Lorisleiva\Actions\Concerns\AsAction;
 use Throwable;
 
 /**
- * Finds newer versions of a scanned image that fix vulnerabilities (spec 7.1, 7.2, and the candidate rules of
- * spec 11): the same tag with a newer build, the newest tag of the same line, and the next major for information.
+ * Finds newer versions of a scanned image that fix vulnerabilities (spec 7.2 and the candidate rules of spec 15.4):
+ * the same tag with a newer build, the newest tag of the same line, and the next major for information.
  * Candidates are scanned from the registry on the server, at most 2 per image and 20 per server and day; the SBOM of
  * a candidate digest is kept per server and reused.
  *
  * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`, with status `skipped` when
  * only the base image was checked. The base image of a Dockerfile build (spec 7.4) is scanned from the registry with the
  * newest tag of its line; the result is under `base`: `{image, status, checked_at, error, tags_truncated, attributable,
- * attributable_ids, current_digest, entries}`. A finding of the app is attributable to the base image when the current
- * base image has it too; the line candidate fixes the attributable findings it does not have. Base entries never make a
+ * attributable_ids, current_digest, entries}`. A relevant finding of the app is attributable to the base image when the
+ * current base image has it too; the line candidate fixes the attributable findings it does not have. Base entries never make a
  * finding fixable now. Never throws for registry or scan problems: they become the status. Registry credentials are read only after an anonymous request failed, only for the registry of the image, and are
  * never stored or logged.
  */
@@ -165,8 +166,8 @@ class RefreshCandidates
     }
 
     /**
-     * Candidates are looked for only for images the user does not build in Coolify, with a package fix at or above
-     * the alert level that is not ignored (spec 7.1).
+     * Candidates are looked for only for images the user does not build in Coolify, with a relevant finding or an
+     * end-of-life distro (spec 15.4).
      */
     private static function needsImageCandidates(ImageScan $scan): bool
     {
@@ -178,21 +179,12 @@ class RefreshCandidates
             return false;
         }
 
-        $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
-        $ignores = IgnoreMatcher::forResource($resource);
-
-        foreach (ResourceScans::findings($scan) as $finding) {
-            if ($finding->fixState === 'fixed' && $finding->fixedIn !== null && $level->includes($finding->severity) && $ignores->matches($finding) === null) {
-                return true;
-            }
-        }
-
-        return false;
+        return self::hasEolDistro($scan) || self::relevantFindings($scan, $resource) !== [];
     }
 
     /**
-     * A newer base image is looked for when a Dockerfile build with a known base image has findings at or above the
-     * alert level that are not ignored (spec 7.4). Nixpacks, Railpack, and static builds have no base image.
+     * A newer base image is looked for on the same trigger when a Dockerfile build has a known base image (spec 15.4).
+     * Nixpacks, Railpack, and static builds have no base image.
      */
     private static function needsBaseCandidates(ImageScan $scan): bool
     {
@@ -202,23 +194,27 @@ class RefreshCandidates
             && $resource instanceof Application
             && $resource->build_pack === 'dockerfile'
             && filled($scan->base_image_ref)
-            && self::alertFindings($scan, $resource) !== [];
+            && (self::hasEolDistro($scan) || self::relevantFindings($scan, $resource) !== []);
     }
 
     /**
-     * Findings at or above the alert level that are not ignored.
+     * The relevant findings of the scan (spec 15.2).
      *
      * @return list<Finding>
      */
-    public static function alertFindings(ImageScan $scan, Model $resource): array
+    public static function relevantFindings(ImageScan $scan, Model $resource): array
     {
-        $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
         $ignores = IgnoreMatcher::forResource($resource);
 
         return array_values(array_filter(
             ResourceScans::findings($scan),
-            fn (Finding $finding): bool => $level->includes($finding->severity) && $ignores->matches($finding) === null,
+            fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $ignores),
         ));
+    }
+
+    private static function hasEolDistro(ImageScan $scan): bool
+    {
+        return is_array(data_get($scan->summary, 'eol_distro'));
     }
 
     /**
@@ -430,29 +426,26 @@ class RefreshCandidates
             return $failure(null, $currentDigest);
         }
 
-        $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
         $ignores = IgnoreMatcher::forResource($resource);
-        $notIgnored = fn (array $findings) => array_values(array_filter($findings, fn (Finding $finding) => $ignores->matches($finding) === null));
         $evaluator = new CandidateEvaluator;
-        $currentBaseFindings = $notIgnored($currentBase['findings']);
-        $attributable = $evaluator->shared(self::alertFindings($scan, $resource), $currentBaseFindings);
+        $attributable = $evaluator->shared(self::relevantFindings($scan, $resource), $currentBase['findings']);
 
         $candidate = $this->scanCandidate($lineDigest, $platform, $lockWaitSeconds);
         if ($candidate === null) {
             return $failure($attributable, $currentDigest);
         }
 
-        $candidateFindings = $notIgnored($candidate['findings']);
+        $candidateFindings = $candidate['findings'];
         $better = ! $currentBase['truncated'] && ! $candidate['truncated']
-            && $evaluator->isBetter($evaluator->summarize($currentBaseFindings, $level), $candidateFindings, $level, $currentBase['eol'] !== null, $candidate['eol'] !== null);
+            && $evaluator->isBetter($currentBase['findings'], $candidateFindings, $ignores, $currentBase['eol'], $candidate['eol']);
         $entry = [
             'ref' => (string) $this->image->withTag($line),
             'digest' => $lineDigest,
             'kind' => 'line',
             'better' => $better,
-            'fixed_ids' => $evaluator->fixedIds($attributable, $candidateFindings),
+            'fixed_ids' => $evaluator->fixedIds($attributable, $candidateFindings, $ignores),
             'fixes' => $evaluator->counts($evaluator->fixed($attributable, $candidateFindings)),
-            'left' => $evaluator->counts($evaluator->atLevel($candidateFindings, $level)),
+            'left' => $evaluator->counts($evaluator->relevant($candidateFindings, $ignores)),
             'eol' => $candidate['eol'],
             'scanned_at' => now()->toIso8601String(),
         ];
@@ -470,14 +463,12 @@ class RefreshCandidates
             return [];
         }
 
-        $level = ImageScanPolicyResolver::for($resource, $scan->server)->alertLevel;
         $ignores = IgnoreMatcher::forResource($resource);
-        $notIgnored = fn (array $findings) => array_values(array_filter($findings, fn (Finding $finding) => $ignores->matches($finding) === null));
         $evaluator = new CandidateEvaluator;
-        $current = $notIgnored(ResourceScans::findings($scan));
-        $currentAtLevel = $evaluator->atLevel($current, $level);
-        $currentSummary = $evaluator->summarize($current, $level);
-        $currentEol = is_array(data_get($scan->summary, 'eol_distro'));
+        $current = ResourceScans::findings($scan);
+        $currentRelevant = $evaluator->relevant($current, $ignores);
+        $currentEol = data_get($scan->summary, 'eol_distro');
+        $currentEol = is_array($currentEol) ? $currentEol : null;
 
         $entries = [];
         foreach ($candidates as $candidate) {
@@ -486,16 +477,15 @@ class RefreshCandidates
                 continue;
             }
 
-            $findings = $notIgnored($report['findings']);
-            $fixed = $evaluator->fixed($currentAtLevel, $findings);
+            $findings = $report['findings'];
             $entries[] = [
                 'ref' => (string) $this->image->withTag($candidate['tag']),
                 'digest' => $candidate['digest'],
                 'kind' => $candidate['kind'],
-                'better' => ! $report['truncated'] && $evaluator->isBetter($currentSummary, $findings, $level, $currentEol, $report['eol'] !== null),
-                'fixed_ids' => $evaluator->fixedIds($currentAtLevel, $findings),
-                'fixes' => $evaluator->counts($fixed),
-                'left' => $evaluator->counts($evaluator->atLevel($findings, $level)),
+                'better' => ! $report['truncated'] && $evaluator->isBetter($current, $findings, $ignores, $currentEol, $report['eol']),
+                'fixed_ids' => $evaluator->fixedIds($currentRelevant, $findings, $ignores),
+                'fixes' => $evaluator->counts($evaluator->fixed($currentRelevant, $findings)),
+                'left' => $evaluator->counts($evaluator->relevant($findings, $ignores)),
                 'eol' => $report['eol'],
                 'scanned_at' => now()->toIso8601String(),
             ];

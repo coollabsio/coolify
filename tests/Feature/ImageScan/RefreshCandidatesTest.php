@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
+use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -17,8 +18,10 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Services\ImageScan\CandidateEvaluator;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
+use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
@@ -45,6 +48,12 @@ const CANDIDATES_LINE = 'sha256:333333333333333333333333333333333333333333333333
 
 const CANDIDATES_SECRET = 'S3cr3t-registry-password';
 
+/**
+ * The critical Go stdlib findings of gosu in the 15-alpine fixture that 15.0-alpine does not have. They make 15-alpine
+ * not better (spec 15.4), so most tests ignore them.
+ */
+const CANDIDATES_GOSU_IDS = ['GO-2026-4337', 'GO-2026-6612', 'GO-2026-6604'];
+
 beforeEach(function () {
     Server::flushIdentityMap();
     Storage::fake('ssh-keys');
@@ -68,6 +77,9 @@ beforeEach(function () {
     $this->anonymousFails = false;
     $this->diskFree = '50000000000 50000000000';
     $this->grypeCut = false;
+    foreach (CANDIDATES_GOSU_IDS as $id) {
+        ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => $id]);
+    }
 });
 
 function candidatesServer(Team $team): Server
@@ -204,7 +216,8 @@ it('recommends the newest tag of the line when it has fewer findings and lists w
         ->and($scan->candidates['checked_at'])->not->toBeNull()
         ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'better' => true, 'eol' => null])
         ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
-        ->and($line['left'])->toBe(['critical' => 3, 'high' => 32, 'medium' => 0])
+        ->and($line['fixed_ids'])->not->toContain('CVE-2023-2650')
+        ->and($line['left'])->toBe(['critical' => 0, 'high' => 32, 'medium' => 0])
         ->and($line['fixes']['critical'] + $line['fixes']['high'])->toBeGreaterThan(0)
         ->and($line['scanned_at'])->not->toBeNull()
         ->and($major)->toMatchArray(['ref' => 'postgres:16.4-alpine', 'better' => false])
@@ -221,7 +234,7 @@ it('recommends the newest tag of the line when it has fewer findings and lists w
         ->and(candidatesRan('.docker/config.json'))->toBe(0);
 });
 
-it('says that no newer version is better when the line candidate has more findings', function () {
+it('says that no newer version is better when the line candidate adds critical findings', function () {
     candidatesFake();
     $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype-candidate-15.11';
     $scan = candidatesScan();
@@ -387,15 +400,62 @@ it('records a failure and does not throw when the registry cannot be read', func
     expect($scan->fresh()->candidateStatus())->toBe('failed');
 });
 
-it('does nothing for an image without a package fix at the alert level', function () {
+it('does not recommend 15-alpine when its critical Go findings are not ignored', function () {
+    candidatesFake();
+    ImageScanIgnore::query()->delete();
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    $line = collect($scan->fresh()->candidateEntries())->firstWhere('kind', 'line');
+    expect($scan->fresh()->candidateStatus())->toBe('no_better')
+        ->and($line['better'])->toBeFalse()
+        ->and($line['fixed_ids'])->toContain('CVE-2025-1094');
+});
+
+it('does nothing for an image without relevant findings on a supported distro', function () {
     candidatesFake();
     $scan = candidatesScan();
-    $scan->update(['findings' => array_map(fn (Finding $finding) => [...$finding->toArray(), 'fixState' => 'not-fixed', 'fixedIn' => null], candidatesFindings())]);
+    $scan->update([
+        'findings' => array_map(fn (Finding $finding) => [...$finding->toArray(), 'severity' => 'medium', 'kev' => false, 'epss' => null], candidatesFindings()),
+        'summary' => [...$scan->summary, 'eol_distro' => null],
+    ]);
 
     RefreshCandidates::run($scan);
 
     expect($scan->fresh()->candidates)->toBeNull();
     Process::assertNothingRan();
+});
+
+it('looks for candidates for an end-of-life distro or a relevant finding without a fix', function (string $case) {
+    candidatesFake();
+    $scan = candidatesScan();
+    $finding = fn (array $data) => [...candidatesFindings()[0]->toArray(), 'aliases' => [], 'fixState' => 'not-fixed', 'fixedIn' => null, ...$data];
+    $scan->update(match ($case) {
+        'eol' => ['findings' => []],
+        'not fixed' => ['findings' => [$finding(['id' => 'CVE-2025-1094', 'severity' => 'high'])], 'summary' => [...$scan->summary, 'eol_distro' => null]],
+    });
+
+    expect(RefreshCandidates::needsCandidates($scan->fresh()))->toBeTrue();
+})->with(['eol', 'not fixed']);
+
+it('looks for candidates for a fixable high known exploited finding with no alert level involved', function () {
+    candidatesFake();
+    ImageScanPolicy::query()->update(['alert_level' => ImageScanAlertLevel::Critical]);
+    $scan = candidatesScan();
+    $kev = Finding::fromArray([
+        'id' => 'CVE-2025-1094', 'aliases' => [], 'severity' => 'high', 'package' => 'postgresql', 'version' => '15.0', 'type' => 'binary',
+        'artifactId' => 'pg', 'fixedIn' => '15.11', 'fixState' => 'fixed', 'kev' => true,
+    ]);
+    $scan->update(['findings' => [$kev->toArray()], 'summary' => [...$scan->summary, 'eol_distro' => null]]);
+
+    RefreshCandidates::run($scan);
+
+    $line = collect($scan->fresh()->candidateEntries())->firstWhere('kind', 'line');
+    expect($scan->fresh()->candidateStatus())->toBe('ok')
+        ->and($line['better'])->toBeTrue()
+        ->and($line['fixed_ids'])->toBe(['CVE-2025-1094'])
+        ->and($line['fixes'])->toBe(['critical' => 0, 'high' => 1, 'medium' => 0]);
 });
 
 it('does nothing for an application that Coolify builds', function () {
@@ -615,17 +675,25 @@ function candidatesDockerfileScan(string $baseImageRef = 'postgres:15.0-alpine',
         'builds_image' => true,
         'base_image_ref' => $baseImageRef,
         'findings' => $withFindings ? array_map(fn (Finding $finding) => $finding->toArray(), [...candidatesFindings(), $added]) : [],
+        'summary' => $withFindings ? $scan->summary : [...$scan->summary, 'eol_distro' => null],
     ]);
 
     return $scan->fresh();
 }
 
 /**
- * The findings of the grype fixture at the alert level (high): those the current base image has too.
+ * The relevant findings of the grype fixture: those the current base image has too.
+ *
+ * @return list<Finding>
  */
+function candidatesRelevantFindings(): array
+{
+    return (new CandidateEvaluator)->relevant(candidatesFindings(), IgnoreMatcher::fromIgnores(collect()));
+}
+
 function candidatesAttributableCount(): int
 {
-    return collect(candidatesFindings())->filter(fn (Finding $finding) => in_array(strtolower($finding->severity), ['critical', 'high'], true))->count();
+    return count(candidatesRelevantFindings());
 }
 
 it('attributes findings to the base image from a registry scan of the current base and recommends the newer tag', function () {
@@ -645,10 +713,11 @@ it('attributes findings to the base image from a registry scan of the current ba
         ->and($base)->toMatchArray(['image' => 'postgres:15.0-alpine', 'status' => 'ok', 'tags_truncated' => false, 'current_digest' => CANDIDATES_REPO_DIGEST])
         ->and($base['attributable'])->toBe(candidatesAttributableCount())
         ->and($base['attributable_ids'])->not->toContain('CVE-2099-0001')
-        ->and($base['attributable_ids'])->toHaveCount(collect(candidatesFindings())->filter(fn (Finding $finding) => in_array(strtolower($finding->severity), ['critical', 'high'], true))->pluck('id')->unique()->count())
+        ->and($base['attributable_ids'])->toHaveCount(collect(candidatesRelevantFindings())->pluck('id')->unique()->count())
+        ->and($base['attributable_ids'])->not->toContain('CVE-2023-2650')
         ->and($base['checked_at'])->not->toBeNull()
         ->and($base['entries'])->toHaveCount(1)
-        ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 3, 'high' => 32, 'medium' => 0]])
+        ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 0, 'high' => 32, 'medium' => 0]])
         ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
         ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
         ->and(array_sum($line['fixes']))->toBeGreaterThan(0)->toBeLessThanOrEqual($base['attributable'])
@@ -665,22 +734,21 @@ it('attributes findings to the base image from a registry scan of the current ba
 it('counts only findings that the current base image has as attributable and fixed', function () {
     candidatesFake();
     $scan = candidatesDockerfileScan();
-    // The current base image has 56 of the 91 high and critical findings of the app; the line candidate has none of the app's.
+    // The current base image has 27 of the 50 relevant findings of the app; the line candidate has none of the app's.
     $this->grype[substr(CANDIDATES_REPO_DIGEST, 7)] = 'grype-candidate-15.11';
     $currentBase = (new GrypeReportParser)->parse(file_get_contents(base_path('tests/Fixtures/image-scan/grype-candidate-15.11.ndjson')))['findings'];
     $baseKeys = collect($currentBase)->flatMap(fn (Finding $finding) => [$finding->id, ...$finding->aliases])->map(fn (string $id) => strtolower($id))->flip();
-    $attributable = collect(candidatesFindings())
-        ->filter(fn (Finding $finding) => in_array(strtolower($finding->severity), ['critical', 'high'], true))
+    $attributable = collect(candidatesRelevantFindings())
         ->filter(fn (Finding $finding) => collect([$finding->id, ...$finding->aliases])->contains(fn (string $id) => $baseKeys->has(strtolower($id))));
 
     RefreshCandidates::run($scan);
 
     $base = $scan->fresh()->candidates['base'];
     $line = $base['entries'][0];
-    expect($attributable)->toHaveCount(56)
+    expect($attributable)->toHaveCount(27)
         ->and($base['status'])->toBe('ok')
-        ->and($base['attributable'])->toBe(56)
-        ->and(array_sum($line['fixes']))->toBe(56)
+        ->and($base['attributable'])->toBe(27)
+        ->and(array_sum($line['fixes']))->toBe(27)
         ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
         ->and(collect($line['fixed_ids'])->every(fn (string $id) => $baseKeys->has(strtolower($id))))->toBeTrue();
 });
@@ -709,7 +777,7 @@ it('says that no newer base image is better when the line candidate has as many 
         ->and($scan->fresh()->candidates['base']['entries'][0]['better'])->toBeFalse();
 });
 
-it('looks for no base image candidates without findings at the alert level or for another build pack', function (bool $withFindings, string $buildPack, ?string $baseImageRef) {
+it('looks for no base image candidates without relevant findings or for another build pack', function (bool $withFindings, string $buildPack, ?string $baseImageRef) {
     candidatesFake();
     $scan = candidatesDockerfileScan($baseImageRef ?? 'postgres:15.0-alpine', $withFindings);
     $scan->update(['base_image_ref' => $baseImageRef]);
