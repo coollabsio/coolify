@@ -1,9 +1,4 @@
 @php
-    $fixStates = [
-        'fixable_now' => 'Fixable now',
-        'not_released' => 'Fix not released yet',
-        'no_fix' => 'No fix',
-    ];
     $segment = 'h-7 rounded-md px-2.5 text-[12px] font-medium whitespace-nowrap transition-colors';
     $segmentActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
     $segmentIdle = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
@@ -28,30 +23,27 @@
         </x-empty>
     @elseif ($offState === 'application')
         <x-empty title="Image scanning is off for this app."
-            description="Turn on Scan this app in the rules below." icon-name="shield-alert" />
+            description="Turn on Scan this app in the settings below." icon-name="shield-alert" />
     @else
         @php
             $isScanning = $progress !== null;
-            $hasCallouts = $errorMessages !== [] || $runsOtherImage || $eolDistro !== null || $truncated;
+            $checkNeeded = ($card['status'] ?? null) === 'check_needed';
         @endphp
 
-        <x-application.settings-section id="vulnerabilities-section" title="Vulnerabilities"
-            helper="Known vulnerabilities in the packages of the images this resource runs. Fixable now means you can fix it by updating the image or a package."
-            flush>
-            @if ($oldResultsDays !== null)
+        {{-- Main card (spec 15.7): status, sentence, the action that fixes the most, why. --}}
+        <x-application.settings-section id="security-section" title="Security">
+            @if (filled($card['badge'] ?? null))
                 <x-slot:badges>
-                    <span data-tooltip="Coolify rescans running images every day. The last rescans did not finish.">
-                        <x-status-badge type="warning" :label="'Results from '.$oldResultsDays.' days ago'" />
-                    </span>
+                    <x-status-badge :type="$card['badgeType']" :label="$card['badge']" />
                 </x-slot:badges>
             @endif
             <x-slot:actions>
-                @if ($scannedAt !== null)
-                    <span class="{{ $muted }}" data-tooltip="{{ $scannedAt->toDayDateTimeString() }}">
-                        Scanned {{ $scannedAt->diffForHumans() }}
+                @if ($checkedAt !== null)
+                    <span class="{{ $muted }}" data-tooltip="{{ $checkedAt->toDayDateTimeString() }}">
+                        Checked {{ $checkedAt->diffForHumans() }}
                     </span>
                 @endif
-                @if ($canUpdate)
+                @if ($canUpdate && ! $checkNeeded)
                     <x-forms.button class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
                         <x-reicon name="refresh" class="size-3.5" />
                         Scan now
@@ -59,68 +51,111 @@
                 @endif
             </x-slot:actions>
 
-            @if (array_sum([$fixableBySeverity['critical'], $fixableBySeverity['high'], $fixableBySeverity['medium']]) > 0)
-                <div class="flex flex-col gap-2 border-b border-neutral-200 p-3 sm:flex-row sm:items-center sm:gap-4 dark:border-white/[0.08]">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        <span class="text-[12px] font-medium text-neutral-700 dark:text-fg">Fixable now</span>
-                        @foreach (['critical', 'high', 'medium'] as $severity)
-                            @if ($fixableBySeverity[$severity] > 0)
-                                <x-image-scan.severity-badge :severity="$severity" :count="$fixableBySeverity[$severity]" />
-                            @endif
+            <div class="flex flex-col gap-4">
+                @foreach ($errorMessages as $message)
+                    <x-callout type="danger" title="The last scan could not run">{{ $message }}</x-callout>
+                @endforeach
+
+                @if ($isScanning)
+                    <div class="flex flex-col divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
+                        role="status" aria-live="polite">
+                        @foreach ($checkpoints as $checkpoint)
+                            <x-checkpoint-item :title="$checkpoint['title']" :status="$checkpoint['status']" />
                         @endforeach
                     </div>
-                    <x-image-scan.severity-bar class="sm:max-w-60" :counts="$fixableBySeverity" />
-                </div>
-            @endif
+                @endif
 
-            @if ($hasCallouts)
-                <div class="flex flex-col gap-2 border-b border-neutral-200 p-3 dark:border-white/[0.08]">
-                    @foreach ($errorMessages as $message)
-                        <x-callout type="danger" title="The last scan could not run">{{ $message }}</x-callout>
-                    @endforeach
-                    @if ($runsOtherImage)
-                        <x-callout type="warning" title="Results are out of date">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <span>The running image is not the scanned image.</span>
-                                @if ($canUpdate)
-                                    <x-forms.button class="normal-case!" wire:click="scanNow" :disabled="$isScanning">Scan now</x-forms.button>
-                                @endif
-                            </div>
-                        </x-callout>
-                    @endif
-                    @if ($eolDistro !== null)
-                        <x-callout type="warning" title="Old operating system">
-                            This image uses {{ $eolDistro['name'] }} {{ $eolDistro['version'] }}, which no longer gets security fixes.
-                        </x-callout>
-                    @endif
-                    @if ($truncated)
-                        <x-callout type="info" title="Too many results">Only the first 5,000 are shown.</x-callout>
-                    @endif
-                </div>
-            @endif
+                @if ($card === null)
+                    @unless ($isScanning)
+                        <x-empty size="sm" title="Not scanned yet. The next deploy scans the image.">
+                            @if ($canUpdate)
+                                <x-slot:actions>
+                                    <x-forms.button class="normal-case!" wire:click="scanNow">Scan now</x-forms.button>
+                                </x-slot:actions>
+                            @endif
+                        </x-empty>
+                    @endunless
+                @else
+                    <div class="flex max-w-3xl flex-col gap-1.5">
+                        <p class="text-[14px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['headline'] }}</p>
+                        @foreach ($card['lines'] as $line)
+                            <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $line }}</p>
+                        @endforeach
+                    </div>
 
-            @if ($isScanning)
-                <div class="flex flex-col divide-y divide-neutral-200 border-b border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
-                    role="status" aria-live="polite">
-                    @foreach ($checkpoints as $checkpoint)
-                        <x-checkpoint-item :title="$checkpoint['title']" :status="$checkpoint['status']" />
-                    @endforeach
-                </div>
-            @endif
-
-            @if ($scans->isEmpty())
-                @unless ($isScanning)
-                    <x-empty size="sm" title="Not scanned yet. The next deploy scans the image.">
+                    @if ($checkNeeded)
                         @if ($canUpdate)
-                            <x-slot:actions>
-                                <x-forms.button class="normal-case!" wire:click="scanNow">Scan now</x-forms.button>
-                            </x-slot:actions>
+                            <div>
+                                <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Scan now
+                                </x-forms.button>
+                            </div>
                         @endif
-                    </x-empty>
-                @endunless
-            @else
-                {{-- Version recommendations (spec 7.3). The Dockerfile base image recommendation (7.4) goes here too. --}}
-                <x-image-scan.fix-panel :items="$fixPanel" :can-update="$canUpdate" />
+                    @elseif ($card['primary'] !== null)
+                        @include('livewire.image-scan.partials.security-action', ['action' => $card['primary'], 'primary' => true, 'withSentence' => false])
+                    @endif
+
+                    @if ($card['why'] !== [])
+                        <div class="flex flex-col gap-2">
+                            <ul class="flex flex-col divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
+                                aria-label="Problems">
+                                @foreach ($card['why'] as $entry)
+                                    <li wire:key="security-why-{{ md5($entry['display_id'].$entry['title']) }}"
+                                        class="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                                        <div class="flex min-w-0 flex-col gap-0.5">
+                                            @if ($entry['title'] !== '')
+                                                <span class="text-[13px] leading-5 text-neutral-900 dark:text-fg">{{ $entry['title'] }}</span>
+                                            @endif
+                                            @if ($entry['link'] !== null)
+                                                <a href="{{ $entry['link'] }}" target="_blank" rel="noopener noreferrer"
+                                                    class="w-fit font-mono text-[11px] text-neutral-500 underline-offset-4 hover:text-black hover:underline dark:text-fg-faint dark:hover:text-fg">{{ $entry['display_id'] }}</a>
+                                            @else
+                                                <span class="font-mono text-[11px] text-neutral-500 dark:text-fg-faint">{{ $entry['display_id'] }}</span>
+                                            @endif
+                                        </div>
+                                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                            <span class="text-[12px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $entry['score'] }}</span>
+                                            @if ($entry['signal'] !== null)
+                                                <x-status-badge :type="$entry['signal'] === 'Used by attackers' ? 'error' : 'warning'" :label="$entry['signal']" />
+                                            @endif
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            @if ($card['whyMore'] !== '')
+                                <p class="{{ $muted }} text-[12px]!">{{ ucfirst($card['whyMore']) }}.</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    @if ($card['others'] !== [])
+                        <div class="flex flex-col gap-2">
+                            <h4 class="text-[12px] font-medium text-neutral-700 dark:text-fg-dim">Other fixes</h4>
+                            <div class="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]">
+                                @foreach ($card['others'] as $other)
+                                    <div class="px-3 py-2.5">
+                                        @include('livewire.image-scan.partials.security-action', ['action' => $other, 'primary' => false, 'withSentence' => true])
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if ($card['moreActions'] > 0)
+                                <p class="{{ $muted }} text-[12px]!">and {{ $card['moreActions'] }} more</p>
+                            @endif
+                        </div>
+                    @endif
+                @endif
+            </div>
+        </x-application.settings-section>
+
+        @if ($scans->isNotEmpty())
+            <x-application.settings-section id="all-findings-section" :title="'All findings ('.number_format($findingCount).')'"
+                collapsible flush>
+                @if ($truncated)
+                    <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <x-callout type="info" title="Too many results">Only the first 5,000 are shown.</x-callout>
+                    </div>
+                @endif
 
                 <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
                     <x-slot:search>
@@ -204,16 +239,15 @@
                     <x-table.loading target="search,setFixState,toggleSeverity,toggleImage,resetFilters,view,showIgnored,previousPage,nextPage,gotoPage,perPage" />
 
                     @if ($items->isEmpty())
-                        @if (! $showIgnored && ! $hasFilters && $fixState === 'fixable_now')
-                            <x-empty size="sm" title="Nothing to fix now.">
-                                <x-slot:actions>
-                                    <button type="button" class="button normal-case!" wire:click="setFixState('not_released')">
-                                        Fix not released yet ({{ $stateCounts['not_released'] }})
-                                    </button>
-                                    <button type="button" class="button normal-case!" wire:click="setFixState('no_fix')">
-                                        No fix ({{ $stateCounts['no_fix'] }})
-                                    </button>
-                                </x-slot:actions>
+                        @if (! $showIgnored && ! $hasFilters && $fixState === 'fixed')
+                            <x-empty size="sm" title="No finding has a fixed version.">
+                                @if ($stateCounts['no_fix'] > 0)
+                                    <x-slot:actions>
+                                        <button type="button" class="button normal-case!" wire:click="setFixState('no_fix')">
+                                            No fix yet ({{ $stateCounts['no_fix'] }})
+                                        </button>
+                                    </x-slot:actions>
+                                @endif
                             </x-empty>
                         @elseif ($hasFilters)
                             <x-empty size="sm" title="No matching vulnerabilities"
@@ -316,8 +350,8 @@
                             wire:click="$set('showIgnored', true)">{{ $ignoredCount }} ignored</button>
                     </div>
                 @endif
-            @endif
-        </x-application.settings-section>
+            </x-application.settings-section>
+        @endif
 
         @if ($canUpdate)
             @include('livewire.image-scan.partials.ignore-modal')

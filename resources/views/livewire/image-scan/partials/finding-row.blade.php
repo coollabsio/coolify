@@ -6,7 +6,8 @@
     $likelihood = \App\Services\ImageScan\ResourceScans::exploitLikelihood($finding->epss);
     $ignore = $row['ignore'];
     $muted = 'text-[11px] text-neutral-500 dark:text-fg-faint';
-    $hasDetails = $finding->summary !== '' || $likelihood !== null || $aliases !== [] || $ignore !== null;
+    $base = $row['base'] ?? null;
+    $hasDetails = $finding->summary !== '' || $likelihood !== null || $aliases !== [] || $ignore !== null || filled($base);
 @endphp
 
 <div wire:key="finding-{{ $nested ? 'nested-' : '' }}{{ $row['key'] }}" x-data="{ open: false }"
@@ -71,6 +72,9 @@
         @endif
         @if ($likelihood !== null)
             <p class="{{ $muted }}">Exploit likelihood: {{ $likelihood }}</p>
+        @endif
+        @if (filled($base))
+            <p class="{{ $muted }}">Comes from <span class="font-mono">{{ $base }}</span>.</p>
         @endif
         @if ($aliases !== [])
             <p class="{{ $muted }}">

@@ -63,7 +63,7 @@ final class SecurityActions
 
         $kind = self::imageKind($scan, $owner);
         [$line, $sameTag] = in_array($kind, ['third_party', 'docker_image'], true) ? self::imageCandidates($scan) : [null, null];
-        $base = $kind === 'dockerfile' ? FixPanel::betterBase($scan) : null;
+        $base = $kind === 'dockerfile' ? BaseImageCheck::betterBase($scan) : null;
         // Null while Coolify does not know which findings come from the base image of a Dockerfile app.
         $fromBase = $kind === 'dockerfile' ? self::baseIds($scan) : [];
         $originKnown = $fromBase !== null;

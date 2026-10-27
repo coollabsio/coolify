@@ -210,7 +210,9 @@ final class SecuritySentences
             return '';
         }
 
-        return trim("It moves off {$security->eol['name']} {$security->eol['version']}, which no longer gets security fixes.");
+        $name = ucfirst($security->eol['name']);
+
+        return trim("It moves off {$name} {$security->eol['version']}").', which no longer gets security fixes.';
     }
 
     private static function problems(int $count): string

@@ -2082,6 +2082,30 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     color: inherit;
 }
 
+/* Collapsible layer card: the title is the toggle; closed, only the title row shows. */
+.application-settings-section > header.is-collapsed {
+    padding-bottom: 0.25rem;
+}
+
+.application-settings-section .settings-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    color: inherit;
+    font: inherit;
+    transition: color 150ms ease;
+}
+
+.application-settings-section .settings-section-toggle:hover {
+    color: var(--card-fg);
+}
+
+.application-settings-section .settings-section-toggle:focus-visible {
+    outline: 2px solid var(--color-coollabs);
+    outline-offset: 2px;
+}
+
 .application-settings-section > .application-settings-section-header p {
     margin-top: 0.125rem;
     font-size: 11px;

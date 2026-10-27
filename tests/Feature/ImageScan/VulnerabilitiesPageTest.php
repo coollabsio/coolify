@@ -355,7 +355,7 @@ describe('ignore', function () {
 });
 
 describe('findings', function () {
-    it('shows only fixable now by default', function () {
+    it('shows the findings with a fixed version by default', function () {
         vulnerabilitiesScan($this->application, [
             vulnerabilitiesFinding(),
             vulnerabilitiesFinding(['id' => 'CVE-2024-0002', 'package' => 'zlib', 'fixedIn' => null, 'fixState' => 'not-fixed']),
@@ -396,14 +396,14 @@ describe('findings', function () {
             ->assertDontSee('bad alias');
     });
 
-    it('says when nothing is fixable now', function () {
+    it('says when no finding has a fixed version', function () {
         vulnerabilitiesScan($this->application, [
             vulnerabilitiesFinding(['package' => 'zlib', 'fixedIn' => null, 'fixState' => 'not-fixed']),
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Nothing to fix now.')
-            ->assertSee('No fix (1)');
+            ->assertSee('No finding has a fixed version.')
+            ->assertSee('No fix yet (1)');
     });
 
     it('hides ignored findings and counts them', function () {
@@ -416,7 +416,7 @@ describe('findings', function () {
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Nothing to fix now.')
+            ->assertSee('All findings (0)')
             ->assertSee('1 ignored')
             ->set('showIgnored', true)
             ->assertSee('CVE-2024-0001');
@@ -472,14 +472,14 @@ describe('states', function () {
             ->assertSee('Not enough disk space on prod-1: 3 GB needed.');
     });
 
-    it('warns about old results, an end-of-life distro, and cut results', function () {
+    it('asks for a new check of old results, and names an end-of-life distro and cut results', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
             'scanned_at' => now()->subDays(5)->subHour(),
             'summary' => vulnerabilitiesSummary(1, ['truncated' => true, 'eol_distro' => ['name' => 'alpine', 'version' => '3.12']]),
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Results from 5 days ago')
+            ->assertSee('Coolify needs to check this image again: the last check was 5 days ago.')
             ->assertSee('This image uses Alpine 3.12, which no longer gets security fixes.')
             ->assertSee('Only the first 5,000 are shown.');
     });
@@ -489,14 +489,14 @@ describe('states', function () {
         $this->application->forceFill(['docker_registry_image_tag' => '1.28'])->saveQuietly();
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('The running image is not the scanned image.');
+            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.');
     });
 
     it('does not warn while the scanned image runs', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertDontSee('The running image is not the scanned image.');
+            ->assertDontSee('the running image is not the checked image');
     });
 });
 
@@ -508,9 +508,7 @@ describe('service page', function () {
         vulnerabilitiesScan($web, [vulnerabilitiesFinding(['package' => 'nginx-module'])]);
         vulnerabilitiesScan($db, [vulnerabilitiesFinding(['id' => 'CVE-2024-5555', 'package' => 'libpq'])], ['image_ref' => 'postgres:16']);
 
-        // An image of a service without a newer version has no action: its fixes are not released.
         $page = vulnerabilitiesPage($this->admin, $service, 'service')
-            ->call('setFixState', 'not_released')
             ->assertSee('nginx-module')
             ->assertSee('libpq')
             ->assertSee('postgres:16');
@@ -547,7 +545,6 @@ describe('service page', function () {
         vulnerabilitiesScan($db, [vulnerabilitiesFinding(['package' => 'libpq'])], ['image_ref' => 'postgres:16']);
 
         vulnerabilitiesPage($this->admin, $service, 'service')
-            ->call('setFixState', 'not_released')
             ->call('toggleImage', 'postgres:16')
             ->assertSee('libpq')
             ->assertDontSee('nginx-module');
@@ -555,7 +552,7 @@ describe('service page', function () {
 });
 
 describe('database page', function () {
-    it('shows the findings and the sidebar count of a standalone database', function () {
+    it('shows the findings of a standalone database', function () {
         $database = create_standalone_postgresql($this->environment->id, $this->destination);
         vulnerabilitiesScan($database, [vulnerabilitiesFinding(['package' => 'libpq'])], [
             'image_ref' => 'postgres:16-alpine',
@@ -566,16 +563,12 @@ describe('database page', function () {
 
         vulnerabilitiesPage($this->admin, $database, 'database')
             ->assertSee('libpq')
-            ->assertDontSee('The running image is not the scanned image.');
-
-        $this->blade('<x-database.configuration-sidebar :database="$database" current-route="project.database.configuration" />', [
-            'database' => $database->fresh(),
-        ])->assertSee('4 fixable now');
+            ->assertDontSee('the running image is not the checked image');
     });
 });
 
 describe('routes', function () {
-    it('opens the Vulnerabilities page of an application, a service, and a database', function () {
+    it('opens the Security page of an application, a service, and a database', function () {
         $service = vulnerabilitiesService();
         $database = create_standalone_postgresql($this->environment->id, $this->destination);
         $parameters = ['project_uuid' => $this->environment->project->uuid, 'environment_uuid' => $this->environment->uuid];
@@ -605,7 +598,7 @@ describe('packages', function () {
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Packages::class, ['resourceType' => 'application', 'resourceUuid' => $this->application->uuid])
-            ->assertSee('Packages (3)')
+            ->assertSee('Packages and SBOM')
             ->assertSee('Download SBOM')
             ->call('toggleType', 'apk')
             ->assertSee('busybox')
@@ -617,7 +610,7 @@ describe('packages', function () {
 });
 
 describe('sidebar', function () {
-    it('shows the fixable now count of the app', function () {
+    it('names the item Security and shows no count', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
             'summary' => vulnerabilitiesSummary(3),
         ]);
@@ -626,21 +619,31 @@ describe('sidebar', function () {
 
         $this->blade('<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />', [
             'application' => $this->application->fresh(),
-        ])->assertSee('Vulnerabilities')->assertSee('3 fixable now');
+        ])->assertSee('menu-item-label">Security<', false)
+            ->assertDontSee('fixable now')
+            ->assertDontSee('Vulnerabilities');
     });
 
-    it('sums the counts of the service applications and databases', function () {
+    it('shows the dot of the combined status of the service applications and databases', function () {
         $service = vulnerabilitiesService();
         $web = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:1.27']);
         $db = ServiceDatabase::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'db', 'image' => 'postgres:16']);
-        vulnerabilitiesScan($web, [], ['summary' => vulnerabilitiesSummary(2)]);
-        vulnerabilitiesScan($db, [], ['summary' => vulnerabilitiesSummary(3)]);
+        vulnerabilitiesScan($web, [], ['builds_image' => false, 'grype_db_built_at' => now()]);
+        vulnerabilitiesScan($db, [vulnerabilitiesFinding(['kev' => true])], [
+            'image_ref' => 'postgres:16',
+            'builds_image' => false,
+            'grype_db_built_at' => now(),
+            'candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
+                ['ref' => 'postgres:16.4', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2024-0001']],
+            ]],
+        ]);
+        ResourceScans::refreshSummaries(ResourceScans::current($service));
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
 
         $this->blade('<x-service.configuration-sidebar :service="$service" current-route="project.service.configuration" />', [
             'service' => $service->fresh(),
-        ])->assertSee('5 fixable now');
+        ])->assertSee('aria-label="Security: update now"', false);
     });
 
     it('hides the item when the instance does not allow image scanning', function () {
@@ -652,6 +655,6 @@ describe('sidebar', function () {
 
         $this->blade('<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />', [
             'application' => $this->application->fresh(),
-        ])->assertDontSee('Vulnerabilities');
+        ])->assertDontSee('menu-item-label">Security<', false);
     });
 });

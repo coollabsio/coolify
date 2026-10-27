@@ -8,6 +8,7 @@ use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Services\ImageScan\SecurityCard;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
@@ -161,7 +162,7 @@ class Heading extends Component
      * Gate warning for the latest deployment of the application (not a preview) when the image scan
      * gate blocked it or could not run. Re-evaluated on the heading's existing 10s poll.
      *
-     * @return array{result: array<string, mixed>, vulnerabilities_url: string, deployment_url: string}|null
+     * @return array{result: array<string, mixed>, action: ?string, vulnerabilities_url: string, deployment_url: string}|null
      */
     #[Computed]
     public function imageScanGate(): ?array
@@ -188,6 +189,7 @@ class Heading extends Component
 
         return [
             'result' => $deployment->scan_gate_result,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)?->sentence : null,
             'vulnerabilities_url' => route('project.application.vulnerabilities', $parameters),
             'deployment_url' => route('project.application.deployment.show', [...$parameters, 'deployment_uuid' => $deployment->deployment_uuid]),
         ];

@@ -926,12 +926,14 @@ The shared workspace grid is:
 
 Instance Settings uses `x-settings.layout` with the same full-width workspace.
 
-A sidebar item can show a count pill at its end: set `'count' => int|null` and
-`'countLabel'` on the item, and the sidebar renders `<x-menu-count>`. The pill is
-neutral, renders nothing for null or 0, and puts `{count} {countLabel}` in a
-tooltip and in screen reader text. The Vulnerabilities item uses it for the
-fixable-now count. Status that needs live updates keeps its own component
-(the application Servers item uses the `badge` server status badge).
+The Security item of the resource sidebars shows a status dot at its end
+(`<x-image-scan.security-dot :status="..." />`, set `'security'` on the item to
+the stored status): a red `bg-error` dot for update_now and a yellow
+`bg-warning` dot for update_available, each with an `aria-label`
+("Security: update now", "Security: security update") that is also the tooltip.
+Other statuses show nothing, and the item never shows a count. Status that needs
+live updates keeps its own component (the application Servers item uses the
+`badge` server status badge).
 
 **Page titles (global):** `x-dashboard.navbar` H1s (`titleOnDesktop="false"`,
 the default) hide at **lg+** only when the page renders a fixed tab strip or
@@ -1003,6 +1005,13 @@ Anatomy:
 
 The title row has `4px 8px 10px` padding inside the 6px outer padding, so
 header actions sit 10px from the top and 14px from the right edge.
+
+A card that most users do not need open can be collapsible: pass
+`collapsible` (and `:open="true"` to start open). The title becomes a button
+with a chevron (`aria-expanded`, `aria-controls` the well), the well is hidden
+until it is opened, and the closed title row has a 4px bottom padding. Header
+actions stay visible while it is closed. The Security page uses it for "All
+findings ({n})", "Packages and SBOM", and "Settings".
 
 The card keeps `overflow: visible` so listbox panels and tooltips can escape
 it. Do not add `overflow: hidden` to the card or the well.
@@ -1223,25 +1232,27 @@ and control anatomy but do not show an artificial loading state.
 
 ### Fix-state switch
 
-The Vulnerabilities page splits findings by what the user can do about them:
-"Fixable now", "Fix not released yet", and "No fix". This is a view switch, not
-a filter, so it is not in the `x-table.filter` menu and "Reset filters" keeps its
-meaning:
+The "All findings ({n})" card of the Security page splits findings into "Fixed
+by an update" (a fixed version exists, or an action of the main card fixes it)
+and "No fix yet". This is a view switch, not a filter, so it is not in the
+`x-table.filter` menu and "Reset filters" keeps its meaning:
 
 - a segmented control in the table toolbar, after the search: a 4px-padded
   neutral track (`bg-neutral-100`, dark `white/4%`) with 28px, 6px-radius
   buttons; the current one is the raised white pill (dark `white/9%`) with a
   hairline ring;
 - `role="group"` with an `aria-label`, and `aria-pressed` on each button;
-- each label has its count in parentheses: `Fixable now (5)`. The counts follow
-  the search and the filters, so a switch never hides results without saying how
-  many;
-- "Fixable now" is the default. When it is empty, the empty state says "Nothing
-  to fix now." and links to the other two states with their counts;
+- each label has its count in parentheses: `Fixed by an update (5)`. The counts
+  follow the search and the filters, so a switch never hides results without
+  saying how many;
+- "Fixed by an update" is the default. When it is empty, the empty state says
+  "No finding has a fixed version." and links to "No fix yet ({n})";
 - the same segmented anatomy is used for the "By package / By CVE" grouping
   toggle on the right of the toolbar;
-- ignored findings are not a fourth state. The table footer has an "{n} ignored"
-  link that opens the ignored list.
+- ignored findings are not a third state. The table footer has an "{n} ignored"
+  link that opens the ignored list;
+- a finding of a Dockerfile build that the base image has too says "Comes from
+  {base}." in its details.
 
 The reference is `resources/views/livewire/image-scan/vulnerabilities.blade.php`.
 
@@ -1319,10 +1330,10 @@ Relevant classes:
 Create a page-specific grid class when columns differ. Add responsive rules
 that hide secondary columns before allowing horizontal overflow.
 
-### Severity badge, severity bar, vulnerability marker, and fix panel
+### Severity badge, vulnerability marker, gate status, and the Security main card
 
-Image scan findings use three shared pieces in
-`resources/views/components/image-scan/`. All three keep the status badge rule:
+Image scan findings use shared pieces in
+`resources/views/components/image-scan/`. They keep the status badge rule:
 the surface stays neutral and only a small mark carries the color, and the
 severity word is always in the text, so color is never the only signal.
 
@@ -1345,11 +1356,6 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   `x-status-badge` with the types `severity-critical`, `severity-high`,
   `severity-medium`, or `severity-low` (unknown is neutral). The label is
   `2 critical`, or `Critical` (sentence case) when `count` is null.
-- `<x-image-scan.severity-bar :counts="[...]" />` is a 6px, fully rounded bar
-  with 1px gaps. Segment widths are proportional. It shows fixable-now counts
-  only (critical, high, medium), has `role="img"` and an `aria-label` such as
-  `Fixable now: 2 critical, 5 high, 0 medium`, never animates, and renders
-  nothing when all counts are 0. Do not add a legend: the label is the legend.
 - `<x-image-scan.marker :count="2" :label="'2 critical, 5 high with a fix.'" />`
   is the resource vulnerability marker for lists and headers: a `shield-alert`
   icon with the count, in the normal text color, not red. `label` is both
@@ -1395,27 +1401,38 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   log toolbar when blocked (no card above the log). The application heading
   teleports it into `#configuration-warning-hud-slot` from `xl` and repeats it
   in the in-flow heading below `xl`, for the latest non-preview deployment
-  only. "Deploy anyway" shows only where the page can run it and the user has
-  Write access; otherwise "Ask someone with write access to deploy anyway."
-- `<x-image-scan.fix-panel :items="$fixPanel" :can-update="$canUpdate" />` is
-  the fix panel of the Vulnerabilities findings card: a band between the header
-  callouts and the toolbar, one row per scanned image (`#fix-panel`, the target
-  of the gate popover's "Update to" link). Each row has a neutral icon tile, the
-  image ref in mono 11px, and one sentence with exact numbers fixed and left, in
-  the words of the alert level ("Update to 15.15-alpine: fixes 17 critical and
-  high. 3 critical are left, waiting for a fix from the image maintainer.").
-  The action is a compact neutral `.button` on the right ("Update to {tag}", or
-  "Pull latest and restart" for a newer build of the same tag) that opens
-  `x-modal-confirmation` with the change as `old → new` (each service
-  application or database on its own line), what restarts, and the warning for
-  the resource type. Without Write access the sentence stays and the button is
-  hidden. When the running image is not the scanned one, or a compose variable
-  sets the image, the row explains that instead of offering the action. When
-  the update moves off an end-of-life distro, the sentence says so. When there is no version to update to, the row explains why (no
-  better version, cannot compare + Docker Hub link, login needed + registry
-  logins link). A newer major version is never an action: it sits in a
-  collapsed "Newer major version" detail with a warning callout. The panel is
-  not rendered for resources with `id = 0`; their findings still show.
+  only. A blocked popover shows the sentence of the primary action for the
+  blocked image (`:action`, from `SecurityCard::gateAction()`) and an "Open
+  Security" link; it never runs an update itself. "Deploy anyway" shows only
+  where the page can run it and the user has Write access; otherwise "Ask
+  someone with write access to deploy anyway."
+- The Security main card (`livewire/image-scan/vulnerabilities.blade.php`, data
+  from `SecurityCard::for()`) is the first layer card of a resource's Security
+  page, for people who are not security experts:
+  - title "Security" with the status badge in the badges slot ("Update now"
+    error, "Security update" warning, "No fix yet" and "Check needed"
+    neutral, none for ok and not checked), and "Checked {time}" (absolute
+    time in the tooltip) and Scan now in the header actions;
+  - the sentence of `SecuritySentences::headline()` in 14px medium, then the
+    extra lines (an exploited problem without a fix, an end-of-life OS the
+    sentence does not name) in 13px muted;
+  - the primary action: a highlighted button that opens `x-modal-confirmation`
+    (the change as `old → new`, one line per image for a merged service update,
+    what restarts, and the warning: the patch release sentence for a database,
+    the template warning for a service), or the copy text in a mono chip with
+    `x-copy-button` (`FROM node:20.18-alpine`, `lodash 4.17.21`), or nothing
+    when the sentence is the action. A check_needed card offers Scan now
+    instead. Buttons show only to users who may run them (Write for updates,
+    Deploy for Rebuild) and never for `id = 0` or a transferred-away server;
+  - the why-list: up to 3 rows in one bordered list, each with the title, the
+    display ID (an NVD or GitHub link), "8.1 High" or "No score", and a
+    status badge "Used by attackers" (error) or "Likely to be exploited"
+    (warning); then "And {n} more serious problems that this update fixes.";
+  - "Other fixes": up to 5 more actions as rows with their sentence and a
+    neutral button or copy chip, then "and {n} more";
+  - no totals and no severity bar: the only finding count is in the "All
+    findings ({n})" header. The collapsed "All findings", "Packages and SBOM",
+    and "Settings" (applications only) cards follow it.
 
 ---
 
@@ -1581,7 +1598,8 @@ Use these as implementation references:
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
 | Empty state | `resources/views/components/empty.blade.php` |
 | Status pill | `resources/views/components/status-badge.blade.php` |
-| Severity badge, severity bar, vulnerability marker, fix panel | `resources/views/components/image-scan/` |
+| Severity badge, vulnerability marker, gate status, security dot | `resources/views/components/image-scan/` |
+| Security main card | `resources/views/livewire/image-scan/vulnerabilities.blade.php` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
 | Command palette / global search | `resources/views/livewire/global-search.blade.php` |

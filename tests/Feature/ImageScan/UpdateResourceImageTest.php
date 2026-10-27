@@ -20,7 +20,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\ImageScan\FixPanel;
+use App\Services\ImageScan\BaseImageCheck;
 use App\Services\ImageScan\ImageUpdateRefused;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -406,8 +406,8 @@ describe('service', function () {
         expect($web->fresh()->image)->toBe('nginx:${NGINX_VERSION:-1.27}');
 
         updateImagePage($this->admin, $service, 'service')
-            ->assertSee('The compose file sets this image with a variable. Change the version in the compose file.')
-            ->assertDontSee('Update to 1.29');
+            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.')
+            ->assertDontSeeHtml('updateImage(');
     });
 
     it('refuses when the compose file names another image than the application', function () {
@@ -460,70 +460,57 @@ describe('service', function () {
     });
 });
 
-describe('fix panel', function () {
-    it('shows the version to update to with what it fixes and leaves, and opens By CVE', function () {
+describe('main card actions', function () {
+    it('confirms the update of a database with the change and the patch release note', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSet('view', 'cve')
-            ->assertSee('Update to 15.15-alpine: fixes 17 critical and high. 3 critical are left, waiting for a fix from the image maintainer.')
-            ->assertSee('Check the release notes. Some updates need a data migration.')
-            ->assertSee('postgres:15.0-alpine → postgres:15.15-alpine');
-    });
-
-    it('says nothing fixable is left when the candidate leaves nothing at the alert level', function () {
-        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine', 'line', true, ['left' => ['critical' => 0, 'high' => 0, 'medium' => 5]])]);
-
-        updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('Update to 15.15-alpine: fixes 17 critical and high. Nothing fixable is left.');
+            ->assertSee('Update to 15.15-alpine to fix it.')
+            ->assertSee('postgres:15.0-alpine → postgres:15.15-alpine')
+            ->assertSee('Restart the database.')
+            ->assertSee('This is a patch release of PostgreSQL 15. Your data stays as it is. The database restarts and is unavailable for a few seconds.')
+            ->assertSeeHtml('updateImage(');
     });
 
     it('offers pull latest and restart for a newer build of the same tag', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.0-alpine', 'same_tag')]);
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('A newer build of postgres:15.0-alpine fixes 17 critical and high.')
-            ->assertSee('Pull latest and restart');
+            ->assertSee('A newer build of this image fixes it. Pull it and restart.')
+            ->assertSee('Pull latest and restart')
+            ->assertSee('Coolify pulls the newest build of postgres:15.0-alpine and restarts.');
     });
 
-    it('explains why there is no version to update to', function (string $status, string $imageRef, string $text, ?string $link) {
-        updateImageScan($this->database, $imageRef, [], $status);
-
-        $page = updateImagePage($this->admin, $this->database, 'database')
-            ->assertSet('view', 'package')
-            ->assertSee($text)
-            ->assertDontSee('Update to');
-        if ($link !== null) {
-            $page->assertSeeHtml($link);
-        }
-    })->with([
-        'no better version' => ['no_better', 'postgres:15.0-alpine', 'No newer version of postgres is better yet. Coolify checks again every day.', null],
-        'cannot compare, Docker Hub official' => ['cannot_compare', 'postgres:latest', 'Coolify cannot compare versions of this image. Check the image page for a newer version.', 'https://hub.docker.com/_/postgres'],
-        'cannot compare, Docker Hub namespace' => ['cannot_compare', 'bitnami/postgresql:latest', 'Coolify cannot compare versions of this image.', 'https://hub.docker.com/r/bitnami/postgresql'],
-        'login needed' => ['auth_required', 'ghcr.io/acme/api:1.0', 'Coolify cannot read the tags of ghcr.io/acme/api. Log in to ghcr.io on main-server.', '/registries'],
-    ]);
-
-    it('shows a newer major version only in the details, without an action', function () {
-        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:16.4-alpine', 'major', false, ['fixes' => null, 'left' => null])], 'no_better');
+    it('never offers a newer major version', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:16.4-alpine', 'major', true, ['fixes' => null, 'left' => null])]);
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('Newer major version')
-            ->assertSee('postgres:16.4-alpine is available')
-            ->assertDontSee('Update to 16.4-alpine');
+            ->assertSee('No fix yet')
+            ->assertDontSee('Update to 16.4-alpine')
+            ->assertDontSeeHtml('updateImage(');
     });
 
-    it('shows the recommendation without the action to a read-only member', function () {
+    it('asks for a new check while Coolify could not check for newer versions', function (string $status) {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [], $status);
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->assertSee('Coolify needs to check this image again: Coolify could not check for newer versions.')
+            ->assertDontSeeHtml('updateImage(');
+    })->with(['failed', 'auth_required']);
+
+    it('shows the action without the button to a read-only member', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.15-alpine')]);
 
         updateImagePage(updateImageMember($this->team), $this->database, 'database')
-            ->assertSee('Update to 15.15-alpine: fixes 17 critical and high.')
+            ->assertSee('Update to 15.15-alpine to fix it.')
             ->assertDontSeeHtml('updateImage(');
     });
 
     it('lists the service applications that change', function () {
         $service = updateImageService(['web' => 'nginx:1.27', 'worker' => 'nginx:1.27']);
         $web = updateImageSubResource($service, 'web', 'nginx:1.27');
-        updateImageSubResource($service, 'worker', 'nginx:1.27');
+        // The worker runs the same image but is left out of the status, so only the web scan counts.
+        updateImageSubResource($service, 'worker', 'nginx:1.27')->forceFill(['exclude_from_status' => true])->save();
         updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
 
         updateImagePage($this->admin, $service, 'service')
@@ -533,7 +520,7 @@ describe('fix panel', function () {
             ->assertSeeHtml($web->uuid);
     });
 
-    it('is hidden for Coolify\'s own database, while the findings stay', function () {
+    it('tells Coolify\'s own database to update Coolify, without a button, while the findings stay', function () {
         Team::forceCreate(['id' => 0, 'name' => 'Root team', 'personal_team' => false]);
         $this->admin->teams()->attach(0, ['role' => 'admin']);
         $database = updateImageDatabase(['id' => 0, 'name' => 'coolify-db']);
@@ -541,8 +528,9 @@ describe('fix panel', function () {
 
         updateImagePage($this->admin->fresh(), $database, 'database')
             ->assertSee('libpq')
+            ->assertSee('Update Coolify to get a newer version.')
             ->assertDontSee('Update to 15.15-alpine')
-            ->assertDontSeeHtml('data-image-scan-fix-panel');
+            ->assertDontSeeHtml('updateImage(');
     });
 
     it('names the distro that the update moves off', function () {
@@ -550,7 +538,7 @@ describe('fix panel', function () {
         $scan->forceFill(['summary' => [...$scan->summary, 'eol_distro' => ['name' => 'alpine', 'version' => '3.16']]])->save();
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('waiting for a fix from the image maintainer. It moves off Alpine 3.16, which no longer gets security fixes.');
+            ->assertSee('Update to 15.15-alpine to fix it. It moves off Alpine 3.16, which no longer gets security fixes.');
     });
 
     it('offers no update while the database runs another image than the scanned one', function () {
@@ -558,22 +546,8 @@ describe('fix panel', function () {
         $this->database->forceFill(['image' => 'postgres:15.15-alpine'])->save();
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSet('view', 'package')
-            ->assertSee('The running image is not the scanned image. Scan it again to check for newer versions.')
-            ->assertDontSee('Update to 15.15-alpine')
+            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.')
             ->assertDontSeeHtml('updateImage(');
-    });
-
-    it('phrases the critical and high counts', function () {
-        expect(FixPanel::fixesPhrase(['critical' => 0, 'high' => 1, 'medium' => 3]))->toBe('fixes 1 high vulnerability.')
-            ->and(FixPanel::fixesPhrase(['critical' => 1, 'high' => 0, 'medium' => 0]))->toBe('fixes 1 critical vulnerability.')
-            ->and(FixPanel::fixesPhrase(['critical' => 2, 'high' => 15, 'medium' => 4]))->toBe('fixes 17 critical and high.')
-            ->and(FixPanel::leftSentence(['critical' => 3, 'high' => 2, 'medium' => 1]))
-            ->toBe('3 critical and 2 high are left, waiting for a fix from the image maintainer.')
-            ->and(FixPanel::leftSentence(['critical' => 1, 'high' => 0, 'medium' => 4]))
-            ->toBe('1 critical is left, waiting for a fix from the image maintainer.')
-            ->and(FixPanel::leftSentence(['critical' => 0, 'high' => 0, 'medium' => 4]))
-            ->toBe('Nothing fixable is left.');
     });
 });
 
@@ -585,7 +559,7 @@ describe('updateImage action', function () {
         updateImagePage($this->admin, $this->database, 'database')
             ->call('updateImage', 'postgres:15.15-alpine', '', '')
             ->assertDispatched('success', 'Update started.')
-            ->assertSee('The running image is not the scanned image. Scan it again to check for newer versions.')
+            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.')
             ->assertDontSeeHtml('updateImage(');
 
         expect($this->database->fresh()->image)->toBe('postgres:15.15-alpine');
@@ -716,48 +690,44 @@ describe('base image of a Dockerfile build', function () {
         ]);
     }
 
-    it('recommends the newer base image with what it fixes and a copy button for the FROM line', function () {
+    it('recommends the newer base image with a copy button for the FROM line', function () {
         [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
 
         updateImagePage($this->admin, $application, 'application')
-            ->assertSeeHtml('Change <code')
-            ->assertSeeText('Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 7.')
+            ->assertSee('Change the base image to node:20.18-alpine in your Dockerfile, then redeploy. This fixes 5 serious problems (1 critical, 4 high).')
             ->assertSeeHtml("copy(await ('FROM node:20.18-alpine'))")
             ->assertDontSee('Update to')
             ->assertDontSeeHtml('updateImage(');
     });
 
-    it('counts what the newer base image fixes on the findings that are not ignored now', function (array $ignored, ?string $text) {
-        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
+    it('counts what the newer base image fixes on the findings that are not ignored now', function (array $ignored, ?array $counts) {
+        [$application, $scan] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
         foreach ($ignored as $id) {
             ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => $application->getMorphClass(), 'resource_id' => $application->id, 'vulnerability_id' => $id]);
         }
 
-        $page = updateImagePage($this->admin, $application, 'application');
-        $text === null ? $page->assertDontSee('Change FROM') : $page->assertSeeText($text);
+        $base = BaseImageCheck::baseImage($scan->fresh());
+        expect($base === null ? null : [$base['fixed'], $base['total']])->toBe($counts);
     })->with([
-        'one not fixed ignored' => [['CVE-2026-0002'], 'Change FROM node:20.11-alpine to node:20.18-alpine: fixes 5 of 6.'],
-        'one fixed ignored' => [['CVE-2026-0011'], 'Change FROM node:20.11-alpine to node:20.18-alpine: fixes 4 of 6.'],
+        'nothing ignored' => [[], [5, 7]],
+        'one not fixed ignored' => [['CVE-2026-0002'], [5, 6]],
+        'one fixed ignored' => [['CVE-2026-0011'], [4, 6]],
         'all fixed ignored' => [['CVE-2026-0001', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014'], null],
         'all attributable ignored' => [['CVE-2026-0001', 'CVE-2026-0002', 'CVE-2026-0011', 'CVE-2026-0012', 'CVE-2026-0013', 'CVE-2026-0014', 'CVE-2026-0015'], null],
     ]);
 
     it('keeps the name of the base image as the Dockerfile writes it', function () {
-        [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageEntry('node:20.18-alpine', 'line', true, ['fixed_ids' => ['CVE-2026-0011', 'CVE-2026-0012']])]], 'docker.io/library/node:20.11-alpine');
+        [$application, $scan] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageEntry('node:20.18-alpine', 'line', true, ['fixed_ids' => ['CVE-2026-0011', 'CVE-2026-0012']])]], 'docker.io/library/node:20.11-alpine');
 
+        expect(BaseImageCheck::baseImage($scan->fresh()))->toBe(['from' => 'docker.io/library/node:20.11-alpine', 'to' => 'docker.io/library/node:20.18-alpine', 'fixed' => 2, 'total' => 7]);
         updateImagePage($this->admin, $application, 'application')
-            ->assertSeeText('Change FROM docker.io/library/node:20.11-alpine to docker.io/library/node:20.18-alpine: fixes 2 of 7.')
             ->assertSeeHtml('copy(await ('.Js::from('FROM docker.io/library/node:20.18-alpine').'))');
     });
 
-    it('shows nothing for the base image without a better line candidate that fixes something', function (?array $base) {
-        [$application] = updateImageDockerfileScan($base);
+    it('has no newer base image without a better line candidate that fixes something', function (?array $base) {
+        [, $scan] = updateImageDockerfileScan($base);
 
-        updateImagePage($this->admin, $application, 'application')
-            ->assertDontSee('Change FROM')
-            ->assertDontSee('No newer version')
-            ->assertDontSee('Coolify could not check')
-            ->assertDontSeeHtml('data-image-scan-fix-panel');
+        expect(BaseImageCheck::baseImage($scan->fresh()))->toBeNull();
     })->with([
         'not checked' => [null],
         'no better' => [['status' => 'no_better', 'entries' => [updateImageBaseEntry(['better' => false])]]],

@@ -159,7 +159,7 @@ describe('log toolbar', function () {
         surfacesShow($this->admin, $deployment)
             ->assertSee('Blocked')
             ->assertSee('Deploy blocked: this image has a security problem that attackers are using.')
-            ->assertSee('Review vulnerabilities')
+            ->assertSee('Open Security')
             ->assertSee('Deploy anyway')
             ->assertDontSee('Ask someone with write access to deploy anyway.');
     });
@@ -184,11 +184,12 @@ describe('log toolbar', function () {
         surfacesShow($this->admin, $deployment)
             ->assertSee('Not scanned')
             ->assertSee('Scan skipped: Turn on image scanning on main-server.')
-            ->assertSee('Review vulnerabilities')
+            ->assertSee('Open Security')
             ->assertDontSee('Deploy anyway');
     });
 
-    it('offers Update to only when a candidate is better', function () {
+    it('shows the action of the Security page for the blocked image only when a candidate is better', function () {
+        $this->application->forceFill(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'postgres', 'docker_registry_image_tag' => '16.3-alpine'])->saveQuietly();
         $deployment = surfacesDeployment(['scan_gate_result' => surfacesBlockedResult()]);
         $scan = ImageScan::create([
             'server_id' => $this->server->id,
@@ -198,38 +199,29 @@ describe('log toolbar', function () {
             'image_ref' => 'postgres:16.3-alpine',
             'deployment_queue_id' => $deployment->id,
             'status' => ImageScanStatus::Completed,
-            'candidates' => [['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => false, 'fixed_ids' => []]],
+            'findings' => [[
+                'id' => 'CVE-2026-1234', 'aliases' => [], 'severity' => 'critical', 'package' => 'openssl', 'version' => '3.0.13',
+                'type' => 'apk', 'artifactId' => 'a1', 'fixedIn' => '3.0.15', 'fixState' => 'fixed', 'kev' => true,
+            ]],
+            'candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
+                ['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => false, 'fixed_ids' => []],
+            ]],
+            'scanned_at' => now(),
         ]);
 
         surfacesShow($this->admin, $deployment)->assertDontSee('Update to');
 
-        $scan->update(['candidates' => [
-            ['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => false, 'fixed_ids' => []],
-            ['ref' => 'postgres:16.4-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
-        ]]);
-
-        surfacesShow($this->admin, $deployment)->assertSee('Update to 16.4-alpine');
-
         $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
-            ['ref' => 'postgres:16.5-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
+            ['ref' => 'postgres:16.4-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
         ]]]);
 
-        surfacesShow($this->admin, $deployment)->assertSee('Update to 16.5-alpine');
+        surfacesShow($this->admin, $deployment)->assertSee('Update to 16.4-alpine.');
 
         $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
-            ['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
-            ['ref' => 'postgres:16.3-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
             ['ref' => 'postgres:17.0-alpine', 'kind' => 'major', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
         ]]]);
 
         surfacesShow($this->admin, $deployment)->assertDontSee('Update to');
-
-        $scan->update(['candidates' => ['status' => 'ok', 'checked_at' => now()->toIso8601String(), 'entries' => [
-            ['ref' => 'postgres:16.3-alpine', 'kind' => 'same_tag', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
-            ['ref' => 'postgres:16.6-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
-        ]]]);
-
-        surfacesShow($this->admin, $deployment)->assertSee('Update to 16.6-alpine');
     });
 });
 

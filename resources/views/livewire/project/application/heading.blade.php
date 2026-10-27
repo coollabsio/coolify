@@ -28,7 +28,7 @@
                     <div class="flex w-full flex-wrap gap-1">
                         <x-application.restart-limit-warning :application="$application" />
                         @if ($this->imageScanGate)
-                            <x-image-scan.gate-status :result="$this->imageScanGate['result']"
+                            <x-image-scan.gate-status :result="$this->imageScanGate['result']" :action="$this->imageScanGate['action']"
                                 :vulnerabilities-url="$this->imageScanGate['vulnerabilities_url']"
                                 :deployment-url="$this->imageScanGate['deployment_url']" />
                         @endif
@@ -148,7 +148,7 @@
             {{-- From xl the topbar shows the warning. Below xl the in-flow heading above repeats it. --}}
             @teleport('#configuration-warning-hud-slot')
                 <div class="hidden items-center xl:flex">
-                    <x-image-scan.gate-status :result="$this->imageScanGate['result']"
+                    <x-image-scan.gate-status :result="$this->imageScanGate['result']" :action="$this->imageScanGate['action']"
                         :vulnerabilities-url="$this->imageScanGate['vulnerabilities_url']"
                         :deployment-url="$this->imageScanGate['deployment_url']" />
                 </div>

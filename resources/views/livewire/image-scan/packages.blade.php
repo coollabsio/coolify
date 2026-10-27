@@ -7,8 +7,7 @@
 
 <div class="contents">
     @if ($scans->isNotEmpty())
-        <x-application.settings-section id="packages-section" :title="'Packages ('.number_format($total).')'"
-            helper="The packages Coolify found in the images. The SBOM download is made from this list." flush>
+        <x-application.settings-section id="packages-section" title="Packages and SBOM" collapsible flush>
             <x-slot:actions>
                 <x-table.dropdown role="menu" panel-class="min-w-56! p-1!">
                     <x-slot:trigger>

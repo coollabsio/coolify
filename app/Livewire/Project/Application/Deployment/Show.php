@@ -5,12 +5,10 @@ namespace App\Livewire\Project\Application\Deployment;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
-use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
-use App\Services\ImageScan\ImageRef;
+use App\Services\ImageScan\SecurityCard;
 use App\Traits\AuditsApplicationSettings;
-use Illuminate\Support\Str;
 use Livewire\Component;
 use Throwable;
 
@@ -203,9 +201,10 @@ class Show extends Component
     }
 
     /**
-     * Gate result of the shown deployment, for the log toolbar. Null when the gate passed or did not run.
+     * Gate result of the shown deployment, for the log toolbar. Null when the gate passed or did not run. `action` is
+     * the sentence of the action that fixes the blocked image, from the Security page.
      *
-     * @return array{result: array<string, mixed>, blocked: bool, update_to: ?string}|null
+     * @return array{result: array<string, mixed>, blocked: bool, action: ?string}|null
      */
     public function getImageScanGateProperty(): ?array
     {
@@ -217,46 +216,8 @@ class Show extends Component
         return [
             'result' => $deployment->scan_gate_result,
             'blocked' => $deployment->isImageScanBlocked(),
-            'update_to' => $deployment->isImageScanBlocked() ? $this->betterImageTag($deployment) : null,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)?->sentence : null,
         ];
-    }
-
-    /**
-     * Tag of a newer version in the same line that fixes vulnerabilities, from the scans of this deployment. A newer
-     * build of the same tag is a pull and restart, not an update, and a major version is never offered.
-     */
-    private function betterImageTag(ApplicationDeploymentQueue $deployment): ?string
-    {
-        $scans = ImageScan::query()
-            ->where('resource_type', $this->application->getMorphClass())
-            ->where('resource_id', $this->application->id)
-            ->where('deployment_queue_id', $deployment->id)
-            ->get(['id', 'image_ref', 'candidates']);
-
-        foreach ($scans as $scan) {
-            try {
-                $currentTag = ImageRef::parse((string) $scan->image_ref)->tag;
-            } catch (Throwable) {
-                $currentTag = null;
-            }
-
-            foreach ($scan->candidateEntries() as $candidate) {
-                if (($candidate['kind'] ?? null) !== 'line' || ($candidate['better'] ?? false) !== true || ! is_string($candidate['ref'] ?? null)) {
-                    continue;
-                }
-
-                try {
-                    $tag = ImageRef::parse(Str::before($candidate['ref'], '@'))->tag;
-                } catch (Throwable) {
-                    continue;
-                }
-                if ($tag !== null && $tag !== $currentTag) {
-                    return $tag;
-                }
-            }
-        }
-
-        return null;
     }
 
     public function refreshQueue()

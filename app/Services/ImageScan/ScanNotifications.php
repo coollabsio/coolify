@@ -231,7 +231,7 @@ final class ScanNotifications
     }
 
     /**
-     * The better images the resource can switch to, as `ref@digest`, with what the fix panel says about each.
+     * The better images the resource can switch to, as `ref@digest`, with what each fixes.
      *
      * @return array<string, string>
      */
@@ -251,7 +251,7 @@ final class ScanNotifications
             }
         }
 
-        $base = FixPanel::baseImage($scan);
+        $base = BaseImageCheck::baseImage($scan);
         if ($base !== null) {
             $candidates['base:'.$base['to']] = "Change FROM {$base['from']} to {$base['to']}.";
         }
@@ -311,7 +311,7 @@ final class ScanNotifications
     }
 
     /**
-     * The first update the fix panel offers: a newer tag, a newer build of the same tag, or a newer base image.
+     * The first update Coolify offers: a newer tag, a newer build of the same tag, or a newer base image.
      */
     public static function recommendedFix(ImageScan $scan, Model $owner): ?string
     {

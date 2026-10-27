@@ -50,11 +50,7 @@ class UpdateResourceImage
             default => null,
         };
 
-        Gate::forUser($by)->authorize('update', $service ?? $resource);
-
-        if ((int) $resource->getKey() === 0 || ($service !== null && (int) $service->getKey() === 0)) {
-            throw new AuthorizationException('Coolify does not change the images of its own resources.');
-        }
+        $this->authorizeFor($service ?? $resource, $by, (int) $resource->getKey() === 0);
 
         if ($resource instanceof Application && $resource->build_pack !== 'dockerimage') {
             throw new ImageUpdateRefused('Coolify builds the image of this app, so there is no image to update.');
@@ -74,21 +70,80 @@ class UpdateResourceImage
         $newTag = (string) ImageRef::parse($newRef)->tag;
 
         $updated = match (true) {
-            $service !== null => $this->updateService($service, $oldRef, $newTag, $sameTag),
+            $service !== null => $this->updateService($service, [['old' => $oldRef, 'tag' => $newTag, 'same_tag' => $sameTag]]),
             $owner instanceof Application => $this->updateApplication($owner, $newTag, $sameTag),
             default => $this->updateDatabase($owner, $newTag, $sameTag),
         };
 
-        $target = $service ?? $owner;
+        $this->audit($service ?? $owner, $by, $updated, [['old_ref' => $oldRef, 'new_ref' => $newRef, 'kind' => $candidate['kind']]]);
+    }
+
+    /**
+     * Updates several images of one service in one change and one restart: the parts of a merged update ("Update n8n
+     * and n8n runners to 2.10.4."). Each part must be a better candidate of the current scan of its own application
+     * or database. When the restart fails, every image and the compose file are put back.
+     *
+     * @param  list<array{owner: Model, ref: string}>  $parts
+     *
+     * @throws AuthorizationException When the user may not update the service, or the service belongs to Coolify (id 0).
+     * @throws ImageUpdateRefused When a part is not a better candidate, or the update cannot start.
+     */
+    public function handleParts(Service $service, array $parts, User $by): void
+    {
+        $this->authorizeFor($service, $by, false);
+
+        if ($parts === []) {
+            throw new ImageUpdateRefused('This update has no images.');
+        }
+
+        $owners = ResourceScans::owners($service);
+        $changes = [];
+        $log = [];
+        foreach ($parts as $part) {
+            $owner = $owners->first(fn (Model $candidate): bool => $candidate->getMorphClass() === $part['owner']->getMorphClass()
+                && (string) $candidate->getKey() === (string) $part['owner']->getKey());
+            if (! $owner instanceof Model) {
+                throw new ImageUpdateRefused('An image of this update does not belong to this service.');
+            }
+
+            [, $scan, $candidate] = $this->candidate(collect([$owner]), $part['ref']);
+            $changes[] = ['old' => (string) $scan->image_ref, 'tag' => (string) ImageRef::parse($part['ref'])->tag, 'same_tag' => $candidate['kind'] === 'same_tag'];
+            $log[] = ['old_ref' => (string) $scan->image_ref, 'new_ref' => $part['ref'], 'kind' => $candidate['kind']];
+        }
+
+        $updated = $this->updateService($service, $changes);
+
+        $this->audit($service, $by, $updated, $log);
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    private function authorizeFor(Model $target, User $by, bool $isCoolifyOwner): void
+    {
+        Gate::forUser($by)->authorize('update', $target);
+
+        if ($isCoolifyOwner || (int) $target->getKey() === 0) {
+            throw new AuthorizationException('Coolify does not change the images of its own resources.');
+        }
+    }
+
+    /**
+     * @param  list<string>  $updated
+     * @param  non-empty-list<array{old_ref: string, new_ref: string, kind: string}>  $changes
+     */
+    private function audit(Model $target, User $by, array $updated, array $changes): void
+    {
         auditLog('ui.image_scan.image_updated', [
             'team_id' => $target->team()?->id,
             'resource_type' => $target->getMorphClass(),
             'resource_uuid' => (string) $target->getAttribute('uuid'),
             'resource_name' => (string) $target->getAttribute('name'),
             'updated_uuids' => $updated,
-            'old_ref' => $oldRef,
-            'new_ref' => $newRef,
-            'kind' => $candidate['kind'],
+            'old_ref' => $changes[0]['old_ref'],
+            'new_ref' => $changes[0]['new_ref'],
+            'kind' => $changes[0]['kind'],
+            ...(count($changes) > 1 ? ['changes' => $changes] : []),
             'user_id' => $by->id,
             'actor_id' => $by->id,
             'actor_name' => $by->name,
@@ -218,26 +273,43 @@ class UpdateResourceImage
     }
 
     /**
+     * Changes the images of the service to their new tags and restarts it once. A change of the same tag only pulls.
+     *
+     * @param  non-empty-list<array{old: string, tag: string, same_tag: bool}>  $changes
      * @return list<string>
      */
-    private function updateService(Service $service, string $oldRef, string $newTag, bool $sameTag): array
+    private function updateService(Service $service, array $changes): array
     {
         if (ResourceStartActivity::latestRunning((string) $service->uuid) !== null) {
             throw new ImageUpdateRefused('A start of this service is running. Try again when it is done.');
         }
 
-        $subResources = $sameTag ? collect() : self::subResourcesUsing($service, $oldRef);
-        $oldCompose = $service->docker_compose_raw;
-        $oldImages = $subResources->mapWithKeys(fn (Model $subResource): array => [$subResource->getMorphClass().':'.$subResource->getKey() => $subResource->image])->all();
+        /** @var array<string, array{resource: ServiceApplication|ServiceDatabase, tag: string}> $targets */
+        $targets = [];
+        foreach ($changes as $change) {
+            if ($change['same_tag']) {
+                continue;
+            }
+            $subResources = self::subResourcesUsing($service, $change['old']);
+            if ($subResources->isEmpty()) {
+                throw new ImageUpdateRefused('No application or database of this service runs this image.');
+            }
+            foreach ($subResources as $subResource) {
+                $targets[$subResource->getMorphClass().':'.$subResource->getKey()] = ['resource' => $subResource, 'tag' => $change['tag']];
+            }
+        }
 
-        if (! $sameTag) {
-            $compose = $this->composeWithImages($service, $subResources, $newTag);
-            DB::transaction(function () use ($service, $compose, $subResources, $newTag): void {
+        $oldCompose = $service->docker_compose_raw;
+        $oldImages = array_map(fn (array $target): string => (string) $target['resource']->image, $targets);
+
+        if ($targets !== []) {
+            $compose = $this->composeWithImages($service, $targets);
+            DB::transaction(function () use ($service, $compose, $targets): void {
                 $service->docker_compose_raw = Yaml::dump($compose, 10, 2);
                 $service->save();
-                foreach ($subResources as $subResource) {
-                    $subResource->image = $this->withTag((string) $subResource->image, $newTag);
-                    $subResource->save();
+                foreach ($targets as $target) {
+                    $target['resource']->image = $this->withTag((string) $target['resource']->image, $target['tag']);
+                    $target['resource']->save();
                 }
             });
         }
@@ -245,13 +317,13 @@ class UpdateResourceImage
         try {
             RestartService::run($service, true);
         } catch (Throwable $e) {
-            if (! $sameTag) {
-                DB::transaction(function () use ($service, $oldCompose, $subResources, $oldImages): void {
+            if ($targets !== []) {
+                DB::transaction(function () use ($service, $oldCompose, $targets, $oldImages): void {
                     $service->docker_compose_raw = $oldCompose;
                     $service->save();
-                    foreach ($subResources as $subResource) {
-                        $subResource->image = $oldImages[$subResource->getMorphClass().':'.$subResource->getKey()];
-                        $subResource->save();
+                    foreach ($targets as $key => $target) {
+                        $target['resource']->image = $oldImages[$key];
+                        $target['resource']->save();
                     }
                 });
             }
@@ -260,7 +332,7 @@ class UpdateResourceImage
             throw new ImageUpdateRefused('The restart failed. Coolify kept the old image.', previous: $e);
         }
 
-        return $subResources->map(fn (Model $subResource): string => (string) $subResource->getAttribute('uuid'))->values()->all();
+        return array_values(array_map(fn (array $target): string => (string) $target['resource']->getAttribute('uuid'), $targets));
     }
 
     /**
@@ -295,15 +367,11 @@ class UpdateResourceImage
      * The compose file with the new image for each sub-resource. Refuses when the compose file names another image
      * for one of them, for example a variable, because then the image does not come from the field Coolify changes.
      *
-     * @param  Collection<int, ServiceApplication|ServiceDatabase>  $subResources
+     * @param  array<string, array{resource: ServiceApplication|ServiceDatabase, tag: string}>  $targets
      * @return array<string, mixed>
      */
-    private function composeWithImages(Service $service, Collection $subResources, string $newTag): array
+    private function composeWithImages(Service $service, array $targets): array
     {
-        if ($subResources->isEmpty()) {
-            throw new ImageUpdateRefused('No application or database of this service runs this image.');
-        }
-
         try {
             $compose = parseDockerComposeYaml((string) $service->docker_compose_raw);
         } catch (ParseException) {
@@ -313,13 +381,14 @@ class UpdateResourceImage
             throw new ImageUpdateRefused('The compose file of this service is not valid.');
         }
 
-        foreach ($subResources as $subResource) {
+        foreach ($targets as $target) {
+            $subResource = $target['resource'];
             $name = (string) $subResource->name;
             $configured = $compose['services'][$name]['image'] ?? null;
             if (! is_string($configured) || trim($configured) !== trim((string) $subResource->image)) {
                 throw new ImageUpdateRefused("The compose file sets the image of {$name} in another way. Change it in the compose file.");
             }
-            $compose['services'][$name]['image'] = $this->withTag((string) $subResource->image, $newTag);
+            $compose['services'][$name]['image'] = $this->withTag((string) $subResource->image, $target['tag']);
         }
 
         return $compose;

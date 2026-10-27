@@ -4,7 +4,8 @@
     'deploymentUrl' => null,
     'showDeployAnyway' => false,
     'canDeployAnyway' => false,
-    'updateTo' => null,
+    // The sentence of the primary action of the Security page for the blocked image.
+    'action' => null,
 ])
 
 @php
@@ -56,16 +57,13 @@
                 </span>
                 <div class="min-w-0 flex-1 whitespace-normal">
                     <p class="text-[13px] font-semibold leading-4 text-neutral-950 dark:text-fg">{{ $headline }}</p>
-                    @if ($isBlocked && $updateTo)
-                        <p class="mt-1 text-[11px] leading-4 text-neutral-600 dark:text-fg-dim">
-                            A newer version fixes vulnerabilities.
-                            <a href="{{ $vulnerabilitiesUrl }}#fix-panel" {{ wireNavigate() }} class="{{ $linkClasses }}">Update to {{ $updateTo }}</a>
-                        </p>
+                    @if ($isBlocked && filled($action))
+                        <p class="mt-1 text-[11px] leading-4 text-neutral-600 dark:text-fg-dim">{{ $action }}</p>
                     @endif
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] leading-4">
                         @if ($vulnerabilitiesUrl)
                             <a href="{{ $vulnerabilitiesUrl }}" {{ wireNavigate() }} class="{{ $linkClasses }}">
-                                Review vulnerabilities
+                                Open Security
                                 <x-reicon name="arrow-right" class="size-2.5" />
                             </a>
                         @endif

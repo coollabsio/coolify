@@ -9,17 +9,21 @@ use App\Enums\ImageScanFixState;
 use App\Jobs\RefreshImageScanSummariesJob;
 use App\Jobs\ScanResourceImagesJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneDocker;
 use App\Services\ImageScan\Finding;
-use App\Services\ImageScan\FixPanel;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ImageUpdateRefused;
 use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\SecurityAction;
 use App\Services\ImageScan\SecurityActions;
+use App\Services\ImageScan\SecurityCard;
+use App\Services\ImageScan\SecurityStatus;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -39,7 +43,9 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
 /**
- * The findings of the images a resource runs (spec 6.2). The resource is reloaded and authorized on every request.
+ * The Security page of a resource (spec 15.7): the main card with the status, the sentence, and the action that fixes
+ * the most, then the findings of the images the resource runs (spec 6.2). The resource is reloaded and authorized on
+ * every request.
  */
 class Vulnerabilities extends Component
 {
@@ -60,8 +66,8 @@ class Vulnerabilities extends Component
     /** Progress stage of ScanImage => index in CHECKPOINTS. */
     private const STAGE_CHECKPOINT = ['database' => 1, 'inspect' => 2, 'sbom' => 2, 'vulnerabilities' => 3];
 
-    /** Results older than this get a warning. */
-    private const OLD_RESULTS_DAYS = 2;
+    /** The fix states of the findings table: a fixed version exists (or an action fixes it), or none exists yet. */
+    public const FIX_STATES = ['fixed' => 'Fixed by an update', 'no_fix' => 'No fix yet'];
 
     #[Locked]
     public string $resourceType;
@@ -69,7 +75,7 @@ class Vulnerabilities extends Component
     #[Locked]
     public string $resourceUuid;
 
-    public string $fixState = 'fixable_now';
+    public string $fixState = 'fixed';
 
     /** @var list<string> */
     public array $severities = [];
@@ -93,7 +99,7 @@ class Vulnerabilities extends Component
     /** @var Collection<int, ImageScan>|null */
     private ?Collection $scans = null;
 
-    /** @var list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>|null */
+    /** @var list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>|null */
     private ?array $rows = null;
 
     /** @var array<string, IgnoreMatcher> */
@@ -112,10 +118,6 @@ class Vulnerabilities extends Component
         $this->resourceType = $resourceType;
         $this->resourceUuid = $resourceUuid;
         $this->resource();
-
-        if (FixPanel::hasUpdate($this->resource(), $this->currentScans())) {
-            $this->view = 'cve';
-        }
     }
 
     /**
@@ -141,7 +143,7 @@ class Vulnerabilities extends Component
 
     public function setFixState(string $state): void
     {
-        $this->fixState = ImageScanFixState::tryFrom($state)?->value ?? ImageScanFixState::FixableNow->value;
+        $this->fixState = array_key_exists($state, self::FIX_STATES) ? $state : 'fixed';
         $this->showIgnored = false;
         $this->resetPage();
     }
@@ -223,8 +225,8 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * Updates the image to a candidate of the fix panel. The confirmation modal passes the password field last; it is
-     * not used.
+     * Updates the image to a candidate of an action of the main card. The confirmation modal passes the password field
+     * last; it is not used.
      *
      * @param  string|null  $ownerUuid  On a service page: the application or database whose scan offers the candidate.
      */
@@ -260,6 +262,137 @@ class Vulnerabilities extends Component
         $this->dispatch('success', 'Update started.');
 
         return true;
+    }
+
+    /**
+     * Runs a merged service update ("Update n8n and n8n runners to 2.10.4."): every image of the action in one change
+     * and one restart. The action is looked up again from the current status by its key.
+     */
+    public function updateImages(string $actionKey): bool
+    {
+        $resource = $this->resource();
+        $this->authorize('update', $resource);
+        abort_unless($resource instanceof Service, 404);
+
+        $action = collect(SecurityStatus::forResource($resource)->actions)
+            ->first(fn (SecurityAction $action): bool => $action->parts !== [] && SecurityCard::key($action) === $actionKey);
+        if (! $action instanceof SecurityAction) {
+            $this->dispatch('error', 'This update is no longer offered. Reload the page.');
+
+            return true;
+        }
+
+        $owners = $this->owners();
+        $parts = [];
+        foreach ($action->parts as $part) {
+            $owner = $owners->first(fn (Model $owner): bool => $owner->getMorphClass() === $part['owner_type'] && (string) $owner->getKey() === (string) $part['owner_id']);
+            abort_unless($owner instanceof Model && is_string($part['ref']), 404);
+            $parts[] = ['owner' => $owner, 'ref' => $part['ref']];
+        }
+
+        try {
+            UpdateResourceImage::make()->handleParts($resource, $parts, auth()->user());
+        } catch (ImageUpdateRefused $e) {
+            $this->dispatch('error', $e->getMessage());
+
+            return true;
+        } catch (AuthorizationException|HttpExceptionInterface $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
+            $this->dispatch('error', 'The update could not start.');
+
+            return true;
+        }
+
+        $this->loadedOwners = null;
+        $this->scans = null;
+        $this->rows = null;
+        $this->dispatch('success', 'Update started.');
+
+        return true;
+    }
+
+    /**
+     * Rebuilds the running commit of the app without cache and redeploys it (spec 15.5 `rebuild`), on the server and
+     * destination of the deployment that runs now.
+     */
+    public function rebuild(): bool
+    {
+        $application = $this->resource();
+        abort_unless($application instanceof Application, 404);
+        $this->authorize('deploy', $application);
+        abort_if((int) $application->getKey() === 0, 403, 'Coolify does not rebuild its own resources.');
+
+        $running = SecurityCard::runningDeployment($application);
+        if (! $running instanceof ApplicationDeploymentQueue) {
+            $this->dispatch('error', 'Deploy the app first.');
+
+            return true;
+        }
+
+        $server = $this->deploymentServer($application, $running);
+        if (! $server instanceof Server) {
+            $this->dispatch('error', 'The server of the running deployment is no longer one of this app.');
+
+            return true;
+        }
+        if ($server->isTransferredAway()) {
+            $this->dispatch('error', 'Another Coolify instance manages this server now.');
+
+            return true;
+        }
+        $destination = StandaloneDocker::query()
+            ->whereKey($running->destination_id)
+            ->where('server_id', $server->id)
+            ->first();
+
+        try {
+            $result = queue_application_deployment(
+                application: $application,
+                deployment_uuid: new_public_id(),
+                commit: $running->commit,
+                force_rebuild: true,
+                git_type: $running->git_type,
+                server: $server,
+                destination: $destination,
+                only_this_server: (bool) $running->only_this_server,
+            );
+        } catch (AuthorizationException|HttpExceptionInterface $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
+            $this->dispatch('error', 'The rebuild could not start.');
+
+            return true;
+        }
+
+        if (($result['status'] ?? null) !== 'queued') {
+            $this->dispatch('error', 'The rebuild did not start.', (string) ($result['message'] ?? ''));
+
+            return true;
+        }
+
+        auditLog('ui.image_scan.rebuild', [
+            'team_id' => $application->team()?->id,
+            'resource_type' => $application->getMorphClass(),
+            'resource_uuid' => (string) $application->uuid,
+            'commit' => $running->commit,
+        ]);
+        $this->dispatch('success', 'Rebuild started.');
+
+        return true;
+    }
+
+    /**
+     * The server of a deployment when it is the destination server or an additional server of the application.
+     */
+    private function deploymentServer(Application $application, ApplicationDeploymentQueue $deployment): ?Server
+    {
+        return collect([$application->destination?->server])
+            ->concat($application->additional_servers()->get())
+            ->filter(fn ($server): bool => $server instanceof Server)
+            ->first(fn (Server $server): bool => (int) $server->id === (int) $deployment->server_id);
     }
 
     /**
@@ -499,7 +632,7 @@ class Vulnerabilities extends Component
      * One row per finding of the current scans, with its fix state and the ignore that matches it. Built once per
      * request.
      *
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>
+     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>
      */
     private function findingRows(): array
     {
@@ -512,15 +645,19 @@ class Vulnerabilities extends Component
             $owner = $scan->resource;
             $matcher = $this->matcherFor($owner);
             $classify = SecurityActions::fixStates($scan, $matcher);
+            $baseIds = $this->baseIds($scan);
 
             foreach (ResourceScans::findings($scan) as $index => $finding) {
+                $fromBase = $baseIds !== [] && collect([$finding->id, ...$finding->aliases])
+                    ->contains(fn (string $id): bool => isset($baseIds[mb_strtolower($id)]));
                 $rows[] = [
                     'key' => $scan->uuid.'-'.$index,
                     'finding' => $finding,
-                    'state' => $classify($finding)->value,
+                    'state' => $classify($finding) === ImageScanFixState::NoFix ? 'no_fix' : 'fixed',
                     'ignore' => $matcher->matches($finding),
                     'image' => (string) $scan->image_ref,
                     'owner' => (string) $owner->getAttribute('uuid'),
+                    'base' => $fromBase ? (string) $scan->base_image_ref : null,
                 ];
             }
         }
@@ -529,8 +666,30 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>  $rows
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>
+     * The IDs of the findings that the current base image of a Dockerfile build has too, from the last base check.
+     *
+     * @return array<string, true>
+     */
+    private function baseIds(ImageScan $scan): array
+    {
+        $base = data_get($scan->candidates, 'base');
+        if (blank($scan->base_image_ref) || ! is_array($base) || ($base['image'] ?? null) !== $scan->base_image_ref) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ((array) ($base['attributable_ids'] ?? []) as $id) {
+            if (is_string($id) && $id !== '') {
+                $ids[mb_strtolower($id)] = true;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>  $rows
+     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>
      */
     private function filterRows(array $rows): array
     {
@@ -568,7 +727,7 @@ class Vulnerabilities extends Component
     /**
      * Rows of the By package view: one per package version of an image, worst first.
      *
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>  $rows
+     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>  $rows
      * @return list<array<string, mixed>>
      */
     private function packageGroups(array $rows): array
@@ -618,8 +777,8 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>  $rows
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string}>
+     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>  $rows
+     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>
      */
     private function sortRows(array $rows): array
     {
@@ -657,22 +816,6 @@ class Vulnerabilities extends Component
         return ImageScanPolicyResolver::offState($resource, $server);
     }
 
-    /**
-     * @param  Collection<int, ImageScan>  $scans
-     * @return array{name: string, version: string}|null
-     */
-    private function eolDistro(Collection $scans): ?array
-    {
-        foreach ($scans as $scan) {
-            $eol = data_get($scan->summary, 'eol_distro');
-            if (is_array($eol) && filled($eol['name'] ?? null)) {
-                return ['name' => ucfirst((string) $eol['name']), 'version' => (string) ($eol['version'] ?? '')];
-            }
-        }
-
-        return null;
-    }
-
     public function render(): View
     {
         $resource = $this->resource();
@@ -695,7 +838,7 @@ class Vulnerabilities extends Component
             return view('livewire.image-scan.vulnerabilities', $base);
         }
 
-        $this->fixState = ImageScanFixState::tryFrom($this->fixState)?->value ?? ImageScanFixState::FixableNow->value;
+        $this->fixState = array_key_exists($this->fixState, self::FIX_STATES) ? $this->fixState : 'fixed';
         $this->view = in_array($this->view, self::VIEWS, true) ? $this->view : 'package';
 
         $scans = $this->currentScans();
@@ -703,15 +846,8 @@ class Vulnerabilities extends Component
         $activeRows = array_values(array_filter($allRows, fn (array $row): bool => $row['ignore'] === null));
         $ignoredRows = array_values(array_filter($allRows, fn (array $row): bool => $row['ignore'] !== null));
 
-        $fixableBySeverity = array_fill_keys(self::SEVERITIES, 0);
-        foreach ($activeRows as $row) {
-            if ($row['state'] === ImageScanFixState::FixableNow->value) {
-                $fixableBySeverity[$this->severityOf($row['finding'])]++;
-            }
-        }
-
         $filteredRows = $this->filterRows($activeRows);
-        $stateCounts = array_fill_keys(array_map(fn (ImageScanFixState $state) => $state->value, ImageScanFixState::cases()), 0);
+        $stateCounts = array_fill_keys(array_keys(self::FIX_STATES), 0);
         foreach ($filteredRows as $row) {
             $stateCounts[$row['state']]++;
         }
@@ -725,8 +861,8 @@ class Vulnerabilities extends Component
         }
 
         $progress = $this->progress($owners);
-        $scannedAt = $scans->max('scanned_at');
-        $scannedAt = $scannedAt instanceof Carbon ? $scannedAt : null;
+        $security = $scans->isEmpty() ? null : SecurityStatus::forResource($resource);
+        $checkedAt = $security?->checkedAt ?? $scans->max('scanned_at');
         $imageOptions = $scans->pluck('image_ref')->map(fn ($ref) => (string) $ref)->unique()->values()->all();
 
         return view('livewire.image-scan.vulnerabilities', [
@@ -735,16 +871,12 @@ class Vulnerabilities extends Component
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
-            'runsOtherImage' => $scans->contains(fn (ImageScan $scan): bool => ResourceScans::runsOtherImage($scan, $scan->resource)),
-            'scannedAt' => $scannedAt,
-            'oldResultsDays' => $scannedAt !== null && $scannedAt->lt(now()->subDays(self::OLD_RESULTS_DAYS))
-                ? (int) $scannedAt->diffInDays(now())
-                : null,
-            'eolDistro' => $this->eolDistro($scans),
-            'fixPanel' => FixPanel::items($resource, $scans, $user),
+            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $user),
+            'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),
             'truncated' => $scans->contains(fn (ImageScan $scan): bool => (bool) data_get($scan->summary, 'truncated', false)),
-            'fixableBySeverity' => $fixableBySeverity,
+            'findingCount' => count($activeRows),
             'stateCounts' => $stateCounts,
+            'fixStates' => self::FIX_STATES,
             'ignoredCount' => count($ignoredRows),
             'items' => $items,
             'imageOptions' => count($imageOptions) > 1 ? $imageOptions : [],

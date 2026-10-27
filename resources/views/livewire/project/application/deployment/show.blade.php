@@ -360,7 +360,7 @@
                                             'application_uuid' => $application->uuid,
                                         ])"
                                         :show-deploy-anyway="true" :can-deploy-anyway="auth()->user()->can('update', $application)"
-                                        :update-to="$imageScanGate['update_to']" />
+                                        :action="$imageScanGate['action']" />
                                 @endif
                             </div>
                             <div class="logs-viewer-end">
