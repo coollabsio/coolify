@@ -177,6 +177,25 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
 - Do not add a `TRUSTED_PROXIES` setting or change `TrustProxies` to use one. This caused problems in supported Coolify deployments. Fix IP-based rate limits and allow-lists at their call sites instead of changing proxy trust as a shortcut.
 
+### Security threat model (read before you report or rate a vulnerability)
+
+Before you rate a vulnerability or write an advisory, find the security boundary that the attack crosses. The boundary decides the severity. A finding that crosses no boundary is still a valid finding, but its severity is low. The full scope is in [`SECURITY.md`](SECURITY.md).
+
+- Trusted by design (attacks that need these roles are low severity):
+  - A team admin or owner, and an API token with `write` or `root` ability, already has root on every server of that team (terminal, any Compose file with host mounts, scheduled commands, all team secrets).
+  - An instance admin (admin or owner of the root team) already controls the Coolify instance and its host.
+  - Repository, Dockerfile, and Compose content that a team admin deploys is trusted for that deployment.
+- Real boundaries:
+  - No login -> any access.
+  - Team member (read-only) -> write, command execution, or secrets in the own team.
+  - One team -> another team.
+  - Team user -> the Coolify container or the Coolify host, when the user is not an instance admin.
+  - Token -> more than its abilities allow.
+- Rate with the real role that the attack needs, not the role that the reporter claims. Read the policy or gate that protects the path. Admin needed means `PR:H`. Use `S:C` only when the impact reaches another team, the Coolify instance, or a server that the attacker does not manage.
+- If a path is reachable by a member only because of a different missing authorization check, report that check as the main issue, with high severity. Rate each injection behind it by the role it needs when the check works.
+- Always fix low-severity findings (escape shell arguments, validate input, confine paths) when you find them. Do not dismiss them because the attacker is an admin.
+- Do not put exploit details, payloads, or unreleased advisory IDs in commits, PR descriptions, code comments, or this file.
+
 ### Event Broadcasting
 - Laravel Reverb WebSocket server for real-time updates (port 6001) and a Node terminal WebSocket server (port 6002), both run inside the `coolify` container as s6 services
 - Server-side broadcasts use `PUSHER_BACKEND_HOST`/`PUSHER_BACKEND_PORT` (defaults `127.0.0.1:6001`); `PUSHER_HOST`/`PUSHER_PORT` are browser-facing only
