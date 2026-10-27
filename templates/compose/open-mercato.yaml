@@ -1,0 +1,286 @@
+# documentation: https://docs.openmercato.com/
+# slogan: Modular business application platform with CRM, sales, and commerce.
+# category: business
+# tags: crm,erp,commerce,sales,open-mercato
+# logo: svgs/open-mercato.svg
+# port: 3000
+
+# Builds v0.7.0 from pinned public source; allow at least 8 GB RAM for the build.
+# Initial passwords: generated SERVICE_PASSWORD_64_* value followed by aA1!.
+# Inline build adds Turbo cache directories and writable non-root runtime volumes.
+
+services:
+  app:
+    build:
+      context: https://github.com/open-mercato/open-mercato.git#8b492325d3db29c431cca43674dcc93f894110be
+      target: runner
+      dockerfile_inline: |
+        FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS builder
+        ENV NODE_ENV=production \
+            NEXT_TELEMETRY_DISABLED=1
+        WORKDIR /app
+        RUN apk add --no-cache python3 make g++ ca-certificates openssl
+        RUN corepack enable
+        COPY package.json yarn.lock .yarnrc.yml turbo.json ./
+        COPY tsconfig.base.json tsconfig.json ./
+        COPY apps/docs/package.json ./apps/docs/
+        COPY apps/mercato/package.json ./apps/mercato/
+        COPY packages/ai-assistant/package.json ./packages/ai-assistant/
+        COPY packages/cache/package.json ./packages/cache/
+        COPY packages/channel-apns/package.json ./packages/channel-apns/
+        COPY packages/channel-expo/package.json ./packages/channel-expo/
+        COPY packages/channel-fcm/package.json ./packages/channel-fcm/
+        COPY packages/channel-gmail/package.json ./packages/channel-gmail/
+        COPY packages/channel-imap/package.json ./packages/channel-imap/
+        COPY packages/checkout/package.json ./packages/checkout/
+        COPY packages/cli/package.json ./packages/cli/
+        COPY packages/content/package.json ./packages/content/
+        COPY packages/core/package.json ./packages/core/
+        COPY packages/create-app/package.json ./packages/create-app/
+        COPY packages/enterprise/package.json ./packages/enterprise/
+        COPY packages/eslint-plugin-ds/package.json ./packages/eslint-plugin-ds/
+        COPY packages/events/package.json ./packages/events/
+        COPY packages/gateway-stripe/package.json ./packages/gateway-stripe/
+        COPY packages/onboarding/package.json ./packages/onboarding/
+        COPY packages/queue/package.json ./packages/queue/
+        COPY packages/scheduler/package.json ./packages/scheduler/
+        COPY packages/search/package.json ./packages/search/
+        COPY packages/shared/package.json ./packages/shared/
+        COPY packages/storage-s3/package.json ./packages/storage-s3/
+        COPY packages/sync-akeneo/package.json ./packages/sync-akeneo/
+        COPY packages/telemetry/package.json ./packages/telemetry/
+        COPY packages/ui/package.json ./packages/ui/
+        COPY packages/webhooks/package.json ./packages/webhooks/
+        COPY scripts/official-modules-setup.mjs ./scripts/
+        COPY scripts/lib/official-modules.mjs ./scripts/lib/
+        RUN yarn install --immutable
+        COPY packages/ ./packages/
+        COPY apps/ ./apps/
+        COPY scripts/ ./scripts/
+        COPY AGENTS.md BACKWARD_COMPATIBILITY.md ./
+        COPY newrelic.js ./
+        COPY jest.config.cjs jest.setup.ts jest.dom.setup.ts ./
+        COPY eslint.config.mjs ./
+        ENV NODE_OPTIONS="--max-old-space-size=4096"
+        RUN for d in packages/* apps/*; do mkdir -p "$$d/.turbo"; done
+        RUN yarn build
+        FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS runner
+        ARG CONTAINER_PORT=3000
+        ENV NODE_ENV=production \
+            NEXT_TELEMETRY_DISABLED=1 \
+            PORT=$${CONTAINER_PORT}
+        WORKDIR /app
+        RUN apk add --no-cache ca-certificates openssl sudo
+        RUN corepack enable
+        COPY package.json yarn.lock .yarnrc.yml turbo.json ./
+        COPY tsconfig.base.json tsconfig.json ./
+        COPY --from=builder /app/.yarn ./.yarn
+        COPY --from=builder /app/apps/mercato/package.json ./apps/mercato/
+        COPY --from=builder /app/packages/ai-assistant/package.json ./packages/ai-assistant/
+        COPY --from=builder /app/packages/cache/package.json ./packages/cache/
+        COPY --from=builder /app/packages/channel-apns/package.json ./packages/channel-apns/
+        COPY --from=builder /app/packages/channel-expo/package.json ./packages/channel-expo/
+        COPY --from=builder /app/packages/channel-fcm/package.json ./packages/channel-fcm/
+        COPY --from=builder /app/packages/channel-gmail/package.json ./packages/channel-gmail/
+        COPY --from=builder /app/packages/channel-imap/package.json ./packages/channel-imap/
+        COPY --from=builder /app/packages/checkout/package.json ./packages/checkout/
+        COPY --from=builder /app/packages/cli/package.json ./packages/cli/
+        COPY --from=builder /app/packages/content/package.json ./packages/content/
+        COPY --from=builder /app/packages/core/package.json ./packages/core/
+        COPY --from=builder /app/packages/create-app/package.json ./packages/create-app/
+        COPY --from=builder /app/packages/enterprise/package.json ./packages/enterprise/
+        COPY --from=builder /app/packages/eslint-plugin-ds/package.json ./packages/eslint-plugin-ds/
+        COPY --from=builder /app/packages/events/package.json ./packages/events/
+        COPY --from=builder /app/packages/gateway-stripe/package.json ./packages/gateway-stripe/
+        COPY --from=builder /app/packages/onboarding/package.json ./packages/onboarding/
+        COPY --from=builder /app/packages/queue/package.json ./packages/queue/
+        COPY --from=builder /app/packages/scheduler/package.json ./packages/scheduler/
+        COPY --from=builder /app/packages/search/package.json ./packages/search/
+        COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+        COPY --from=builder /app/packages/telemetry/package.json ./packages/telemetry/
+        COPY --from=builder /app/packages/storage-s3/package.json ./packages/storage-s3/
+        COPY --from=builder /app/packages/sync-akeneo/package.json ./packages/sync-akeneo/
+        COPY --from=builder /app/packages/ui/package.json ./packages/ui/
+        COPY --from=builder /app/packages/webhooks/package.json ./packages/webhooks/
+        RUN yarn workspaces focus @open-mercato/app --production
+        COPY --from=builder /app/packages/ ./packages/
+        COPY --from=builder /app/apps/mercato/.mercato/next ./apps/mercato/.mercato/next
+        COPY --from=builder /app/apps/mercato/public ./apps/mercato/public
+        COPY --from=builder /app/apps/mercato/next.config.ts ./apps/mercato/
+        COPY --from=builder /app/apps/mercato/components.json ./apps/mercato/
+        COPY --from=builder /app/apps/mercato/tsconfig.json ./apps/mercato/
+        COPY --from=builder /app/apps/mercato/postcss.config.mjs ./apps/mercato/
+        COPY --from=builder /app/apps/mercato/.mercato/generated ./apps/mercato/.mercato/generated
+        COPY --from=builder /app/apps/mercato/src ./apps/mercato/src
+        COPY --from=builder /app/apps/mercato/types ./apps/mercato/types
+        COPY --from=builder /app/newrelic.js ./
+        COPY docker/scripts/railway-entrypoint.sh /app/docker/scripts/railway-entrypoint.sh
+        COPY docker/scripts/init-or-migrate.sh /app/docker/scripts/init-or-migrate.sh
+        COPY docker/scripts/mcp-entrypoint.sh /app/docker/scripts/mcp-entrypoint.sh
+        RUN chmod +x /app/docker/scripts/railway-entrypoint.sh
+        RUN chmod +x /app/docker/scripts/init-or-migrate.sh
+        RUN chmod +x /app/docker/scripts/mcp-entrypoint.sh
+        RUN mkdir -p /app/apps/mercato/storage
+        RUN adduser -D -u 1001 omuser \
+         && chown -R omuser:omuser /app/apps/mercato/storage \
+         && echo "omuser ALL=(root) NOPASSWD: /bin/chown" > /etc/sudoers.d/omuser \
+         && chmod 0440 /etc/sudoers.d/omuser
+        RUN mkdir -p /var/lib/open-mercato /app/apps/mercato/.mercato/queue /app/node_modules/.cache \
+         && chown -R omuser:omuser /var/lib/open-mercato /app/apps/mercato/.mercato/queue \
+            /app/apps/mercato/.mercato/generated /app/node_modules/.cache /app/packages /app/apps/mercato/src \
+         && chown omuser:omuser /app/apps/mercato/.mercato
+        USER omuser
+        EXPOSE $${CONTAINER_PORT}
+        WORKDIR /app/apps/mercato
+        CMD ["yarn", "start"]
+    restart: unless-stopped
+    working_dir: /app/apps/mercato
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        if [ ! -f /var/lib/open-mercato/.initialized ]; then
+          echo 'Initializing Open Mercato; output is in /var/lib/open-mercato/bootstrap.log'
+          yarn mercato init --no-examples --skip-password-policy=false >/var/lib/open-mercato/bootstrap.log 2>&1 || {
+            echo 'Initialization failed; inspect /var/lib/open-mercato/bootstrap.log'
+            exit 1
+          }
+          touch /var/lib/open-mercato/.initialized
+        else
+          yarn db:migrate
+          yarn mercato auth sync-role-acls
+        fi
+        exec yarn start
+    environment:
+      SERVICE_URL_APP_3000: /
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=768
+      NEXT_TELEMETRY_DISABLED: '1'
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+      APP_URL: ${SERVICE_URL_APP}
+      INTERNAL_APP_ORIGIN: http://app:3000
+      DATABASE_URL: postgres://mercato:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/mercato
+      DB_POOL_MAX: '5'
+      DB_POOL_MIN: '1'
+      AUTH_SECRET: ${SERVICE_HEX_64_AUTH}
+      JWT_SECRET: ${SERVICE_HEX_64_AUTH}
+      JWT_LEGACY_GRACE_MINUTES: '0'
+      CONSENT_INTEGRITY_SECRET: ${SERVICE_HEX_64_CONSENT}
+      TENANT_DATA_ENCRYPTION: 'true'
+      TENANT_DATA_ENCRYPTION_FALLBACK_KEY: ${SERVICE_HEX_64_ENCRYPTION}
+      CACHE_STRATEGY: redis
+      CACHE_REDIS_URL: redis://redis:6379
+      QUEUE_STRATEGY: local
+      QUEUE_BASE_DIR: /app/apps/mercato/.mercato/queue
+      AUTO_SPAWN_WORKERS: 'true'
+      OM_AUTO_SPAWN_WORKERS_LAZY: 'true'
+      OM_AUTO_SPAWN_WORKERS_LAZY_MODE: shared
+      AUTO_SPAWN_SCHEDULER: 'true'
+      RATE_LIMIT_STRATEGY: memory
+      OM_MULTI_INSTANCE: 'false'
+      OM_INSTANCE_COUNT: '1'
+      ENABLE_CRUD_API_CACHE: 'true'
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${SERVICE_PASSWORD_64_MEILI}
+      SELF_SERVICE_ONBOARDING_ENABLED: 'false'
+      DEMO_MODE: 'false'
+      OM_INIT_SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-superadmin@example.com}
+      OM_INIT_SUPERADMIN_PASSWORD: ${SERVICE_PASSWORD_64_SUPERADMIN}aA1!
+      OM_INIT_ADMIN_PASSWORD: ${SERVICE_PASSWORD_64_ADMIN}aA1!
+      OM_INIT_EMPLOYEE_PASSWORD: ${SERVICE_PASSWORD_64_EMPLOYEE}aA1!
+    volumes:
+      - init-state:/var/lib/open-mercato
+      - attachments:/app/apps/mercato/storage
+      - queue:/app/apps/mercato/.mercato/queue
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 900s
+  postgres:
+    image: pgvector/pgvector:pg17-trixie@sha256:69573b32242ca232f65871d4cb916ba7210a372b9bd74068204c1a9a57bada4f
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - max_connections=40
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+    environment:
+      POSTGRES_USER: mercato
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_DB: mercato
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U mercato -d mercato
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --maxmemory
+      - 96mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ''
+      - --appendonly
+      - 'no'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  meilisearch:
+    image: getmeili/meilisearch:v1.11@sha256:6f8f1fc29d1ff67b4d8d503bb4e0a69b55c8d42600decafde951344218193a27
+    restart: unless-stopped
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${SERVICE_PASSWORD_64_MEILI}
+      MEILI_NO_ANALYTICS: 'true'
+      MEILI_MAX_INDEXING_MEMORY: 128Mb
+      MEILI_MAX_INDEXING_THREADS: '1'
+    volumes:
+      - meili-data:/meili_data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:7700/health
+      interval: 10s
+      timeout: 5s
+      retries: 10
+volumes:
+  attachments: null
+  queue: null
+  postgres-data: null
+  meili-data: null
+  init-state: null
