@@ -73,6 +73,14 @@ test('preserves quoted backup container and file arguments for a non-root server
     expect($result)->toBe(['sudo '.$command]);
 });
 
+test('does not add sudo to && and || inside a docker exec sh -c script', function () {
+    $command = "docker exec postgres sh -c '/tmp/restore.sh && rm -f /tmp/restore.sql || exit 1'";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'docker exec postgres sh -c '\\''/tmp/restore.sh && rm -f /tmp/restore.sql || exit 1'\\'''");
+});
+
 test('wraps complex Docker install command with multiple fallbacks', function () {
     $commands = collect([
         'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',

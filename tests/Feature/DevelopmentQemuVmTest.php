@@ -817,3 +817,21 @@ it('seeds a gpu vm through the container so it installs the driver', function ()
 
     Process::assertRan("docker exec 'coolify' php artisan dev:qemu:seed 'ubuntu-root' --as-localhost --gpu");
 });
+
+it('does not start a gpu vm while host processes still use the gpu', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-busy-test-'.uniqid()]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(output: 'exists'),
+        '* domstate *' => Process::result(output: "shut off\n"),
+        '* dumpxml --inactive *' => Process::result(output: "<hostdev mode='subsystem' type='pci' managed='yes'>"),
+        'fuser *' => Process::result(output: "/dev/nvidia0: root 1210 F...m Xorg\n"),
+        '*' => Process::result(),
+    ]);
+
+    expect(fn () => StartDevelopmentQemuVm::run('ubuntu-root'))
+        ->toThrow(RuntimeException::class, 'Xorg');
+
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh start'));
+});

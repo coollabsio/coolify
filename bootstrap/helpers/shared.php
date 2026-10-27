@@ -135,6 +135,18 @@ function new_public_id(int $length = 24): string
 }
 
 /**
+ * The name of a clone: the source name without the "-clone-<id>" suffixes of earlier clones, then a new suffix.
+ * Without this, each clone of a clone adds a suffix, and the name soon becomes longer than the 255 characters of the column.
+ */
+function clone_resource_name(string $name, string $uuid): string
+{
+    $suffix = '-clone-'.$uuid;
+    $baseName = preg_replace('/(-clone-[a-z0-9]{7,})+$/i', '', $name);
+
+    return Str::limit($baseName, 255 - strlen($suffix), '').$suffix;
+}
+
+/**
  * Validate that a path or identifier is safe for use in shell commands.
  *
  * This function prevents command injection by rejecting strings that contain
@@ -1256,6 +1268,123 @@ function parseEnvFormatToArray($env_file_contents)
     }
 
     return $env_array;
+}
+
+/**
+ * Format a value for a KEY=VALUE line of the developer view, so that parseEnvFormatToArray()
+ * reads it back unchanged. Returns null when the format cannot hold the value: it has a line
+ * break, or it needs quotes and has both quote types.
+ */
+function formatEnvValueForDevView(?string $value): ?string
+{
+    $value ??= '';
+    if (str_contains($value, "\n")) {
+        return null;
+    }
+
+    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1;
+    if (! $needsQuotes) {
+        return $value;
+    }
+    if (! str_contains($value, "'")) {
+        return "'{$value}'";
+    }
+    if (! str_contains($value, '"')) {
+        return "\"{$value}\"";
+    }
+
+    return null;
+}
+
+/**
+ * Format a variable for the developer view: its KEY=value line, with a "# coolify:" directive
+ * line above it when a flag is not its default. A variable that the view cannot edit gets a
+ * placeholder line and no directive.
+ */
+function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue): string
+{
+    if (! $canViewValue) {
+        return "{$variable->key}=(Hidden, only admins can view)";
+    }
+    if ($variable->is_shown_once) {
+        return "{$variable->key}=(Locked Secret, delete and add again to change)";
+    }
+    if ($variable->is_multiline) {
+        return "{$variable->key}=(Multiline environment variable, edit in normal view)";
+    }
+    $value = formatEnvValueForDevView($variable->value);
+    if ($value === null) {
+        return "{$variable->key}=(Value cannot be shown in this view, edit in normal view)";
+    }
+
+    $flags = [];
+    foreach ($variable::DEV_VIEW_FLAG_DEFAULTS as $flag => $default) {
+        if ((bool) $variable->{"is_{$flag}"} !== $default) {
+            $flags[] = $default ? "{$flag}=false" : $flag;
+        }
+    }
+    $line = "{$variable->key}={$value}";
+
+    return $flags === [] ? $line : '# coolify: '.implode(' ', $flags)."\n".$line;
+}
+
+/**
+ * Parse developer view text. Returns the result of parseEnvFormatToArray() with a 'settings'
+ * entry per key: the flags of the "# coolify:" line directly above the key line, as model
+ * attributes (for example ['is_literal' => true]). A key without a directive gets empty
+ * settings, so its current flags stay.
+ *
+ * @param  array<string, bool>  $flagDefaults  the allowed flags and their defaults
+ * @return array<string, array{value: string, comment: ?string, settings: array<string, bool>}>
+ *
+ * @throws InvalidArgumentException when a directive is not directly above a KEY=value line, or has an unknown flag or value
+ */
+function parseEnvDevView(?string $contents, array $flagDefaults): array
+{
+    $contents ??= '';
+    $settingsByKey = [];
+    $directive = null;
+    $directiveLine = 0;
+
+    foreach (explode("\n", $contents) as $index => $line) {
+        $isKeyLine = $line !== '' && ! str_starts_with($line, '#') && str_contains($line, '=');
+        if ($directive !== null && ! $isKeyLine) {
+            throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+        }
+
+        if ($isKeyLine) {
+            $settingsByKey[substr($line, 0, strpos($line, '='))] = $directive ?? [];
+            $directive = null;
+        } elseif (str_starts_with($line, '# coolify:')) {
+            $directiveLine = $index + 1;
+            $flags = preg_split('/\s+/', trim(substr($line, strlen('# coolify:'))), -1, PREG_SPLIT_NO_EMPTY);
+            if ($flags === []) {
+                throw new InvalidArgumentException("Line {$directiveLine}: the \"# coolify:\" line has no flags.");
+            }
+
+            $directive = [];
+            foreach ($flags as $flag) {
+                [$name, $value] = array_pad(explode('=', $flag, 2), 2, 'true');
+                if (! array_key_exists($name, $flagDefaults)) {
+                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', array_keys($flagDefaults)).'.');
+                }
+                if ($value !== 'true' && $value !== 'false') {
+                    throw new InvalidArgumentException("Line {$directiveLine}: the value of \"{$name}\" must be true or false.");
+                }
+                $directive["is_{$name}"] = $value === 'true';
+            }
+        }
+    }
+    if ($directive !== null) {
+        throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+    }
+
+    $variables = parseEnvFormatToArray($contents);
+    foreach ($variables as $key => $data) {
+        $variables[$key]['settings'] = $settingsByKey[$key] ?? [];
+    }
+
+    return $variables;
 }
 
 /**

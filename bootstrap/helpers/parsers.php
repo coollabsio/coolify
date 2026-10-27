@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ProxyTypes;
-use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\LocalFileVolume;
@@ -1602,6 +1601,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
+                        $storedSource = $source;
                         $isPreviewSuffixEnabled = $foundConfig
                             ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
                             : true;
@@ -1617,7 +1618,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                     'resource_type' => get_class($originalResource),
                                 ],
                                 [
-                                    'fs_path' => $source,
+                                    'fs_path' => $storedSource,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
@@ -1698,7 +1699,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         ? ['name' => $name]
                         : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
         }
@@ -2034,7 +2034,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {
                 $parsedDomain = composeDomainEntryString($domain);
-                $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
+                $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper()->value();
 
                 if (filled($parsedDomain)) {
                     $parsedDomain = str($parsedDomain)->explode(',')->first();
@@ -2042,42 +2042,15 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $coolifyScheme = $coolifyUrl->getScheme();
                     $coolifyFqdn = $coolifyUrl->getHost();
                     $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                    $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
                     $coolifyEnvironments->put('SERVICE_URL_'.$serviceEnvKey, $coolifyUrl->__toString());
                     $coolifyEnvironments->put('SERVICE_FQDN_'.$serviceEnvKey, $coolifyFqdn);
                     // A preview uses its own domains; the stored variables belong to the main application.
                     if ($isPullRequest) {
                         continue;
                     }
-                    $resource->environment_variables()->updateOrCreate([
-                        'resourceable_type' => Application::class,
-                        'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_URL_'.$serviceEnvKey,
-                    ], [
-                        'value' => $coolifyUrl->__toString(),
-                        'is_preview' => false,
-                    ]);
-                    $resource->environment_variables()->updateOrCreate([
-                        'resourceable_type' => Application::class,
-                        'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_FQDN_'.$serviceEnvKey,
-                    ], [
-                        'value' => $coolifyFqdn,
-                        'is_preview' => false,
-                    ]);
+                    syncComposeServiceUrlVariables($resource, $serviceEnvKey, $coolifyUrl->__toString(), $coolifyFqdn);
                 } elseif (! $isPullRequest) {
-                    $resource->environment_variables()->where('resourceable_type', Application::class)
-                        ->where('resourceable_id', $resource->id)
-                        ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
-                        ->update([
-                            'value' => null,
-                        ]);
-                    $resource->environment_variables()->where('resourceable_type', Application::class)
-                        ->where('resourceable_id', $resource->id)
-                        ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
-                        ->update([
-                            'value' => null,
-                        ]);
+                    syncComposeServiceUrlVariables($resource, $serviceEnvKey, null, null);
                 }
             }
         }
@@ -3121,7 +3094,6 @@ function serviceParser(Service $resource): Collection
                     );
                     $topLevel->get('volumes')->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume));
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
         }

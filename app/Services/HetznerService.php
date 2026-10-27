@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -44,7 +45,17 @@ class HetznerService
 
                 // Exponential backoff for other retriable errors: 100ms, 200ms, 400ms
                 return $attempt * 100;
-            })
+            }, function (\Exception $exception) use ($method) {
+                if ($exception instanceof RequestException && $exception->response->status() === 429) {
+                    return true;
+                }
+
+                // A POST that failed with a 5xx or a timeout can still have created the resource, so only idempotent requests are sent again.
+                // Client errors such as 401, 403, or 422 do not change when the request is sent again.
+                $isServerError = ! $exception instanceof RequestException || $exception->response->status() >= 500;
+
+                return $isServerError && in_array(strtolower($method), ['get', 'delete'], true);
+            }, throw: false)
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
@@ -61,7 +72,13 @@ class HetznerService
                 );
             }
 
-            throw new \Exception('Hetzner API error: '.$response->json('error.message', 'Unknown error'));
+            throw new CloudProviderApiException(
+                'Hetzner',
+                $response->json('error.message', 'Unknown error'),
+                $response->status(),
+                $response->json('error.code'),
+                collect($response->json('error.details.fields', []))->pluck('name')->all(),
+            );
         }
 
         return $response->json();
@@ -101,16 +118,31 @@ class HetznerService
         ]);
     }
 
-    public function getServerTypes(): array
+    /**
+     * Server types that can be ordered now. Each type keeps only the locations
+     * where it is in stock and not deprecated, and types with no such location are removed.
+     * With $includeOutOfStock, locations where the type is out of stock are kept.
+     */
+    public function getServerTypes(?string $location = null, bool $includeOutOfStock = false): array
     {
         $types = $this->requestPaginated('get', '/server_types', 'server_types');
 
-        // Filter out entries where "deprecated" is explicitly true
-        $filtered = array_filter($types, function ($type) {
-            return ! (isset($type['deprecated']) && $type['deprecated'] === true);
-        });
+        return collect($types)
+            ->reject(fn (array $type) => ($type['deprecated'] ?? false) === true)
+            ->map(function (array $type) use ($includeOutOfStock) {
+                $type['locations'] = collect($type['locations'] ?? [])
+                    ->filter(fn (array $typeLocation) => empty($typeLocation['deprecation'])
+                        && ($includeOutOfStock || ($typeLocation['available'] ?? true) === true))
+                    ->values()
+                    ->all();
 
-        return array_values($filtered);
+                return $type;
+            })
+            ->filter(fn (array $type) => $location === null
+                ? $type['locations'] !== []
+                : in_array($location, array_column($type['locations'], 'name'), true))
+            ->values()
+            ->all();
     }
 
     public function getSshKeys(): array

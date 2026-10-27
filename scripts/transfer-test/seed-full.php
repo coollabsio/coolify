@@ -48,7 +48,7 @@ $server->settings->forceFill([
     'is_traffic_analytics_enabled' => true, 'traffic_topn' => 20, 'traffic_sample_threshold' => 9, 'traffic_retention_1h_days' => 3, 'traffic_retention_1d_days' => 60,
     'traffic_ip_mode' => 'anonymized', 'is_geoip_enabled' => true, 'geoip_maxmind_license_key' => 'fake-maxmind-key', 'geoip_refresh_days' => 14,
     'logdrain_newrelic_license_key' => 'fake-newrelic', 'logdrain_newrelic_base_uri' => 'https://log-api.eu.newrelic.com/log/v1',
-    'logdrain_highlight_project_id' => 'fake-highlight', 'logdrain_axiom_dataset_name' => 'fake-dataset', 'logdrain_axiom_api_key' => 'fake-axiom',
+    'logdrain_axiom_dataset_name' => 'fake-dataset', 'logdrain_axiom_api_key' => 'fake-axiom',
     'logdrain_custom_config' => "[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name fake\n",
     'logdrain_cloudwatch_region' => 'eu-central-1', 'logdrain_cloudwatch_group' => 'fake-group', 'logdrain_cloudwatch_stream_prefix' => 'fake-prefix',
 ])->saveQuietly();

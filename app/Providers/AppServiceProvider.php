@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use App\Services\Access\AccessResolver;
 use App\Support\AtomicFilesystem;
+use App\Support\RetryHttpConnectionFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Console\ConfigCacheCommand;
 use Illuminate\Foundation\Console\RouteCacheCommand;
@@ -45,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
+        $this->configureHttpClient();
         $this->configureGitHubHttp();
         $this->configureGitLabHttp();
         $this->configureOidcSocialite();
@@ -124,6 +126,12 @@ class AppServiceProvider extends ServiceProvider
                 '',
             );
         });
+    }
+
+    private function configureHttpClient(): void
+    {
+        Http::globalOptions(['connect_timeout' => 10, 'timeout' => 30]);
+        Http::globalMiddleware(new RetryHttpConnectionFailures);
     }
 
     private function configureGitHubHttp(): void

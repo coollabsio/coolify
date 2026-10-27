@@ -42,6 +42,13 @@ class EnvironmentVariable extends BaseModel
 {
     use Auditable;
 
+    /**
+     * Flags that a "# coolify:" line of the developer view can set, with their defaults.
+     *
+     * @var array<string, bool>
+     */
+    public const DEV_VIEW_FLAG_DEFAULTS = ['literal' => false, 'buildtime' => true, 'runtime' => true];
+
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
     /**
@@ -101,6 +108,7 @@ class EnvironmentVariable extends BaseModel
         'value' => 'encrypted',
         'preserve_compose_null' => 'boolean',
         'is_multiline' => 'boolean',
+        'is_literal' => 'boolean',
         'is_preview' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',

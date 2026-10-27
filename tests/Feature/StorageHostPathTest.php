@@ -59,11 +59,12 @@ beforeEach(function () {
 });
 
 /**
- * `test -L` prints $symlink and `test -f`/`test -d` print $exists.
+ * `test -L` prints $symlink and `test -f`/`test -d` print $exists. The file state check sees a file when $exists is OK.
  */
 function storageHostPathFakeServer(string $symlink = 'OK', string $exists = 'NOK'): void
 {
     Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput($exists === 'OK' ? 'file' : 'missing'),
         str_contains(remoteProcessScript($process), 'test -L') => $symlink,
         str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
         str_contains(remoteProcessScript($process), 'test -') => $exists,
@@ -333,6 +334,7 @@ test('the delete dialog offers deletion on the host only for mounts inside the r
 
 test('a file outside the resource directory never replaces a directory on the host', function () {
     Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('directory'),
         str_contains(remoteProcessScript($process), 'test -L') => 'OK',
         str_contains(remoteProcessScript($process), 'test -d') => 'OK',
         str_contains(remoteProcessScript($process), 'test -f') => 'NOK',

@@ -63,7 +63,7 @@ class CloneMe extends Component
             ->where('team_id', $this->project->team_id)
             ->get()
             ->reject(fn ($server) => $server->isBuildServer());
-        $this->newName = str($this->project->name.'-clone-'.new_public_id())->slug();
+        $this->newName = str(clone_resource_name($this->project->name, new_public_id()))->slug();
     }
 
     public function toggleVolumeCloning(bool $value)

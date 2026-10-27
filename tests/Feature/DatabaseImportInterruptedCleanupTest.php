@@ -440,12 +440,15 @@ test('a restore that exits like a lost SSH connection or timeout reports a norma
     expect($restoreLine)->toContain($scriptPath);
 
     // Fake sudo and docker: `docker exec <container> ...` runs the restore script on this machine.
+    // Database images have no sudo (#9949), so sudo fails inside the fake container.
     $dir = sys_get_temp_dir().'/coolify-restore-exit-'.Str::random(8);
-    mkdir($dir);
+    mkdir("{$dir}/container", recursive: true);
     file_put_contents("{$dir}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
-    file_put_contents("{$dir}/docker", "#!/bin/sh\n[ \"\$1\" = exec ] || exit 1\nshift 2\nexec \"\$@\"\n");
+    file_put_contents("{$dir}/container/sudo", "#!/bin/sh\necho 'sh: sudo: not found' >&2\nexit 127\n");
+    file_put_contents("{$dir}/docker", "#!/bin/sh\n[ \"\$1\" = exec ] || exit 1\nshift 2\nPATH=\"{$dir}/container:\$PATH\" exec \"\$@\"\n");
     file_put_contents($scriptPath, "echo restoring\nexit {$restoreExitCode}\n");
     chmod("{$dir}/sudo", 0755);
+    chmod("{$dir}/container/sudo", 0755);
     chmod("{$dir}/docker", 0755);
     chmod($scriptPath, 0755);
 
@@ -454,9 +457,12 @@ test('a restore that exits like a lost SSH connection or timeout reports a norma
         $restore->run();
 
         expect($restore->getExitCode())->toBe($expectedExitCode)
-            ->and($restore->getOutput())->toContain('restoring');
+            ->and($restore->getOutput())->toContain('restoring')
+            ->and($restore->getErrorOutput())->not->toContain('sudo: not found');
     } finally {
         @unlink($scriptPath);
+        @unlink("{$dir}/container/sudo");
+        rmdir("{$dir}/container");
         array_map('unlink', glob("{$dir}/*"));
         rmdir($dir);
     }

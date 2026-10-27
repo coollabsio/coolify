@@ -175,6 +175,36 @@ it('passes the S3 keys of a database backup upload to mc on stdin, not in a comm
     s3ArgvTestAssertSecretOnlyOnStdin($processes, $sshUser !== 'root');
 })->with(['root', 'deploy']);
 
+it('makes mc use virtual-hosted-style URLs when the storage turns path-style URLs off', function (bool $usePathStyleEndpoint, string $expectedAlias) {
+    [$team, $server, $storage] = s3ArgvTestSetup('root');
+    $storage->update(['use_path_style_endpoint' => $usePathStyleEndpoint]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+    $database = create_standalone_postgresql($environment->id, $destination, ['status' => 'running:healthy']);
+    $backup = new ScheduledDatabaseBackup;
+    $backup->forceFill([
+        'enabled' => true,
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $storage->id,
+        'frequency' => 'daily',
+        'databases_to_backup' => 'app',
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'team_id' => $team->id,
+    ])->save();
+    $backup->syncS3Storages([$storage->id]);
+    $processes = s3ArgvTestFakeSsh();
+
+    (new DatabaseBackupJob($backup->fresh()))->handle();
+
+    $aliasProcess = $processes->sole(fn (array $process) => str_contains($process['command'], 'mc alias set'));
+    expect(s3ArgvTestRunAliasProcess($aliasProcess)['argv'])->toContain($expectedAlias);
+})->with([
+    'path-style' => [true, 'mc alias set temporary https://8.8.8.8'],
+    'virtual-hosted-style' => [false, 'mc alias set --path off temporary https://8.8.8.8'],
+]);
+
 it('passes the S3 keys of a volume backup to mc on stdin, not in a command line', function (string $sshUser, bool $streamToS3) {
     [$team, $server, $storage] = s3ArgvTestSetup($sshUser);
     $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();

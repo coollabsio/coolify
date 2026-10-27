@@ -6,6 +6,7 @@ import {
     authenticateTerminalUpgrade,
     createTerminalUpgradeHandler,
     extractSshArgs,
+    getTerminalAuthHeaders,
     extractTargetHost,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
@@ -308,18 +309,40 @@ function createFakeWebSocketServer({ handles = true } = {}) {
 
 const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
 
-test('authenticateTerminalUpgrade rejects missing session cookies with the auth close code without calling Coolify', async () => {
+test('getTerminalAuthHeaders forwards the whole cookie header so Laravel reads its own session cookie name', () => {
+    // APP_NAME="Coolify - Prod" gives the Laravel cookie "coolify_prod_session";
+    // the terminal server must not guess that name (issue #10549).
+    const cookieHeader = 'theme=dark; coolify_prod_session=session-value; XSRF-TOKEN=xsrf-value';
+
+    assert.deepEqual(getTerminalAuthHeaders(cookieHeader), [{
+        'Cookie': cookieHeader,
+        'X-XSRF-TOKEN': 'xsrf-value',
+    }]);
+});
+
+test('getTerminalAuthHeaders makes one candidate for each XSRF-TOKEN cookie', () => {
+    // A Laravel app on a sibling subdomain with SESSION_DOMAIN=.example.com sets a
+    // second XSRF-TOKEN cookie that the browser also sends to Coolify (issue #10397).
+    const cookieHeader = 'XSRF-TOKEN=sibling%3D; coolify_session=session; XSRF-TOKEN=coolify%3D; XSRF-TOKEN=sibling%3D';
+
+    assert.deepEqual(getTerminalAuthHeaders(cookieHeader).map((headers) => headers['X-XSRF-TOKEN']), ['sibling=', 'coolify=']);
+});
+
+test('getTerminalAuthHeaders limits the number of XSRF-TOKEN candidates', () => {
+    const cookieHeader = Array.from({ length: 50 }, (_, index) => `XSRF-TOKEN=token-${index}`).join('; ');
+
+    assert.deepEqual(getTerminalAuthHeaders(cookieHeader).map((headers) => headers['X-XSRF-TOKEN']), ['token-0', 'token-1', 'token-2', 'token-3', 'token-4']);
+});
+
+test('authenticateTerminalUpgrade rejects missing cookies with the auth close code without calling Coolify', async () => {
     let requests = 0;
     const postToCoolify = async () => {
         requests++;
         return { status: 200 };
     };
 
-    for (const session of [
-        { sessionCookieName: 'coolify_session', laravelSession: undefined, xsrfToken: 'xsrf' },
-        { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: undefined },
-    ]) {
-        assert.deepEqual(await authenticateTerminalUpgrade(session, postToCoolify), {
+    for (const cookieHeader of ['', undefined, 'coolify_session=session', 'coolify_session=session; XSRF-TOKEN=']) {
+        assert.deepEqual(await authenticateTerminalUpgrade(getTerminalAuthHeaders(cookieHeader), postToCoolify), {
             authenticated: false,
             closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
             reason: 'Unauthorized: Missing required tokens',
@@ -334,36 +357,50 @@ test('authenticateTerminalUpgrade rejects missing session cookies with the auth 
 test('authenticateTerminalUpgrade checks the Laravel session exactly like the previous verifyClient', async () => {
     const requests = [];
     const result = await authenticateTerminalUpgrade(
-        { sessionCookieName: 'coolify_session', laravelSession: 'session-value', xsrfToken: 'xsrf-value' },
+        getTerminalAuthHeaders('coolify_session=session-value; XSRF-TOKEN=xsrf-value'),
         async (path, headers) => {
             requests.push([path, headers]);
             return { status: 200 };
         },
     );
 
-    assert.deepEqual(result, { authenticated: true });
-    assert.deepEqual(requests, [[
-        '/terminal/auth',
-        { 'Cookie': 'coolify_session=session-value', 'X-XSRF-TOKEN': 'xsrf-value' },
-    ]]);
+    const authHeaders = { 'Cookie': 'coolify_session=session-value; XSRF-TOKEN=xsrf-value', 'X-XSRF-TOKEN': 'xsrf-value' };
+    assert.deepEqual(result, { authenticated: true, authHeaders });
+    assert.deepEqual(requests, [['/terminal/auth', authHeaders]]);
+});
+
+test('authenticateTerminalUpgrade tries the next XSRF-TOKEN when Coolify rejects one', async () => {
+    const triedTokens = [];
+    const result = await authenticateTerminalUpgrade(
+        getTerminalAuthHeaders('XSRF-TOKEN=sibling; coolify_session=session; XSRF-TOKEN=coolify; XSRF-TOKEN=other'),
+        async (path, headers) => {
+            triedTokens.push(headers['X-XSRF-TOKEN']);
+            return { status: headers['X-XSRF-TOKEN'] === 'coolify' ? 200 : 419 };
+        },
+    );
+
+    assert.equal(result.authenticated, true);
+    assert.equal(result.authHeaders['X-XSRF-TOKEN'], 'coolify');
+    assert.deepEqual(triedTokens, ['sibling', 'coolify']);
 });
 
 test('authenticateTerminalUpgrade rejects every non-200 Coolify response', async () => {
     for (const status of [201, 204, 302, 401, 403, 419, 500]) {
         const result = await authenticateTerminalUpgrade(
-            { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: 'xsrf' },
+            getTerminalAuthHeaders('coolify_session=session; XSRF-TOKEN=xsrf; XSRF-TOKEN=other'),
             async () => ({ status }),
         );
 
         assert.equal(result.authenticated, false, `status ${status} must not authenticate`);
         assert.equal(result.closeCode, TERMINAL_CLOSE_CODES.AUTH_REJECTED);
         assert.equal(result.reason, 'Unauthorized: Invalid credentials');
+        assert.equal(result.status, status);
     }
 });
 
 test('authenticateTerminalUpgrade does not authenticate when Coolify is unreachable', async () => {
     const result = await authenticateTerminalUpgrade(
-        { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: 'xsrf' },
+        getTerminalAuthHeaders('coolify_session=session; XSRF-TOKEN=xsrf'),
         async () => {
             throw new Error('connect ECONNREFUSED');
         },
@@ -374,18 +411,13 @@ test('authenticateTerminalUpgrade does not authenticate when Coolify is unreacha
     assert.equal(result.error.message, 'connect ECONNREFUSED');
 });
 
-test('rejectTerminalSocket sends the legacy message before closing with a readable code', () => {
+test('rejectTerminalSocket closes with a readable code and sends no text message', () => {
     const ws = createFakeWebSocket();
 
-    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 'Unauthorized: Terminal token was rejected', {
-        message: 'Unauthorized: Terminal token was rejected',
-    });
+    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 'Unauthorized: Terminal token was rejected');
     ws.peerClosed();
 
-    assert.deepEqual(ws.events, [
-        ['send', 'Unauthorized: Terminal token was rejected'],
-        ['close', 4403, 'Unauthorized: Terminal token was rejected'],
-    ]);
+    assert.deepEqual(ws.events, [['close', 4403, 'Unauthorized: Terminal token was rejected']]);
 });
 
 test('rejectTerminalSocket terminates peers that ignore the close handshake', async () => {

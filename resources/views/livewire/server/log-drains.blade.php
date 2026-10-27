@@ -47,18 +47,25 @@
                     </x-application.settings-section>
                     <x-application.settings-section id="server-axiom-drain-section" title="Axiom"
                         helper="Send logs to an Axiom dataset using its ingest API.">
-                        <div class="grid gap-4 lg:grid-cols-3">
+                        <div class="mb-4 max-w-sm">
                             <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainAxiomEnabled" label="Status"
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
                                 :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
+                        </div>
+                        <div class="grid gap-4 lg:grid-cols-3">
                             <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainAxiomEnabled"
                                 id="logDrainAxiomApiKey" label="API key"
                                 :disabled="$server->isLogDrainEnabled()" />
                             <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
                                 id="logDrainAxiomDatasetName" label="Dataset name"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
+                                id="logDrainAxiomDomain" label="Edge domain"
+                                placeholder="us-east-1.aws.edge.axiom.co"
+                                helper="Base domain of the edge deployment of your Axiom organization.<br><br>US: <code>us-east-1.aws.edge.axiom.co</code><br>EU: <code>eu-central-1.aws.edge.axiom.co</code>"
                                 :disabled="$server->isLogDrainEnabled()" />
                         </div>
                     </x-application.settings-section>

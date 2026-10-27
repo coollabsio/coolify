@@ -30,11 +30,15 @@
 - In browser tests, address `x-forms.input` fields by `name` (`type('fieldName', ...)`); its HTML `id` is not always the Livewire property, so `#property` waits forever.
 - For load tests against a dev VM, use your own instance (`COOLIFY_DEV_INSTANCE=<name> COOLIFY_DEV_SIDE_BY_SIDE=1 ./scripts/dev start`); other sessions can reseed the localhost VM of a shared instance. The 1 GiB VM drops packets when its conntrack table is full (`dmesg`: `nf_conntrack: table full`), so raise `net.netfilter.nf_conntrack_max` on it and run an idle load first to prove a clean baseline.
 - Do not call `sleep()` in a browser test. The app server runs in the test process, so `sleep()` stops it; use `$page->wait()`.
-- `Queue::fake()` also captures `dispatchSync()` of a `ShouldQueue` job, so the job never runs. Fake only the jobs to block (`Queue::fake([SomeJob::class])`).
+- `Queue::fake()` also captures `dispatchSync()` of a `ShouldQueue` job, so the job never runs. Fake only the jobs to block (`Queue::fake([SomeJob::class])`). Exception: actions (`AsAction`) are queued as `JobDecorator`, so `Queue::fake([SomeAction::class])` does not stop them; use `Queue::fake()` and `SomeAction::assertPushed()`.
+- `Notification::fake()` records nothing for a team that has no enabled channel. Turn one on (for example `emailNotificationSettings()->update(['use_instance_email_settings' => true, '<event>_email_notifications' => true])`) before `assertSentTo`.
 - In tests, turning on `is_metrics_enabled` (and other Sentinel settings) with `save()`/`update()` runs the settings hook, which starts Sentinel over a real SSH connection on the sync queue. Use `saveQuietly()` or `Queue::fake()`.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 - The root team (id 0) has `personal_team = true`, so `personal_team` does not identify a user's own team. To clean up test users, detach them from shared teams and then delete the user; never delete a team selected by a filter. A Team delete revokes the team's API tokens and deletes its private keys before any guard can stop it.
 - SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely.
+- SQLite does not enforce `varchar(255)` lengths, while Postgres rejects a longer value (`SQLSTATE[22001]`). Tests cannot show a too-long name, so assert the length or the exact value of generated strings.
+
+- The Compose parsers (`parse()`, `applicationParser`, `serviceParser`) run on page mounts, refreshes, and deployments. Do not dispatch jobs or run server commands from them; let the caller that changes data start the work. Code that only needs the service names reads `docker_compose_raw` (`Application::composeServicesWithoutParse()`).
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.

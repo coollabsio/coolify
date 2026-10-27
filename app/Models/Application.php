@@ -1586,6 +1586,8 @@ class Application extends BaseModel
                 : 'GIT_SSH_COMMAND="'.$resolvedGitSshCommand.'"')
             : 'GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"';
 
+        $git_clone_command = $this->gitLfsSkipSmudgePrefix($onlyCheckout).$git_clone_command;
+
         // Use the explicitly passed commit (e.g. from rollback), falling back to the application's git_commit_sha.
         // Invalid refs will cause the git checkout/fetch command to fail on the remote server.
         $commitToUse = $commit ?? $this->git_commit_sha;
@@ -1593,9 +1595,18 @@ class Application extends BaseModel
         if ($commitToUse !== 'HEAD') {
             $escapedCommit = escapeshellarg($commitToUse);
             // If shallow clone is enabled and we need a specific commit,
-            // we need to fetch that specific commit with depth=1
+            // we need to fetch that specific commit with depth=1.
+            // A remote cannot fetch a short SHA (Bitbucket sends one for pull requests),
+            // so fetch the tip of each branch and let the checkout expand it. When the
+            // commit is not a branch tip, fetch the full history of the branches.
             if ($isShallowCloneEnabled) {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $checkoutCommand = "{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                if (preg_match('/\A[0-9a-fA-F]{7,39}\z/', $commitToUse) === 1) {
+                    $branchesRefspec = escapeshellarg('+refs/heads/*:refs/remotes/origin/*');
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$branchesRefspec} && ({$checkoutCommand} || (echo 'The commit is not a branch tip. Fetching the full history.' && {$sshCommand} {$gitCommand} fetch --unshallow origin {$branchesRefspec} && {$checkoutCommand}))";
+                } else {
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$checkoutCommand}";
+                }
             } else {
                 $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             }
@@ -1866,6 +1877,16 @@ class Application extends BaseModel
         ];
     }
 
+    /**
+     * The helper image installs the Git LFS filter system-wide, so every checkout downloads
+     * LFS objects unless the smudge filter is skipped. A checkout that only reads files (the
+     * Compose file) never needs LFS objects.
+     */
+    private function gitLfsSkipSmudgePrefix(bool $onlyCheckout = false): string
+    {
+        return $this->settings->is_git_lfs_enabled && ! $onlyCheckout ? '' : 'export GIT_LFS_SKIP_SMUDGE=1 && ';
+    }
+
     private function gitCommandsAsShellCommand(Collection|array|string $commands): string
     {
         if (is_string($commands)) {
@@ -1979,10 +2000,11 @@ class Application extends BaseModel
 
                     $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOption ?? null);
                     $escapedPrBranch = escapeshellarg($branch);
+                    $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command";
                     if ($exec_in_docker) {
-                        $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command")));
+                        $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_pr_command)));
                     } else {
-                        $commands->push($this->gitCommand("cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command"));
+                        $commands->push($this->gitCommand($git_pr_command));
                     }
                 }
 
@@ -2264,6 +2286,23 @@ class Application extends BaseModel
         $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
 
         instant_remote_process($commands, $this->destination->server, false);
+    }
+
+    /**
+     * The services of the Compose file, read without parse(). A parse saves volumes and variables, so
+     * code that only needs the service names uses this.
+     *
+     * @return array<string, mixed>
+     */
+    public function composeServicesWithoutParse(): array
+    {
+        try {
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services');
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($services) ? $services : [];
     }
 
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)

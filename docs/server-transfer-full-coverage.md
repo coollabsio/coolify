@@ -42,7 +42,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Metrics / Sentinel | metrics on, refresh rate 10 s, history 14 days, push interval 30 s |
 | ✅ | Traffic analytics | on, top N 20, sample threshold, retention 1h=3 / 1d=60 days, IP mode `anonymized` |
 | ✅ | GeoIP | on, MaxMind license key, refresh 14 days |
-| ✅ | Log drains | New Relic (key + base URI), Highlight (project ID), Axiom (dataset + key), custom (config + parser), one of them enabled |
+| ✅ | Log drains | New Relic (key + base URI), Axiom (dataset, key + edge domain), custom (config + parser), one of them enabled |
 | ✅ | Cloudflare tunnel | tunnel on, tunnel ID, account ID, Cloudflare integration token selected, and the DNS record of the SSH hostname. Expected: the record moves with the server; the source keeps it only for a take back (not owned) |
 | ➕ | Jump server flag | on (on a server that is only a jump host) |
 

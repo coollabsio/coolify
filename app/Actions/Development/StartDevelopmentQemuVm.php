@@ -155,10 +155,18 @@ class StartDevelopmentQemuVm
 
     /**
      * nvidia-persistenced keeps the GPU open, which blocks libvirt from moving it to vfio-pci.
+     * Other users of the GPU (for example a desktop session) must stop first: if libvirt unbinds the
+     * nvidia driver while they hold the GPU open, the GPU stays unusable until the host reboots.
      */
     private function releaseHostGpu(): void
     {
         Process::run('systemctl stop nvidia-persistenced');
+
+        $users = Process::run('fuser -v /dev/nvidia[0-9]* 2>&1');
+
+        if ($users->successful() && trim($users->output()) !== '') {
+            throw new RuntimeException("These host processes still use the NVIDIA GPU, so it cannot move to the VM. Stop them (for example the display manager), or remove the GPU from the VM with --fresh and without --gpu:\n".trim($users->output()));
+        }
     }
 
     private function destroyVm(string $domain): void

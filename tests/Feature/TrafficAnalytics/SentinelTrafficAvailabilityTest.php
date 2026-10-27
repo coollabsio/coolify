@@ -116,5 +116,6 @@ it('shows no data without an error when Sentinel has no traffic routes (0.0.x an
         ->assertSet('series', [])
         ->assertNotDispatched('error');
 
-    Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/api/traffic/dashboard'));
+    // The concurrent prefetch remembers the failure, so the per-server pass does not fetch it again.
+    Process::assertRanTimes(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/api/traffic/dashboard'), 1);
 });

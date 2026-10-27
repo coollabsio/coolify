@@ -127,11 +127,12 @@ function contentHostPathUseServerUser(string $user): void
 }
 
 /**
- * Fakes the server: `test -f`/`test -d` print NOK (the file is missing), the symlink check prints OK.
+ * Fakes the server: every checked path is missing, the symlink check prints OK.
  */
 function contentHostPathFakeServer(): void
 {
     Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
         str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
         str_contains(remoteProcessScript($process), 'test -') => 'NOK',
         default => '',

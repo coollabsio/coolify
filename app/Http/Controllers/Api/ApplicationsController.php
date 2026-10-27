@@ -381,7 +381,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        required: ['project_uuid', 'server_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -593,7 +593,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        required: ['project_uuid', 'server_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -803,7 +803,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        required: ['project_uuid', 'server_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -1013,7 +1013,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'dockerfile'],
+                        required: ['project_uuid', 'server_uuid', 'dockerfile'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -1192,7 +1192,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_registry_image_name'],
+                        required: ['project_uuid', 'server_uuid', 'docker_registry_image_name'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -2417,7 +2417,7 @@ class ApplicationsController extends Controller
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             $validationRules = [
-                'docker_registry_image_name' => ['required', 'string', 'max:255', new DockerImageFormat],
+                'docker_registry_image_name' => ['required', 'string', 'max:255', new DockerImageFormat(allowVariableTag: true)],
                 'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
             ];
@@ -2662,7 +2662,7 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'service_name',
                 in: 'query',
-                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.',
                 required: false,
                 schema: new OA\Schema(type: 'string'),
             ),
@@ -2741,7 +2741,7 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'service_name',
                 in: 'query',
-                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.',
                 required: false,
                 schema: new OA\Schema(type: 'string'),
             ),
@@ -2808,20 +2808,13 @@ class ApplicationsController extends Controller
 
             if (! $matchingContainer) {
                 return response()->json([
-                    'message' => "No running container found for service_name '{$serviceName}'.",
+                    'message' => "No container found for service_name '{$serviceName}'.",
                 ], 404);
             }
 
             $container = $matchingContainer;
         } else {
-            $container = $containers->first();
-        }
-
-        $status = getContainerStatus($application->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Application is not running.',
-            ], 400);
+            $container = $containers->firstWhere('State', 'running') ?? $containers->first();
         }
 
         $lines = normalizeLogLines($request->query('lines'));

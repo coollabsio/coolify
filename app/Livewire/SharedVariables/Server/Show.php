@@ -4,6 +4,7 @@ namespace App\Livewire\SharedVariables\Server;
 
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -82,26 +83,21 @@ class Show extends Component
     {
         $canViewValues = auth()->user()?->isAdminOfTeam($this->server->team_id) ?? false;
 
-        return $variables->map(function ($item) use ($canViewValues) {
-            if (! $canViewValues) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
-
-            return "$item->key=$item->value";
-        })->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, $canViewValues))->join("\n");
     }
 
     public function submit()
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('update', $this->server);
-            $this->handleBulkSubmit();
+            $variables = parseEnvDevView($this->variables, SharedEnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            $this->handleBulkSubmit($variables);
             $this->getDevView();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -110,10 +106,8 @@ class Show extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables)
     {
-        $variables = parseEnvFormatToArray($this->variables);
-
         $changesMade = DB::transaction(function () use ($variables) {
             // Delete removed variables
             $deletedCount = $this->deleteRemovedVariables($variables);
@@ -162,10 +156,13 @@ class Show extends Component
             $found = $this->server->environment_variables()->where('key', $key)->first();
 
             if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
-                    if ($found->value !== $value || $found->comment !== $comment) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
+                    if ($found->value !== $value) {
                         $found->value = $value;
-                        $found->comment = $comment;
+                    }
+                    $found->comment = $comment;
+                    $found->fill($data['settings']);
+                    if ($found->isDirty()) {
                         $found->save();
                         $count++;
                     }
@@ -177,6 +174,7 @@ class Show extends Component
                     'comment' => $comment,
                     'is_multiline' => false,
                     'is_literal' => false,
+                    ...$data['settings'],
                     'type' => 'server',
                     'team_id' => $this->server->team_id,
                 ]);

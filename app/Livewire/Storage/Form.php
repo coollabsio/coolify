@@ -33,6 +33,10 @@ class Form extends Component
 
     public string $region;
 
+    public bool $usePathStyleEndpoint = true;
+
+    public bool $usePathStyleEndpointChanged = false;
+
     public string $key;
 
     public string $secret;
@@ -52,6 +56,7 @@ class Form extends Component
             'secret' => 'required|max:255',
             'bucket' => ['required', new ValidS3BucketName],
             'endpoint' => ['required', 'max:255', new SafeWebhookUrl],
+            'usePathStyleEndpoint' => 'boolean',
         ];
     }
 
@@ -82,6 +87,7 @@ class Form extends Component
         'secret' => 'Secret',
         'bucket' => 'Bucket',
         'endpoint' => 'Endpoint',
+        'usePathStyleEndpoint' => 'Use path-style URLs',
     ];
 
     /**
@@ -98,6 +104,7 @@ class Form extends Component
             $this->storage->endpoint = $this->endpoint;
             $this->storage->bucket = $this->bucket;
             $this->storage->region = $this->region;
+            $this->storage->use_path_style_endpoint = $this->usePathStyleEndpoint;
             $this->storage->key = $this->key;
             $this->storage->secret = $this->secret;
             $this->storage->is_usable = $this->isUsable;
@@ -110,6 +117,9 @@ class Form extends Component
             $this->endpointPartsChanged = false;
             $this->bucket = $this->storage->bucket;
             $this->region = $this->storage->region;
+            $this->usePathStyleEndpoint = $this->storage->usesPathStyleEndpoint();
+            // A saved style that detection would not pick is a user choice, so keep it when the endpoint changes.
+            $this->usePathStyleEndpointChanged = $this->usePathStyleEndpoint !== S3Storage::detectPathStyleEndpoint($this->endpoint);
             $canSeeCredentials = auth()->user()?->can('update', $this->storage) ?? false;
             $this->key = $canSeeCredentials ? $this->storage->key : '';
             $this->secret = $canSeeCredentials ? $this->storage->secret : '';
@@ -142,10 +152,13 @@ class Form extends Component
             $testedStorage->endpoint = $this->endpoint;
             $testedStorage->bucket = $this->bucket;
             $testedStorage->region = $this->region;
+            $testedStorage->use_path_style_endpoint = $this->usePathStyleEndpoint;
             $testedStorage->key = $this->key;
             $testedStorage->secret = $this->secret;
 
             $testedStorage->testConnection();
+            $switchedToVirtualHostedStyle = $this->usePathStyleEndpoint && ! $testedStorage->usesPathStyleEndpoint();
+            $this->usePathStyleEndpoint = $testedStorage->usesPathStyleEndpoint();
 
             // Update component property to reflect the new validation status
             $this->isUsable = $testedStorage->is_usable;
@@ -154,7 +167,9 @@ class Form extends Component
             $this->storage->save();
             $this->dispatch('storage-status-changed', isUsable: $this->isUsable);
 
-            return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
+            return $this->dispatch('success', 'Connection is working.', $switchedToVirtualHostedStyle
+                ? 'The provider rejects path-style URLs, so "Use path-style URLs" is now off. Save to keep it.'
+                : 'Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
             if ($testedStorage) {
                 $this->isUsable = $testedStorage->is_usable;
@@ -192,9 +207,11 @@ class Form extends Component
                 $this->storage->unusable_email_sent = false;
                 $this->storage->save();
 
-                // Update local property to reflect success
+                // Update local properties to reflect success
                 $this->isUsable = true;
+                $this->usePathStyleEndpoint = $this->storage->usesPathStyleEndpoint();
             });
+            $this->dispatch('name-changed', uuid: $this->storage->uuid, name: $this->storage->name);
 
             $this->dispatch('success', 'Storage settings updated and connection verified.');
         } catch (\Throwable $e) {
@@ -209,5 +226,13 @@ class Form extends Component
     public function updatedEndpointParts(): void
     {
         $this->endpointPartsChanged = true;
+        if (! $this->usePathStyleEndpointChanged) {
+            $this->usePathStyleEndpoint = S3Storage::detectPathStyleEndpoint(DomainUrlParts::compose(...$this->endpointParts));
+        }
+    }
+
+    public function updatedUsePathStyleEndpoint(): void
+    {
+        $this->usePathStyleEndpointChanged = true;
     }
 }

@@ -170,9 +170,9 @@ class General extends Component
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
-            'installCommand' => ValidationPatterns::shellSafeCommandRules(),
-            'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
-            'startCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'installCommand' => $this->changedCommandRules('installCommand', 'install_command'),
+            'buildCommand' => $this->changedCommandRules('buildCommand', 'build_command'),
+            'startCommand' => $this->changedCommandRules('startCommand', 'start_command'),
             'buildPack' => 'required',
             'staticImage' => ['required', Rule::enum(StaticImageTypes::class)],
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
@@ -215,6 +215,19 @@ class General extends Component
             'watchPaths' => 'nullable',
             'redirect' => 'string|required',
         ];
+    }
+
+    /**
+     * Commands saved before they were validated stay valid until they change. The deployment escapes them as one
+     * argument, and the fields are hidden for build packs other than Nixpacks and Railpack, so a user cannot fix them.
+     */
+    private function changedCommandRules(string $property, string $column): array
+    {
+        if (isset($this->application) && (string) $this->{$property} === (string) $this->application->getOriginal($column)) {
+            return ['nullable'];
+        }
+
+        return ValidationPatterns::shellSafeCommandRules();
     }
 
     protected function messages(): array
@@ -973,6 +986,7 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
+            $this->dispatch('name-changed', uuid: $this->application->uuid, name: $this->application->name);
             $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
             $this->syncData();
             if ($oldPortsExposes !== $this->application->ports_exposes || $oldCustomNetworkAliases !== $this->application->custom_network_aliases) {

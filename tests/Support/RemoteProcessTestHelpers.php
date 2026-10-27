@@ -34,3 +34,11 @@ function fakeRemoteProcesses(array $handlers): void
         return Process::result();
     });
 }
+
+/**
+ * The output of LocalFileVolume::remoteFileStateCommand() when every checked path has the same state.
+ */
+function remoteFileStatesOutput(string $state, int $paths = 20): string
+{
+    return implode("\n", array_map(fn (int $index) => "{$index}:{$state}", range(1, $paths)));
+}

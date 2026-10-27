@@ -43,6 +43,7 @@ beforeEach(function () {
     $this->serviceApplication = ServiceApplication::create(['name' => 'app', 'service_id' => $this->service->id]);
 
     Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
         str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
         str_contains(remoteProcessScript($process), 'test -') => 'NOK',
         default => '',
@@ -106,6 +107,7 @@ test('an absolute directory path keeps working unchanged', function () {
 
 test('deleting a relative path removes it from the resource directory', function () {
     Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('file'),
         str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
         str_contains(remoteProcessScript($process), 'test -f') => 'OK',
         default => 'NOK',

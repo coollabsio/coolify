@@ -1,3 +1,5 @@
+import { parseCookie } from 'cookie';
+
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
 /**
@@ -14,16 +16,54 @@ export const TERMINAL_CLOSE_CODES = Object.freeze({
 export const TERMINAL_REJECTED_SOCKET_TERMINATE_MS = 2000;
 
 /**
- * Authenticates a terminal WebSocket upgrade with the browser's Laravel session
- * cookie and XSRF token. Performs the same checks as the former verifyClient
- * callback; only the way a rejection is reported to the client differs.
- *
- * @param {{ laravelSession?: string, xsrfToken?: string, sessionCookieName: string }} session
- * @param {(path: string, headers: object) => Promise<{ status: number }>} postToCoolify
- * @returns {Promise<{ authenticated: true } | { authenticated: false, closeCode: number, reason: string, status?: number, error?: Error }>}
+ * Limits the Coolify requests that one WebSocket upgrade can cause.
  */
-export async function authenticateTerminalUpgrade({ laravelSession, xsrfToken, sessionCookieName }, postToCoolify) {
-    if (!laravelSession || !xsrfToken) {
+export const MAX_XSRF_TOKEN_CANDIDATES = 5;
+
+/**
+ * Builds the header sets that can authenticate terminal requests to Coolify, one
+ * for each XSRF-TOKEN cookie. The whole browser Cookie header is forwarded, so
+ * Laravel finds its session cookie by its own name (SESSION_COOKIE or the slug
+ * of APP_NAME).
+ *
+ * The browser sends more than one XSRF-TOKEN cookie when a Laravel app on a
+ * parent domain also sets one (for example SESSION_DOMAIN=.example.com). Their
+ * order in the header does not show which one is Coolify's, so the caller must
+ * try each one.
+ *
+ * @param {string | undefined} cookieHeader
+ * @returns {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string }>} empty when a required value is missing
+ */
+export function getTerminalAuthHeaders(cookieHeader) {
+    if (!cookieHeader) {
+        return [];
+    }
+
+    // parseCookie() keeps only the first cookie of a name, so parse each pair alone.
+    const xsrfTokens = cookieHeader
+        .split(';')
+        .map((pair) => parseCookie(pair)['XSRF-TOKEN'])
+        .filter(Boolean);
+
+    return [...new Set(xsrfTokens)]
+        .slice(0, MAX_XSRF_TOKEN_CANDIDATES)
+        .map((xsrfToken) => ({
+            'Cookie': cookieHeader,
+            'X-XSRF-TOKEN': xsrfToken,
+        }));
+}
+
+/**
+ * Authenticates a terminal WebSocket upgrade with the browser's Laravel session
+ * cookie and XSRF token. Returns the headers that Coolify accepted, for the
+ * requests that follow on the same connection.
+ *
+ * @param {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string }>} authHeaderCandidates from getTerminalAuthHeaders()
+ * @param {(path: string, headers: object) => Promise<{ status: number }>} postToCoolify
+ * @returns {Promise<{ authenticated: true, authHeaders: object } | { authenticated: false, closeCode: number, reason: string, status?: number, error?: Error }>}
+ */
+export async function authenticateTerminalUpgrade(authHeaderCandidates, postToCoolify) {
+    if (authHeaderCandidates.length === 0) {
         return {
             authenticated: false,
             closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
@@ -31,22 +71,18 @@ export async function authenticateTerminalUpgrade({ laravelSession, xsrfToken, s
         };
     }
 
+    let status;
+
     try {
-        const response = await postToCoolify('/terminal/auth', {
-            'Cookie': `${sessionCookieName}=${laravelSession}`,
-            'X-XSRF-TOKEN': xsrfToken,
-        });
+        for (const authHeaders of authHeaderCandidates) {
+            const response = await postToCoolify('/terminal/auth', authHeaders);
 
-        if (response.status === 200) {
-            return { authenticated: true };
+            if (response.status === 200) {
+                return { authenticated: true, authHeaders };
+            }
+
+            status = response.status;
         }
-
-        return {
-            authenticated: false,
-            closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
-            reason: 'Unauthorized: Invalid credentials',
-            status: response.status,
-        };
     } catch (error) {
         return {
             authenticated: false,
@@ -55,24 +91,26 @@ export async function authenticateTerminalUpgrade({ laravelSession, xsrfToken, s
             error,
         };
     }
+
+    return {
+        authenticated: false,
+        closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
+        reason: 'Unauthorized: Invalid credentials',
+        status,
+    };
 }
 
 /**
- * Closes a WebSocket that must not be used, optionally sending a legacy text
- * message first for clients that predate close codes. The socket is terminated
- * if the peer does not complete the close handshake quickly.
+ * Closes a WebSocket that must not be used. The socket is terminated if the
+ * peer does not complete the close handshake quickly.
  */
-export function rejectTerminalSocket(ws, closeCode, reason, { message = null, terminateAfterMs = TERMINAL_REJECTED_SOCKET_TERMINATE_MS } = {}) {
+export function rejectTerminalSocket(ws, closeCode, reason, { terminateAfterMs = TERMINAL_REJECTED_SOCKET_TERMINATE_MS } = {}) {
     const terminateTimer = setTimeout(() => ws.terminate(), terminateAfterMs);
     terminateTimer.unref?.();
     ws.once('close', () => clearTimeout(terminateTimer));
     // Rejected sockets have no other listeners; an unhandled 'error' (e.g. a
     // malformed frame from an unauthenticated client) would crash the server.
     ws.on('error', () => ws.terminate());
-
-    if (message !== null) {
-        ws.send(message);
-    }
 
     ws.close(closeCode, reason);
 }

@@ -81,6 +81,7 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
