@@ -121,7 +121,7 @@ final class ScanNotifications
                     continue;
                 }
                 if ($entry['held']) {
-                    $held[$entry['scan_id']] = true;
+                    $held[$entry['scan_id']] = $entry['scanned_at'];
 
                     continue;
                 }
@@ -137,17 +137,18 @@ final class ScanNotifications
                 'digest_ids' => self::merge((array) $state->digest_ids, self::ids(array_column($withAction, 'finding'))),
             ]);
 
-            return [$alert, array_keys($held)];
+            return [$alert, $held];
         });
-
-        foreach ($held as $scanId) {
-            // The wait ends at the latest HOLD_MINUTES after the scan, also when the check never stores a result.
-            ImageScanAlertCheckJob::dispatch((int) $scanId)->delay(now()->addMinutes(self::HOLD_MINUTES + 1));
-        }
 
         $team = $alert === [] ? null : Team::query()->find($teamId);
         if ($team instanceof Team) {
             $team->notify(new ExploitedProblemFound($owner, $alert));
+        }
+
+        // After the alert, so a failed dispatch cannot lose an alert whose IDs are recorded already.
+        foreach ($held as $scanId => $scannedAt) {
+            // The wait ends at the latest HOLD_MINUTES after the scan, also when the check never stores a result.
+            ImageScanAlertCheckJob::dispatch((int) $scanId, $scannedAt)->delay(now()->addMinutes(self::HOLD_MINUTES + 1));
         }
     }
 
@@ -220,7 +221,8 @@ final class ScanNotifications
                 'read_ids' => array_values((array) $state?->notified_ids),
                 'read_digest_ids' => array_values((array) $state?->digest_ids),
                 'read_candidates' => array_values((array) $state?->notified_candidates),
-                'add_ids' => $baseline ? self::ids(array_column($current['signal'], 'finding')) : [],
+                // A fix of an exploited problem that the digest names is not alerted again when its wait ends.
+                'add_ids' => self::ids($baseline ? array_column($current['signal'], 'finding') : $newSignalFixable),
                 'add_digest_ids' => self::ids($baseline ? $current['fixable'] : $newFixable),
                 'add_candidates' => $baseline ? array_keys($current['candidates']) : $newCandidates,
                 'present' => array_keys($current['present']),
@@ -402,7 +404,7 @@ final class ScanNotifications
      *
      * @param  Collection<int, ImageScan>|null  $only
      * @param  ?int  $released  A scan whose findings do not wait for its check any more.
-     * @return array{scans: Collection<int, ImageScan>, signal: list<array{finding: Finding, action: ?SecurityAction, held: bool, incomplete: bool, scan_id: int}>, fixable: list<Finding>, candidates: array<string, array<string, true>>, present: array<string, true>, candidatesChecked: bool, pending: bool}
+     * @return array{scans: Collection<int, ImageScan>, signal: list<array{finding: Finding, action: ?SecurityAction, held: bool, incomplete: bool, scan_id: int, scanned_at: ?string}>, fixable: list<Finding>, candidates: array<string, array<string, true>>, present: array<string, true>, candidatesChecked: bool, pending: bool}
      */
     private static function current(Model $owner, ?Collection $only = null, ?int $released = null): array
     {
@@ -445,6 +447,7 @@ final class ScanNotifications
                         && $scan->scanned_at !== null && $scan->scanned_at->gt(now()->subMinutes(self::HOLD_MINUTES)),
                     'incomplete' => $check['incomplete'],
                     'scan_id' => (int) $scan->getKey(),
+                    'scanned_at' => $scan->scanned_at?->toIso8601String(),
                 ];
             }
             $candidates += self::betterCandidates($scan, $owner);

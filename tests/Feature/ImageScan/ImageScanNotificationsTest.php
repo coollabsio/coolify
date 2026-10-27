@@ -32,6 +32,7 @@ use App\Notifications\ImageScan\ExploitedProblemFound;
 use App\Notifications\ImageScan\VulnerabilityDigest;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanNotifications;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -705,6 +706,37 @@ describe('immediate alert', function () {
             ->and($alert->toWebhook()['status'])->toBe('check_needed');
     });
 
+    it('looks again at a scan that is rescanned while its problems wait', function () {
+        Queue::fake();
+        $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], ['candidates' => null]);
+        ScanNotifications::afterScan($scan);
+
+        $this->travel(30)->minutes();
+        $scan = notifyRefresh($scan, ['scanned_at' => now()]);
+        ScanNotifications::afterScan($scan);
+
+        Queue::assertPushed(ImageScanAlertCheckJob::class, 2);
+        Queue::assertPushed(ImageScanAlertCheckJob::class, fn (ImageScanAlertCheckJob $job) => $job->scannedAt === $scan->scanned_at->toIso8601String());
+    });
+
+    it('sends the alert even when the follow-up of a waiting problem cannot be queued', function () {
+        $scan = notifyScan($this->application, [notifyExploited('CVE-2026-0001'), notifyExploitedWithoutFix('CVE-2026-0002')], ['candidates' => null]);
+        $this->mock(Dispatcher::class)->shouldReceive('dispatch')->andThrow(new RuntimeException('queue down'));
+
+        expect(fn () => ScanNotifications::afterScan($scan))->toThrow(RuntimeException::class);
+
+        expect(array_column(notifySentAlert()->why, 'display_id'))->toBe(['CVE-2026-0001'])
+            ->and(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001']);
+    });
+
+    it('retries the follow-up of a waiting problem when it fails', function () {
+        $job = new ImageScanAlertCheckJob(1, '2026-10-27T10:00:00+00:00');
+
+        expect($job->tries)->toBe(3)
+            ->and($job->backoff())->toBe([60, 300])
+            ->and($job->uniqueId())->toBe('1:2026-10-27T10:00:00+00:00');
+    });
+
     it('alerts at once when the version check job fails', function () {
         Queue::fake();
         $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001', ['epss' => 0.5, 'kev' => false])], ['candidates' => null]);
@@ -854,17 +886,20 @@ describe('digest', function () {
 
     it('names a fix of an exploited problem at once while the resource needs a check', function () {
         $key = 'nginx:1.28@sha256:'.str_repeat('b', 64);
-        notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], ['candidates' => notifyCandidates(), 'scanned_at' => now()->subDays(3)]);
-        notifyState($this->application, ['CVE-2026-0001']);
+        $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], ['candidates' => notifyCandidates(), 'scanned_at' => now()->subDays(3)]);
         notifyStateOf($this->application)->update(['check_reported' => true]);
 
         notifyRunDigest();
+        // The alert does not name the problem again.
+        ScanNotifications::afterScan($scan);
 
         $resource = notifySentDigest()->digest['resources'][0];
         expect($resource['status'])->toBe('check_needed')
             ->and($resource['action'])->toBe('Update to 1.28.')
             ->and(notifyStateOf($this->application)->digest_ids)->toBe(['CVE-2026-0001'])
+            ->and(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001'])
             ->and(notifyStateOf($this->application)->notified_candidates)->toBe([$key]);
+        Notification::assertNotSentTo($this->team, ExploitedProblemFound::class);
     });
 
     it('names held problems after 3 digests while the resource still needs a check', function () {

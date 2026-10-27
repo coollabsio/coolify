@@ -12,31 +12,44 @@ use Illuminate\Queue\InteractsWithQueue;
 
 /**
  * Looks again at the alert of a scan whose exploited problems waited for the version check (spec 15.8). It runs when
- * the wait ends, so the alert is sent even when the check never stores a result.
+ * the wait ends, so the alert is sent even when the check never stores a result. Unique per scan and scan time, so a
+ * rescan of the same row during a wait gets its own run.
  */
 class ImageScanAlertCheckJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
-    public $tries = 1;
+    public $tries = 3;
 
     public $uniqueFor = 7200;
 
-    public function __construct(public int $scanId)
+    /**
+     * @param  ?string  $scannedAt  The scan time of the row when the wait started.
+     */
+    public function __construct(public int $scanId, public ?string $scannedAt = null)
     {
         $this->onQueue('high');
     }
 
     public function uniqueId(): string
     {
-        return (string) $this->scanId;
+        return $this->scanId.':'.$this->scannedAt;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function backoff(): array
+    {
+        return [60, 300];
     }
 
     public function handle(): void
     {
         $scan = ImageScan::query()->find($this->scanId);
         if ($scan instanceof ImageScan) {
-            ScanNotifications::reevaluate($scan);
+            // Errors fail the run, so it is tried again.
+            ScanNotifications::afterScan($scan, candidateCheck: true);
         }
     }
 }
