@@ -55,7 +55,7 @@ class StandaloneKeydb extends BaseModel
         'health_check_start_period',
     ];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
