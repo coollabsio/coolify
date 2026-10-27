@@ -76,11 +76,10 @@ beforeEach(function () {
  */
 function chainedServiceVolumeClones(): array
 {
-    $first = Bus::dispatched(CallQueuedClosure::class)->first();
+    $first = Bus::dispatched(CallQueuedClosure::class)->first() ?? Bus::dispatched(VolumeCloneJob::class)->first();
     expect($first)->not->toBeNull('No volume clone chain was dispatched.');
 
-    return collect($first->chained)
-        ->map(fn (string $job) => unserialize($job))
+    return collect([$first, ...array_map(fn (string $job) => unserialize($job), $first->chained)])
         ->filter(fn ($job) => $job instanceof VolumeCloneJob)
         ->map(fn (VolumeCloneJob $job) => (fn () => [$this->sourceVolume, $this->targetVolume])->call($job))
         ->values()

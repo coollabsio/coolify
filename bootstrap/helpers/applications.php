@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Application\StopApplication;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
@@ -447,6 +447,7 @@ function clone_application(Application $source, $destination, array $overrides =
     }
 
     // Clone persistent volumes
+    $pendingVolumeClones = [];
     $persistentVolumes = $source->persistentStorages()->get();
     foreach ($persistentVolumes as $volume) {
         $newName = '';
@@ -472,27 +473,17 @@ function clone_application(Application $source, $destination, array $overrides =
         $newPersistentVolume->save();
 
         if ($cloneVolumeData) {
-            try {
-                StopApplication::dispatch($source, false, false);
-                $sourceVolume = $volume->name;
-                $targetVolume = $newPersistentVolume->name;
-                $sourceServer = $source->destination->server;
-                $targetServer = $newApplication->destination->server;
-
-                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                queue_application_deployment(
-                    deployment_uuid: new_public_id(),
-                    application: $source,
-                    server: $sourceServer,
-                    destination: $source->destination,
-                    no_questions_asked: true
-                );
-            } catch (Exception $e) {
-                Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-            }
+            $pendingVolumeClones[] = new VolumeCloneJob(
+                $volume->name,
+                $newPersistentVolume->name,
+                $source->destination->server,
+                $newApplication->destination->server,
+                $newPersistentVolume,
+            );
         }
     }
+
+    CloneVolumeDataWithSourceStopped::run($source, $pendingVolumeClones);
 
     // Clone file storages
     $fileStorages = $source->fileStorages()->get();

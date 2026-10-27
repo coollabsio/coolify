@@ -34,6 +34,7 @@
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
     DASH_DEFAULT_VAR: null
+    MAP_EMPTY_FROM_DATABASE: production-value
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -172,6 +173,7 @@
         environment:
           MAP_LITERAL: map-value
           MAP_NULL: null
+          MAP_EMPTY_FROM_DATABASE: production-value
           COOLIFY_BRANCH: '"main"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: api-referenceapplication0001-20260102T030405
@@ -677,6 +679,7 @@
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
     DASH_DEFAULT_VAR: null
+    MAP_EMPTY_FROM_DATABASE: production-value
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -819,6 +822,7 @@
         environment:
           MAP_LITERAL: map-value
           MAP_NULL: null
+          MAP_EMPTY_FROM_DATABASE: production-value
           COOLIFY_BRANCH: '"main"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: api-referenceapplication0001-20260102T030405
@@ -1373,6 +1377,7 @@
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
     DASH_DEFAULT_VAR: null
+    MAP_EMPTY_FROM_DATABASE: production-value
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -1386,9 +1391,9 @@
       required: true
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
-    SERVICE_FQDN_ADMIN: referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_ADMIN: admin.example.com
     SERVICE_FQDN_ADMIN_8080: null
-    SERVICE_FQDN_API: referenceapplication0001.10.0.0.1.sslip.io/api
+    SERVICE_FQDN_API: www.api.example.com
     SERVICE_FQDN_API_V2: api-v2.example.com
     SERVICE_FQDN_BLOG: blog.example.com
     SERVICE_FQDN_MY_APP: my-app.example.com
@@ -1516,6 +1521,7 @@
         environment:
           MAP_LITERAL: map-value
           MAP_NULL: null
+          MAP_EMPTY_FROM_DATABASE: preview-value
           COOLIFY_BRANCH: '"pull/7/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: api-referenceapplication0001-pr-7
@@ -2072,6 +2078,7 @@
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
     DASH_DEFAULT_VAR: null
+    MAP_EMPTY_FROM_DATABASE: production-value
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -2085,9 +2092,9 @@
       required: true
     SELF_REF: null
     SERVICE_BASE64_64_WEB: '<generated:SERVICE_BASE64_64_WEB:64>'
-    SERVICE_FQDN_ADMIN: referenceapplication0001.10.0.0.1.sslip.io
+    SERVICE_FQDN_ADMIN: admin.example.com
     SERVICE_FQDN_ADMIN_8080: null
-    SERVICE_FQDN_API: referenceapplication0001.10.0.0.1.sslip.io/api
+    SERVICE_FQDN_API: www.api.example.com
     SERVICE_FQDN_API_V2: api-v2.example.com
     SERVICE_FQDN_BLOG: blog.example.com
     SERVICE_FQDN_MY_APP: my-app.example.com
@@ -2193,6 +2200,7 @@
         environment:
           MAP_LITERAL: map-value
           MAP_NULL: null
+          MAP_EMPTY_FROM_DATABASE: preview-value
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
           COOLIFY_CONTAINER_NAME: api-referenceapplication0001-pr-8

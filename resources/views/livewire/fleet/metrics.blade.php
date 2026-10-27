@@ -52,14 +52,14 @@ $serverListboxOptions = array_merge(
                             <x-loading compact aria-label="Loading metrics" />
                         </div>
                     </div>
-                    <x-live-toggle :active="$live" storageKey="metrics-live" title="Turn live refresh on or off (updates every 60 seconds)" />
+                    <x-live-toggle :active="$live" storageKey="metrics-live" :restoreLive="$range === '24h'" title="Turn live refresh on or off (updates every 60 seconds)" />
                 </div>
             </div>
         @endif
     </div>
 
-    @if ($live)
-        <div wire:poll.60s="loadData" class="hidden"></div>
+    @if ($this->pollSeconds())
+        <div wire:poll.{{ $this->pollSeconds() }}s="pollData" class="hidden"></div>
     @endif
 
     @if ($servers->isEmpty())

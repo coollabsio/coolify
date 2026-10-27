@@ -38,7 +38,7 @@ beforeEach(function () {
     ]);
 
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'readlink -f') ? 'OK' : 'NOK'
+        output: str_contains(remoteProcessScript($process), 'readlink -f') ? 'OK' : 'NOK'
     ));
 
     $this->processedSaves = 0;
@@ -65,13 +65,13 @@ it('runs the storage save after its mount is committed', function () {
     $volume = createStorageSaveTestMount($this->application);
 
     expect($this->processedSaves)->toBe(0);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mkdir -p'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'mkdir -p'));
 
     DB::commit();
 
     expect($this->processedSaves)->toBe(1)
         ->and($volume->exists)->toBeTrue();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mkdir -p'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mkdir -p'));
 });
 
 it('does not run the storage save after its mount is rolled back', function () {
@@ -81,7 +81,7 @@ it('does not run the storage save after its mount is rolled back', function () {
 
     expect($this->processedSaves)->toBe(0)
         ->and(LocalFileVolume::query()->count())->toBe(0);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mkdir -p'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'mkdir -p'));
 });
 
 it('writes a new file mount immediately when there is no transaction', function () {
@@ -95,7 +95,7 @@ it('writes a new file mount immediately when there is no transaction', function 
     ]);
 
     expect($this->processedSaves)->toBe(1);
-    Process::assertRan(fn ($process) => str_contains($process->command, base64_encode('KEY=value')));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('KEY=value')));
 });
 
 it('does not write compose content outside the resource directory before a deployment', function () {
@@ -114,7 +114,7 @@ it('does not write compose content outside the resource directory before a deplo
     ]);
 
     expect($this->processedSaves)->toBe(0);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, base64_encode('outside-content')));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('outside-content')));
 });
 
 it('writes compose content inside the resource directory immediately', function () {
@@ -133,7 +133,7 @@ it('writes compose content inside the resource directory immediately', function 
     ]);
 
     expect($this->processedSaves)->toBe(1);
-    Process::assertRan(fn ($process) => str_contains($process->command, base64_encode('inside-content')));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('inside-content')));
 });
 
 it('does not write a mount outside the resource directory before a deployment', function () {
@@ -147,5 +147,5 @@ it('does not write a mount outside the resource directory before a deployment', 
     ]);
 
     expect($this->processedSaves)->toBe(0);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, base64_encode('outside-without-compose')));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('outside-without-compose')));
 });

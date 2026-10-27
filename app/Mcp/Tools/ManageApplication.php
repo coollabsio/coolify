@@ -16,7 +16,7 @@ class ManageApplication extends RestActionTool
     protected function actions(): array
     {
         return [
-            'update' => ['method' => 'PATCH', 'path' => 'applications/{uuid}', 'ability' => 'write', 'description' => 'update application settings (data: same fields as the REST update, e.g. name, domains, git_branch, ports_exposes, build_command; instant_deploy and manual_webhook_secret_* need deploy ability)'],
+            'update' => ['method' => 'PATCH', 'path' => 'applications/{uuid}', 'ability' => 'write', 'description' => 'update application settings (data: same fields as the REST update, e.g. name, domains, git_branch, ports_exposes, build_command, is_container_label_readonly_enabled, include_coolify_default_variables; instant_deploy and manual_webhook_secret_* need deploy ability)'],
             'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}', 'ability' => 'deploy', 'confirm' => true, 'description' => 'delete the application and its containers (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
             'clone' => ['method' => 'POST', 'path' => 'applications/{uuid}/clone', 'ability' => 'write', 'description' => 'clone the application to a destination of the team (data: destination_uuid, name, clone_volumes; clone_volumes needs deploy ability)'],
             'move' => ['method' => 'POST', 'path' => 'applications/{uuid}/move', 'ability' => 'write', 'confirm' => true, 'description' => 'move the application to another environment of the team (data: environment_uuid)'],

@@ -182,7 +182,7 @@ it('collects localhost server details after a successful connection check', func
 
     // The connection check also runs SSH multiplexing commands, so answer by command, not by order.
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return str_contains($command, '---PRETTY_NAME---')
             ? Process::result(output: localhostMetadataProcessOutput(), exitCode: 0)

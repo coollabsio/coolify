@@ -240,5 +240,5 @@ it('keeps the Fluent Bit drain running if CloudWatch is also enabled, matching t
 
     StartLogDrain::run($server);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'log-drains/docker-compose.yml up -d'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'log-drains/docker-compose.yml up -d'));
 });

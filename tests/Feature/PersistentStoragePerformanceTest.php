@@ -25,7 +25,7 @@ beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'readlink -f') ? 'OK' : ''
+        output: str_contains(remoteProcessScript($process), 'readlink -f') ? 'OK' : ''
     ));
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
         ['id' => 0],

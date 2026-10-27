@@ -124,6 +124,19 @@ test('buildRestoreCommand dump-all PostgreSQL restore is pg_restore for PGDMP ot
         ->and(strpos($command, 'kind=archive'))->toBeLessThan(strpos($command, 'dropdb'));
 });
 
+test('dump-all PostgreSQL restore does not stop on the errors every pg_dumpall dump produces', function () {
+    $component = importFormWithResource('App\Models\StandalonePostgresql');
+    $component->dumpAll = true;
+
+    // A pg_dumpall dump always runs CREATE ROLE for the existing superuser (and CREATE DATABASE
+    // for the recreated target database), and an archive with owners can reference missing
+    // roles. Stopping on that first error would leave the server without the dropped databases.
+    expect($component->buildRestoreCommand('/tmp/test.dump'))
+        ->not->toContain('ON_ERROR_STOP')
+        ->not->toContain('--exit-on-error')
+        ->not->toContain('--single-transaction');
+});
+
 test('dump-all PostgreSQL import text shows the client chosen by the dump format', function () {
     $component = importFormWithResource('App\Models\StandalonePostgresql');
     $component->updatedDumpAll(true);
@@ -132,8 +145,9 @@ test('dump-all PostgreSQL import text shows the client chosen by the dump format
 });
 
 test('dump-all PostgreSQL restore selects the client for the dump format', function (string $contents, bool $gzip, string $restore, array $preflight) {
-    // Check the archive, terminate sessions, list databases, recreate the target database, then restore.
-    expect(invokedPostgresRestoreClients($contents, $gzip))->toBe([...$preflight, 'psql:', 'psql:', 'psql:', 'createdb:', $restore]);
+    // Check the archive, terminate sessions, list databases, recreate the target database and the
+    // postgres database (POSTGRES_DB is "app" here), then restore.
+    expect(invokedPostgresRestoreClients($contents, $gzip))->toBe([...$preflight, 'psql:', 'psql:', 'psql:', 'createdb:', 'createdb:', $restore]);
 })->with([
     'custom archive' => ['PGDMP'.str_repeat("\0", 16), false, 'pg_restore:PGDMP', ['pg_restore:PGDMP']],
     'gzip custom archive' => ['PGDMP'.str_repeat("\0", 16), true, 'pg_restore:PGDMP', ['pg_restore:PGDMP']],

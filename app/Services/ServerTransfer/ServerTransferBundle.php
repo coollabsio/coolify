@@ -213,6 +213,7 @@ class ServerTransferBundle
                 }
 
                 foreach (self::items($environment['databases'] ?? null) as $d => $database) {
+                    self::checkDatabasePorts($errors, "{$at}.databases.{$d}", (array) ($database['attributes'] ?? []));
                     self::checkStorages($errors, "{$at}.databases.{$d}", $database);
                     self::checkScheduledBackups($errors, "{$at}.databases.{$d}", $database);
                 }
@@ -393,6 +394,40 @@ class ServerTransferBundle
         foreach (self::items($database['scheduled_backups'] ?? null) as $i => $backup) {
             self::checkCron($errors, "{$at}.scheduled_backups.{$i}.frequency", $backup['frequency'] ?? null);
             self::checkPath($errors, "{$at}.scheduled_backups.{$i}.databases_to_backup", $backup['databases_to_backup'] ?? null);
+        }
+    }
+
+    /**
+     * Checks the port values of a database. Older databases were saved before the UI checked them
+     * (March 2026), so this accepts any public port in 1-65535, spaces around mappings, empty entries,
+     * and container-only ports. It refuses values that are not ports, because they reach the compose file.
+     *
+     * @param  list<string>  $errors
+     * @param  array<string, mixed>  $attributes
+     */
+    private static function checkDatabasePorts(array &$errors, string $at, array $attributes): void
+    {
+        if (array_key_exists('public_port', $attributes)) {
+            self::check($errors, "{$at}.public_port", $attributes['public_port'], ['nullable', 'integer', 'between:1,65535']);
+        }
+
+        if (! array_key_exists('ports_mappings', $attributes) || $attributes['ports_mappings'] === null) {
+            return;
+        }
+        $mappings = $attributes['ports_mappings'];
+        if (! is_string($mappings)) {
+            $errors[] = "{$at}.ports_mappings must be a string.";
+
+            return;
+        }
+        foreach (explode(',', $mappings) as $mapping) {
+            $mapping = trim($mapping, " \t");
+            if ($mapping === '' || preg_match('/^\d+(?:-\d+)?(?:\/(?:tcp|udp|sctp))?$/', $mapping) === 1 || preg_match(ValidationPatterns::PORT_MAPPINGS_PATTERN, $mapping) === 1) {
+                continue;
+            }
+            $errors[] = "{$at}.ports_mappings must be a comma-separated list of port mappings (e.g. 5432:5432,127.0.0.1:8080:80/udp).";
+
+            return;
         }
     }
 }

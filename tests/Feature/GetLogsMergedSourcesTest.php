@@ -118,7 +118,7 @@ it('rejects a foreign server or an invalid container name before reading logs', 
 
 it('merges container logs by timestamp and tags each line with its source', function () {
     Process::fake(function (PendingProcess $process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : (string) $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'web-helsinki')) {
             return Process::result(output: "2026-09-28T10:00:02Z second\n2026-09-28T10:00:01Z first\n");
         }
@@ -161,7 +161,7 @@ it('merges container logs by timestamp and tags each line with its source', func
 it('asks each source only for lines after its own timestamp', function () {
     $commands = [];
     Process::fake(function (PendingProcess $process) use (&$commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : (string) $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands[] = $command;
 
         return Process::result(output: "2026-09-28T10:00:03Z line\n");

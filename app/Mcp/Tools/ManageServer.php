@@ -17,7 +17,7 @@ class ManageServer extends RestActionTool
     {
         return [
             'create' => ['method' => 'POST', 'path' => 'servers', 'ability' => 'write', 'description' => 'add a server (data: ip, private_key_uuid, name, description, port, user, server_role, proxy_type, instant_validate)'],
-            'update' => ['method' => 'PATCH', 'path' => 'servers/{uuid}', 'ability' => 'write', 'description' => 'update a server (data: name, description, ip, port, user, private_key_uuid, server_role, proxy_type, concurrent_builds, dynamic_timeout, deployment_queue_limit, connection_timeout, is_terminal_enabled, server_disk_usage_*; changing proxy_type needs deploy ability)'],
+            'update' => ['method' => 'PATCH', 'path' => 'servers/{uuid}', 'ability' => 'write', 'description' => 'update a server (data: name, description, ip, port, user, private_key_uuid, server_role, proxy_type, concurrent_builds, dynamic_timeout, deployment_queue_limit, connection_timeout, is_terminal_enabled, server_disk_usage_*, wildcard_domain, server_timezone, backup_compression_cpu_percentage; changing proxy_type needs deploy ability)'],
             'delete' => ['method' => 'DELETE', 'path' => 'servers/{uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete a server without resources (the Coolify host cannot be deleted)'],
             'validate' => ['method' => 'POST', 'path' => 'servers/{uuid}/validate', 'ability' => 'write', 'description' => 'start a server validation (data: install=true also installs Docker and needs deploy ability)'],
         ];

@@ -157,9 +157,9 @@ it('lists through a locked-down helper container that runs as the container proc
     $server->update(['user' => 'root']);
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
-        return str_contains($process->command, '/status')
+        return str_contains(remoteProcessScript($process), '/status')
             ? Process::result(output: fsProcessStatus('65532', '0', '0 1000', '0000000000000000'))
             : Process::result(output: "regular file\t9\t1\t644\troot\troot\t./users.yml");
     });
@@ -189,7 +189,7 @@ it('wraps the helper command in one sudo shell for non-root servers', function (
     $server->update(['user' => 'deploy']);
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return count($commands) === 1
             ? Process::result(output: fsProcessStatus('0', '0', '0', '00000000a80425fb'))
@@ -264,7 +264,7 @@ it('writes content near or above the shell argument limit via docker cp', functi
 
     (new ContainerFilesystemService($server, 'app-123'))->write('/app/big.txt', str_repeat('a', $size));
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker cp'));
 })->with([96 * 1024, 200_000]);
 
 it('base64-encodes content in the write command', function () {
@@ -363,8 +363,8 @@ it('uploads by scp-ing to the server then docker cp into the container', functio
 
     (new ContainerFilesystemService($server, 'app-123'))->upload($local, '/app/plugins/x.jar');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp')
-        && str_contains($process->command, 'app-123'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker cp')
+        && str_contains(remoteProcessScript($process), 'app-123'));
     @unlink($local);
 });
 
@@ -379,7 +379,7 @@ it('executes read guards for real file bytes through the non-root sudo parser', 
     $path = tempnam(sys_get_temp_dir(), 'fs-read-');
     file_put_contents($path, $content);
     Process::fake(function ($process) {
-        $lines = explode("\n", $process->command);
+        $lines = explode("\n", remoteProcessScript($process));
         $body = implode("\n", array_slice($lines, 1, -1));
         $local = new Symfony\Component\Process\Process([
             'bash', '-c',
@@ -415,7 +415,7 @@ it('rejects a symlink to an oversized file before reading its content', function
     fclose($handle);
     symlink($path, $link);
     Process::fake(function ($process) {
-        $body = implode("\n", array_slice(explode("\n", $process->command), 1, -1));
+        $body = implode("\n", array_slice(explode("\n", remoteProcessScript($process)), 1, -1));
         $local = new Symfony\Component\Process\Process(['bash', '-c', 'sudo() { "$@"; }; docker() { shift 2; "$@"; }; export -f sudo docker;'."\n".$body]);
         $local->run();
 
@@ -461,13 +461,13 @@ it('streams the remote command output to the writer in chunks', function () {
     $server = fsServer();
     $svc = new class($server, 'app-123') extends ContainerFilesystemService
     {
-        public ?string $remoteCommand = null;
+        public string $stdinFile;
 
-        protected function sshCommand(string $command): string
+        protected function sshCommand(): string
         {
-            $this->remoteCommand = $command;
+            $this->stdinFile = tempnam(sys_get_temp_dir(), 'fs-stream-');
 
-            return 'head -c 200000 /dev/zero';
+            return 'cat > '.escapeshellarg($this->stdinFile).'; head -c 200000 /dev/zero';
         }
     };
     $received = '';
@@ -478,7 +478,9 @@ it('streams the remote command output to the writer in chunks', function () {
         $chunks++;
     });
 
-    expect($svc->remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'");
+    $remoteCommand = file_get_contents($svc->stdinFile);
+    unlink($svc->stdinFile);
+    expect($remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'\n");
     expect(strlen($received))->toBe(200000);
     expect($chunks)->toBeGreaterThan(1);
 });

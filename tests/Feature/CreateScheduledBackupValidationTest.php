@@ -226,7 +226,7 @@ it('backs up sqlite files added to the database after the backup was scheduled',
 
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push(is_array($process->command) ? implode(' ', $process->command) : $process->command);
+        $commands->push(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process));
 
         return Process::result(output: '');
     });

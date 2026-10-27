@@ -114,7 +114,7 @@ class CheckProxy
             $results = Process::concurrently(function ($pool) use ($server, $ports, $proxyContainerName) {
                 foreach ($ports as $port) {
                     $commands = $this->buildPortCheckCommands($server, $port, $proxyContainerName);
-                    $pool->command($commands['ssh_command'])->timeout(10);
+                    $pool->command($commands['ssh_command'])->input($commands['input'])->timeout(10);
                 }
             });
 
@@ -152,10 +152,10 @@ class CheckProxy
     private function buildPortCheckCommands(Server $server, int $port, string $proxyContainerName): array
     {
         $portCheckScript = $this->buildPortCheckScript($port, $proxyContainerName);
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $portCheckScript);
 
         return [
-            'ssh_command' => $sshCommand,
+            'ssh_command' => SshMultiplexingHelper::generateSshBatchCommand($server),
+            'input' => SshMultiplexingHelper::sshBatchInput($portCheckScript),
             'script' => $portCheckScript,
         ];
     }

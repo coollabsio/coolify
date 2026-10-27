@@ -5395,7 +5395,7 @@
                     "Applications"
                 ],
                 "summary": "Update Storage",
-                "description": "Update a persistent storage or file storage by application UUID.",
+                "description": "Update a persistent storage or file storage by application UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.",
                 "operationId": "update-storage-by-application-uuid",
                 "parameters": [
                     {
@@ -10286,7 +10286,7 @@
                     "Databases"
                 ],
                 "summary": "Update Storage",
-                "description": "Update a persistent storage or file storage by database UUID.",
+                "description": "Update a persistent storage or file storage by database UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.",
                 "operationId": "update-storage-by-database-uuid",
                 "parameters": [
                     {
@@ -17932,7 +17932,7 @@
                     "Servers"
                 ],
                 "summary": "Migrate server to another Coolify instance",
-                "description": "Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. Follow the progress with GET \/servers\/{uuid}\/transfer. The target URL must use https. Requires read:sensitive and write.",
+                "description": "Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. All secrets of the server, also locked environment variables, are sent to the target. Follow the progress with GET \/servers\/{uuid}\/transfer. The target URL must use https. Requires read:sensitive and write, and the owner role of the server team.",
                 "operationId": "migrate-server-between-instances",
                 "parameters": [
                     {
@@ -17973,7 +17973,7 @@
                         "description": "Transfer started"
                     },
                     "403": {
-                        "description": "Missing sensitive permission"
+                        "description": "Missing sensitive permission or not an owner of the server team"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -21735,7 +21735,7 @@
                     "Services"
                 ],
                 "summary": "Update Storage",
-                "description": "Update a persistent storage or file storage by service UUID.",
+                "description": "Update a persistent storage or file storage by service UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.",
                 "operationId": "update-storage-by-service-uuid",
                 "parameters": [
                     {

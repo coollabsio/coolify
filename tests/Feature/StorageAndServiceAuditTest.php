@@ -47,7 +47,7 @@ beforeEach(function () {
     Bus::fake();
     // Remote `test -f` / `test -d` probes report a missing path; path confinement checks pass.
     Process::fake(fn ($process) => Process::result(
-        output: str_contains(implode(' ', (array) $process->command), '&& echo OK || echo NOK') ? 'NOK' : 'OK'
+        output: str_contains(implode(' ', (array) remoteProcessScript($process)), '&& echo OK || echo NOK') ? 'NOK' : 'OK'
     ));
     Server::flushIdentityMap();
 

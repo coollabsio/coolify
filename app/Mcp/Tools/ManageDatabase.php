@@ -16,7 +16,7 @@ class ManageDatabase extends RestActionTool
     protected function actions(): array
     {
         return [
-            'update' => ['method' => 'PATCH', 'path' => 'databases/{uuid}', 'ability' => 'write', 'description' => 'update database settings (data: name, description, image, is_public, public_port, public_port_timeout, limits_*, type credentials and *_conf fields, redact_all_env_values_in_logs, instant_deploy; instant_deploy and changing is_public need deploy ability)'],
+            'update' => ['method' => 'PATCH', 'path' => 'databases/{uuid}', 'ability' => 'write', 'description' => 'update database settings (data: name, description, image, is_public, public_port, public_port_timeout, limits_*, type credentials and *_conf fields, redact_all_env_values_in_logs, is_log_drain_enabled, include_coolify_default_variables, instant_deploy; instant_deploy and changing is_public need deploy ability)'],
             'delete' => ['method' => 'DELETE', 'path' => 'databases/{uuid}', 'ability' => 'deploy', 'confirm' => true, 'description' => 'delete the database (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup; all default true)'],
             'clone' => ['method' => 'POST', 'path' => 'databases/{uuid}/clone', 'ability' => 'write', 'confirm' => true, 'description' => 'clone the database to a destination of the team (data: destination_uuid, name, clone_volumes; clone_volumes stops the source database while volumes are copied and needs deploy ability)'],
             'move' => ['method' => 'POST', 'path' => 'databases/{uuid}/move', 'ability' => 'write', 'confirm' => true, 'description' => 'move the database to another environment of the team (data: environment_uuid)'],

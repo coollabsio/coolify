@@ -473,7 +473,7 @@ describe('isolated Docker with Sysbox', function () {
             ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
             ->call('checkSysbox');
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'test -x /usr/bin/fusermount3'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'test -x /usr/bin/fusermount3'));
     });
 
     it('shows the install button when Sysbox is missing', function () {
@@ -495,7 +495,7 @@ describe('isolated Docker with Sysbox', function () {
             ->call('installSysbox')
             ->assertNotDispatched('activityMonitor');
 
-        Process::assertRanTimes(fn ($process) => str_contains($process->command, 'apt-get'), 1);
+        Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'apt-get'), 1);
     });
 
     it('does not let members install Sysbox', function () {

@@ -562,6 +562,7 @@ test('restores PostgreSQL backups containing all databases after checking the fo
         ['psql', '', ["-U {$user} -d template1 -t -c", 'SELECT datname FROM pg_database']],
         ['dropdb', '', ["-U {$user} --maintenance-db=template1 --if-exists app"]],
         ['createdb', '', ["-U {$user} app"]],
+        ['createdb', '', ["-U {$user} postgres"]],
     ];
     $inspect = $restoreCall[0] === 'pg_restore' ? [['pg_restore', 'PGDMP', ['-l']]] : [];
 

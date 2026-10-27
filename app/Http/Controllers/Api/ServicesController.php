@@ -1573,7 +1573,9 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
-        $env->value = $request->value;
+        if ($request->has('value')) {
+            $env->value = $request->value;
+        }
         if ($request->has('is_literal')) {
             $env->is_literal = $request->is_literal;
         }
@@ -2760,7 +2762,7 @@ class ServicesController extends Controller
 
     #[OA\Patch(
         summary: 'Update Storage',
-        description: 'Update a persistent storage or file storage by service UUID.',
+        description: 'Update a persistent storage or file storage by service UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.',
         path: '/services/{uuid}/storages',
         operationId: 'update-storage-by-service-uuid',
         security: [

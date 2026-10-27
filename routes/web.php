@@ -193,6 +193,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
     Route::get('/two-factor-required', TwoFactorRequired::class)->name('two-factor.required');
+    // A member without 2FA can leave a team that requires it, but only for a team that does not.
+    Route::post('/two-factor-required/switch-team', function (Request $request) {
+        $team = $request->user()->teams()
+            ->whereKey($request->integer('team_id'))
+            ->where('is_two_factor_required', false)
+            ->first();
+        if (! $team) {
+            return redirect()->route('two-factor.required');
+        }
+        refreshSession($team);
+
+        return redirect()->route('dashboard');
+    })->name('two-factor.required.switch-team');
 
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
