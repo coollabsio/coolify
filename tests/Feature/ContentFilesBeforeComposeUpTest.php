@@ -379,14 +379,14 @@ test('a deployment to an additional server writes missing content files on that 
         ->and(ContentFilesUpRecorder::ssh()[$write])->not->toContain("@'{$this->server->ip}'");
 });
 
-test('a Dockerfile deployment to an additional server writes missing content files before the container starts', function () {
+test('a Dockerfile deployment to an additional server writes missing content files before the container starts', function (string $state) {
     $this->application->update(['build_pack' => 'dockerfile', 'docker_compose_location' => null]);
     $volume = contentFilesVolume($this->application, 'config/app.conf');
     $otherServer = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->server->private_key_id,
     ])->fresh();
-    fakeContentFilesServer([$volume->fs_path => 'missing']);
+    fakeContentFilesServer([$volume->fs_path => $state]);
 
     $job = new ContentFilesUpDeploymentJob;
     $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
@@ -421,11 +421,20 @@ test('a Dockerfile deployment to an additional server writes missing content fil
         ->and($write)->toBeLessThan($up)
         ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
         ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
+    if ($state === 'empty-directory') {
+        $writeCommand = ContentFilesUpRecorder::ssh()[$write];
+        $escapedPath = escapeshellarg($volume->fs_path);
+        expect(strpos($writeCommand, "rmdir {$escapedPath}"))->toBeLessThan(strpos($writeCommand, "tee {$escapedPath}"));
+    }
 
     $connect = ContentFilesUpRecorder::indexOf('deployment', "docker network connect '{$this->destination->network}' coolify-proxy");
     expect($connect)->not->toBeNull()
         ->and($connect)->toBeLessThan($up);
-});
+})->with([
+    'missing file' => ['missing'],
+    // Docker creates a missing bind source as an empty directory (#10398).
+    'empty directory left by Docker' => ['empty-directory'],
+]);
 
 test('the content file check and write are safe for non-root servers', function () {
     $this->server->update(['user' => 'ubuntu']);
