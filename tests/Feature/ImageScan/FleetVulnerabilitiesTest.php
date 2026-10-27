@@ -237,6 +237,40 @@ describe('page', function () {
             ->assertSee('Not checked (0)');
     });
 
+    it('ignores malformed status filters in the URL', function (mixed $statuses, array $expected) {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('available-app'), 'update_available');
+
+        $page = fleetPage($this->admin, query: ['statuses' => $statuses])
+            ->assertOk()
+            ->assertSet('statuses', $expected)
+            ->assertSee('now-app');
+
+        if ($expected === []) {
+            $page->assertSee('available-app');
+        }
+    })->with([
+        'a string' => ['foo', []],
+        'a number' => ['5', []],
+        'nested arrays' => [[['x']], []],
+        'unknown and nested values next to a status' => [['update_now', ['x'], 'foo'], ['update_now']],
+    ]);
+
+    it('ignores malformed server and project filters sent with an update', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+
+        fleetPage($this->admin)
+            ->set('servers', 'not-a-list')
+            ->assertOk()
+            ->assertSet('servers', [])
+            ->set('projects', [['nested'], 7])
+            ->assertOk()
+            ->assertSet('projects', [])
+            ->call('toggleServer', $this->server->uuid)
+            ->assertOk()
+            ->assertSee('now-app');
+    });
+
     it('explains a check needed and a resource that is not checked in the Action column', function () {
         $check = fleetApplication('check-app');
         fleetScan($check, 'check_needed');

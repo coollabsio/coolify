@@ -25,15 +25,20 @@ class FleetVulnerabilities extends Component
     #[Url(except: '')]
     public string $search = '';
 
-    /** @var list<string> Server UUIDs. */
-    public array $servers = [];
+    /**
+     * Untyped, like $projects and $statuses: a malformed URL or request value (a string, nested arrays) must not fail
+     * the page. `normalizeFilters()` keeps only known string values.
+     *
+     * @var list<string> Server UUIDs.
+     */
+    public $servers = [];
 
     /** @var list<string> Project UUIDs. */
-    public array $projects = [];
+    public $projects = [];
 
     /** @var list<string> SecurityStatusType values. */
     #[Url(except: [])]
-    public array $statuses = [];
+    public $statuses = [];
 
     public int $perPage = 25;
 
@@ -61,9 +66,24 @@ class FleetVulnerabilities extends Component
 
     public function updated(string $property): void
     {
+        $this->normalizeFilters();
+
         if (in_array($property, ['search', 'perPage'], true)) {
             $this->resetPage();
         }
+    }
+
+    /**
+     * Keeps only string values, and only allowed statuses. Servers and projects are checked against the options in
+     * render().
+     */
+    private function normalizeFilters(): void
+    {
+        $strings = fn (mixed $values): array => array_values(array_unique(array_filter(is_array($values) ? $values : [], 'is_string')));
+
+        $this->servers = $strings($this->servers);
+        $this->projects = $strings($this->projects);
+        $this->statuses = array_values(array_intersect($strings($this->statuses), TeamVulnerabilities::STATUS_ORDER));
     }
 
     public function toggleServer(string $uuid): void
@@ -106,6 +126,7 @@ class FleetVulnerabilities extends Component
 
     public function render(): View
     {
+        $this->normalizeFilters();
         $user = auth()->user();
         $team = currentTeam();
         $allowed = (bool) instanceSettings()->is_image_scanning_allowed;
@@ -123,7 +144,6 @@ class FleetVulnerabilities extends Component
             ->mapWithKeys(fn ($project) => [$project->uuid => $project->name])->sort(SORT_NATURAL | SORT_FLAG_CASE)->all();
         $this->servers = array_values(array_intersect($this->servers, array_keys($serverOptions)));
         $this->projects = array_values(array_intersect($this->projects, array_keys($projectOptions)));
-        $this->statuses = array_values(array_intersect(array_map('strval', $this->statuses), TeamVulnerabilities::STATUS_ORDER));
 
         $inScope = $entries->filter(fn (array $entry): bool => ($this->servers === [] || in_array($entry['server']?->uuid, $this->servers, true))
             && ($this->projects === [] || in_array($entry['project']?->uuid, $this->projects, true)))->values();
