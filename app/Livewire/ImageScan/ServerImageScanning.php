@@ -5,6 +5,7 @@ namespace App\Livewire\ImageScan;
 use App\Jobs\PrepareImageScannerJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ScannerCommands;
 use App\Traits\ListensToTeamChannel;
 use Carbon\CarbonImmutable;
@@ -154,6 +155,10 @@ class ServerImageScanning extends Component
             'enabled' => (bool) $this->server->settings->is_image_scan_enabled,
             'prepareState' => is_string($state) ? $state : null,
             'failedStep' => is_string($failedStep) ? $failedStep : null,
+            'registries' => collect(config('constants.image_scan.images'))
+                ->map(fn (array $image) => ImageRef::parse($image['repo'])->registry)
+                ->unique()
+                ->implode(', '),
             'diskUsed' => is_int($diskUsed) ? formatBytes($diskUsed, 1) : null,
             'toolVersions' => collect(['syft' => 'Syft', 'grype' => 'Grype', 'regctl' => 'regctl'])
                 ->map(fn (string $name, string $tool) => $name.' '.config("constants.image_scan.images.{$tool}.version"))

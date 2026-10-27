@@ -56,7 +56,7 @@ function imageScanningPage(): Testable
 function fakeScannerPreparation(array $overrides = []): void
 {
     $outputs = array_merge([
-        'prepare' => "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0",
+        'prepare' => "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0\ncoolify-scan-exit pull-init 0\ncoolify-scan-exit db-volume 0",
         'db-update' => 'coolify-scan-exit db-update 0',
         'disk' => "coolify-scan-exit disk-db 0 1000\ncoolify-scan-exit disk-sboms 0 234",
         'db-status' => "coolify-scan-exit db-status 0 90\ncoolify-scan-payload\n".json_encode(['built' => '2026-10-25T08:15:00Z', 'valid' => true]),
@@ -295,7 +295,7 @@ describe('prepare image scanner job', function () {
             }
 
             return Process::result(output: str_contains($process->command, 'docker pull')
-                ? "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0"
+                ? "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0\ncoolify-scan-exit pull-init 0\ncoolify-scan-exit db-volume 0"
                 : '');
         });
 
@@ -322,6 +322,37 @@ describe('prepare image scanner job', function () {
             ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBe('pulling');
         Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
     });
+
+    it('marks a failed storage setup and stops before the database update', function () {
+        fakeScannerPreparation(['prepare' => "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0\ncoolify-scan-exit pull-init 0\ncoolify-scan-exit db-volume 1"]);
+
+        (new PrepareImageScannerJob($this->server))->handle();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('failed')
+            ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBe('setup');
+        Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+    });
+
+    it('marks a connection failure separately from a failed pull', function () {
+        Process::fake(fn () => Process::result(errorOutput: 'ssh: connect to host failed', exitCode: 255));
+
+        (new PrepareImageScannerJob($this->server))->handle();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('failed')
+            ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBe('connection');
+    });
+
+    it('names the step that failed and the registry the images come from', function (string $step, string $text) {
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'failed');
+        Cache::put(PrepareImageScannerJob::failedStepCacheKey($this->server), $step);
+
+        imageScanningPage()->assertSee($text)->assertDontSee('ghcr.io');
+    })->with([
+        'pull' => ['pulling', 'Coolify could not pull the scanner images. Check that the server can reach docker.io.'],
+        'setup' => ['setup', 'Coolify could not set up the scanner storage on the server.'],
+        'connection' => ['connection', 'Coolify could not connect to the server.'],
+    ]);
 
     it('marks a failed database update', function () {
         fakeScannerPreparation(['db-update' => 'coolify-scan-exit db-update 1']);

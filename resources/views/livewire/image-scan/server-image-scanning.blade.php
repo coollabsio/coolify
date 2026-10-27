@@ -10,7 +10,7 @@
         $pullState = match ($prepareState) {
             'pulling' => 'running',
             'updating_database', 'ready' => 'success',
-            'failed' => $failedStep === 'pulling' ? 'error' : 'success',
+            'failed' => in_array($failedStep, ['pulling', 'setup', 'connection'], true) ? 'error' : 'success',
             default => 'idle',
         };
         $databaseState = match ($prepareState) {
@@ -53,7 +53,11 @@
                                 :description="match ($pullState) {
                                     'running' => 'Pulling the scanner images.',
                                     'success' => 'The scanner images are on this server.',
-                                    'error' => 'Coolify could not pull the scanner images. Check that the server can reach ghcr.io.',
+                                    'error' => match ($failedStep) {
+                                        'setup' => 'Coolify could not set up the scanner storage on the server. Check that the SSH user can run Docker commands.',
+                                        'connection' => 'Coolify could not connect to the server. Check that the server is reachable, then try again.',
+                                        default => 'Coolify could not pull the scanner images. Check that the server can reach ' . $registries . '.',
+                                    },
                                     default => 'Not done yet.',
                                 }" />
                             <x-checkpoint-item title="Update database" icon="database" :status="$databaseState"

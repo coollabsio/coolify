@@ -39,6 +39,12 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
 
     public const STATE_FAILED = 'failed';
 
+    public const FAILED_PULLING = 'pulling';
+
+    public const FAILED_SETUP = 'setup';
+
+    public const FAILED_CONNECTION = 'connection';
+
     public $timeout = 3600;
 
     public $tries = ScanResourceImagesJob::MAX_ATTEMPTS;
@@ -109,7 +115,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
             $this->prepare($server, $settings->image_scan_db_url);
         } catch (\Throwable $e) {
             report($e);
-            $this->setState($server, self::STATE_FAILED);
+            $this->setState($server, self::STATE_FAILED, self::FAILED_CONNECTION);
         }
     }
 
@@ -124,12 +130,22 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
 
         $this->setState($server, self::STATE_PULLING);
         $pulled = self::run($commands->prepare(), $server, self::TIMEOUT_PREPARE);
-        foreach (['pull-syft', 'pull-grype', 'pull-regctl'] as $step) {
+        if ($pulled['exit_codes'] === []) {
+            $this->setState($server, self::STATE_FAILED, self::FAILED_CONNECTION);
+
+            return;
+        }
+        foreach (['pull-syft', 'pull-grype', 'pull-regctl', 'pull-init'] as $step) {
             if (($pulled['exit_codes'][$step] ?? null) !== 0) {
-                $this->setState($server, self::STATE_FAILED);
+                $this->setState($server, self::STATE_FAILED, self::FAILED_PULLING);
 
                 return;
             }
+        }
+        if (($pulled['exit_codes']['db-volume'] ?? null) !== 0) {
+            $this->setState($server, self::STATE_FAILED, self::FAILED_SETUP);
+
+            return;
         }
 
         if (! $this->isStillEnabled($server)) {
@@ -216,12 +232,16 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         return $enabled;
     }
 
-    private function setState(Server $server, string $state): void
+    /**
+     * @param  string|null  $failedStep  one of the FAILED_* steps; without it a failure is put on the running step
+     */
+    private function setState(Server $server, string $state, ?string $failedStep = null): void
     {
         $running = in_array($state, [self::STATE_PULLING, self::STATE_UPDATING_DATABASE], true);
         $previous = Cache::get(self::stateCacheKey($server));
-        if ($state === self::STATE_FAILED && in_array($previous, [self::STATE_PULLING, self::STATE_UPDATING_DATABASE], true)) {
-            Cache::put(self::failedStepCacheKey($server), $previous, now()->addDays(7));
+        $failedStep ??= in_array($previous, [self::STATE_PULLING, self::STATE_UPDATING_DATABASE], true) ? $previous : null;
+        if ($state === self::STATE_FAILED && $failedStep !== null) {
+            Cache::put(self::failedStepCacheKey($server), $failedStep, now()->addDays(7));
         } elseif ($running) {
             Cache::forget(self::failedStepCacheKey($server));
         }

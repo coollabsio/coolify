@@ -72,6 +72,8 @@ class ScannerCommands
 
     private const TIMEOUT_PULL = 600;
 
+    private const TIMEOUT_VOLUME_SETUP = 120;
+
     public function __construct(public readonly Server $server, public readonly string $runId)
     {
         if (preg_match('/\A[a-z0-9]{8,32}\z/', $runId) !== 1) {
@@ -80,7 +82,7 @@ class ScannerCommands
     }
 
     /**
-     * Creates the SBOM directory and the Grype database volume, and pulls the three scanner images.
+     * Creates the SBOM directory, pulls the scanner images, and sets up the Grype database volume.
      *
      * @return list<string>
      */
@@ -89,11 +91,11 @@ class ScannerCommands
         return [
             $this->removeContainer(),
             ...$this->sbomDirectory(),
-            ...$this->databaseVolume(),
             ...array_map(
                 fn (string $tool) => $this->step("pull-{$tool}", 'timeout -k 10 '.self::TIMEOUT_PULL.' docker pull '.escapeshellarg($this->image($tool)).' >/dev/null 2>&1'),
-                ['syft', 'grype', 'regctl'],
+                ['syft', 'grype', 'regctl', 'init'],
             ),
+            $this->databaseVolume(),
         ];
     }
 
@@ -110,7 +112,7 @@ class ScannerCommands
         return [
             ...$this->start(['scratch']),
             ...$this->ownWorkDir(),
-            ...$this->databaseVolume(),
+            $this->databaseVolume(),
             $this->step('db-update', $this->dockerRun('grype', self::TIMEOUT_DB_UPDATE, true, $env, ['type=volume,src='.self::DB_VOLUME.',dst=/db'], ['db', 'update']).' >/dev/null 2>&1'),
             ...$this->finish(),
         ];
@@ -600,21 +602,25 @@ class ScannerCommands
     }
 
     /**
-     * Creates the database volume owned by the scanner user with a `tmp/` directory for `db update`.
-     * `chown -h` does not follow a link that a database update could have left.
-     *
-     * @return list<string>
+     * Creates the database volume and gives it to the scanner user from inside a container, so the shell
+     * never needs the host path of the volume (`chown -h` does not follow a link that a database update could have left).
+     * Prints `coolify-scan-exit db-volume {rc}`.
      */
-    private function databaseVolume(): array
+    private function databaseVolume(): string
     {
-        $mountpoint = "\"\$(docker volume inspect -f '{{.Mountpoint}}' ".self::DB_VOLUME.')';
+        $script = 'mkdir -p /db/tmp && chown 65534:65534 /db && chown -h 65534:65534 /db/tmp && chmod 700 /db/tmp';
+        $run = implode(' ', [
+            'timeout -k 10 '.self::TIMEOUT_VOLUME_SETUP.' docker run',
+            '--rm --name '.$this->containerName(),
+            '--network none --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER',
+            '--security-opt no-new-privileges --read-only --pids-limit 64',
+            '--user 0:0 --cpus 0.5 --memory 64m --memory-swap 64m --log-driver none',
+            '--mount type=volume,src='.self::DB_VOLUME.',dst=/db',
+            escapeshellarg($this->image('init')),
+            'sh -c '.escapeshellarg($script),
+        ]);
 
-        return [
-            'docker volume create '.self::DB_VOLUME.' >/dev/null',
-            'chown '.self::SCANNER_USER." {$mountpoint}\"",
-            "mkdir -p -m 0700 {$mountpoint}/tmp\"",
-            'chown -h '.self::SCANNER_USER." {$mountpoint}/tmp\"",
-        ];
+        return $this->shell($this->step('db-volume', 'docker volume create '.self::DB_VOLUME." >/dev/null && {$run} >/dev/null 2>&1"));
     }
 
     /**

@@ -7,6 +7,7 @@ use Tests\TestCase;
 uses(TestCase::class);
 
 const SCANNER_TEST_RUN_ID = 'run1234abcd';
+const SCANNER_TEST_INIT_IMAGE = 'alpine@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
 const SCANNER_TEST_HEX = 'aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999';
 
 beforeEach(function () {
@@ -75,7 +76,7 @@ function scannerUnwrapped(array $commands): array
  */
 function scannerDockerRuns(array $commands): array
 {
-    return array_values(array_filter(scannerUnwrapped($commands), fn (string $line) => str_contains($line, 'docker run')));
+    return array_values(array_filter(scannerUnwrapped($commands), fn (string $line) => str_contains($line, 'docker run') && ! str_contains($line, SCANNER_TEST_INIT_IMAGE)));
 }
 
 it('starts every command list by removing a leftover scan container', function () {
@@ -118,7 +119,7 @@ it('gives the work directory to the scanner user before a container uses it', fu
     $chown = "chown -R 65534:65534 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."'";
 
     foreach (scannerCommandLists($this->commands) as $name => $commands) {
-        $run = collect($commands)->search(fn (string $line) => str_contains($line, 'docker run'));
+        $run = collect($commands)->search(fn (string $line) => str_contains($line, 'docker run') && ! str_contains($line, SCANNER_TEST_INIT_IMAGE));
         if ($run === false) {
             continue;
         }
@@ -437,3 +438,38 @@ it('refuses to delete an SBOM by an invalid image ID', function (string $imageId
     'short' => ['sha256:abc'],
     'no prefix' => [SCANNER_TEST_HEX],
 ])->throws(InvalidArgumentException::class);
+
+it('sets up the database volume inside a container instead of through a host path', function () {
+    foreach (['prepare' => $this->commands->prepare(), 'dbUpdate' => $this->commands->dbUpdate(null)] as $name => $commands) {
+        $all = implode("\n", $commands);
+        $setup = collect(scannerUnwrapped($commands))->first(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
+
+        expect($all)->not->toContain('Mountpoint', $name)
+            ->and($setup)->toBeString($name)
+            ->toContain('docker volume create coolify-grype-db')
+            ->toContain('coolify-scan-exit db-volume')
+            ->toContain('--mount type=volume,src=coolify-grype-db,dst=/db ')
+            ->toContain('--network none ')
+            ->toContain('--cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER ')
+            ->toContain('--security-opt no-new-privileges --read-only ')
+            ->toMatch('/timeout -k 10 120 docker run /')
+            ->toContain('chown 65534:65534 /db')
+            ->toContain('chown -h 65534:65534 /db/tmp')
+            ->not->toContain('docker.sock');
+    }
+});
+
+it('pulls the volume setup image before it is used', function () {
+    $commands = $this->commands->prepare();
+    $pull = collect($commands)->search(fn (string $line) => str_contains($line, 'docker pull '.escapeshellarg(SCANNER_TEST_INIT_IMAGE)));
+    $setup = collect($commands)->search(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
+
+    expect($pull)->toBeInt()->and($setup)->toBeInt()->toBeGreaterThan($pull);
+});
+
+it('keeps the volume setup as one sudo shell line for a non-root SSH user', function () {
+    $setup = collect($this->commands->prepare())->first(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
+    $parsed = parseCommandsByLineForSudo(collect([$setup]), $this->server);
+
+    expect($parsed)->toBe(['sudo '.$setup]);
+});
