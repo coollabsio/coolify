@@ -99,12 +99,18 @@ class GrypeReportParser
             }
         }
 
+        $aliases = array_values(array_unique($aliases));
+        $severity = in_array($severity, self::SEVERITIES, true) ? $severity : 'unknown';
+        $package = ScannerText::clean($row['pkg'] ?? null, 214);
+        $version = ScannerText::clean($row['ver'] ?? null, 128);
+        $namespace = ScannerText::clean($row['ns'] ?? null, 128);
+
         return new Finding(
             id: $id,
-            aliases: array_values(array_unique($aliases)),
-            severity: in_array($severity, self::SEVERITIES, true) ? $severity : 'unknown',
-            package: ScannerText::clean($row['pkg'] ?? null, 214),
-            version: ScannerText::clean($row['ver'] ?? null, 128),
+            aliases: $aliases,
+            severity: $severity,
+            package: $package,
+            version: $version,
             type: ScannerText::clean($row['type'] ?? null, 32),
             artifactId: ScannerText::clean($row['art'] ?? null, 64),
             fixedIn: $fixedIn !== '' ? $fixedIn : null,
@@ -113,6 +119,76 @@ class GrypeReportParser
             epss: is_numeric($row['epss'] ?? null) ? (float) $row['epss'] : null,
             risk: is_numeric($row['risk'] ?? null) ? (float) $row['risk'] : null,
             summary: ScannerText::clean($row['desc'] ?? null, 300),
+            cvssScore: $this->score($row['cvss'] ?? null, $row['rcvss'] ?? null, $namespace),
+            title: ScannerText::title(
+                is_string($row['desc'] ?? null) ? $row['desc'] : null,
+                is_string($row['rdesc'] ?? null) ? $row['rdesc'] : null,
+                $package,
+                $version,
+                $severity,
+            ),
+            displayId: Finding::displayIdFor($id, $aliases),
+            namespace: $namespace,
+            matchType: ScannerText::clean($row['mt'] ?? null, 64),
         );
+    }
+
+    /**
+     * The base score of the finding's own source (every entry for an NVD namespace, otherwise the entries that
+     * are not from NVD), then the NVD score of the finding or its first related vulnerability. Within a source
+     * the highest CVSS version wins (4.x, 3.1, 3.0); v2 is ignored.
+     */
+    private function score(mixed $own, mixed $related, string $namespace): ?float
+    {
+        $own = $this->scoreEntries($own);
+        $related = $this->scoreEntries($related);
+        $isNvdNamespace = str_starts_with(strtolower($namespace), 'nvd');
+
+        $groups = [
+            $isNvdNamespace ? $own : array_filter($own, fn (array $entry): bool => ! $entry['nvd']),
+            array_filter([...$own, ...$related], fn (array $entry): bool => $entry['nvd']),
+        ];
+
+        foreach ($groups as $group) {
+            $best = null;
+            foreach ($group as $entry) {
+                if ($best === null || $entry['version'] > $best['version'] || ($entry['version'] === $best['version'] && $entry['nvd'] && ! $best['nvd'])) {
+                    $best = $entry;
+                }
+            }
+
+            if ($best !== null) {
+                return $best['score'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array{nvd: bool, version: float, score: float}>
+     */
+    private function scoreEntries(mixed $entries): array
+    {
+        $result = [];
+        foreach (is_array($entries) ? array_slice($entries, 0, 32) : [] as $entry) {
+            if (! is_array($entry) || ! is_numeric($entry['score'] ?? null) || ! is_numeric($entry['version'] ?? null)) {
+                continue;
+            }
+
+            $score = (float) $entry['score'];
+            $version = (float) $entry['version'];
+            if ($version < 3.0 || $score <= 0.0 || $score > 10.0) {
+                continue;
+            }
+
+            $result[] = [
+                'nvd' => str_contains(strtolower(ScannerText::clean($entry['source'] ?? null, 128)), 'nvd'),
+                'version' => $version,
+                'score' => $score,
+            ];
+        }
+
+        return $result;
     }
 }

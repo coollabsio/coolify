@@ -5,7 +5,7 @@ namespace App\Services\ImageScan;
 class ScannerText
 {
     /**
-     * Strip control characters (including ANSI escape starts) and cut to $max characters.
+     * Strip control and format characters (including ANSI escape starts and bidi overrides) and cut to $max characters.
      */
     public static function clean(mixed $value, int $max): string
     {
@@ -17,6 +17,58 @@ class ScannerText
             return '';
         }
 
-        return mb_substr(preg_replace('/\p{Cc}/u', '', $value) ?? '', 0, $max);
+        return mb_substr(preg_replace('/[\p{Cc}\p{Cf}]/u', '', $value) ?? '', 0, $max);
+    }
+
+    /**
+     * A short single-line title for a finding: the first sentence of the description, else of the related
+     * description, without Markdown, URLs, or invisible characters.
+     */
+    public static function title(?string $description, ?string $relatedDescription, string $package, string $version, string $severity): string
+    {
+        $text = self::sentence($description) ?: self::sentence($relatedDescription);
+
+        if (count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: []) < 4) {
+            return self::fallbackTitle($package, $version, $severity);
+        }
+
+        return $text;
+    }
+
+    public static function fallbackTitle(string $package, string $version, string $severity): string
+    {
+        $prefix = trim(self::clean(trim($package.' '.$version), 80));
+
+        return trim($prefix.': '.self::clean($severity, 16).' vulnerability', ': ');
+    }
+
+    private static function sentence(?string $text): string
+    {
+        if ($text === null) {
+            return '';
+        }
+
+        $text = preg_replace('/\s+/u', ' ', $text) ?? '';
+        $text = self::clean($text, 2000);
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/u', '$1', $text) ?? '';
+        $text = preg_replace('~(?:https?|ftp)://\S+|\bwww\.\S+~iu', '', $text) ?? '';
+        $text = preg_replace('/[*`~\[\]\\\\]|(?<!\w)_+|_+(?!\w)|^[#>]+\s*/u', '', $text) ?? '';
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+
+        if (preg_match('/^(.*?[.!?])\s+\p{Lu}/su', $text, $match) === 1) {
+            $text = $match[1];
+        }
+
+        if (mb_strlen($text) <= 120) {
+            return $text;
+        }
+
+        $cut = mb_substr($text, 0, 119);
+        $space = mb_strrpos($cut, ' ');
+        if ($space !== false && $space > 0) {
+            $cut = mb_substr($cut, 0, $space);
+        }
+
+        return rtrim($cut, " \t,;:.-").'…';
     }
 }
