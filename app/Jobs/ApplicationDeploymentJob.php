@@ -664,6 +664,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Mark deployment as complete FIRST, before any other operations
         // This ensures the deployment status is FINISHED even if subsequent operations fail
         $this->completeDeployment();
+        $this->linkReusedImageScans();
 
         // Then handle side effects - these should not fail the deployment
         try {
@@ -703,16 +704,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * The gate scanned the new image while the deployment was in progress, so its stored security status compared it
-     * with the image of the previous deployment. Now that this deployment finished, the scans it reused join it and
-     * the status is stored again.
+     * with the image of the previous deployment. Now that this deployment finished, the status is stored again.
      */
     private function refreshImageScanSecurity(): void
     {
         if ($this->pull_request_id !== 0) {
             return;
         }
-
-        $this->linkReusedImageScans();
 
         try {
             ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
@@ -1620,6 +1618,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->should_skip_build();
         $this->completeDeployment();
+        $this->linkReusedImageScans();
     }
 
     private function should_skip_build()
@@ -3065,7 +3064,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * The stored scans that the gate reused belong to this deployment once it finished, so the current scans of the
      * application (all images of a Compose deployment) include them. Until then they stay with the deployment that
      * ran them: a deployment that is running or failed never takes them over. Preview deployments keep the link of
-     * the application.
+     * the application. Called right after the deployment is marked finished (`post_deployment()`, `just_restart()`).
      */
     private function linkReusedImageScans(): void
     {
@@ -3074,7 +3073,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
-            ImageScan::query()
+            $this->application->imageScans()
                 ->whereKey(array_keys($this->imageScanReusedScans))
                 ->where(fn ($query) => $query
                     ->whereNull('deployment_queue_id')

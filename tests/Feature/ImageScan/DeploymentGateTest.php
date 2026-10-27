@@ -24,8 +24,10 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ImageScan\ResourceScans;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -58,6 +60,9 @@ class DeploymentGateTestJob extends ApplicationDeploymentJob
     /** @var array<string, string> */
     public array $outputs = [];
 
+    /** Stop at the container start, or let the job go on. */
+    public bool $stopAtStart = true;
+
     public function __construct() {}
 
     public function execute_remote_command(...$commands): void
@@ -68,7 +73,7 @@ class DeploymentGateTestJob extends ApplicationDeploymentJob
             $text = (string) ($command['command'] ?? $command[0]);
             $this->commands[] = $text;
 
-            if (preg_match('/ up (--pull always )?--build -d|stack deploy/', $text) === 1) {
+            if ($this->stopAtStart && preg_match('/ up (--pull always )?--build -d|stack deploy/', $text) === 1) {
                 throw new DeploymentGateStarted('started');
             }
 
@@ -1201,4 +1206,40 @@ it('prefers a scan without a deployment over the scan of a failed deployment', f
     $unlinked = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('f', 64), 'deployment_queue_id' => null, 'scanned_at' => now()->subDay()]);
 
     expect(ResourceScans::currentFor($this->application->fresh())->pluck('id')->all())->toBe([$unlinked->id]);
+});
+
+it('links the reused scans right when the deployment is finished, before the post-deployment command', function () {
+    Queue::fake();
+    ['job' => $job, 'reused' => $reused] = deployGateComposeRedeploy();
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'application'))->getValue($job)->post_deployment_command = 'php artisan migrate';
+    $linksAtCommand = null;
+    DB::listen(function (QueryExecuted $query) use (&$linksAtCommand, $reused) {
+        if ($linksAtCommand === null && str_contains((string) json_encode($query->bindings), 'Executing post-deployment command')) {
+            $linksAtCommand = ImageScan::query()->whereKey($reused)->pluck('deployment_queue_id')->unique()->values()->all();
+        }
+    });
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateCall($job, 'post_deployment');
+
+    expect($linksAtCommand)->toBe([test()->queue->id]);
+});
+
+it('links the reused scans when a restart finishes', function () {
+    Queue::fake();
+    deployGatePolicy();
+    $finished = deployGatePreviousDeployment('gate-finished', ApplicationDeploymentStatus::FINISHED, attributes: [
+        'configuration_snapshot' => $this->application->fresh()->deploymentConfigurationSnapshot(),
+    ]);
+    $scan = deployGateStoredScan([], ['image_id' => GATE_IMAGE_ID, 'deployment_queue_id' => $finished->id]);
+    $this->queue = deployGatePreviousDeployment('gate-restart', ApplicationDeploymentStatus::IN_PROGRESS);
+    ScanImage::shouldRun()->never();
+    $job = deployGateJob(['restart_only' => true, 'saved_outputs' => new Collection(['local_image_found' => str('sha256:aaaa')])]);
+    $job->stopAtStart = false;
+    $job->outputs = ['docker image inspect' => GATE_IMAGE_ID.' ', 'docker images -q' => 'sha256:aaaa'];
+
+    deployGateCall($job, 'just_restart');
+
+    expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value)
+        ->and($scan->fresh()->deployment_queue_id)->toBe(test()->queue->id);
 });
