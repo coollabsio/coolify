@@ -529,7 +529,9 @@ class GetContainersStatus implements ShouldBeUnique
                         ->where('restart_limit_reached', false)
                         ->update(['restart_limit_reached' => true]) === 1;
 
-                    if ($restartLimitClaimed) {
+                    // Stop again while a container still runs: an earlier stop can fail or come too late.
+                    $stillRunning = $containerStatuses->contains(fn (string $status): bool => ! str($status)->contains('exited'));
+                    if ($restartLimitClaimed || $stillRunning) {
                         $application->refresh();
                         StopApplication::dispatch(
                             application: $application,
@@ -538,6 +540,8 @@ class GetContainersStatus implements ShouldBeUnique
                             resetRestartCount: false,
                             removeContainers: false,
                         );
+                    }
+                    if ($restartLimitClaimed) {
                         $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
                     }
                 }
