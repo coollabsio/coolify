@@ -498,7 +498,7 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
         $this->withHeaders(previewAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$this->application->uuid}/logs?service_name=work")
             ->assertNotFound()
-            ->assertJson(['message' => "No running container found for service_name 'work'."]);
+            ->assertJson(['message' => "No container found for service_name 'work'."]);
     });
 });
 

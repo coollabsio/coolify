@@ -4343,7 +4343,7 @@
                     {
                         "name": "service_name",
                         "in": "query",
-                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -4447,7 +4447,7 @@
                     {
                         "name": "service_name",
                         "in": "query",
-                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.",
                         "required": false,
                         "schema": {
                             "type": "string"

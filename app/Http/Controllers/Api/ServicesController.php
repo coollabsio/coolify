@@ -993,13 +993,6 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Container not found.'], 404);
         }
 
-        $status = getContainerStatus($service->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Container is not running.',
-            ], 400);
-        }
-
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
         $logs = sanitizeLogsForExport(
