@@ -126,6 +126,7 @@ class ApplicationsController extends Controller
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === true) {
             $application->makeVisible([
+                ...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
                 'custom_labels',
                 'dockerfile',
                 'docker_compose',
