@@ -1,5 +1,9 @@
 <?php
 
+it('points the scripts at the stable channel of the CDN, which scripts/sync-cdn.sh rewrites for the other channels', function (string $script) {
+    expect(file_get_contents(dirname(__DIR__, 2)."/{$script}"))->toMatch('/^CDN="https:\/\/cdn\.coollabs\.io\/coolify"$/m');
+})->with(['scripts/install.sh', 'scripts/upgrade.sh']);
+
 it('publishes main builds under rolling and commit sha tags with a traceable internal version', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-main-build.yml');
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
