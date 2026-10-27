@@ -241,6 +241,8 @@ class GetContainersStatus implements ShouldBeUnique
                                     })->first();
                                     if (! $foundTcpProxy) {
                                         StartDatabaseProxy::run($service_db);
+                                    } elseif (! $this->server->isSwarm() && StartDatabaseProxy::claimOutdatedRefresh($proxyUuid, data_get($foundTcpProxy, 'Config.Labels'))) {
+                                        StartDatabaseProxy::run($service_db);
                                     }
                                 } else {
                                     // Clean up orphaned proxy when is_public=false
@@ -291,6 +293,8 @@ class GetContainersStatus implements ShouldBeUnique
                                     }
                                 })->first();
                                 if (! $foundTcpProxy) {
+                                    StartDatabaseProxy::run($database);
+                                } elseif (! $this->server->isSwarm() && StartDatabaseProxy::claimOutdatedRefresh($uuid, data_get($foundTcpProxy, 'Config.Labels'))) {
                                     StartDatabaseProxy::run($database);
                                 }
                             } else {

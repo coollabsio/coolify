@@ -864,6 +864,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
                 $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server, restartedResource: $database));
+            } elseif (StartDatabaseProxy::claimOutdatedRefresh($databaseUuid, data_get($tcpProxyContainerFound, 'labels'))) {
+                StartDatabaseProxy::dispatch($database);
             }
         } elseif ($this->isRunning($containerStatus) && ! $tcpProxy) {
             // Clean up orphaned proxy containers when is_public=false
