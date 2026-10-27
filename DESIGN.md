@@ -1194,8 +1194,8 @@ A setting that inherits through levels (for example instance → team → server
 `x-forms.listbox` and prepends one option with the value `''`:
 
 ```blade
-<x-forms.inherited-listbox id="alertLevel" label="Alert on"
-    inheritLabel="Use team default (High or critical with a fix)" :options="$options" />
+<x-forms.inherited-listbox id="gateMode" label="Block deploys"
+    inheritLabel="Use team default (Off)" :options="$options" />
 ```
 
 - the label is `Use {level} default ({value})`: `{level}` is the level the
@@ -1209,7 +1209,7 @@ A setting that inherits through levels (for example instance → team → server
 - a related choice that is not inheritance, such as "Detect automatically",
   uses a plain listbox with its own first option instead.
 
-The reference is `resources/views/livewire/image-scan/scan-settings.blade.php`.
+The reference is `resources/views/livewire/image-scan/partials/scan-rules.blade.php`.
 
 ### Standard table controls
 
