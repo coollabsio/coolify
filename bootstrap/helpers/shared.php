@@ -1285,6 +1285,97 @@ function formatEnvValueForDevView(?string $value): ?string
 }
 
 /**
+ * Format a variable for the developer view: its KEY=value line, with a "# coolify:" directive
+ * line above it when a flag is not its default. A variable that the view cannot edit gets a
+ * placeholder line and no directive.
+ */
+function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue): string
+{
+    if (! $canViewValue) {
+        return "{$variable->key}=(Hidden, only admins can view)";
+    }
+    if ($variable->is_shown_once) {
+        return "{$variable->key}=(Locked Secret, delete and add again to change)";
+    }
+    if ($variable->is_multiline) {
+        return "{$variable->key}=(Multiline environment variable, edit in normal view)";
+    }
+    $value = formatEnvValueForDevView($variable->value);
+    if ($value === null) {
+        return "{$variable->key}=(Value cannot be shown in this view, edit in normal view)";
+    }
+
+    $flags = [];
+    foreach ($variable::DEV_VIEW_FLAG_DEFAULTS as $flag => $default) {
+        if ((bool) $variable->{"is_{$flag}"} !== $default) {
+            $flags[] = $default ? "{$flag}=false" : $flag;
+        }
+    }
+    $line = "{$variable->key}={$value}";
+
+    return $flags === [] ? $line : '# coolify: '.implode(' ', $flags)."\n".$line;
+}
+
+/**
+ * Parse developer view text. Returns the result of parseEnvFormatToArray() with a 'settings'
+ * entry per key: the flags of the "# coolify:" line directly above the key line, as model
+ * attributes (for example ['is_literal' => true]). A key without a directive gets empty
+ * settings, so its current flags stay.
+ *
+ * @param  array<string, bool>  $flagDefaults  the allowed flags and their defaults
+ * @return array<string, array{value: string, comment: ?string, settings: array<string, bool>}>
+ *
+ * @throws InvalidArgumentException when a directive is not directly above a KEY=value line, or has an unknown flag or value
+ */
+function parseEnvDevView(?string $contents, array $flagDefaults): array
+{
+    $contents ??= '';
+    $settingsByKey = [];
+    $directive = null;
+    $directiveLine = 0;
+
+    foreach (explode("\n", $contents) as $index => $line) {
+        $isKeyLine = $line !== '' && ! str_starts_with($line, '#') && str_contains($line, '=');
+        if ($directive !== null && ! $isKeyLine) {
+            throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+        }
+
+        if ($isKeyLine) {
+            $settingsByKey[substr($line, 0, strpos($line, '='))] = $directive ?? [];
+            $directive = null;
+        } elseif (str_starts_with($line, '# coolify:')) {
+            $directiveLine = $index + 1;
+            $flags = preg_split('/\s+/', trim(substr($line, strlen('# coolify:'))), -1, PREG_SPLIT_NO_EMPTY);
+            if ($flags === []) {
+                throw new InvalidArgumentException("Line {$directiveLine}: the \"# coolify:\" line has no flags.");
+            }
+
+            $directive = [];
+            foreach ($flags as $flag) {
+                [$name, $value] = array_pad(explode('=', $flag, 2), 2, 'true');
+                if (! array_key_exists($name, $flagDefaults)) {
+                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', array_keys($flagDefaults)).'.');
+                }
+                if ($value !== 'true' && $value !== 'false') {
+                    throw new InvalidArgumentException("Line {$directiveLine}: the value of \"{$name}\" must be true or false.");
+                }
+                $directive["is_{$name}"] = $value === 'true';
+            }
+        }
+    }
+    if ($directive !== null) {
+        throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+    }
+
+    $variables = parseEnvFormatToArray($contents);
+    foreach ($variables as $key => $data) {
+        $variables[$key]['settings'] = $settingsByKey[$key] ?? [];
+    }
+
+    return $variables;
+}
+
+/**
  * Extract inline comments from environment variables in raw docker-compose YAML.
  *
  * Parses raw docker-compose YAML to extract inline comments from environment sections.
