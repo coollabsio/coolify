@@ -127,8 +127,8 @@ describe('GET /api/v1/hetzner/server-types', function () {
         Http::fake([
             'https://api.hetzner.cloud/v1/server_types*' => Http::response([
                 'server_types' => [
-                    ['id' => 1, 'name' => 'cx11', 'description' => 'CX11', 'cores' => 1, 'memory' => 2.0, 'disk' => 20],
-                    ['id' => 2, 'name' => 'cx21', 'description' => 'CX21', 'cores' => 2, 'memory' => 4.0, 'disk' => 40],
+                    ['id' => 1, 'name' => 'cx11', 'description' => 'CX11', 'cores' => 1, 'memory' => 2.0, 'disk' => 20, 'locations' => [['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null]]],
+                    ['id' => 2, 'name' => 'cx21', 'description' => 'CX21', 'cores' => 2, 'memory' => 4.0, 'disk' => 40, 'locations' => [['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null]]],
                 ],
                 'meta' => ['pagination' => ['next_page' => null]],
             ], 200),
@@ -148,8 +148,8 @@ describe('GET /api/v1/hetzner/server-types', function () {
         Http::fake([
             'https://api.hetzner.cloud/v1/server_types*' => Http::response([
                 'server_types' => [
-                    ['id' => 1, 'name' => 'cx11', 'deprecated' => false],
-                    ['id' => 2, 'name' => 'cx21', 'deprecated' => true],
+                    ['id' => 1, 'name' => 'cx11', 'deprecated' => false, 'locations' => [['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null]]],
+                    ['id' => 2, 'name' => 'cx21', 'deprecated' => true, 'locations' => [['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null]]],
                 ],
                 'meta' => ['pagination' => ['next_page' => null]],
             ], 200),
@@ -164,6 +164,57 @@ describe('GET /api/v1/hetzner/server-types', function () {
         $response->assertJsonCount(1);
         $response->assertJsonFragment(['name' => 'cx11']);
         $response->assertJsonMissing(['name' => 'cx21']);
+    });
+
+    test('removes locations where a server type is out of stock or deprecated', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx22', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null],
+                        ['id' => 2, 'name' => 'fsn1', 'available' => false, 'deprecation' => null],
+                        ['id' => 3, 'name' => 'hel1', 'available' => true, 'deprecation' => ['announced' => '2025-09-24T00:00:00+00:00', 'unavailable_after' => '2025-12-31T00:00:00+00:00']],
+                    ]],
+                    ['id' => 2, 'name' => 'cpx11', 'locations' => [
+                        ['id' => 2, 'name' => 'fsn1', 'available' => false, 'deprecation' => null],
+                    ]],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->getJson('/api/v1/hetzner/server-types?cloud_provider_token_uuid='.$this->hetznerToken->uuid);
+
+        $response->assertStatus(200);
+        expect($response->json())->toHaveCount(1)
+            ->and($response->json('0.name'))->toBe('cx22')
+            ->and(collect($response->json('0.locations'))->pluck('name')->all())->toBe(['nbg1']);
+    });
+
+    test('returns only server types that can be ordered in the given location', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx22', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null],
+                        ['id' => 2, 'name' => 'fsn1', 'available' => false, 'deprecation' => null],
+                    ]],
+                    ['id' => 2, 'name' => 'cpx11', 'locations' => [
+                        ['id' => 2, 'name' => 'fsn1', 'available' => true, 'deprecation' => null],
+                    ]],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->getJson('/api/v1/hetzner/server-types?location=fsn1&cloud_provider_token_uuid='.$this->hetznerToken->uuid);
+
+        $response->assertStatus(200);
+        expect(collect($response->json())->pluck('name')->all())->toBe(['cpx11']);
     });
 });
 

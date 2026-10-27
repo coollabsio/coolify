@@ -118,16 +118,29 @@ class HetznerService
         ]);
     }
 
-    public function getServerTypes(): array
+    /**
+     * Server types that can be ordered now. Each type keeps only the locations
+     * where it is in stock and not deprecated, and types with no such location are removed.
+     */
+    public function getServerTypes(?string $location = null): array
     {
         $types = $this->requestPaginated('get', '/server_types', 'server_types');
 
-        // Filter out entries where "deprecated" is explicitly true
-        $filtered = array_filter($types, function ($type) {
-            return ! (isset($type['deprecated']) && $type['deprecated'] === true);
-        });
+        return collect($types)
+            ->reject(fn (array $type) => ($type['deprecated'] ?? false) === true)
+            ->map(function (array $type) {
+                $type['locations'] = collect($type['locations'] ?? [])
+                    ->filter(fn (array $typeLocation) => ($typeLocation['available'] ?? true) === true && empty($typeLocation['deprecation']))
+                    ->values()
+                    ->all();
 
-        return array_values($filtered);
+                return $type;
+            })
+            ->filter(fn (array $type) => $location === null
+                ? $type['locations'] !== []
+                : in_array($location, array_column($type['locations'], 'name'), true))
+            ->values()
+            ->all();
     }
 
     public function getSshKeys(): array

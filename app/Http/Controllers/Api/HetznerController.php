@@ -140,7 +140,7 @@ class HetznerController extends Controller
 
     #[OA\Get(
         summary: 'Get Hetzner Server Types',
-        description: 'Get all available Hetzner server types (instance sizes).',
+        description: 'Get the Hetzner server types (instance sizes) that can be ordered now. Each type lists only the locations where it is in stock and not deprecated.',
         path: '/hetzner/server-types',
         operationId: 'get-hetzner-server-types',
         security: [
@@ -148,6 +148,13 @@ class HetznerController extends Controller
         ],
         tags: ['Hetzner'],
         parameters: [
+            new OA\Parameter(
+                name: 'location',
+                in: 'query',
+                required: false,
+                description: 'Return only the server types that can be ordered in this location, for example nbg1.',
+                schema: new OA\Schema(type: 'string')
+            ),
             new OA\Parameter(
                 name: 'cloud_provider_token_uuid',
                 in: 'query',
@@ -231,6 +238,7 @@ class HetznerController extends Controller
         $validator = customApiValidator($request->all(), [
             'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
             'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
+            'location' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -253,7 +261,7 @@ class HetznerController extends Controller
 
         try {
             $hetznerService = new HetznerService($token->token);
-            $serverTypes = $hetznerService->getServerTypes();
+            $serverTypes = $hetznerService->getServerTypes($request->query('location'));
 
             return response()->json($serverTypes);
         } catch (CloudProviderApiException $e) {

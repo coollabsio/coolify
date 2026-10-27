@@ -12588,9 +12588,18 @@
                     "Hetzner"
                 ],
                 "summary": "Get Hetzner Server Types",
-                "description": "Get all available Hetzner server types (instance sizes).",
+                "description": "Get the Hetzner server types (instance sizes) that can be ordered now. Each type lists only the locations where it is in stock and not deprecated.",
                 "operationId": "get-hetzner-server-types",
                 "parameters": [
+                    {
+                        "name": "location",
+                        "in": "query",
+                        "description": "Return only the server types that can be ordered in this location, for example nbg1.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "cloud_provider_token_uuid",
                         "in": "query",
