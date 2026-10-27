@@ -46,6 +46,8 @@ class InstanceSettings extends Model
         'allowed_ips',
         'auto_update_frequency',
         'update_check_frequency',
+        'update_channel',
+        'update_custom_tag',
         'new_version_available',
         'instance_timezone',
         'helper_version',
