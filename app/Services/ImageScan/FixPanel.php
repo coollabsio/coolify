@@ -155,6 +155,40 @@ final class FixPanel
      */
     public static function baseImage(ImageScan $scan): ?array
     {
+        $better = self::betterBase($scan);
+        $owner = $scan->resource;
+        if ($better === null || ! $owner instanceof Model) {
+            return null;
+        }
+
+        $base = (array) data_get($scan->candidates, 'base');
+        $from = $better['from'];
+        $attributableIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($base['attributable_ids'] ?? [])));
+        $fixedIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($better['entry']['fixed_ids'] ?? [])));
+        $has = fn (Finding $finding, array $ids): bool => collect([$finding->id, ...$finding->aliases])->contains(fn (string $id): bool => isset($ids[mb_strtolower($id)]));
+        $attributable = array_filter(RefreshCandidates::relevantFindings($scan, $owner), fn (Finding $finding): bool => $has($finding, $attributableIds));
+        $total = count($attributable);
+        $fixed = count(array_filter($attributable, fn (Finding $finding): bool => $has($finding, $fixedIds)));
+        if ($total === 0 || $fixed === 0) {
+            return null;
+        }
+
+        return [
+            'from' => $from,
+            'to' => $better['to'],
+            'fixed' => $fixed,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * The better `line` candidate of the base check, when the check is for the current base image (`base_image_ref`)
+     * and the candidate is a newer tag of the same image. `to` keeps the registry and name as the Dockerfile writes them.
+     *
+     * @return array{from: string, to: string, entry: array<string, mixed>}|null
+     */
+    public static function betterBase(ImageScan $scan): ?array
+    {
         $from = (string) $scan->base_image_ref;
         $base = data_get($scan->candidates, 'base');
         if ($from === '' || ! is_array($base) || ($base['status'] ?? null) !== 'ok' || ($base['image'] ?? null) !== $from) {
@@ -178,26 +212,10 @@ final class FixPanel
             return null;
         }
 
-        $owner = $scan->resource;
-        if (! $owner instanceof Model) {
-            return null;
-        }
-
-        $attributableIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($base['attributable_ids'] ?? [])));
-        $fixedIds = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($entry['fixed_ids'] ?? [])));
-        $has = fn (Finding $finding, array $ids): bool => collect([$finding->id, ...$finding->aliases])->contains(fn (string $id): bool => isset($ids[mb_strtolower($id)]));
-        $attributable = array_filter(RefreshCandidates::relevantFindings($scan, $owner), fn (Finding $finding): bool => $has($finding, $attributableIds));
-        $total = count($attributable);
-        $fixed = count(array_filter($attributable, fn (Finding $finding): bool => $has($finding, $fixedIds)));
-        if ($total === 0 || $fixed === 0) {
-            return null;
-        }
-
         return [
             'from' => $from,
             'to' => substr($from, 0, (int) strrpos($from, ':')).':'.$candidate->tag,
-            'fixed' => $fixed,
-            'total' => $total,
+            'entry' => $entry,
         ];
     }
 
