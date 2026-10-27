@@ -2,7 +2,7 @@
 
 namespace App\Services\ImageScan;
 
-use App\Enums\ImageScanAlertLevel;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Models\Application;
 use App\Models\ImageScanPolicy;
@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ImageScanPolicyResolver
 {
-    private const FIELDS = ['alert_level', 'gate_enabled', 'on_scan_error'];
+    private const FIELDS = ['gate_mode', 'on_scan_error'];
 
     /**
      * Rules always resolve through the main destination server (spec 3.1). The given server only decides where the
@@ -50,11 +50,11 @@ class ImageScanPolicyResolver
         $values = array_map(fn (array $field) => $field['value'], $resolved);
         $sources = array_map(fn (array $field) => $field['source'], $resolved);
 
-        $gateEnabled = $isApplication && $values['gate_enabled'] === true;
+        // Services and databases have no deploy to block.
+        $gateMode = $isApplication ? $values['gate_mode'] : ImageScanGateMode::Off;
 
         return new ResolvedImageScanPolicy(
-            alertLevel: $values['alert_level'],
-            gateEnabled: $gateEnabled,
+            gateMode: $gateMode->value,
             onScanError: $values['on_scan_error'],
             scanEnabled: self::isScanEnabled($resource, $scanServer),
             sources: $sources,
@@ -81,7 +81,7 @@ class ImageScanPolicyResolver
      * The values a level inherits from the levels above it, each with the level it comes from.
      *
      * @param  Model  $scope  Team, Server or Application.
-     * @return array{alert_level: array{value: ImageScanAlertLevel, source: string}, gate_enabled: array{value: bool, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
+     * @return array{gate_mode: array{value: ImageScanGateMode, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
      */
     public static function inheritedFor(Model $scope): array
     {
@@ -106,13 +106,12 @@ class ImageScanPolicyResolver
 
     /**
      * @param  list<array{0: string, 1: ?ImageScanPolicy}>  $levels  From the top level down.
-     * @return array{alert_level: array{value: ImageScanAlertLevel, source: string}, gate_enabled: array{value: bool, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
+     * @return array{gate_mode: array{value: ImageScanGateMode, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
      */
     private static function resolveLevels(array $levels): array
     {
         $resolved = [
-            'alert_level' => ['value' => ImageScanAlertLevel::Critical, 'source' => 'instance'],
-            'gate_enabled' => ['value' => false, 'source' => 'instance'],
+            'gate_mode' => ['value' => ImageScanGateMode::Off, 'source' => 'instance'],
             'on_scan_error' => ['value' => ImageScanOnError::Deploy, 'source' => 'instance'],
         ];
 

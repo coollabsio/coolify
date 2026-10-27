@@ -99,7 +99,30 @@ function fleetFinding(array $overrides = []): array
 }
 
 /**
- * @param  array<string, int>  $fixable  Fixable-now counts by severity.
+ * A stored summary with the counts of the stored security status: the relevant findings that an action fixes.
+ *
+ * @param  array<string, int>  $fixable  Counts by severity.
+ * @return array<string, mixed>
+ */
+function fleetSummary(array $fixable, int $atLevel, int $kev = 0): array
+{
+    return [
+        'truncated' => false,
+        'eol_distro' => null,
+        'security' => [
+            'status' => $atLevel > 0 ? 'update_available' : 'ok',
+            'facts' => ['counts' => [
+                'relevant_fixed' => $atLevel,
+                'critical_fixed' => $fixable['critical'] ?? 0,
+                'high_fixed' => $fixable['high'] ?? 0,
+                'kev_fixed' => $kev,
+            ]],
+        ],
+    ];
+}
+
+/**
+ * @param  array<string, int>  $fixable  Counts of the relevant findings that an action fixes, by severity.
  * @param  array<string, mixed>  $attributes
  */
 function fleetScan(Model $resource, array $fixable = [], int $atLevel = 0, array $attributes = []): ImageScan
@@ -114,13 +137,7 @@ function fleetScan(Model $resource, array $fixable = [], int $atLevel = 0, array
         'image_ref' => 'nginx:1.27',
         'builds_image' => true,
         'findings' => [fleetFinding()],
-        'summary' => [
-            'counts' => ['fixable_now' => [...['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0, 'unknown' => 0], ...$fixable]],
-            'fixable_now_at_level' => $atLevel,
-            'known_exploited_fixable' => 0,
-            'truncated' => false,
-            'eol_distro' => null,
-        ],
+        'summary' => fleetSummary($fixable, $atLevel),
         'scanned_at' => now(),
         ...$attributes,
     ]);
@@ -139,10 +156,7 @@ describe('page', function () {
         $quiet = fleetApplication('quiet-app');
         fleetScan($quiet, ['high' => 1], 1);
         $worst = fleetApplication('worst-app');
-        fleetScan($worst, ['critical' => 2, 'high' => 1], 3, ['summary' => [
-            'counts' => ['fixable_now' => ['critical' => 2, 'high' => 1, 'medium' => 0, 'low' => 0, 'unknown' => 0]],
-            'fixable_now_at_level' => 3, 'known_exploited_fixable' => 1, 'truncated' => false, 'eol_distro' => null,
-        ]]);
+        fleetScan($worst, ['critical' => 2, 'high' => 1], 3, ['summary' => fleetSummary(['critical' => 2, 'high' => 1], 3, kev: 1)]);
 
         $this->actingAs(fleetMember($this->team));
         session(['currentTeam' => $this->team]);
@@ -375,7 +389,7 @@ describe('markers', function () {
             'environment_id' => $this->environment->id,
             'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass(),
         ]);
-        fleetScan($database, ['critical' => 1, 'high' => 4], 1, [
+        fleetScan($database, ['critical' => 1], 1, [
             'image_ref' => 'postgres:16.3-alpine',
             'builds_image' => false,
             'candidates' => ['status' => 'ok', 'entries' => [[
@@ -468,7 +482,7 @@ describe('dashboard and search', function () {
             ->assertSee('Review')
             ->assertSeeHtml('coolify.image-scan.dashboard-dismissed.2');
 
-        $scan->forceFill(['summary' => [...$scan->summary, 'fixable_now_at_level' => 0]])->save();
+        $scan->forceFill(['summary' => fleetSummary([], 0)])->save();
 
         Livewire::test(Dashboard::class)->assertSee('1 resource has vulnerabilities you can fix now.');
     });

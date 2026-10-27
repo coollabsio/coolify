@@ -454,9 +454,8 @@ describe('rescan', function () {
             ->and(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(0);
     });
 
-    it('checks for newer versions of a running image with a package fix at the alert level', function () {
+    it('checks for newer versions of a running image with a relevant finding', function () {
         rescanTestFake();
-        ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high']);
         $database = StandalonePostgresql::forceCreate([
             'name' => 'pg',
             'postgres_password' => 'secret',
@@ -481,7 +480,6 @@ describe('rescan', function () {
 
     it('skips the candidate check of a scan whose candidate job is queued or running', function () {
         rescanTestFake();
-        ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high']);
         $database = StandalonePostgresql::forceCreate([
             'name' => 'pg',
             'postgres_password' => 'secret',
@@ -548,7 +546,7 @@ describe('ended ignores', function () {
             'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
             'risk' => 1.0, 'summary' => '', 'layer' => 'app',
         ];
-        $scan = rescanTestScan($this->otherApplication, ['status' => ImageScanStatus::Completed, 'builds_image' => true, 'findings' => [$finding], 'summary' => ['fixable_now_at_level' => 0]]);
+        $scan = rescanTestScan($this->otherApplication, ['status' => ImageScanStatus::Completed, 'builds_image' => true, 'findings' => [$finding], 'summary' => []]);
         ImageScanIgnore::factory()->create([
             'team_id' => $this->team->id,
             'resource_type' => $this->otherApplication->getMorphClass(),
@@ -559,7 +557,7 @@ describe('ended ignores', function () {
 
         rescanTestRun();
 
-        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(1);
+        expect(ResourceScans::storedFixedCount($scan->fresh()))->toBe(1);
     });
 
     it('queues a refresh of the team counts when a team-wide ignore ended', function () {

@@ -1658,8 +1658,7 @@ class ServerTransferExporter
             $out[] = [
                 'scope_kind' => $isServer ? 'server' : 'application',
                 'scope_uuid' => $scope->uuid,
-                'alert_level' => $policy->alert_level?->value,
-                'gate_enabled' => $policy->gate_enabled,
+                'gate_mode' => $policy->gate_mode?->value,
                 'on_scan_error' => $policy->on_scan_error?->value,
             ];
         }

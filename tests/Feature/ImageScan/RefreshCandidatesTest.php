@@ -2,7 +2,6 @@
 
 use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\ScanImage;
-use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityActionType;
 use App\Jobs\RefreshCandidatesJob;
@@ -22,7 +21,6 @@ use App\Services\ImageScan\CandidateEvaluator;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\IgnoreMatcher;
-use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\SecurityActions;
@@ -60,7 +58,7 @@ beforeEach(function () {
     ImageScanPolicy::factory()->create([
         'scope_type' => $this->server->getMorphClass(),
         'scope_id' => $this->server->id,
-        'alert_level' => ImageScanAlertLevel::High,
+        'gate_mode' => 'strict',
     ]);
     $this->destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
     $project = Project::factory()->create(['team_id' => $this->team->id]);
@@ -121,7 +119,7 @@ function candidatesScan(string $imageRef = 'postgres:15.0-alpine', ?string $repo
         'image_ref' => $imageRef,
         'status' => ImageScanStatus::Completed,
         'findings' => array_map(fn (Finding $finding) => $finding->toArray(), candidatesFindings()),
-        'summary' => ['fixable_now_at_level' => 0, 'eol_distro' => ['name' => 'alpine', 'version' => '3.16.2'], 'truncated' => false],
+        'summary' => ['eol_distro' => ['name' => 'alpine', 'version' => '3.16.2'], 'truncated' => false],
         'builds_image' => false,
         'scanned_at' => now(),
     ]);
@@ -215,7 +213,7 @@ it('recommends the newest tag of the line when it has fewer findings and lists w
         ->and($line['scanned_at'])->not->toBeNull()
         ->and($major)->toMatchArray(['ref' => 'postgres:16.4-alpine', 'better' => false])
         ->and(collect($scan->candidateEntries())->where('kind', 'same_tag'))->toBeEmpty()
-        ->and($scan->summary['fixable_now_at_level'])->toBeGreaterThan(0)
+        ->and(ResourceScans::storedFixedCount($scan))->toBeGreaterThan(0)
         ->and($scan->summary['eol_distro'])->toBe(['name' => 'alpine', 'version' => '3.16.2'])
         ->and(candidatesScansToday())->toBe(1)
         ->and(ImageSbom::query()->where('server_id', $this->server->id)->where('image_id', CANDIDATES_LINE)->first()?->packages)->not->toBeEmpty();
@@ -237,7 +235,7 @@ it('says that no newer version is better when the line candidate adds findings w
     $scan->refresh();
     expect($scan->candidateStatus())->toBe('no_better')
         ->and(collect($scan->candidateEntries())->firstWhere('kind', 'line')['better'])->toBeFalse()
-        ->and($scan->summary['fixable_now_at_level'])->toBe(0)
+        ->and(ResourceScans::storedFixedCount($scan))->toBe(0)
         ->and(RefreshCandidates::message($scan))->toBe('No newer version of postgres is better yet. Coolify checks again every day.');
 });
 
@@ -433,9 +431,8 @@ it('looks for candidates for an end-of-life distro or a relevant finding without
     expect(RefreshCandidates::needsCandidates($scan->fresh()))->toBeTrue();
 })->with(['eol', 'not fixed']);
 
-it('looks for candidates for a fixable high known exploited finding with no alert level involved', function () {
+it('looks for candidates for a fixable high known exploited finding', function () {
     candidatesFake();
-    ImageScanPolicy::query()->update(['alert_level' => ImageScanAlertLevel::Critical]);
     $scan = candidatesScan();
     $kev = Finding::fromArray([
         'id' => 'CVE-2025-1094', 'aliases' => [], 'severity' => 'high', 'package' => 'postgresql', 'version' => '15.0', 'type' => 'binary',
@@ -469,14 +466,14 @@ it('does nothing for an application that Coolify builds', function () {
     Process::assertNothingRan();
 });
 
-it('marks the findings that a better candidate fixes as fixable now for the gate', function () {
+it('marks the findings that a better candidate fixes as fixed by an update', function () {
     candidatesFake();
     $scan = candidatesScan();
 
     RefreshCandidates::run($scan);
 
     $scan = $scan->fresh();
-    $classify = ImageScanGate::classifierFor($scan);
+    $classify = SecurityActions::fixStates($scan, IgnoreMatcher::forResource($scan->resource));
     $finding = collect(candidatesFindings())->firstWhere('id', 'CVE-2025-1094');
 
     expect($classify($finding)->value)->toBe('fixable_now');
@@ -715,7 +712,7 @@ it('attributes findings to the base image from a registry scan of the current ba
         ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
         ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
         ->and(array_sum($line['fixes']))->toBeGreaterThan(0)->toBeLessThanOrEqual($base['attributable'])
-        ->and($scan->summary['counts'])->toBe($summary['counts'])
+        ->and($scan->summary['eol_distro'])->toBe($summary['eol_distro'])
         ->and(candidatesScansToday())->toBe(2)
         ->and(RefreshCandidates::shouldRefresh($scan))->toBeFalse();
 
@@ -747,7 +744,7 @@ it('counts only findings that the current base image has as attributable and fix
         ->and(collect($line['fixed_ids'])->every(fn (string $id) => $baseKeys->has(strtolower($id))))->toBeTrue();
 });
 
-it('never makes base image candidates fixable now for the gate', function () {
+it('never makes base image candidates fix an image that the team does not build', function () {
     candidatesFake();
     $scan = candidatesDockerfileScan();
     RefreshCandidates::run($scan);
@@ -757,7 +754,7 @@ it('never makes base image candidates fixable now for the gate', function () {
     $finding = collect(candidatesFindings())->first(fn (Finding $finding) => $finding->id === $fixedId || in_array($fixedId, $finding->aliases, true));
     $scan->builds_image = false;
 
-    expect(ImageScanGate::classifierFor($scan)($finding)->value)->not->toBe('fixable_now');
+    expect(SecurityActions::fixStates($scan, IgnoreMatcher::forResource($scan->resource))($finding)->value)->not->toBe('fixable_now');
 });
 
 it('says that no newer base image is better when the line candidate has as many findings as the current base', function () {

@@ -4,7 +4,6 @@ namespace App\Services\ImageScan;
 
 use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\UpdateResourceImage;
-use App\Enums\ImageScanAlertLevel;
 use App\Models\Application;
 use App\Models\ImageScan;
 use App\Models\Server;
@@ -20,7 +19,8 @@ use InvalidArgumentException;
  */
 final class FixPanel
 {
-    private const SEVERITIES = ['critical', 'high', 'medium'];
+    /** The severities of the relevant findings (spec 15.2). */
+    private const SEVERITIES = ['critical', 'high'];
 
     /**
      * @param  Collection<int, ImageScan>  $scans  The current scans, loaded with their resource.
@@ -63,29 +63,15 @@ final class FixPanel
     }
 
     /**
-     * "fixes 17 critical and high." uses the severities of the alert level.
-     */
-    public static function levelWords(ImageScanAlertLevel $level): string
-    {
-        return match ($level) {
-            ImageScanAlertLevel::Critical => 'critical',
-            ImageScanAlertLevel::High => 'critical and high',
-            ImageScanAlertLevel::Medium => 'critical, high, and medium',
-        };
-    }
-
-    /**
-     * "fixes 17 critical and high." with the words of the alert level, or "fixes 1 high vulnerability." for one.
+     * "fixes 17 critical and high." or "fixes 1 high vulnerability." for one.
      *
      * @param  array<string, mixed>|null  $fixes
      */
-    public static function fixesPhrase(?array $fixes, ImageScanAlertLevel $level): string
+    public static function fixesPhrase(?array $fixes): string
     {
         $counts = [];
         foreach (self::SEVERITIES as $severity) {
-            if ($level->includes($severity)) {
-                $counts[$severity] = (int) ($fixes[$severity] ?? 0);
-            }
+            $counts[$severity] = (int) ($fixes[$severity] ?? 0);
         }
 
         $total = array_sum($counts);
@@ -93,7 +79,7 @@ final class FixPanel
             return 'fixes 1 '.array_search(1, $counts, true).' vulnerability.';
         }
 
-        return "fixes {$total} ".self::levelWords($level).'.';
+        return "fixes {$total} critical and high.";
     }
 
     /**
@@ -101,13 +87,13 @@ final class FixPanel
      *
      * @param  array<string, mixed>|null  $left
      */
-    public static function leftSentence(?array $left, ImageScanAlertLevel $level): string
+    public static function leftSentence(?array $left): string
     {
         $parts = [];
         $total = 0;
         foreach (self::SEVERITIES as $severity) {
             $count = (int) ($left[$severity] ?? 0);
-            if ($count > 0 && $level->includes($severity)) {
+            if ($count > 0) {
                 $parts[] = "{$count} {$severity}";
                 $total += $count;
             }
@@ -226,7 +212,6 @@ final class FixPanel
     {
         $imageRef = (string) $scan->image_ref;
         $status = $scan->candidateStatus();
-        $level = ImageScanPolicyResolver::for($owner, $scan->server)->alertLevel;
         $blocked = UpdateResourceImage::blockedReason($scan, $owner);
         $candidate = $scan->updateCandidates()[0] ?? null;
         $eol = data_get($scan->summary, 'eol_distro');
@@ -237,7 +222,7 @@ final class FixPanel
             'key' => (string) $scan->uuid,
             'image' => $imageRef,
             'owner' => $resource instanceof Service ? (string) $owner->getAttribute('uuid') : '',
-            'update' => $candidate === null || $blocked !== null ? null : self::update($resource, $imageRef, $candidate, $level, is_array($eol) ? $eol : null),
+            'update' => $candidate === null || $blocked !== null ? null : self::update($resource, $imageRef, $candidate, is_array($eol) ? $eol : null),
             'message' => match (true) {
                 $candidate !== null => $blocked,
                 in_array($status, ['no_better', 'cannot_compare', 'auth_required', 'failed'], true) => RefreshCandidates::message($scan),
@@ -257,12 +242,12 @@ final class FixPanel
      * @param  array<string, mixed>|null  $currentEol  The end-of-life distro of the current image.
      * @return array<string, mixed>
      */
-    private static function update(Model $resource, string $imageRef, array $candidate, ImageScanAlertLevel $level, ?array $currentEol): array
+    private static function update(Model $resource, string $imageRef, array $candidate, ?array $currentEol): array
     {
         $ref = (string) $candidate['ref'];
         $tag = (string) ImageRef::parse($ref)->tag;
         $sameTag = $candidate['kind'] === 'same_tag';
-        $fixes = self::fixesPhrase(is_array($candidate['fixes'] ?? null) ? $candidate['fixes'] : null, $level);
+        $fixes = self::fixesPhrase(is_array($candidate['fixes'] ?? null) ? $candidate['fixes'] : null);
         $leavesEol = filled($currentEol['name'] ?? null) && empty($candidate['eol']);
         $eolSentence = $leavesEol
             ? ' It moves off '.ucfirst((string) $currentEol['name']).rtrim(' '.($currentEol['version'] ?? '')).', which no longer gets security fixes.'
@@ -272,7 +257,7 @@ final class FixPanel
             'ref' => $ref,
             'sameTag' => $sameTag,
             'text' => ($sameTag ? "A newer build of {$imageRef} {$fixes}" : "Update to {$tag}: {$fixes}")
-                .' '.self::leftSentence(is_array($candidate['left'] ?? null) ? $candidate['left'] : null, $level)
+                .' '.self::leftSentence(is_array($candidate['left'] ?? null) ? $candidate['left'] : null)
                 .$eolSentence,
             'button' => $sameTag ? 'Pull latest and restart' : "Update to {$tag}",
             'title' => $sameTag ? "Pull the newest build of {$imageRef}?" : "Update to {$tag}?",

@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\ImageScanAlertLevel;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Models\Application;
 use App\Models\Environment;
@@ -65,12 +65,10 @@ function resolverService(): Service
 it('uses the instance defaults when no level sets a value', function () {
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::Critical)
-        ->and($policy->gateEnabled)->toBeFalse()
+    expect($policy->gateMode)->toBe('off')
         ->and($policy->onScanError)->toBe(ImageScanOnError::Deploy)
         ->and($policy->sources)->toBe([
-            'alert_level' => 'instance',
-            'gate_enabled' => 'instance',
+            'gate_mode' => 'instance',
             'on_scan_error' => 'instance',
         ])
         ->and($policy->scanServer->is($this->server))->toBeTrue();
@@ -78,15 +76,13 @@ it('uses the instance defaults when no level sets a value', function () {
 
 it('reads the instance row from the database', function () {
     ImageScanPolicy::query()->whereNull('scope_type')->update([
-        'alert_level' => 'medium',
-        'gate_enabled' => true,
+        'gate_mode' => 'strict',
         'on_scan_error' => 'block',
     ]);
 
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::Medium)
-        ->and($policy->gateEnabled)->toBeTrue()
+    expect($policy->gateMode)->toBe('strict')
         ->and($policy->onScanError)->toBe(ImageScanOnError::Block);
 });
 
@@ -95,78 +91,75 @@ it('falls back to the code defaults when the instance row is missing', function 
 
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::Critical)
-        ->and($policy->gateEnabled)->toBeFalse()
+    expect($policy->gateMode)->toBe('off')
         ->and($policy->onScanError)->toBe(ImageScanOnError::Deploy)
-        ->and($policy->sources['alert_level'])->toBe('instance');
+        ->and($policy->sources['gate_mode'])->toBe('instance');
 });
 
 it('reads the lowest id when the instance row exists twice', function () {
-    ImageScanPolicy::query()->whereNull('scope_type')->update(['alert_level' => 'high']);
-    ImageScanPolicy::query()->create(['alert_level' => 'medium', 'gate_enabled' => true, 'on_scan_error' => 'block']);
+    ImageScanPolicy::query()->whereNull('scope_type')->update(['gate_mode' => 'on']);
+    ImageScanPolicy::query()->create(['gate_mode' => 'strict', 'on_scan_error' => 'block']);
 
-    expect(ImageScanPolicyResolver::for($this->application)->alertLevel)->toBe(ImageScanAlertLevel::High);
+    expect(ImageScanPolicyResolver::for($this->application)->gateMode)->toBe('on');
 });
 
 it('lets the team override the instance', function () {
-    resolverPolicyFor($this->team, ['alert_level' => ImageScanAlertLevel::High]);
+    resolverPolicyFor($this->team, ['gate_mode' => ImageScanGateMode::On]);
 
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::High)
-        ->and($policy->sources['alert_level'])->toBe('team')
-        ->and($policy->sources['gate_enabled'])->toBe('instance');
+    expect($policy->gateMode)->toBe('on')
+        ->and($policy->sources['gate_mode'])->toBe('team')
+        ->and($policy->sources['on_scan_error'])->toBe('instance');
 });
 
 it('lets the server override the team and the app override the server', function () {
-    resolverPolicyFor($this->team, ['alert_level' => ImageScanAlertLevel::High, 'on_scan_error' => ImageScanOnError::Block]);
-    resolverPolicyFor($this->server, ['alert_level' => ImageScanAlertLevel::Medium, 'gate_enabled' => true]);
-    resolverPolicyFor($this->application, ['alert_level' => ImageScanAlertLevel::Critical]);
+    resolverPolicyFor($this->team, ['gate_mode' => ImageScanGateMode::Strict, 'on_scan_error' => ImageScanOnError::Block]);
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::Off]);
+    resolverPolicyFor($this->application, ['gate_mode' => ImageScanGateMode::On]);
 
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::Critical)
-        ->and($policy->gateEnabled)->toBeTrue()
+    expect($policy->gateMode)->toBe('on')
         ->and($policy->onScanError)->toBe(ImageScanOnError::Block)
         ->and($policy->sources)->toBe([
-            'alert_level' => 'app',
-            'gate_enabled' => 'server',
+            'gate_mode' => 'app',
             'on_scan_error' => 'team',
         ]);
 });
 
-it('turns the gate off at the app level even when the server turns it on', function () {
-    resolverPolicyFor($this->server, ['gate_enabled' => true]);
-    resolverPolicyFor($this->application, ['gate_enabled' => false]);
+it('turns the gate off at the app level even when the server sets strict', function () {
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::Strict]);
+    resolverPolicyFor($this->application, ['gate_mode' => ImageScanGateMode::Off]);
 
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->gateEnabled)->toBeFalse()
-        ->and($policy->sources['gate_enabled'])->toBe('app');
+    expect($policy->gateMode)->toBe('off')
+        ->and($policy->sources['gate_mode'])->toBe('app');
 });
 
 it('inherits the server value when the app value is null', function () {
-    resolverPolicyFor($this->server, ['gate_enabled' => true]);
-    resolverPolicyFor($this->application, ['gate_enabled' => null, 'alert_level' => ImageScanAlertLevel::High]);
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::Strict]);
+    resolverPolicyFor($this->application, ['gate_mode' => null, 'on_scan_error' => ImageScanOnError::Block]);
 
     $policy = ImageScanPolicyResolver::for($this->application);
 
-    expect($policy->gateEnabled)->toBeTrue()
-        ->and($policy->sources['gate_enabled'])->toBe('server')
-        ->and($policy->sources['alert_level'])->toBe('app');
+    expect($policy->gateMode)->toBe('strict')
+        ->and($policy->sources['gate_mode'])->toBe('server')
+        ->and($policy->sources['on_scan_error'])->toBe('app');
 });
 
-it('resolves a service without the app level and never enables the gate', function () {
+it('resolves a service without the app level and never turns the gate on', function () {
     $service = resolverService();
     $serviceApplication = ServiceApplication::create(['name' => 'app', 'service_id' => $service->id]);
-    resolverPolicyFor($this->server, ['gate_enabled' => true, 'alert_level' => ImageScanAlertLevel::High]);
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::Strict, 'on_scan_error' => ImageScanOnError::Block]);
 
     foreach ([$service, $serviceApplication] as $resource) {
         $policy = ImageScanPolicyResolver::for($resource);
 
-        expect($policy->gateEnabled)->toBeFalse()
-            ->and($policy->alertLevel)->toBe(ImageScanAlertLevel::High)
-            ->and($policy->sources['alert_level'])->toBe('server')
+        expect($policy->gateMode)->toBe('off')
+            ->and($policy->onScanError)->toBe(ImageScanOnError::Block)
+            ->and($policy->sources['on_scan_error'])->toBe('server')
             ->and($policy->scanServer->is($this->server))->toBeTrue();
     }
 });
@@ -180,40 +173,48 @@ it('does not read app rows for a database', function () {
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
     ]);
-    resolverPolicyFor($this->server, ['gate_enabled' => true]);
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::On]);
     ImageScanPolicy::query()->create([
         'scope_type' => $database->getMorphClass(),
         'scope_id' => $database->id,
-        'alert_level' => ImageScanAlertLevel::Medium,
+        'on_scan_error' => ImageScanOnError::Block,
     ]);
 
     $policy = ImageScanPolicyResolver::for($database);
 
-    expect($policy->gateEnabled)->toBeFalse()
-        ->and($policy->alertLevel)->toBe(ImageScanAlertLevel::Critical)
+    expect($policy->gateMode)->toBe('off')
+        ->and($policy->onScanError)->toBe(ImageScanOnError::Deploy)
         ->and($policy->scanServer->is($this->server))->toBeTrue();
 });
 
 it('uses the team of the resource and not the session team', function () {
     $otherTeam = Team::factory()->create();
-    resolverPolicyFor($this->team, ['alert_level' => ImageScanAlertLevel::High]);
-    resolverPolicyFor($otherTeam, ['alert_level' => ImageScanAlertLevel::Medium]);
+    resolverPolicyFor($this->team, ['gate_mode' => ImageScanGateMode::On]);
+    resolverPolicyFor($otherTeam, ['gate_mode' => ImageScanGateMode::Strict]);
     session(['currentTeam' => $otherTeam]);
 
-    expect(ImageScanPolicyResolver::for($this->application)->alertLevel)->toBe(ImageScanAlertLevel::High);
+    expect(ImageScanPolicyResolver::for($this->application)->gateMode)->toBe('on');
 });
 
 it('scans on the given server but resolves the rules through the main destination server', function () {
     $buildServer = Server::factory()->create(['team_id' => $this->team->id]);
-    resolverPolicyFor($this->server, ['alert_level' => ImageScanAlertLevel::High, 'gate_enabled' => true]);
-    resolverPolicyFor($buildServer, ['alert_level' => ImageScanAlertLevel::Medium, 'gate_enabled' => false]);
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::Strict]);
+    resolverPolicyFor($buildServer, ['gate_mode' => ImageScanGateMode::Off]);
 
     $policy = ImageScanPolicyResolver::for($this->application, $buildServer);
 
-    expect($policy->alertLevel)->toBe(ImageScanAlertLevel::High)
-        ->and($policy->gateEnabled)->toBeTrue()
-        ->and($policy->sources['gate_enabled'])->toBe('server')
+    expect($policy->gateMode)->toBe('strict')
+        ->and($policy->sources['gate_mode'])->toBe('server')
         ->and($policy->scanServer->is($buildServer))->toBeTrue();
+});
+
+it('lists the inherited value and its level for each field', function () {
+    resolverPolicyFor($this->server, ['gate_mode' => ImageScanGateMode::On]);
+
+    expect(ImageScanPolicyResolver::inheritedFor($this->application))->toBe([
+        'gate_mode' => ['value' => ImageScanGateMode::On, 'source' => 'server'],
+        'on_scan_error' => ['value' => ImageScanOnError::Deploy, 'source' => 'instance'],
+    ]);
 });
 
 it('keeps scanning off until the server opts in', function () {
@@ -257,7 +258,7 @@ it('does not apply the app scan switch to services', function () {
 it('returns the instance row, an existing row, or a new unsaved row to edit', function () {
     $instance = ImageScanPolicyResolver::forScope(null);
     $new = ImageScanPolicyResolver::forScope($this->server);
-    $existing = resolverPolicyFor($this->team, ['alert_level' => ImageScanAlertLevel::High]);
+    $existing = resolverPolicyFor($this->team, ['gate_mode' => ImageScanGateMode::On]);
 
     expect($instance->exists)->toBeTrue()
         ->and($instance->scope_type)->toBeNull()

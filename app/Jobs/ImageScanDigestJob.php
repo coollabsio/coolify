@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
- * The daily image vulnerability digest of one team (spec 8): new fixable-now findings at the alert level and new
+ * The daily image vulnerability digest of one team (spec 8): new findings that an action fixes and new
  * fixes per scanned resource of the team, ignores that end within 7 days, and servers whose rescans failed 2 days in
  * a row. Sends one VulnerabilityDigest only when something changed, then records what it covered in the
  * notification state of each scan owner (see ScanNotifications). An ignore is named once per end date (cache); a

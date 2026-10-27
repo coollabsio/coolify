@@ -1,9 +1,7 @@
 <?php
 
 use App\Actions\ImageScan\ScanImage;
-use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanErrorCode;
-use App\Enums\ImageScanOnError;
 use App\Enums\ImageScanStatus;
 use App\Events\ImageScanUpdated;
 use App\Jobs\RefreshCandidatesJob;
@@ -13,7 +11,6 @@ use App\Models\Environment;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
 use App\Models\ImageScanNotificationState;
-use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -21,9 +18,6 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Notifications\ImageScan\KnownExploitedFound;
-use App\Services\ImageScan\IgnoreMatcher;
-use App\Services\ImageScan\ImageScanGate;
-use App\Services\ImageScan\ResolvedImageScanPolicy;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\SecurityStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -146,7 +140,7 @@ it('stores the findings, the summary, and the package list of a completed scan',
         ->and($scan->findings)->toHaveCount(166)
         ->and($scan->summary['eol_distro'])->toBe(['name' => 'alpine', 'version' => '3.16.2'])
         ->and($scan->summary['truncated'])->toBeFalse()
-        ->and(array_sum(array_map('array_sum', $scan->summary['counts'])))->toBe(166)
+        ->and($scan->summary['ignored'])->toBe(0)
         ->and($scan->fresh()->summary['security']['status'])->toBe(SecurityStatus::forScan($scan->fresh())->status->value);
 
     $sbom = ImageSbom::query()->sole();
@@ -653,37 +647,17 @@ it('fails when the vulnerability database is older than 5 days', function () {
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'coolify-scan-exit db-update'));
 });
 
-it('counts the same fixable findings in the summary as the gate', function () {
-    scanImageTestFake();
-    ImageScanPolicy::factory()->create([
-        'scope_type' => $this->server->getMorphClass(),
-        'scope_id' => $this->server->id,
-        'alert_level' => ImageScanAlertLevel::High,
-    ]);
-
-    $scan = scanImageTestRun();
-
-    $policy = new ResolvedImageScanPolicy(ImageScanAlertLevel::High, true, ImageScanOnError::Deploy, true, [], $this->server);
-    $gate = (new ImageScanGate)->evaluate($scan->fresh(), $policy, IgnoreMatcher::forResource($this->application));
-    expect($scan->summary['fixable_now_at_level'])->toBeGreaterThan(0)
-        ->and($scan->summary['fixable_now_at_level'])->toBe($gate->count);
-});
-
-it('counts the summary of a build server scan at the alert level of the main destination server', function () {
+it('stores the security status of a build server scan with the rules of the main destination server', function () {
     scanImageTestFake();
     $buildServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id]);
     $buildServer->settings->forceFill(['is_reachable' => true, 'is_usable' => true, 'is_image_scan_enabled' => true])->saveQuietly();
     $buildServer = $buildServer->fresh();
-    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => ImageScanAlertLevel::High]);
-    ImageScanPolicy::factory()->create(['scope_type' => $buildServer->getMorphClass(), 'scope_id' => $buildServer->id, 'alert_level' => ImageScanAlertLevel::Critical]);
 
     $scan = ScanImage::run($buildServer, $this->application, 'postgres:15.0-alpine');
 
-    $policy = new ResolvedImageScanPolicy(ImageScanAlertLevel::High, true, ImageScanOnError::Deploy, true, [], $this->server);
-    $gate = (new ImageScanGate)->evaluate($scan->fresh(), $policy, IgnoreMatcher::forResource($this->application));
     expect($scan->server_id)->toBe($buildServer->id)
-        ->and($scan->summary['fixable_now_at_level'])->toBe($gate->count)
-        ->and($scan->summary['fixable_now_at_level'])->toBeGreaterThan((int) data_get($scan->summary, 'counts.fixable_now.critical', 0));
+        ->and($scan->fresh()->summary['security']['status'])->toBe(SecurityStatus::forScan($scan->fresh())->status->value)
+        ->and($scan->fresh()->summary)->not->toHaveKeys(['counts', 'fixable_now_at_level']);
 });
 
 it('scopes the SBOM reuse and the scan writes to the server', function () {
@@ -755,15 +729,10 @@ it('keeps the deployment of a scan when a later rescan has none', function () {
 describe('candidate check', function () {
     beforeEach(function () {
         Queue::fake();
-        ImageScanPolicy::factory()->create([
-            'scope_type' => $this->server->getMorphClass(),
-            'scope_id' => $this->server->id,
-            'alert_level' => ImageScanAlertLevel::High,
-        ]);
         $this->application->forceFill(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'postgres', 'docker_registry_image_tag' => '15.0-alpine'])->save();
     });
 
-    it('queues a candidate check after a scan of an image with a package fix at the alert level', function () {
+    it('queues a candidate check after a scan of an image with a relevant finding', function () {
         scanImageTestFake();
 
         $scan = scanImageTestRun($this->application->fresh());
@@ -781,7 +750,7 @@ describe('candidate check', function () {
         Queue::assertNotPushed(RefreshCandidatesJob::class);
     });
 
-    it('queues a base image check for a Dockerfile build with findings at the alert level', function () {
+    it('queues a base image check for a Dockerfile build with relevant findings', function () {
         scanImageTestFake();
         $this->application->forceFill(['build_pack' => 'dockerfile'])->save();
 
@@ -811,8 +780,10 @@ describe('notifications', function () {
             'image_vulnerabilities_discord_notifications' => true,
         ]);
         $grype = file_get_contents(base_path('tests/Fixtures/image-scan/grype.ndjson'));
-        $known = json_encode(['art' => '0bbf5c9dd36d4a50', 'desc' => '', 'epss' => 0.9, 'fix' => 'fixed', 'fixv' => ['15.11'], 'id' => 'CVE-2026-7777',
-            'kev' => true, 'pkg' => 'postgresql', 'rel' => [], 'risk' => 90.0, 'sev' => 'Critical', 'sugg' => '15.11', 'type' => 'binary', 'ver' => '15.0']);
+        // A language package with a fix gets an action in an image that a builder builds (spec 15.5).
+        $this->application->forceFill(['build_pack' => 'nixpacks'])->save();
+        $known = json_encode(['art' => '0bbf5c9dd36d4a50', 'desc' => '', 'epss' => 0.9, 'fix' => 'fixed', 'fixv' => ['4.17.21'], 'id' => 'CVE-2026-7777',
+            'kev' => true, 'pkg' => 'lodash', 'rel' => [], 'risk' => 90.0, 'sev' => 'Critical', 'sugg' => '4.17.21', 'type' => 'npm', 'ver' => '4.17.0']);
         $withKnown = scanImageTestPayload('grype', rtrim($grype)."\n".$known);
 
         scanImageTestFake();

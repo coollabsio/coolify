@@ -70,7 +70,7 @@ function surfacesBlockedResult(): array
         'scan_ran' => true,
         'error' => null,
         'count' => 1,
-        'headline' => 'Deploy blocked: 1 critical vulnerability with a fix.',
+        'headline' => 'Deploy blocked: this image has a security problem that attackers are using.',
         'top' => [['id' => 'CVE-2026-1234', 'severity' => 'critical', 'package' => 'openssl', 'version' => '3.0.13', 'fixed_in' => '3.0.15', 'kev' => false]],
     ];
 }
@@ -158,7 +158,7 @@ describe('log toolbar', function () {
 
         surfacesShow($this->admin, $deployment)
             ->assertSee('Blocked')
-            ->assertSee('Deploy blocked: 1 critical vulnerability with a fix.')
+            ->assertSee('Deploy blocked: this image has a security problem that attackers are using.')
             ->assertSee('Review vulnerabilities')
             ->assertSee('Deploy anyway')
             ->assertDontSee('Ask someone with write access to deploy anyway.');
@@ -356,7 +356,7 @@ describe('topbar warning', function () {
 
         Livewire::test(Heading::class, ['application' => $this->application])
             ->assertSeeHtml('data-image-scan-gate')
-            ->assertSee('Deploy blocked: 1 critical vulnerability with a fix.')
+            ->assertSee('Deploy blocked: this image has a security problem that attackers are using.')
             ->assertSee($deployment->deployment_uuid);
     });
 

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\ImageScanAlertLevel;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -19,16 +19,14 @@ class ImageScanPolicy extends BaseModel
     protected $fillable = [
         'scope_type',
         'scope_id',
-        'alert_level',
-        'gate_enabled',
+        'gate_mode',
         'on_scan_error',
     ];
 
     protected function casts(): array
     {
         return [
-            'alert_level' => ImageScanAlertLevel::class,
-            'gate_enabled' => 'boolean',
+            'gate_mode' => ImageScanGateMode::class,
             'on_scan_error' => ImageScanOnError::class,
         ];
     }
@@ -41,8 +39,7 @@ class ImageScanPolicy extends BaseModel
     public static function validationRules(): array
     {
         return [
-            'alert_level' => ['nullable', Rule::enum(ImageScanAlertLevel::class)],
-            'gate_enabled' => ['nullable', 'boolean'],
+            'gate_mode' => ['nullable', Rule::enum(ImageScanGateMode::class)],
             'on_scan_error' => ['nullable', Rule::enum(ImageScanOnError::class)],
         ];
     }

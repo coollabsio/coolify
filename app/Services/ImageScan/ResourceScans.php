@@ -325,7 +325,8 @@ final class ResourceScans
     }
 
     /**
-     * Fixable now at the alert level, from the stored summaries: the sidebar count. 0 while the resource is not scanned.
+     * The relevant findings that an action fixes (spec 15.5), from the stored security status: the sidebar count. 0
+     * while the resource is not scanned.
      */
     public static function fixableNowCount(Model $resource): int
     {
@@ -334,12 +335,37 @@ final class ResourceScans
         }
 
         return (int) self::current($resource, null, ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'summary', 'scanned_at'])
-            ->sum(fn (ImageScan $scan): int => (int) data_get($scan->summary, 'fixable_now_at_level', 0));
+            ->sum(fn (ImageScan $scan): int => self::storedFixedCount($scan));
     }
 
     /**
-     * Writes the summaries again, for example after an ignore or a version check, so the counts and the stored
-     * security status match the findings.
+     * The relevant findings of a scan that an action fixes, from its stored security status.
+     */
+    public static function storedFixedCount(ImageScan $scan): int
+    {
+        return (int) data_get($scan->summary, 'security.facts.counts.relevant_fixed', 0);
+    }
+
+    /**
+     * The summary of a scan before its security status is added (`SecurityStatus::store()`): the number of ignored
+     * findings, the end-of-life OS, and whether the report was cut.
+     *
+     * @param  list<Finding>  $findings
+     * @param  array{name: string, version: string}|null  $eol
+     * @return array{ignored: int, eol_distro: array{name: string, version: string}|null, truncated: bool}
+     */
+    public static function summaryFor(array $findings, IgnoreMatcher $ignores, ?array $eol, bool $truncated): array
+    {
+        return [
+            'ignored' => count(array_filter($findings, fn (Finding $finding): bool => $ignores->matches($finding) !== null)),
+            'eol_distro' => $eol,
+            'truncated' => $truncated,
+        ];
+    }
+
+    /**
+     * Writes the summaries again, for example after an ignore or a version check, so the stored security status
+     * matches the findings.
      *
      * @param  Collection<int, ImageScan>  $scans  Loaded with their resource.
      */
@@ -352,11 +378,9 @@ final class ResourceScans
             }
 
             $summary = (array) $scan->summary;
-            $scan->summary = ScanSummary::build(
+            $scan->summary = self::summaryFor(
                 self::findings($scan),
-                ImageScanGate::classifierFor($scan),
                 IgnoreMatcher::forResource($owner),
-                ImageScanPolicyResolver::for($owner)->alertLevel,
                 is_array($summary['eol_distro'] ?? null) ? $summary['eol_distro'] : null,
                 (bool) ($summary['truncated'] ?? false),
             );

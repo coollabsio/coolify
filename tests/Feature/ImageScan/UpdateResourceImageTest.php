@@ -3,7 +3,6 @@
 use App\Actions\Database\RestartDatabase;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Actions\Service\RestartService;
-use App\Enums\ImageScanAlertLevel;
 use App\Livewire\ImageScan\Vulnerabilities;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -11,7 +10,6 @@ use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
-use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -53,7 +51,6 @@ beforeEach(function () {
     $this->admin = updateImageMember($this->team, 'admin');
     $this->server = Server::factory()->create(['team_id' => $this->team->id, 'name' => 'main-server']);
     $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
-    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high']);
     $this->destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
     $this->environment = Environment::factory()->create([
         'project_id' => Project::factory()->create(['team_id' => $this->team->id])->id,
@@ -130,7 +127,7 @@ function updateImageScan(Model $resource, string $imageRef, array $entries, stri
             'type' => 'apk', 'artifactId' => 'a1', 'fixedIn' => '15.10', 'fixState' => 'fixed', 'kev' => false,
             'epss' => 0.2, 'risk' => 1.0, 'summary' => 'A bug.', 'layer' => 'base',
         ]],
-        'summary' => ['fixable_now_at_level' => 1, 'truncated' => false, 'eol_distro' => null],
+        'summary' => ['truncated' => false, 'eol_distro' => null],
         'candidates' => ['status' => $status, 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => $entries],
         'scanned_at' => now(),
     ]);
@@ -567,18 +564,15 @@ describe('fix panel', function () {
             ->assertDontSeeHtml('updateImage(');
     });
 
-    it('phrases the counts for the alert level', function () {
-        expect(FixPanel::fixesPhrase(['critical' => 0, 'high' => 1, 'medium' => 3], ImageScanAlertLevel::High))->toBe('fixes 1 high vulnerability.')
-            ->and(FixPanel::fixesPhrase(['critical' => 1, 'high' => 0, 'medium' => 0], ImageScanAlertLevel::Critical))->toBe('fixes 1 critical vulnerability.')
-            ->and(FixPanel::fixesPhrase(['critical' => 2, 'high' => 15, 'medium' => 4], ImageScanAlertLevel::High))->toBe('fixes 17 critical and high.')
-            ->and(FixPanel::fixesPhrase(['critical' => 2, 'high' => 15, 'medium' => 4], ImageScanAlertLevel::Medium))->toBe('fixes 21 critical, high, and medium.')
-            ->and(FixPanel::levelWords(ImageScanAlertLevel::Medium))->toBe('critical, high, and medium')
-            ->and(FixPanel::levelWords(ImageScanAlertLevel::Critical))->toBe('critical')
-            ->and(FixPanel::leftSentence(['critical' => 3, 'high' => 2, 'medium' => 1], ImageScanAlertLevel::Medium))
-            ->toBe('3 critical, 2 high, and 1 medium are left, waiting for a fix from the image maintainer.')
-            ->and(FixPanel::leftSentence(['critical' => 1, 'high' => 0, 'medium' => 4], ImageScanAlertLevel::High))
+    it('phrases the critical and high counts', function () {
+        expect(FixPanel::fixesPhrase(['critical' => 0, 'high' => 1, 'medium' => 3]))->toBe('fixes 1 high vulnerability.')
+            ->and(FixPanel::fixesPhrase(['critical' => 1, 'high' => 0, 'medium' => 0]))->toBe('fixes 1 critical vulnerability.')
+            ->and(FixPanel::fixesPhrase(['critical' => 2, 'high' => 15, 'medium' => 4]))->toBe('fixes 17 critical and high.')
+            ->and(FixPanel::leftSentence(['critical' => 3, 'high' => 2, 'medium' => 1]))
+            ->toBe('3 critical and 2 high are left, waiting for a fix from the image maintainer.')
+            ->and(FixPanel::leftSentence(['critical' => 1, 'high' => 0, 'medium' => 4]))
             ->toBe('1 critical is left, waiting for a fix from the image maintainer.')
-            ->and(FixPanel::leftSentence(['critical' => 0, 'high' => 0, 'medium' => 4], ImageScanAlertLevel::Critical))
+            ->and(FixPanel::leftSentence(['critical' => 0, 'high' => 0, 'medium' => 4]))
             ->toBe('Nothing fixable is left.');
     });
 });
@@ -699,7 +693,7 @@ describe('base image of a Dockerfile build', function () {
                 ['CVE-2026-0001', 'critical'], ['CVE-2026-0002', 'critical'], ['CVE-2026-0011', 'high'], ['CVE-2026-0012', 'high'],
                 ['CVE-2026-0013', 'high'], ['CVE-2026-0014', 'high'], ['CVE-2026-0015', 'high'], ['CVE-2026-0030', 'critical'],
             ]),
-            'summary' => ['fixable_now_at_level' => 1, 'truncated' => false, 'eol_distro' => null],
+            'summary' => ['truncated' => false, 'eol_distro' => null],
             'candidates' => ['status' => 'skipped', 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => [],
                 ...($base === null ? [] : ['base' => [
                     'image' => $baseImageRef, 'checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false,

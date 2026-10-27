@@ -1,7 +1,7 @@
 <?php
 
-use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanErrorCode;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Enums\ImageScanStatus;
 use App\Models\Application;
@@ -18,6 +18,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
@@ -46,8 +47,7 @@ it('seeds the instance policy row', function () {
     $policy = ImageScanPolicy::query()->whereNull('scope_type')->first();
 
     expect($policy)->not->toBeNull()
-        ->and($policy->alert_level)->toBe(ImageScanAlertLevel::Critical)
-        ->and($policy->gate_enabled)->toBeFalse()
+        ->and($policy->gate_mode)->toBe(ImageScanGateMode::Off)
         ->and($policy->on_scan_error)->toBe(ImageScanOnError::Deploy)
         ->and($policy->uuid)->not->toBeEmpty();
 });
@@ -56,12 +56,12 @@ it('resolves the scope of a policy', function () {
     $policy = ImageScanPolicy::factory()->create([
         'scope_type' => $this->server->getMorphClass(),
         'scope_id' => $this->server->id,
-        'alert_level' => ImageScanAlertLevel::High,
+        'gate_mode' => ImageScanGateMode::Strict,
     ]);
 
     expect($policy->fresh()->scope->is($this->server))->toBeTrue()
-        ->and($policy->fresh()->alert_level)->toBe(ImageScanAlertLevel::High)
-        ->and($policy->fresh()->gate_enabled)->toBeNull();
+        ->and($policy->fresh()->gate_mode)->toBe(ImageScanGateMode::Strict)
+        ->and($policy->fresh()->on_scan_error)->toBeNull();
 });
 
 it('deletes scans with their application', function () {
@@ -178,17 +178,13 @@ it('writes the candidate scan counter', function () {
         ->and($settings->fresh()->image_candidate_scans_date->toDateString())->toBe('2026-10-26');
 });
 
-it('describes alert levels and which severities they include', function () {
-    expect(ImageScanAlertLevel::Critical->label())->toBe('Critical with a fix')
-        ->and(ImageScanAlertLevel::High->label())->toBe('High or critical with a fix')
-        ->and(ImageScanAlertLevel::Medium->label())->toBe('Medium or higher with a fix')
-        ->and(ImageScanAlertLevel::Critical->includes('critical'))->toBeTrue()
-        ->and(ImageScanAlertLevel::Critical->includes('high'))->toBeFalse()
-        ->and(ImageScanAlertLevel::High->includes('High'))->toBeTrue()
-        ->and(ImageScanAlertLevel::High->includes('medium'))->toBeFalse()
-        ->and(ImageScanAlertLevel::Medium->includes('medium'))->toBeTrue()
-        ->and(ImageScanAlertLevel::Medium->includes('low'))->toBeFalse()
-        ->and(ImageScanAlertLevel::Medium->includes('unknown'))->toBeFalse()
+it('describes the gate modes and the scan error options', function () {
+    expect(ImageScanGateMode::Off->label())->toBe('Off')
+        ->and(ImageScanGateMode::On->label())->toBe('On')
+        ->and(ImageScanGateMode::Strict->label())->toBe('Strict')
+        ->and(ImageScanGateMode::Off->description())->toBeNull()
+        ->and(ImageScanGateMode::On->description())->toBe('Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.')
+        ->and(ImageScanGateMode::Strict->description())->toBe('Also blocks critical and high problems that have a fix, and operating systems that no longer get security fixes.')
         ->and(ImageScanOnError::Deploy->label())->toBe('Deploy anyway')
         ->and(ImageScanOnError::Block->label())->toBe('Block the deploy');
 });
@@ -208,8 +204,8 @@ it('builds error messages from their context', function () {
 
 it('deletes the team rules and the ignores of a team with the team', function () {
     $other = Team::factory()->create();
-    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'alert_level' => ImageScanAlertLevel::High]);
-    $kept = ImageScanPolicy::factory()->create(['scope_type' => $other->getMorphClass(), 'scope_id' => $other->id, 'alert_level' => ImageScanAlertLevel::High]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => ImageScanGateMode::On]);
+    $kept = ImageScanPolicy::factory()->create(['scope_type' => $other->getMorphClass(), 'scope_id' => $other->id, 'gate_mode' => ImageScanGateMode::On]);
     ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => null, 'resource_id' => null]);
     $otherIgnore = ImageScanIgnore::factory()->create(['team_id' => $other->id, 'resource_type' => null, 'resource_id' => null]);
 
@@ -225,4 +221,30 @@ it('keeps one index on the resource of a notification state, the unique key', fu
 
     expect($indexes)->toHaveCount(1)
         ->and($indexes->first()['unique'])->toBeTrue();
+});
+
+it('turns Block deploys on into strict and drops the alert level when it migrates', function () {
+    $migration = require database_path('migrations/2026_10_27_130000_replace_image_scan_gate_enabled_with_gate_mode.php');
+    $migration->down();
+    ImageScanPolicy::query()->whereNull('scope_type')->delete();
+    $rows = [
+        'instance' => [null, null, null],
+        'on' => [$this->server->getMorphClass(), $this->server->id, true],
+        'off' => [$this->team->getMorphClass(), $this->team->id, false],
+        'inherit' => ['App\\Models\\Application', 1, null],
+    ];
+    foreach ($rows as $name => [$type, $id, $gate]) {
+        DB::table('image_scan_policies')->insert(['uuid' => $name, 'scope_type' => $type, 'scope_id' => $id, 'alert_level' => 'high', 'gate_enabled' => $gate]);
+    }
+
+    $migration->up();
+
+    expect(DB::table('image_scan_policies')->pluck('gate_mode', 'uuid')->all())->toBe([
+        'instance' => 'off',
+        'on' => 'strict',
+        'off' => 'off',
+        'inherit' => null,
+    ])
+        ->and(Schema::hasColumns('image_scan_policies', ['alert_level']))->toBeFalse()
+        ->and(Schema::hasColumns('image_scan_policies', ['gate_enabled']))->toBeFalse();
 });

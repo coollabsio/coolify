@@ -52,7 +52,7 @@ beforeEach(function () {
         'resource_id' => $this->application->id,
         'image_ref' => 'nginx:1.27',
         'findings' => [],
-        'summary' => ['fixable_now_at_level' => 0],
+        'summary' => [],
     ]);
 });
 

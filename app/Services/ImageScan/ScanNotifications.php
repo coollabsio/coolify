@@ -5,7 +5,6 @@ namespace App\Services\ImageScan;
 use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ApplicationDeploymentStatus;
-use App\Enums\ImageScanFixState;
 use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -216,22 +215,18 @@ final class ScanNotifications
     }
 
     /**
-     * Fixable now at the alert level and not ignored: the findings of the counts and the gate.
+     * The relevant findings that an action fixes (spec 15.5): what the stored status counts as fixable.
      *
      * @return list<Finding>
      */
     public static function fixableNow(ImageScan $scan, Model $owner, ?IgnoreMatcher $ignores = null): array
     {
         $scan->setRelation('resource', $owner);
-        $classify = ImageScanGate::classifierFor($scan);
-        $ignores ??= IgnoreMatcher::forResource($owner);
-        $level = ImageScanPolicyResolver::for($owner)->alertLevel;
+        $byFinding = SecurityActions::forScan($scan, $ignores ?? IgnoreMatcher::forResource($owner))['byFinding'];
 
         return array_values(array_filter(
             ResourceScans::findings($scan),
-            fn (Finding $finding): bool => $level->includes($finding->severity)
-                && $ignores->matches($finding) === null
-                && $classify($finding) === ImageScanFixState::FixableNow,
+            fn (Finding $finding): bool => isset($byFinding[$finding->id]),
         ));
     }
 

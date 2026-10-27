@@ -35,7 +35,7 @@ class DeploymentFailed extends CustomEmailNotification
 
     public ?string $fqdn = null;
 
-    /** "Deploy blocked: 2 critical vulnerabilities with a fix" when the image scan gate stopped the deployment. Counts only, never IDs. */
+    /** The gate headline ("Deploy blocked: this image has 2 security problems that attackers are using") when the image scan gate stopped the deployment. Never IDs. */
     public ?string $blockedTitle = null;
 
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null, ?ApplicationDeploymentQueue $deployment = null)

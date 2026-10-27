@@ -112,7 +112,7 @@ class EnvironmentCanvas
                 $resource instanceof Service => $this->serviceNode($resource, in_array($resource->uuid, $startingServiceUuids, true)),
                 default => $this->databaseNode($resource),
             };
-            // Fixable now at the alert level: the resource vulnerability marker of the card.
+            // Relevant findings that an action fixes: the resource vulnerability marker of the card.
             $node['vulnerabilities'] = $markers[ResourceScans::key($resource)] ?? null;
             foreach ($node['servers'] as $server) {
                 $servers->put($server->id, $server);

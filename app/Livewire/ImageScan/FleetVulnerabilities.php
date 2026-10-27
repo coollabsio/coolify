@@ -183,7 +183,7 @@ class FleetVulnerabilities extends Component
     }
 
     /**
-     * Known exploited first, then the count at the alert level, then critical and high counts.
+     * Known exploited first, then the count of relevant findings that an action fixes, then critical and high counts.
      *
      * @param  Collection<int, array<string, mixed>>  $entries
      * @return Collection<int, array<string, mixed>>

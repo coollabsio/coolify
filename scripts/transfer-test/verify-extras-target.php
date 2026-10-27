@@ -67,7 +67,7 @@ $check('maintenance mode moved', $app?->is_maintenance_enabled === true && $app?
 
 $check('image scan opt-in of the server moved', $server?->settings?->is_image_scan_enabled === true);
 $serverPolicy = ImageScanPolicy::where('scope_type', $server?->getMorphClass())->where('scope_id', $server?->id)->first();
-$check('server scan rules moved', $serverPolicy?->alert_level?->value === 'high' && $serverPolicy->gate_enabled === true);
+$check('server scan rules moved', $serverPolicy?->gate_mode?->value === 'strict');
 $check('app scan rules moved', ImageScanPolicy::where('scope_type', $app?->getMorphClass())->where('scope_id', $app?->id)->first()?->on_scan_error?->value === 'block');
 $check('app scan switch and image builds by team moved', $app?->settings?->is_image_scan_enabled === false && $app->settings->image_builds_by_team === true);
 $check('team-wide ignore stays on the source', ! ImageScanIgnore::where('vulnerability_id', 'CVE-2024-0002')->exists());

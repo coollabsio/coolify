@@ -664,7 +664,7 @@ describe('stored status', function () {
         $stored = SecurityStatus::stored($this->application);
         $live = SecurityStatus::forResource($this->application);
         expect($scan->fresh()->summary['security']['status'])->toBe('update_now')
-            ->and($scan->fresh()->summary)->toHaveKey('fixable_now_at_level')
+            ->and($scan->fresh()->summary)->not->toHaveKey('fixable_now_at_level')
             ->and($stored->toArray())->toBe($live->toArray())
             ->and($stored->actions[0]->ref)->toBe('nginx:1.28');
     });

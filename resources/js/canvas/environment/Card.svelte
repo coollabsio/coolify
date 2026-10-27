@@ -114,7 +114,7 @@
   {#if extra || vulnerabilities}
     <div class="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 overflow-hidden h-5">
       {#if vulnerabilities}
-        <!-- Fixable now at the alert level (the resource vulnerability marker). -->
+        <!-- Relevant findings that an action fixes (the resource vulnerability marker). -->
         <span
           class="inline-flex h-5 shrink-0 cursor-help items-center gap-1 text-xs leading-none font-medium text-neutral-700 dark:text-white"
           role="img"

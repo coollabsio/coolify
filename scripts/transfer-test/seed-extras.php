@@ -83,7 +83,7 @@ $app->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>fa
 
 // Image scan: server opt-in, server and app rules, and an ignore of the app
 $server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
-$quiet(ImageScanPolicy::class, ['scope_type' => $server->getMorphClass(), 'scope_id' => $server->id, 'alert_level' => 'high', 'gate_enabled' => true]);
+$quiet(ImageScanPolicy::class, ['scope_type' => $server->getMorphClass(), 'scope_id' => $server->id, 'gate_mode' => 'strict']);
 $quiet(ImageScanPolicy::class, ['scope_type' => $app->getMorphClass(), 'scope_id' => $app->id, 'on_scan_error' => 'block']);
 $quiet(ImageScanIgnore::class, ['team_id' => $teamId, 'resource_type' => $app->getMorphClass(), 'resource_id' => $app->id, 'vulnerability_id' => 'CVE-2024-0001', 'reason' => 'fake ignore']);
 $quiet(ImageScanIgnore::class, ['team_id' => $teamId, 'vulnerability_id' => 'CVE-2024-0002', 'reason' => 'fake team-wide ignore']);

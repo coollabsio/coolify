@@ -276,7 +276,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Looks for newer versions of each rescanned image that has a package fix at the alert level (spec 4.5, 7.1).
+     * Looks for newer versions of each rescanned image that has a relevant finding (spec 4.5, 15.4).
      * The rescan released the lock; each candidate scan takes it again. Runs here, one image after the other, under
      * the unique lock of RefreshCandidatesJob: a queued or running job of the same scan does the check instead. When
      * the scan lock is busy, the check moves to a queued job that retries later.

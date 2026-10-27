@@ -80,7 +80,7 @@ final class TeamVulnerabilities
     }
 
     /**
-     * How many resources the user can see have something fixable now at the alert level. Starts from the current
+     * How many resources the user can see have a relevant finding that an action fixes. Starts from the current
      * scans with a count above 0, so only those resources are loaded, not every resource of the team.
      */
     public static function fixableResourceCount(int $teamId): int
@@ -108,7 +108,7 @@ final class TeamVulnerabilities
             ->select(['id', 'resource_type', 'resource_id', 'summary'])
             ->whereIn('id', $currentIds)
             ->get()
-            ->filter(fn (ImageScan $scan): bool => (int) data_get($scan->summary, 'fixable_now_at_level', 0) > 0)
+            ->filter(fn (ImageScan $scan): bool => ResourceScans::storedFixedCount($scan) > 0)
             ->groupBy('resource_type')
             ->map(fn (Collection $scans): array => $scans->pluck('resource_id')->unique()->values()->all());
 
@@ -189,8 +189,8 @@ final class TeamVulnerabilities
                     }
 
                     $scan->setAttribute('findings', $loaded->findings);
-                    $classify = ImageScanGate::classifierFor($scan);
                     $matcher = $this->matcherFor($scan->resource, $ignores);
+                    $classify = SecurityActions::fixStates($scan, $matcher);
                     foreach (ResourceScans::findings($scan) as $finding) {
                         if (! self::matches($finding, $term) || ($severities !== [] && ! in_array(self::severityOf($finding), $severities, true))) {
                             continue;
@@ -252,8 +252,8 @@ final class TeamVulnerabilities
                 }
 
                 $scan->setAttribute('findings', $loaded->findings);
-                $classify = ImageScanGate::classifierFor($scan);
                 $matcher = $this->matcherFor($scan->resource, $ignores);
+                $classify = SecurityActions::fixStates($scan, $matcher);
                 foreach (ResourceScans::findings($scan) as $finding) {
                     if ($matcher->matches($finding) === null && $classify($finding) === ImageScanFixState::FixableNow) {
                         $packages[$scan->image_ref."\0".$finding->package] = true;

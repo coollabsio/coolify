@@ -16,10 +16,10 @@ use App\Models\Service;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\FixPanel;
 use App\Services\ImageScan\IgnoreMatcher;
-use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ImageUpdateRefused;
 use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\SecurityActions;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -511,7 +511,7 @@ class Vulnerabilities extends Component
         foreach ($this->currentScans() as $scan) {
             $owner = $scan->resource;
             $matcher = $this->matcherFor($owner);
-            $classify = ImageScanGate::classifierFor($scan);
+            $classify = SecurityActions::fixStates($scan, $matcher);
 
             foreach (ResourceScans::findings($scan) as $index => $finding) {
                 $rows[] = [

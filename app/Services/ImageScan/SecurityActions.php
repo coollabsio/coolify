@@ -3,6 +3,7 @@
 namespace App\Services\ImageScan;
 
 use App\Actions\ImageScan\UpdateResourceImage;
+use App\Enums\ImageScanFixState;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityActionType;
 use App\Models\Application;
@@ -30,6 +31,23 @@ final class SecurityActions
     private const LANGUAGE_PACKAGE_TYPES = ['npm', 'python', 'go-module', 'java-archive', 'gem', 'php-composer', 'rust-crate', 'dotnet'];
 
     private const BUTTON_TYPES = [SecurityActionType::UpdateImage, SecurityActionType::PullLatest, SecurityActionType::Rebuild];
+
+    /**
+     * The fix state of each finding of a scan for the findings lists: fixed by an action of the scan, a package fix
+     * that no action brings to this image, or no fix.
+     *
+     * @return \Closure(Finding): ImageScanFixState
+     */
+    public static function fixStates(ImageScan $scan, IgnoreMatcher $ignores): \Closure
+    {
+        $byFinding = self::forScan($scan, $ignores)['byFinding'];
+
+        return fn (Finding $finding): ImageScanFixState => match (true) {
+            isset($byFinding[$finding->id]) => ImageScanFixState::FixableNow,
+            $finding->fixState === 'fixed' && filled($finding->fixedIn) => ImageScanFixState::NotReleased,
+            default => ImageScanFixState::NoFix,
+        };
+    }
 
     /**
      * `byFinding` is keyed by finding ID. `eol` is the action that moves the image off an end-of-life OS.

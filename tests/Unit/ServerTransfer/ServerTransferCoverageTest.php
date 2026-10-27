@@ -157,8 +157,8 @@ beforeEach(function () {
         'source_type' => $application->getMorphClass(), 'source_id' => $application->id,
         'target_type' => $service->getMorphClass(), 'target_id' => $service->id,
     ]);
-    transferCoverageRecord(ImageScanPolicy::class, ['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high', 'gate_enabled' => true, 'on_scan_error' => 'block']);
-    transferCoverageRecord(ImageScanPolicy::class, ['scope_type' => $application->getMorphClass(), 'scope_id' => $application->id, 'alert_level' => 'medium']);
+    transferCoverageRecord(ImageScanPolicy::class, ['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'strict', 'on_scan_error' => 'block']);
+    transferCoverageRecord(ImageScanPolicy::class, ['scope_type' => $application->getMorphClass(), 'scope_id' => $application->id, 'gate_mode' => 'on']);
     transferCoverageRecord(ImageScanIgnore::class, [...$teamId, 'resource_type' => $application->getMorphClass(), 'resource_id' => $application->id, 'vulnerability_id' => 'CVE-2024-1', 'package' => 'openssl', 'expires_at' => now()->addYear()]);
     transferCoverageRecord(GithubRunnerConfig::class, ['server_id' => $this->server->id, 'github_app_id' => $githubApp->id, 'labels' => ['coverage']]);
     transferCoverageRecord(ServiceApplication::class, ['service_id' => $service->id]);

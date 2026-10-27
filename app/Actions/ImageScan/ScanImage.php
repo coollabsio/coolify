@@ -17,14 +17,13 @@ use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageRef;
-use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\Package;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
+use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\ScanNotifications;
-use App\Services\ImageScan\ScanSummary;
 use App\Services\ImageScan\SecurityStatus;
 use App\Services\ImageScan\SyftPackageParser;
 use Carbon\CarbonImmutable;
@@ -88,7 +87,7 @@ class ScanImage
      *
      * @param  int  $lockWaitSeconds  A deploy gate waits for the server lock; 0 tries once (background scans).
      * @param  ?string  $baseImageRef  The base image of the final stage of a Dockerfile build (spec 7.4), stored on the scan.
-     * @param  bool  $queueCandidateCheck  Queue the check for newer versions; the deploy gate checks them itself.
+     * @param  bool  $queueCandidateCheck  Queue the check for newer versions; the deploy gate queues it itself.
      * @param  bool  $retryWhenBusy  The caller retries later when the lock is busy: a busy lock is not recorded as the last error.
      */
     public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null, bool $queueCandidateCheck = true, bool $retryWhenBusy = false): ImageScan
@@ -599,17 +598,7 @@ class ScanImage
 
         $buildsImage = self::buildsImage($resource, $imageRef);
         $existing = $this->resourceScans($resource)->where('image_id', $image['id'])->with('deploymentQueue:id,pull_request_id')->first();
-        $classifierScan = $existing !== null ? clone $existing : new ImageScan;
-        $classifierScan->forceFill(['builds_image' => $buildsImage])->setRelation('resource', $resource);
-
-        $summary = ScanSummary::build(
-            $findings,
-            ImageScanGate::classifierFor($classifierScan),
-            IgnoreMatcher::forResource($resource),
-            $policy->alertLevel,
-            $report['eol'],
-            $report['truncated'],
-        );
+        $summary = ResourceScans::summaryFor($findings, IgnoreMatcher::forResource($resource), $report['eol'], $report['truncated']);
 
         $scan = $this->upsert($resource, $image['id'], [
             'server_id' => $server->id,

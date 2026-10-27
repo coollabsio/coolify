@@ -8,8 +8,8 @@
         default => 'Rules for this app.',
     };
     $gateHelper = $isApplication
-        ? 'Stop a deploy when the image has vulnerabilities with a fix at the alert level.'
-        : 'Default for apps. Stop a deploy when the image has vulnerabilities with a fix at the alert level.';
+        ? 'Stop a deploy when the new image has security problems.'
+        : 'Default for apps. Stop a deploy when the new image has security problems.';
 @endphp
 
 <div class="flex flex-col gap-6">
@@ -41,24 +41,21 @@
             @endif
 
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <x-forms.inherited-listbox id="alertLevel" label="Alert on" :disabled="! $canEdit"
-                    :inheritLabel="$inheritLabels['alert_level'] ?? null" :options="$alertLevelOptions"
-                    helper="Coolify alerts when the image has vulnerabilities with a fix at this level or higher." />
                 <div class="min-w-0">
-                    <x-forms.inherited-listbox id="gateEnabled" label="Block deploys"
-                        :disabled="! $canEdit || ! $appScanOn" :inheritLabel="$inheritLabels['gate_enabled'] ?? null"
-                        :options="$onOff" :helper="$gateHelper" />
+                    <x-forms.inherited-listbox id="gateMode" label="Block deploys"
+                        :disabled="! $canEdit || ! $appScanOn" :inheritLabel="$inheritLabels['gate_mode'] ?? null"
+                        :options="$gateModeOptions" :helper="$gateHelper" />
                     @if (! $appScanOn)
                         <p class="mt-1.5 text-[12px] text-neutral-500 dark:text-fg-faint">Turn on the scan for this app first.</p>
                     @endif
                 </div>
                 <x-forms.inherited-listbox id="onScanError" label="If the scan cannot run" :disabled="! $canEdit"
                     :inheritLabel="$inheritLabels['on_scan_error'] ?? null" :options="$onScanErrorOptions"
-                    helper="Applies when Block deploys is on." />
+                    helper="Applies when Block deploys is On or Strict." />
             </div>
 
             @if (in_array($scopeType, ['instance', 'team', 'server'], true))
-                <p class="text-[12px] text-neutral-500 dark:text-fg-faint">Services and databases use only the alert setting.</p>
+                <p class="text-[12px] text-neutral-500 dark:text-fg-faint">Block deploys applies only to apps.</p>
             @endif
         </div>
     </x-application.settings-section>

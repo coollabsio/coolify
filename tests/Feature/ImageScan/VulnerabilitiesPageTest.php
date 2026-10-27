@@ -21,6 +21,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ImageScan\ResourceScans;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -93,6 +94,16 @@ function vulnerabilitiesFinding(array $overrides = []): array
 }
 
 /**
+ * A stored summary whose security status counts `$fixed` relevant findings that an action fixes.
+ *
+ * @return array<string, mixed>
+ */
+function vulnerabilitiesSummary(int $fixed, array $overrides = []): array
+{
+    return ['truncated' => false, 'eol_distro' => null, 'security' => ['facts' => ['counts' => ['relevant_fixed' => $fixed]]], ...$overrides];
+}
+
+/**
  * @param  list<array<string, mixed>>  $findings
  * @param  array<string, mixed>  $attributes
  */
@@ -105,7 +116,7 @@ function vulnerabilitiesScan(Model $resource, array $findings, array $attributes
         'image_ref' => 'nginx:1.27',
         'builds_image' => true,
         'findings' => $findings,
-        'summary' => ['fixable_now_at_level' => 0, 'truncated' => false, 'eol_distro' => null],
+        'summary' => ['truncated' => false, 'eol_distro' => null],
         'scanned_at' => now(),
         ...$attributes,
     ]);
@@ -250,24 +261,24 @@ describe('ignore', function () {
         ]);
         $critical = vulnerabilitiesFinding(['severity' => 'critical']);
         vulnerabilitiesScan($this->application, [$critical]);
-        $otherScan = vulnerabilitiesScan($other, [$critical], ['summary' => ['fixable_now_at_level' => 1]]);
+        $otherScan = vulnerabilitiesScan($other, [$critical], ['summary' => vulnerabilitiesSummary(1)]);
         $otherTeamApp = Application::factory()->create([
             'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => Team::factory()->create()->id])->id])->id,
             'destination_id' => $this->destination->id,
             'destination_type' => $this->destination->getMorphClass(),
         ]);
-        $foreignScan = vulnerabilitiesScan($otherTeamApp, [$critical], ['summary' => ['fixable_now_at_level' => 7]]);
+        $foreignScan = vulnerabilitiesScan($otherTeamApp, [$critical], ['summary' => vulnerabilitiesSummary(7)]);
 
         vulnerabilitiesPage($this->admin, $this->application)
             ->call('ignore', 'CVE-2024-0001', 'vulnerability', 'team', '90', 'Not reachable');
 
         Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
-        expect($otherScan->fresh()->summary['fixable_now_at_level'])->toBe(1);
+        expect(ResourceScans::storedFixedCount($otherScan->fresh()))->toBe(1);
 
         (new RefreshImageScanSummariesJob($this->team->id))->handle();
 
-        expect($otherScan->fresh()->summary['fixable_now_at_level'])->toBe(0)
-            ->and($foreignScan->fresh()->summary['fixable_now_at_level'])->toBe(7);
+        expect(ResourceScans::storedFixedCount($otherScan->fresh()))->toBe(0)
+            ->and(ResourceScans::storedFixedCount($foreignScan->fresh()))->toBe(7);
     });
 
     it('rejects an ID that is not in the results', function () {
@@ -331,14 +342,14 @@ describe('ignore', function () {
     });
 
     it('updates the stored count of the scan', function () {
-        $scan = vulnerabilitiesScan($this->application, [vulnerabilitiesFinding(['severity' => 'critical'])], [
-            'summary' => ['fixable_now_at_level' => 1, 'truncated' => false, 'eol_distro' => null],
+        $scan = vulnerabilitiesScan($this->application, [vulnerabilitiesFinding(['severity' => 'critical', 'type' => 'npm'])], [
+            'summary' => vulnerabilitiesSummary(1),
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
             ->call('ignore', 'CVE-2024-0001', 'vulnerability', 'resource', '90', 'Not reachable');
 
-        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(0)
+        expect(ResourceScans::storedFixedCount($scan->fresh()))->toBe(0)
             ->and($scan->fresh()->summary['ignored'])->toBe(1);
     });
 });
@@ -464,7 +475,7 @@ describe('states', function () {
     it('warns about old results, an end-of-life distro, and cut results', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
             'scanned_at' => now()->subDays(5)->subHour(),
-            'summary' => ['fixable_now_at_level' => 1, 'truncated' => true, 'eol_distro' => ['name' => 'alpine', 'version' => '3.12']],
+            'summary' => vulnerabilitiesSummary(1, ['truncated' => true, 'eol_distro' => ['name' => 'alpine', 'version' => '3.12']]),
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
@@ -497,7 +508,9 @@ describe('service page', function () {
         vulnerabilitiesScan($web, [vulnerabilitiesFinding(['package' => 'nginx-module'])]);
         vulnerabilitiesScan($db, [vulnerabilitiesFinding(['id' => 'CVE-2024-5555', 'package' => 'libpq'])], ['image_ref' => 'postgres:16']);
 
+        // An image of a service without a newer version has no action: its fixes are not released.
         $page = vulnerabilitiesPage($this->admin, $service, 'service')
+            ->call('setFixState', 'not_released')
             ->assertSee('nginx-module')
             ->assertSee('libpq')
             ->assertSee('postgres:16');
@@ -534,6 +547,7 @@ describe('service page', function () {
         vulnerabilitiesScan($db, [vulnerabilitiesFinding(['package' => 'libpq'])], ['image_ref' => 'postgres:16']);
 
         vulnerabilitiesPage($this->admin, $service, 'service')
+            ->call('setFixState', 'not_released')
             ->call('toggleImage', 'postgres:16')
             ->assertSee('libpq')
             ->assertDontSee('nginx-module');
@@ -546,8 +560,8 @@ describe('database page', function () {
         vulnerabilitiesScan($database, [vulnerabilitiesFinding(['package' => 'libpq'])], [
             'image_ref' => 'postgres:16-alpine',
             'builds_image' => false,
-            'candidates' => [['better' => true, 'fixed_ids' => ['CVE-2024-0001']]],
-            'summary' => ['fixable_now_at_level' => 4],
+            'candidates' => [['ref' => 'postgres:16.4-alpine', 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2024-0001']]],
+            'summary' => vulnerabilitiesSummary(4),
         ]);
 
         vulnerabilitiesPage($this->admin, $database, 'database')
@@ -605,7 +619,7 @@ describe('packages', function () {
 describe('sidebar', function () {
     it('shows the fixable now count of the app', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
-            'summary' => ['fixable_now_at_level' => 3, 'truncated' => false, 'eol_distro' => null],
+            'summary' => vulnerabilitiesSummary(3),
         ]);
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
@@ -619,8 +633,8 @@ describe('sidebar', function () {
         $service = vulnerabilitiesService();
         $web = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:1.27']);
         $db = ServiceDatabase::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'db', 'image' => 'postgres:16']);
-        vulnerabilitiesScan($web, [], ['summary' => ['fixable_now_at_level' => 2]]);
-        vulnerabilitiesScan($db, [], ['summary' => ['fixable_now_at_level' => 3]]);
+        vulnerabilitiesScan($web, [], ['summary' => vulnerabilitiesSummary(2)]);
+        vulnerabilitiesScan($db, [], ['summary' => vulnerabilitiesSummary(3)]);
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
 

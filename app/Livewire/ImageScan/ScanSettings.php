@@ -2,7 +2,7 @@
 
 namespace App\Livewire\ImageScan;
 
-use App\Enums\ImageScanAlertLevel;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Jobs\RefreshImageScanSummariesJob;
 use App\Models\Application;
@@ -40,9 +40,7 @@ class ScanSettings extends Component
     #[Locked]
     public ?string $scopeUuid = null;
 
-    public ?string $alertLevel = '';
-
-    public ?string $gateEnabled = '';
+    public ?string $gateMode = '';
 
     public ?string $onScanError = '';
 
@@ -60,8 +58,7 @@ class ScanSettings extends Component
 
         $scope = $this->loadScope();
         $policy = ImageScanPolicyResolver::forScope($scope);
-        $this->alertLevel = $policy->alert_level?->value ?? '';
-        $this->gateEnabled = self::boolToOption($policy->gate_enabled);
+        $this->gateMode = $policy->gate_mode?->value ?? '';
         $this->onScanError = $policy->on_scan_error?->value ?? '';
 
         if ($scope instanceof Application) {
@@ -73,14 +70,9 @@ class ScanSettings extends Component
         }
     }
 
-    public function updatedAlertLevel(): void
+    public function updatedGateMode(): void
     {
-        $this->saveRule('alert_level', 'alertLevel');
-    }
-
-    public function updatedGateEnabled(): void
-    {
-        $this->saveRule('gate_enabled', 'gateEnabled');
+        $this->saveRule('gate_mode', 'gateMode');
     }
 
     public function updatedOnScanError(): void
@@ -172,41 +164,18 @@ class ScanSettings extends Component
         $this->validate([$property => $rules]);
 
         $policy = ImageScanPolicyResolver::forScope($scope);
-        if ($column === 'gate_enabled' && $scope instanceof Application && ! $scope->settings?->is_image_scan_enabled) {
-            $this->gateEnabled = self::boolToOption($policy->gate_enabled);
+        if ($column === 'gate_mode' && $scope instanceof Application && ! $scope->settings?->is_image_scan_enabled) {
+            $this->gateMode = $policy->gate_mode?->value ?? '';
             $this->dispatch('error', 'Turn on the scan for this app first.');
 
             return;
         }
 
         $value = $this->{$property} === '' || $this->{$property} === null ? null : $this->{$property};
-        $policy->{$column} = $column === 'gate_enabled' ? self::optionToBool($value) : $value;
+        $policy->{$column} = $value;
         $policy->save();
-        if ($column === 'alert_level') {
-            $this->refreshCounts($scope);
-        }
         $this->audit($scope, $column);
         $this->dispatch('success', 'Saved.');
-    }
-
-    /**
-     * The stored counts depend on the alert level: write them again for every resource the level applies to.
-     */
-    private function refreshCounts(?Model $scope): void
-    {
-        $teamIds = match (true) {
-            $scope instanceof Application => [],
-            $scope instanceof Server => [(int) $scope->team_id],
-            $scope instanceof Team => [(int) $scope->id],
-            default => Server::query()->whereHas('imageScans')->distinct()->pluck('team_id')->map(fn ($id): int => (int) $id)->all(),
-        };
-
-        if ($scope instanceof Application) {
-            ResourceScans::refreshSummaries(ResourceScans::currentFor($scope));
-        }
-        foreach (array_unique($teamIds) as $teamId) {
-            RefreshImageScanSummariesJob::dispatch($teamId);
-        }
     }
 
     /**
@@ -307,8 +276,7 @@ class ScanSettings extends Component
         $label = fn (string $field, string $valueLabel) => 'Use '.self::LEVEL_NAMES[$inherited[$field]['source']].' default ('.$valueLabel.')';
 
         return [
-            'alert_level' => $label('alert_level', $inherited['alert_level']['value']->label()),
-            'gate_enabled' => $label('gate_enabled', $inherited['gate_enabled']['value'] ? 'On' : 'Off'),
+            'gate_mode' => $label('gate_mode', $inherited['gate_mode']['value']->label()),
             'on_scan_error' => $label('on_scan_error', $inherited['on_scan_error']['value']->label()),
         ];
     }
@@ -358,8 +326,8 @@ class ScanSettings extends Component
         return view('livewire.image-scan.scan-settings', [
             'canEdit' => $this->canEdit($scope),
             'inheritLabels' => $this->inheritLabels($scope),
-            'alertLevelOptions' => collect(ImageScanAlertLevel::cases())
-                ->map(fn (ImageScanAlertLevel $level) => ['value' => $level->value, 'label' => $level->label()])
+            'gateModeOptions' => collect(ImageScanGateMode::cases())
+                ->map(fn (ImageScanGateMode $mode) => array_filter(['value' => $mode->value, 'label' => $mode->label(), 'description' => $mode->description()], fn ($value) => $value !== null))
                 ->all(),
             'onScanErrorOptions' => collect(ImageScanOnError::cases())
                 ->map(fn (ImageScanOnError $option) => ['value' => $option->value, 'label' => $option->label()])

@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\ImageScanAlertLevel;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Jobs\RefreshImageScanSummariesJob;
 use App\Livewire\ImageScan\InstanceImageScanning;
@@ -17,6 +17,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ImageScan\ResourceScans;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -89,16 +90,14 @@ describe('instance scope', function () {
         $admin = scanSettingsInstanceAdmin();
 
         scanSettingsAs($admin, Team::find(0), 'instance')
-            ->set('alertLevel', 'high')
+            ->set('gateMode', 'strict')
             ->assertHasNoErrors()
             ->assertDispatched('success')
-            ->set('onScanError', 'block')
-            ->set('gateEnabled', '1');
+            ->set('onScanError', 'block');
 
         $row = scanSettingsInstanceRow();
-        expect($row->alert_level)->toBe(ImageScanAlertLevel::High)
-            ->and($row->on_scan_error)->toBe(ImageScanOnError::Block)
-            ->and($row->gate_enabled)->toBeTrue();
+        expect($row->gate_mode)->toBe(ImageScanGateMode::Strict)
+            ->and($row->on_scan_error)->toBe(ImageScanOnError::Block);
     });
 
     it('never nulls the instance row', function () {
@@ -106,24 +105,33 @@ describe('instance scope', function () {
 
         scanSettingsAs($admin, Team::find(0), 'instance')
             ->assertDontSee('Use Coolify default')
-            ->set('alertLevel', '')
-            ->assertHasErrors('alertLevel')
-            ->set('gateEnabled', '')
-            ->assertHasErrors('gateEnabled');
+            ->set('gateMode', '')
+            ->assertHasErrors('gateMode')
+            ->set('onScanError', '')
+            ->assertHasErrors('onScanError');
 
         $row = scanSettingsInstanceRow();
-        expect($row->alert_level)->toBe(ImageScanAlertLevel::Critical)
-            ->and($row->gate_enabled)->toBeFalse();
+        expect($row->gate_mode)->toBe(ImageScanGateMode::Off)
+            ->and($row->on_scan_error)->toBe(ImageScanOnError::Deploy);
     });
 
-    it('rejects an alert level that does not exist', function () {
+    it('rejects a gate mode that does not exist', function () {
         $admin = scanSettingsInstanceAdmin();
 
         scanSettingsAs($admin, Team::find(0), 'instance')
-            ->set('alertLevel', 'everything')
-            ->assertHasErrors('alertLevel');
+            ->set('gateMode', 'always')
+            ->assertHasErrors('gateMode');
 
-        expect(scanSettingsInstanceRow()->alert_level)->toBe(ImageScanAlertLevel::Critical);
+        expect(scanSettingsInstanceRow()->gate_mode)->toBe(ImageScanGateMode::Off);
+    });
+
+    it('offers Off, On, and Strict with what On and Strict block', function () {
+        scanSettingsAs(scanSettingsInstanceAdmin(), Team::find(0), 'instance')
+            ->assertSee('Block deploys')
+            ->assertSee('Strict')
+            ->assertSee('Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.')
+            ->assertSee('Also blocks critical and high problems that have a fix, and operating systems that no longer get security fixes.')
+            ->assertDontSee('Alert on');
     });
 
     it('forbids the instance rules to users who are not instance admins', function () {
@@ -177,17 +185,17 @@ describe('instance page', function () {
 describe('team scope', function () {
     it('saves the team rules and stores null for the Coolify default', function () {
         scanSettingsAs($this->admin, $this->team, 'team', (string) $this->team->id)
-            ->assertSee('Use Coolify default (Critical with a fix)')
-            ->set('alertLevel', 'medium')
+            ->assertSee('Use Coolify default (Off)')
+            ->set('gateMode', 'on')
             ->assertDispatched('success');
 
-        expect(scanSettingsRow($this->team)->alert_level)->toBe(ImageScanAlertLevel::Medium);
+        expect(scanSettingsRow($this->team)->gate_mode)->toBe(ImageScanGateMode::On);
 
         scanSettingsAs($this->admin, $this->team, 'team', (string) $this->team->id)
-            ->set('alertLevel', '')
+            ->set('gateMode', '')
             ->assertHasNoErrors();
 
-        expect(scanSettingsRow($this->team)->alert_level)->toBeNull();
+        expect(scanSettingsRow($this->team)->gate_mode)->toBeNull();
     });
 
     it('saves the default for new servers', function () {
@@ -202,7 +210,7 @@ describe('team scope', function () {
         $member = scanSettingsMember($this->team);
 
         scanSettingsAs($member, $this->team, 'team', (string) $this->team->id)
-            ->set('alertLevel', 'high')
+            ->set('gateMode', 'strict')
             ->assertForbidden();
 
         expect(scanSettingsRow($this->team))->toBeNull();
@@ -214,9 +222,9 @@ describe('team scope', function () {
 
         $component = scanSettingsAs($this->admin, $this->team, 'team', (string) $this->team->id);
         session(['currentTeam' => $otherTeam]);
-        $component->set('alertLevel', 'high')->assertHasNoErrors();
+        $component->set('gateMode', 'strict')->assertHasNoErrors();
 
-        expect(scanSettingsRow($this->team)->alert_level)->toBe(ImageScanAlertLevel::High)
+        expect(scanSettingsRow($this->team)->gate_mode)->toBe(ImageScanGateMode::Strict)
             ->and(scanSettingsRow($otherTeam))->toBeNull();
     });
 
@@ -240,27 +248,27 @@ describe('server scope', function () {
         ImageScanPolicy::query()->create([
             'scope_type' => $this->team->getMorphClass(),
             'scope_id' => $this->team->id,
-            'alert_level' => ImageScanAlertLevel::High,
+            'gate_mode' => ImageScanGateMode::Strict,
         ]);
 
         scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)
-            ->assertSee('Use team default (High or critical with a fix)')
+            ->assertSee('Use team default (Strict)')
             ->assertSee('Use Coolify default (Deploy anyway)')
-            ->assertSee('Services and databases use only the alert setting.');
+            ->assertSee('Block deploys applies only to apps.');
     });
 
     it('saves the server rules and stores null for the inherited value', function () {
         scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)
-            ->set('gateEnabled', '1')
+            ->set('gateMode', 'on')
             ->assertDispatched('success');
 
-        expect(scanSettingsRow($this->server)->gate_enabled)->toBeTrue();
+        expect(scanSettingsRow($this->server)->gate_mode)->toBe(ImageScanGateMode::On);
 
         scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)
-            ->set('gateEnabled', '')
+            ->set('gateMode', '')
             ->assertHasNoErrors();
 
-        expect(scanSettingsRow($this->server)->gate_enabled)->toBeNull();
+        expect(scanSettingsRow($this->server)->gate_mode)->toBeNull();
     });
 
     it('forbids a change after the session switched to a team the user owns', function () {
@@ -270,7 +278,7 @@ describe('server scope', function () {
 
         $component = scanSettingsAs($member, $this->team, 'server', $this->server->uuid);
         session(['currentTeam' => $ownTeam]);
-        $component->set('alertLevel', 'high')->assertForbidden();
+        $component->set('gateMode', 'strict')->assertForbidden();
 
         expect(scanSettingsRow($this->server))->toBeNull();
     });
@@ -297,7 +305,7 @@ describe('application scope', function () {
         ]);
 
         scanSettingsAs($deployer, $this->team, 'application', $this->application->uuid)
-            ->set('alertLevel', 'high')
+            ->set('gateMode', 'off')
             ->assertForbidden();
 
         expect(scanSettingsRow($this->application))->toBeNull();
@@ -314,11 +322,11 @@ describe('application scope', function () {
             ->set('appScanEnabled', '0')
             ->assertDispatched('success')
             ->assertSee('Turn on the scan for this app first.')
-            ->set('gateEnabled', '1')
+            ->set('gateMode', 'on')
             ->assertDispatched('error');
 
         expect($this->application->settings->fresh()->is_image_scan_enabled)->toBeFalse()
-            ->and(scanSettingsRow($this->application)?->gate_enabled)->toBeNull();
+            ->and(scanSettingsRow($this->application)?->gate_mode)->toBeNull();
     });
 
     it('saves who builds a Docker image app', function () {
@@ -433,13 +441,14 @@ describe('ignore list', function () {
                 'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
                 'risk' => 1.0, 'summary' => '', 'layer' => 'app',
             ]],
-            'summary' => ['fixable_now_at_level' => 0, 'ignored' => 1],
+            'summary' => ['ignored' => 1],
         ]);
 
         scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
             ->call('removeIgnore', $this->appIgnore->uuid);
 
-        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(1);
+        expect(ResourceScans::storedFixedCount($scan->fresh()))->toBe(1)
+            ->and($scan->fresh()->summary['ignored'])->toBe(0);
     });
 
     it('does not let a deploy-only user remove an app ignore', function () {
@@ -455,61 +464,15 @@ describe('ignore list', function () {
     });
 });
 
-describe('alert level counts', function () {
-    function scanSettingsHighScan(): ImageScan
-    {
-        return ImageScan::factory()->create([
-            'server_id' => test()->server->id,
-            'resource_type' => test()->application->getMorphClass(),
-            'resource_id' => test()->application->id,
-            'builds_image' => true,
-            'findings' => [[
-                'id' => 'CVE-2024-33333', 'aliases' => [], 'severity' => 'high', 'package' => 'openssl', 'version' => '1',
-                'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
-                'risk' => 1.0, 'summary' => '', 'layer' => 'app',
-            ]],
-            'summary' => ['fixable_now_at_level' => 0],
-        ]);
-    }
-
-    it('writes the stored counts of the app again when its alert level changes', function () {
-        Queue::fake();
-        $scan = scanSettingsHighScan();
-
-        scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
-            ->set('alertLevel', 'high')
-            ->assertDispatched('success');
-
-        expect($scan->fresh()->summary['fixable_now_at_level'])->toBe(1);
-        Queue::assertNotPushed(RefreshImageScanSummariesJob::class);
-    });
-
-    it('queues a refresh of the team counts when the server or team alert level changes', function (string $scope) {
-        Queue::fake();
-        $uuid = $scope === 'server' ? $this->server->uuid : (string) $this->team->id;
-
-        scanSettingsAs($this->admin, $this->team, $scope, $uuid)->set('alertLevel', 'high')->assertDispatched('success');
-
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
-    })->with(['server', 'team']);
-
-    it('queues one refresh per team with scans when the instance alert level changes', function () {
-        Queue::fake();
-        scanSettingsHighScan();
-        Server::factory()->create(['team_id' => Team::factory()->create()->id]);
-
-        scanSettingsAs(scanSettingsInstanceAdmin(), $this->team, 'instance')->set('alertLevel', 'high')->assertDispatched('success');
-
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job) => $job->teamId === $this->team->id);
-    });
-
-    it('does not refresh the counts when another rule changes', function () {
+describe('stored statuses', function () {
+    it('does not refresh the stored statuses when a rule changes', function (string $property, string $value) {
         Queue::fake();
 
-        scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)->set('onScanError', 'block')->assertDispatched('success');
+        scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)->set($property, $value)->assertDispatched('success');
 
         Queue::assertNotPushed(RefreshImageScanSummariesJob::class);
-    });
+    })->with([
+        'block deploys' => ['gateMode', 'strict'],
+        'if the scan cannot run' => ['onScanError', 'block'],
+    ]);
 });

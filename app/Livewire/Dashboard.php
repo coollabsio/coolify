@@ -30,7 +30,7 @@ class Dashboard extends Component
     public bool $showsTeamSections = true;
 
     /**
-     * Resources the user can see with something fixable now at the alert level.
+     * Resources the user can see with a relevant finding that an action fixes.
      */
     #[Locked]
     public int $fixableResourceCount = 0;

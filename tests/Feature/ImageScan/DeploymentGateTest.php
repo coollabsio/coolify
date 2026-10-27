@@ -40,6 +40,8 @@ const GATE_REPO_DIGEST = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 const GATE_COMMIT = '0123456789abcdef0123456789abcdef01234567';
 
+const DEPLOY_GATE_HEADLINE = 'Deploy blocked: this image has a security problem that attackers are using.';
+
 /**
  * Thrown when the job reaches the container start, so a test can stop there.
  */
@@ -127,12 +129,12 @@ function deployGateServer(Team $team, string $name, bool $scanning = true): Serv
     return $server->fresh();
 }
 
-function deployGatePolicy(string $onScanError = 'deploy', bool $gate = true): void
+function deployGatePolicy(string $onScanError = 'deploy', string $mode = 'on'): void
 {
     ImageScanPolicy::query()->create([
         'scope_type' => test()->application->getMorphClass(),
         'scope_id' => test()->application->id,
-        'gate_enabled' => $gate,
+        'gate_mode' => $mode,
         'on_scan_error' => $onScanError,
     ]);
 }
@@ -140,11 +142,11 @@ function deployGatePolicy(string $onScanError = 'deploy', bool $gate = true): vo
 /**
  * @return array<string, mixed>
  */
-function deployGateFindingRow(string $severity = 'critical'): array
+function deployGateFindingRow(string $severity = 'critical', bool $kev = true, string $id = 'CVE-2026-1234'): array
 {
     return [
-        'id' => 'CVE-2026-1234', 'aliases' => [], 'severity' => $severity, 'package' => 'openssl', 'version' => '3.0.13',
-        'type' => 'npm', 'artifactId' => 'a-1', 'fixedIn' => '3.0.15', 'fixState' => 'fixed', 'kev' => false,
+        'id' => $id, 'aliases' => [], 'severity' => $severity, 'package' => 'openssl', 'version' => '3.0.13',
+        'type' => 'npm', 'artifactId' => 'a-1', 'fixedIn' => '3.0.15', 'fixState' => 'fixed', 'kev' => $kev,
         'epss' => null, 'risk' => 1.0, 'summary' => '', 'layer' => 'app',
     ];
 }
@@ -351,7 +353,7 @@ it('does not queue a scan after the deploy when scanning is off on the server', 
     Queue::assertNotPushed(ScanResourceImagesJob::class);
 });
 
-it('blocks the deploy when the image has a critical vulnerability with a fix', function () {
+it('blocks the deploy when the image has a problem that attackers are using', function () {
     deployGatePolicy();
     ScanImage::shouldRun()->once()
         ->withArgs(fn ($server, $resource, $ref, $deployment, $wait) => $server->is(test()->server) && $resource->is(test()->application)
@@ -363,17 +365,16 @@ it('blocks the deploy when the image has a critical vulnerability with a fix', f
     $job->failed($exception);
 
     $queue = test()->queue->fresh();
-    expect($exception->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.')
+    expect($exception->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
         ->and($queue->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
         ->and($queue->scan_gate_result['blocked'])->toBeTrue()
         ->and($queue->scan_gate_result['count'])->toBe(1)
-        ->and(deployGateLogs())->toContain('Image scan: 1 critical with a fix.')
-        ->toContain('Deploy blocked: 1 critical vulnerability with a fix.')
-        ->toContain('CVE-2026-1234  critical  openssl 3.0.13')
+        ->and(deployGateLogs())->toContain(DEPLOY_GATE_HEADLINE)
+        ->toContain('CVE-2026-1234  Critical  openssl 3.0.13  used by attackers')
         ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, ' up ')))->toBeFalse();
 });
 
-it('starts the deploy when the scan finds nothing to fix now', function () {
+it('starts the deploy when the scan finds no problem that attackers use', function () {
     deployGatePolicy();
     ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([]));
 
@@ -387,7 +388,7 @@ it('reuses the stored scan of an image found on the server and blocks it', funct
     deployGateStoredScan([deployGateFindingRow()]);
     $job = deployGateJob(['saved_outputs' => new Collection(['local_image_found' => str('sha256:aaaa')])]);
 
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.')
+    expect(deployGateBlocked($job)->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
         ->and(test()->queue->fresh()->scan_gate_result['blocked'])->toBeTrue();
 });
 
@@ -398,7 +399,7 @@ it('reuses the scan of the main deployment on an additional server', function ()
     $additional = deployGateServer($this->team, 'additional-server');
     $job = deployGateJob(['is_this_additional_server' => true, 'server' => $additional, 'mainServer' => $additional]);
 
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
+    expect(deployGateBlocked($job)->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
 });
 
 it('keeps the gate commands intact for a non-root SSH user', function () {
@@ -435,7 +436,7 @@ it('blocks a restart that skips the build with the stored scan', function () {
         'saved_outputs' => new Collection(['local_image_found' => str('sha256:aaaa')]),
     ]);
 
-    expect(deployGateBlocked($job, 'should_skip_build')->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.')
+    expect(deployGateBlocked($job, 'should_skip_build')->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
         ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, ' up ')))->toBeFalse();
 });
 
@@ -480,12 +481,12 @@ it('gates a rollback to the commit of a blocked deployment', function () {
     // The blocked image stays tagged on the server, so it is in the rollback list. That alone does not count.
     GetRollbackImages::shouldNotRun();
     $blocked = deployGatePreviousDeployment('gate-blocked', ApplicationDeploymentStatus::FAILED, attributes: [
-        'scan_gate_result' => ['blocked' => true, 'scan_ran' => true, 'error' => null, 'count' => 1, 'headline' => 'Deploy blocked: 1 critical vulnerability with a fix.', 'top' => []],
+        'scan_gate_result' => ['blocked' => true, 'scan_ran' => true, 'error' => null, 'count' => 1, 'headline' => DEPLOY_GATE_HEADLINE, 'top' => []],
     ]);
     deployGateStoredScan([deployGateFindingRow()], ['deployment_queue_id' => $blocked->id]);
     $job = deployGateJob(['rollback' => true]);
 
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
+    expect(deployGateBlocked($job)->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
 });
 
 it('gates a rollback to a commit that a finished deployment of another application ran', function () {
@@ -504,7 +505,7 @@ it('gates a rollback to a commit that a finished deployment of another applicati
         'commit' => GATE_COMMIT,
     ]);
 
-    expect(deployGateBlocked(deployGateJob(['rollback' => true]))->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
+    expect(deployGateBlocked(deployGateJob(['rollback' => true]))->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
 });
 
 it('does not gate a rollback to an image that a finished deployment scanned', function () {
@@ -523,7 +524,7 @@ it('gates a rollback to an image that never ran', function () {
     ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
     $job = deployGateJob(['rollback' => true]);
 
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.');
+    expect(deployGateBlocked($job)->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
 });
 
 it('starts a deploy that a user deployed anyway and records it', function () {
@@ -620,7 +621,7 @@ it('gates a built image without a repo digest by its local image ID and does not
     $job = deployGateJob(['use_build_server' => true, 'build_server' => $buildServer, 'server' => $buildServer]);
     $job->outputs = ['docker image inspect' => GATE_IMAGE_ID.' '];
 
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.')
+    expect(deployGateBlocked($job)->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
         ->and(Yaml::parse((new ReflectionProperty(ApplicationDeploymentJob::class, 'docker_compose'))->getValue($job))['services']['gate-app']['image'])
         ->toBe($this->application->uuid.':'.GATE_COMMIT);
 });
@@ -848,15 +849,15 @@ it('does not fail the deploy when the Dockerfile cannot be read', function () {
 });
 
 it('gates a build server image with the rules of the main destination server', function () {
-    ImageScanPolicy::query()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_enabled' => true, 'alert_level' => 'high']);
+    ImageScanPolicy::query()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'strict']);
     $buildServer = deployGateServer($this->team, 'build-server');
-    ImageScanPolicy::query()->create(['scope_type' => $buildServer->getMorphClass(), 'scope_id' => $buildServer->id, 'gate_enabled' => false, 'alert_level' => 'critical']);
+    ImageScanPolicy::query()->create(['scope_type' => $buildServer->getMorphClass(), 'scope_id' => $buildServer->id, 'gate_mode' => 'off']);
     ScanImage::shouldRun()->once()
         ->withArgs(fn ($server) => $server->is($buildServer))
-        ->andReturn(deployGateReturnedScan([deployGateFindingRow('high')]));
+        ->andReturn(deployGateReturnedScan([deployGateFindingRow('high', kev: false)]));
     $job = deployGateJob(['use_build_server' => true, 'build_server' => $buildServer, 'server' => $buildServer]);
 
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 high vulnerability with a fix.');
+    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: this image has a security problem that needs a security update.');
 });
 
 /**
@@ -881,54 +882,18 @@ function deployGateOfficialImageJob(): DeploymentGateTestJob
     return $job;
 }
 
-/**
- * @param  array<string, mixed>  $candidates
- */
-function deployGateStoreCandidates(ImageScan $scan, array $candidates): void
-{
-    $row = ImageScan::query()->findOrFail($scan->id);
-    $row->candidates = ['checked_at' => now()->toIso8601String(), 'error' => null, 'tags_truncated' => false, 'entries' => [], ...$candidates];
-    $row->save();
-}
-
-it('checks newer versions before the gate on the first deploy of an official image and blocks a fix', function () {
+it('does not wait for newer versions of an official image and queues their check', function () {
     deployGatePolicy();
+    Queue::fake();
     $job = deployGateOfficialImageJob();
     ScanImage::shouldRun()->once()
         ->withArgs(fn ($server, $resource, $ref, $deployment, $wait, $baseImageRef, $queueCandidateCheck) => $queueCandidateCheck === false)
         ->andReturnUsing(fn () => deployGateOfficialImageScan());
-    RefreshCandidates::shouldRun()->once()
-        ->withArgs(fn ($checked, $wait) => $checked->image_ref === 'nginx:1.27' && $wait === ScanImage::GATE_LOCK_WAIT_SECONDS)
-        ->andReturnUsing(fn ($checked) => deployGateStoreCandidates($checked, ['status' => 'ok', 'entries' => [
-            ['ref' => 'nginx:1.28', 'digest' => GATE_REPO_DIGEST, 'kind' => 'line', 'better' => true, 'fixed_ids' => ['CVE-2026-1234']],
-        ]]));
-
-    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: 1 critical vulnerability with a fix.')
-        ->and(test()->queue->fresh()->scan_gate_result['repo_digest'])->toBe('nginx@'.GATE_REPO_DIGEST)
-        ->and(deployGateLogs())->not->toContain('Coolify could not check newer versions');
-});
-
-it('deploys an official image when the check of newer versions fails and says why', function () {
-    deployGatePolicy();
-    $job = deployGateOfficialImageJob();
-    ScanImage::shouldRun()->once()->andReturnUsing(fn () => deployGateOfficialImageScan());
-    RefreshCandidates::shouldRun()->once()
-        ->andReturnUsing(fn ($checked) => deployGateStoreCandidates($checked, ['status' => 'failed', 'error' => 'daily_limit']));
-
-    expect(deployGateReachesStart($job))->toBeTrue()
-        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'scan_ran' => true])
-        ->and(deployGateLogs())->toContain('Coolify could not check newer versions of nginx:1.27: the daily limit of version checks on main-server is reached.');
-});
-
-it('does not check newer versions again before the gate within 20 hours', function () {
-    deployGatePolicy();
-    Queue::fake();
-    $job = deployGateOfficialImageJob();
-    deployGateOfficialImageScan(['status' => 'failed', 'error' => 'registry', 'checked_at' => now()->subHours(2)->toIso8601String(), 'entries' => []]);
-    ScanImage::shouldRun()->never();
     RefreshCandidates::shouldRun()->never();
 
-    expect(deployGateReachesStart($job))->toBeTrue();
+    expect(deployGateBlocked($job)->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(test()->queue->fresh()->scan_gate_result['repo_digest'])->toBe('nginx@'.GATE_REPO_DIGEST);
+    Queue::assertPushed(RefreshCandidatesJob::class, fn (RefreshCandidatesJob $refresh) => $refresh->scan->image_ref === 'nginx:1.27');
 });
 
 it('queues the check of newer versions for an image the team builds', function () {
@@ -1011,4 +976,78 @@ it('starts the blocked image by its digest when a user deployed a Docker image a
     expect(Yaml::parse($compose)['services']['gate-app']['image'])->toBe('nginx@'.GATE_REPO_DIGEST)
         ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, 'docker pull') || preg_match('/docker compose .* pull/', $command) === 1))->toBeFalse()
         ->and(deployGateLogs())->toContain('Deploy anyway by Ada Admin.');
+});
+
+/**
+ * A scan of the image that the finished deployment `gate-running` started.
+ *
+ * @param  list<array<string, mixed>>  $findings
+ */
+function deployGateRunningScan(array $findings, string $imageId = 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', ApplicationDeploymentStatus $status = ApplicationDeploymentStatus::FINISHED): ImageScan
+{
+    $running = deployGatePreviousDeployment('gate-running', $status, commit: 'fedcba9876543210fedcba9876543210fedcba98');
+
+    return deployGateStoredScan($findings, ['image_id' => $imageId, 'deployment_queue_id' => $running->id, 'scanned_at' => now()->subHour()]);
+}
+
+it('starts a new image whose exploited problem the running image has too and warns about it', function () {
+    deployGatePolicy();
+    deployGateRunningScan([deployGateFindingRow()]);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+
+    expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'scan_ran' => true, 'mode' => 'on', 'carried_count' => 1])
+        ->and(deployGateLogs())->toContain('Image scan: passed.')
+        ->toContain('Already in the running image: a security problem that attackers are using.')
+        ->toContain('CVE-2026-1234  Critical  openssl 3.0.13  already running');
+});
+
+it('blocks a new image that adds an exploited problem to the running image', function () {
+    deployGatePolicy();
+    deployGateRunningScan([deployGateFindingRow()]);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow(), deployGateFindingRow(id: 'CVE-2026-9999')]));
+
+    expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(test()->queue->fresh()->scan_gate_result['top'][0]['id'])->toBe('CVE-2026-9999')
+        ->and(test()->queue->fresh()->scan_gate_result['carried'][0]['id'])->toBe('CVE-2026-1234');
+});
+
+it('starts a redeploy of the running image when the gate is on', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->never();
+    $scan = deployGateRunningScan([deployGateFindingRow()], imageId: GATE_IMAGE_ID);
+
+    expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
+        ->and($scan->fresh()->deployment_queue_id)->toBe(test()->queue->id);
+});
+
+it('does not count the image of a blocked deployment as running', function () {
+    deployGatePolicy();
+    deployGateRunningScan([deployGateFindingRow()], status: ApplicationDeploymentStatus::FAILED);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+
+    expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
+});
+
+it('blocks a critical problem with a fix only in strict mode', function (string $mode, bool $blocked) {
+    deployGatePolicy(mode: $mode);
+    deployGateRunningScan([deployGateFindingRow(kev: false)]);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow(kev: false)]));
+
+    if ($blocked) {
+        expect(deployGateBlocked(deployGateJob())->getMessage())->toBe('Deploy blocked: this image has a security problem that needs a security update.');
+    } else {
+        expect(deployGateReachesStart(deployGateJob()))->toBeTrue();
+    }
+})->with([
+    'on' => ['on', false],
+    'strict' => ['strict', true],
+]);
+
+it('does not gate when the mode is off', function () {
+    deployGatePolicy(onScanError: 'block', mode: 'off');
+    ScanImage::shouldRun()->never();
+
+    expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
+        ->and(test()->queue->fresh()->scan_gate_result)->toBeNull();
 });

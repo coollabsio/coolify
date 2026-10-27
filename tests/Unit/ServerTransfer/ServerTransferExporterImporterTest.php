@@ -2010,9 +2010,9 @@ test('scan rules and ignores of the server and its applications move, linked by 
     $user = User::factory()->create();
     $this->server->settings->forceFill(['is_image_scan_enabled' => true, 'image_candidate_scans_today' => 7, 'image_candidate_scans_date' => '2031-02-03'])->saveQuietly();
     $this->application->settings->forceFill(['is_image_scan_enabled' => false, 'image_builds_by_team' => true])->saveQuietly();
-    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'alert_level' => 'high', 'gate_enabled' => true]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'on']);
     ImageScanPolicy::factory()->create(['scope_type' => $this->application->getMorphClass(), 'scope_id' => $this->application->id, 'on_scan_error' => 'block']);
-    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'alert_level' => 'medium']);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict']);
     ImageScanIgnore::factory()->create([
         'team_id' => $this->team->id, 'resource_type' => $this->application->getMorphClass(), 'resource_id' => $this->application->id,
         'vulnerability_id' => 'CVE-2024-12345', 'package' => 'openssl', 'reason' => 'Not reachable', 'expires_at' => '2031-06-01 00:00:00', 'created_by' => $user->id,
@@ -2046,11 +2046,10 @@ test('scan rules and ignores of the server and its applications move, linked by 
         ->and($server->settings->image_candidate_scans_date)->toBeNull()
         ->and($app->settings->is_image_scan_enabled)->toBeFalse()
         ->and($app->settings->image_builds_by_team)->toBeTrue()
-        ->and($serverPolicy->alert_level->value)->toBe('high')
-        ->and($serverPolicy->gate_enabled)->toBeTrue()
+        ->and($serverPolicy->gate_mode->value)->toBe('on')
         ->and($serverPolicy->on_scan_error)->toBeNull()
         ->and($appPolicy->on_scan_error->value)->toBe('block')
-        ->and($appPolicy->alert_level)->toBeNull()
+        ->and($appPolicy->gate_mode)->toBeNull()
         ->and($ignore->team_id)->toBe($team->id)
         ->and($ignore->created_by)->toBeNull()
         ->and($ignore->vulnerability_id)->toBe('CVE-2024-12345')
@@ -2060,6 +2059,28 @@ test('scan rules and ignores of the server and its applications move, linked by 
         ->and(ImageScanIgnore::query()->where('resource_type', $database->getMorphClass())->where('resource_id', $database->id)->where('package', 'libpq')->exists())->toBeTrue()
         ->and(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
         ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(3);
+});
+
+test('scan rules of a bundle from an older version map Block deploys on to strict and drop the alert level', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $appUuid = $this->application->uuid;
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'high', 'gate_enabled' => true, 'on_scan_error' => 'block'],
+        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'alert_level' => 'medium', 'gate_enabled' => false, 'on_scan_error' => null],
+    ];
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $app = Application::query()->where('name', 'my-app')->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    $appPolicy = ImageScanPolicy::query()->where('scope_type', $app->getMorphClass())->where('scope_id', $app->id)->firstOrFail();
+
+    expect($serverPolicy->gate_mode->value)->toBe('strict')
+        ->and($serverPolicy->on_scan_error->value)->toBe('block')
+        ->and($appPolicy->gate_mode->value)->toBe('off')
+        ->and($appPolicy->getAttributes())->not->toHaveKeys(['alert_level', 'gate_enabled'])
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(0);
 });
 
 test('no team-wide ignore warning is exported when the team has none', function () {
@@ -2075,9 +2096,9 @@ test('scan rules that fail the validation of the UI or point to nothing in the b
     $appUuid = $this->application->uuid;
     $ignore = fn (array $fields): array => ['resource_kind' => 'application', 'resource_uuid' => $appUuid, 'vulnerability_id' => 'CVE-2024-1', 'package' => null, 'reason' => 'ok', 'expires_at' => null, ...$fields];
     $bundle['image_scan_policies'] = [
-        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'severe', 'gate_enabled' => null, 'on_scan_error' => null],
-        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'alert_level' => 'medium', 'gate_enabled' => true, 'on_scan_error' => 'deploy'],
-        ['scope_kind' => 'application', 'scope_uuid' => 'missing-app', 'alert_level' => 'medium', 'gate_enabled' => null, 'on_scan_error' => null],
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'gate_mode' => 'always', 'on_scan_error' => null],
+        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'gate_mode' => 'strict', 'on_scan_error' => 'deploy'],
+        ['scope_kind' => 'application', 'scope_uuid' => 'missing-app', 'gate_mode' => 'on', 'on_scan_error' => null],
     ];
     $bundle['image_scan_ignores'] = [
         $ignore(['vulnerability_id' => 'bad id; rm -rf /']),
@@ -2091,7 +2112,7 @@ test('scan rules that fail the validation of the UI or point to nothing in the b
     ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
 
     expect(ImageScanIgnore::query()->where('team_id', $team->id)->pluck('vulnerability_id')->all())->toBe(['GHSA-abcd-1234'])
-        ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->pluck('alert_level')->map(fn ($level) => $level?->value)->all())->toBe(['medium'])
+        ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->pluck('gate_mode')->map(fn ($mode) => $mode?->value)->all())->toBe(['strict'])
         ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'vulnerability ignore')))->toHaveCount(5)
         ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(2);
 });

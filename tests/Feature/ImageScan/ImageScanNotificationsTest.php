@@ -518,10 +518,11 @@ describe('known exploited', function () {
         notifyRunDigest();
 
         Notification::assertSentToTimes($this->team, KnownExploitedFound::class, 1);
-        Notification::assertSentTo($this->team, KnownExploitedFound::class, fn (KnownExploitedFound $notification) => $notification->count === 1
+        // A finding in CISA KEV is relevant at any severity (spec 15.2).
+        Notification::assertSentTo($this->team, KnownExploitedFound::class, fn (KnownExploitedFound $notification) => $notification->count === 2
             && $notification->resourceName === 'api'
             && $notification->worst === 'critical'
-            && $notification->ids === ['CVE-2026-0001']);
+            && $notification->ids === ['CVE-2026-0001', 'CVE-2026-0002']);
         Notification::assertNotSentTo($this->team, VulnerabilityDigest::class);
     });
 
@@ -770,17 +771,17 @@ describe('blocked deploys', function () {
             'status' => ApplicationDeploymentStatus::FAILED->value,
             'scan_gate_result' => [
                 'blocked' => true, 'scan_ran' => true, 'error' => null, 'count' => 2,
-                'headline' => 'Deploy blocked: 2 critical vulnerabilities with a fix.',
+                'headline' => 'Deploy blocked: this image has 2 security problems that attackers are using.',
                 'top' => [['id' => 'CVE-2026-1234', 'severity' => 'critical', 'package' => 'openssl', 'version' => '3.0.13', 'fixed_in' => '3.0.15', 'kev' => false]],
             ],
         ]);
 
         $notification = new DeploymentFailed($this->application, $deployment->deployment_uuid, null, $deployment);
 
-        expect($notification->toDiscord()->title)->toStartWith('Deploy blocked: 2 critical vulnerabilities with a fix')
+        expect($notification->toDiscord()->title)->toStartWith('Deploy blocked: this image has 2 security problems that attackers are using')
             ->and($notification->toSlack()->title)->toStartWith('Deploy blocked')
             ->and($notification->toPushover()->title)->toStartWith('Deploy blocked')
-            ->and($notification->toTelegram()['message'])->toContain('Deploy blocked: 2 critical vulnerabilities with a fix')
+            ->and($notification->toTelegram()['message'])->toContain('Deploy blocked: this image has 2 security problems that attackers are using')
             ->and($notification->toWebhook()['message'])->toStartWith('Deploy blocked')
             ->and($notification->toMail($this->team)->subject)->toContain('Deploy blocked');
         foreach (notifyChatPayloads($notification) as $payload) {

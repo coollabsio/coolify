@@ -8,6 +8,7 @@ use App\Actions\ImageScan\ScanImage;
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanErrorCode;
+use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanStatus;
 use App\Enums\ProcessStatus;
 use App\Enums\StaticImageTypes;
@@ -34,10 +35,10 @@ use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\ImageScan\DockerfileBaseImage;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageRef;
-use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
 use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\SecurityGate;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -2951,7 +2952,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * The deploy gate (spec section 5): stops the start of an image with vulnerabilities that can be fixed now.
+     * The deploy gate (spec 15.8): stops the start of an image with security problems, by the "Block deploys" mode.
      * Does nothing, and runs no remote command, unless the gate applies to this application.
      */
     private function checkImageScanGate(string $imageRef): void
@@ -2997,11 +2998,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        // Read before the scan: a scan of the same image takes over the row of the running image.
+        $running = $this->runningImageScan($imageRef);
         $reused = $image !== null ? $this->completedImageScan($image['id']) : null;
         $scan = $reused ?? ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: ScanImage::GATE_LOCK_WAIT_SECONDS, baseImageRef: $this->imageScanBaseImageRef, queueCandidateCheck: false);
-        $scan = $this->checkImageScanCandidates($scan);
+        $this->queueImageScanCandidates($scan);
 
-        $this->applyImageScanGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null);
+        $this->applyImageScanGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, running: $running);
 
         if ($reused !== null) {
             $this->linkReusedImageScan($reused);
@@ -3009,82 +3012,45 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * The gate of an image that someone else builds needs its newer versions (spec 7.5): without a check, nothing
-     * would be fixable now. Checks them before the gate when they were never checked or not in the last 20 hours,
-     * under the same caps, timeouts, and lock as the daily check. When the check cannot finish, the gate goes on
-     * without candidates. Other scans get their check in a queued job.
+     * Queues the check of newer versions and of the base image for the scanned image. The gate does not wait for it:
+     * it reads only the findings.
      */
-    private function checkImageScanCandidates(ImageScan $scan): ImageScan
+    private function queueImageScanCandidates(ImageScan $scan): void
     {
         try {
             $scan->setRelation('resource', $this->application);
-            if (! $scan->exists || $scan->status !== ImageScanStatus::Completed || $scan->builds_image !== false
-                || $this->imageScanCandidatesCheckedRecently($scan) || ! RefreshCandidates::needsCandidates($scan)) {
-                if (RefreshCandidates::shouldRefresh($scan)) {
-                    RefreshCandidatesJob::dispatch($scan);
-                }
-
-                return $scan;
+            if ($scan->exists && RefreshCandidates::shouldRefresh($scan)) {
+                RefreshCandidatesJob::dispatch($scan);
             }
         } catch (Throwable $e) {
             report($e);
-
-            return $scan;
-        }
-
-        $this->application_deployment_queue->addLogEntry('Image scan: checking newer versions of the image.');
-        try {
-            RefreshCandidates::run($scan, ScanImage::GATE_LOCK_WAIT_SECONDS);
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        $checked = $scan->fresh() ?? $scan;
-        $checked->setRelation('resource', $this->application);
-        $reason = $this->imageScanCandidateFailure($checked);
-        if ($reason !== null) {
-            $this->application_deployment_queue->addLogEntry("Coolify could not check newer versions of {$scan->image_ref}: {$reason}.", 'stderr');
-        }
-
-        return $checked;
-    }
-
-    private function imageScanCandidatesCheckedRecently(ImageScan $scan): bool
-    {
-        $checkedAt = data_get($scan->candidates, 'checked_at');
-        if (! is_string($checkedAt)) {
-            return false;
-        }
-
-        try {
-            return now()->subHours(RefreshCandidates::FRESH_HOURS)->lt($checkedAt);
-        } catch (Throwable) {
-            return false;
         }
     }
 
     /**
-     * Why the check of newer versions did not finish, in words for the deploy log. Null when it finished.
+     * The scan of the image the application ran before this deployment: the latest completed scan of a finished
+     * deployment that is not a preview. A Compose application matches the image by name. Null before the first
+     * deploy, so every finding of the new image counts as new.
      */
-    private function imageScanCandidateFailure(ImageScan $scan): ?string
+    private function runningImageScan(string $imageRef): ?ImageScan
     {
-        $status = $scan->candidateStatus();
-        if (in_array($status, ['ok', 'no_better', 'skipped'], true) && $this->imageScanCandidatesCheckedRecently($scan)) {
-            return null;
+        $query = fn () => $this->application->imageScans()
+            ->where('status', ImageScanStatus::Completed)
+            ->whereHas('deploymentQueue', fn ($query) => $query
+                ->where('pull_request_id', 0)
+                ->where('status', ApplicationDeploymentStatus::FINISHED->value))
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id');
+
+        if ($this->application->build_pack !== 'dockercompose') {
+            return $query()->first();
         }
 
-        return match (true) {
-            $status === 'auth_required' => 'the registry needs a login on '.$this->server->name,
-            $status === 'cannot_compare' => 'Coolify cannot compare versions of this image',
-            $status !== 'failed' => 'the check did not finish',
-            default => match (data_get($scan->candidates, 'error')) {
-                'daily_limit' => 'the daily limit of version checks on '.$this->server->name.' is reached',
-                'lock_busy' => 'another scan is running on '.$this->server->name,
-                'disk' => 'not enough disk space on '.$this->server->name,
-                'registry', 'registry_auth' => 'the registry did not answer',
-                default => 'the check failed',
-            },
-        };
+        $name = ScanImage::imageName($imageRef);
+        $id = $query()->get(['id', 'image_ref'])
+            ->first(fn (ImageScan $scan): bool => ScanImage::imageName((string) $scan->image_ref) === $name)?->id;
+
+        return $id === null ? null : ImageScan::query()->find($id);
     }
 
     /**
@@ -3208,7 +3174,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return false;
         }
 
-        return $this->imageScanPolicy()->gateEnabled;
+        return $this->imageScanPolicy()->gateMode !== ImageScanGateMode::Off->value;
     }
 
     /**
@@ -3398,8 +3364,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * Writes the result on the deployment, logs it, and stops the deployment when the gate blocks.
      *
      * @param  array<string, int|string>  $errorContext
+     * @param  ImageScan|null  $running  The scan of the image the application ran before this deployment.
      */
-    private function applyImageScanGate(?ImageScan $scan, ?ImageScanErrorCode $error = null, array $errorContext = [], ?string $imageRef = null, ?string $repoDigest = null): void
+    private function applyImageScanGate(?ImageScan $scan, ?ImageScanErrorCode $error = null, array $errorContext = [], ?string $imageRef = null, ?string $repoDigest = null, ?ImageScan $running = null): void
     {
         $completed = $scan !== null && $scan->status === ImageScanStatus::Completed;
 
@@ -3409,8 +3376,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $scan?->setRelation('resource', $this->application);
-        $gate = app(ImageScanGate::class);
-        $result = $gate->evaluate($scan, $this->imageScanPolicy(), IgnoreMatcher::forResource($this->application), $error, $errorContext);
+        $policy = $this->imageScanPolicy();
+        $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, IgnoreMatcher::forResource($this->application), $error, $errorContext, $policy->onScanError);
+        $stored = SecurityGate::stored($result);
 
         // A Compose deployment gates several images: keep the worst result (blocked, then error, then pass).
         $rank = fn (?array $gateResult): int => match (true) {
@@ -3419,21 +3387,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ($gateResult['error'] ?? null) !== null => 1,
             default => 0,
         };
-        if ($rank($result->toArray()) >= $rank($this->imageScanGateResult)) {
+        if ($rank($stored) >= $rank($this->imageScanGateResult)) {
             // The digest lets "Deploy anyway" start the image that was blocked.
-            $this->imageScanGateResult = [...$result->toArray(), ...($repoDigest !== null ? ['repo_digest' => $repoDigest] : [])];
+            $this->imageScanGateResult = [...$stored, ...($repoDigest !== null ? ['repo_digest' => $repoDigest] : [])];
             $this->application_deployment_queue->update(['scan_gate_result' => $this->imageScanGateResult]);
         }
-        if ($result->scanRan && $imageRef !== null) {
+        if ($result['scan_ran'] && $imageRef !== null) {
             $this->imageScanScannedImages[$imageRef] = true;
         }
 
-        foreach ($gate->logLines($result, $completed ? (array) $scan->summary : []) as $line) {
-            $this->application_deployment_queue->addLogEntry($line, $result->blocked || $result->error !== null ? 'stderr' : 'stdout');
+        // A pass logs "passed" first; the lines after it warn about problems that the running image has too.
+        $failed = $result['blocked'] || $result['error'] !== null;
+        foreach (SecurityGate::logLines($result) as $index => $line) {
+            $this->application_deployment_queue->addLogEntry($line, $failed || $index > 0 ? 'stderr' : 'stdout');
         }
 
-        if ($result->blocked) {
-            throw DeploymentException::alreadyLogged($result->headline);
+        if ($result['blocked']) {
+            throw DeploymentException::alreadyLogged($result['headline']);
         }
     }
 

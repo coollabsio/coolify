@@ -2427,6 +2427,7 @@ class ServerTransferImporter
 
     /**
      * Scan rules of the server and of its applications. A rule that fails the validation of the UI, or whose scope is not in the bundle, is dropped.
+     * A bundle of an older version has `gate_enabled` (on: strict, off: off) and `alert_level` (no longer used).
      *
      * @param  list<array<string, mixed>>  $policies
      */
@@ -2439,9 +2440,15 @@ class ServerTransferImporter
                 'application' => $this->applicationMap[(string) data_get($policyPayload, 'scope_uuid')] ?? null,
                 default => null,
             };
+            $gateMode = array_key_exists('gate_mode', (array) $policyPayload)
+                ? data_get($policyPayload, 'gate_mode')
+                : match (data_get($policyPayload, 'gate_enabled')) {
+                    true => 'strict',
+                    false => 'off',
+                    default => null,
+                };
             $fields = [
-                'alert_level' => data_get($policyPayload, 'alert_level'),
-                'gate_enabled' => data_get($policyPayload, 'gate_enabled'),
+                'gate_mode' => $gateMode,
                 'on_scan_error' => data_get($policyPayload, 'on_scan_error'),
             ];
             if ($scope === null) {
