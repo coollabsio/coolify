@@ -1589,9 +1589,18 @@ class Application extends BaseModel
         if ($commitToUse !== 'HEAD') {
             $escapedCommit = escapeshellarg($commitToUse);
             // If shallow clone is enabled and we need a specific commit,
-            // we need to fetch that specific commit with depth=1
+            // we need to fetch that specific commit with depth=1.
+            // A remote cannot fetch a short SHA (Bitbucket sends one for pull requests),
+            // so fetch the tip of each branch and let the checkout expand it. When the
+            // commit is not a branch tip, fetch the full history of the branches.
             if ($isShallowCloneEnabled) {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $checkoutCommand = "{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                if (preg_match('/\A[0-9a-fA-F]{7,39}\z/', $commitToUse) === 1) {
+                    $branchesRefspec = escapeshellarg('+refs/heads/*:refs/remotes/origin/*');
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$branchesRefspec} && ({$checkoutCommand} || (echo 'The commit is not a branch tip. Fetching the full history.' && {$sshCommand} {$gitCommand} fetch --unshallow origin {$branchesRefspec} && {$checkoutCommand}))";
+                } else {
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$checkoutCommand}";
+                }
             } else {
                 $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             }
