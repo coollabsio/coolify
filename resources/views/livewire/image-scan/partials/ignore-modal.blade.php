@@ -3,6 +3,7 @@
     target: '',
     kind: 'vulnerability',
     owner: null,
+    neverAllowed: true,
     scope: 'resource',
     expires: '90',
     reason: '',
@@ -11,6 +12,7 @@
         this.target = detail.target;
         this.kind = detail.kind;
         this.owner = detail.owner ?? null;
+        this.neverAllowed = detail.neverAllowed !== false;
         this.scope = 'resource';
         this.expires = '90';
         this.reason = '';
@@ -51,12 +53,23 @@
                         ['value' => 'resource', 'label' => 'This resource'],
                         $canIgnoreForTeam ? ['value' => 'team', 'label' => 'All team resources'] : null,
                     ]))" />
-                <x-forms.listbox id="image-scan-ignore-expires" label="Expires" :wire="false" x-model="expires" value="90"
-                    :options="[
-                        ['value' => '30', 'label' => '30 days'],
-                        ['value' => '90', 'label' => '90 days'],
-                        ['value' => 'never', 'label' => 'Never'],
-                    ]" />
+                {{-- Ignores of problems that attackers are using or are likely to use always expire (spec 15.2). --}}
+                <template x-if="neverAllowed">
+                    <x-forms.listbox id="image-scan-ignore-expires" label="Expires" :wire="false" x-model="expires" value="90"
+                        :options="[
+                            ['value' => '30', 'label' => '30 days'],
+                            ['value' => '90', 'label' => '90 days'],
+                            ['value' => 'never', 'label' => 'Never'],
+                        ]" />
+                </template>
+                <template x-if="!neverAllowed">
+                    <x-forms.listbox id="image-scan-ignore-expires" label="Expires" :wire="false" x-model="expires" value="90"
+                        helper="Attackers are using or are likely to use this problem, so its ignore expires."
+                        :options="[
+                            ['value' => '30', 'label' => '30 days'],
+                            ['value' => '90', 'label' => '90 days'],
+                        ]" />
+                </template>
             </div>
         </form>
         <x-slot:footer>

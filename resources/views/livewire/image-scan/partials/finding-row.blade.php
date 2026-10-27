@@ -60,6 +60,7 @@
                         target: {{ \Illuminate\Support\Js::from($finding->id) }},
                         kind: 'vulnerability',
                         owner: {{ \Illuminate\Support\Js::from($row['owner']) }},
+                        neverAllowed: {{ \Illuminate\Support\Js::from($row['never_allowed'] ?? true) }},
                     })">Ignore</button>
             @endif
         </span>

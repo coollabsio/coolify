@@ -23,6 +23,7 @@ use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\SecurityAction;
 use App\Services\ImageScan\SecurityActions;
 use App\Services\ImageScan\SecurityCard;
+use App\Services\ImageScan\SecurityRules;
 use App\Services\ImageScan\SecurityStatus;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -99,7 +100,7 @@ class Vulnerabilities extends Component
     /** @var Collection<int, ImageScan>|null */
     private ?Collection $scans = null;
 
-    /** @var list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>|null */
+    /** @var list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>|null */
     private ?array $rows = null;
 
     /** @var array<string, IgnoreMatcher> */
@@ -465,9 +466,16 @@ class Vulnerabilities extends Component
             : $resource;
         abort_unless($owner instanceof Model, 404);
 
-        if (! $this->ownerHasFinding($owner, $kind, $kind === 'package' ? (string) $package : $target)) {
+        $matching = $this->ownerFindings($owner, $kind, $kind === 'package' ? (string) $package : $target);
+        if ($matching === []) {
             $this->validateOrToast(Validator::make([], [])->after(fn ($validator) => $validator->errors()
                 ->add($kind === 'package' ? 'package' : 'vulnerability_id', 'This is not in the scan results.')));
+        }
+
+        // Spec 15.2: an ignore of a problem with an exploit signal expires after at most 90 days.
+        if ($expires === 'never' && collect($matching)->contains(fn (Finding $finding): bool => self::hasExploitSignal($finding))) {
+            $this->validateOrToast(Validator::make([], [])->after(fn ($validator) => $validator->errors()
+                ->add('expires', 'Attackers are using or are likely to use this problem, so its ignore must expire. Choose 30 or 90 days.')));
         }
 
         $ignore = ImageScanIgnore::query()->create([
@@ -575,11 +583,17 @@ class Vulnerabilities extends Component
             ->all();
     }
 
-    private function ownerHasFinding(Model $owner, string $kind, string $target): bool
+    /**
+     * The findings of the owner's current scans that an ignore of $target would match.
+     *
+     * @return list<Finding>
+     */
+    private function ownerFindings(Model $owner, string $kind, string $target): array
     {
         $target = $kind === 'package' ? $target : mb_strtolower($target);
         $scans = $this->currentScans()->filter(fn (ImageScan $scan): bool => $scan->resource->is($owner));
 
+        $matching = [];
         foreach ($scans as $scan) {
             foreach (ResourceScans::findings($scan) as $finding) {
                 $matches = $kind === 'package'
@@ -587,12 +601,20 @@ class Vulnerabilities extends Component
                     : in_array($target, array_map('mb_strtolower', [$finding->id, ...$finding->aliases]), true);
 
                 if ($matches) {
-                    return true;
+                    $matching[] = $finding;
                 }
             }
         }
 
-        return false;
+        return $matching;
+    }
+
+    /**
+     * A finding whose ignore must expire (spec 15.2): an exploit signal, and not a CPE-only OS match.
+     */
+    private static function hasExploitSignal(Finding $finding): bool
+    {
+        return SecurityRules::exploitSignal($finding) !== null && ! SecurityRules::isCpeOnlyOsMatch($finding);
     }
 
     /**
@@ -662,7 +684,7 @@ class Vulnerabilities extends Component
      * One row per finding of the current scans, with its fix state and the ignore that matches it. Built once per
      * request.
      *
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>
+     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
      */
     private function findingRows(): array
     {
@@ -692,6 +714,22 @@ class Vulnerabilities extends Component
             }
         }
 
+        // The ignore modal offers "Never" only when no finding the ignore would match has an exploit signal.
+        $signalIds = [];
+        $signalPackages = [];
+        foreach ($rows as $row) {
+            if (self::hasExploitSignal($row['finding'])) {
+                foreach ([$row['finding']->id, ...$row['finding']->aliases] as $id) {
+                    $signalIds[$row['owner']][mb_strtolower($id)] = true;
+                }
+                $signalPackages[$row['owner']][$row['finding']->package] = true;
+            }
+        }
+        foreach ($rows as $index => $row) {
+            $rows[$index]['never_allowed'] = ! isset($signalIds[$row['owner']][mb_strtolower($row['finding']->id)]);
+            $rows[$index]['package_never_allowed'] = ! isset($signalPackages[$row['owner']][$row['finding']->package]);
+        }
+
         return $this->rows = $rows;
     }
 
@@ -718,8 +756,8 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>  $rows
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>
+     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
+     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
      */
     private function filterRows(array $rows): array
     {
@@ -757,7 +795,7 @@ class Vulnerabilities extends Component
     /**
      * Rows of the By package view: one per package version of an image, worst first.
      *
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>  $rows
+     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
      * @return list<array<string, mixed>>
      */
     private function packageGroups(array $rows): array
@@ -775,6 +813,7 @@ class Vulnerabilities extends Component
                 'owner' => $row['owner'],
                 'severity' => 'unknown',
                 'kev' => false,
+                'never_allowed' => $row['package_never_allowed'],
                 'fixed' => [],
                 'rows' => [],
             ];
@@ -807,8 +846,8 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>  $rows
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string}>
+     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
+     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
      */
     private function sortRows(array $rows): array
     {

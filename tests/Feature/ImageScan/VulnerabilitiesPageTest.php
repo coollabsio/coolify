@@ -312,7 +312,7 @@ describe('ignore', function () {
     });
 
     it('ignores a package for all team resources without an expiry', function () {
-        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding(['epss' => null])]);
 
         vulnerabilitiesPage($this->admin, $this->application)
             ->call('ignore', 'openssl', 'package', 'team', 'never', 'Patched by the base image')
@@ -323,6 +323,40 @@ describe('ignore', function () {
             ->and($ignore->vulnerability_id)->toBeNull()
             ->and($ignore->resource_id)->toBeNull()
             ->and($ignore->expires_at)->toBeNull();
+    });
+
+    it('refuses an ignore without an expiry for a problem with an exploit signal', function (string $target, string $kind, array $finding) {
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding(['epss' => null]), vulnerabilitiesFinding($finding)]);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('ignore', $target, $kind, 'resource', 'never', 'Not reachable')
+            ->assertHasErrors(['expires'])
+            ->assertDispatched('error', 'Attackers are using or are likely to use this problem, so its ignore must expire. Choose 30 or 90 days.');
+        expect(ImageScanIgnore::query()->count())->toBe(0);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('ignore', $target, $kind, 'resource', '90', 'Not reachable')
+            ->assertHasNoErrors();
+        expect(ImageScanIgnore::query()->sole()->expires_at->isSameDay(now()->addDays(90)))->toBeTrue();
+    })->with([
+        'exploited ID' => ['CVE-2026-0002', 'vulnerability', ['id' => 'CVE-2026-0002', 'kev' => true, 'epss' => null]],
+        'exploited alias' => ['CVE-2026-0003', 'vulnerability', ['id' => 'GHSA-aaaa-bbbb-cccc', 'aliases' => ['CVE-2026-0003'], 'kev' => true, 'epss' => null]],
+        'likely to be exploited' => ['CVE-2026-0004', 'vulnerability', ['id' => 'CVE-2026-0004', 'epss' => 0.5, 'cvssScore' => 9.8]],
+        'package with an exploited problem' => ['zlib', 'package', ['id' => 'CVE-2026-0005', 'package' => 'zlib', 'kev' => true, 'epss' => null]],
+    ]);
+
+    it('offers "Never" only for problems without an exploit signal', function () {
+        vulnerabilitiesScan($this->application, [
+            vulnerabilitiesFinding(['epss' => null]),
+            vulnerabilitiesFinding(['id' => 'CVE-2026-0002', 'package' => 'zlib', 'kev' => true, 'epss' => null]),
+        ]);
+
+        $html = preg_replace('/\s+/', ' ', vulnerabilitiesPage($this->admin, $this->application)->html());
+
+        expect($html)->toContain("target: 'CVE-2026-0002', kind: 'vulnerability', owner: '{$this->application->uuid}', neverAllowed: false,")
+            ->and($html)->toContain("target: 'zlib', kind: 'package', owner: '{$this->application->uuid}', neverAllowed: false,")
+            ->and($html)->toContain("target: 'CVE-2024-0001', kind: 'vulnerability', owner: '{$this->application->uuid}', neverAllowed: true,")
+            ->and($html)->toContain("target: 'openssl', kind: 'package', owner: '{$this->application->uuid}', neverAllowed: true,");
     });
 
     it('lets only team admins ignore for all team resources', function () {
@@ -472,16 +506,16 @@ describe('states', function () {
             ->assertSee('Not enough disk space on prod-1: 3 GB needed.');
     });
 
-    it('asks for a new check of old results, and names an end-of-life distro and cut results', function () {
+    it('asks for a new check of cut results, and names an end-of-life distro', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
             'scanned_at' => now()->subDays(5)->subHour(),
             'summary' => vulnerabilitiesSummary(1, ['truncated' => true, 'eol_distro' => ['name' => 'alpine', 'version' => '3.12']]),
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Coolify needs to check this image again: the last check was 5 days ago.')
+            ->assertSee('Coolify needs to check this image again: the scan result was too large to read completely.')
             ->assertSee('This image uses Alpine 3.12, which no longer gets security fixes.')
-            ->assertSee('Only the first 5,000 are shown.');
+            ->assertSee('Only part of the results is shown, with the problems that attackers are using first.');
     });
 
     it('says when the running image is not the scanned image', function () {
