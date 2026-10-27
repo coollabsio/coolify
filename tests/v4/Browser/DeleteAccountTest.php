@@ -38,7 +38,11 @@ it('lets a user delete their own account from the profile page', function () {
         ->screenshot(filename: 'delete-account-modal')
         ->fill('[x-model="userConfirmationText"]', 'leaving@example.com')
         ->screenshot(filename: 'delete-account-confirm-text')
+        // Password managers detect fields when they are added or focused, not when a hidden one shows.
+        ->assertScript('() => document.querySelector(\'input[type="password"][x-model="password"]\') === null', true)
         ->click('button:visible:has-text("Continue")')
+        ->wait(0.3)
+        ->assertScript('() => document.activeElement?.matches(\'input[type="password"][x-model="password"]\')', true)
         ->fill('[x-model="password"]', 'password')
         ->screenshot(filename: 'delete-account-password');
 
