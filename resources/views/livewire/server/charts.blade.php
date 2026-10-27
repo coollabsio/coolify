@@ -63,7 +63,7 @@
                      charts fall into a 2x2 below (mirrors the fleet /metrics layout). --}}
                 <div class="grid gap-6 lg:grid-cols-2">
                     <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage" class="lg:col-span-2"
-                        helper="Percentage of available CPU capacity used by this server.">
+                        helper="Average usage of all CPU cores on this server. 100% means that all cores are fully busy. For example, on a server with 8 cores, one fully busy core shows as 12.5%.">
                         <x-slot:actions>
                             <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
                         </x-slot:actions>
