@@ -519,8 +519,8 @@ fi
 
 # Fetch versions.json once and parse all values from it
 VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
-LATEST_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+LATEST_VERSION=$(echo "$VERSIONS_JSON" | sed -n '/"v4"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
+LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | sed -n '/"helper"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest

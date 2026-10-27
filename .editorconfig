@@ -17,6 +17,9 @@ indent_size = 2
 [docker-compose.yml]
 indent_size = 4
 
+[{release.json,upstream.json}]
+indent_style = tab
+
 [scripts/{clean-manifests,release,sync-cdn,undo-release,version}.sh]
 indent_style = tab
 binary_next_line = true

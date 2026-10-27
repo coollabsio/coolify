@@ -1,5 +1,14 @@
 <?php
 
+it('reads the Coolify and helper versions by key from the versions.json scripts/sync-cdn.sh writes', function () {
+    $versions = shell_exec("jq --indent 4 --arg version 4.6.0-beta.1 '{coolify: ({v4: {\$version}} + del(.traefik)), traefik}' ".escapeshellarg(dirname(__DIR__, 2).'/upstream.json'));
+    $parse = implode("\n", preg_grep('/^LATEST_(HELPER_)?VERSION=\$\(echo "\$VERSIONS_JSON"/', file(dirname(__DIR__, 2).'/scripts/install.sh')));
+    $output = shell_exec('VERSIONS_JSON='.escapeshellarg($versions).' bash -c '.escapeshellarg($parse."\necho \"\$LATEST_VERSION \$LATEST_HELPER_VERSION\""));
+    $helper = json_decode(file_get_contents(dirname(__DIR__, 2).'/upstream.json'), true)['helper']['version'];
+
+    expect(trim($output))->toBe("4.6.0-beta.1 {$helper}");
+});
+
 it('points the scripts at the stable channel of the CDN, which scripts/sync-cdn.sh rewrites for the other channels', function (string $script) {
     expect(file_get_contents(dirname(__DIR__, 2)."/{$script}"))->toMatch('/^CDN="https:\/\/cdn\.coollabs\.io\/coolify"$/m');
 })->with(['scripts/install.sh', 'scripts/upgrade.sh']);
@@ -219,12 +228,13 @@ it('guides issue authors to the correct contribution branch', function () {
         ->toContain('Small fixes should target `main`; larger changes should target `next`');
 });
 
-it('ships versions.json in the production image so version checks work right after an upgrade', function () {
+it('writes versions.json in the production image from upstream.json so version checks work right after an upgrade', function () {
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $dockerignore = file_get_contents(dirname(__DIR__, 2).'/.dockerignore');
 
     expect($dockerfile)
-        ->toContain('COPY --chown=www-data:www-data versions.json ./versions.json')
+        ->toContain('COPY --chown=www-data:www-data release.json upstream.json ./')
+        ->toContain('upstream.json > versions.json')
         ->and($dockerignore)
-        ->not->toMatch('/^\/?versions\.json$/m');
+        ->not->toMatch('/^\/?(release|upstream)\.json$/m');
 });
