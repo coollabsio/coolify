@@ -63,6 +63,7 @@ class StandaloneDragonfly extends BaseModel
      */
     protected $hidden = [
         'dragonfly_password',
+        'custom_docker_run_options',
         'internal_db_url',
         'external_db_url',
         // Internal start-command state, not part of the API.

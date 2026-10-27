@@ -71,6 +71,8 @@ class StandalonePostgresql extends BaseModel
     protected $hidden = [
         'postgres_password',
         'init_scripts',
+        'postgres_conf',
+        'custom_docker_run_options',
         'internal_db_url',
         'external_db_url',
     ];

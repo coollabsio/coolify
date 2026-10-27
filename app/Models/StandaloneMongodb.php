@@ -67,6 +67,8 @@ class StandaloneMongodb extends BaseModel
      */
     protected $hidden = [
         'mongo_initdb_root_password',
+        'mongo_conf',
+        'custom_docker_run_options',
         'internal_db_url',
         'external_db_url',
     ];

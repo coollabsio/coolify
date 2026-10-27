@@ -57,6 +57,15 @@ class StandaloneSqlite extends BaseModel
         'health_check_start_period',
     ];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'custom_docker_run_options',
+    ];
+
     protected $appends = ['database_type', 'server_status'];
 
     protected $casts = [

@@ -69,6 +69,7 @@ class StandaloneClickhouse extends BaseModel
      */
     protected $hidden = [
         'clickhouse_admin_password',
+        'custom_docker_run_options',
         'internal_db_url',
         'external_db_url',
     ];

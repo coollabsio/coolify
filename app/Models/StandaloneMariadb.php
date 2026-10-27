@@ -68,6 +68,8 @@ class StandaloneMariadb extends BaseModel
     protected $hidden = [
         'mariadb_password',
         'mariadb_root_password',
+        'mariadb_conf',
+        'custom_docker_run_options',
         'internal_db_url',
         'external_db_url',
     ];

@@ -65,6 +65,8 @@ class StandaloneRedis extends BaseModel
      */
     protected $hidden = [
         'redis_password',
+        'redis_conf',
+        'custom_docker_run_options',
         'internal_db_url',
         'external_db_url',
         // Internal start-command state, not part of the API.
