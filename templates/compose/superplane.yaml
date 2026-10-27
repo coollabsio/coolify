@@ -1,5 +1,5 @@
 # documentation: https://docs.superplane.com/
-# slogan: Open-source automation engine for AI-driven engineering
+# slogan: Open source factory for one-shot engineering
 # category: automation
 # tags: automation,ai,ci,workflows
 # logo: svgs/superplane.svg
@@ -60,7 +60,7 @@ services:
       retries: 10
 
   app:
-    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0-rc5}
+    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0}
     stop_grace_period: 45s
     expose:
       - "8000"
@@ -148,7 +148,7 @@ services:
       - ENABLE_PASSWORD_LOGIN=yes
       - BLOCK_SIGNUP=yes
       - REDIRECT_HTTP_REQUESTS=yes
-      - 'SUPERPLANE_VERSION=${SUPERPLANE_VERSION:-v1.0.0-rc5}'
+      - 'SUPERPLANE_VERSION=${SUPERPLANE_VERSION:-v1.0.0}'
       - 'RUNNER_STABLE_VERSION=${RUNNER_VERSION:-v0.2.1}'
       - SUPERPLANE_INSTALLATION_TYPE=single-host
       - SUPERPLANE_BILLING_ENABLED=no
@@ -260,7 +260,7 @@ services:
         echo "Fleet Manager token is ready."
 
   fleet-manager:
-    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:-v0.1.5}-docker
+    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:-v0.1.6}-docker
     depends_on:
       app:
         condition: service_healthy
