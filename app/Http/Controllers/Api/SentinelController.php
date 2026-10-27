@@ -132,7 +132,7 @@ class SentinelController extends Controller
 
         Cache::put(Server::sentinelReportedVersionCacheKey($server->id), $runningVersion, now()->addHours(2));
 
-        $latestVersion = data_get(get_versions_data(), 'coolify.sentinel.version');
+        $latestVersion = data_get(get_versions_data(), 'sentinel.version');
         if (blank($latestVersion) || version_compare($runningVersion, $latestVersion, '>=')) {
             return;
         }

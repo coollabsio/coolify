@@ -83,7 +83,8 @@ class Updates extends Component
             $changedFields = auditChangedFields($this->settings);
             $this->settings->save();
             if ($channelChanged) {
-                (new CheckForUpdatesJob(cdnTries: 1, channelChanged: true))->handle();
+                invalidate_versions_cache();
+                (new CheckForUpdatesJob(cdnTries: 1))->handle();
                 $this->dispatch('updateAvailable');
             }
             if ($changedFields !== []) {

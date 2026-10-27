@@ -160,7 +160,7 @@ The pull request workflow builds every pull request and publishes the image of a
 
 ## CDN
 
-`scripts/sync-cdn.sh` syncs a channel of `coollabsio/coollabs-cdn` from the commit of the version it syncs: the install and upgrade scripts, the compose files, the environment file, the service templates, the GitHub releases and `versions.json`.
+`scripts/sync-cdn.sh` syncs a channel of `coollabsio/coollabs-cdn` from the commit of the version it syncs: the install and upgrade scripts, the compose files, the environment file, the service templates, the GitHub releases and the block of the channel in `/coolify/versions.json`.
 
 | Channel   | Path                | Synced by                                                 |
 | --------- | ------------------- | --------------------------------------------------------- |
@@ -170,9 +170,8 @@ The pull request workflow builds every pull request and publishes the image of a
 
 - The preview channel takes betas and release candidates, alphas reach the nightly channel only
 - `CDN_TOKEN` in the environment `release` is a fine-grained token for `coollabsio/coollabs-cdn` alone, with read and write access to contents and pull requests
-- `versions.json` of a channel names its Coolify version and the helper, Sentinel and Traefik versions of `upstream.json`
-- `/coolify/release.json` lists the Coolify version of every channel, each sync sets the version of its channel
-- An instance on the preview or nightly channel takes the newest version of its channel and the more stable ones from `/coolify/release.json`
+- `/coolify/versions.json` has a `stable`, `preview` and `nightly` block, each with the Coolify version of its channel and the helper, Sentinel and Traefik versions of the `upstream.json` it was synced from. An instance takes the newest version of its channel and the more stable ones
+- Every stable sync also sets the `coolify` and `traefik` keys, which older instances read, to the stable versions, so older instances upgrade to a version that reads the blocks
 
 Cloudflare keeps a file of the CDN for up to 10 minutes. To clear the cache sooner, for example once the pull request of the stable channel is merged and deployed, set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` in `.env` or the environment, with a token that can purge the cache of the zone:
 

@@ -52,7 +52,7 @@ class UpdateCoolify
             $latest = fetch_latest_versions(tries: $manual_update ? 1 : 3);
 
             if ($latest !== null) {
-                $this->latestVersion = data_get($latest, 'versions.coolify.v4.version');
+                $this->latestVersion = data_get($latest, 'versions.coolify.version');
                 $this->upgradeScriptUrl = $latest['upgrade_script_url'];
             } else {
                 // Fallback to cache if CDN unavailable
@@ -71,6 +71,7 @@ class UpdateCoolify
                 }
 
                 $this->latestVersion = $cacheVersion;
+                $this->upgradeScriptUrl = data_get(get_versions_data(), 'upgrade_script_url');
                 Log::warning('Failed to fetch fresh version from CDN (unsuccessful response), using validated cache', [
                     'version' => $cacheVersion,
                 ]);
@@ -92,6 +93,7 @@ class UpdateCoolify
             }
 
             $this->latestVersion = $cacheVersion;
+            $this->upgradeScriptUrl = data_get(get_versions_data(), 'upgrade_script_url');
             Log::warning('Failed to fetch fresh version from CDN, using validated cache', [
                 'error' => $e->getMessage(),
                 'version' => $cacheVersion,

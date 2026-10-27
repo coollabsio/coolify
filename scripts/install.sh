@@ -16,6 +16,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 CDN="https://cdn.coollabs.io/coolify"
+CHANNEL="stable"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
@@ -518,9 +519,10 @@ if [ "$OS_TYPE" = 'amzn' ]; then
 fi
 
 # Fetch versions.json once and parse all values from it
-VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
-LATEST_VERSION=$(echo "$VERSIONS_JSON" | sed -n '/"v4"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
-LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | sed -n '/"helper"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
+VERSIONS_JSON=$(curl -L --silent https://cdn.coollabs.io/coolify/versions.json)
+CHANNEL_VERSIONS=$(echo "$VERSIONS_JSON" | sed -n "/^    \"$CHANNEL\": {/,/^    }/p")
+LATEST_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"coolify"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
+LATEST_HELPER_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"helper"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest

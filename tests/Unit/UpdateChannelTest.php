@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Services\CoolifyUpgradeStatus;
 use App\Support\RemoteProcessCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
@@ -37,7 +36,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    File::delete(storage_path('app/versions.json'));
+    @unlink(storage_path('app/versions.json'));
 });
 
 function updateChannelTestUse(string $channel, ?string $customTag = null, ?string $preview = '4.6.0-beta.2', string $nightly = '4.6.0-beta.1.20261027.3'): void
@@ -45,14 +44,11 @@ function updateChannelTestUse(string $channel, ?string $customTag = null, ?strin
     InstanceSettings::findOrFail(0)->update(['update_channel' => $channel, 'update_custom_tag' => $customTag]);
     Once::flush();
     Http::fake([
-        'cdn.example.com/coolify/release.json' => Http::response(array_filter([
-            'stable' => ['coolify' => '4.5.1'],
-            'preview' => $preview ? ['coolify' => $preview] : null,
-            'nightly' => ['coolify' => $nightly],
+        'cdn.example.com/coolify/versions.json' => Http::response(array_filter([
+            'stable' => ['coolify' => ['version' => '4.5.1']],
+            'preview' => $preview ? ['coolify' => ['version' => $preview]] : null,
+            'nightly' => ['coolify' => ['version' => $nightly]],
         ])),
-        'cdn.example.com/coolify/versions.json' => Http::response(['coolify' => ['v4' => ['version' => '4.5.1']]]),
-        'cdn.example.com/coolify/preview/versions.json' => Http::response(['coolify' => ['v4' => ['version' => $preview]]]),
-        'cdn.example.com/coolify/nightly/versions.json' => Http::response(['coolify' => ['v4' => ['version' => $nightly]]]),
     ]);
 }
 
@@ -60,7 +56,7 @@ it('follows the newest version of the channel and the more stable ones', functio
     updateChannelTestUse($channel);
 
     expect(fetch_latest_versions())->toMatchArray([
-        'versions' => ['coolify' => ['v4' => ['version' => $version]]],
+        'versions' => ['coolify' => ['version' => $version]],
         'upgrade_script_url' => $upgradeScriptUrl,
     ]);
 })->with([
@@ -77,16 +73,16 @@ it('asks only the stable channel of the CDN on the stable channel', function () 
     Http::assertSentCount(1);
 });
 
-it('skips a channel that release.json does not list yet', function () {
+it('skips a channel that versions.json does not list yet', function () {
     updateChannelTestUse('nightly', preview: null, nightly: '4.6.0-alpha.0.20261027.1');
 
     expect(fetch_latest_versions(tries: 1)['upgrade_script_url'])->toBe('https://cdn.example.com/coolify/nightly/upgrade.sh');
 });
 
-it('checks nothing when release.json does not answer', function () {
+it('checks nothing when versions.json does not answer', function () {
     InstanceSettings::findOrFail(0)->update(['update_channel' => 'nightly']);
     Once::flush();
-    Http::fake(['cdn.example.com/coolify/release.json' => Http::response('', 404)]);
+    Http::fake(['cdn.example.com/coolify/versions.json' => Http::response('', 404)]);
 
     expect(fetch_latest_versions(tries: 1))->toBeNull();
 });
@@ -168,12 +164,10 @@ it('keeps the nightlies of the running version after a switch to stable until it
     InstanceSettings::findOrFail(0)->update(['update_channel' => 'stable', 'previous_update_channel' => 'nightly']);
     Once::flush();
     Http::fake([
-        'cdn.example.com/coolify/release.json' => Http::response(['stable' => ['coolify' => $stable], 'nightly' => ['coolify' => $nightly]]),
-        'cdn.example.com/coolify/versions.json' => Http::response(['coolify' => ['v4' => ['version' => $stable]]]),
-        'cdn.example.com/coolify/nightly/versions.json' => Http::response(['coolify' => ['v4' => ['version' => $nightly]]]),
+        'cdn.example.com/coolify/versions.json' => Http::response(['stable' => ['coolify' => ['version' => $stable]], 'nightly' => ['coolify' => ['version' => $nightly]]]),
     ]);
 
-    expect(data_get(fetch_latest_versions(), 'versions.coolify.v4.version'))->toBe($version);
+    expect(data_get(fetch_latest_versions(), 'versions.coolify.version'))->toBe($version);
 })->with([
     'a newer nightly of 4.6.0' => ['4.5.1', '4.6.0-beta.2.20261028.1', '4.6.0-beta.2.20261028.1'],
     'the stable release of 4.6.0' => ['4.6.0', '4.7.0-alpha.0.20261101.1', '4.6.0'],
@@ -208,22 +202,3 @@ it('follows the channel it left after a switch to a more stable channel', functi
     'stable to nightly' => ['stable', 'nightly', null],
     'nightly to a custom image' => ['nightly', 'custom', null],
 ]);
-
-it('replaces the versions of the old channel after a channel change', function () {
-    config(['constants.coolify.version' => '4.5.1']);
-    File::put(storage_path('app/versions.json'), json_encode(['coolify' => ['v4' => ['version' => '4.6.0-beta.2.20261027.1']]]));
-    updateChannelTestUse('stable');
-
-    refresh_versions_file(tries: 1, channelChanged: true);
-
-    expect(data_get(json_decode(File::get(storage_path('app/versions.json')), true), 'coolify.v4.version'))->toBe('4.5.1');
-});
-
-it('falls back to the versions of the image when the CDN fails after a channel change', function () {
-    File::put(storage_path('app/versions.json'), json_encode(['coolify' => ['v4' => ['version' => '4.6.0-beta.2.20261027.1']]]));
-    Http::fake(['*' => Http::response('', 500)]);
-
-    refresh_versions_file(tries: 1, channelChanged: true);
-
-    expect(File::exists(storage_path('app/versions.json')))->toBeFalse();
-});
