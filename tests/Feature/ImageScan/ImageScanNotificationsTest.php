@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\ImageScanStatus;
 use App\Jobs\ImageRescanJob;
 use App\Jobs\ImageScanAlertCheckJob;
 use App\Jobs\ImageScanDigestJob;
@@ -450,6 +451,27 @@ describe('notification state', function () {
 
         expect(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0001'])
             ->and(notifyStateOf($this->application)->digest_ids)->toBe(['CVE-2026-0002']);
+    });
+
+    it('keeps the reported IDs of a Compose image whose scan failed, so they are not reported again', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        $deployment = notifyDeployment($this->application);
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['deployment_queue_id' => $deployment->id, 'image_ref' => 'web:1']);
+        $worker = notifyScan($this->application, [notifyExploited('CVE-2026-0002')], ['deployment_queue_id' => $deployment->id, 'image_ref' => 'worker:1']);
+        notifyState($this->application, ['CVE-2026-0002'], digestIds: ['CVE-2026-0001', 'CVE-2026-0002']);
+        $worker->forceFill(['status' => ImageScanStatus::Failed])->save();
+
+        notifyRunDigest();
+
+        expect(notifyStateOf($this->application)->notified_ids)->toBe(['CVE-2026-0002'])
+            ->and(notifyStateOf($this->application)->digest_ids)->toBe(['CVE-2026-0001', 'CVE-2026-0002']);
+
+        // The scan works again: nothing is new.
+        $worker->forceFill(['status' => ImageScanStatus::Completed])->save();
+        ScanNotifications::afterScan(notifyRefresh($worker));
+        notifyRunDigest();
+
+        Notification::assertNotSentTo($this->team, ExploitedProblemFound::class);
     });
 
     it('matches reported IDs by alias and skips ignored findings', function () {

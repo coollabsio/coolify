@@ -202,7 +202,9 @@ final class ScanNotifications
         }
         $newSignalFixable = array_values(array_filter($newFixable, fn (Finding $finding): bool => self::isIn($finding, $signalIds)));
         $newSignalCandidates = array_values(array_filter($newCandidates, fn (string $key): bool => array_intersect_key($current['candidates'][$key], $signalIds) !== []));
-        $deploying = self::isDeploying($owner);
+        // While an image of a Compose app has no result (a failed scan), its findings are not "gone": keep them, so
+        // they are not reported again once its scan works.
+        $prunable = ! self::isDeploying($owner) && ResourceScans::uncheckedComposeImages($owner, $current['scans']) === 0;
 
         return [
             'baseline' => $baseline,
@@ -227,8 +229,8 @@ final class ScanNotifications
                 'add_candidates' => $baseline ? array_keys($current['candidates']) : $newCandidates,
                 'present' => array_keys($current['present']),
                 'offered' => array_keys($current['candidates']),
-                'prune_ids' => ! $deploying,
-                'prune_candidates' => ! $deploying && $current['candidatesChecked'],
+                'prune_ids' => $prunable,
+                'prune_candidates' => $prunable && $current['candidatesChecked'],
                 'check_reported' => null,
                 'held_digests' => null,
             ],
