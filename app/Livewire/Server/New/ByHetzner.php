@@ -4,6 +4,7 @@ namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
 use App\Exceptions\CloudProviderApiException;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -757,6 +758,8 @@ class ByHetzner extends Component
                     report($e);
                 }
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 // Complete the boarding when server is successfully created via Hetzner

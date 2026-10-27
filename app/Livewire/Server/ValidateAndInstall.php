@@ -116,6 +116,22 @@ class ValidateAndInstall extends Component
         try {
             $this->authorize('update', $this->server);
             Server::throttleValidation($this->server->team_id, $this->server->ip);
+            if ($this->server->hetzner_server_id) {
+                $status = $this->server->refreshHetznerState();
+                $this->server->refresh();
+
+                if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
+                    $this->error = $status === 'off'
+                        ? 'Hetzner server is off. Power it on before validating.'
+                        : "Hetzner server is {$status}. Wait until it is running, then validate.";
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
             if ($this->server->vultr_instance_id) {
                 $status = $this->server->refreshVultrState();
                 $this->server->refresh();

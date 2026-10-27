@@ -13101,7 +13101,7 @@
                                     "instant_validate": {
                                         "type": "boolean",
                                         "example": false,
-                                        "description": "Validate server immediately after creation"
+                                        "description": "Validate the server and install Docker when it is running. Defaults to true for tokens with the deploy permission, and needs that permission."
                                     }
                                 },
                                 "type": "object"

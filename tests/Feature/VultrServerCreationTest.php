@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\ByVultr;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
@@ -9,12 +10,15 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'app.maintenance.driver' => 'file',
         'cache.default' => 'array',

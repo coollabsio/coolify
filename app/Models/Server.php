@@ -462,6 +462,20 @@ class Server extends BaseModel
         static::flushIdentityMap();
     }
 
+    /**
+     * Refresh the status of the linked cloud server from its provider.
+     */
+    public function refreshCloudProviderState(): ?string
+    {
+        return match ($this->cloudProviderToken?->provider) {
+            'hetzner' => $this->hetzner_server_id ? $this->refreshHetznerState() : null,
+            'vultr' => $this->vultr_instance_id ? $this->refreshVultrState() : null,
+            'digitalocean' => $this->digitalocean_droplet_id ? $this->refreshDigitalOceanState() : null,
+            'hostinger' => $this->hostinger_virtual_machine_id ? $this->refreshHostingerState() : null,
+            default => null,
+        };
+    }
+
     public function refreshHetznerState(): ?string
     {
         // Another instance manages the cloud server of an archive; keep the stored status.

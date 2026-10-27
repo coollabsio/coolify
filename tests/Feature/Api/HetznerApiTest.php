@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -7,12 +8,15 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config()->set('cache.default', 'array');
     config()->set('app.maintenance.driver', 'file');
     config()->set('app.maintenance.store', 'array');
@@ -411,6 +415,7 @@ describe('POST /api/v1/servers/hetzner', function () {
                 'server' => [
                     'id' => 456,
                     'name' => 'test-server',
+                    'status' => 'initializing',
                     'public_net' => [
                         'ipv4' => ['ip' => '1.2.3.4'],
                         'ipv6' => ['ip' => '2001:db8::1'],
@@ -443,7 +448,41 @@ describe('POST /api/v1/servers/hetzner', function () {
             'ip' => '1.2.3.4',
             'team_id' => $this->team->id,
             'hetzner_server_id' => 456,
+            'hetzner_server_status' => 'initializing',
         ]);
+    });
+
+    test('validates the new server when it runs by default for tokens with the deploy permission', function () {
+        fakeHetznerServerCreation();
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->bearerToken])
+            ->postJson('/api/v1/servers/hetzner', hetznerCreatePayload($this))
+            ->assertStatus(201);
+
+        Bus::assertDispatched(ValidateNewCloudServerJob::class);
+    });
+
+    test('does not validate the new server by default for tokens without the deploy permission', function () {
+        fakeHetznerServerCreation();
+        $writeToken = $this->user->createToken('write-only', ['write'])->plainTextToken;
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$writeToken])
+            ->postJson('/api/v1/servers/hetzner', hetznerCreatePayload($this))
+            ->assertStatus(201);
+
+        Bus::assertNotDispatched(ValidateNewCloudServerJob::class);
+    });
+
+    test('rejects instant validation for tokens without the deploy permission before it creates the server', function () {
+        Http::fake();
+        $writeToken = $this->user->createToken('write-only', ['write'])->plainTextToken;
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$writeToken])
+            ->postJson('/api/v1/servers/hetzner', [...hetznerCreatePayload($this), 'instant_validate' => true])
+            ->assertStatus(403);
+
+        Http::assertNothingSent();
+        Bus::assertNotDispatched(ValidateNewCloudServerJob::class);
     });
 
     test('enables backups after creating a Hetzner server when requested', function () {
@@ -1121,3 +1160,39 @@ describe('error responses do not leak exception details', function () {
         expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
     });
 });
+
+function fakeHetznerServerCreation(): void
+{
+    Http::fake([
+        'https://api.hetzner.cloud/v1/ssh_keys' => Http::response([
+            'ssh_key' => ['id' => 123, 'fingerprint' => 'aa:bb:cc:dd'],
+        ], 201),
+        'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+            'ssh_keys' => [],
+            'meta' => ['pagination' => ['next_page' => null]],
+        ], 200),
+        'https://api.hetzner.cloud/v1/servers' => Http::response([
+            'server' => [
+                'id' => 456,
+                'name' => 'test-server',
+                'status' => 'initializing',
+                'public_net' => ['ipv4' => ['ip' => '203.0.113.10']],
+            ],
+        ], 201),
+    ]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function hetznerCreatePayload(object $test): array
+{
+    return [
+        'cloud_provider_token_id' => $test->hetznerToken->uuid,
+        'location' => 'nbg1',
+        'server_type' => 'cx11',
+        'image' => 15512617,
+        'name' => 'test-server',
+        'private_key_uuid' => $test->privateKey->uuid,
+    ];
+}

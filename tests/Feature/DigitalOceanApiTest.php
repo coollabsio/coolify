@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -7,6 +8,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Once;
@@ -14,6 +16,8 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     InstanceSettings::query()->whereKey(0)->delete();
     $settings = new InstanceSettings(['is_api_enabled' => true]);
     $settings->id = 0;

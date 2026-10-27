@@ -37,6 +37,19 @@ class ValidateServer
         $server->update([
             'validation_logs' => null,
         ]);
+        if ($server->hetzner_server_id) {
+            $status = $server->refreshHetznerState();
+            if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
+                $this->error = $status === 'off'
+                    ? 'Hetzner server is off. Power it on before validating.'
+                    : "Hetzner server is {$status}. Wait until it is running, then validate.";
+                $server->update([
+                    'validation_logs' => $this->error,
+                ]);
+                throw new \Exception($this->error);
+            }
+        }
+
         if ($server->vultr_instance_id) {
             $status = $server->refreshVultrState();
             if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {

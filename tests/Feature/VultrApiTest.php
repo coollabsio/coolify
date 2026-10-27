@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\VultrController;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -10,12 +11,15 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'app.maintenance.driver' => 'file',
         'cache.default' => 'array',

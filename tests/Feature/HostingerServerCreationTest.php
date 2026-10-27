@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\DeleteServer;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\Create;
 use App\Livewire\Server\CreatePage;
 use App\Livewire\Server\Delete;
@@ -14,6 +15,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -22,6 +24,8 @@ use Lorisleiva\Actions\Decorators\JobDecorator;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     Http::preventStrayRequests();
 
     config([

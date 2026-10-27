@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -724,7 +724,7 @@ class HetznerController extends Controller
                         'hetzner_firewall_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Existing Hetzner firewall IDs to apply during server creation'],
                         'hetzner_network_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Existing Hetzner network IDs to attach during server creation'],
                         'cloud_init_script' => ['type' => 'string', 'description' => 'Cloud-init YAML script (optional). Needs a token with the deploy permission.'],
-                        'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Validate server immediately after creation'],
+                        'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Validate the server and install Docker when it is running. Defaults to true for tokens with the deploy permission, and needs that permission.'],
                     ],
                 ),
             ),
@@ -872,8 +872,12 @@ class HetznerController extends Controller
         if (is_null($request->hetzner_network_ids)) {
             $request->offsetSet('hetzner_network_ids', []);
         }
-        if (is_null($request->instant_validate)) {
-            $request->offsetSet('instant_validate', false);
+        $request->offsetSet('instant_validate', $request->filled('instant_validate') ? $request->boolean('instant_validate') : $this->hasDeployAbility($request));
+        if ($request->instant_validate) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Instant validation installs Docker and starts the proxy on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
         }
 
         if (! $request->boolean('enable_ipv4') && ! $request->boolean('enable_ipv6')) {
@@ -1000,6 +1004,7 @@ class HetznerController extends Controller
                 'private_key_id' => $privateKey->id,
                 'cloud_provider_token_id' => $token->id,
                 'hetzner_server_id' => $hetznerServer['id'],
+                'hetzner_server_status' => $hetznerServer['status'] ?? null,
             ]);
 
             $server->proxy->set('status', 'exited');
@@ -1016,7 +1021,7 @@ class HetznerController extends Controller
 
             // Validate server if requested
             if ($request->instant_validate) {
-                ValidateServer::dispatch($server);
+                ValidateNewCloudServerJob::dispatch($server);
             }
 
             auditLog('api.hetzner_server.created', [
