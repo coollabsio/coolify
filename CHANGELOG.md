@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Sync the CDN with `scripts/sync-cdn.sh` instead of `php artisan sync:cdn`, from the release workflow when `latest` or `preview` moves and from the nightly workflow, the stable channel opens a pull request, the preview and nightly channels push to `main`
     - Skip the build of a pull request from `main`, `next`, a release branch or a patch branch, the release and nightly workflows build their commits
 - Read the helper version and the Coolify version of builds without `COOLIFY_VERSION` from `upstream.json` and `release.json` in `config/constants.php`
+- Take the Coolify version from the image alone, the upgrade script removes `COOLIFY_VERSION` from `.env`
 - Read the Coolify and helper versions in `install.sh` by key, `versions.json` has no `nightly` entry anymore
 - Sync the preview and nightly channels of the CDN with the install and upgrade scripts and compose files of the commit they release, pointed at their channel
 
