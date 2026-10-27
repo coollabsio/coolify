@@ -9,7 +9,6 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
-use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -48,12 +47,6 @@ const CANDIDATES_LINE = 'sha256:333333333333333333333333333333333333333333333333
 
 const CANDIDATES_SECRET = 'S3cr3t-registry-password';
 
-/**
- * The critical Go stdlib findings of gosu in the 15-alpine fixture that 15.0-alpine does not have. They make 15-alpine
- * not better (spec 15.4), so most tests ignore them.
- */
-const CANDIDATES_GOSU_IDS = ['GO-2026-4337', 'GO-2026-6612', 'GO-2026-6604'];
-
 beforeEach(function () {
     Server::flushIdentityMap();
     Storage::fake('ssh-keys');
@@ -77,9 +70,7 @@ beforeEach(function () {
     $this->anonymousFails = false;
     $this->diskFree = '50000000000 50000000000';
     $this->grypeCut = false;
-    foreach (CANDIDATES_GOSU_IDS as $id) {
-        ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => $id]);
-    }
+    $this->grypeEdit = null;
 });
 
 function candidatesServer(Team $team): Server
@@ -176,7 +167,7 @@ function candidatesFake(): void
             str_contains($command, "'registry:") => 'coolify-scan-exit sbom 0',
             str_contains($command, 'coolify-scan-exit packages') => candidatesPayload('packages', file_get_contents(base_path('tests/Fixtures/image-scan/syft-packages.ndjson'))),
             str_contains($command, 'coolify-scan-exit grype') => preg_match('#sboms/([a-f0-9]{64})\.json#', $command, $hex) === 1 && isset(test()->grype[$hex[1]])
-                ? candidatesPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/'.test()->grype[$hex[1]].'.ndjson')), size: test()->grypeCut ? ScannerCommands::OUTPUT_LIMIT + 1 : null)
+                ? candidatesPayload('grype', (test()->grypeEdit ?? fn (string $payload) => $payload)(file_get_contents(base_path('tests/Fixtures/image-scan/'.test()->grype[$hex[1]].'.ndjson'))), size: test()->grypeCut ? ScannerCommands::OUTPUT_LIMIT + 1 : null)
                 : candidatesPayload('grype', '', 125),
             default => '',
         });
@@ -217,7 +208,7 @@ it('recommends the newest tag of the line when it has fewer findings and lists w
         ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'better' => true, 'eol' => null])
         ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
         ->and($line['fixed_ids'])->not->toContain('CVE-2023-2650')
-        ->and($line['left'])->toBe(['critical' => 0, 'high' => 32, 'medium' => 0])
+        ->and($line['left'])->toBe(['critical' => 3, 'high' => 32, 'medium' => 0])
         ->and($line['fixes']['critical'] + $line['fixes']['high'])->toBeGreaterThan(0)
         ->and($line['scanned_at'])->not->toBeNull()
         ->and($major)->toMatchArray(['ref' => 'postgres:16.4-alpine', 'better' => false])
@@ -234,7 +225,7 @@ it('recommends the newest tag of the line when it has fewer findings and lists w
         ->and(candidatesRan('.docker/config.json'))->toBe(0);
 });
 
-it('says that no newer version is better when the line candidate adds critical findings', function () {
+it('says that no newer version is better when the line candidate adds findings with an exploit signal', function () {
     candidatesFake();
     $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype-candidate-15.11';
     $scan = candidatesScan();
@@ -400,10 +391,11 @@ it('records a failure and does not throw when the registry cannot be read', func
     expect($scan->fresh()->candidateStatus())->toBe('failed');
 });
 
-it('does not recommend 15-alpine when its critical Go findings are not ignored', function () {
+it('does not recommend a line candidate that adds a finding with an exploit signal, even when it fixes others', function () {
     candidatesFake();
-    ImageScanIgnore::query()->delete();
     $scan = candidatesScan();
+    // GO-2026-4337 (CVSS 10) of gosu, which 15.0-alpine does not have, gets an EPSS of 0.5: a likely exploit.
+    $this->grypeEdit = fn (string $payload) => str_replace('"epss":0.00915', '"epss":0.5', $payload);
 
     RefreshCandidates::run($scan);
 
@@ -717,7 +709,7 @@ it('attributes findings to the base image from a registry scan of the current ba
         ->and($base['attributable_ids'])->not->toContain('CVE-2023-2650')
         ->and($base['checked_at'])->not->toBeNull()
         ->and($base['entries'])->toHaveCount(1)
-        ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 0, 'high' => 32, 'medium' => 0]])
+        ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 3, 'high' => 32, 'medium' => 0]])
         ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
         ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
         ->and(array_sum($line['fixes']))->toBeGreaterThan(0)->toBeLessThanOrEqual($base['attributable'])

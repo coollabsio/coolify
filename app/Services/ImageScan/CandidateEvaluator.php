@@ -10,8 +10,8 @@ final class CandidateEvaluator
     private const COUNTED_SEVERITIES = ['critical', 'high', 'medium'];
 
     /**
-     * Better: fixes at least one relevant finding or leaves an end-of-life distro, and adds no finding with an
-     * exploit signal and no critical finding. Ignores apply to both images.
+     * Better: adds no finding with an exploit signal, and fixes a finding with an exploit signal, leaves an end-of-life
+     * distro, or has fewer relevant findings (an end-of-life distro counts as one). Ignores apply to both images.
      *
      * @param  list<Finding>  $currentFindings
      * @param  list<Finding>  $candidateFindings
@@ -20,10 +20,6 @@ final class CandidateEvaluator
      */
     public function isBetter(array $currentFindings, array $candidateFindings, IgnoreMatcher $ignores, ?array $currentEol, ?array $candidateEol): bool
     {
-        if ($candidateEol !== null && $currentEol === null) {
-            return false;
-        }
-
         $current = [];
         foreach ($this->notIgnored($currentFindings, $ignores) as $finding) {
             foreach ($this->keys($finding) as $key) {
@@ -31,15 +27,19 @@ final class CandidateEvaluator
             }
         }
 
-        foreach ($this->relevant($candidateFindings, $ignores) as $finding) {
-            $serious = SecurityRules::exploitSignal($finding) !== null || strtolower($finding->severity) === 'critical';
-            if ($serious && array_intersect_key(array_flip($this->keys($finding)), $current) === []) {
+        $candidateRelevant = $this->relevant($candidateFindings, $ignores);
+        foreach ($candidateRelevant as $finding) {
+            if (SecurityRules::exploitSignal($finding) !== null && array_intersect_key(array_flip($this->keys($finding)), $current) === []) {
                 return false;
             }
         }
 
-        return ($currentEol !== null && $candidateEol === null)
-            || $this->fixed($this->relevant($currentFindings, $ignores), $candidateFindings) !== [];
+        $currentRelevant = $this->relevant($currentFindings, $ignores);
+        $fixesExploit = array_filter($this->fixed($currentRelevant, $candidateFindings), fn (Finding $finding): bool => SecurityRules::exploitSignal($finding) !== null) !== [];
+
+        return $fixesExploit
+            || ($currentEol !== null && $candidateEol === null)
+            || count($candidateRelevant) + ($candidateEol === null ? 0 : 1) < count($currentRelevant) + ($currentEol === null ? 0 : 1);
     }
 
     /**
