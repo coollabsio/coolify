@@ -241,6 +241,16 @@ class Vulnerabilities extends Component
             abort_unless($target instanceof Model, 404);
         }
 
+        $refusal = $this->updateRefusal(collect(SecurityStatus::forResource($resource)->actions)->first(
+            fn (SecurityAction $action): bool => $action->ref === $candidateRef
+                || collect($action->parts)->contains(fn (array $part): bool => $part['ref'] === $candidateRef),
+        ));
+        if ($refusal !== null) {
+            $this->dispatch('error', $refusal);
+
+            return true;
+        }
+
         try {
             UpdateResourceImage::run($target, $candidateRef, auth()->user());
         } catch (ImageUpdateRefused $e) {
@@ -276,8 +286,9 @@ class Vulnerabilities extends Component
 
         $action = collect(SecurityStatus::forResource($resource)->actions)
             ->first(fn (SecurityAction $action): bool => $action->parts !== [] && SecurityCard::key($action) === $actionKey);
-        if (! $action instanceof SecurityAction) {
-            $this->dispatch('error', 'This update is no longer offered. Reload the page.');
+        $refusal = $this->updateRefusal($action);
+        if ($refusal !== null) {
+            $this->dispatch('error', $refusal);
 
             return true;
         }
@@ -314,6 +325,19 @@ class Vulnerabilities extends Component
     }
 
     /**
+     * Why the page does not run an update: it is no longer an action of the current status, or the action has no
+     * button (Coolify's own resources, a server another Coolify instance manages, an image set in a compose file).
+     */
+    private function updateRefusal(?SecurityAction $action): ?string
+    {
+        return match (true) {
+            ! $action instanceof SecurityAction => 'This update is no longer offered. Reload the page.',
+            ! $action->button => 'Coolify cannot run this update. Follow the steps on this page instead.',
+            default => null,
+        };
+    }
+
+    /**
      * Rebuilds the running commit of the app without cache and redeploys it (spec 15.5 `rebuild`), on the server and
      * destination of the deployment that runs now.
      */
@@ -327,6 +351,11 @@ class Vulnerabilities extends Component
         $running = SecurityCard::runningDeployment($application);
         if (! $running instanceof ApplicationDeploymentQueue) {
             $this->dispatch('error', 'Deploy the app first.');
+
+            return true;
+        }
+        if (! SecurityCard::knowsRunningCommit($application, $running)) {
+            $this->dispatch('error', 'Coolify does not know which commit runs now. Redeploy the app first.');
 
             return true;
         }
@@ -357,6 +386,7 @@ class Vulnerabilities extends Component
                 server: $server,
                 destination: $destination,
                 only_this_server: (bool) $running->only_this_server,
+                docker_registry_image_tag: $running->docker_registry_image_tag,
             );
         } catch (AuthorizationException|HttpExceptionInterface $e) {
             throw $e;

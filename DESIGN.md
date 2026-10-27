@@ -1427,7 +1427,7 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   - the why-list: up to 3 rows in one bordered list, each with the title, the
     display ID (an NVD or GitHub link), "8.1 High" or "No score", and a
     status badge "Used by attackers" (error) or "Likely to be exploited"
-    (warning); then "And {n} more serious problems that this update fixes.";
+    (warning); then "and {n} more serious problems that this update fixes" (a lowercase continuation without a period, like the "and {n} more" of the other actions);
   - "Other fixes": up to 5 more actions as rows with their sentence and a
     neutral button or copy chip, then "and {n} more";
   - no totals and no severity bar: the only finding count is in the "All

@@ -216,7 +216,7 @@ class Show extends Component
         return [
             'result' => $deployment->scan_gate_result,
             'blocked' => $deployment->isImageScanBlocked(),
-            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)?->sentence : null,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)['sentence'] ?? null : null,
         ];
     }
 

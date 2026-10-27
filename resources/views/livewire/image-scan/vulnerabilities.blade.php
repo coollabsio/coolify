@@ -124,7 +124,7 @@
                                 @endforeach
                             </ul>
                             @if ($card['whyMore'] !== '')
-                                <p class="{{ $muted }} text-[12px]!">{{ ucfirst($card['whyMore']) }}.</p>
+                                <p class="{{ $muted }} text-[12px]!">{{ $card['whyMore'] }}</p>
                             @endif
                         </div>
                     @endif

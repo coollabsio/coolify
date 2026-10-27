@@ -6,6 +6,7 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Service\RestartService;
 use App\Models\Application;
 use App\Models\ImageScan;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -118,6 +119,7 @@ class UpdateResourceImage
 
     /**
      * @throws AuthorizationException
+     * @throws ImageUpdateRefused When another Coolify instance manages the server now.
      */
     private function authorizeFor(Model $target, User $by, bool $isCoolifyOwner): void
     {
@@ -125,6 +127,12 @@ class UpdateResourceImage
 
         if ($isCoolifyOwner || (int) $target->getKey() === 0) {
             throw new AuthorizationException('Coolify does not change the images of its own resources.');
+        }
+
+        // Another Coolify instance manages a transferred server; this one keeps only an archive of it.
+        $server = $target instanceof Service ? $target->server : $target->getAttribute('destination')?->server;
+        if ($server instanceof Server && $server->isTransferredAway()) {
+            throw new ImageUpdateRefused('Another Coolify instance manages this server now.');
         }
     }
 

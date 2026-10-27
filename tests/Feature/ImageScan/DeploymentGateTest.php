@@ -374,6 +374,7 @@ it('blocks the deploy when the image has a problem that attackers are using', fu
         ->and($queue->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
         ->and($queue->scan_gate_result['blocked'])->toBeTrue()
         ->and($queue->scan_gate_result['count'])->toBe(1)
+        ->and($queue->scan_gate_result['action'] ?? null)->toBe(['sentence' => 'Upgrade openssl to 3.0.15 or later, then redeploy.', 'button' => false])
         ->and(deployGateLogs())->toContain(DEPLOY_GATE_HEADLINE)
         ->toContain('CVE-2026-1234  Critical  openssl 3.0.13  used by attackers')
         ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, ' up ')))->toBeFalse();

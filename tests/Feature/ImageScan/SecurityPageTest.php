@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ImageScan\UpdateResourceImage;
 use App\Actions\Service\RestartService;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Livewire\ImageScan\Vulnerabilities;
@@ -19,6 +20,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ImageScan\ImageUpdateRefused;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\SecurityActions;
 use App\Services\ImageScan\SecurityCard;
@@ -417,6 +419,62 @@ describe('rebuild', function () {
     });
 });
 
+describe('rebuild limits', function () {
+    it('passes the image tag of the running deployment', function () {
+        $application = securityPageDockerfileApp();
+        SecurityCard::runningDeployment($application)->update(['docker_registry_image_tag' => 'v1.2']);
+
+        securityPage($this->admin, $application, 'application')
+            ->call('rebuild', '')
+            ->assertDispatched('success', 'Rebuild started.');
+
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->latest('id')->first()->docker_registry_image_tag)->toBe('v1.2');
+    });
+
+    it('hides and refuses the rebuild of a Git app whose running commit is not known', function (?string $commit) {
+        $application = securityPageDockerfileApp();
+        SecurityCard::runningDeployment($application)->update(['commit' => $commit]);
+
+        securityPage($this->admin, $application, 'application')
+            ->assertSee('Rebuild without cache to get the fixed system packages.')
+            ->assertDontSeeHtml('submitAction: \'rebuild\'')
+            ->call('rebuild', '')
+            ->assertDispatched('error', 'Coolify does not know which commit runs now. Redeploy the app first.');
+
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1);
+    })->with(['HEAD' => ['HEAD'], 'blank' => ['']]);
+
+    it('hides the rebuild of Coolify\'s own app', function () {
+        Team::forceCreate(['id' => 0, 'name' => 'Root team', 'personal_team' => false]);
+        $this->admin->teams()->attach(0, ['role' => 'admin']);
+        $application = securityPageApplication(['id' => 0, 'build_pack' => 'dockerfile', 'docker_registry_image_name' => null]);
+        $deployment = securityPageDeployment($application);
+        securityPageScan($application, $application->uuid.':'.$deployment->commit, [securityPageFinding('CVE-2026-2000', ['kev' => false, 'epss' => 0.5])], [
+            'deployment_queue_id' => $deployment->id,
+            'builds_image' => true,
+        ]);
+
+        securityPage($this->admin->fresh(), $application, 'application')
+            ->assertSee('Rebuild without cache to get the fixed system packages.')
+            ->assertDontSeeHtml('submitAction: \'rebuild\'');
+    });
+
+    it('authorizes the rebuild against the team of the app after the session switched teams', function () {
+        $application = securityPageDockerfileApp();
+        $deployer = securityPageMember($this->team, 'member', [
+            ['scope' => 'resource', 'uuid' => $application->uuid, 'levels' => ['read', 'deploy']],
+        ]);
+        $ownTeam = Team::factory()->create();
+        $deployer->teams()->attach($ownTeam, ['role' => 'owner']);
+
+        $page = securityPage($deployer->fresh(), $application, 'application');
+        session(['currentTeam' => $ownTeam]);
+        $page->call('rebuild', '')->assertDispatched('success', 'Rebuild started.');
+
+        expect(AuditEvent::query()->where('event', 'ui.image_scan.rebuild')->sole()->team_id)->toBe($this->team->id);
+    });
+});
+
 describe('merged service update', function () {
     it('updates every image of the action and restarts the service once', function () {
         [$service, $main, $runners] = securityPageN8nService();
@@ -472,6 +530,79 @@ describe('merged service update', function () {
         securityPage(securityPageMember($this->team), $service, 'service')
             ->call('updateImages', $key, '')
             ->assertForbidden();
+    });
+});
+
+describe('update limits', function () {
+    it('refuses a merged update on a server that another Coolify instance manages', function () {
+        [$service, $main, $runners] = securityPageN8nService();
+        $raw = $service->docker_compose_raw;
+        $key = SecurityCard::key(SecurityStatus::forResource($service)->actions[0]);
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+        Server::flushIdentityMap();
+        RestartService::shouldRun()->never();
+
+        securityPage($this->admin, $service, 'service')
+            ->assertDontSeeHtml('updateImages(')
+            ->call('updateImages', $key, '')
+            ->assertDispatched('error');
+
+        expect($service->fresh()->docker_compose_raw)->toBe($raw)
+            ->and($main->fresh()->image)->toBe('n8nio/n8n:1.0')
+            ->and($runners->fresh()->image)->toBe('n8nio/runners:1.0');
+        expect(fn () => UpdateResourceImage::make()->handleParts($service->fresh(), [
+            ['owner' => $main, 'ref' => 'n8nio/n8n:1.1'],
+            ['owner' => $runners, 'ref' => 'n8nio/runners:1.1'],
+        ], $this->admin))->toThrow(ImageUpdateRefused::class, 'Another Coolify instance manages this server now.');
+        expect($main->fresh()->image)->toBe('n8nio/n8n:1.0');
+    });
+
+    it('refuses a single update on a server that another Coolify instance manages', function () {
+        $database = securityPageDatabase();
+        securityPageScan($database, 'postgres:15.0', [securityPageFinding('CVE-2025-1094')], [
+            'candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', ['CVE-2025-1094'])]),
+        ]);
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+        Server::flushIdentityMap();
+
+        securityPage($this->admin, $database, 'database')
+            ->call('updateImage', 'postgres:15.13', '', '')
+            ->assertDispatched('error');
+
+        expect(fn () => UpdateResourceImage::run($database->fresh(), 'postgres:15.13', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'Another Coolify instance manages this server now.');
+        expect($database->fresh()->image)->toBe('postgres:15.0');
+    });
+
+    it('refuses a part with a ref that is not a better candidate of its own scan', function () {
+        [$service, $main, $runners] = securityPageN8nService();
+        RestartService::shouldRun()->never();
+
+        expect(fn () => UpdateResourceImage::make()->handleParts($service, [
+            ['owner' => $main, 'ref' => 'n8nio/n8n:1.1'],
+            ['owner' => $runners, 'ref' => 'n8nio/runners:0.9'],
+        ], $this->admin))->toThrow(ImageUpdateRefused::class);
+
+        expect($main->fresh()->image)->toBe('n8nio/n8n:1.0')
+            ->and($runners->fresh()->image)->toBe('n8nio/runners:1.0');
+    });
+
+    it('authorizes a merged update against the team of the service after the session switched teams', function () {
+        [$service, $main] = securityPageN8nService();
+        $writer = securityPageMember($this->team, 'member', [
+            ['scope' => 'resource', 'uuid' => $service->uuid, 'levels' => ['read', 'write']],
+        ]);
+        $ownTeam = Team::factory()->create();
+        $writer->teams()->attach($ownTeam, ['role' => 'owner']);
+        RestartService::shouldRun()->once()->andReturn(new Activity);
+        $key = SecurityCard::key(SecurityStatus::forResource($service)->actions[0]);
+
+        $page = securityPage($writer->fresh(), $service, 'service');
+        session(['currentTeam' => $ownTeam]);
+        $page->call('updateImages', $key, '')->assertDispatched('success', 'Update started.');
+
+        expect($main->fresh()->image)->toBe('n8nio/n8n:1.1')
+            ->and(AuditEvent::query()->where('event', 'ui.image_scan.image_updated')->sole()->team_id)->toBe($this->team->id);
     });
 });
 
@@ -558,6 +689,26 @@ describe('deploy gate popover', function () {
         ])->assertSee('Update to 1.28.')
             ->assertSee('Open Security')
             ->assertSee('Deploy anyway');
+    });
+
+    it('reads the action stored with the gate result', function () {
+        [$application, $deployment] = securityPageBlockedDeploy();
+        $deployment->update(['scan_gate_result' => [...$deployment->scan_gate_result, 'action' => ['sentence' => 'Upgrade lodash to 4.17.21 or later, then redeploy.', 'button' => false]]]);
+
+        expect(SecurityCard::gateAction($application, $deployment->fresh()))
+            ->toBe(['sentence' => 'Upgrade lodash to 4.17.21 or later, then redeploy.', 'button' => false]);
+    });
+
+    it('computes the action of an older result once per version of the scan', function () {
+        [$application, $deployment] = securityPageBlockedDeploy();
+
+        expect(SecurityCard::gateAction($application, $deployment))->toBe(['sentence' => 'Update to 1.28.', 'button' => true]);
+
+        ImageScan::query()->where('deployment_queue_id', $deployment->id)->toBase()->update(['findings' => json_encode([])]);
+        expect(SecurityCard::gateAction($application, $deployment))->toBe(['sentence' => 'Update to 1.28.', 'button' => true]);
+
+        ImageScan::query()->where('deployment_queue_id', $deployment->id)->toBase()->update(['candidates' => json_encode(securityPageCandidates([], 'no_better'))]);
+        expect(SecurityCard::gateAction($application, $deployment))->toBeNull();
     });
 
     it('shows the action in the application heading', function () {

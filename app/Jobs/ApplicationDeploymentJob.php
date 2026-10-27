@@ -38,6 +38,7 @@ use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
 use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\SecurityCard;
 use App\Services\ImageScan\SecurityGate;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
@@ -3394,6 +3395,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $policy = $this->imageScanPolicy();
         $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, IgnoreMatcher::forResource($this->application), $error, $errorContext, $policy->onScanError);
         $stored = SecurityGate::stored($result);
+        if ($stored['blocked'] && $completed) {
+            // The action that fixes the blocked image, for the gate popover.
+            try {
+                $action = SecurityCard::blockedImageAction($scan);
+                if ($action !== null) {
+                    $stored['action'] = $action;
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
 
         // A Compose deployment gates several images: keep the worst result (blocked, then error, then pass).
         $rank = fn (?array $gateResult): int => match (true) {

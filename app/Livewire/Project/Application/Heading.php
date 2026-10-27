@@ -189,7 +189,7 @@ class Heading extends Component
 
         return [
             'result' => $deployment->scan_gate_result,
-            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)?->sentence : null,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)['sentence'] ?? null : null,
             'vulnerabilities_url' => route('project.application.vulnerabilities', $parameters),
             'deployment_url' => route('project.application.deployment.show', [...$parameters, 'deployment_uuid' => $deployment->deployment_uuid]),
         ];

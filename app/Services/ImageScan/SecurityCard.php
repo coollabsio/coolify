@@ -14,6 +14,7 @@ use App\Models\Service;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
 /**
@@ -113,35 +114,91 @@ final class SecurityCard
     }
 
     /**
-     * The action the deploy gate popover shows for a blocked deployment: the primary action of the blocked image
-     * (the image of a Compose app whose primary action fixes the most findings with an exploit signal), else the
+     * The action the deploy gate popover shows for a blocked deployment: the action stored with the gate result, else
+     * the primary action of the blocked image (of a Compose app, the image whose primary action fixes the most
+     * findings with an exploit signal), computed once per version of its scans. Without a scan of the deployment, the
      * primary action of the main card.
+     *
+     * @return array{sentence: string, button: bool}|null
      */
-    public static function gateAction(Application $application, ApplicationDeploymentQueue $deployment): ?SecurityAction
+    public static function gateAction(Application $application, ApplicationDeploymentQueue $deployment): ?array
     {
-        $best = null;
-        $bestRank = null;
-        $scans = ImageScan::query()
+        $stored = data_get($deployment->scan_gate_result, 'action');
+        if (is_array($stored) && filled($stored['sentence'] ?? null)) {
+            return ['sentence' => (string) $stored['sentence'], 'button' => (bool) ($stored['button'] ?? false)];
+        }
+
+        $scans = fn () => ImageScan::query()
             ->where('resource_type', $application->getMorphClass())
             ->where('resource_id', $application->id)
             ->where('deployment_queue_id', $deployment->id)
-            ->where('status', ImageScanStatus::Completed)
-            ->get();
-        foreach ($scans as $scan) {
-            $scan->setRelation('resource', $application);
-            $security = SecurityStatus::forScan($scan);
-            $primary = $security->primary();
-            if ($primary === null) {
-                continue;
-            }
-            $stats = (array) data_get($security->facts, 'action_stats.0', []);
-            $rank = [(int) ($stats['signal'] ?? 0), (int) ($stats['critical'] ?? 0) + (int) ($stats['high'] ?? 0)];
-            if ($bestRank === null || $rank > $bestRank) {
-                [$best, $bestRank] = [$primary, $rank];
-            }
+            ->where('status', ImageScanStatus::Completed);
+        // The version changes with the scan, its version and base checks, and its stored status (ignores).
+        $versions = $scans()->orderBy('id')->get(['id', 'updated_at', 'candidates', 'summary'])
+            ->map(fn (ImageScan $scan): array => [$scan->id, (string) $scan->updated_at, $scan->candidates, $scan->summary]);
+        if ($versions->isEmpty()) {
+            return self::actionSummary(SecurityStatus::stored($application)->primary());
         }
 
-        return $best ?? ($scans->isEmpty() ? SecurityStatus::stored($application)->primary() : null);
+        return Cache::remember(
+            "image-scan:gate-action:{$deployment->id}:".md5((string) json_encode($versions)),
+            now()->addDay(),
+            function () use ($scans, $application): array {
+                $best = null;
+                $bestRank = null;
+                foreach ($scans()->get() as $scan) {
+                    $action = self::rankedAction($scan->setRelation('resource', $application));
+                    if ($action !== null && ($bestRank === null || $action['rank'] > $bestRank)) {
+                        [$best, $bestRank] = [$action['action'], $action['rank']];
+                    }
+                }
+
+                return ['action' => self::actionSummary($best)];
+            },
+        )['action'];
+    }
+
+    /**
+     * The primary action of a blocked image, stored with the gate result so the popover does not compute it again.
+     *
+     * @return array{sentence: string, button: bool}|null
+     */
+    public static function blockedImageAction(ImageScan $scan): ?array
+    {
+        return self::actionSummary(self::rankedAction($scan)['action'] ?? null);
+    }
+
+    /**
+     * @return array{action: SecurityAction, rank: array{0: int, 1: int}}|null
+     */
+    private static function rankedAction(ImageScan $scan): ?array
+    {
+        $security = SecurityStatus::forScan($scan);
+        $primary = $security->primary();
+        if ($primary === null) {
+            return null;
+        }
+        $stats = (array) data_get($security->facts, 'action_stats.0', []);
+
+        return ['action' => $primary, 'rank' => [(int) ($stats['signal'] ?? 0), (int) ($stats['critical'] ?? 0) + (int) ($stats['high'] ?? 0)]];
+    }
+
+    /**
+     * @return array{sentence: string, button: bool}|null
+     */
+    private static function actionSummary(?SecurityAction $action): ?array
+    {
+        return $action === null ? null : ['sentence' => $action->sentence, 'button' => $action->button];
+    }
+
+    /**
+     * A Git app can be rebuilt only from a known commit: "HEAD" or no commit would build whatever the branch has now.
+     */
+    public static function knowsRunningCommit(Application $application, ApplicationDeploymentQueue $deployment): bool
+    {
+        $commit = trim((string) $deployment->commit);
+
+        return ! $application->git_based() || ($commit !== '' && strtoupper($commit) !== 'HEAD');
     }
 
     public static function shortCommit(?string $commit): string
@@ -199,7 +256,7 @@ final class SecurityCard
                 return null;
             }
             $deployment = self::runningDeployment($resource);
-            if ($deployment === null) {
+            if ($deployment === null || ! self::knowsRunningCommit($resource, $deployment)) {
                 return null;
             }
             $commit = self::shortCommit($deployment->commit);
