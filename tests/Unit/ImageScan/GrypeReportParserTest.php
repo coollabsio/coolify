@@ -2,6 +2,7 @@
 
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
+use App\Services\ImageScan\ScannerText;
 
 function imageScanFixture(string $name): string
 {
@@ -220,8 +221,10 @@ it('cuts a long title at a word boundary and adds an ellipsis within 120 charact
 });
 
 it('removes Markdown, URLs, and control and format characters from the title', function () {
-    expect(parsedFinding(['desc' => 'Fixes [the parser bug](https://e.com/x) in `libfoo` with **bold** and _emphasis_ at https://example.org/a?b=1 now'])->title)
-        ->toBe('Fixes the parser bug in libfoo with bold and emphasis at now');
+    expect(parsedFinding(['desc' => 'Fixes [the parser bug](https://e.com/x) in `libfoo` with **bold** and __two words__ at https://example.org/a?b=1 now'])->title)
+        ->toBe('Fixes the parser bug in libfoo with bold and two words at now');
+    expect(parsedFinding(['desc' => 'Shows ![the alt text](https://e.com/i.png) and more words'])->title)
+        ->toBe('Shows the alt text and more words');
     expect(parsedFinding(['desc' => "Evil \u{202E}title with\u{200B} hidden\ncharacters and more"])->title)
         ->toBe('Evil title with hidden characters and more');
     expect(parsedFinding(['desc' => 'Reads client_encoding from PQescapeLiteral() calls today'])->title)
@@ -270,4 +273,43 @@ it('round trips the new fields', function () {
         ->and($array['matchType'])->toBe('exact-indirect-match')
         ->and(Finding::fromArray($array))->toEqual($f)
         ->and($f->withLayer('base')->cvssScore)->toBe(6.5);
+});
+
+it('keeps code-like tokens in the title intact', function (string $desc) {
+    expect(parsedFinding(['desc' => $desc])->title)->toBe($desc);
+})->with([
+    '__proto__' => 'Prototype pollution through __proto__ in merge',
+    'lone backtick' => 'Escaping of the character (`) allows command injection',
+    'tilde version' => 'Crash when parsing version 1.2.3~rc1 of the package',
+    'backslash path' => 'Path traversal in C:\Windows\system32 handling code',
+    'star glob' => 'Matching of *.js files skips the permission check',
+    'arithmetic stars' => 'Overflow when computing 2**3 and 4**5 values',
+]);
+
+it('keeps the inner text of paired inline code', function () {
+    expect(parsedFinding(['desc' => 'The `parse()` call and the (`) character fail in `a b` mode'])->title)
+        ->toBe('The parse() call and the (`) character fail in a b mode');
+});
+
+it('keeps punctuation after a removed URL and still splits the sentence', function () {
+    expect(parsedFinding(['desc' => 'Issue at (see https://example.com/a). Next sentence is here and long.'])->title)
+        ->toBe('Issue at (see ).');
+    expect(parsedFinding(['desc' => 'Details at https://example.com/a, plus more words here. Another one.'])->title)
+        ->toBe('Details at , plus more words here.');
+    expect(parsedFinding(['desc' => 'Empty parens (https://e.com/x) and [](https://e.com) vanish from PQescapeLiteral() titles'])->title)
+        ->toBe('Empty parens and vanish from PQescapeLiteral() titles');
+});
+
+it('does not split after e.g. or i.e.', function () {
+    expect(parsedFinding(['desc' => 'Unsafe input (e.g. A crafted header) leads to a crash. Then more.'])->title)
+        ->toBe('Unsafe input (e.g. A crafted header) leads to a crash.');
+    expect(parsedFinding(['desc' => 'Some formats, I.E. Another format, are affected by it. Next one.'])->title)
+        ->toBe('Some formats, I.E. Another format, are affected by it.');
+});
+
+it('builds the fallback title without double spaces and with an unknown severity label', function () {
+    expect(ScannerText::fallbackTitle('openssl', '1.0', ''))->toBe('openssl 1.0: unknown vulnerability')
+        ->and(ScannerText::fallbackTitle('openssl', '', 'high'))->toBe('openssl: high vulnerability')
+        ->and(ScannerText::fallbackTitle('', '', 'high'))->toBe('high vulnerability')
+        ->and(ScannerText::fallbackTitle(' open  ssl ', ' 1.0 ', ''))->toBe('open ssl 1.0: unknown vulnerability');
 });

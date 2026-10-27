@@ -37,9 +37,11 @@ class ScannerText
 
     public static function fallbackTitle(string $package, string $version, string $severity): string
     {
-        $prefix = trim(self::clean(trim($package.' '.$version), 80));
+        $prefix = trim(preg_replace('/\s+/u', ' ', self::clean(trim($package.' '.$version), 80)) ?? '');
+        $label = trim(self::clean($severity, 16));
+        $label = $label !== '' ? $label : 'unknown';
 
-        return trim($prefix.': '.self::clean($severity, 16).' vulnerability', ': ');
+        return $prefix !== '' ? "{$prefix}: {$label} vulnerability" : "{$label} vulnerability";
     }
 
     private static function sentence(?string $text): string
@@ -50,12 +52,20 @@ class ScannerText
 
         $text = preg_replace('/\s+/u', ' ', $text) ?? '';
         $text = self::clean($text, 2000);
-        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/u', '$1', $text) ?? '';
-        $text = preg_replace('~(?:https?|ftp)://\S+|\bwww\.\S+~iu', '', $text) ?? '';
-        $text = preg_replace('/[*`~\[\]\\\\]|(?<!\w)_+|_+(?!\w)|^[#>]+\s*/u', '', $text) ?? '';
+        $text = preg_replace('/!?\[([^\]]*)\]\([^)\s]*\)/u', '$1', $text) ?? '';
+        $text = preg_replace('~\(\s*(?:https?|ftp)://[^\s()]*\s*\)~iu', '', $text) ?? '';
+        $text = preg_replace_callback(
+            '~(?:https?|ftp)://\S+|\bwww\.\S+~iu',
+            fn (array $match): string => substr($match[0], strlen(rtrim($match[0], '.,;:)'))),
+            $text,
+        ) ?? '';
+        $text = preg_replace('/(?<!\w)(\*\*|~~)(?=\S)(.+?)(?<=\S)\1(?!\w)/u', '$2', $text) ?? '';
+        $text = preg_replace('/(?<!\w)__(?=\S)([^_]*?\s[^_]*?)(?<=\S)__(?!\w)/u', '$1', $text) ?? '';
+        $text = preg_replace('/`(?=\S)([^`]*?)(?<=\S)`/u', '$1', $text) ?? '';
+        $text = preg_replace('/^(?:#{1,6}|>)\s+/u', '', $text) ?? '';
         $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
 
-        if (preg_match('/^(.*?[.!?])\s+\p{Lu}/su', $text, $match) === 1) {
+        if (preg_match('/^(.*?(?i:(?<!\be\.g)(?<!\bi\.e))[.!?])\s+\p{Lu}/su', $text, $match) === 1) {
             $text = $match[1];
         }
 
