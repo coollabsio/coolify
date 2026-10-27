@@ -57,7 +57,7 @@ it('persists the selected registry url during upgrades', function (string $path)
     'stable upgrade' => 'scripts/upgrade.sh',
 ]);
 
-it('persists the target image and runtime version before recreating containers', function (string $path) {
+it('persists the target image and lets the image set its version before recreating containers', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
     if ($script === false) {
         throw new RuntimeException("Unable to read {$path}");
@@ -73,7 +73,7 @@ it('persists the target image and runtime version before recreating containers',
     };
 
     $latestImagePosition = $position('set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"');
-    $coolifyVersionPosition = $position('set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
+    $coolifyVersionPosition = $position('sed -i \'/^COOLIFY_VERSION=/d\' "$ENV_FILE"');
     $imagesPulledPosition = $position('log "All images pulled successfully"');
     $composeUpPosition = $position('docker compose --env-file /data/coolify/source/.env');
 
