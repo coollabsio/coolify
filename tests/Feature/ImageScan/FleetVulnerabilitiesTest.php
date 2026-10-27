@@ -545,7 +545,7 @@ describe('markers', function () {
             ->not->toMatch('/<span role="img"[^>]*text-error/')
             ->toContain('>Update now</span>')
             ->toContain('aria-label="Security: update now. Update to 1.28."')
-            ->toContain('data-tooltip="Update to 1.28."');
+            ->toContain('data-tooltip="Update to 1.28." data-tooltip-wrap');
 
         $html = (string) $this->blade('<x-image-scan.marker status="no_fix" text="No fix yet" label="Security: no fix yet" />');
         expect($html)->not->toContain('text-error')

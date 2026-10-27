@@ -120,6 +120,7 @@
           role="img"
           aria-label={security.label}
           data-tooltip={security.tooltip || undefined}
+          data-tooltip-wrap={security.tooltip ? '' : undefined}
         >
           <Icon name="shieldAlert" class="size-4 {security.status === 'update_now' ? 'text-error' : 'text-neutral-500 dark:text-fg-dim'}" />
           <span aria-hidden="true">{security.text}</span>

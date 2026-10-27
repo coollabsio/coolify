@@ -1365,7 +1365,10 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     renders nothing.
   - `tooltip` (`data-tooltip`) is the sentence of the primary action, when
     update_now has one. `label` (`aria-label`) names the status and that
-    action: "Security: update now. Update to 15.15."
+    action: "Security: update now. Update to 15.15." The marker sets
+    `data-tooltip-wrap`, so a long action sentence wraps at `max-w-xs`
+    instead of running off the screen. Short labels keep the default
+    one-line tooltip; add `data-tooltip-wrap` only to sentence tooltips.
   - It sits right after the resource name: the environment list (table and
     cards), the server Resources tab, and the canvas cards (in the chip row,
     before the extra servers chip; `Card.svelte` draws the same anatomy from

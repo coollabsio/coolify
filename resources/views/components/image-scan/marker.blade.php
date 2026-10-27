@@ -17,7 +17,7 @@
 
 @if ($bind)
     <template x-if="{{ $bind }}?.text">
-        <span role="img" x-bind:aria-label="{{ $bind }}.label" x-bind:data-tooltip="{{ $bind }}.tooltip"
+        <span role="img" x-bind:aria-label="{{ $bind }}.label" x-bind:data-tooltip="{{ $bind }}.tooltip" data-tooltip-wrap
             x-bind:class="{{ $bind }}.tooltip ? 'cursor-help' : ''"
             {{ $attributes->class([$classes]) }}>
             <span class="contents" x-bind:class="{{ $bind }}.status === 'update_now' ? 'text-error' : 'text-neutral-500 dark:text-fg-dim'">
@@ -27,7 +27,7 @@
         </span>
     </template>
 @elseif (isset($iconTones[$status]) && filled($text))
-    <span role="img" aria-label="{{ $label }}" @if (filled($tooltip)) data-tooltip="{{ $tooltip }}" @endif
+    <span role="img" aria-label="{{ $label }}" @if (filled($tooltip)) data-tooltip="{{ $tooltip }}" data-tooltip-wrap @endif
         {{ $attributes->class([$classes, 'cursor-help' => filled($tooltip)]) }}>
         <x-reicon name="shield-alert" class="size-4 shrink-0 {{ $iconTones[$status] }}" />
         <span aria-hidden="true">{{ $text }}</span>
