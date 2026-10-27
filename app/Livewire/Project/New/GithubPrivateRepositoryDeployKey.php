@@ -130,7 +130,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function setPrivateKey($private_key_id)
     {
-        $this->authorize('create', Application::class);
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($private_key_id);
         $this->private_key_id = $privateKey->id;
@@ -151,8 +153,6 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function submit()
     {
-        $this->authorize('create', Application::class);
-
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
         $this->validate();
@@ -171,6 +171,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),

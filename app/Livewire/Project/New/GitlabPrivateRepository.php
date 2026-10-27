@@ -161,8 +161,6 @@ class GitlabPrivateRepository extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Application::class);
-
             $validator = validator([
                 'selected_repository_path' => $this->selected_repository_path,
                 'selected_branch_name' => $this->selected_branch_name,
@@ -188,6 +186,7 @@ class GitlabPrivateRepository extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
 
             $gitlab_app = $this->getGitlabApp();
 
