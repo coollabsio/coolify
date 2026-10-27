@@ -466,7 +466,24 @@ describe('compose builds and builder images', function () {
         expect($scan->builds_image)->toBeFalse()
             ->and(array_keys($result['byFinding']))->toBe(['CVE-1'])
             ->and($result['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpdateImage)
+            ->and($result['byFinding']['CVE-1']->sentence)->toBe('Change the version to 16.4 in the compose file of this app, then redeploy.')
+            ->and($result['byFinding']['CVE-1']->target)->toBe('16.4')
             ->and($result['byFinding']['CVE-1']->button)->toBeFalse();
+    });
+
+    it('tells a compose app to redeploy for a newer build of a pulled image', function () {
+        $app = composeApp();
+        $scan = actionScan($app, [actionFinding('CVE-1')], [
+            'image_ref' => 'postgres:16', 'builds_image' => ScanImage::buildsImage($app, 'postgres:16'),
+            'candidates' => actionCandidates([actionEntry('postgres:16', 'same_tag', ['CVE-1'])]),
+        ]);
+
+        $action = actionsFor($scan)['byFinding']['CVE-1'];
+
+        expect($action->type)->toBe(SecurityActionType::PullLatest)
+            ->and($action->sentence)->toBe('A newer build of this image fixes it. Redeploy this app to pull it.')
+            ->and($action->target)->toBe('16')
+            ->and($action->button)->toBeFalse();
     });
 
     it('decides which compose images Coolify builds', function (string $imageRef, bool $builds) {

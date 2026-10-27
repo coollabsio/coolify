@@ -862,12 +862,49 @@ it('checks the disk space for the app image size before the base image registry 
         ->and(candidatesScansToday())->toBe(0);
 });
 
-it('cannot compare a base image without a version tag', function () {
+it('cannot compare a base image without a version tag, but learns which findings come from it', function () {
+    candidatesFake();
+    $this->digests['latest'] = CANDIDATES_REPO_DIGEST;
+    $scan = candidatesDockerfileScan('postgres:latest');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidates['base'])->toMatchArray([
+        'image' => 'postgres:latest', 'status' => 'cannot_compare', 'error' => null, 'entries' => [],
+        'attributable' => candidatesAttributableCount(), 'current_digest' => CANDIDATES_REPO_DIGEST,
+    ])
+        ->and(candidatesRan("'registry:"))->toBe(1)
+        ->and(SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding']['CVE-2099-0001']->type)->toBe(SecurityActionType::Rebuild);
+});
+
+it('scans a base image pinned by digest without asking the registry for its digest', function () {
+    candidatesFake();
+    $scan = candidatesDockerfileScan('postgres@'.CANDIDATES_REPO_DIGEST);
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'cannot_compare', 'attributable' => candidatesAttributableCount(), 'current_digest' => CANDIDATES_REPO_DIGEST])
+        ->and(candidatesRan('coolify-scan-exit digest'))->toBe(0);
+});
+
+it('leaves the base origin unknown when the base image could not be scanned', function () {
     candidatesFake();
     $scan = candidatesDockerfileScan('postgres:latest');
 
     RefreshCandidates::run($scan);
 
-    expect($scan->fresh()->candidates['base'])->toMatchArray(['image' => 'postgres:latest', 'status' => 'cannot_compare', 'entries' => [], 'attributable' => null]);
-    Process::assertNothingRan();
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'failed', 'attributable' => null]);
+});
+
+it('leaves the base origin unknown when the scan of the current base image was cut', function () {
+    candidatesFake();
+    $this->grypeCut = true;
+    $scan = candidatesDockerfileScan();
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidates['base'])->toMatchArray(['status' => 'no_better', 'attributable' => null, 'attributable_ids' => []])
+        ->and(SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding'])->not->toHaveKey('CVE-2099-0001');
 });

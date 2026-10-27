@@ -359,8 +359,9 @@ class RefreshCandidates
     /**
      * Scans the current base image and the newest tag of its line from the registry (spec 7.4): two candidate scans
      * with the usual lock, disk, reuse, and daily rules. Only a different tag can change the `FROM` line, so a newer
-     * build of the same tag is not checked. The current base image is scanned also when no newer tag exists, so
-     * `attributable` is set on every result but a failure or cannot_compare.
+     * build of the same tag is not checked. The current base image is scanned also when no newer tag exists or the tag
+     * cannot be compared (not a version, or pinned by digest), so `attributable` is set on every result but a failure,
+     * an unparsable reference, or a truncated scan of the current base image.
      *
      * @return array{status: string, error: ?string, entries: list<array<string, mixed>>, attributable: ?int,
      *     attributable_ids: list<string>, current_digest: ?string}
@@ -388,9 +389,7 @@ class RefreshCandidates
 
         $tag = $this->image->tag ?? 'latest';
         $selector = new TagSelector;
-        if ($this->image->digest !== null || ! $selector->isVersion($tag)) {
-            return $result('cannot_compare');
-        }
+        $comparable = $this->image->digest === null && $selector->isVersion($tag);
 
         $platform = $scan->sbom?->platform;
         if (! is_string($platform) || $platform === '') {
@@ -403,6 +402,25 @@ class RefreshCandidates
         // The disk check of the registry scans uses the size of the app image, an upper bound of its base image.
         $this->currentImageId = $scan->image_id;
         $this->currentImageSize = null;
+        // A truncated scan of the current base image cannot tell which findings come from it.
+        $attributableOf = fn (array $currentBase): ?array => $currentBase['truncated']
+            ? null
+            : (new CandidateEvaluator)->shared(self::relevantFindings($scan, $resource), $currentBase['findings']);
+
+        if (! $comparable) {
+            // No newer tag can be chosen, but the current base image (by tag or pinned digest) still tells the origin.
+            $currentDigest = $this->image->digest ?? $this->digest($tag);
+            if ($currentDigest === null) {
+                return $failure();
+            }
+            $currentBase = $this->scanCandidate($currentDigest, $platform, $lockWaitSeconds);
+            if ($currentBase === null) {
+                return $failure(null, $currentDigest);
+            }
+
+            return $result('cannot_compare', [], $attributableOf($currentBase), $currentDigest);
+        }
+
         $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
         if ($tags === null) {
             return $failure();
@@ -426,7 +444,7 @@ class RefreshCandidates
 
         $ignores = IgnoreMatcher::forResource($resource);
         $evaluator = new CandidateEvaluator;
-        $attributable = $evaluator->shared(self::relevantFindings($scan, $resource), $currentBase['findings']);
+        $attributable = $attributableOf($currentBase);
         if (! $hasLine || $lineDigest === $currentDigest) {
             return $result('no_better', [], $attributable, $currentDigest);
         }
@@ -444,8 +462,8 @@ class RefreshCandidates
             'digest' => $lineDigest,
             'kind' => 'line',
             'better' => $better,
-            'fixed_ids' => $evaluator->fixedIds($attributable, $candidateFindings, $ignores),
-            'fixes' => $evaluator->counts($evaluator->fixed($attributable, $candidateFindings)),
+            'fixed_ids' => $evaluator->fixedIds($attributable ?? [], $candidateFindings, $ignores),
+            'fixes' => $evaluator->counts($evaluator->fixed($attributable ?? [], $candidateFindings)),
             'left' => $evaluator->counts($evaluator->relevant($candidateFindings, $ignores)),
             'eol' => $candidate['eol'],
             'scanned_at' => now()->toIso8601String(),

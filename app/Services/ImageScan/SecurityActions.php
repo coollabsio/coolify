@@ -119,6 +119,8 @@ final class SecurityActions
         $context = [
             'image' => $scan->image_ref === null ? null : (string) $scan->image_ref,
             'coolify' => self::isCoolifyResource($owner),
+            // A Compose app sets the images of its file; Coolify does not change them.
+            'compose' => $owner instanceof Application && $owner->build_pack === 'dockercompose',
             'buttons' => ! self::isCoolifyResource($owner) && ! (bool) $scan->server?->isTransferredAway(),
             'switchBlocked' => $line !== null || $sameTag !== null ? UpdateResourceImage::blockedReason($scan, $owner) !== null : false,
             'line' => $line,
@@ -136,7 +138,7 @@ final class SecurityActions
 
     /**
      * @param  array{type: SecurityActionType, ids: list<string>, package: ?string, fixedIn: ?string, versions: list<string>}  $plan
-     * @param  array{image: ?string, coolify: bool, buttons: bool, switchBlocked: bool, line: ?array<string, mixed>, sameTag: ?array<string, mixed>, base: ?array{from: string, to: string, entry: array<string, mixed>}}  $context
+     * @param  array{image: ?string, coolify: bool, compose: bool, buttons: bool, switchBlocked: bool, line: ?array<string, mixed>, sameTag: ?array<string, mixed>, base: ?array{from: string, to: string, entry: array<string, mixed>}}  $context
      */
     private static function action(array $plan, array $context): SecurityAction
     {
@@ -153,8 +155,16 @@ final class SecurityActions
         $newBase = $type === SecurityActionType::ChangeBase ? (string) $context['base']['to'] : null;
 
         $sentence = match ($type) {
-            SecurityActionType::UpdateImage => $context['coolify'] ? self::COOLIFY_TEXT : "Update to {$tag}.",
-            SecurityActionType::PullLatest => $context['coolify'] ? self::COOLIFY_TEXT : 'A newer build of this image fixes it. Pull it and restart.',
+            SecurityActionType::UpdateImage => match (true) {
+                $context['coolify'] => self::COOLIFY_TEXT,
+                $context['compose'] => "Change the version to {$tag} in the compose file of this app, then redeploy.",
+                default => "Update to {$tag}.",
+            },
+            SecurityActionType::PullLatest => match (true) {
+                $context['coolify'] => self::COOLIFY_TEXT,
+                $context['compose'] => 'A newer build of this image fixes it. Redeploy this app to pull it.',
+                default => 'A newer build of this image fixes it. Pull it and restart.',
+            },
             SecurityActionType::ChangeBase => "Change the base image to {$newBase} in your Dockerfile, then redeploy.",
             SecurityActionType::Rebuild => 'Rebuild without cache to get the fixed system packages.',
             SecurityActionType::UpgradeInDockerfile => "Upgrade {$package} to {$fixedIn} or later in your Dockerfile.",
@@ -179,7 +189,7 @@ final class SecurityActions
             },
             fixedIds: $plan['ids'],
             button: in_array($type, self::BUTTON_TYPES, true) && $context['buttons']
-                && ($type === SecurityActionType::Rebuild || ! $context['switchBlocked']),
+                && ($type === SecurityActionType::Rebuild || (! $context['switchBlocked'] && ! $context['compose'])),
             image: $context['image'],
             ref: $ref,
         );
