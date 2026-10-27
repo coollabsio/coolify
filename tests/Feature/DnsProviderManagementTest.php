@@ -24,6 +24,7 @@ use App\Services\Dns\CloudflareDnsProvider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -928,4 +929,23 @@ test('a team member cannot mark a service domain managed with a forged dns compl
         ->assertNotDispatched('success');
 
     expect($webApp->fresh()->domain_dns_statuses)->toBeEmpty();
+});
+
+test('cloudflare dns reads are retried after a connection failure but record creation is not', function () {
+    $token = IntegrationToken::factory()->create(['provider' => 'cloudflare', 'token' => 'secret']);
+    $zone = DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::sequence()
+            ->pushFailedConnection()
+            ->push(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records' => Http::failedConnection(),
+    ]);
+
+    expect(fn () => app(CloudflareDnsProvider::class)->createRecord($zone, 'app.example.com', '203.0.113.10'))
+        ->toThrow(ConnectionException::class);
+
+    Http::assertSentCount(3);
+    Http::assertSent(fn ($request) => $request->method() === 'POST');
+    expect(ManagedDnsRecord::query()->count())->toBe(0);
 });

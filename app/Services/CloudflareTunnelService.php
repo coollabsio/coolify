@@ -14,7 +14,6 @@ use App\Services\Dns\ManagedDnsRecordCleanup;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use RuntimeException;
 use Spatie\Activitylog\Models\Activity;
@@ -283,6 +282,6 @@ class CloudflareTunnelService
 
     private function client(IntegrationToken $token): PendingRequest
     {
-        return Http::withToken($token->token)->acceptJson()->connectTimeout(5)->timeout(15);
+        return CloudflareHttp::client($token->token);
     }
 }

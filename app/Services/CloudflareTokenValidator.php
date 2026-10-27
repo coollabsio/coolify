@@ -2,14 +2,11 @@
 
 namespace App\Services;
 
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
-
 class CloudflareTokenValidator
 {
     public function validate(string $token, array $capabilities): bool
     {
-        $client = $this->client($token);
+        $client = CloudflareHttp::client($token);
         $verification = $client->get('https://api.cloudflare.com/client/v4/user/tokens/verify');
 
         if (! $verification->successful() || $verification->json('result.status') !== 'active') {
@@ -41,13 +38,5 @@ class CloudflareTokenValidator
         }
 
         return true;
-    }
-
-    private function client(string $token): PendingRequest
-    {
-        return Http::withToken($token)
-            ->acceptJson()
-            ->connectTimeout(5)
-            ->timeout(10);
     }
 }
