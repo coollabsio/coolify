@@ -35,6 +35,7 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -168,6 +169,17 @@ test('audit log persists a structured event for the current team', function () {
         ->and($event->resource_uuid)->toBe('app-123')
         ->and($event->resource_name)->toBe('Website')
         ->and($event->metadata['changed'])->toBe(['name']);
+});
+
+test('audit log records the Cloudflare client ip when the request comes from Cloudflare', function () {
+    app()->instance('request', Request::create('/', server: [
+        'REMOTE_ADDR' => '162.158.79.140',
+        'HTTP_CF_CONNECTING_IP' => '160.79.104.10',
+    ]));
+
+    auditLog('api.application.updated', ['application_uuid' => 'app-123']);
+
+    expect(AuditEvent::query()->sole()->ip_address)->toBe('160.79.104.10');
 });
 
 test('auditable models record authenticated create update and delete actions', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -44,7 +45,17 @@ class HetznerService
 
                 // Exponential backoff for other retriable errors: 100ms, 200ms, 400ms
                 return $attempt * 100;
-            })
+            }, function (\Exception $exception) use ($method) {
+                if ($exception instanceof RequestException && $exception->response->status() === 429) {
+                    return true;
+                }
+
+                // A POST that failed with a 5xx or a timeout can still have created the resource, so only idempotent requests are sent again.
+                // Client errors such as 401, 403, or 422 do not change when the request is sent again.
+                $isServerError = ! $exception instanceof RequestException || $exception->response->status() >= 500;
+
+                return $isServerError && in_array(strtolower($method), ['get', 'delete'], true);
+            }, throw: false)
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
@@ -61,7 +72,13 @@ class HetznerService
                 );
             }
 
-            throw new \Exception('Hetzner API error: '.$response->json('error.message', 'Unknown error'));
+            throw new CloudProviderApiException(
+                'Hetzner',
+                $response->json('error.message', 'Unknown error'),
+                $response->status(),
+                $response->json('error.code'),
+                collect($response->json('error.details.fields', []))->pluck('name')->all(),
+            );
         }
 
         return $response->json();

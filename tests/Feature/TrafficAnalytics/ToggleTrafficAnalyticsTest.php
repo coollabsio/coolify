@@ -56,7 +56,7 @@ it('warns about the application interruption before enabling traffic analytics',
 
     Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->assertSee('Enable traffic analytics?')
-        ->assertSee('Restarting Sentinel and proxy...')
+        ->assertSeeHtml('wire:target="toggleTrafficAnalytics"')
         ->assertSee('Enabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.');
 });
 

@@ -129,7 +129,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     private function syncData(bool $toModel = false): void
@@ -151,6 +151,7 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
@@ -159,7 +160,7 @@ class General extends Component
             $this->mariadbUser = $this->database->mariadb_user;
             $this->mariadbPassword = $canSeeCredentials ? $this->database->mariadb_password : '';
             $this->mariadbDatabase = $this->database->mariadb_database;
-            $this->mariadbConf = $this->database->mariadb_conf;
+            $this->mariadbConf = $canSeeCredentials ? $this->database->mariadb_conf : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;

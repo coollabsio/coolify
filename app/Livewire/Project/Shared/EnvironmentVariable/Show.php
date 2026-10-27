@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Services\SharedVariableCanvas;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
@@ -128,6 +129,9 @@ class Show extends Component
 
     public function mount()
     {
+        if ($this->composeInfo !== null && ! (auth()->user()?->can('update', $this->resource) ?? false)) {
+            $this->composeInfo['default'] = null;
+        }
         $this->syncData();
         if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
@@ -223,11 +227,14 @@ class Show extends Component
                 $this->env->is_shared = $this->is_shared;
             }
             $this->env->key = $this->key;
-            $this->env->value = $this->value;
+            // The form never holds a locked value, so keep the stored one and keep the lock.
+            if (! $this->env->is_shown_once) {
+                $this->env->value = $this->value;
+                $this->env->is_shown_once = $this->is_shown_once;
+            }
             $this->env->comment = $this->comment;
             $this->env->is_multiline = $this->is_multiline;
             $this->env->is_literal = $this->is_literal;
-            $this->env->is_shown_once = $this->is_shown_once;
             $this->env->save();
             $this->valuesLoaded = true;
         } else {
@@ -355,9 +362,11 @@ class Show extends Component
                 }
             }
 
-            if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
-                $oldValue = $this->env->getOriginal('value');
-                $this->value = $oldValue;
+            $submittedValue = $this->env->is_shown_once ? $this->env->value : $this->value;
+            if (! $this->isSharedVariable && $this->is_required && str($submittedValue)->isEmpty()) {
+                if (! $this->env->is_shown_once) {
+                    $this->value = $this->env->getOriginal('value');
+                }
                 $this->dispatch('error', 'Required environment variables cannot be empty.');
 
                 return;
@@ -402,6 +411,15 @@ class Show extends Component
             $resource->docker_compose_raw ?? $resource->docker_compose,
             $storedEnvironmentVariable->key
         );
+    }
+
+    /**
+     * Shared variables only: the connect envs canvas with this variable selected.
+     */
+    #[Computed]
+    public function connectLink(): ?string
+    {
+        return $this->isSharedVariable ? app(SharedVariableCanvas::class)->connectLink($this->env) : null;
     }
 
     #[Computed]

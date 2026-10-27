@@ -91,7 +91,7 @@ it('fetches a healthy server with a bounded ssh and curl timeout', function () {
 
     expect($overview->requests)->toBe(7);
     Process::assertRan(fn (PendingProcess $process) => $process->timeout <= 30
-        && str_contains($process->command, '--max-time'));
+        && str_contains(remoteProcessScript($process), '--max-time'));
 });
 
 it('shows no data without an error when Sentinel has no traffic routes (0.0.x answers 404)', function () {
@@ -116,5 +116,5 @@ it('shows no data without an error when Sentinel has no traffic routes (0.0.x an
         ->assertSet('series', [])
         ->assertNotDispatched('error');
 
-    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, '/api/traffic/dashboard'));
+    Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/api/traffic/dashboard'));
 });

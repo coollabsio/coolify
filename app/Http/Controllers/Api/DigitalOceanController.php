@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
@@ -210,6 +211,7 @@ class DigitalOceanController extends Controller
             new OA\Response(response: 403, description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'DigitalOcean rate limit exceeded.'),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function createServer(Request $request): JsonResponse
@@ -395,12 +397,13 @@ class DigitalOceanController extends Controller
             }
 
             return $response;
-        } catch (\Throwable $e) {
+        } catch (CloudProviderApiException $e) {
             $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
 
-            logger()->error('Failed to create DigitalOcean server', [
-                'error' => $e->getMessage(),
-            ]);
+            return $e->toJsonResponse('Failed to create DigitalOcean server.');
+        } catch (\Throwable $e) {
+            $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
+            report($e);
 
             return response()->json(['message' => 'Failed to create DigitalOcean server.'], 500);
         }

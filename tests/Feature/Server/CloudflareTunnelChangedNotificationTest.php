@@ -34,7 +34,7 @@ beforeEach(function () {
 it('uses sudo for the health check on a non-root server', function () {
     Event::fake();
     Sleep::fake();
-    Process::fake([
+    fakeRemoteProcesses([
         '*sudo docker inspect coolify-cloudflared*' => Process::result(output: 'true'),
         '*' => Process::result(errorOutput: 'permission denied while trying to connect to the Docker API', exitCode: 1),
     ]);

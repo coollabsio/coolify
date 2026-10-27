@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\InstanceSettings;
@@ -15,12 +16,15 @@ use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    // An import validates the claimed server over SSH; the sync test queue would run it.
+    Queue::fake([ValidateAndInstallServerJob::class]);
     config()->set('app.env', 'local');
     config()->set('app.maintenance.driver', 'file');
     Server::flushIdentityMap();
@@ -80,7 +84,7 @@ test('preview imports reject another team UUID and roll back all imported record
     $token->accessToken->forceFill(['team_id' => $team->id])->save();
     $counts = [Server::count(), Application::withTrashed()->count(), PrivateKey::count(), Project::count()];
 
-    $this->withToken($token->plainTextToken)->postJson('/api/v1/servers/import', ['bundle' => $bundle])
+    $this->withToken($token->plainTextToken)->postJson('/api/v1/servers/import', ['bundle' => $bundle, 'adopt_mode' => false])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('previews');
 
@@ -103,7 +107,7 @@ test('preview imports reject another team domain without clearing it', function 
     $serverCount = Server::count();
 
     try {
-        app(ServerTransferImporter::class)->import($bundle, $team->id, preserveUuids: $preserveUuids);
+        app(ServerTransferImporter::class)->import($bundle, $team->id, preserveUuids: $preserveUuids, adoptMode: false);
         $this->fail('A foreign preview domain must be rejected.');
     } catch (ValidationException $exception) {
         expect($exception->errors())->toHaveKey('previews');
@@ -130,7 +134,7 @@ test('preview imports preserve same-team UUID handoffs and preview volumes', fun
         'mount_path' => '/data',
     ]);
 
-    $result = app(ServerTransferImporter::class)->import($fixture['bundle'], $team->id);
+    $result = app(ServerTransferImporter::class)->import($fixture['bundle'], $team->id, adoptMode: false);
 
     $imported = Server::whereUuid($result['server_uuid'])->firstOrFail()->applications()->firstOrFail();
     expect($preview->fresh()->application_id)->toBe($imported->id)
@@ -146,7 +150,7 @@ test('preview imports can release a same-team domain collision', function () {
     $bundle = $fixture['bundle'];
     $bundle['projects'][0]['environments'][0]['applications'][0]['previews'][0]['uuid'] = new_public_id();
 
-    $result = app(ServerTransferImporter::class)->import($bundle, $team->id);
+    $result = app(ServerTransferImporter::class)->import($bundle, $team->id, adoptMode: false);
 
     $imported = Server::whereUuid($result['server_uuid'])->firstOrFail()->applications()->firstOrFail();
     expect($fixture['preview']->fresh()->fqdn)->toBeNull();

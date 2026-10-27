@@ -1,7 +1,8 @@
 {{--
-    Paginated "top hosts" list — request volume grouped by served hostname (an app's
-    primary domain), with a proportional bar and right-aligned compact metrics.
-    Links each host to its live origin. Expects `$hosts` in scope.
+    Sortable, paginated "top hosts" list — request volume grouped by served hostname
+    (an app's primary domain), with a proportional bar and right-aligned compact
+    metrics. Select a column header to sort by it. Links each host to its live
+    origin. Expects `$hosts` in scope.
 
     @param iterable $hosts      host rows: ['host', 'requests', 'bandwidth']
     @param ?string  $keyPrefix  wire:key prefix (default "analytics-host")
@@ -15,37 +16,42 @@
     <x-empty size="sm" title="No host data" description="No hostnames were recorded for the selected range."
         icon-name="unordered-list" />
 @else
-    <div x-data="{ page: 0, per: 10, total: {{ count($hosts) }} }">
-        <div class="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.07] dark:text-fg-dim">
-            <span class="min-w-0 flex-1">Host</span>
-            <span class="hidden w-16 shrink-0 text-right sm:inline" title="Request volume relative to the busiest row in this list">Volume</span>
-            <span class="w-16 shrink-0 text-right">Requests</span>
-            <span class="hidden w-16 shrink-0 text-right sm:inline" title="Total response data sent">Bandwidth</span>
+    <div x-data="trafficTable()">
+        <div class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+            @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Host', 'text' => true, 'class' => 'min-w-0 flex-1'])
+            <span class="hidden w-16 shrink-0 sm:inline" aria-hidden="true"></span>
+            @include('livewire.traffic._sort-header', ['column' => 'requests', 'label' => 'Requests', 'class' => 'w-16 shrink-0'])
+            @include('livewire.traffic._sort-header', ['column' => 'bytesOut', 'label' => 'Bandwidth', 'class' => 'hidden w-16 shrink-0 sm:inline-flex', 'title' => 'Total response data sent'])
         </div>
-        @foreach ($hosts as $row)
-            @php
-                $host = (string) ($row['host'] ?? '');
-                $known = $host !== '';
-                $requests = (int) ($row['requests'] ?? 0);
-                $width = min(100, round(($requests / $maxRequests) * 100, 1));
-            @endphp
-            <div wire:key="{{ $keyPrefix }}-{{ $loop->index }}"
-                x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
-                class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
-                @if ($known)
-                    <a href="https://{{ $host }}" target="_blank" rel="noopener noreferrer nofollow"
-                        class="min-w-0 flex-1 truncate font-mono text-[12px] text-black hover:underline dark:text-fg">{{ $host }}</a>
-                @else
-                    <span class="min-w-0 flex-1 truncate text-[12px] text-neutral-500 dark:text-fg-dim">Unknown host</span>
-                @endif
-                <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
-                    <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
+        <div class="flex flex-col">
+            @foreach ($hosts as $row)
+                @php
+                    $host = (string) ($row['host'] ?? '');
+                    $known = $host !== '';
+                    $requests = (int) ($row['requests'] ?? 0);
+                    $bandwidth = (int) ($row['bandwidth'] ?? 0);
+                    $width = min(100, round(($requests / $maxRequests) * 100, 1));
+                @endphp
+                <div wire:key="{{ $keyPrefix }}-{{ md5($host) }}"
+                    data-row="{{ json_encode(['name' => $host, 'requests' => $requests, 'bytesOut' => $bandwidth]) }}" @if (! $known) data-pinned @endif
+                    x-show="shown($el)"
+                    class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
+                    @if ($known)
+                        <a href="https://{{ $host }}" target="_blank" rel="noopener noreferrer nofollow"
+                            class="min-w-0 flex-1 truncate font-mono text-[12px] text-black hover:underline dark:text-fg">{{ $host }}</a>
+                    @else
+                        <span class="min-w-0 flex-1 truncate text-[12px] text-neutral-500 dark:text-fg-dim">Unknown host</span>
+                    @endif
+                    <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]"
+                        title="Request volume relative to the busiest row in this list">
+                        <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
+                    </div>
+                    <span class="w-16 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                        title="{{ number_format($requests) }} requests">{{ compactNumber($requests) }}</span>
+                    <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($bandwidth) }}</span>
                 </div>
-                <span class="w-16 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
-                    title="{{ number_format($requests) }} requests">{{ compactNumber($requests) }}</span>
-                <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes((int) ($row['bandwidth'] ?? 0)) }}</span>
-            </div>
-        @endforeach
+            @endforeach
+        </div>
         @include('livewire.traffic._pager')
     </div>
 @endif

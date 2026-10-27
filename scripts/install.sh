@@ -929,13 +929,31 @@ update_env_var() {
 
     # If variable "key=" exists but has no value, update the value of the existing line
     if grep -q "^${key}=$" "$ENV_FILE"; then
-        sed -i "s|^${key}=$|${key}=${value}|" "$ENV_FILE"
+        # awk reads the value from the environment, so characters such as | & \ in it stay literal
+        KEY="$key" VALUE="$value" awk '$0 == ENVIRON["KEY"] "=" { $0 = ENVIRON["KEY"] "=" ENVIRON["VALUE"] } { print }' "$ENV_FILE" >"$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
         echo " - Updated value of ${key} as the current value was empty"
     # If variable "key=" doesn't exist, append it to the file with value
     elif ! grep -q "^${key}=" "$ENV_FILE"; then
         printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
         echo " - Added ${key} and its value as the variable was missing"
     fi
+}
+
+# Quote a user-supplied value so that Docker Compose and phpdotenv both read it back unchanged
+# (spaces, #, $ and quotes otherwise break parsing or change the value).
+quote_env_value() {
+    local value="$1"
+    case "$value" in
+    *\'*)
+        value=${value//\\/\\\\}
+        value=${value//\"/\\\"}
+        value=${value//\$/\\\$}
+        printf '"%s"' "$value"
+        ;;
+    *)
+        printf "'%s'" "$value"
+        ;;
+    esac
 }
 
 update_env_var "APP_ID" "$(openssl rand -hex 16)"
@@ -948,12 +966,16 @@ update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_BACKEND_PORT" "6001"
 
-# Add default root user credentials from environment variables
-if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+# Add default root user credentials from environment variables (ROOT_USERNAME is optional)
+if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
     echo " - Setting predefined root user credentials from environment"
-    update_env_var "ROOT_USERNAME" "$ROOT_USERNAME"
-    update_env_var "ROOT_USER_EMAIL" "$ROOT_USER_EMAIL"
-    update_env_var "ROOT_USER_PASSWORD" "$ROOT_USER_PASSWORD"
+    if [ -n "$ROOT_USERNAME" ]; then
+        update_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+    fi
+    update_env_var "ROOT_USER_EMAIL" "$(quote_env_value "$ROOT_USER_EMAIL")"
+    update_env_var "ROOT_USER_PASSWORD" "$(quote_env_value "$ROOT_USER_PASSWORD")"
+elif [ -n "$ROOT_USERNAME" ] || [ -n "$ROOT_USER_EMAIL" ] || [ -n "$ROOT_USER_PASSWORD" ]; then
+    warn "Predefined root user skipped: set both ROOT_USER_EMAIL and ROOT_USER_PASSWORD."
 fi
 
 if [ -n "${REGISTRY_URL+x}" ]; then
@@ -1006,7 +1028,8 @@ if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
-    sed -i "/coolify/d" ~/.ssh/authorized_keys
+    # Remove only the key from a previous install (comment "coolify", or "root@coolify" before September 2024), not other keys that contain "coolify"
+    sed -i -E "/[[:space:]](root@)?coolify[[:space:]]*$/d" ~/.ssh/authorized_keys
     cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
     rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
@@ -1144,6 +1167,9 @@ for IP in $PRIVATE_IPS; do
     fi
 done
 
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ]; }; then
+    printf '\n  %s! Create the root account within 10 minutes. If the time ends, run %sdocker restart coolify%s%s and try again.%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
+fi
 printf '\n  %s! Back up %s/data/coolify/source/.env%s%s to a safe place outside this server (e.g. a password manager).%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
 printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
 

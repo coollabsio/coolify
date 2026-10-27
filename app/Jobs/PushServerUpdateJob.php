@@ -551,7 +551,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 ->select($databaseColumns)
                 ->where(fn ($query) => $this->scopeDestination($query, $standaloneDockerIds, $swarmDockerIds))
                 ->get();
-        })->filter(fn ($database) => data_get($database, 'name') !== 'coolify-db')->values();
+        })->reject(fn ($database) => $database instanceof StandalonePostgresql && $database->isInstanceDatabase())->values();
     }
 
     private function serverDestinationIds(): array
@@ -614,7 +614,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         ->where('restart_limit_reached', false)
                         ->update(['restart_limit_reached' => true]) === 1;
 
-                    if ($restartLimitClaimed) {
+                    // Stop again while a container still runs: an earlier stop can fail or come too late.
+                    $stillRunning = $containerStatuses->contains(fn (string $status): bool => ! str($status)->contains('exited'));
+                    if ($restartLimitClaimed || $stillRunning) {
                         $application->refresh();
                         StopApplication::dispatch(
                             application: $application,
@@ -623,6 +625,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                             resetRestartCount: false,
                             removeContainers: false,
                         );
+                    }
+                    if ($restartLimitClaimed) {
                         $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
                     }
                 }
@@ -817,7 +821,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function updateProxyStatus()
     {
         // If proxy is not found, start it
-        if ($this->server->isProxyShouldRun()) {
+        if ($this->server->isProxyShouldRun() && ! $this->server->isProxyTransitionInProgress()) {
             if ($this->foundProxy === false) {
                 try {
                     if (CheckProxy::run($this->server)) {
@@ -860,6 +864,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
                 $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server, restartedResource: $database));
+            } elseif (StartDatabaseProxy::claimOutdatedRefresh($databaseUuid, data_get($tcpProxyContainerFound, 'labels'))) {
+                StartDatabaseProxy::dispatch($database);
             }
         } elseif ($this->isRunning($containerStatus) && ! $tcpProxy) {
             // Clean up orphaned proxy containers when is_public=false
@@ -973,7 +979,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function checkLogDrainContainer()
     {
-        if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
+        if ($this->server->isFluentBitLogDrainEnabled() && $this->foundLogDrainContainer === false) {
             StartLogDrain::dispatch($this->server);
         }
     }

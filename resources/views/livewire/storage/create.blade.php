@@ -1,14 +1,17 @@
 @can('create', App\Models\S3Storage::class)
     <div class="w-full">
-        <div class="mb-4">For more details, please visit the <a class="underline dark:text-warning"
+        <div class="mb-4">For more details, please visit the <a class="underline dark:text-brand-light"
                 href="https://coolify.io/docs/knowledge-base/s3/introduction" target="_blank">Coolify Docs</a>.</div>
         <form class="flex flex-col gap-2" wire:submit='submit'>
             <div class="flex gap-2">
                 <x-forms.input required label="Name" id="name" />
                 <x-forms.input label="Description" id="description" />
             </div>
-            <x-forms.domain-input id="endpointParts" errorId="endpoint" host-label="Host"
-                host-placeholder="minio.internal or 192.168.1.50" />
+            {{-- Sends the endpoint right away, so the URL style below follows the provider. --}}
+            <div x-on:change="$wire.$commit()">
+                <x-forms.domain-input id="endpointParts" errorId="endpoint" host-label="Host"
+                    host-placeholder="minio.internal or 192.168.1.50" />
+            </div>
             <div class="flex gap-2">
                 <x-forms.input required label="Bucket" id="bucket" />
                 <x-forms.input required helper="Region only required for AWS. Leave it as-is for other providers."
@@ -17,6 +20,10 @@
             <div class="flex gap-2">
                 <x-forms.input required type="password" label="Access Key" id="key" />
                 <x-forms.input required type="password" label="Secret Key" id="secret" />
+            </div>
+            <div class="w-64">
+                <x-forms.checkbox id="usePathStyleEndpoint" label="Use path-style URLs"
+                    helper="Turn this off for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Coolify turns it off for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS, and when the provider rejects path-style URLs." />
             </div>
 
             <x-forms.button class="mt-4" type="submit" wire:target="submit">

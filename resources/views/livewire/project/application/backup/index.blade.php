@@ -157,10 +157,9 @@
                 </div>
             </div>
 
-            <div @class([
-                'application-settings-section-body w-full',
-                'is-flush' => $backups->isNotEmpty(),
-            ])>
+            <x-application.settings-section title="Schedules"
+                helper="Persistent volume and directory backup schedules for this application."
+                :flush="$backups->isNotEmpty()">
                 <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
                     <x-empty size="sm" title="No backups found"
                         description="No scheduled backups match your search." />
@@ -181,6 +180,7 @@
                         @foreach ($backups as $backup)
                             @php
                                 $latestExecution = $backup->latestExecution;
+                                $s3StorageNames = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name');
                                 $status = $latestExecution?->status;
                                 $statusLabel = match ($status) {
                                     'running' => 'In progress',
@@ -208,9 +208,9 @@
                                 <span>{{ $backup->targetType() }}</span>
                                 <span>{{ $backup->frequency }}</span>
                                 <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                                <span title="{{ $backup->save_s3 ? ($backup->s3?->name ?? 'S3 storage unavailable') : 'S3 storage is not configured' }}">
-                                    <x-status-badge :status="$backup->save_s3 ? ($backup->s3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                        :type="$backup->save_s3 ? ($backup->s3 ? 'success' : 'error') : 'neutral'" />
+                                <span title="{{ $backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? $s3StorageNames->join(', ') : 'S3 storage unavailable') : 'S3 storage is not configured' }}">
+                                    <x-status-badge :status="$backup->save_s3 ? match ($s3StorageNames->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $s3StorageNames->count().' storages' } : 'Not set'"
+                                        :type="$backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? 'success' : 'error') : 'neutral'" />
                                 </span>
                                 <span>
                                     {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
@@ -226,7 +226,7 @@
                         description="Add a persistent volume or directory backup schedule to protect application data."
                         icon-name="storages" />
                 @endif
-            </div>
+            </x-application.settings-section>
         </div>
         </div>
     </section>

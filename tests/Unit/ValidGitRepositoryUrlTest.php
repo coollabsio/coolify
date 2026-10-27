@@ -460,3 +460,100 @@ it('provides meaningful error messages', function () {
         expect($validator->errors()->first('url'))->toContain($testCase['expectedError']);
     }
 });
+
+it('allows percent-encoded repository paths', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://dev.azure.com/org/My%20Project/_git/repo',
+        'https://org@dev.azure.com/org/My%20Project/_git/My%20Repo',
+        'https://org.visualstudio.com/My%20Project/_git/repo',
+        'git@ssh.dev.azure.com:v3/org/My%20Project/repo',
+        'ssh://git@ssh.dev.azure.com/v3/org/My%20Project/repo',
+        'https://git.example.com/group/caf%C3%A9.git',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("Percent-encoded URL should be allowed: {$url}");
+    }
+});
+
+it('validates repository URL formats of common git hosts', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://dev.azure.com/org/project/_git/repo',
+        'https://org@dev.azure.com/org/project/_git/repo',
+        'git@ssh.dev.azure.com:v3/org/project/repo',
+        'https://org.visualstudio.com/DefaultCollection/project/_git/repo',
+        'org@vs-ssh.visualstudio.com:v3/org/project/repo',
+        'https://git-codecommit.us-east-2.amazonaws.com/v1/repos/MyDemoRepo',
+        'ssh://APKAEIBAERJR2EXAMPLE@git-codecommit.us-east-2.amazonaws.com/v1/repos/MyDemoRepo',
+        'https://bitbucket.example.com/scm/PROJ/repo.git',
+        'ssh://git@bitbucket.example.com:7999/PROJ/repo.git',
+        'https://gerrit.example.com/a/project',
+        'ssh://user@gerrit.example.com:29418/project',
+        'git@git.sr.ht:~user/repo',
+        'https://gitlab.com/group/subgroup/subsubgroup/project.git',
+        'https://gitea.example.com:3000/user/repo.git',
+        'ssh://git@codeberg.org/user/repo.git',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("Git host URL should be allowed: {$url}");
+    }
+});
+
+it('rejects malformed or dangerous percent-encoding', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://github.com/user/repo%',
+        'https://github.com/user/repo%2',
+        'https://github.com/user/repo%zz',
+        'https://github.com/user/repo%0A',
+        'https://github.com/user/repo%0d%0aprotocol=https',
+        'https://github.com/user/repo%00',
+        'https://github.com/user/repo%09',
+        'https://github.com/user/repo%7F',
+        'https://github.com/user/repo%3Bid',
+        'https://github.com/user/%24%28whoami%29',
+        'https://github.com/user/%60id%60',
+        'https://github.com/user/%2e%2e%2fetc',
+        'https://github.com/user/..%2Fetc',
+        'https://github.com/user/repo%2527',
+        'https://github.com/user/repo%27',
+        'https://github.com/user/repo%3Fref=main',
+        'https://git%68ub.com/user/repo',
+        'https://us%40er@github.com/user/repo',
+        'git@github.com:user/repo%0A',
+        'git@github.com:user/%3Bid',
+        'ssh://git@github.com/user/repo%0A',
+        'ssh://git@github.com/user/%2e%2e%2frepo',
+        'git://github.com/user/repo%0A',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("URL should be rejected: {$url}");
+    }
+});
+
+it('rejects raw control characters', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        "ssh://git@github.com/user/repo.git\n",
+        "git@github.com:user/repo.git\n",
+        "git://github.com/user/repo.git\n",
+        "https://github.com/user/repo\t",
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue('URL with a control character should be rejected: '.json_encode($url));
+        expect($validator->errors()->first('url'))->toContain('invalid characters');
+    }
+});

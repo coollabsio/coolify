@@ -6,10 +6,12 @@ use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
 use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -21,6 +23,17 @@ class S3Storage extends BaseModel
 
     private const REQUEST_TIMEOUT_SECONDS = 15;
 
+    /**
+     * Endpoint host suffixes of providers that reject path-style URLs: Alibaba Cloud OSS, Tencent Cloud COS
+     * (buckets created after 2024-01-01), and Volcengine / BytePlus TOS.
+     */
+    private const VIRTUAL_HOSTED_STYLE_HOST_SUFFIXES = ['aliyuncs.com', 'myqcloud.com', 'volces.com', 'bytepluses.com'];
+
+    /**
+     * Parts of the errors that these providers return for a path-style request.
+     */
+    private const PATH_STYLE_REJECTION_ERRORS = ['secondleveldomainforbidden', 'pathstyledomainforbidden', 'virtual hosted style', 'virtual-hosted style', 'virtual-styled'];
+
     protected $fillable = [
         'team_id',
         'name',
@@ -30,6 +43,7 @@ class S3Storage extends BaseModel
         'secret',
         'bucket',
         'endpoint',
+        'use_path_style_endpoint',
         'is_usable',
         'unusable_email_sent',
     ];
@@ -41,6 +55,7 @@ class S3Storage extends BaseModel
 
     protected $casts = [
         'is_usable' => 'boolean',
+        'use_path_style_endpoint' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
@@ -67,19 +82,48 @@ class S3Storage extends BaseModel
         });
 
         static::deleting(function (S3Storage $storage) {
-            ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->update([
-                'save_s3' => false,
-                's3_storage_id' => null,
-            ]);
-            ScheduledVolumeBackupExecution::where('s3_storage_id', $storage->id)
-                ->update([
-                    's3_storage_deleted' => true,
-                    's3_cleanup_pending' => false,
-                ]);
-            ScheduledVolumeBackup::where('s3_storage_id', $storage->id)->update([
-                'save_s3' => false,
-                's3_storage_id' => null,
-            ]);
+            $storage->detachFromBackups();
+        });
+    }
+
+    /**
+     * Removes this storage from every backup schedule and marks the copies in it as deleted. A schedule moves its
+     * primary destination to a remaining storage, or stops S3 backups when none remains.
+     */
+    public function detachFromBackups(): void
+    {
+        DB::transaction(function (): void {
+            foreach ([ScheduledDatabaseBackup::class, ScheduledVolumeBackup::class] as $backupModel) {
+                $backupModel::query()
+                    ->usingS3Storage($this->id)
+                    ->lazyById()
+                    ->each(function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup): void {
+                        $backup->syncS3Storages($backup->s3Storages()->whereKeyNot($this->id)->pluck('s3_storages.id')->all());
+                        if ($backup->s3_storage_id === null && $backup->save_s3) {
+                            $backup->update(['save_s3' => false]);
+                        }
+                    });
+            }
+
+            foreach ([DatabaseBackupS3Replica::class, VolumeBackupS3Replica::class] as $replicaModel) {
+                $replicaModel::query()
+                    ->with('execution')
+                    ->where('s3_storage_id', $this->id)
+                    ->where('s3_storage_deleted', false)
+                    ->lazyById()
+                    ->each(function (DatabaseBackupS3Replica|VolumeBackupS3Replica $replica): void {
+                        $replica->update(['s3_storage_deleted' => true]);
+                        $replica->execution?->refreshS3Summary();
+                    });
+            }
+
+            ScheduledVolumeBackupExecution::query()
+                ->where('s3_cleanup_pending', true)
+                ->whereHas('s3Replicas', fn (Builder $query) => $query->where('s3_storage_id', $this->id))
+                ->whereDoesntHave('s3Replicas', fn (Builder $query) => $query
+                    ->where('s3_storage_deleted', false)
+                    ->where(fn (Builder $query) => $query->whereNull('s3_uploaded')->orWhere('s3_uploaded', false)))
+                ->update(['s3_cleanup_pending' => false]);
         });
     }
 
@@ -186,9 +230,7 @@ class S3Storage extends BaseModel
                 throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
             }
 
-            $disk = $this->filesystem();
-            // Test the connection by listing files with ListObjectsV2 (S3)
-            $disk->files();
+            $this->listFilesWithAddressingStyleFallback();
 
             $this->unusable_email_sent = false;
             $this->is_usable = true;
@@ -234,12 +276,85 @@ class S3Storage extends BaseModel
             'secret' => $this['secret'],
             'bucket' => $this['bucket'],
             'endpoint' => $this['endpoint'],
-            'use_path_style_endpoint' => true,
+            'use_path_style_endpoint' => $this->usesPathStyleEndpoint(),
             'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint'], $this->trustedInternalHosts()), [
                 'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                 'timeout' => self::REQUEST_TIMEOUT_SECONDS,
             ]),
         ]);
+    }
+
+    /**
+     * The `docker run` option that makes the MinIO client sign requests for the storage region, as filesystem() does.
+     * Without it, mc signs for us-east-1, and providers that enforce the region reject the requests.
+     */
+    public function minioClientRegionOption(): string
+    {
+        return '-e '.escapeshellarg('MC_REGION='.$this->region);
+    }
+
+    /**
+     * Path-style URLs (`endpoint/bucket`) are the default. Providers like Alibaba Cloud OSS only accept
+     * virtual-hosted-style URLs (`bucket.endpoint`). A storage that is not saved yet has no value, so it uses the default.
+     */
+    public function usesPathStyleEndpoint(): bool
+    {
+        return $this->use_path_style_endpoint ?? true;
+    }
+
+    /**
+     * The URL style for a new storage: virtual-hosted style for providers that reject path-style URLs, else path-style.
+     */
+    public static function detectPathStyleEndpoint(?string $endpoint): bool
+    {
+        $host = strtolower((string) parse_url((string) $endpoint, PHP_URL_HOST));
+
+        return ! collect(self::VIRTUAL_HOSTED_STYLE_HOST_SUFFIXES)
+            ->contains(fn (string $suffix): bool => $host === $suffix || str_ends_with($host, '.'.$suffix));
+    }
+
+    /**
+     * Tests the connection with ListObjectsV2. When the provider rejects path-style URLs, it tests again with
+     * virtual-hosted-style URLs and keeps that style when it works.
+     */
+    private function listFilesWithAddressingStyleFallback(): void
+    {
+        try {
+            $this->filesystem()->files();
+        } catch (\Throwable $exception) {
+            if (! $this->usesPathStyleEndpoint() || ! self::isPathStyleRejection($exception)) {
+                throw $exception;
+            }
+
+            $this->use_path_style_endpoint = false;
+            try {
+                $this->filesystem()->files();
+            } catch (\Throwable) {
+                $this->use_path_style_endpoint = true;
+
+                throw $exception;
+            }
+        }
+    }
+
+    private static function isPathStyleRejection(\Throwable $exception): bool
+    {
+        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
+            if (str($current->getMessage())->lower()->contains(self::PATH_STYLE_REJECTION_ERRORS)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The `mc alias set` option that makes the MinIO client use virtual-hosted-style URLs, as filesystem() does.
+     * With path-style URLs, mc keeps its own `auto` lookup, as before.
+     */
+    public function minioClientPathOption(): string
+    {
+        return $this->usesPathStyleEndpoint() ? '' : ' --path off';
     }
 
     /**

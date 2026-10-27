@@ -59,6 +59,8 @@ class All extends Component
 
     public bool $include_coolify_default_variables = true;
 
+    public bool $redact_all_env_values_in_logs = true;
+
     /**
      * Environment variable rows are loaded after first paint via wire:init
      * so the surrounding configuration page can render immediately.
@@ -66,6 +68,8 @@ class All extends Component
     public bool $readyToLoad = false;
 
     private ?Collection $composeEnvironmentAssignments = null;
+
+    private ?bool $canViewComposeContent = null;
 
     protected $listeners = [
         'saveKey' => 'submit',
@@ -113,6 +117,9 @@ class All extends Component
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $coolifyDefaultVariablesOwner = $this->resource instanceof Application ? $this->resource->settings : $this->resource;
         $this->include_coolify_default_variables = data_get($coolifyDefaultVariablesOwner, 'include_coolify_default_variables') !== false;
+        if ($this->hasLogRedactionSetting()) {
+            $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+        }
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -138,6 +145,41 @@ class All extends Component
 
         if ($this->view === 'dev') {
             $this->getDevView();
+        }
+    }
+
+    /**
+     * Applications, services, and standalone databases have the "Environment values in logs" setting.
+     */
+    public function hasLogRedactionSetting(): bool
+    {
+        return method_exists($this->resource, 'redactsAllEnvValuesInLogs');
+    }
+
+    public function saveLogRedactionSetting()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resource instanceof Application) {
+                $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } elseif ($this->hasLogRedactionSetting()) {
+                // Services and databases use the Auditable trait, so saving records the changed field.
+                $this->resource->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->resource->save();
+            } else {
+                return;
+            }
+
+            $this->dispatch('success', 'Log redaction setting updated.');
+        } catch (\Throwable $e) {
+            if ($this->hasLogRedactionSetting()) {
+                $this->resource->refresh();
+                $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+            }
+
+            return handleError($e, $this);
         }
     }
 
@@ -858,10 +900,24 @@ class All extends Component
     /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
     private function composeInfoFor(string $key): ?array
     {
-        return dockerComposeEnvironmentVariableInfo(
+        $composeInfo = dockerComposeEnvironmentVariableInfo(
             $this->resource->docker_compose_raw ?? $this->resource->docker_compose,
             $key
         );
+
+        if ($composeInfo !== null && ! $this->canViewComposeContent()) {
+            $composeInfo['default'] = null;
+        }
+
+        return $composeInfo;
+    }
+
+    /**
+     * Compose defaults are compose content, which only users who can update the resource may see.
+     */
+    private function canViewComposeContent(): bool
+    {
+        return $this->canViewComposeContent ??= auth()->user()?->can('update', $this->resource) ?? false;
     }
 
     private function composeEnvironmentAssignments(): Collection
@@ -931,23 +987,12 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $hideValues = ! $this->canViewEnvironmentValues();
+        $canViewValues = $this->canViewEnvironmentValues();
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(function ($item) use ($hideValues) {
-                if ($hideValues) {
-                    return "$item->key=(Hidden, only admins can view)";
-                }
-                if ($item->is_shown_once) {
-                    return "$item->key=(Locked Secret, delete and add again to change)";
-                }
-                if ($item->is_multiline) {
-                    return "$item->key=(Multiline environment variable, edit in normal view)";
-                }
-
-                return "$item->key=$item->value";
-            })->join("\n");
+            ->map(fn ($item) => formatEnvVariableForDevView($item, $canViewValues))
+            ->join("\n");
     }
 
     public function switch()
@@ -962,11 +1007,28 @@ class All extends Component
 
     public function submit($data = null)
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $this->handleBulkSubmit();
+                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $previewVariables = [];
+                if ($this->showPreview) {
+                    try {
+                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                    } catch (\InvalidArgumentException $e) {
+                        throw new \InvalidArgumentException('Preview deployments: '.$e->getMessage(), previous: $e);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            if ($data === null) {
+                $this->handleBulkSubmit($variables, $previewVariables);
             } else {
                 $this->handleSingleSubmit($data);
             }
@@ -1016,9 +1078,8 @@ class All extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables, array $previewVariables)
     {
-        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -1037,8 +1098,6 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
-
             // Try to delete removed preview variables
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
             if ($deletedPreviewCount > 0) {
@@ -1168,7 +1227,7 @@ class All extends Component
             $found = $this->resource->$method()->where('key', $key)->first();
 
             if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     $changed = false;
 
                     // Update value if it changed
@@ -1184,7 +1243,10 @@ class All extends Component
                         $changed = true;
                     }
 
-                    if ($changed) {
+                    // Flags change only when a "# coolify:" line sets them
+                    $found->fill($data['settings']);
+
+                    if ($changed || $found->isDirty()) {
                         $found->save();
                         $count++;
                     }
@@ -1195,6 +1257,7 @@ class All extends Component
                 $environment->value = $value;
                 $environment->comment = $comment; // Set comment from inline comment
                 $environment->is_multiline = false;
+                $environment->fill($data['settings']);
                 $environment->is_preview = $isPreview;
                 $environment->resourceable_id = $this->resource->id;
                 $environment->resourceable_type = $this->resource->getMorphClass();

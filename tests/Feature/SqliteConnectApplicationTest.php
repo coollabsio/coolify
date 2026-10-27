@@ -264,8 +264,8 @@ it('keeps a docker volume shared with another resource when the application volu
 
     $this->application->deleteVolumes();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume rm -f '.escapeshellarg($this->application->uuid.'-data')));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'sqlite-data-'.$this->sqlite->uuid));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume rm -f '.escapeshellarg($this->application->uuid.'-data')));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'sqlite-data-'.$this->sqlite->uuid));
 });
 
 it('keeps the sqlite data volume when the database volumes are deleted while an application mounts it', function () {
@@ -275,7 +275,7 @@ it('keeps the sqlite data volume when the database volumes are deleted while an 
 
     $this->sqlite->deleteVolumes();
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, $databaseVolume->name));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), $databaseVolume->name));
 });
 
 it('removes the sqlite data volume when no application mounts it', function () {
@@ -284,7 +284,7 @@ it('removes the sqlite data volume when no application mounts it', function () {
 
     $this->sqlite->deleteVolumes();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume rm -f '.escapeshellarg($databaseVolume->name)));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume rm -f '.escapeshellarg($databaseVolume->name)));
 });
 
 function connectSqliteVolume(Application $application, StandaloneSqlite $sqlite): LocalPersistentVolume

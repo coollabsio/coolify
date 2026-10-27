@@ -39,6 +39,7 @@
             ->sortBy(fn ($item) => strtolower($item['resource']->name))
             ->map(fn ($item) => [
                 'label' => $item['resource']->name,
+                'uuid' => $item['resource']->uuid,
                 'href' => match ($item['type']) {
                     'application' => route('project.application.configuration', [
                         'project_uuid' => $currentProject->uuid,
@@ -65,7 +66,8 @@
     $currentStorage = $storages->firstWhere('uuid', $storageUuid);
     $githubAppUuid = request()->route('github_app_uuid');
     $gitlabAppUuid = request()->route('gitlab_app_uuid');
-    $sourceUuid = $githubAppUuid ?? $gitlabAppUuid;
+    $giteaAppUuid = request()->route('gitea_app_uuid');
+    $sourceUuid = $githubAppUuid ?? $gitlabAppUuid ?? $giteaAppUuid;
     $sources = $sourceUuid && $team ? $team->sources()->sortBy('name')->values() : collect();
     $currentSource = $sources->firstWhere('uuid', $sourceUuid);
     $destinationUuid = request()->route('destination_uuid');
@@ -85,7 +87,7 @@
     $currentTag = $tags->firstWhere('name', $tagName);
     $dashboardContext = match (true) {
         request()->routeIs('dashboard') => 'Dashboard',
-        request()->routeIs('project.index') => 'Projects',
+        request()->routeIs('project.index', 'project.canvas.index') => 'Projects',
         request()->routeIs('terminal') => 'Terminal',
         request()->routeIs('server.*') => 'Servers',
         request()->routeIs('source.*') => 'Sources',
@@ -102,75 +104,40 @@
         request()->routeIs('admin.*') => 'Admin',
         default => null,
     };
-    // Workspace destinations require an active plan on cloud; unsubscribed users
-    // only keep profile/appearance and must not see this switcher.
-    $canUseWorkspaceNav = isSubscribed() || ! isCloud();
-    $pageDestinations = $canUseWorkspaceNav
-        ? collect([
-            ['label' => 'Dashboard', 'href' => url('/')],
-            ['label' => 'Projects', 'href' => url('/projects')],
-            auth()->user()?->can('canAccessTerminal')
-                ? ['label' => 'Terminal', 'href' => route('terminal')]
-                : null,
-            ['label' => 'Servers', 'href' => url('/servers')],
-            ['label' => 'Sources', 'href' => route('source.all')],
-            ['label' => 'Destinations', 'href' => route('destination.index')],
-            auth()->user()?->isAdmin()
-                ? ['label' => 'Registries', 'href' => route('registries.index')]
-                : null,
-            ['label' => 'S3 Storage', 'href' => route('storage.index')],
-            ['label' => 'Shared Variables', 'href' => route('shared-variables.index')],
-            ['label' => 'Team', 'href' => route('team.index')],
-            ['label' => 'Notifications', 'href' => route('notifications.email')],
-            ['label' => 'Keys & Tokens', 'href' => route('security.private-key.index')],
-            ['label' => 'Tags', 'href' => route('tags.show')],
-            isInstanceAdmin()
-                ? ['label' => 'Settings', 'href' => route('settings.index')]
-                : null,
-        ])->filter()
-        : collect();
 @endphp
-<div class="flex min-w-0 items-center gap-0.5 text-[13px]">
+<div class="flex min-w-0 items-center gap-0.5 text-[13px]" data-page-context="{{ $dashboardContext }}"
+    x-data="{
+        titleRepeats: false,
+        renamed: {},
+        nameOf(uuid, name) {
+            return this.renamed[uuid] ?? name;
+        },
+        syncTitle() {
+            const expected = this.$el.dataset.pageContext || '';
+            const heading = document.querySelector('.app-main h1');
+            const title = heading && heading.offsetHeight > 0 && heading.getBoundingClientRect().top < 140
+                ? heading.textContent.trim()
+                : '';
+            this.titleRepeats = expected !== '' && title === expected;
+        },
+    }"
+    x-init="syncTitle()" x-on:livewire:navigated.window="$nextTick(() => syncTitle())"
+    x-on:name-changed.window="renamed[$event.detail.uuid] = $event.detail.name">
     {{-- Team --}}
     <div class="shrink-0" x-data="{ collapsed: false }">
         <livewire:switch-team />
     </div>
 
-    @if (!$currentProject && $dashboardContext && $canUseWorkspaceNav)
-        <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
-        <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
-            <button type="button" @click="open = !open" @click.outside="open = false" title="Switch page"
-                class="flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
-                <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $dashboardContext }}</span>
-                <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
-                    fill="none">
-                    <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
-                        stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            </button>
-            <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-                class="listbox-panel scrollbar left-0! z-[90]! max-h-80! min-w-52">
-                <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint">
-                    Pages
-                </div>
-                @foreach ($pageDestinations as $destination)
-                    <a href="{{ $destination['href'] }}" {{ wireNavigate() }} @click="open = false"
-                        class="listbox-option {{ $destination['label'] === $dashboardContext ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
-                        <span class="min-w-0 flex-1 truncate">{{ $destination['label'] }}</span>
-                    </a>
-                @endforeach
-            </div>
-        </div>
-    @elseif (!$currentProject && $dashboardContext)
-        {{-- Static context label only — no links to paid workspace pages. --}}
-        <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
-        <span
+    @if (!$currentProject && $dashboardContext)
+        <span x-show="!titleRepeats" x-cloak class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
+        <span x-show="!titleRepeats" x-cloak
             class="flex h-8 min-w-0 items-center truncate px-2 font-semibold text-black opacity-70 dark:text-fg">{{ $dashboardContext }}</span>
     @endif
 
     @if ($currentStorage)
-        <x-breadcrumb-switcher title="S3 Storage" :label="$currentStorage->name" :items="$storages->map(fn ($storage) => [
+        <x-breadcrumb-switcher title="S3 Storage" :label="$currentStorage->name" :uuid="$currentStorage->uuid" :items="$storages->map(fn ($storage) => [
             'label' => $storage->name,
+            'uuid' => $storage->uuid,
             'href' => route('storage.show', ['storage_uuid' => $storage->uuid]),
             'active' => $storage->uuid === $currentStorage->uuid,
         ])">
@@ -191,11 +158,14 @@
                 ? filled($currentSource->installation_id)
                 : filled($currentSource->access_token);
         @endphp
-        <x-breadcrumb-switcher title="Sources" :label="$currentSource->name ?: 'Source'" :items="$sources->map(fn ($source) => [
+        <x-breadcrumb-switcher title="Sources" :label="$currentSource->name ?: 'Source'" :uuid="$currentSource->uuid" :items="$sources->map(fn ($source) => [
             'label' => $source->name ?: class_basename($source),
-            'href' => $source instanceof \App\Models\GithubApp
-                ? route('source.github.show', ['github_app_uuid' => $source->uuid])
-                : route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid]),
+            'uuid' => $source->uuid,
+            'href' => match (true) {
+                $source instanceof \App\Models\GithubApp => route('source.github.show', ['github_app_uuid' => $source->uuid]),
+                $source instanceof \App\Models\GiteaApp => route('source.gitea.show', ['gitea_app_uuid' => $source->uuid]),
+                default => route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid]),
+            },
             'active' => $source->getMorphClass() === $currentSource->getMorphClass() && $source->uuid === $currentSource->uuid,
         ])">
             <x-slot:meta>
@@ -212,8 +182,9 @@
     @endif
 
     @if ($currentDestination)
-        <x-breadcrumb-switcher title="Destinations" :label="$currentDestination->name" :items="$destinations->map(fn ($destination) => [
+        <x-breadcrumb-switcher title="Destinations" :label="$currentDestination->name" :uuid="$currentDestination->uuid" :items="$destinations->map(fn ($destination) => [
             'label' => $destination->name,
+            'uuid' => $destination->uuid,
             'href' => route('destination.show', ['destination_uuid' => $destination->uuid]),
             'active' => $destination->getMorphClass() === $currentDestination->getMorphClass() && $destination->uuid === $currentDestination->uuid,
         ])">
@@ -247,8 +218,9 @@
         {{-- Project switcher --}}
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = !open" @click.outside="open = false" title="Switch project"
-                class="flex items-center gap-1.5 min-w-0 h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
-                <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentProject->name }}</span>
+                class="flex items-center gap-1.5 min-w-0 max-w-full h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                <span class="min-w-0 truncate font-semibold text-black dark:text-fg"
+                    x-text="nameOf(@js($currentProject->uuid), @js($currentProject->name))">{{ $currentProject->name }}</span>
                 <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                     <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
@@ -261,7 +233,7 @@
                 @foreach ($projects as $p)
                     <a href="{{ route($projectDestinationRoute, ['project_uuid' => $p->uuid]) }}" {{ wireNavigate() }} @click="open = false"
                         class="listbox-option {{ $p->uuid === $currentProject->uuid ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
-                        <span class="min-w-0 flex-1 truncate">{{ $p->name }}</span>
+                        <span class="min-w-0 flex-1 truncate" x-text="nameOf(@js($p->uuid), @js($p->name))">{{ $p->name }}</span>
                     </a>
                 @endforeach
             </div>
@@ -273,7 +245,7 @@
         {{-- Environment switcher --}}
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = !open" @click.outside="open = false" title="Switch environment"
-                class="flex items-center gap-1.5 min-w-0 h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                class="flex items-center gap-1.5 min-w-0 max-w-full h-8 px-2 rounded-md opacity-70 transition-[background-color,opacity] hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
                 <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentEnvironment->name }}</span>
                 <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                     <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
@@ -295,18 +267,21 @@
     @endif
 
     @if ($currentResource)
-        <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :items="$resourceItems">
+        <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :uuid="$currentResource->uuid" :items="$resourceItems">
             <x-slot:meta>
-                @if ($currentApplication)
-                    <livewire:project.application.status :application="$currentApplication"
-                        :wire:key="'application-status-'.$currentApplication->uuid" />
-                @elseif ($currentDatabase)
-                    <livewire:project.database.status :database="$currentDatabase"
-                        :wire:key="'database-status-'.$currentDatabase->uuid" />
-                @else
-                    <livewire:project.service.status :service="$currentService"
-                        :wire:key="'service-status-'.$currentService->uuid" />
-                @endif
+                {{-- Below xl, the page heading shows the status. --}}
+                <div class="hidden xl:flex">
+                    @if ($currentApplication)
+                        <livewire:project.application.status :application="$currentApplication"
+                            :wire:key="'application-status-'.$currentApplication->uuid" />
+                    @elseif ($currentDatabase)
+                        <livewire:project.database.status :database="$currentDatabase"
+                            :wire:key="'database-status-'.$currentDatabase->uuid" />
+                    @else
+                        <livewire:project.service.status :service="$currentService"
+                            :wire:key="'service-status-'.$currentService->uuid" />
+                    @endif
+                </div>
             </x-slot:meta>
         </x-breadcrumb-switcher>
     @endif

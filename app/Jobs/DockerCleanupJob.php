@@ -116,11 +116,13 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $cleanup_log = CleanupDocker::run(
                     server: $this->server,
                     deleteUnusedVolumes: $this->deleteUnusedVolumes,
-                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks,
+                    pruneBuildCacheDuringDeployment: $this->manualCleanup
                 );
                 $usageAfter = $this->server->getDiskUsage();
                 $message = ($this->manualCleanup ? 'Manual' : 'Forced').' Docker cleanup job executed successfully. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
 
+                $message = $this->withBuildCacheKeptReason($message, $cleanup_log);
                 $this->execution_log->update([
                     'status' => 'success',
                     'message' => $message,
@@ -137,10 +139,12 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $cleanup_log = CleanupDocker::run(
                     server: $this->server,
                     deleteUnusedVolumes: $this->deleteUnusedVolumes,
-                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks,
+                    pruneBuildCacheDuringDeployment: $this->manualCleanup
                 );
                 $message = 'Docker cleanup job executed successfully, but no disk usage could be determined.';
 
+                $message = $this->withBuildCacheKeptReason($message, $cleanup_log);
                 $this->execution_log->update([
                     'status' => 'success',
                     'message' => $message,
@@ -157,7 +161,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $cleanup_log = CleanupDocker::run(
                     server: $this->server,
                     deleteUnusedVolumes: $this->deleteUnusedVolumes,
-                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks,
+                    pruneBuildCacheDuringDeployment: $this->manualCleanup
                 );
                 $usageAfter = $this->server->getDiskUsage();
                 $diskSaved = $this->usageBefore - $usageAfter;
@@ -168,6 +173,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     $message = 'Docker cleanup job executed successfully, but no disk space was saved. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
                 }
 
+                $message = $this->withBuildCacheKeptReason($message, $cleanup_log);
                 $this->execution_log->update([
                     'status' => 'success',
                     'message' => $message,
@@ -189,14 +195,15 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             $failed = true;
+            $errorMessage = remove_iip($e->getMessage());
             if ($this->execution_log) {
                 $this->execution_log->update([
                     'status' => 'failed',
-                    'message' => $e->getMessage(),
+                    'message' => $errorMessage,
                 ]);
                 event(new DockerCleanupDone($this->execution_log));
             }
-            $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$e->getMessage()));
+            $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$errorMessage));
             throw $e;
         } finally {
             if (! $failed && $this->occurrenceUuid) {
@@ -213,6 +220,13 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 Cache::forget($this->executionCacheKey());
             }
         }
+    }
+
+    private function withBuildCacheKeptReason(string $message, array $cleanupLog): string
+    {
+        $reason = CleanupDocker::buildCacheKeptReason($cleanupLog);
+
+        return $reason ? $message.' '.$reason : $message;
     }
 
     /**
@@ -282,7 +296,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $message = $exception?->getMessage() ?? 'Docker cleanup job failed without an exception.';
+        $message = remove_iip($exception?->getMessage() ?? 'Docker cleanup job failed without an exception.');
 
         $updated = DockerCleanupExecution::query()
             ->whereKey($execution->id)

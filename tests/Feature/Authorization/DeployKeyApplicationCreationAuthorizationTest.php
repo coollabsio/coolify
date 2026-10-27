@@ -113,6 +113,51 @@ test('deploy key application keeps an scp-style ssh url with a custom username',
         ->toBe('custom-user@github.example.com:organization/repository.git');
 });
 
+test('deploy key application keeps the base directory for every build pack', function (string $buildPack) {
+    actAsDeployKeyUser($this->admin, $this->team);
+
+    deployKeyComponent()
+        ->call('setPrivateKey', $this->privateKey->id)
+        ->set('repository_url', 'git@example.com:owner/monorepo.git')
+        ->set('branch', 'main')
+        ->set('build_pack', $buildPack)
+        ->set('base_directory', '/apps/api')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Application::query()->sole()->base_directory)->toBe('/apps/api');
+})->with(['dockerfile', 'railpack', 'static', 'dockercompose']);
+
+test('deploy key application uses the repository root when the base directory is empty', function () {
+    actAsDeployKeyUser($this->admin, $this->team);
+
+    deployKeyComponent()
+        ->call('setPrivateKey', $this->privateKey->id)
+        ->set('repository_url', 'git@example.com:owner/repository.git')
+        ->set('branch', 'main')
+        ->set('build_pack', 'dockerfile')
+        ->set('base_directory', '')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Application::query()->sole()->base_directory)->toBe('/');
+});
+
+test('deploy key application rejects an invalid base directory', function () {
+    actAsDeployKeyUser($this->admin, $this->team);
+
+    deployKeyComponent()
+        ->call('setPrivateKey', $this->privateKey->id)
+        ->set('repository_url', 'git@example.com:owner/repository.git')
+        ->set('branch', 'main')
+        ->set('build_pack', 'dockerfile')
+        ->set('base_directory', '/apps; rm -rf /')
+        ->call('submit')
+        ->assertHasErrors('base_directory');
+
+    expect(Application::query()->count())->toBe(0);
+});
+
 test('member cannot invoke the deploy key selection action directly', function () {
     actAsDeployKeyUser($this->member, $this->team);
     $this->withoutExceptionHandling();

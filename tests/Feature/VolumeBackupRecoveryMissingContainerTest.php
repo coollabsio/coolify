@@ -109,7 +109,7 @@ function missingContainerRecoveryBackup(string $user): array
 function fakeMissingContainerRemote(string $fakeDockerDir): void
 {
     Process::fake(function ($process) use ($fakeDockerDir) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $lines = explode(PHP_EOL, $command);
         $remote = implode(PHP_EOL, array_slice($lines, 1, -1));
         if (str_starts_with($remote, 'sudo ')) {

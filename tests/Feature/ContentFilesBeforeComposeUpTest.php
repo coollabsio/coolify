@@ -97,7 +97,7 @@ function fakeContentFilesServer(array $states): void
     ContentFilesUpRecorder::$commands = [];
 
     Process::fake(function ($process) use ($states) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         ContentFilesUpRecorder::$commands[] = ['ssh', $command];
 
         if (str_contains($command, 'empty-directory')) {
@@ -125,6 +125,9 @@ function fakeContentFilesServer(array $states): void
     });
 }
 
+/**
+ * The file state checks: one for all content files, then one by each write of a missing file.
+ */
 function contentFilesStateChecks(): array
 {
     return array_values(array_filter(ContentFilesUpRecorder::ssh(), fn (string $command) => str_contains($command, 'empty-directory')));
@@ -132,9 +135,9 @@ function contentFilesStateChecks(): array
 
 function contentFilesAssertNoWrite(): void
 {
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'base64 -d'));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rmdir'));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -fr'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'base64 -d'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rmdir'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rm -fr'));
 }
 
 beforeEach(function () {
@@ -251,14 +254,14 @@ test('a Compose deployment checks all content files with one server command', fu
 
     runComposeStart($this);
 
-    expect(contentFilesStateChecks())->toHaveCount(1)
+    expect(contentFilesStateChecks())->toHaveCount(2)
         ->and(contentFilesStateChecks()[0])->toContain(escapeshellarg($first->fs_path))
         ->toContain(escapeshellarg($second->fs_path))
         ->toContain(escapeshellarg($third->fs_path))
         ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'tee '.escapeshellarg($second->fs_path)));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'tee '.escapeshellarg($first->fs_path)));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'tee '.escapeshellarg($third->fs_path)));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'tee '.escapeshellarg($second->fs_path)));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'tee '.escapeshellarg($first->fs_path)));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'tee '.escapeshellarg($third->fs_path)));
 });
 
 test('a Compose deployment does not change a content file that exists on the server', function () {
@@ -286,7 +289,7 @@ test('a Compose deployment replaces an empty directory with the content file', f
         ->and($write)->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'))
         ->and(strpos($writeCommand, "rmdir {$escapedPath}"))->toBeLessThan(strpos($writeCommand, "tee {$escapedPath}"))
         ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -fr'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rm -fr'));
 });
 
 test('a Compose deployment keeps a directory that is not empty and shows a warning', function () {
@@ -322,14 +325,28 @@ test('a Compose deployment does not write storages without Coolify content', fun
 ]);
 
 test('a pull request deployment writes the preview content file path', function () {
-    $volume = contentFilesVolume($this->application, 'config/app.conf-pr-7', ['is_preview_suffix_enabled' => true]);
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    $previewPath = $volume->fs_path.'-pr-7';
+    fakeContentFilesServer([$volume->fs_path => 'file', $previewPath => 'missing']);
+
+    runComposeStart($this, ['pull_request_id' => 7]);
+
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($previewPath));
+    expect($write)->not->toBeNull()
+        ->and($write)->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'))
+        ->and(ContentFilesUpRecorder::indexOf('ssh', 'tee '.escapeshellarg($volume->fs_path).' '))->toBeNull()
+        ->and($volume->fresh()->fs_path)->toBe($this->application->workdir().'/config/app.conf');
+});
+
+test('a pull request deployment of the legacy compose parser writes the content file path of the application', function () {
+    $this->application->update(['compose_parsing_version' => '2']);
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
     fakeContentFilesServer([$volume->fs_path => 'missing']);
 
     runComposeStart($this, ['pull_request_id' => 7]);
 
-    $write = ContentFilesUpRecorder::indexOf('ssh', 'tee '.escapeshellarg($this->application->workdir().'/config/app.conf-pr-7'));
-    expect($write)->not->toBeNull()
-        ->and($write)->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'));
+    expect(ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($volume->fs_path)))->not->toBeNull()
+        ->and(ContentFilesUpRecorder::indexOf('ssh', '-pr-7'))->toBeNull();
 });
 
 test('a preserve-repository deployment writes content files before docker compose up', function () {
@@ -355,7 +372,7 @@ test('a deployment to an additional server writes missing content files on that 
     runComposeStart($this, ['server' => $otherServer, 'mainServer' => $otherServer]);
 
     $write = ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($volume->fs_path));
-    expect(contentFilesStateChecks())->toHaveCount(1)
+    expect(contentFilesStateChecks())->toHaveCount(2)
         ->and(contentFilesStateChecks()[0])->toContain("@'{$otherServer->ip}'")
         ->and($write)->not->toBeNull()
         ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
@@ -420,8 +437,8 @@ test('the content file check and write are safe for non-root servers', function 
     $escapedPath = escapeshellarg($volume->fs_path);
     expect(contentFilesStateChecks())->not->toBeEmpty()
         ->and(contentFilesStateChecks()[0])->toContain("sudo bash -c 'sh -c ");
-    Process::assertRan(fn ($process) => str_contains($process->command, "sudo rmdir {$escapedPath}")
-        && str_contains($process->command, "| sudo tee {$escapedPath}"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo rmdir {$escapedPath}")
+        && str_contains(remoteProcessScript($process), "| sudo tee {$escapedPath}"));
 });
 
 test('starting a service writes missing content files before docker compose up', function () {
@@ -441,15 +458,15 @@ test('starting a service writes missing content files before docker compose up',
     $activity = StartService::run($service->fresh());
 
     $command = RemoteProcessCommand::read($activity);
-    expect(contentFilesStateChecks())->toHaveCount(1)
+    expect(contentFilesStateChecks())->toHaveCount(2)
         ->and($command)->toContain("echo 'Writing 1 missing configuration file.'")
         ->and($command)->toContain("echo 'Warning: A directory that is not empty is at {$workerConf->fs_path} on the server.")
         ->and(strpos($command, 'Writing 1 missing configuration file.'))->toBeLessThan(strpos($command, ' up -d'))
         ->and($command)->not->toContain(base64_encode('listen 8080;'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'base64 -d | tee '.escapeshellarg($appConf->fs_path))
-        && str_contains($process->command, base64_encode('listen 8080;')));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'tee '.escapeshellarg($workerConf->fs_path)));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -fr'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'base64 -d | tee '.escapeshellarg($appConf->fs_path))
+        && str_contains(remoteProcessScript($process), base64_encode('listen 8080;')));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'tee '.escapeshellarg($workerConf->fs_path)));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rm -fr'));
 });
 
 test('deploying one service application writes only its missing content files', function () {
@@ -469,11 +486,11 @@ test('deploying one service application writes only its missing content files', 
     $activity = DeployServiceApplication::run($service->applications()->where('name', 'app')->firstOrFail());
 
     $command = RemoteProcessCommand::read($activity);
-    expect(contentFilesStateChecks())->toHaveCount(1)
+    expect(contentFilesStateChecks())->toHaveCount(2)
         ->and(contentFilesStateChecks()[0])->not->toContain(escapeshellarg($workerConf->fs_path))
         ->and(strpos($command, 'Writing 1 missing configuration file.'))->toBeLessThan(strpos($command, ' up -d'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'tee '.escapeshellarg($appConf->fs_path)));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'tee '.escapeshellarg($workerConf->fs_path)));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'tee '.escapeshellarg($appConf->fs_path)));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'tee '.escapeshellarg($workerConf->fs_path)));
 });
 
 test('starting a service without content files does not run the file check', function () {
@@ -523,8 +540,8 @@ test('the storage save job writes the content again when the same file exists', 
 
     $writes = array_filter(ContentFilesUpRecorder::ssh(), fn (string $command) => str_contains($command, 'base64 -d | tee '.escapeshellarg($volume->fs_path)));
     expect($writes)->toHaveCount(2);
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -fr'));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rmdir'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rm -fr'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rmdir'));
 });
 
 test('the storage save job replaces an empty directory with the content file', function () {
@@ -534,11 +551,11 @@ test('the storage save job replaces an empty directory with the content file', f
     (new ServerStorageSaveJob($volume))->handle();
 
     $escapedPath = escapeshellarg($volume->fs_path);
-    Process::assertRan(fn ($process) => str_contains($process->command, "rmdir {$escapedPath}")
-        && str_contains($process->command, base64_encode(CONTENT_FILES_UP_CONTENT))
-        && strpos($process->command, "rmdir {$escapedPath}") < strpos($process->command, "tee {$escapedPath}"));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -fr'));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, "touch {$escapedPath}"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "rmdir {$escapedPath}")
+        && str_contains(remoteProcessScript($process), base64_encode(CONTENT_FILES_UP_CONTENT))
+        && strpos(remoteProcessScript($process), "rmdir {$escapedPath}") < strpos(remoteProcessScript($process), "tee {$escapedPath}"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rm -fr'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "touch {$escapedPath}"));
 });
 
 test('the storage save job does not delete a directory that is not empty', function () {
@@ -573,8 +590,22 @@ test('the server file sync replaces an empty directory with the content file', f
     expect($volume->fresh())
         ->is_directory->toBeFalsy()
         ->content->toBe(CONTENT_FILES_UP_CONTENT);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rmdir'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'base64 -d'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rmdir'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'base64 -d'));
+});
+
+test('the server file sync checks all file storages with one server command', function () {
+    $first = contentFilesVolume($this->application, 'conf/app.conf');
+    $second = contentFilesVolume($this->application, 'conf/worker.conf');
+    $directory = contentFilesVolume($this->application, 'data/cache', ['content' => null]);
+    fakeContentFilesServer([$first->fs_path => 'file', $second->fs_path => 'file', $directory->fs_path => 'directory']);
+
+    getFilesystemVolumesFromServer($this->application->fresh());
+
+    expect(ContentFilesUpRecorder::ssh())->toHaveCount(1)
+        ->and(contentFilesStateChecks())->toHaveCount(1)
+        ->and($directory->fresh()->is_directory)->toBeTruthy()
+        ->and($first->fresh()->is_directory)->toBeFalsy();
 });
 
 test('the server file sync still marks a storage without content as a directory', function () {

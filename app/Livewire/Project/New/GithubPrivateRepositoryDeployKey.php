@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
@@ -10,6 +11,7 @@ use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
+use App\Traits\HasRepositoryDetection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -18,6 +20,7 @@ use Spatie\Url\Url;
 class GithubPrivateRepositoryDeployKey extends Component
 {
     use AuthorizesRequests;
+    use HasRepositoryDetection;
 
     public $current_step = 'private_keys';
 
@@ -37,9 +40,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public ?string $publish_directory = null;
 
-    // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
+    // In case of docker compose
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
 
@@ -53,7 +56,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private object $repository_url_parsed;
 
-    private GithubApp|GitlabApp|string $git_source = 'other';
+    private GithubApp|GitlabApp|GiteaApp|string $git_source = 'other';
 
     private ?string $git_host = null;
 
@@ -68,6 +71,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
+            'base_directory' => ValidationPatterns::directoryPathRules(),
             'docker_compose_location' => ValidationPatterns::filePathRules(),
         ];
     }
@@ -79,6 +83,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'is_static' => 'Is static',
         'publish_directory' => 'Publish directory',
         'build_pack' => 'Build pack',
+        'base_directory' => 'Base directory',
     ];
 
     public function mount()
@@ -132,6 +137,18 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->current_step = 'repository';
     }
 
+    protected function applicationForDetection(): Application
+    {
+        $this->get_git_source();
+
+        return $this->unsavedApplicationForDetection(
+            $this->git_repository,
+            $this->branch ?? 'main',
+            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp || $this->git_source instanceof GiteaApp ? $this->git_source : null,
+            PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id),
+        );
+    }
+
     public function submit()
     {
         $this->authorize('create', Application::class);
@@ -166,6 +183,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
                     'private_key_id' => $privateKey->id,
+                    'base_directory' => $this->base_directory,
                 ];
             } else {
                 $application_init = [
@@ -181,14 +199,17 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'private_key_id' => $privateKey->id,
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
+                    'base_directory' => $this->base_directory,
                 ];
             }
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
             }
+            if ($this->build_pack === 'dockerfile' && $dockerfileLocation = $this->selectedDockerfileLocation()) {
+                $application_init['dockerfile_location'] = $dockerfileLocation;
+            }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
             }
             $application = new Application($application_init);
             $application->save();
@@ -199,6 +220,8 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->fqdn = $fqdn;
             $application->name = generate_random_name($application->uuid);
             $application->save();
+
+            $this->importDetectedEnvironmentVariables($application);
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

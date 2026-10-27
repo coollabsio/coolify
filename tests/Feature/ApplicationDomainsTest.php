@@ -655,6 +655,14 @@ it('lists existing domains as individual rows', function () {
     expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0);
 });
 
+it('loads no domain favicon when HTTP basic auth protects the application', function () {
+    $this->application->update(['fqdn' => 'https://example.com', 'is_http_basic_auth_enabled' => true]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('https://example.com')
+        ->assertDontSee('https://example.com/favicon.ico', false);
+});
+
 it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
     $this->application->update(['fqdn' => 'https://app.example.com']);
 
@@ -720,7 +728,7 @@ it('shows the compose service redirect control in domain settings', function () 
 it('shows dns entries control next to Add', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 
@@ -731,7 +739,7 @@ it('shows dns entries when domains are managed through labels', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh(['settings'])])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 
@@ -2820,6 +2828,21 @@ it('does not prefill the default internal port when editing a domain without a p
         ->assertSet('editingDomainParts.port', '');
 });
 
+it('passes the inherited internal port to the domain settings modal', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com:8080',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 8080)
+        ->assertSet('domainRows.0.inherited_port', 3000)
+        ->call('startEdit', 0)
+        ->assertSet('editingInheritedPort', 3000)
+        ->call('cancelEdit')
+        ->assertSet('editingInheritedPort', null);
+});
+
 it('clears a domain port override and shows the default internal port', function () {
     $this->application->update([
         'ports_exposes' => '3000,8080',
@@ -3674,7 +3697,7 @@ it('offers dns provider record creation for a public server ip', function () {
         ->not->toContain('The server has no public IP address; add the DNS record manually.');
 });
 
-it('does not queue file sync jobs when polling dns checks for compose applications', function () {
+it('does not parse the compose file or queue file sync jobs when it shows compose application domains', function () {
     Queue::fake();
 
     $this->application->update([
@@ -3687,12 +3710,10 @@ it('does not queue file sync jobs when polling dns checks for compose applicatio
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
-    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class)->count();
-
     $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
 
-    expect($queuedOnMount)->toBe(1)
-        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+    expect(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(0)
+        ->and($this->application->persistentStorages()->count())->toBe(0)
         ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
 

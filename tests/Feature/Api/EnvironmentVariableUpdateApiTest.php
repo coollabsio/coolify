@@ -359,6 +359,78 @@ describe('partial PATCH /api/v1/services/{uuid}/envs', function () {
     });
 });
 
+describe('application env PATCH keeps omitted flags', function () {
+    beforeEach(function () {
+        $this->application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->env = EnvironmentVariable::create([
+            'key' => 'FLAGGED_KEY',
+            'value' => 'old-value',
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $this->application->id,
+            'is_preview' => false,
+            'is_literal' => true,
+            'is_multiline' => true,
+            'is_shown_once' => true,
+        ]);
+
+        $this->headers = [
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ];
+    });
+
+    test('single update with only key and value keeps flags', function () {
+        $this->withHeaders($this->headers)
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/envs", [
+                'key' => 'FLAGGED_KEY',
+                'value' => 'new-value',
+            ])
+            ->assertStatus(201);
+
+        $env = $this->env->fresh();
+        expect($env->value)->toBe('new-value')
+            ->and((bool) $env->is_literal)->toBeTrue()
+            ->and($env->is_multiline)->toBeTrue()
+            ->and((bool) $env->is_shown_once)->toBeTrue();
+    });
+
+    test('bulk update with only key and value keeps flags', function () {
+        $this->withHeaders($this->headers)
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/envs/bulk", [
+                'data' => [['key' => 'FLAGGED_KEY', 'value' => 'new-value']],
+            ])
+            ->assertStatus(201);
+
+        $env = $this->env->fresh();
+        expect($env->value)->toBe('new-value')
+            ->and((bool) $env->is_literal)->toBeTrue()
+            ->and($env->is_multiline)->toBeTrue()
+            ->and((bool) $env->is_shown_once)->toBeTrue();
+    });
+
+    test('explicit flags are still applied', function () {
+        $this->withHeaders($this->headers)
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/envs", [
+                'key' => 'FLAGGED_KEY',
+                'value' => 'new-value',
+                'is_literal' => false,
+                'is_multiline' => false,
+                'is_shown_once' => false,
+            ])
+            ->assertStatus(201);
+
+        $env = $this->env->fresh();
+        expect((bool) $env->is_literal)->toBeFalse()
+            ->and($env->is_multiline)->toBeFalse()
+            ->and((bool) $env->is_shown_once)->toBeFalse();
+    });
+});
+
 describe('environment variable key validation for app and service APIs', function () {
     test('rejects invalid service environment variable keys on create update and bulk', function () {
         $service = Service::factory()->create([
@@ -505,4 +577,70 @@ describe('bulk env update for services and databases', function () {
             ->and($victim->environment_variables()->whereIn('key', ['EXISTING', 'CREATED'])->exists())->toBeFalse()
             ->and($resource->environment_variables()->where('key', 'CREATED')->exists())->toBeTrue();
     })->with(['services', 'databases']);
+});
+
+describe('env PATCH keeps the value when value is omitted', function () {
+    beforeEach(function () {
+        $this->headers = [
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ];
+    });
+
+    test('keeps or updates the value', function (string $resourceType, string $endpoint, bool $bulk) {
+        $resource = match ($resourceType) {
+            'application' => Application::factory()->create([
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]),
+            'service' => Service::factory()->create([
+                'server_id' => $this->server->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+                'environment_id' => $this->environment->id,
+            ]),
+            'database' => StandalonePostgresql::create([
+                'name' => 'db',
+                'postgres_user' => 'postgres',
+                'postgres_password' => 'password',
+                'postgres_db' => 'app',
+                'image' => 'postgres:16',
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]),
+        };
+
+        $env = EnvironmentVariable::create([
+            'key' => 'KEEP_ME',
+            'value' => 'secret-value',
+            'resourceable_type' => $resource->getMorphClass(),
+            'resourceable_id' => $resource->id,
+            'is_preview' => false,
+            'is_literal' => false,
+        ]);
+
+        $url = "/api/v1/{$endpoint}/{$resource->uuid}/envs".($bulk ? '/bulk' : '');
+        $send = fn (array $payload) => $this->withHeaders($this->headers)
+            ->patchJson($url, $bulk ? ['data' => [$payload]] : $payload)
+            ->assertStatus(201);
+
+        $send(['key' => 'KEEP_ME', 'is_literal' => true]);
+
+        $env->refresh();
+        expect($env->value)->toBe('secret-value')
+            ->and((bool) $env->is_literal)->toBeTrue();
+
+        $send(['key' => 'KEEP_ME', 'value' => 'new-value']);
+
+        expect($env->fresh()->value)->toBe('new-value');
+    })->with([
+        'application single' => ['application', 'applications', false],
+        'application bulk' => ['application', 'applications', true],
+        'service single' => ['service', 'services', false],
+        'service bulk' => ['service', 'services', true],
+        'database single' => ['database', 'databases', false],
+        'database bulk' => ['database', 'databases', true],
+    ]);
 });

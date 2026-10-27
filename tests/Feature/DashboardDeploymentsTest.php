@@ -55,9 +55,8 @@ function createDashboardDeployment(array $overrides = []): ApplicationDeployment
 
 it('hides the deployments section when there is nothing to show', function () {
     Livewire::test(ActiveDeployments::class)
-        ->assertDontSee('Active and recent deployment activity')
         ->assertDontSee('Running or queued right now')
-        ->assertDontSee('Latest completed deployments')
+        ->assertDontSee('Recent deployments')
         ->assertDontSee('No active deployments')
         ->assertDontSee('No recent deployments');
 });
@@ -72,7 +71,7 @@ it('shows only the active section when there are active deployments', function (
         ->assertSee('Deployments')
         ->assertSee('Running or queued right now')
         ->assertSee('Running Now')
-        ->assertDontSee('Latest completed deployments')
+        ->assertDontSee('Recent deployments')
         ->assertDontSee('No active deployments')
         ->assertDontSee('No recent deployments');
 });
@@ -85,7 +84,7 @@ it('shows only the recent section when there are recent deployments', function (
 
     Livewire::test(ActiveDeployments::class)
         ->assertSee('Deployments')
-        ->assertSee('Latest completed deployments')
+        ->assertSee('Recent deployments')
         ->assertSee('Finished Earlier')
         ->assertDontSee('Running or queued right now')
         ->assertDontSee('No active deployments')

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -43,6 +44,9 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public const DOCKER_TIMEOUT_SECONDS = 15;
 
     private ?string $connectionError = null;
+
+    /** Owner marker that the SSH probe read from the host; empty when the host has none. */
+    private ?string $ownerMarker = null;
 
     public function __construct(
         public Server $server,
@@ -105,6 +109,10 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
                 $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
 
+                return;
+            }
+
+            if ($this->releasedToAnotherInstance()) {
                 return;
             }
 
@@ -218,9 +226,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $process = Process::timeout(self::SSH_TIMEOUT_SECONDS)
-                ->run($this->sshCommand('ls -la /', disableMultiplexing: true));
+                ->run($this->sshCommand(self::probeCommand(), disableMultiplexing: true));
             if ($process->exitCode() !== 0) {
                 $this->connectionError = 'ssh exit '.$process->exitCode().': '.Str::limit(trim($process->errorOutput()), 300);
+            } else {
+                $this->ownerMarker = trim($process->output());
             }
 
             return $process->exitCode() === 0;
@@ -233,6 +243,25 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             return false;
         }
+    }
+
+    /**
+     * The SSH probe also reads the owner marker, so the marker check needs no extra SSH connection.
+     * The remote shell runs with `set -e` and most servers have no marker, so a missing file must not fail the probe.
+     */
+    public static function probeCommand(): string
+    {
+        return 'cat '.ServerTransferClaimer::OWNER_MARKER_PATH.' 2>/dev/null || true; ls -la / > /dev/null';
+    }
+
+    /**
+     * After a transfer, another instance can claim this server. Its owner marker on the host is the only
+     * record that both instances share, so this instance stops managing the server when the marker names
+     * another claim.
+     */
+    private function releasedToAnotherInstance(): bool
+    {
+        return app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server, $this->ownerMarker);
     }
 
     private function checkDockerAvailability(): bool

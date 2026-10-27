@@ -57,7 +57,7 @@ It is recommended to test the new Traefik version before switching it in product
 
 1. Review the [Traefik release notes](https://github.com/traefik/traefik/releases) for changes
 2. Test the new version in a non-production environment
-3. Update your proxy configuration when ready
+3. Update your proxy configuration when ready ([how to update Traefik](https://coolify.io/docs/core/networking/proxy/traefik/update))
 4. Monitor services after the update
 
 ---
