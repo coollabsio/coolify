@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Replace the release process
+    - Decide the version, the releases and the moving tags with `scripts/version.sh`, which also reports what a push publishes
+
 ### Removed
 
 - Remove the git-cliff workflow that generated `CHANGELOG.md`, it is written by hand
