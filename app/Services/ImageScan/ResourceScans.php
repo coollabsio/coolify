@@ -300,12 +300,19 @@ final class ResourceScans
     }
 
     /**
-     * The order of `currentFor()`: scans of the latest deployment first, then scans without a deployment, each by scan
-     * time.
+     * The order of `currentFor()`: scans of finished deployments first (the latest first), then scans without a
+     * deployment, then, only when nothing else exists, scans of deployments that did not finish (a blocked or failed
+     * image never ran). Each by scan time after that.
      */
     private static function latestFirst(Builder $query): Builder
     {
-        return $query->orderByRaw('deployment_queue_id is null')
+        $deployments = (new ApplicationDeploymentQueue)->getTable();
+        $scans = $query->getModel()->getTable();
+
+        return $query->orderByRaw(
+            "case when {$scans}.deployment_queue_id is null then 1 when (select {$deployments}.status from {$deployments} where {$deployments}.id = {$scans}.deployment_queue_id) = ? then 0 else 2 end",
+            [ApplicationDeploymentStatus::FINISHED->value],
+        )
             ->orderByDesc('deployment_queue_id')
             ->orderByDesc('scanned_at')
             ->orderByDesc('id');

@@ -929,6 +929,7 @@ it('links a reused scan to the deployment that passed the gate so unchanged imag
     $job->outputs = ["'web:2'" => $idOf('4').' ', "'cache:1'" => $idOf('2').' ', "'worker:1'" => $idOf('3').' '];
 
     deployGateCall($job, 'checkComposeImageScanGate');
+    test()->queue->update(['status' => ApplicationDeploymentStatus::FINISHED->value]);
 
     expect(ResourceScans::currentFor($this->application->fresh())->pluck('image_ref')->sort()->values()->all())
         ->toBe(['cache:1', 'web:2', 'worker:1']);
@@ -1122,4 +1123,37 @@ it('takes the current scans from the latest deployment, also when an older image
     expect(ResourceScans::currentFor($application)->pluck('id')->all())->toBe([$current->id])
         ->and(ResourceScans::currentForMany(collect([$application]))->get(ResourceScans::key($application))->pluck('id')->all())->toBe([$current->id])
         ->and($stale->exists)->toBeTrue();
+});
+
+it('keeps the scan of the last finished deployment current after a blocked or failed deployment', function (ApplicationDeploymentStatus $status) {
+    $finished = deployGatePreviousDeployment('gate-finished-d2', ApplicationDeploymentStatus::FINISHED);
+    $blocked = deployGatePreviousDeployment('gate-blocked-d3', $status);
+    $running = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('e', 64), 'deployment_queue_id' => $finished->id, 'scanned_at' => now()->subDay()]);
+    deployGateStoredScan([deployGateFindingRow()], ['image_id' => 'sha256:'.str_repeat('f', 64), 'deployment_queue_id' => $blocked->id, 'scanned_at' => now()]);
+
+    $application = $this->application->fresh();
+
+    expect(ResourceScans::currentFor($application)->pluck('id')->all())->toBe([$running->id])
+        ->and(ResourceScans::currentForMany(collect([$application]))->get(ResourceScans::key($application))->pluck('id')->all())->toBe([$running->id]);
+})->with([
+    'failed' => [ApplicationDeploymentStatus::FAILED],
+    'in progress' => [ApplicationDeploymentStatus::IN_PROGRESS],
+]);
+
+it('falls back to the scan of a deployment that did not finish when there is no other', function () {
+    $failed = deployGatePreviousDeployment('gate-failed-d1', ApplicationDeploymentStatus::FAILED);
+    $scan = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('e', 64), 'deployment_queue_id' => $failed->id]);
+
+    $application = $this->application->fresh();
+
+    expect(ResourceScans::currentFor($application)->pluck('id')->all())->toBe([$scan->id])
+        ->and(ResourceScans::currentForMany(collect([$application]))->get(ResourceScans::key($application))->pluck('id')->all())->toBe([$scan->id]);
+});
+
+it('prefers a scan without a deployment over the scan of a failed deployment', function () {
+    $failed = deployGatePreviousDeployment('gate-failed-d1', ApplicationDeploymentStatus::FAILED);
+    deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('e', 64), 'deployment_queue_id' => $failed->id, 'scanned_at' => now()]);
+    $unlinked = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('f', 64), 'deployment_queue_id' => null, 'scanned_at' => now()->subDay()]);
+
+    expect(ResourceScans::currentFor($this->application->fresh())->pluck('id')->all())->toBe([$unlinked->id]);
 });
