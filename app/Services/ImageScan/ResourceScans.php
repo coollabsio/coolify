@@ -115,8 +115,10 @@ final class ResourceScans
     }
 
     /**
-     * The latest completed scan that is not a preview. The other images scanned by the same deployment (a compose
-     * application builds several) are current too.
+     * The completed scan of the latest deployment that is not a preview, else the latest scan without a deployment.
+     * The deployment decides, not the scan time: a redeploy of an older image links its older scan to the newer
+     * deployment. The other images scanned by the same deployment (a compose application builds several) are current
+     * too.
      *
      * @param  list<string>  $columns
      * @return Collection<int, ImageScan>
@@ -130,18 +132,16 @@ final class ResourceScans
             ->where('status', ImageScanStatus::Completed)
             ->where(fn (Builder $query) => $query
                 ->whereNull('deployment_queue_id')
-                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)))
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id');
+                ->orWhereHas('deploymentQueue', fn (Builder $query) => $query->where('pull_request_id', 0)));
 
-        $latest = $query()->first();
+        $latest = self::latestFirst($query())->first();
         if (! $latest instanceof ImageScan) {
             return collect();
         }
 
         $scans = $latest->deployment_queue_id === null
             ? collect([$latest])
-            : $query()->where('deployment_queue_id', $latest->deployment_queue_id)->get();
+            : $query()->where('deployment_queue_id', $latest->deployment_queue_id)->orderByDesc('scanned_at')->orderByDesc('id')->get();
 
         return $scans->each(fn (ImageScan $scan) => $scan->setRelation('resource', $owner))->values();
     }
@@ -284,8 +284,7 @@ final class ResourceScans
                     $query->orWhere(fn (Builder $query) => $query->where('resource_type', $type)->whereIn('resource_id', $ids));
                 }
             })
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
+            ->tap(fn (Builder $query) => self::latestFirst($query))
             ->get()
             ->groupBy(fn (ImageScan $scan): string => $scan->resource_type.':'.$scan->resource_id)
             ->flatMap(function (Collection $group): array {
@@ -298,6 +297,18 @@ final class ResourceScans
             ->map(fn ($id): int => (int) $id)
             ->values()
             ->all();
+    }
+
+    /**
+     * The order of `currentFor()`: scans of the latest deployment first, then scans without a deployment, each by scan
+     * time.
+     */
+    private static function latestFirst(Builder $query): Builder
+    {
+        return $query->orderByRaw('deployment_queue_id is null')
+            ->orderByDesc('deployment_queue_id')
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id');
     }
 
     /**

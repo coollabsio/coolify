@@ -35,8 +35,11 @@ class DeploymentFailed extends CustomEmailNotification
 
     public ?string $fqdn = null;
 
-    /** The gate headline ("Deploy blocked: this image has 2 security problems that attackers are using") when the image scan gate stopped the deployment. Never IDs. */
+    /** The gate headline ("Deploy blocked: this image has 2 security problems that attackers are using") when the image scan gate stopped the deployment, for email. Never IDs. */
     public ?string $blockedTitle = null;
+
+    /** The same headline without counts, for chat and webhook channels. */
+    public ?string $blockedChatTitle = null;
 
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null, ?ApplicationDeploymentQueue $deployment = null)
     {
@@ -54,19 +57,21 @@ class DeploymentFailed extends CustomEmailNotification
         }
         $this->deployment_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
         $this->resolveDeploymentCommitDetails($application, $deployment, $preview);
-        $this->blockedTitle = self::blockedTitle($deployment_uuid, $deployment);
+        $gate = $deployment?->deployment_uuid === $deployment_uuid
+            ? $deployment->scan_gate_result
+            : ApplicationDeploymentQueue::query()->where('deployment_uuid', $deployment_uuid)->value('scan_gate_result');
+        if (is_array($gate) && ($gate['blocked'] ?? false)) {
+            $this->blockedTitle = self::blockedTitle((string) ($gate['headline'] ?? ''));
+            // A result stored before the plain headline existed may count problems: chat gets the generic title then.
+            $this->blockedChatTitle = isset($gate['headline_plain'])
+                ? self::blockedTitle((string) $gate['headline_plain'])
+                : (preg_match('/\d/', (string) ($gate['headline'] ?? '')) === 1 ? self::blockedTitle('') : $this->blockedTitle);
+        }
     }
 
-    private static function blockedTitle(string $deploymentUuid, ?ApplicationDeploymentQueue $deployment): ?string
+    private static function blockedTitle(string $headline): string
     {
-        $gate = $deployment?->deployment_uuid === $deploymentUuid
-            ? $deployment->scan_gate_result
-            : ApplicationDeploymentQueue::query()->where('deployment_uuid', $deploymentUuid)->value('scan_gate_result');
-        if (! is_array($gate) || ! ($gate['blocked'] ?? false)) {
-            return null;
-        }
-
-        $headline = rtrim(NotificationText::plain(mb_substr((string) ($gate['headline'] ?? ''), 0, 300)), '.');
+        $headline = rtrim(NotificationText::plain(mb_substr($headline, 0, 300)), '.');
         if ($headline === '') {
             return 'Deploy blocked by the image scan';
         }
@@ -108,7 +113,7 @@ class DeploymentFailed extends CustomEmailNotification
     {
         if ($this->preview) {
             $message = new DiscordMessage(
-                title: $this->blockedTitle ?? ':cross_mark: Deployment failed',
+                title: $this->blockedChatTitle ?? ':cross_mark: Deployment failed',
                 description: 'Pull request: '.$this->preview->pull_request_id,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
@@ -129,7 +134,7 @@ class DeploymentFailed extends CustomEmailNotification
                 $description = '';
             }
             $message = new DiscordMessage(
-                title: $this->blockedTitle ?? ':cross_mark: Deployment failed',
+                title: $this->blockedChatTitle ?? ':cross_mark: Deployment failed',
                 description: $description,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
@@ -147,8 +152,8 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        if ($this->blockedTitle !== null) {
-            $message = 'Coolify: '.$this->blockedTitle.' ('.$this->application_name.'): ';
+        if ($this->blockedChatTitle !== null) {
+            $message = 'Coolify: '.$this->blockedChatTitle.' ('.$this->application_name.'): ';
         } elseif ($this->preview) {
             $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
         } else {
@@ -169,8 +174,8 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        if ($this->blockedTitle !== null) {
-            $title = $this->blockedTitle;
+        if ($this->blockedChatTitle !== null) {
+            $title = $this->blockedChatTitle;
             $message = 'The image scan blocked the deployment of '.NotificationText::html($this->application_name).'.';
         } elseif ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
@@ -211,8 +216,8 @@ class DeploymentFailed extends CustomEmailNotification
             }
         }
 
-        if ($this->blockedTitle !== null) {
-            $title = $this->blockedTitle;
+        if ($this->blockedChatTitle !== null) {
+            $title = $this->blockedChatTitle;
             $description = 'The image scan blocked the deployment of '.NotificationText::slack($this->application_name).'.';
         }
 
@@ -231,7 +236,7 @@ class DeploymentFailed extends CustomEmailNotification
     {
         $data = [
             'success' => false,
-            'message' => $this->blockedTitle ?? 'Deployment failed',
+            'message' => $this->blockedChatTitle ?? 'Deployment failed',
             'event' => 'deployment_failed',
             'application_name' => $this->application_name,
             'application_uuid' => $this->application->uuid,
@@ -250,7 +255,7 @@ class DeploymentFailed extends CustomEmailNotification
             $data['fqdn'] = $this->fqdn;
         }
 
-        if ($this->blockedTitle !== null) {
+        if ($this->blockedChatTitle !== null) {
             $data['blocked'] = true;
         }
 

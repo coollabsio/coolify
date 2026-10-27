@@ -912,6 +912,8 @@ it('links a reused scan to the deployment that passed the gate so unchanged imag
     deployGatePolicy();
     $this->application->update(['build_pack' => 'dockercompose']);
     $previous = deployGatePreviousDeployment('gate-previous', ApplicationDeploymentStatus::FINISHED);
+    // The deployment that runs now is newer than the one before it.
+    $this->queue = deployGatePreviousDeployment('gate-deployment-2', ApplicationDeploymentStatus::IN_PROGRESS);
     $idOf = fn (string $char) => 'sha256:'.str_repeat($char, 64);
     deployGateStoredScan([], ['image_ref' => 'web:1', 'image_id' => $idOf('1'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
     deployGateStoredScan([], ['image_ref' => 'cache:1', 'image_id' => $idOf('2'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
@@ -1050,4 +1052,74 @@ it('does not gate when the mode is off', function () {
 
     expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
         ->and(test()->queue->fresh()->scan_gate_result)->toBeNull();
+});
+
+it('compares with the image of the latest finished deployment, not with the newest scan', function () {
+    deployGatePolicy();
+    $exploited = deployGateFindingRow(id: 'CVE-2026-5555');
+    // c1 starts image A; c2 starts image B, which adds the exploited finding (deployed anyway).
+    $first = deployGatePreviousDeployment('gate-c1', ApplicationDeploymentStatus::FINISHED, commit: str_repeat('1', 40));
+    $scanA = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('d', 64), 'deployment_queue_id' => $first->id, 'scanned_at' => now()->subDays(2)]);
+    $second = deployGatePreviousDeployment('gate-c2', ApplicationDeploymentStatus::FINISHED, commit: str_repeat('2', 40));
+    deployGateStoredScan([$exploited], ['image_id' => 'sha256:'.str_repeat('b', 64), 'deployment_queue_id' => $second->id, 'scanned_at' => now()->subDay()]);
+    // A redeploy of c1 reuses the scan of image A, which keeps its older scan time.
+    $redeploy = deployGatePreviousDeployment('gate-c1-again', ApplicationDeploymentStatus::FINISHED, commit: str_repeat('1', 40));
+    $scanA->forceFill(['deployment_queue_id' => $redeploy->id])->save();
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([$exploited]));
+
+    expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(ResourceScans::currentFor($this->application->fresh())->pluck('id')->all())->toBe([$scanA->id]);
+});
+
+it('never counts the image of a preview deployment as running', function () {
+    deployGatePolicy();
+    $preview = deployGatePreviousDeployment('gate-preview', ApplicationDeploymentStatus::FINISHED);
+    $preview->forceFill(['pull_request_id' => 3])->save();
+    deployGateStoredScan([deployGateFindingRow()], ['image_id' => 'sha256:'.str_repeat('c', 64), 'deployment_queue_id' => $preview->id]);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+
+    expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
+});
+
+it('matches the running image of a Compose service by its name', function () {
+    deployGatePolicy();
+    $this->application->update(['build_pack' => 'dockercompose']);
+    $previous = deployGatePreviousDeployment('gate-previous', ApplicationDeploymentStatus::FINISHED);
+    $idOf = fn (string $char) => 'sha256:'.str_repeat($char, 64);
+    deployGateStoredScan([deployGateFindingRow()], ['image_ref' => 'web:1', 'image_id' => $idOf('1'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subHour()]);
+    deployGateStoredScan([], ['image_ref' => 'cache:1', 'image_id' => $idOf('2'), 'deployment_queue_id' => $previous->id, 'scanned_at' => now()->subMinute()]);
+    $scanned = [];
+    ScanImage::shouldRun()->twice()->andReturnUsing(function ($server, $resource, string $ref) use (&$scanned) {
+        $scanned[] = $ref;
+
+        return deployGateReturnedScan([deployGateFindingRow()]);
+    });
+    $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => [
+        'web' => ['image' => 'web:2'],
+        'cache' => ['image' => 'cache:2'],
+    ]], 10)]);
+    $job->outputs = ["'web:2'" => $idOf('3').' ', "'cache:2'" => $idOf('4').' '];
+
+    try {
+        deployGateCall($job, 'checkComposeImageScanGate');
+        $this->fail('Expected the gate to block the deploy.');
+    } catch (DeploymentException $exception) {
+        // web:2 has the finding of web:1 and passes; cache:2 adds it and blocks.
+        expect($scanned)->toBe(['web:2', 'cache:2'])
+            ->and($exception->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+            ->and(deployGateLogs())->toContain('Already in the running image: a security problem that attackers are using.');
+    }
+});
+
+it('takes the current scans from the latest deployment, also when an older image was scanned before', function () {
+    $older = deployGatePreviousDeployment('gate-older', ApplicationDeploymentStatus::FINISHED);
+    $newer = deployGatePreviousDeployment('gate-newer', ApplicationDeploymentStatus::FINISHED);
+    $stale = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('e', 64), 'deployment_queue_id' => $older->id, 'scanned_at' => now()]);
+    $current = deployGateStoredScan([], ['image_id' => 'sha256:'.str_repeat('f', 64), 'deployment_queue_id' => $newer->id, 'scanned_at' => now()->subDays(3)]);
+
+    $application = $this->application->fresh();
+
+    expect(ResourceScans::currentFor($application)->pluck('id')->all())->toBe([$current->id])
+        ->and(ResourceScans::currentForMany(collect([$application]))->get(ResourceScans::key($application))->pluck('id')->all())->toBe([$current->id])
+        ->and($stale->exists)->toBeTrue();
 });

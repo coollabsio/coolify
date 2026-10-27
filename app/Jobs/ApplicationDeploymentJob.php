@@ -3028,8 +3028,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * The scan of the image the application ran before this deployment: the latest completed scan of a finished
-     * deployment that is not a preview. A Compose application matches the image by name. Null before the first
+     * The scan of the image the application ran before this deployment: a completed scan of the latest finished
+     * deployment that is not a preview. The deployment decides, not the scan time: a redeploy of an older image links
+     * its older scan to the newer deployment. A Compose application matches the image by name. Null before the first
      * deploy, so every finding of the new image counts as new.
      */
     private function runningImageScan(string $imageRef): ?ImageScan
@@ -3039,6 +3040,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ->whereHas('deploymentQueue', fn ($query) => $query
                 ->where('pull_request_id', 0)
                 ->where('status', ApplicationDeploymentStatus::FINISHED->value))
+            ->orderByDesc('deployment_queue_id')
             ->orderByDesc('scanned_at')
             ->orderByDesc('id');
 

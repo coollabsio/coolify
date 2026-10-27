@@ -27,7 +27,8 @@ final class SecurityGate
 
     /**
      * @param  array<string, int|string>  $ctx  Context of the error message (server).
-     * @return array{blocked: bool, headline: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}}
+     *                                          `headline` counts the problems (email, deploy log); `headline_plain` does not (chat and webhook channels).
+     * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}}
      */
     public static function evaluate(?ImageScan $new, ?ImageScan $running, string $mode, IgnoreMatcher $ignores, ?ImageScanErrorCode $error = null, array $ctx = [], ImageScanOnError $onScanError = ImageScanOnError::Deploy): array
     {
@@ -44,10 +45,12 @@ final class SecurityGate
 
         if ($error !== null) {
             $blocked = $onScanError === ImageScanOnError::Block;
+            $headline = ($blocked ? 'Deploy blocked: ' : 'Scan skipped: ').$error->message($ctx);
 
             return self::result(
                 blocked: $blocked,
-                headline: ($blocked ? 'Deploy blocked: ' : 'Scan skipped: ').$error->message($ctx),
+                headline: $headline,
+                headlinePlain: $headline,
                 error: $error->value,
                 mode: $mode,
             );
@@ -98,6 +101,7 @@ final class SecurityGate
         return self::result(
             blocked: $blocked,
             headline: $blocked ? self::headline($blocking, $eol) : '',
+            headlinePlain: $blocked ? self::headline($blocking, $eol, counted: false) : '',
             new: $blocking,
             carried: self::sorted($carried),
             scanRan: true,
@@ -167,6 +171,7 @@ final class SecurityGate
             'mode' => (string) ($result['mode'] ?? ImageScanGateMode::Off->value),
             'count' => count($new) + (is_array($result['eol'] ?? null) ? 1 : 0),
             'headline' => (string) ($result['headline'] ?? ''),
+            'headline_plain' => (string) ($result['headline_plain'] ?? ''),
             'top' => array_slice($new, 0, self::LOG_LIMIT),
             'carried' => array_slice((array) ($result['carried'] ?? []), 0, self::LOG_LIMIT),
             'carried_count' => count((array) ($result['carried'] ?? [])),
@@ -177,13 +182,19 @@ final class SecurityGate
      * @param  list<array<string, mixed>>  $blocking
      * @param  array{name: string, version: string}|null  $eol
      */
-    private static function headline(array $blocking, ?array $eol): string
+    private static function headline(array $blocking, ?array $eol, bool $counted = true): string
     {
         $signal = array_values(array_filter($blocking, fn (array $row): bool => $row['signal'] !== null));
         if ($signal !== []) {
             $use = collect($signal)->contains(fn (array $row): bool => $row['signal'] === SecurityRules::EXPLOITED) ? 'are using' : 'are likely to use';
 
-            return 'Deploy blocked: this image has '.self::problems(count($signal))." that attackers {$use}.";
+            return $counted
+                ? 'Deploy blocked: this image has '.self::problems(count($signal))." that attackers {$use}."
+                : "Deploy blocked: this image has security problems that attackers {$use}.";
+        }
+
+        if (! $counted) {
+            return 'Deploy blocked: this image needs a security update.';
         }
 
         $count = count($blocking) + ($eol !== null ? 1 : 0);
@@ -300,13 +311,14 @@ final class SecurityGate
      * @param  list<array<string, mixed>>  $new
      * @param  list<array<string, mixed>>  $carried
      * @param  array{name: string, version: string}|null  $eol
-     * @return array{blocked: bool, headline: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}}
+     * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}}
      */
-    private static function result(bool $blocked = false, string $headline = '', array $new = [], array $carried = [], ?string $error = null, bool $scanRan = false, ImageScanGateMode $mode = ImageScanGateMode::Off, ?array $eol = null): array
+    private static function result(bool $blocked = false, string $headline = '', string $headlinePlain = '', array $new = [], array $carried = [], ?string $error = null, bool $scanRan = false, ImageScanGateMode $mode = ImageScanGateMode::Off, ?array $eol = null): array
     {
         return [
             'blocked' => $blocked,
             'headline' => $headline,
+            'headline_plain' => $headlinePlain,
             'new' => $new,
             'carried' => $carried,
             'error' => $error,

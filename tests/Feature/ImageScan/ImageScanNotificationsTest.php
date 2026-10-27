@@ -760,7 +760,7 @@ describe('content', function () {
 });
 
 describe('blocked deploys', function () {
-    it('titles a blocked deploy "Deploy blocked" with counts only in every channel', function () {
+    it('titles a blocked deploy with counts in email and without counts in chat and webhook channels', function () {
         $deployment = ApplicationDeploymentQueue::create([
             'application_id' => $this->application->id,
             'deployment_uuid' => (string) Str::uuid(),
@@ -772,22 +772,42 @@ describe('blocked deploys', function () {
             'scan_gate_result' => [
                 'blocked' => true, 'scan_ran' => true, 'error' => null, 'count' => 2,
                 'headline' => 'Deploy blocked: this image has 2 security problems that attackers are using.',
+                'headline_plain' => 'Deploy blocked: this image has security problems that attackers are using.',
                 'top' => [['id' => 'CVE-2026-1234', 'severity' => 'critical', 'package' => 'openssl', 'version' => '3.0.13', 'fixed_in' => '3.0.15', 'kev' => false]],
             ],
         ]);
 
         $notification = new DeploymentFailed($this->application, $deployment->deployment_uuid, null, $deployment);
 
-        expect($notification->toDiscord()->title)->toStartWith('Deploy blocked: this image has 2 security problems that attackers are using')
-            ->and($notification->toSlack()->title)->toStartWith('Deploy blocked')
-            ->and($notification->toPushover()->title)->toStartWith('Deploy blocked')
-            ->and($notification->toTelegram()['message'])->toContain('Deploy blocked: this image has 2 security problems that attackers are using')
-            ->and($notification->toWebhook()['message'])->toStartWith('Deploy blocked')
-            ->and($notification->toMail($this->team)->subject)->toContain('Deploy blocked');
+        expect($notification->toDiscord()->title)->toBe('Deploy blocked: this image has security problems that attackers are using')
+            ->and($notification->toSlack()->title)->toStartWith('Deploy blocked: this image has security problems')
+            ->and($notification->toPushover()->title)->toStartWith('Deploy blocked: this image has security problems')
+            ->and($notification->toTelegram()['message'])->toContain('Deploy blocked: this image has security problems that attackers are using')
+            ->and($notification->toWebhook()['message'])->toBe('Deploy blocked: this image has security problems that attackers are using')
+            ->and($notification->toMail($this->team)->subject)->toContain('Deploy blocked: this image has 2 security problems that attackers are using');
         foreach (notifyChatPayloads($notification) as $payload) {
-            expect($payload)->not->toContain('CVE-');
+            expect($payload)->not->toContain('CVE-')
+                ->and(preg_match('/\d+ security problems?/', $payload))->toBe(0);
         }
         expect((string) $notification->toMail($this->team)->render())->not->toContain('CVE-');
+    });
+
+    it('leaves the counts out of chat titles of a result stored without a plain headline', function () {
+        $deployment = ApplicationDeploymentQueue::create([
+            'application_id' => $this->application->id,
+            'deployment_uuid' => (string) Str::uuid(),
+            'server_id' => $this->server->id,
+            'server_name' => $this->server->name,
+            'destination_id' => $this->application->destination_id,
+            'pull_request_id' => 0,
+            'status' => ApplicationDeploymentStatus::FAILED->value,
+            'scan_gate_result' => ['blocked' => true, 'scan_ran' => true, 'error' => null, 'count' => 2, 'headline' => 'Deploy blocked: 2 critical vulnerabilities with a fix.'],
+        ]);
+
+        $notification = new DeploymentFailed($this->application, $deployment->deployment_uuid, null, $deployment);
+
+        expect($notification->toWebhook()['message'])->toBe('Deploy blocked by the image scan')
+            ->and($notification->toMail($this->team)->subject)->toContain('Deploy blocked: 2 critical vulnerabilities with a fix');
     });
 
     it('keeps the deployment failed title when the gate did not block', function () {

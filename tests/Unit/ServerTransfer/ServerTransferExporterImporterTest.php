@@ -2083,6 +2083,18 @@ test('scan rules of a bundle from an older version map Block deploys on to stric
         ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(0);
 });
 
+test('scan rules of an older bundle with a Block deploys value that is not a boolean are dropped with a warning', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'high', 'gate_enabled' => 'yes', 'on_scan_error' => 'block'],
+    ];
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(0)
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules of the server were not imported')))->toHaveCount(1);
+});
+
 test('no team-wide ignore warning is exported when the team has none', function () {
     ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => $this->application->getMorphClass(), 'resource_id' => $this->application->id]);
 

@@ -311,3 +311,22 @@ it('reads no candidate entries of a wrapped result without entries', function ()
 
     expect($scan->candidateEntries())->toBe([])->and($scan->candidateStatus())->toBe('auth_required');
 });
+
+it('writes a headline without counts for chat and webhook channels', function (array $findings, array $summary, string $mode, string $counted, string $plain) {
+    $result = SecurityGate::evaluate(securityGateScan($findings, ['summary' => $summary]), null, $mode, securityGateIgnores());
+
+    expect($result['headline'])->toBe($counted)
+        ->and($result['headline_plain'])->toBe($plain)
+        ->and(SecurityGate::stored($result)['headline_plain'])->toBe($plain)
+        ->and($plain)->not->toMatch('/\d/');
+})->with([
+    'exploited' => [[securityGateExploited('CVE-2026-1'), securityGateExploited('CVE-2026-2')], [], 'on',
+        'Deploy blocked: this image has 2 security problems that attackers are using.',
+        'Deploy blocked: this image has security problems that attackers are using.'],
+    'likely' => [[securityGateFinding('CVE-2026-1', ['epss' => 0.3])], [], 'on',
+        'Deploy blocked: this image has a security problem that attackers are likely to use.',
+        'Deploy blocked: this image has security problems that attackers are likely to use.'],
+    'update' => [[securityGateFinding('CVE-2026-1', ['fixState' => 'fixed', 'fixedIn' => '1.1'])], ['eol_distro' => ['name' => 'debian', 'version' => '9']], 'strict',
+        'Deploy blocked: this image has 2 security problems that need a security update.',
+        'Deploy blocked: this image needs a security update.'],
+]);

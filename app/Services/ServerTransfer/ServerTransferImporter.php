@@ -2442,10 +2442,11 @@ class ServerTransferImporter
             };
             $gateMode = array_key_exists('gate_mode', (array) $policyPayload)
                 ? data_get($policyPayload, 'gate_mode')
-                : match (data_get($policyPayload, 'gate_enabled')) {
+                : match ($gateEnabled = data_get($policyPayload, 'gate_enabled')) {
                     true => 'strict',
                     false => 'off',
-                    default => null,
+                    // Anything else is not a value of an old bundle: the validation rejects it.
+                    default => $gateEnabled,
                 };
             $fields = [
                 'gate_mode' => $gateMode,
