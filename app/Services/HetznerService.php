@@ -121,16 +121,18 @@ class HetznerService
     /**
      * Server types that can be ordered now. Each type keeps only the locations
      * where it is in stock and not deprecated, and types with no such location are removed.
+     * With $includeOutOfStock, locations where the type is out of stock are kept.
      */
-    public function getServerTypes(?string $location = null): array
+    public function getServerTypes(?string $location = null, bool $includeOutOfStock = false): array
     {
         $types = $this->requestPaginated('get', '/server_types', 'server_types');
 
         return collect($types)
             ->reject(fn (array $type) => ($type['deprecated'] ?? false) === true)
-            ->map(function (array $type) {
+            ->map(function (array $type) use ($includeOutOfStock) {
                 $type['locations'] = collect($type['locations'] ?? [])
-                    ->filter(fn (array $typeLocation) => ($typeLocation['available'] ?? true) === true && empty($typeLocation['deprecation']))
+                    ->filter(fn (array $typeLocation) => empty($typeLocation['deprecation'])
+                        && ($includeOutOfStock || ($typeLocation['available'] ?? true) === true))
                     ->values()
                     ->all();
 

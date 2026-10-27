@@ -363,4 +363,57 @@ describe('Hetzner data loading', function () {
 
         Http::assertNothingSent();
     });
+    test('lists server types that are out of stock in the selected location as out of stock', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx22', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => false, 'deprecation' => null],
+                        ['id' => 2, 'name' => 'fsn1', 'available' => true, 'deprecation' => null],
+                    ]],
+                    ['id' => 2, 'name' => 'cx32', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null],
+                    ]],
+                    ['id' => 3, 'name' => 'cx11', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => ['announced' => '2025-09-24T00:00:00+00:00', 'unavailable_after' => '2025-12-31T00:00:00+00:00']],
+                    ]],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/*' => Http::response(['locations' => [], 'images' => [], 'ssh_keys' => [], 'firewalls' => [], 'networks' => [], 'meta' => ['pagination' => ['next_page' => null]]], 200),
+        ]);
+
+        $component = Livewire::test(ByHetzner::class, ['selectedTokenUuid' => $this->hetznerToken->uuid])
+            ->call('loadHetznerData')
+            ->set('selected_location', 'nbg1');
+
+        expect(collect($component->instance()->availableServerTypes)->mapWithKeys(fn ($type) => [$type['name'] => $type['out_of_stock']])->all())
+            ->toBe(['cx32' => false, 'cx22' => true]);
+    });
+
+    test('does not create a server with a server type that is out of stock in the selected location', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx22', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => false, 'deprecation' => null],
+                    ]],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/*' => Http::response(['locations' => [], 'images' => [], 'ssh_keys' => [], 'firewalls' => [], 'networks' => [], 'meta' => ['pagination' => ['next_page' => null]]], 200),
+        ]);
+
+        Livewire::test(ByHetzner::class, ['selectedTokenUuid' => $this->hetznerToken->uuid])
+            ->call('loadHetznerData')
+            ->set('server_name', 'test-server')
+            ->set('selected_location', 'nbg1')
+            ->set('selected_server_type', 'cx22')
+            ->set('selected_image', 15512617)
+            ->set('private_key_id', $this->privateKey->id)
+            ->call('submit')
+            ->assertHasErrors(['selected_server_type']);
+
+        Http::assertNotSent(fn ($request) => $request->method() === 'POST');
+    });
 });

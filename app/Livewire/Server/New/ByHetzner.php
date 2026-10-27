@@ -323,7 +323,7 @@ class ByHetzner extends Component
             $hetznerService = new HetznerService($token);
 
             $this->locations = $hetznerService->getLocations();
-            $this->serverTypes = $hetznerService->getServerTypes();
+            $this->serverTypes = $hetznerService->getServerTypes(includeOutOfStock: true);
 
             // Get images and sort by name
             $images = $hetznerService->getImages();
@@ -385,7 +385,7 @@ class ByHetzner extends Component
     public function getAvailableServerTypesProperty()
     {
         if (! $this->selected_location) {
-            return $this->serverTypes;
+            return [];
         }
 
         $filtered = collect($this->serverTypes)
@@ -400,13 +400,22 @@ class ByHetzner extends Component
             })
             ->map(function ($serverType) {
                 $serverType['cpu_vendor_info'] = $this->getCpuVendorInfo($serverType);
+                $serverType['out_of_stock'] = $this->isServerTypeOutOfStock($serverType);
 
                 return $serverType;
             })
+            ->sortBy('out_of_stock')
             ->values()
             ->toArray();
 
         return $filtered;
+    }
+
+    private function isServerTypeOutOfStock(array $serverType): bool
+    {
+        $typeLocation = collect($serverType['locations'] ?? [])->firstWhere('name', $this->selected_location);
+
+        return ($typeLocation['available'] ?? true) === false;
     }
 
     public function getAvailableImagesProperty()
@@ -669,6 +678,13 @@ class ByHetzner extends Component
     public function submit()
     {
         $this->validate();
+
+        $selectedServerType = collect($this->serverTypes)->firstWhere('name', $this->selected_server_type);
+        if ($selectedServerType && $this->isServerTypeOutOfStock($selectedServerType)) {
+            $this->addError('selected_server_type', 'This server type is out of stock in the selected location. Select a different server type or location.');
+
+            return null;
+        }
 
         if (! $this->enable_ipv4 && ! $this->enable_ipv6) {
             $this->addError('enable_ipv4', 'Enable at least one public IP protocol.');
