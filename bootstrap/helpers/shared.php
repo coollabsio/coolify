@@ -1259,6 +1259,32 @@ function parseEnvFormatToArray($env_file_contents)
 }
 
 /**
+ * Format a value for a KEY=VALUE line of the developer view, so that parseEnvFormatToArray()
+ * reads it back unchanged. Returns null when the format cannot hold the value: it has a line
+ * break, or it needs quotes and has both quote types.
+ */
+function formatEnvValueForDevView(?string $value): ?string
+{
+    $value ??= '';
+    if (str_contains($value, "\n")) {
+        return null;
+    }
+
+    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1;
+    if (! $needsQuotes) {
+        return $value;
+    }
+    if (! str_contains($value, "'")) {
+        return "'{$value}'";
+    }
+    if (! str_contains($value, '"')) {
+        return "\"{$value}\"";
+    }
+
+    return null;
+}
+
+/**
  * Extract inline comments from environment variables in raw docker-compose YAML.
  *
  * Parses raw docker-compose YAML to extract inline comments from environment sections.

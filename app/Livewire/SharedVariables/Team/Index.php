@@ -85,8 +85,12 @@ class Index extends Component
             if ($item->is_multiline) {
                 return "$item->key=(Multiline environment variable, edit in normal view)";
             }
+            $value = formatEnvValueForDevView($item->value);
+            if ($value === null) {
+                return "$item->key=(Value cannot be shown in this view, edit in normal view)";
+            }
 
-            return "$item->key=$item->value";
+            return "$item->key=$value";
         })->join("\n");
     }
 
@@ -149,7 +153,7 @@ class Index extends Component
             $found = $this->team->environment_variables()->where('key', $key)->first();
 
             if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     if ($found->value !== $value) {
                         $found->value = $value;
                         $found->save();
