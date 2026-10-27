@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -447,4 +448,61 @@ describe('environment variable key validation for app and service APIs', functio
             ])
             ->assertStatus(422);
     });
+});
+
+describe('bulk env update for services and databases', function () {
+    test('cannot move an environment variable to a resource of another team', function (string $resourceType) {
+        $resource = $resourceType === 'services'
+            ? Service::factory()->create([
+                'server_id' => $this->server->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+                'environment_id' => $this->environment->id,
+            ])
+            : StandalonePostgresql::create([
+                'name' => 'test-postgres',
+                'image' => 'postgres:15-alpine',
+                'postgres_user' => 'postgres',
+                'postgres_password' => 'password',
+                'postgres_db' => 'postgres',
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]);
+
+        $otherTeam = Team::factory()->create();
+        $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+        $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->first();
+        $victim = Application::factory()->create([
+            'environment_id' => Environment::factory()->create([
+                'project_id' => Project::factory()->create(['team_id' => $otherTeam->id])->id,
+            ])->id,
+            'destination_id' => $otherDestination->id,
+            'destination_type' => $otherDestination->getMorphClass(),
+        ]);
+
+        $existing = EnvironmentVariable::create([
+            'key' => 'EXISTING',
+            'value' => 'old-value',
+            'resourceable_type' => $resource->getMorphClass(),
+            'resourceable_id' => $resource->id,
+        ]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/{$resourceType}/{$resource->uuid}/envs/bulk", [
+            'data' => [
+                ['key' => 'EXISTING', 'value' => 'new-value', 'resourceable_type' => Application::class, 'resourceable_id' => $victim->id],
+                ['key' => 'CREATED', 'value' => 'x', 'resourceable_type' => Application::class, 'resourceable_id' => $victim->id],
+            ],
+        ])->assertStatus(201);
+
+        $existing->refresh();
+        expect($existing->resourceable_id)->toBe($resource->id)
+            ->and($existing->resourceable_type)->toBe($resource->getMorphClass())
+            ->and($existing->value)->toBe('new-value')
+            ->and($victim->environment_variables()->whereIn('key', ['EXISTING', 'CREATED'])->exists())->toBeFalse()
+            ->and($resource->environment_variables()->where('key', 'CREATED')->exists())->toBeTrue();
+    })->with(['services', 'databases']);
 });

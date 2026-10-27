@@ -832,12 +832,9 @@ class ServerTransferImporter
         int $teamId = 0,
     ): ?Model {
         $type = (string) data_get($payload, 'type', 'StandalonePostgresql');
-        $modelClass = self::DATABASE_MODELS[$type]
-            ?? (is_string(data_get($payload, 'model')) && class_exists((string) data_get($payload, 'model'))
-                ? (string) data_get($payload, 'model')
-                : null);
+        $modelClass = self::DATABASE_MODELS[$type] ?? null;
 
-        if (! $modelClass || ! class_exists($modelClass)) {
+        if (! $modelClass) {
             throw new RuntimeException("Unsupported database type: {$type}");
         }
 
