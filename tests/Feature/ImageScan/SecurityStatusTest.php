@@ -292,7 +292,7 @@ describe('status rules', function () {
             ->and(array_column($security->why, 'display_id'))->toBe(['CVE-2024-0001']);
     });
 
-    it('knows that every image that drives no_fix is built by a builder', function () {
+    it('knows that a builder update fixes every problem without a fix', function () {
         $builder = statusTestApplication(['build_pack' => 'nixpacks']);
         statusTestScan($builder, [statusTestFinding('CVE-2024-0001', ['kev' => true])], ['builds_image' => true]);
         $dockerfile = statusTestApplication(['build_pack' => 'dockerfile']);
@@ -305,11 +305,34 @@ describe('status rules', function () {
             ->and($builderSecurity->builderImage)->toBeTrue()
             ->and(SecurityStatus::stored($builder)->builderImage)->toBeTrue()
             ->and(ResourceSecurity::fromArray($builderSecurity->toArray())->builderImage)->toBeTrue()
+            ->and(SecuritySentences::headline($builderSecurity))->toContain('A fix exists, but it reaches this app only with a builder update')
             ->and(SecurityStatus::forResource($dockerfile)->builderImage)->toBeFalse()
             ->and(SecurityStatus::forResource($this->application)->builderImage)->toBeFalse();
     });
 
-    it('does not call a no_fix image a builder image unless every image that drives it is', function () {
+    it('does not promise a builder fix for a builder image without a fixed version', function () {
+        $builder = statusTestApplication(['build_pack' => 'nixpacks']);
+        statusTestScan($builder, [statusTestFinding('CVE-2024-0001', ['kev' => true, 'fixedIn' => null, 'fixState' => 'not-fixed'])], ['builds_image' => true]);
+
+        $security = SecurityStatus::forResource($builder);
+
+        expect($security->status)->toBe(SecurityStatusType::NoFix)
+            ->and($security->builderImage)->toBeFalse()
+            ->and(SecuritySentences::headline($security))->toContain('no fixed version exists yet')
+            ->and(SecuritySentences::headline($security))->not->toContain('A fix exists');
+    });
+
+    it('does not promise a builder fix for a language package of a builder image', function () {
+        $builder = statusTestApplication(['build_pack' => 'nixpacks']);
+        statusTestScan($builder, [
+            statusTestFinding('CVE-2024-0001', ['kev' => true]),
+            statusTestFinding('CVE-2024-0002', ['kev' => true, 'type' => 'binary', 'package' => 'tool']),
+        ], ['builds_image' => true]);
+
+        expect(SecurityStatus::forResource($builder)->builderImage)->toBeFalse();
+    });
+
+    it('does not call a service no_fix a builder one when another image drives it', function () {
         $service = statusTestService();
         $web = statusTestServiceApplication($service, 'web', 'nginx:1.27');
         $worker = statusTestServiceApplication($service, 'worker', 'nginx:1.27');

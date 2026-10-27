@@ -12,6 +12,14 @@ use Throwable;
  */
 final class SecuritySentences
 {
+    private const CHECK_REASONS = [
+        SecurityStatus::REASON_IMAGES_UNCHECKED,
+        SecurityStatus::REASON_STALE,
+        SecurityStatus::REASON_DB_OUTDATED,
+        SecurityStatus::REASON_IMAGE_CHANGED,
+        SecurityStatus::REASON_VERSIONS_UNCHECKED,
+    ];
+
     /**
      * The sentence under the status line.
      */
@@ -20,9 +28,11 @@ final class SecuritySentences
         return match ($security->status) {
             SecurityStatusType::UpdateNow => self::updateNow($security),
             SecurityStatusType::UpdateAvailable => self::updateAvailable($security),
-            SecurityStatusType::NoFix => $security->builderImage ? SecurityActions::BUILDER_TEXT : self::noFix($security),
+            SecurityStatusType::NoFix => self::noFix($security),
             SecurityStatusType::Ok => 'No action needed.',
-            SecurityStatusType::CheckNeeded => 'Coolify needs to check this image again: '.self::checkReason((string) $security->checkReason, self::checkContext($security)).'.',
+            SecurityStatusType::CheckNeeded => 'Coolify needs to check this image again: '.(in_array($security->checkReason, self::CHECK_REASONS, true)
+                ? self::checkReason((string) $security->checkReason, self::checkContext($security))
+                : 'the last check is incomplete').'.',
             SecurityStatusType::NotChecked => self::checkReason((string) ($security->checkReason ?? 'not_scanned'), $security->checkContext),
         };
     }
@@ -41,15 +51,17 @@ final class SecuritySentences
         $unfixed = match ($security->status) {
             SecurityStatusType::UpdateNow => $security->exploitedCount - $security->problemCount,
             SecurityStatusType::UpdateAvailable => $security->exploitedCount,
-            default => null,
+            default => 0,
         };
-        if ($unfixed === null) {
+        if ($unfixed < 1) {
             return [];
         }
 
+        $use = (int) data_get($security->facts, 'counts.kev_unfixed', 0) > 0 ? 'are using' : 'are likely to use';
+
         return [$unfixed > 1
-            ? "{$unfixed} more problems that attackers are using have no fix yet."
-            : 'One more problem that attackers are using has no fix yet.'];
+            ? "{$unfixed} more problems that attackers {$use} have no fix yet."
+            : "One more problem that attackers {$use} has no fix yet."];
     }
 
     /**
@@ -119,14 +131,16 @@ final class SecuritySentences
             return $headline;
         }
 
+        $fixed = $security->fixedByPrimary;
+        $what = $fixed > 0 && $fixed < $security->problemCount ? "{$fixed} of them" : ($security->problemCount === 1 ? 'it' : 'them');
         $sentence = $action->sentence;
         if ($action->type === SecurityActionType::UpdateImage && str_starts_with($sentence, 'Update ') && $sentence !== SecurityActions::COOLIFY_TEXT && str_ends_with($sentence, '.')) {
-            $fixed = $security->fixedByPrimary;
-            $what = $fixed > 0 && $fixed < $security->problemCount ? "{$fixed} of them" : ($security->problemCount === 1 ? 'it' : 'them');
             $sentence = substr($sentence, 0, -1)." to fix {$what}.";
+        } elseif ($action->type === SecurityActionType::PullLatest && $sentence !== SecurityActions::COOLIFY_TEXT) {
+            $sentence = "A newer build of this image fixes {$what}. ".self::pullInstruction($sentence);
         }
 
-        return "{$headline} {$sentence}";
+        return trim("{$headline} {$sentence} ".self::eolSentence($security));
     }
 
     private static function updateAvailable(ResourceSecurity $security): string
@@ -139,13 +153,29 @@ final class SecuritySentences
         ]));
         $breakdown = $parts === [] ? '' : ' ('.implode(', ', $parts).')';
         $noun = $fixed === 1 ? 'problem' : 'problems';
+        $fixes = "This fixes {$fixed} serious {$noun}{$breakdown}.";
 
-        $sentence = trim(($action?->sentence ?? '')." This fixes {$fixed} serious {$noun}{$breakdown}.");
-        if (! $security->exploitedWithoutFix) {
-            $sentence .= ' Attackers are not known to use '.($fixed === 1 ? 'it' : 'them').'.';
+        $sentence = $action?->sentence ?? '';
+        if ($action?->type === SecurityActionType::PullLatest && $sentence !== SecurityActions::COOLIFY_TEXT) {
+            $sentence = 'A newer build of this image is available. '.self::pullInstruction($sentence);
+        }
+        $note = '';
+        $majorNote = ' This is a major version change. Check for breaking changes.';
+        if (str_ends_with($sentence, $majorNote)) {
+            $sentence = substr($sentence, 0, -strlen($majorNote));
+            $note = $majorNote;
         }
 
-        return $sentence;
+        $text = trim("{$sentence} {$fixes}").$note;
+        $eol = self::eolSentence($security);
+        if ($eol !== '') {
+            $text .= " {$eol}";
+        }
+        if (! $security->exploitedWithoutFix) {
+            $text .= ' Attackers are not known to use '.($fixed === 1 ? 'it' : 'them').'.';
+        }
+
+        return $text;
     }
 
     private static function noFix(ResourceSecurity $security): string
@@ -153,7 +183,34 @@ final class SecuritySentences
         $problems = self::problems($security->problemCount);
         $use = $security->anyExploited ? 'are using' : 'are likely to use';
 
-        return "This image has {$problems} that attackers {$use}, and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or ignore the problem if the affected part is not used.";
+        if ($security->builderImage) {
+            return "This image has {$problems} that attackers {$use}. ".SecurityActions::BUILDER_TEXT;
+        }
+
+        $many = $security->problemCount > 1;
+        $ignore = $many ? 'ignore the problems if the affected parts are not used' : 'ignore the problem if the affected part is not used';
+
+        return "This image has {$problems} that attackers {$use}, and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or {$ignore}.";
+    }
+
+    /**
+     * The "pull it" half of a pull_latest sentence: "Pull it and restart." or "Redeploy this app to pull it.".
+     */
+    private static function pullInstruction(string $sentence): string
+    {
+        return str_contains($sentence, 'Redeploy this app to pull it.') ? 'Redeploy this app to pull it.' : 'Pull it and restart.';
+    }
+
+    /**
+     * Said when the primary action moves the image off an end-of-life OS.
+     */
+    private static function eolSentence(ResourceSecurity $security): string
+    {
+        if ($security->eol === null || $security->eol['name'] === '' || (int) data_get($security->facts, 'action_stats.0.eol', 0) < 1) {
+            return '';
+        }
+
+        return trim("It moves off {$security->eol['name']} {$security->eol['version']}, which no longer gets security fixes.");
     }
 
     private static function problems(int $count): string

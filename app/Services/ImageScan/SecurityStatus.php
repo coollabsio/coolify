@@ -66,7 +66,7 @@ final class SecurityStatus
 
     private const STORED_COLUMNS = ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_ref', 'summary', 'scanned_at'];
 
-    private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'relevant_fixed'];
+    private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'relevant_fixed', 'builder_unfixed'];
 
     /**
      * The status of one scanned image, with the age of the result.
@@ -182,6 +182,16 @@ final class SecurityStatus
         $scan->summary = $summary;
     }
 
+    /**
+     * A finding of a builder image that a builder update would fix: an OS package with a fixed version.
+     */
+    private static function builderCanFix(Finding $finding): bool
+    {
+        return in_array(strtolower($finding->type), ['apk', 'deb', 'rpm'], true)
+            && $finding->fixState === 'fixed'
+            && ($finding->fixedIn ?? '') !== '';
+    }
+
     private static function notChecked(string $reason): ResourceSecurity
     {
         return new ResourceSecurity(status: SecurityStatusType::NotChecked, checkReason: $reason);
@@ -248,6 +258,7 @@ final class SecurityStatus
         $unfixed = [];
         $seen = [];
         $hasRelevant = false;
+        $isBuilder = SecurityActions::imageKind($scan, $owner) === 'builder';
         foreach (ResourceScans::findings($scan) as $finding) {
             $key = mb_strtolower($finding->id);
             if (isset($seen[$key]) || ! SecurityRules::isRelevant($finding, $ignores)) {
@@ -265,6 +276,7 @@ final class SecurityStatus
                 if ($signal !== null) {
                     $counts['signal_unfixed']++;
                     $counts['kev_unfixed'] += $signal === SecurityRules::EXPLOITED ? 1 : 0;
+                    $counts['builder_unfixed'] += $isBuilder && self::builderCanFix($finding) ? 1 : 0;
                     $unfixed[] = $why;
                 }
 
@@ -324,7 +336,6 @@ final class SecurityStatus
             eol: $eol,
             checkedAt: $scan->scanned_at === null ? null : CarbonImmutable::instance($scan->scanned_at),
             facts: ['reasons' => $reasons, 'counts' => $counts, 'action_stats' => $stats, 'unfixed_why' => self::topWhy($unfixed)],
-            builderImage: SecurityActions::imageKind($scan, $owner) === 'builder',
         )], null, false);
     }
 
@@ -343,12 +354,8 @@ final class SecurityStatus
         $eol = null;
         $checkedAt = null;
         $unknownTime = false;
-        $unfixedParts = [];
         foreach ($parts as $part) {
             $facts = $part->facts;
-            if ((int) data_get($facts, 'counts.signal_unfixed', 0) > 0) {
-                $unfixedParts[] = $part;
-            }
             foreach ($part->actions as $index => $action) {
                 $entries[] = ['action' => $action, 'stats' => self::stats(data_get($facts, "action_stats.{$index}"))];
             }
@@ -445,7 +452,7 @@ final class SecurityStatus
                 'action_stats' => array_map(fn (array $entry): array => $entry['stats'], $entries),
                 'unfixed_why' => self::topWhy($unfixed),
             ],
-            builderImage: $unfixedParts !== [] && collect($unfixedParts)->every(fn (ResourceSecurity $part): bool => $part->builderImage),
+            builderImage: $counts['signal_unfixed'] > 0 && $counts['builder_unfixed'] === $counts['signal_unfixed'],
         );
     }
 

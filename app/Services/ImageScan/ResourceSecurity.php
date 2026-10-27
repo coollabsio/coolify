@@ -24,8 +24,8 @@ use Throwable;
  * An action that leaves an end-of-life OS counts it as one critical relevant fix (`problemCount`, `criticalCount`,
  * `fixedByPrimary`, `primaryCritical`); `eol.fixed` says so. It is not in `why` or `moreFixed`.
  *
- * `builderImage`: every image whose findings drive no_fix is built by a builder (Nixpacks, Railpack, static), so the
- * no_fix text is the builder text.
+ * `builderImage`: every no_fix finding is an OS package with a fix in an image that a builder (Nixpacks, Railpack,
+ * static) builds, so a builder update fixes it and the no_fix text says so.
  *
  * `checkedAt` is the time of the oldest current scan of the resource (null when one has no time); `stale` uses it.
  *

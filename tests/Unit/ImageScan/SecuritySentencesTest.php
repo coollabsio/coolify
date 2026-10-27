@@ -121,14 +121,28 @@ it('leaves out "Attackers are not known to use" when a problem that attackers us
 });
 
 it('writes the exploited_without_fix extra line for update_now and update_available', function () {
-    expect(SecuritySentences::lines(sentenceUpdateNow(['exploitedWithoutFix' => true, 'exploitedCount' => 2])))
+    $kev = ['counts' => ['kev_unfixed' => 1]];
+
+    expect(SecuritySentences::lines(sentenceUpdateNow(['exploitedWithoutFix' => true, 'exploitedCount' => 2, 'facts' => $kev])))
         ->toBe(['One more problem that attackers are using has no fix yet.'])
-        ->and(SecuritySentences::lines(sentenceUpdateNow(['exploitedWithoutFix' => true, 'exploitedCount' => 4])))
+        ->and(SecuritySentences::lines(sentenceUpdateNow(['exploitedWithoutFix' => true, 'exploitedCount' => 4, 'facts' => $kev])))
         ->toBe(['3 more problems that attackers are using have no fix yet.'])
-        ->and(SecuritySentences::lines(sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 1])))
+        ->and(SecuritySentences::lines(sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 1, 'facts' => $kev])))
         ->toBe(['One more problem that attackers are using has no fix yet.'])
-        ->and(SecuritySentences::lines(sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 2])))
+        ->and(SecuritySentences::lines(sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 2, 'facts' => $kev])))
         ->toBe(['2 more problems that attackers are using have no fix yet.']);
+});
+
+it('says "likely to use" in the extra line when no problem without a fix is a known exploited one', function () {
+    expect(SecuritySentences::lines(sentenceUpdateNow(['exploitedWithoutFix' => true, 'exploitedCount' => 2])))
+        ->toBe(['One more problem that attackers are likely to use has no fix yet.'])
+        ->and(SecuritySentences::lines(sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 3, 'facts' => ['counts' => ['kev_unfixed' => 0]]])))
+        ->toBe(['3 more problems that attackers are likely to use have no fix yet.']);
+});
+
+it('writes no extra line when nothing is left without a fix', function () {
+    expect(SecuritySentences::lines(sentenceUpdateNow(['exploitedWithoutFix' => true, 'exploitedCount' => 1])))->toBe([])
+        ->and(SecuritySentences::lines(sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 0])))->toBe([]);
 });
 
 it('writes no extra line without the exploited_without_fix flag or for other statuses', function () {
@@ -145,20 +159,78 @@ it('says "likely to use" for a no_fix image when no problem is a known exploited
 });
 
 it('writes the no_fix headline', function () {
-    $tail = ', and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or ignore the problem if the affected part is not used.';
+    $middle = ', and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or ';
 
     expect(SecuritySentences::headline(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true])))
-        ->toBe('This image has a security problem that attackers are using'.$tail)
+        ->toBe('This image has a security problem that attackers are using'.$middle.'ignore the problem if the affected part is not used.')
         ->and(SecuritySentences::headline(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2, 'anyExploited' => true])))
-        ->toBe('This image has 2 security problems that attackers are using'.$tail);
+        ->toBe('This image has 2 security problems that attackers are using'.$middle.'ignore the problems if the affected parts are not used.');
 });
 
-it('uses the builder text for a no_fix image that a builder builds', function () {
-    $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true, 'builderImage' => true]);
+it('writes the builder no_fix headline with the problem first', function () {
+    $builder = fn (bool $kev, int $count): string => SecuritySentences::headline(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => $count, 'anyExploited' => $kev, 'builderImage' => true]));
 
-    expect(SecuritySentences::headline($security))->toBe(SecurityActions::BUILDER_TEXT)
+    expect($builder(true, 1))->toBe('This image has a security problem that attackers are using. '.SecurityActions::BUILDER_TEXT)
+        ->and($builder(false, 2))->toBe('This image has 2 security problems that attackers are likely to use. '.SecurityActions::BUILDER_TEXT)
         ->and(SecuritySentences::headline(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true])))
-        ->not->toBe(SecurityActions::BUILDER_TEXT);
+        ->not->toContain(SecurityActions::BUILDER_TEXT);
+});
+
+it('says what a pull_latest action fixes in update_now', function () {
+    $pull = sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.');
+    $compose = sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Redeploy this app to pull it.');
+    $coolify = sentenceAction(SecurityActionType::PullLatest, SecurityActions::COOLIFY_TEXT);
+    $head = 'This image has a security problem that attackers are using. ';
+
+    expect(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$pull]])))->toBe($head.'A newer build of this image fixes it. Pull it and restart.')
+        ->and(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$compose]])))->toBe($head.'A newer build of this image fixes it. Redeploy this app to pull it.')
+        ->and(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$coolify]])))->toBe($head.SecurityActions::COOLIFY_TEXT)
+        ->and(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$pull], 'problemCount' => 3, 'fixedByPrimary' => 3])))
+        ->toBe('This image has 3 security problems that attackers are using. A newer build of this image fixes them. Pull it and restart.')
+        ->and(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$pull], 'problemCount' => 3, 'fixedByPrimary' => 2])))
+        ->toEndWith('A newer build of this image fixes 2 of them. Pull it and restart.');
+});
+
+it('says a newer build is available for a pull_latest action in update_available', function () {
+    $pull = sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.');
+    $compose = sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Redeploy this app to pull it.');
+    $coolify = sentenceAction(SecurityActionType::PullLatest, SecurityActions::COOLIFY_TEXT);
+
+    expect(SecuritySentences::headline(sentenceUpdateAvailable(['actions' => [$pull]])))
+        ->toBe('A newer build of this image is available. Pull it and restart. This fixes 3 serious problems (1 critical, 2 high). Attackers are not known to use them.')
+        ->and(SecuritySentences::headline(sentenceUpdateAvailable(['actions' => [$compose]])))
+        ->toStartWith('A newer build of this image is available. Redeploy this app to pull it. This fixes')
+        ->and(SecuritySentences::headline(sentenceUpdateAvailable(['actions' => [$coolify]])))
+        ->toStartWith(SecurityActions::COOLIFY_TEXT.' This fixes');
+});
+
+it('puts "This fixes" before the major version note', function () {
+    $upgrade = sentenceAction(SecurityActionType::UpgradePackage, 'Upgrade lodash to 5.0.0 or later, then redeploy. This is a major version change. Check for breaking changes.');
+
+    expect(SecuritySentences::headline(sentenceUpdateAvailable(['actions' => [$upgrade], 'fixedByPrimary' => 1, 'primaryCritical' => 1, 'primaryHigh' => 0])))
+        ->toBe('Upgrade lodash to 5.0.0 or later, then redeploy. This fixes 1 serious problem (1 critical). This is a major version change. Check for breaking changes. Attackers are not known to use it.');
+});
+
+it('says when the primary action moves the image off an end-of-life OS', function () {
+    $eol = ['name' => 'Alpine', 'version' => '3.16', 'fixed' => true];
+    $stats = ['action_stats' => [['eol' => 1]]];
+    $sentence = 'It moves off Alpine 3.16, which no longer gets security fixes.';
+
+    expect(SecuritySentences::headline(sentenceUpdateAvailable(['eol' => $eol, 'facts' => $stats])))
+        ->toBe('Update to 16.4-alpine. This fixes 3 serious problems (1 critical, 2 high). '.$sentence.' Attackers are not known to use them.')
+        ->and(SecuritySentences::headline(sentenceUpdateNow(['eol' => $eol, 'facts' => $stats])))
+        ->toEndWith('Update to 16.4-alpine to fix it. '.$sentence)
+        ->and(SecuritySentences::headline(sentenceUpdateAvailable(['eol' => $eol, 'facts' => ['action_stats' => [['eol' => 0]]]])))
+        ->not->toContain('no longer gets')
+        ->and(SecuritySentences::headline(sentenceUpdateAvailable(['eol' => ['name' => 'Alpine', 'version' => '3.16', 'fixed' => false]])))
+        ->not->toContain('no longer gets');
+});
+
+it('says the last check is incomplete for an unknown check_needed reason', function () {
+    expect(SecuritySentences::headline(sentenceSecurity(SecurityStatusType::CheckNeeded, ['checkReason' => 'something_new'])))
+        ->toBe('Coolify needs to check this image again: the last check is incomplete.')
+        ->and(SecuritySentences::headline(sentenceSecurity(SecurityStatusType::CheckNeeded)))
+        ->toBe('Coolify needs to check this image again: the last check is incomplete.');
 });
 
 it('writes the ok headline', function () {
@@ -247,6 +319,10 @@ it('never writes an em dash, "safe" or "secure" in any sentence', function () {
         sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1]), sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 3]),
         sentenceSecurity(SecurityStatusType::Ok),
         sentenceSecurity(SecurityStatusType::NotChecked),
+        sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2, 'builderImage' => true]),
+        sentenceSecurity(SecurityStatusType::CheckNeeded, ['checkReason' => 'unknown']),
+        sentenceUpdateNow(['actions' => [sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.')], 'eol' => ['name' => 'Alpine', 'version' => '3.16', 'fixed' => true], 'facts' => ['action_stats' => [['eol' => 1]]]]),
+        sentenceUpdateAvailable(['actions' => [sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.')], 'eol' => ['name' => 'Alpine', 'version' => '3.16', 'fixed' => true], 'facts' => ['action_stats' => [['eol' => 1]]]]),
     ];
     foreach (['instance', 'server', 'application', 'not_scanned'] as $code) {
         $securities[] = sentenceSecurity(SecurityStatusType::NotChecked, ['checkReason' => $code]);
