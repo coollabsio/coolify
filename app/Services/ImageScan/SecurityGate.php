@@ -14,7 +14,9 @@ use App\Models\ImageScan;
  *
  * - On: blocks when the new image has a relevant finding with an exploit signal that the running image of the app
  *   does not have (by ID and aliases). Such findings that the running image has too are listed as a warning, so an
- *   EPSS change of a finding that already runs never blocks. Without a running image every finding is new.
+ *   EPSS change of a finding that already runs never blocks. Before the first deploy every finding is new. When the
+ *   app ran before but Coolify has no earlier scan to compare with (`$baselineMissing`), nothing blocks: the findings
+ *   are listed as a warning and this deploy becomes the baseline.
  * - Strict: blocks on any relevant finding with an exploit signal, any relevant critical or high finding with a
  *   package fix, and an end-of-life OS.
  * - Off never blocks. A scan that cannot run, or whose report was cut (`summary.truncated`), follows "If the scan
@@ -29,9 +31,9 @@ final class SecurityGate
     /**
      * @param  array<string, int|string>  $ctx  Context of the error message (server).
      *                                          `headline` counts the problems (email, deploy log); `headline_plain` does not (chat and webhook channels).
-     * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}}
+     * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}, baseline_missing: bool}
      */
-    public static function evaluate(?ImageScan $new, ?ImageScan $running, string $mode, IgnoreMatcher $ignores, ?ImageScanErrorCode $error = null, array $ctx = [], ImageScanOnError $onScanError = ImageScanOnError::Deploy): array
+    public static function evaluate(?ImageScan $new, ?ImageScan $running, string $mode, IgnoreMatcher $ignores, ?ImageScanErrorCode $error = null, array $ctx = [], ImageScanOnError $onScanError = ImageScanOnError::Deploy, bool $baselineMissing = false): array
     {
         $mode = ImageScanGateMode::tryFrom($mode) ?? ImageScanGateMode::Off;
         $completed = $new !== null && $new->status === ImageScanStatus::Completed;
@@ -85,7 +87,7 @@ final class SecurityGate
             if ($signal === null) {
                 continue;
             }
-            if (self::inSet($finding, $runningIds)) {
+            if ($baselineMissing || self::inSet($finding, $runningIds)) {
                 $carried[] = self::row($finding, $signal);
             } else {
                 $blocking[] = self::row($finding, $signal);
@@ -113,6 +115,7 @@ final class SecurityGate
             scanRan: true,
             mode: $mode,
             eol: $eol,
+            baselineMissing: $baselineMissing && $mode === ImageScanGateMode::On,
         );
     }
 
@@ -149,11 +152,16 @@ final class SecurityGate
             $lines[] = 'Image scan: passed.';
         }
 
+        $baselineMissing = (bool) ($result['baseline_missing'] ?? false);
+        if ($baselineMissing) {
+            $lines[] = 'Coolify has no earlier scan of this app to compare with. This deploy becomes the baseline.';
+        }
+
         $carried = (array) ($result['carried'] ?? []);
         if ($carried !== []) {
             $use = collect($carried)->contains(fn (array $row): bool => $row['signal'] === SecurityRules::EXPLOITED) ? 'are using' : 'are likely to use';
-            $lines[] = 'Already in the running image: '.self::problems(count($carried))." that attackers {$use}.";
-            $lines = [...$lines, ...self::rowLines($carried, 'already running')];
+            $lines[] = ($baselineMissing ? 'This image has ' : 'Already in the running image: ').self::problems(count($carried))." that attackers {$use}.";
+            $lines = [...$lines, ...self::rowLines($carried, $baselineMissing ? null : 'already running')];
         }
 
         return $lines;
@@ -181,6 +189,7 @@ final class SecurityGate
             'top' => array_slice($new, 0, self::LOG_LIMIT),
             'carried' => array_slice((array) ($result['carried'] ?? []), 0, self::LOG_LIMIT),
             'carried_count' => count((array) ($result['carried'] ?? [])),
+            'baseline_missing' => (bool) ($result['baseline_missing'] ?? false),
         ];
     }
 
@@ -317,9 +326,9 @@ final class SecurityGate
      * @param  list<array<string, mixed>>  $new
      * @param  list<array<string, mixed>>  $carried
      * @param  array{name: string, version: string}|null  $eol
-     * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}}
+     * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}, baseline_missing: bool}
      */
-    private static function result(bool $blocked = false, string $headline = '', string $headlinePlain = '', array $new = [], array $carried = [], ?string $error = null, bool $scanRan = false, ImageScanGateMode $mode = ImageScanGateMode::Off, ?array $eol = null): array
+    private static function result(bool $blocked = false, string $headline = '', string $headlinePlain = '', array $new = [], array $carried = [], ?string $error = null, bool $scanRan = false, ImageScanGateMode $mode = ImageScanGateMode::Off, ?array $eol = null, bool $baselineMissing = false): array
     {
         return [
             'blocked' => $blocked,
@@ -331,6 +340,7 @@ final class SecurityGate
             'scan_ran' => $scanRan,
             'mode' => $mode->value,
             'eol' => $eol,
+            'baseline_missing' => $baselineMissing,
         ];
     }
 }

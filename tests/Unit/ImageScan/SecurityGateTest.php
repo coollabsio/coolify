@@ -76,6 +76,31 @@ describe('mode on', function () {
             ]);
     });
 
+    it('does not block without an earlier scan of an app that ran before, and says this deploy is the baseline', function () {
+        $result = SecurityGate::evaluate(
+            securityGateScan([securityGateExploited('CVE-2026-1')]),
+            null,
+            'on',
+            securityGateIgnores(),
+            baselineMissing: true,
+        );
+
+        expect($result['blocked'])->toBeFalse()
+            ->and($result['baseline_missing'])->toBeTrue()
+            ->and(SecurityGate::logLines($result))->toBe([
+                'Image scan: passed.',
+                'Coolify has no earlier scan of this app to compare with. This deploy becomes the baseline.',
+                'This image has a security problem that attackers are using.',
+                '  CVE-2026-1  8.1 High  openssl 3.0.13  used by attackers',
+            ]);
+    });
+
+    it('still blocks in strict mode without a baseline', function () {
+        $result = SecurityGate::evaluate(securityGateScan([securityGateExploited('CVE-2026-1')]), null, 'strict', securityGateIgnores(), baselineMissing: true);
+
+        expect($result['blocked'])->toBeTrue()->and($result['baseline_missing'])->toBeFalse();
+    });
+
     it('matches a carried over finding by its aliases', function () {
         $result = SecurityGate::evaluate(
             securityGateScan([securityGateExploited('GHSA-aaaa-bbbb-cccc', ['aliases' => ['CVE-2026-7']])]),

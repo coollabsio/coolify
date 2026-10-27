@@ -330,6 +330,34 @@ it('stores the security status again when the deployment finished', function () 
         ->and($scan->fresh()->summary['security']['status'])->toBe('ok');
 });
 
+it('does not store the security status again when scanning is off for the app', function () {
+    Queue::fake();
+    $this->application->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
+    $scan = ImageScan::factory()->create([
+        'server_id' => $this->server->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->id,
+        'deployment_queue_id' => $this->queue->id,
+        'image_ref' => $this->application->uuid.':'.GATE_COMMIT,
+        'builds_image' => true,
+        'findings' => [],
+        'summary' => ['truncated' => false, 'eol_distro' => null, 'security' => ['status' => 'check_needed', 'check_reason' => 'image_changed']],
+        'grype_db_built_at' => now(),
+    ]);
+    $summaryQueries = 0;
+    DB::listen(function (QueryExecuted $query) use (&$summaryQueries) {
+        if (str_contains($query->sql, 'update "image_scans"')) {
+            $summaryQueries++;
+        }
+    });
+
+    deployGateCall(deployGateJob(), 'post_deployment');
+
+    expect($this->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value)
+        ->and($scan->fresh()->summary['security']['check_reason'])->toBe('image_changed')
+        ->and($summaryQueries)->toBe(0);
+});
+
 it('does not queue a scan after a skipped build or on an additional server when the gate is off', function (array $overrides) {
     Queue::fake();
 
@@ -426,7 +454,8 @@ it('keeps the gate commands intact for a non-root SSH user', function () {
 });
 
 it('blocks a restart that skips the build with the stored scan', function () {
-    deployGatePolicy();
+    // Strict: in On mode the stored scan of the same image is also the baseline of an app that ran before.
+    deployGatePolicy(mode: 'strict');
     ScanImage::shouldRun()->never();
     deployGateStoredScan([deployGateFindingRow()]);
     ApplicationDeploymentQueue::create([
@@ -984,6 +1013,19 @@ it('links the reused scans to the redeploy when it finished so they stay current
         ->and(deployGateCurrentImages())->toBe(['cache:1', 'web:2', 'worker:1']);
 });
 
+it('does not link the reused scans when the deployment was marked failed before it finished', function () {
+    Queue::fake();
+    ['job' => $job, 'previous' => $previous, 'reused' => $reused] = deployGateComposeRedeploy();
+
+    deployGateCall($job, 'checkComposeImageScanGate');
+    // For example, another process marked it failed: completeDeployment() then changes nothing.
+    test()->queue->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+    deployGateCall($job, 'post_deployment');
+
+    expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
+        ->and(ImageScan::query()->whereKey($reused)->pluck('deployment_queue_id')->unique()->all())->toBe([$previous->id]);
+});
+
 it('keeps the link of a reused scan for a preview deployment', function () {
     deployGatePolicy();
     $previous = deployGatePreviousDeployment('gate-previous', ApplicationDeploymentStatus::FINISHED);
@@ -1081,6 +1123,49 @@ it('does not count the image of a blocked deployment as running', function () {
     ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
 
     expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE);
+});
+
+it('does not block and starts a baseline when the app ran before but has no earlier scan', function () {
+    deployGatePolicy();
+    deployGatePreviousDeployment('gate-before-scanning', ApplicationDeploymentStatus::FINISHED, commit: str_repeat('1', 40));
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+
+    expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'scan_ran' => true, 'baseline_missing' => true, 'carried_count' => 1])
+        ->and(deployGateLogs())->toContain('Image scan: passed.')
+        ->toContain('Coolify has no earlier scan of this app to compare with. This deploy becomes the baseline.')
+        ->toContain('This image has a security problem that attackers are using.')
+        ->not->toContain('already running');
+});
+
+it('compares with the newest earlier scan when the app ran before without a scan of its deployment', function (array $newFindings, bool $blocked) {
+    deployGatePolicy();
+    deployGatePreviousDeployment('gate-before-scanning', ApplicationDeploymentStatus::FINISHED, commit: str_repeat('1', 40));
+    // A scan without a deployment (taken before any deployment finished) of an image with the exploited finding.
+    deployGateStoredScan([deployGateFindingRow()], ['image_id' => 'sha256:'.str_repeat('e', 64), 'deployment_queue_id' => null, 'scanned_at' => now()->subDay()]);
+    // The image of a deployment the gate blocked is never the baseline.
+    $blockedDeployment = deployGatePreviousDeployment('gate-blocked', ApplicationDeploymentStatus::FAILED, commit: str_repeat('2', 40), attributes: ['scan_gate_result' => ['blocked' => true]]);
+    deployGateStoredScan([deployGateFindingRow(), deployGateFindingRow(id: 'CVE-2026-9999')], ['image_id' => 'sha256:'.str_repeat('f', 64), 'deployment_queue_id' => $blockedDeployment->id, 'scanned_at' => now()->subHour()]);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan($newFindings));
+
+    if ($blocked) {
+        expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+            ->and(test()->queue->fresh()->scan_gate_result['top'][0]['id'])->toBe('CVE-2026-9999');
+    } else {
+        expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
+            ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'baseline_missing' => false, 'carried_count' => 1]);
+    }
+})->with([
+    'same exploited finding' => [[deployGateFindingRow()], false],
+    'a new exploited finding' => [[deployGateFindingRow(), deployGateFindingRow(id: 'CVE-2026-9999')], true],
+]);
+
+it('counts every finding as new on the first deploy', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+
+    expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(test()->queue->fresh()->scan_gate_result['baseline_missing'])->toBeFalse();
 });
 
 it('blocks a critical problem with a fix only in strict mode', function (string $mode, bool $blocked) {

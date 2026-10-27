@@ -709,7 +709,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function refreshImageScanSecurity(): void
     {
-        if ($this->pull_request_id !== 0) {
+        if ($this->pull_request_id !== 0 || ! ImageScanPolicyResolver::isScanOn($this->application)) {
             return;
         }
 
@@ -3006,11 +3006,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Read before the scan: a scan of the same image takes over the row of the running image.
         $running = $this->runningImageScan($imageRef);
+        $baselineMissing = false;
+        if ($running === null && $this->hasEarlierFinishedDeployment()) {
+            $running = $this->latestEarlierImageScan($imageRef);
+            $baselineMissing = $running === null;
+        }
         $reused = $image !== null ? $this->completedImageScan($image['id']) : null;
         $scan = $reused ?? ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: ScanImage::GATE_LOCK_WAIT_SECONDS, baseImageRef: $this->imageScanBaseImageRef, queueCandidateCheck: false);
         $this->queueImageScanCandidates($scan);
 
-        $this->applyImageScanGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, running: $running);
+        $this->applyImageScanGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, running: $running, baselineMissing: $baselineMissing);
 
         if ($reused !== null) {
             $this->imageScanReusedScans[(int) $reused->id] = true;
@@ -3062,6 +3067,45 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * A finished deployment of this application that is not a preview ran before this one, so this is not the first
+     * deploy.
+     */
+    private function hasEarlierFinishedDeployment(): bool
+    {
+        return ApplicationDeploymentQueue::query()
+            ->where('application_id', (string) $this->application->id)
+            ->where('pull_request_id', 0)
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->whereKeyNot($this->application_deployment_queue->id)
+            ->exists();
+    }
+
+    /**
+     * The gate's baseline when no scan of the running image exists although the app was deployed before (for
+     * example, scanning was turned on after the deploy): the newest completed scan that is not a preview. The scan of
+     * an image the gate blocked never counts, so trying the same image again cannot pass.
+     */
+    private function latestEarlierImageScan(string $imageRef): ?ImageScan
+    {
+        $name = $this->application->build_pack === 'dockercompose' ? ScanImage::imageName($imageRef) : null;
+
+        return $this->application->imageScans()
+            ->where('status', ImageScanStatus::Completed)
+            ->where(fn ($query) => $query
+                ->whereNull('deployment_queue_id')
+                ->orWhereHas('deploymentQueue', fn ($deployment) => $deployment
+                    ->where('pull_request_id', 0)
+                    ->whereKeyNot($this->application_deployment_queue->id)))
+            ->with('deploymentQueue:id,scan_gate_result')
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->first(fn (ImageScan $scan): bool => ! (bool) data_get($scan->deploymentQueue?->scan_gate_result, 'blocked', false)
+                && ($name === null || ScanImage::imageName((string) $scan->image_ref) === $name));
+    }
+
+    /**
      * The stored scans that the gate reused belong to this deployment once it finished, so the current scans of the
      * application (all images of a Compose deployment) include them. Until then they stay with the deployment that
      * ran them: a deployment that is running or failed never takes them over. Preview deployments keep the link of
@@ -3070,6 +3114,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function linkReusedImageScans(): void
     {
         if ($this->pull_request_id !== 0 || $this->imageScanReusedScans === []) {
+            return;
+        }
+
+        // completeDeployment() does nothing when the deployment was cancelled or failed meanwhile.
+        if (ApplicationDeploymentQueue::query()->whereKey($this->application_deployment_queue->id)->value('status') !== ApplicationDeploymentStatus::FINISHED->value) {
             return;
         }
 
@@ -3381,8 +3430,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      *
      * @param  array<string, int|string>  $errorContext
      * @param  ImageScan|null  $running  The scan of the image the application ran before this deployment.
+     * @param  bool  $baselineMissing  The app was deployed before, but Coolify has no earlier scan to compare with.
      */
-    private function applyImageScanGate(?ImageScan $scan, ?ImageScanErrorCode $error = null, array $errorContext = [], ?string $imageRef = null, ?string $repoDigest = null, ?ImageScan $running = null): void
+    private function applyImageScanGate(?ImageScan $scan, ?ImageScanErrorCode $error = null, array $errorContext = [], ?string $imageRef = null, ?string $repoDigest = null, ?ImageScan $running = null, bool $baselineMissing = false): void
     {
         $completed = $scan !== null && $scan->status === ImageScanStatus::Completed;
 
@@ -3393,7 +3443,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $scan?->setRelation('resource', $this->application);
         $policy = $this->imageScanPolicy();
-        $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, IgnoreMatcher::forResource($this->application), $error, $errorContext, $policy->onScanError);
+        $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, IgnoreMatcher::forResource($this->application), $error, $errorContext, $policy->onScanError, $baselineMissing);
         $stored = SecurityGate::stored($result);
         if ($stored['blocked'] && $completed) {
             // The action that fixes the blocked image, for the gate popover.
