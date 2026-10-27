@@ -8,6 +8,7 @@ use App\Data\Traffic\TrafficPathData;
 use App\Data\Traffic\TrafficSeriesBucketData;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use Illuminate\Contracts\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -355,6 +356,56 @@ class SentinelTrafficClient
     }
 
     /**
+     * Fetch the server-wide dashboard bundle of several servers at the same time, so a page
+     * waits for the slowest server instead of for every server in turn. Each response warms
+     * the cache that prefetchServerWide() reads; a failed fetch is remembered like in
+     * fetchDashboard(), so prefetchServerWide() does not fetch it again.
+     *
+     * @param  iterable<int, self>  $clients
+     */
+    public static function prefetchServerWideConcurrently(iterable $clients, string $from, string $to, string $range, int $pathLimit = 50, int $breakdownLimit = 50, int $appsLimit = 200): void
+    {
+        $started = [];
+        foreach ($clients as $client) {
+            $url = $client->dashboardUrl(null, $from, $to, $range, $pathLimit, $breakdownLimit, $appsLimit);
+            if (! $client->fetchesThroughStartRemoteFetch()
+                || Cache::has($client->cacheKey($url))
+                || Cache::get($client->dashboardAbsenceKey()) === true) {
+                continue;
+            }
+
+            try {
+                $started[] = [$client, $url, $client->startRemoteFetch($url)];
+            } catch (\Throwable) {
+                // An unavailable server fails again at once in prefetchServerWide().
+            }
+        }
+
+        foreach ($started as [$client, $url, $process]) {
+            try {
+                Cache::put($client->cacheKey($url), $client->guard($client->awaitRemote($process)), 60);
+            } catch (\Throwable) {
+                Cache::put($client->dashboardAbsenceKey(), true, 60);
+            }
+        }
+    }
+
+    /**
+     * False for a fake that serves canned bodies from raw() or remoteFetch(): the concurrent
+     * prefetch would otherwise reach real SSH.
+     */
+    private function fetchesThroughStartRemoteFetch(): bool
+    {
+        foreach (['raw', 'remoteFetch'] as $method) {
+            if ((new \ReflectionMethod($this, $method))->getDeclaringClass()->getName() !== self::class) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * The usable keys of a Sentinel-reported key list. A key that would be unsafe in a request
      * url is dropped (and logged) on its own, so it doesn't fail the whole server's analytics.
      *
@@ -686,12 +737,20 @@ class SentinelTrafficClient
 
     protected function remoteFetch(string $url): string
     {
+        // Throw the real SSH/docker error (for example, an unreadable SSH key or a missing
+        // container). A literal "null" body comes back empty; guard() rejects the empty string.
+        return $this->awaitRemote($this->startRemoteFetch($url));
+    }
+
+    /**
+     * Start the fetch of one URL without waiting for it, so several servers can be fetched at the same time.
+     */
+    protected function startRemoteFetch(string $url): InvokedProcess
+    {
         $this->ensureRemoteAvailable();
         $token = $this->server->settings->ensureValidSentinelToken();
 
-        // Throw the real SSH/docker error (for example, an unreadable SSH key or a missing
-        // container). A literal "null" body comes back empty; guard() rejects the empty string.
-        return $this->runRemote($this->buildFetchCommand($token, $url));
+        return $this->startRemote($this->buildFetchCommand($token, $url));
     }
 
     /**
@@ -702,7 +761,7 @@ class SentinelTrafficClient
         $this->ensureRemoteAvailable();
         $token = $this->server->settings->ensureValidSentinelToken();
 
-        return $this->runRemote($this->buildBatchCommand($token, $urls));
+        return $this->awaitRemote($this->startRemote($this->buildBatchCommand($token, $urls)));
     }
 
     /**
@@ -722,14 +781,25 @@ class SentinelTrafficClient
     /**
      * Unlike instant_remote_process(), there are no SSH retries; a failure marks the server unavailable.
      */
-    private function runRemote(string $command): string
+    private function startRemote(string $command): InvokedProcess
     {
         $commands = $this->server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $this->server) : [$command];
 
         try {
-            $process = Process::timeout(self::REMOTE_TIMEOUT)->run(
+            return Process::timeout(self::REMOTE_TIMEOUT)->start(
                 SshMultiplexingHelper::generateSshCommand($this->server, implode("\n", $commands), commandTimeout: self::REMOTE_TIMEOUT)
             );
+        } catch (\Throwable $e) {
+            Cache::put($this->unavailableKey(), true, self::UNAVAILABLE_TTL);
+
+            throw $e;
+        }
+    }
+
+    private function awaitRemote(InvokedProcess $invoked): string
+    {
+        try {
+            $process = $invoked->wait();
 
             if ($process->exitCode() !== 0) {
                 excludeCertainErrors($process->errorOutput(), $process->exitCode());
