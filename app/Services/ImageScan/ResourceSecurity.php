@@ -19,6 +19,12 @@ use Throwable;
  *
  * `exploitedCount` is all relevant findings with an exploit signal, with or without an action; so
  * `exploitedCount - problemCount` of update_now (or `exploitedCount` of update_available) have no fix yet.
+ * `primaryCritical` and `primaryHigh` are the critical and high fixes of the primary action.
+ *
+ * An action that leaves an end-of-life OS counts it as one critical relevant fix (`problemCount`, `criticalCount`,
+ * `fixedByPrimary`, `primaryCritical`); `eol.fixed` says so. It is not in `why` or `moreFixed`.
+ *
+ * `checkedAt` is the time of the oldest current scan of the resource (null when one has no time); `stale` uses it.
  *
  * `checkReason` is the check_needed reason (`images_unchecked` {checked, total}, `stale` {time}, `db_outdated`,
  * `image_changed`, `versions_unchecked`; context in `checkContext`), or the not_checked reason (`instance`, `server`,
@@ -54,6 +60,8 @@ final readonly class ResourceSecurity
         public int $criticalCount = 0,
         public int $highCount = 0,
         public int $fixedByPrimary = 0,
+        public int $primaryCritical = 0,
+        public int $primaryHigh = 0,
         public ?array $eol = null,
         public ?CarbonImmutable $checkedAt = null,
         public array $facts = [],
@@ -83,6 +91,8 @@ final readonly class ResourceSecurity
             'critical_count' => $this->criticalCount,
             'high_count' => $this->highCount,
             'fixed_by_primary' => $this->fixedByPrimary,
+            'primary_critical' => $this->primaryCritical,
+            'primary_high' => $this->primaryHigh,
             'eol' => $this->eol,
             'checked_at' => $this->checkedAt?->toIso8601String(),
             'facts' => $this->facts,
@@ -95,15 +105,26 @@ final readonly class ResourceSecurity
     public static function fromArray(array $data): self
     {
         $eol = is_array($data['eol'] ?? null) ? $data['eol'] : null;
+        $facts = (array) ($data['facts'] ?? []);
+        $stats = (array) ($facts['action_stats'] ?? []);
+        $actions = [];
+        $actionStats = [];
+        foreach (array_values((array) ($data['actions'] ?? [])) as $index => $actionData) {
+            $action = is_array($actionData) ? SecurityAction::fromArray($actionData) : null;
+            if ($action !== null) {
+                $actions[] = $action;
+                $actionStats[] = $stats[$index] ?? [];
+            }
+        }
+        if (array_key_exists('action_stats', $facts)) {
+            $facts['action_stats'] = $actionStats;
+        }
 
         return new self(
             status: SecurityStatusType::tryFrom((string) ($data['status'] ?? '')) ?? SecurityStatusType::NotChecked,
             checkReason: isset($data['check_reason']) ? (string) $data['check_reason'] : null,
             checkContext: (array) ($data['check_context'] ?? []),
-            actions: array_values(array_filter(array_map(
-                fn ($action): ?SecurityAction => is_array($action) ? SecurityAction::fromArray($action) : null,
-                (array) ($data['actions'] ?? []),
-            ))),
+            actions: $actions,
             why: array_values(array_map(fn ($entry): array => self::whyEntry((array) $entry), (array) ($data['why'] ?? []))),
             moreFixed: (int) ($data['more_fixed'] ?? 0),
             exploitedWithoutFix: (bool) ($data['exploited_without_fix'] ?? false),
@@ -113,9 +134,11 @@ final readonly class ResourceSecurity
             criticalCount: (int) ($data['critical_count'] ?? 0),
             highCount: (int) ($data['high_count'] ?? 0),
             fixedByPrimary: (int) ($data['fixed_by_primary'] ?? 0),
+            primaryCritical: (int) ($data['primary_critical'] ?? 0),
+            primaryHigh: (int) ($data['primary_high'] ?? 0),
             eol: $eol === null ? null : ['name' => (string) ($eol['name'] ?? ''), 'version' => (string) ($eol['version'] ?? ''), 'fixed' => (bool) ($eol['fixed'] ?? false)],
             checkedAt: self::time($data['checked_at'] ?? null),
-            facts: (array) ($data['facts'] ?? []),
+            facts: $facts,
         );
     }
 

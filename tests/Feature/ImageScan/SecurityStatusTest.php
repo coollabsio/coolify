@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
 
@@ -239,7 +240,39 @@ describe('status rules', function () {
 
         expect($security->status)->toBe(SecurityStatusType::UpdateAvailable)
             ->and($security->eol)->toMatchArray(['name' => 'alpine', 'version' => '3.16', 'fixed' => true])
-            ->and($security->actions[0]->type)->toBe(SecurityActionType::UpdateImage);
+            ->and($security->actions[0]->type)->toBe(SecurityActionType::UpdateImage)
+            ->and($security->problemCount)->toBe(1)
+            ->and($security->criticalCount)->toBe(1)
+            ->and($security->fixedByPrimary)->toBe(1)
+            ->and($security->primaryCritical)->toBe(1)
+            ->and($security->why)->toBe([])
+            ->and($security->moreFixed)->toBe(0);
+    });
+
+    it('counts leaving an end-of-life OS as one critical fix of the action', function () {
+        statusTestScan($this->application, [
+            statusTestFinding('CVE-2024-0001'),
+            statusTestFinding('CVE-2024-0002', ['package' => 'curl']),
+            statusTestFinding('CVE-2024-0003', ['package' => 'zlib', 'severity' => 'critical']),
+        ], [
+            'summary' => ['truncated' => false, 'eol_distro' => ['name' => 'alpine', 'version' => '3.16']],
+            'candidates' => statusTestCandidates([
+                'nginx:1.28' => ['CVE-2024-0001'],
+                'nginx:1.27' => ['CVE-2024-0002', 'CVE-2024-0003'],
+            ]),
+        ]);
+
+        $security = SecurityStatus::forResource($this->application);
+
+        // 1 high + the end-of-life OS ties with 1 high + 1 critical; update_image comes first in the type order.
+        expect($security->actions[0]->type)->toBe(SecurityActionType::UpdateImage)
+            ->and($security->problemCount)->toBe(4)
+            ->and($security->criticalCount)->toBe(2)
+            ->and($security->highCount)->toBe(2)
+            ->and($security->fixedByPrimary)->toBe(2)
+            ->and($security->primaryCritical)->toBe(1)
+            ->and($security->primaryHigh)->toBe(1)
+            ->and($security->moreFixed)->toBe(0);
     });
 
     it('has no fix when a finding that attackers are using has no action', function () {
@@ -304,6 +337,53 @@ describe('check needed reasons', function () {
         expect($security->status)->toBe(SecurityStatusType::CheckNeeded)
             ->and($security->checkReason)->toBe('images_unchecked')
             ->and($security->checkContext)->toBe(['checked' => 1, 'total' => 2]);
+    });
+
+    it('counts only the images of a service that Coolify scans', function () {
+        $service = statusTestService();
+        $web = statusTestServiceApplication($service, 'web', 'nginx:1.27');
+        statusTestServiceApplication($service, 'sidecar', 'busybox:1')->forceFill(['exclude_from_status' => true])->save();
+        statusTestServiceApplication($service, 'empty', '');
+        statusTestScan($web, []);
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($web));
+
+        expect(SecurityStatus::forResource($service)->status)->toBe(SecurityStatusType::Ok)
+            ->and(SecurityStatus::stored($service->fresh())->status)->toBe(SecurityStatusType::Ok);
+    });
+
+    it('needs a check when an image of the current Compose deployment has no completed result', function (string $missing) {
+        $application = statusTestApplication(['build_pack' => 'dockercompose']);
+        $deployment = ApplicationDeploymentQueue::create([
+            'deployment_uuid' => Str::random(12),
+            'application_id' => $application->id,
+            'server_id' => $this->server->id,
+            'status' => ApplicationDeploymentStatus::FINISHED->value,
+            'pull_request_id' => 0,
+        ]);
+        $application->forceFill(['docker_compose' => Yaml::dump(['services' => [
+            'web' => ['image' => 'nginx:1.27'],
+            'db' => ['image' => 'postgres:16'],
+            'cache' => ['image' => '${CACHE_IMAGE:-redis:7}'],
+        ]])])->save();
+        statusTestScan($application, [], ['deployment_queue_id' => $deployment->id]);
+        if ($missing === 'failed row') {
+            statusTestScan($application, [], ['deployment_queue_id' => $deployment->id, 'image_ref' => 'postgres:16', 'status' => ImageScanStatus::Failed]);
+        }
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($application));
+
+        foreach ([SecurityStatus::forResource($application), SecurityStatus::stored($application)] as $security) {
+            expect($security->status)->toBe(SecurityStatusType::CheckNeeded)
+                ->and($security->checkReason)->toBe('images_unchecked')
+                ->and($security->checkContext)->toBe(['checked' => 1, 'total' => 2]);
+        }
+    })->with(['failed row', 'image without a row']);
+
+    it('treats a Compose deployment with a result for every image as checked', function () {
+        $application = statusTestApplication(['build_pack' => 'dockercompose']);
+        $application->forceFill(['docker_compose' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:1.27']]])])->save();
+        statusTestScan($application, []);
+
+        expect(SecurityStatus::forResource($application)->status)->toBe(SecurityStatusType::Ok);
     });
 
     it('needs a check when the newest result is older than 2 days', function () {
@@ -452,26 +532,34 @@ describe('primary action and why-list', function () {
         expect(SecurityStatus::forResource($this->application)->why[0]['link'])->toBeNull();
     });
 
-    it('merges the updates of service images of one repository and line into one action', function () {
+    it('merges the updates of service images that run one tag and update to one tag into one action', function () {
         $service = statusTestService();
         $main = statusTestServiceApplication($service, 'n8n', 'n8nio/n8n:1.0');
-        $worker = statusTestServiceApplication($service, 'n8n-worker', 'n8nio/n8n:1.0');
-        $runner = statusTestServiceApplication($service, 'runner', 'n8nio/runners:1.0');
-        foreach ([$main, $worker, $runner] as $owner) {
-            $ref = $owner->image;
+        $runners = statusTestServiceApplication($service, 'n8n runners', 'n8nio/runners:1.0');
+        $cache = statusTestServiceApplication($service, 'cache', 'redis:7.0');
+        foreach ([[$main, 'n8nio/n8n:1.1'], [$runners, 'n8nio/runners:1.1'], [$cache, 'redis:1.1']] as [$owner, $candidate]) {
             statusTestScan($owner, [statusTestFinding('CVE-2024-0001', ['kev' => true])], [
-                'image_ref' => $ref,
-                'candidates' => statusTestCandidates([str_replace(':1.0', ':1.1', $ref) => ['CVE-2024-0001']]),
+                'image_ref' => $owner->image,
+                'candidates' => statusTestCandidates([$candidate => ['CVE-2024-0001']]),
             ]);
         }
 
         $security = SecurityStatus::forResource($service);
 
         expect($security->status)->toBe(SecurityStatusType::UpdateNow)
-            ->and(array_map(fn ($action) => $action->sentence, $security->actions))->toBe(['Update n8n and n8n-worker to 1.1.', 'Update to 1.1.'])
+            ->and(array_map(fn ($action) => $action->sentence, $security->actions))->toBe(['Update n8n and n8n runners to 1.1.', 'Update to 1.1.'])
             ->and($security->actions[0]->fixedIds)->toBe(['CVE-2024-0001'])
+            ->and($security->actions[0]->parts)->toBe([
+                ['owner_type' => $main->getMorphClass(), 'owner_id' => $main->id, 'image' => 'n8nio/n8n:1.0', 'ref' => 'n8nio/n8n:1.1'],
+                ['owner_type' => $runners->getMorphClass(), 'owner_id' => $runners->id, 'image' => 'n8nio/runners:1.0', 'ref' => 'n8nio/runners:1.1'],
+            ])
+            ->and($security->actions[1]->parts)->toBe([])
+            ->and($security->actions[1]->image)->toBe('redis:7.0')
             ->and($security->problemCount)->toBe(3)
             ->and($security->fixedByPrimary)->toBe(2);
+
+        ResourceScans::refreshSummaries(ResourceScans::current($service));
+        expect(SecurityStatus::stored($service->fresh())->actions[0]->parts)->toBe($security->actions[0]->parts);
     });
 
     it('gives Coolify its status but no buttons', function () {
@@ -550,6 +638,22 @@ describe('stored status', function () {
         ResourceScans::refreshSummaries(collect([$scan]));
 
         expect($scan->fresh()->summary)->not->toHaveKey('security');
+    });
+
+    it('keeps the action data with its action when a stored action cannot be read', function () {
+        statusTestScan($this->application, [
+            statusTestFinding('CVE-2024-0001', ['kev' => true]),
+            statusTestFinding('CVE-2024-0002', ['package' => 'curl']),
+        ], ['candidates' => statusTestCandidates(['nginx:1.28' => ['CVE-2024-0002'], 'nginx:1.27' => ['CVE-2024-0001']])]);
+        $data = SecurityStatus::forResource($this->application)->toArray();
+        $data['actions'][0]['type'] = 'unknown';
+
+        $security = ResourceSecurity::fromArray($data);
+
+        expect($security->actions)->toHaveCount(1)
+            ->and($security->actions[0]->type)->toBe(SecurityActionType::UpdateImage)
+            ->and($security->facts['action_stats'])->toHaveCount(1)
+            ->and($security->facts['action_stats'][0]['high'])->toBe(1);
     });
 
     it('round-trips through the array form', function () {

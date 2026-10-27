@@ -2,6 +2,7 @@
 
 namespace App\Services\ImageScan;
 
+use App\Actions\ImageScan\ScanImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
 use App\Models\Application;
@@ -11,11 +12,14 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Traits\HasImageScans;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 use WeakMap;
 
 /**
@@ -67,6 +71,36 @@ final class ResourceScans
     }
 
     /**
+     * The images Coolify scans for a resource without a deployment: each application and database of a service, or
+     * the resource itself (a standalone database), with its image. Owners excluded from the status and owners without
+     * an image are not scanned.
+     *
+     * @return list<array{0: Model, 1: string}>
+     */
+    public static function scanTargets(Model $resource): array
+    {
+        $owners = match (true) {
+            $resource instanceof Service => $resource->applications()->get()->concat($resource->databases()->get()),
+            in_array(HasImageScans::class, class_uses_recursive($resource), true) => collect([$resource]),
+            default => collect(),
+        };
+
+        return $owners
+            ->filter(fn (Model $owner): bool => self::isScanTarget($owner))
+            ->map(fn (Model $owner): array => [$owner, trim((string) $owner->getAttribute('image'))])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Whether Coolify scans the image of an application or database of a service, or of a standalone database.
+     */
+    public static function isScanTarget(Model $owner): bool
+    {
+        return ! $owner->getAttribute('exclude_from_status') && trim((string) $owner->getAttribute('image')) !== '';
+    }
+
+    /**
      * The current scans of every owner of the resource.
      *
      * @param  Collection<int, Model>|null  $owners
@@ -110,6 +144,57 @@ final class ResourceScans
             : $query()->where('deployment_queue_id', $latest->deployment_queue_id)->get();
 
         return $scans->each(fn (ImageScan $scan) => $scan->setRelation('resource', $owner))->values();
+    }
+
+    /**
+     * The images of a Compose application without a completed result in its current deployment: rows of that
+     * deployment that failed or did not finish, and images of the stored Compose file without a row of it. Images set
+     * with a variable are left out. 0 for other resources.
+     *
+     * @param  Collection<int, ImageScan>  $currentScans  The current scans of the application (see `currentFor()`).
+     */
+    public static function uncheckedComposeImages(Model $owner, Collection $currentScans): int
+    {
+        if (! $owner instanceof Application || $owner->build_pack !== 'dockercompose') {
+            return 0;
+        }
+
+        $deploymentId = $currentScans->first()?->deployment_queue_id;
+        $rows = $deploymentId === null
+            ? $currentScans
+            : ImageScan::query()
+                ->select(['id', 'image_ref', 'status'])
+                ->where('resource_type', $owner->getMorphClass())
+                ->where('resource_id', $owner->getKey())
+                ->where('deployment_queue_id', $deploymentId)
+                ->get();
+
+        $unfinished = $rows->filter(fn (ImageScan $row): bool => $row->status !== ImageScanStatus::Completed)->count();
+        $rowNames = $rows->map(fn (ImageScan $row): string => ScanImage::imageName((string) $row->image_ref))->unique()->all();
+
+        return $unfinished + count(array_diff(self::composeImageNames($owner), $rowNames));
+    }
+
+    /**
+     * The image names (without tag) of the services of the stored Compose file of an application.
+     *
+     * @return list<string>
+     */
+    private static function composeImageNames(Application $application): array
+    {
+        try {
+            $compose = Yaml::parse((string) ($application->docker_compose ?: $application->docker_compose_raw));
+        } catch (ParseException) {
+            return [];
+        }
+
+        return collect((array) data_get($compose, 'services', []))
+            ->map(fn ($service) => data_get($service, 'image'))
+            ->filter(fn ($image): bool => is_string($image) && trim($image) !== '' && ! str_contains($image, '$'))
+            ->map(fn (string $image): string => ScanImage::imageName($image))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

@@ -891,7 +891,7 @@ class ScanImage
     /**
      * The image reference without tag and digest, lowercase.
      */
-    private static function imageName(string $imageRef): string
+    public static function imageName(string $imageRef): string
     {
         $name = strtolower(trim(explode('@', $imageRef, 2)[0]));
 

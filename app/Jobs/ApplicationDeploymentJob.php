@@ -37,6 +37,7 @@ use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
+use App\Services\ImageScan\ResourceScans;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -693,6 +694,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->dispatchImageScanAfterStart();
+        $this->refreshImageScanSecurity();
+    }
+
+    /**
+     * The gate scanned the new image while the deployment was in progress, so its stored security status compared it
+     * with the image of the previous deployment. Now that this deployment finished, the status is stored again.
+     */
+    private function refreshImageScanSecurity(): void
+    {
+        if ($this->pull_request_id !== 0) {
+            return;
+        }
+
+        try {
+            ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     private function deploy_simple_dockerfile()

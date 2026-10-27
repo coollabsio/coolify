@@ -10,6 +10,10 @@ use App\Enums\SecurityActionType;
 final readonly class SecurityAction
 {
     /**
+     * `parts`: an update_image that merges the images of several applications or databases of a service lists each
+     * image it updates (owner morph type and key, scanned image, candidate ref). A button for it must update every
+     * part. Empty for an action of one image, which uses `image` and `ref`.
+     *
      * @param  string  $sentence  The text of spec 15.5.
      * @param  ?string  $target  The tag (update_image, pull_latest), the new base image (change_base), or the package.
      * @param  ?string  $copy  Text for the copy button: `FROM {new}` or `{package} {fixed_in}`.
@@ -17,6 +21,7 @@ final readonly class SecurityAction
      * @param  bool  $button  Coolify can do it with a button (update_image, pull_latest, rebuild). Callers still authorize.
      * @param  ?string  $image  The scanned image it belongs to.
      * @param  ?string  $ref  The candidate image to switch to (update_image, pull_latest).
+     * @param  list<array{owner_type: string, owner_id: int|string, image: ?string, ref: ?string}>  $parts  See above.
      */
     public function __construct(
         public SecurityActionType $type,
@@ -27,10 +32,11 @@ final readonly class SecurityAction
         public bool $button,
         public ?string $image,
         public ?string $ref = null,
+        public array $parts = [],
     ) {}
 
     /**
-     * @return array{type: string, sentence: string, target: ?string, copy: ?string, fixed_ids: list<string>, button: bool, image: ?string, ref: ?string}
+     * @return array{type: string, sentence: string, target: ?string, copy: ?string, fixed_ids: list<string>, button: bool, image: ?string, ref: ?string, parts: list<array{owner_type: string, owner_id: int|string, image: ?string, ref: ?string}>}
      */
     public function toArray(): array
     {
@@ -43,6 +49,7 @@ final readonly class SecurityAction
             'button' => $this->button,
             'image' => $this->image,
             'ref' => $this->ref,
+            'parts' => $this->parts,
         ];
     }
 
@@ -67,6 +74,12 @@ final readonly class SecurityAction
             button: (bool) ($data['button'] ?? false),
             image: isset($data['image']) ? (string) $data['image'] : null,
             ref: isset($data['ref']) ? (string) $data['ref'] : null,
+            parts: array_values(array_map(fn ($part): array => [
+                'owner_type' => (string) data_get($part, 'owner_type', ''),
+                'owner_id' => data_get($part, 'owner_id'),
+                'image' => is_string(data_get($part, 'image')) ? data_get($part, 'image') : null,
+                'ref' => is_string(data_get($part, 'ref')) ? data_get($part, 'ref') : null,
+            ], array_filter((array) ($data['parts'] ?? []), 'is_array'))),
         );
     }
 }

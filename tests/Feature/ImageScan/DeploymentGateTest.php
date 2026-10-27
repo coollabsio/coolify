@@ -286,6 +286,43 @@ it('starts without a scan when the gate is off and scans after the deploy', func
         && $scanJob->queue === 'default');
 });
 
+it('stores the security status again when the deployment finished', function () {
+    Queue::fake();
+    ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'previous-deployment',
+        'application_id' => $this->application->id,
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::FINISHED->value,
+        'commit' => 'fedcba9876543210fedcba9876543210fedcba98',
+    ]);
+    $this->queue = ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'gate-deployment-2',
+        'application_id' => $this->application->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        'commit' => GATE_COMMIT,
+    ]);
+    $scan = ImageScan::factory()->create([
+        'server_id' => $this->server->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->id,
+        'deployment_queue_id' => $this->queue->id,
+        'image_ref' => $this->application->uuid.':'.GATE_COMMIT,
+        'builds_image' => true,
+        'findings' => [],
+        'summary' => ['truncated' => false, 'eol_distro' => null],
+        'grype_db_built_at' => now(),
+    ]);
+    ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
+    expect($scan->fresh()->summary['security']['check_reason'])->toBe('image_changed');
+
+    deployGateCall(deployGateJob(), 'post_deployment');
+
+    expect($this->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value)
+        ->and($scan->fresh()->summary['security']['status'])->toBe('ok');
+});
+
 it('does not queue a scan after a skipped build or on an additional server when the gate is off', function (array $overrides) {
     Queue::fake();
 

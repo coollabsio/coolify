@@ -11,7 +11,7 @@ use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\Service;
 use App\Services\ImageScan\ImageScanPolicyResolver;
-use App\Traits\HasImageScans;
+use App\Services\ImageScan\ResourceScans;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -232,18 +232,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function scanTargetsFor(Model $resource): array
     {
-        $owners = match (true) {
-            $resource instanceof Service => $resource->applications()->get()->concat($resource->databases()->get()),
-            in_array(HasImageScans::class, class_uses_recursive($resource), true) => collect([$resource]),
-            default => collect(),
-        };
-
-        return $owners
-            ->filter(fn (Model $owner): bool => ! $owner->getAttribute('exclude_from_status'))
-            ->map(fn (Model $owner): array => [$owner, trim((string) $owner->getAttribute('image'))])
-            ->filter(fn (array $target): bool => $target[1] !== '')
-            ->values()
-            ->all();
+        return ResourceScans::scanTargets($resource);
     }
 
     private function derivedImageCount(): int
