@@ -12,8 +12,12 @@ class FakeMetricsClient extends SentinelMetricsClient
     /** @var array<int, string> */
     public array $failing = [];
 
+    /** @var array<int, string> */
+    public array $urls = [];
+
     protected function raw(string $url): string
     {
+        $this->urls[] = $url;
         foreach ($this->failing as $needle) {
             if (str_contains($url, $needle)) {
                 throw new RuntimeException('boom');
@@ -247,3 +251,16 @@ it('prefers the root mount over the host mount of the Coolify data directory', f
 
     expect($client->history('disk', '24h'))->toBe([[1699999800000, 60.0]]);
 });
+
+it('asks sentinel to bucket history rows by range', function (string $range, int $bucketMs) {
+    $client = fakeMetricsClient();
+
+    $client->history('memory', $range);
+    $client->networkHistory($range);
+
+    expect($client->urls)->each->toContain("bucket_ms={$bucketMs}");
+})->with([
+    ['24h', 300_000],
+    ['7d', 1_800_000],
+    ['30d', 7_200_000],
+]);
