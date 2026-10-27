@@ -31,13 +31,13 @@ test('builds database-specific restore commands', function (string $class, ?stri
     expect($command)->toContain($needle)->toContain("'/tmp/restore file'");
 })->with([
     'postgresql' => [StandalonePostgresql::class, null, 'pg_restore'],
-    'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER'],
-    'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER'],
+    'mysql' => [StandaloneMysql::class, null, 'mysql $client_safety -u $MYSQL_USER'],
+    'mariadb' => [StandaloneMariadb::class, null, 'mariadb $client_safety -u $MARIADB_USER'],
     'mongodb' => [StandaloneMongodb::class, null, 'mongorestore'],
     'sqlite' => [StandaloneSqlite::class, null, '.restore'],
     'service postgres' => [ServiceDatabase::class, 'postgresql', 'pg_restore'],
-    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER'],
-    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER'],
+    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql $client_safety -u $MYSQL_USER'],
+    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb $client_safety -u $MARIADB_USER'],
     'service mongo' => [ServiceDatabase::class, 'mongodb', 'mongorestore'],
 ]);
 
@@ -51,10 +51,10 @@ test('decompresses gzip backups for single-database mysql and mariadb restores',
         ->toContain('is_gzip() { [ "$(head -c 2 "$backup" | od -An -tx1 | tr -d \' \n\')" = 1f8b ]; }')
         ->toEndWith("stream | {$client}");
 })->with([
-    'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
-    'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
-    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
-    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
+    'mysql' => [StandaloneMysql::class, null, 'mysql $client_safety -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
+    'mariadb' => [StandaloneMariadb::class, null, 'mariadb $client_safety -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
+    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql $client_safety -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
+    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb $client_safety -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
 ]);
 
 test('builds dump-all commands and postgres safety scan', function () {
@@ -158,7 +158,7 @@ test('skips the system databases of MySQL and MariaDB all-databases backups by d
     expect($command)->toContain('command -v awk')
         ->toMatch('/stream \| \{?\s*awk /')
         ->toContain('"mysql"')->toContain('"sys"')->toContain('"performance_schema"')->toContain('"information_schema"')
-        ->toContain("| {$binary} -u root");
+        ->toContain("| {$binary} \$client_safety -u root");
 })->with([
     'mysql' => [StandaloneMysql::class, 'mysql'],
     'mariadb' => [StandaloneMariadb::class, 'mariadb'],
@@ -168,7 +168,7 @@ test('restores the system databases of MySQL and MariaDB all-databases backups w
     $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class), '/tmp/backup.sql', true, restoreMysqlUsers: true);
 
     expect($command)->not->toContain('awk')
-        ->toContain("stream | {$binary} -u root");
+        ->toContain("stream | {$binary} \$client_safety -u root");
 })->with([
     'mysql' => [StandaloneMysql::class, 'mysql'],
     'mariadb' => [StandaloneMariadb::class, 'mariadb'],
