@@ -115,17 +115,22 @@ class GithubPrivateRepository extends Component
             ->where('is_public', false)
             ->whereNotNull('app_id')
             ->findOrFail($github_app_id);
-        $token = generateGithubInstallationToken($this->github_app);
-        $repositories = loadRepositoryByPage($this->github_app, $token, $this->page);
-        $this->total_repositories_count = $repositories['total_count'];
-        $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
-        if ($this->repositories->count() < $this->total_repositories_count) {
+        try {
+            $token = generateGithubInstallationToken($this->github_app);
+            $repositories = loadRepositoryByPage($this->github_app, $token, $this->page);
+            $this->total_repositories_count = $repositories['total_count'];
+            $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
             while ($this->repositories->count() < $this->total_repositories_count) {
                 $this->page++;
                 $repositories = loadRepositoryByPage($this->github_app, $token, $this->page);
                 $this->total_repositories_count = $repositories['total_count'];
                 $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
             }
+        } catch (\Throwable $e) {
+            $this->repositories = collect();
+            handleError($e, $this);
+
+            return;
         }
         $this->repositories = $this->repositories->sortBy('name');
         if ($this->repositories->count() > 0) {
@@ -141,12 +146,17 @@ class GithubPrivateRepository extends Component
         $this->selected_repository_repo = data_get($repository, 'name');
         $this->branches = collect();
         $this->page = 1;
-        $this->loadBranchByPage();
-        if ($this->total_branches_count === 100) {
-            while ($this->total_branches_count === 100) {
-                $this->page++;
+        try {
+            do {
                 $this->loadBranchByPage();
-            }
+                $this->page++;
+            } while ($this->total_branches_count === 100);
+        } catch (\Throwable $e) {
+            $this->branches = collect();
+            $this->total_branches_count = 0;
+            handleError($e, $this);
+
+            return;
         }
         $this->branches = sortBranchesByPriority($this->branches);
         $defaultBranch = data_get($repository, 'default_branch', 'main');
@@ -157,7 +167,7 @@ class GithubPrivateRepository extends Component
         $this->detectRepository();
     }
 
-    protected function loadBranchByPage()
+    protected function loadBranchByPage(): void
     {
         $token = generateGithubInstallationToken($this->github_app);
 
@@ -170,7 +180,9 @@ class GithubPrivateRepository extends Component
             ]);
         $json = $response->json();
         if ($response->status() !== 200) {
-            return $this->dispatch('error', $json['message']);
+            $error = data_get($json, 'message', "HTTP {$response->status()}");
+
+            throw new \RuntimeException("Failed to load branches of {$this->selected_repository_owner}/{$this->selected_repository_repo} with error: ".$error);
         }
 
         $this->total_branches_count = count($json);

@@ -212,7 +212,7 @@ function generateGithubToken(GithubApp $source, string $type)
             if (! $response->successful()) {
                 $error = data_get($response->json(), 'message', "HTTP {$response->status()}");
                 if ($error === 'Not Found') {
-                    $error = 'Repository not found. Is it moved or deleted?';
+                    $error = "GitHub App installation {$source->installation_id} was not found. Install the GitHub App again or update its installation ID.";
                 }
                 throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
@@ -388,10 +388,9 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         ]);
     $json = $response->json();
     if ($response->status() !== 200) {
-        return [
-            'total_count' => 0,
-            'repositories' => [],
-        ];
+        $error = data_get($json, 'message', "HTTP {$response->status()}");
+
+        throw new RuntimeException("Failed to load repositories for {$source->name} with error: ".$error);
     }
 
     if ($json['total_count'] === 0) {
