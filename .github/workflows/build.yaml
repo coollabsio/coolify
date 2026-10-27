@@ -35,6 +35,7 @@ jobs:
       - id: version
         env:
           BRANCH: ${{ github.base_ref || github.ref_name }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
         run: |
           coolify="$(scripts/version.sh --build)"
           echo "coolify=$coolify" >> "$GITHUB_OUTPUT"

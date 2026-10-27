@@ -3,6 +3,7 @@ set -euo pipefail
 
 OPTION="$*"
 BRANCH="${BRANCH:-}"
+PULL_REQUEST="${PULL_REQUEST:-}"
 VERSION_FILE=release.json
 ARTIFACT=coolify
 UPSTREAM_FILE=upstream.json
@@ -40,7 +41,7 @@ read_version() {
 	version="$(artifact_version "$channel")"
 	[ -n "$version" ] || die "$VERSION_FILE has no $channel version of $ARTIFACT"
 	if [ "$OPTION" = --build ]; then
-		echo "$version"
+		echo "$version${PULL_REQUEST:+-pr.$PULL_REQUEST}"
 		exit 0
 	fi
 }

@@ -118,6 +118,14 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > [!IMPORTANT]
 > Cut `v4.x` from `main`, or bring an existing one up to date with `main`, before `release/v5.0` is merged into `main`. Afterwards `main` is v5 and v4 lives on `v4.x` alone.
 
+## Pull requests
+
+Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and before `4.6.0-beta.2`.
+
+- Pull requests from forks and Dependabot are built, not published
+- Pull request builds are published to ghcr.io only, as the Docker Hub credentials are in the `release` environment, which no pull request run can use
+- Pull request builds create no git tag and no GitHub release
+
 ## CDN
 
 `scripts/sync-cdn.sh` syncs a channel of `coollabsio/coollabs-cdn` from the commit of the version it syncs: the install and upgrade scripts, the compose files, the environment file, the service templates, the GitHub releases and `versions.json`.
