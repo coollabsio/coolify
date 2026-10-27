@@ -1488,6 +1488,7 @@ class ServerTransferExporter
             'secret' => $storage->secret,
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
+            'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'is_usable' => (bool) $storage->is_usable,
         ];
     }

@@ -14720,6 +14720,9 @@
                                             "region": {
                                                 "type": "string"
                                             },
+                                            "use_path_style_endpoint": {
+                                                "type": "boolean"
+                                            },
                                             "is_usable": {
                                                 "type": "boolean"
                                             },
@@ -14798,6 +14801,10 @@
                                         "type": "string",
                                         "example": "us-east-1",
                                         "description": "S3 region."
+                                    },
+                                    "use_path_style_endpoint": {
+                                        "type": "boolean",
+                                        "description": "Use path-style URLs (endpoint\/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints."
                                     },
                                     "key": {
                                         "type": "string",
@@ -14896,6 +14903,9 @@
                                         },
                                         "region": {
                                             "type": "string"
+                                        },
+                                        "use_path_style_endpoint": {
+                                            "type": "boolean"
                                         },
                                         "is_usable": {
                                             "type": "boolean"
@@ -15021,6 +15031,10 @@
                                     "region": {
                                         "type": "string",
                                         "description": "S3 region."
+                                    },
+                                    "use_path_style_endpoint": {
+                                        "type": "boolean",
+                                        "description": "Use path-style URLs (endpoint\/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS."
                                     },
                                     "key": {
                                         "type": "string",

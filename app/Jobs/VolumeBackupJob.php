@@ -487,7 +487,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function setMinioClientAlias(Server $server, string $container, S3Storage $s3, string $resolveOptions): void
     {
         $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
-            .' mc alias set'.$resolveOptions.' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
+            .' mc alias set'.$resolveOptions.$s3->minioClientPathOption().' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
         $timeout = (int) config('constants.ssh.command_timeout');
 
         SshRetryHandler::retry(

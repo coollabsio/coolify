@@ -119,7 +119,7 @@ class FileDownloadStorageService
             'version' => 'latest',
             'region' => $storage->region,
             'endpoint' => $storage->endpoint,
-            'use_path_style_endpoint' => true,
+            'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'credentials' => false,
             'retries' => 0,
             'http' => array_merge(SafeWebhookUrl::httpClientOptions($storage->endpoint, $storage->trustedInternalHosts()), [
