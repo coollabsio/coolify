@@ -3697,7 +3697,7 @@ it('offers dns provider record creation for a public server ip', function () {
         ->not->toContain('The server has no public IP address; add the DNS record manually.');
 });
 
-it('does not queue file sync jobs when polling dns checks for compose applications', function () {
+it('does not parse the compose file or queue file sync jobs when it shows compose application domains', function () {
     Queue::fake();
 
     $this->application->update([
@@ -3710,12 +3710,10 @@ it('does not queue file sync jobs when polling dns checks for compose applicatio
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
-    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class)->count();
-
     $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
 
-    expect($queuedOnMount)->toBe(1)
-        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+    expect(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(0)
+        ->and($this->application->persistentStorages()->count())->toBe(0)
         ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
 

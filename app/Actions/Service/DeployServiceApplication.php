@@ -20,6 +20,7 @@ class DeployServiceApplication
         $composeServiceName = $serviceApplication->name;
 
         $service->parse();
+        StartService::queueFileStorageSync($service);
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
 

@@ -89,22 +89,13 @@ it('does not read regular bind-mounted file contents while loading service setti
     $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
     $application->setRelation('destination', (object) ['server' => $server]);
 
-    Process::fake(function ($process) {
-        if (str_contains(remoteProcessScript($process), "test -f '/data/large.bin'")) {
-            return Process::result(output: 'OK');
-        }
-
-        if (str_contains(remoteProcessScript($process), "test -d '/data/large.bin'")) {
-            return Process::result(output: 'NOK');
-        }
-
-        return Process::result();
-    });
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains(remoteProcessScript($process), 'empty-directory') ? '1:file' : ''
+    ));
 
     getFilesystemVolumesFromServer($application);
 
     expect($volume->is_directory)->toBeFalse();
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "test -f '/data/large.bin'"));
     Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'cat /data/large.bin') || str_contains(remoteProcessScript($process), 'head -c'));
 });
 
@@ -194,13 +185,15 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     $expression->setRelation('resource', $application);
 
     Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
         str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
-        str_contains(remoteProcessScript($process), 'test -') => 'NOK',
         default => '',
     }));
     getFilesystemVolumesFromServer($application, true);
 
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "test -f '/data/application/my files/config.yaml'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'empty-directory')
+        && str_contains(remoteProcessScript($process), 'my files/config.yaml')
+        && str_contains(remoteProcessScript($process), '"${DATA_PATH:-/srv/app/config.yaml}"'));
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p -- '/data/application/my files/config.yaml'"));
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "dirname -- '/data/application/my files/settings.json'"));
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "tee -- '/data/application/my files/settings.json'"));

@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Jobs\ServerFilesFromServerJob;
 use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -24,6 +25,7 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
+        self::queueFileStorageSync($service);
         // Fetch remote secrets before stopping: if the secret manager fails, the service keeps running.
         // saveComposeConfigs() below reuses the fetched secrets.
         $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
@@ -101,6 +103,18 @@ class StartService
         $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
 
         return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
+    }
+
+    /**
+     * Queues one sync of the file storages with the server for each resource of the service that has
+     * file storages. The sync marks each storage as a file or a directory, as it is on the server.
+     */
+    public static function queueFileStorageSync(Service $service): void
+    {
+        $service->applications()->get()
+            ->concat($service->databases()->get())
+            ->filter(fn (ServiceApplication|ServiceDatabase $resource): bool => $resource->fileStorages()->exists())
+            ->each(fn (ServiceApplication|ServiceDatabase $resource) => ServerFilesFromServerJob::dispatch($resource));
     }
 
     /**

@@ -321,16 +321,10 @@ class Domains extends Component
         if (! $this->isCompose) {
             $this->composeServices = [];
         } elseif ($parseCompose) {
-            try {
-                $parsed = $this->application->parse() ?? [];
-            } catch (\Throwable) {
-                $parsed = [];
-            }
             $this->composeServices = [];
-            $services = data_get($parsed, 'services', []);
-            foreach ($services as $serviceName => $service) {
+            foreach ($this->application->composeServicesWithoutParse() as $serviceName => $service) {
                 if (! isDatabaseImage(data_get($service, 'image'))) {
-                    $this->composeServices[] = $serviceName;
+                    $this->composeServices[] = (string) $serviceName;
                 }
             }
         }

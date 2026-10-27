@@ -1621,15 +1621,15 @@
     - 'referenceapplication0001_web-data-pr-7:/app/data'
   files:
     -
-      fs_path: /data/coolify/applications/referenceapplication0001/config-pr-7
+      fs_path: /data/coolify/applications/referenceapplication0001/config
       mount_path: /app/config
       is_directory: true
     -
-      fs_path: /data/coolify/applications/referenceapplication0001/selinux-pr-7
+      fs_path: /data/coolify/applications/referenceapplication0001/selinux
       mount_path: /app/selinux
       is_directory: true
     -
-      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-7
+      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh
       mount_path: /docker-entrypoint.d/init.sh
       is_directory: false
       content: |
@@ -2483,15 +2483,15 @@
     - 'referenceapplication0001_web-data-pr-8:/app/data'
   files:
     -
-      fs_path: /data/coolify/applications/referenceapplication0001/config-pr-8
+      fs_path: /data/coolify/applications/referenceapplication0001/config
       mount_path: /app/config
       is_directory: true
     -
-      fs_path: /data/coolify/applications/referenceapplication0001/selinux-pr-8
+      fs_path: /data/coolify/applications/referenceapplication0001/selinux
       mount_path: /app/selinux
       is_directory: true
     -
-      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-8
+      fs_path: /data/coolify/applications/referenceapplication0001/web-init.sh
       mount_path: /docker-entrypoint.d/init.sh
       is_directory: false
       content: |

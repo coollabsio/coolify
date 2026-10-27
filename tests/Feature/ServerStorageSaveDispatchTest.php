@@ -37,9 +37,11 @@ beforeEach(function () {
         'destination_type' => $destination->getMorphClass(),
     ]);
 
-    Process::fake(fn ($process) => Process::result(
-        output: str_contains(remoteProcessScript($process), 'readlink -f') ? 'OK' : 'NOK'
-    ));
+    Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        default => 'NOK',
+    }));
 
     $this->processedSaves = 0;
     Event::listen(JobProcessed::class, function (JobProcessed $event): void {
