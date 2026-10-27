@@ -251,13 +251,7 @@ class DatabasesController extends Controller
                 'mysql_root_password',
                 'mariadb_password',
                 'mariadb_root_password',
-                'postgres_conf',
-                'mysql_conf',
-                'mariadb_conf',
-                'mongo_conf',
-                'redis_conf',
-                'keydb_conf',
-                'custom_docker_run_options',
+                ...$database::CONFIGURATION_ATTRIBUTES,
             ]);
             $this->exposeNestedServerSecrets($database);
         } else {
