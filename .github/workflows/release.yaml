@@ -1,0 +1,199 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+      - next
+      - v[0-9]+.x
+      - v[0-9]+.[0-9]+.x
+      - release/v[0-9]+.[0-9]+
+    paths:
+      - release.json
+  workflow_dispatch:
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+  queue: max
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    name: Select the releases
+    if: ${{ github.repository == 'coollabsio/coolify' }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    outputs:
+      releases: ${{ steps.version.outputs.releases }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: version
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          releases="$(scripts/version.sh --release)"
+          echo "releases=$releases" | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: version
+    if: ${{ needs.version.outputs.releases != '[]' }}
+    permissions:
+      contents: read
+    uses: $/.github/workflows/build.yaml
+
+  publish:
+    name: Publish ${{ matrix.release.tag }}
+    needs: [version, build]
+    permissions:
+      contents: write # create the GitHub release and its tag
+      packages: write # push the built images to ghcr.io
+    environment:
+      name: release
+      deployment: false
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        release: ${{ fromJSON(needs.version.outputs.releases) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # https://github.com/actions/download-artifact/releases/tag/v8.0.2
+        with:
+          pattern: image-*
+          path: ${{ runner.temp }}/images
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push the built images
+        env:
+          TAG: ${{ matrix.release.tag }}
+        run: |
+          sources=()
+          for index in "$RUNNER_TEMP"/images/*/index.json; do
+            sources+=("oci-layout://${index%/index.json}@$(jq -r '.manifests[0].digest' "$index")")
+          done
+          for repository in ghcr.io/coollabsio/coolify docker.io/coollabsio/coolify; do
+            docker buildx imagetools create --tag "$repository:${TAG#v}" "${sources[@]}"
+          done
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ matrix.release.tag }}
+          IMAGE_VERSION: ${{ matrix.release.image }}
+        run: |
+          args=(--title "$TAG" --target "$GITHUB_SHA" --notes-file "$RUNNER_TEMP/notes.md" --latest=false)
+          heading="## [v$IMAGE_VERSION]"
+          [[ "$IMAGE_VERSION" != *-* ]] || { args+=(--prerelease); heading="## [Unreleased]"; }
+          awk -v heading="$heading" 'index($0, heading) == 1 { inside = 1; next } /^## / { inside = 0 } inside { sub(/^### /, "## "); print }' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "${args[@]}"
+
+  tags:
+    name: Move the tags
+    needs: publish
+    permissions:
+      contents: write # mark the GitHub release that latest points at as the latest release
+      packages: write # move the tags on ghcr.io
+    environment:
+      name: release
+      deployment: false
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    outputs:
+      tags: ${{ steps.tags.outputs.tags }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Move the tags the releases take over
+        id: tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tags="$(scripts/version.sh --tags)"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          jq -r 'to_entries[] | "\(.key) \(.value)"' <<< "$tags" | while read -r tag release; do
+            for repository in ghcr.io/coollabsio/coolify docker.io/coollabsio/coolify; do
+              docker buildx imagetools create --tag "$repository:$tag" "$repository:${release#v}"
+            done
+          done
+          latest="$(jq -r '.latest // empty' <<< "$tags")"
+          [ -z "$latest" ] || gh release edit "$latest" --latest
+
+  cdn:
+    name: Sync the CDN
+    needs: tags
+    if: ${{ needs.tags.outputs.tags != '{}' }}
+    permissions:
+      contents: read
+    environment:
+      name: release
+      deployment: false
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Sync the channels of the moved tags
+        env:
+          GH_TOKEN: ${{ secrets.CDN_TOKEN }}
+          TAGS: ${{ needs.tags.outputs.tags }}
+        run: |
+          gh auth setup-git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          jq -r '{stable: .latest, preview: .preview} | to_entries[] | select(.value) | "\(.key) \(.value)"' <<< "$TAGS" | while read -r channel release; do
+            git switch --quiet --detach "$release"
+            scripts/sync-cdn.sh "--$channel" "${release#v}"
+          done
+
+  merge:
+    name: Merge forward
+    needs: publish
+    permissions:
+      contents: write # push the merges
+      pull-requests: write # open a pull request when a merge conflicts
+    uses: $/.github/workflows/merge-forward.yaml
