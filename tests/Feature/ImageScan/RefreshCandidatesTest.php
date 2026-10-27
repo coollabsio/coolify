@@ -4,6 +4,7 @@ use App\Actions\ImageScan\RefreshCandidates;
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanAlertLevel;
 use App\Enums\ImageScanStatus;
+use App\Enums\SecurityActionType;
 use App\Jobs\RefreshCandidatesJob;
 use App\Models\Application;
 use App\Models\Environment;
@@ -24,6 +25,7 @@ use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanGate;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
+use App\Services\ImageScan\SecurityActions;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -767,6 +769,41 @@ it('says that no newer base image is better when the line candidate has as many 
 
     expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'no_better', 'attributable' => candidatesAttributableCount()])
         ->and($scan->fresh()->candidates['base']['entries'][0]['better'])->toBeFalse();
+});
+
+it('learns which findings come from the base image also without a newer tag', function (bool $sameDigest, string $baseImageRef) {
+    candidatesFake();
+    if ($sameDigest) {
+        $this->digests['15.15-alpine'] = CANDIDATES_REPO_DIGEST;
+    } else {
+        $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype';
+    }
+    $scan = candidatesDockerfileScan($baseImageRef);
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    $actions = SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource));
+    expect($scan->candidates['base'])->toMatchArray(['status' => 'no_better', 'entries' => [], 'attributable' => candidatesAttributableCount()])
+        ->and($scan->candidates['base']['attributable_ids'])->not->toContain('CVE-2099-0001')
+        ->and($actions['byFinding']['CVE-2099-0001']->type)->toBe(SecurityActionType::Rebuild);
+})->with([
+    'no newer tag in the line' => [false, 'postgres:15.15-alpine'],
+    'the newer tag has the same digest' => [true, 'postgres:15.0-alpine'],
+]);
+
+it('reuses the SBOM of the current base image without a newer tag', function () {
+    candidatesFake();
+    $this->digests['15.15-alpine'] = CANDIDATES_REPO_DIGEST;
+    $scan = candidatesDockerfileScan();
+    ImageSbom::factory()->create(['server_id' => $this->server->id, 'image_id' => CANDIDATES_REPO_DIGEST]);
+
+    RefreshCandidates::run($scan);
+
+    expect($scan->fresh()->candidates['base'])->toMatchArray(['status' => 'no_better', 'attributable' => candidatesAttributableCount()])
+        ->and(candidatesRan("'registry:"))->toBe(0)
+        ->and(candidatesRan('coolify-scan-exit grype'))->toBe(1)
+        ->and(candidatesScansToday())->toBe(0);
 });
 
 it('looks for no base image candidates without relevant findings or for another build pack', function (bool $withFindings, string $buildPack, ?string $baseImageRef) {

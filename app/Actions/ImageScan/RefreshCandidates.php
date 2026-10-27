@@ -359,7 +359,8 @@ class RefreshCandidates
     /**
      * Scans the current base image and the newest tag of its line from the registry (spec 7.4): two candidate scans
      * with the usual lock, disk, reuse, and daily rules. Only a different tag can change the `FROM` line, so a newer
-     * build of the same tag is not checked.
+     * build of the same tag is not checked. The current base image is scanned also when no newer tag exists, so
+     * `attributable` is set on every result but a failure or cannot_compare.
      *
      * @return array{status: string, error: ?string, entries: list<array<string, mixed>>, attributable: ?int,
      *     attributable_ids: list<string>, current_digest: ?string}
@@ -409,19 +410,15 @@ class RefreshCandidates
         $tags = array_values(array_filter(array_map('trim', explode("\n", $tags)), fn (string $line) => $line !== ''));
         $this->tagsTruncated = count($tags) > TagSelector::MAX_TAGS;
         $line = $selector->select($tag, $tags)['line'];
-        if ($line === null || $line === $tag) {
-            return $result('no_better');
-        }
+        $hasLine = $line !== null && $line !== $tag;
 
         $currentDigest = $this->digest($tag);
-        $lineDigest = $currentDigest === null ? null : $this->digest($line);
-        if ($currentDigest === null || $lineDigest === null) {
+        $lineDigest = $currentDigest === null || ! $hasLine ? null : $this->digest($line);
+        if ($currentDigest === null || ($hasLine && $lineDigest === null)) {
             return $failure(null, $currentDigest);
         }
-        if ($lineDigest === $currentDigest) {
-            return $result('no_better', [], null, $currentDigest);
-        }
 
+        // The current base image is scanned also without a newer tag, so the actions know which findings come from it.
         $currentBase = $this->scanCandidate($currentDigest, $platform, $lockWaitSeconds);
         if ($currentBase === null) {
             return $failure(null, $currentDigest);
@@ -430,6 +427,9 @@ class RefreshCandidates
         $ignores = IgnoreMatcher::forResource($resource);
         $evaluator = new CandidateEvaluator;
         $attributable = $evaluator->shared(self::relevantFindings($scan, $resource), $currentBase['findings']);
+        if (! $hasLine || $lineDigest === $currentDigest) {
+            return $result('no_better', [], $attributable, $currentDigest);
+        }
 
         $candidate = $this->scanCandidate($lineDigest, $platform, $lockWaitSeconds);
         if ($candidate === null) {
