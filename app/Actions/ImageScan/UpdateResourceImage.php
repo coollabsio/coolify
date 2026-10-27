@@ -128,6 +128,10 @@ class UpdateResourceImage
      */
     public static function blockedReason(ImageScan $scan, Model $owner): ?string
     {
+        if ($owner instanceof Application && $owner->build_pack === 'dockercompose') {
+            return 'Change the version in the compose file of this app, then redeploy.';
+        }
+
         if (str_contains((string) $owner->getAttribute('image'), '$')) {
             return 'The compose file sets this image with a variable. Change the version in the compose file.';
         }

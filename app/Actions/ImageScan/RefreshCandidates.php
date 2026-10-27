@@ -166,8 +166,8 @@ class RefreshCandidates
     }
 
     /**
-     * Candidates are looked for only for images the user does not build in Coolify, with a relevant finding or an
-     * end-of-life distro (spec 15.4).
+     * Candidates are looked for only for images the user does not build in Coolify (a Docker image app, or an image a
+     * Compose app pulls), with a relevant finding or an end-of-life distro (spec 15.4).
      */
     private static function needsImageCandidates(ImageScan $scan): bool
     {
@@ -175,7 +175,8 @@ class RefreshCandidates
         if ($scan->status !== ImageScanStatus::Completed || ! $resource instanceof Model) {
             return false;
         }
-        if ($resource instanceof Application && $resource->build_pack !== 'dockerimage') {
+        if ($resource instanceof Application && $resource->build_pack !== 'dockerimage'
+            && ($resource->build_pack !== 'dockercompose' || $scan->builds_image !== false)) {
             return false;
         }
 

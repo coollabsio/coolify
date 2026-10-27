@@ -32,8 +32,9 @@ final class SecurityActions
     private const BUTTON_TYPES = [SecurityActionType::UpdateImage, SecurityActionType::PullLatest, SecurityActionType::Rebuild];
 
     /**
+     * `byFinding` is keyed by finding ID. `eol` is the action that moves the image off an end-of-life OS.
+     *
      * @return array{actions: list<SecurityAction>, byFinding: array<string, SecurityAction>, eol: ?SecurityAction}
-     *                                                                                                              `byFinding` is keyed by finding ID. `eol` is the action that moves the image off an end-of-life OS.
      */
     public static function forScan(ImageScan $scan, IgnoreMatcher $ignores): array
     {
@@ -45,7 +46,10 @@ final class SecurityActions
         $kind = self::imageKind($scan, $owner);
         [$line, $sameTag] = in_array($kind, ['third_party', 'docker_image'], true) ? self::imageCandidates($scan) : [null, null];
         $base = $kind === 'dockerfile' ? FixPanel::betterBase($scan) : null;
+        // Null while Coolify does not know which findings come from the base image of a Dockerfile app.
         $fromBase = $kind === 'dockerfile' ? self::baseIds($scan) : [];
+        $originKnown = $fromBase !== null;
+        $fromBase ??= [];
         $lineFixed = self::idSet((array) ($line['fixed_ids'] ?? []));
         $sameTagFixed = self::idSet((array) ($sameTag['fixed_ids'] ?? []));
         $baseFixed = self::idSet((array) ($base['entry']['fixed_ids'] ?? []));
@@ -65,13 +69,13 @@ final class SecurityActions
             $hasFix = $finding->fixState === 'fixed' && filled($finding->fixedIn);
             $isOs = in_array($type, self::OS_PACKAGE_TYPES, true);
             $isFromBase = self::hits($ids, $fromBase);
-            $isPackageFix = $hasFix && ! $isFromBase && in_array($type, self::LANGUAGE_PACKAGE_TYPES, true);
+            $isPackageFix = $hasFix && $originKnown && ! $isFromBase && in_array($type, self::LANGUAGE_PACKAGE_TYPES, true);
 
             $action = match (true) {
                 self::hits($ids, $lineFixed) => SecurityActionType::UpdateImage,
                 self::hits($ids, $sameTagFixed) => SecurityActionType::PullLatest,
                 $isFromBase && self::hits($ids, $baseFixed) => SecurityActionType::ChangeBase,
-                $kind === 'dockerfile' && $isOs && $hasFix && ! $isFromBase => self::hits($ids, $beforeRebuild ??= self::idsBeforeForcedRebuild($scan, $owner))
+                $kind === 'dockerfile' && $isOs && $hasFix && $originKnown && ! $isFromBase => self::hits($ids, $beforeRebuild ??= self::idsBeforeForcedRebuild($scan, $owner))
                     ? SecurityActionType::UpgradeInDockerfile
                     : SecurityActionType::Rebuild,
                 $kind !== 'third_party' && $isPackageFix => SecurityActionType::UpgradePackage,
@@ -215,15 +219,21 @@ final class SecurityActions
     }
 
     /**
-     * The relevant findings that the current base image has too, when the base check is for the current base image.
+     * The relevant findings that the current base image has too. Empty without a base image. Null while unknown: the
+     * base check did not run yet, is for another base image, or did not scan the current base image (failed,
+     * auth_required).
      *
-     * @return array<string, true>
+     * @return array<string, true>|null
      */
-    private static function baseIds(ImageScan $scan): array
+    private static function baseIds(ImageScan $scan): ?array
     {
-        $base = data_get($scan->candidates, 'base');
-        if (! is_array($base) || blank($scan->base_image_ref) || ($base['image'] ?? null) !== $scan->base_image_ref) {
+        if (blank($scan->base_image_ref)) {
             return [];
+        }
+
+        $base = data_get($scan->candidates, 'base');
+        if (! is_array($base) || ($base['image'] ?? null) !== $scan->base_image_ref || ! is_int($base['attributable'] ?? null)) {
+            return null;
         }
 
         return self::idSet((array) ($base['attributable_ids'] ?? []));
@@ -267,7 +277,7 @@ final class SecurityActions
 
     private static function isCoolifyResource(Model $owner): bool
     {
-        if ((int) $owner->getKey() === 0) {
+        if ($owner->getKey() !== null && (int) $owner->getKey() === 0) {
             return true;
         }
 
@@ -280,7 +290,8 @@ final class SecurityActions
     }
 
     /**
-     * The higher of two fixed versions (a leading `v` is ignored). Keeps the first when they cannot be compared.
+     * The higher of two fixed versions (a leading `v` is ignored). A version is preferred to a value that is not one;
+     * of two values that are not versions, the first is kept.
      */
     private static function higher(?string $current, string $candidate): string
     {
@@ -290,8 +301,10 @@ final class SecurityActions
 
         $a = preg_replace('/^v/i', '', $current);
         $b = preg_replace('/^v/i', '', $candidate);
-        if (preg_match('/^\d/', $a) !== 1 || preg_match('/^\d/', $b) !== 1) {
-            return $current;
+        $aIsVersion = preg_match('/^\d/', $a) === 1;
+        $bIsVersion = preg_match('/^\d/', $b) === 1;
+        if (! $aIsVersion || ! $bIsVersion) {
+            return $bIsVersion ? $candidate : $current;
         }
 
         return version_compare($b, $a, '>') ? $candidate : $current;

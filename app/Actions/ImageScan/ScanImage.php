@@ -36,6 +36,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
 /**
@@ -594,7 +596,7 @@ class ScanImage
     {
         $findings = $report['findings'];
 
-        $buildsImage = $this->buildsImage($resource, $imageRef);
+        $buildsImage = self::buildsImage($resource, $imageRef);
         $existing = $this->resourceScans($resource)->where('image_id', $image['id'])->with('deploymentQueue:id,pull_request_id')->first();
         $classifierScan = $existing !== null ? clone $existing : new ImageScan;
         $classifierScan->forceFill(['builds_image' => $buildsImage])->setRelation('resource', $resource);
@@ -724,7 +726,7 @@ class ScanImage
             'status' => ImageScanStatus::Failed,
             'error_code' => $code,
             'error_context' => $context,
-            'builds_image' => $this->buildsImage($resource, $imageRef),
+            'builds_image' => self::buildsImage($resource, $imageRef),
         ];
 
         $scan = $this->firstOrCreateScan($resource, $image['id'], $values);
@@ -827,12 +829,17 @@ class ScanImage
     }
 
     /**
-     * Docker images of the team are built by the team unless it says otherwise; Docker Hub official images are not.
+     * Whether the team builds the image: Coolify builds the images of Dockerfile, Nixpacks, Railpack, and static apps,
+     * and the Compose images of a service with `build` (see composeBuildsImage). Docker images of the team are built by
+     * the team unless it says otherwise; Docker Hub official images are not. Other images are pulled.
      */
-    private function buildsImage(Model $resource, string $imageRef): bool
+    public static function buildsImage(Model $resource, string $imageRef): bool
     {
         if (! $resource instanceof Application) {
             return false;
+        }
+        if ($resource->build_pack === 'dockercompose') {
+            return self::composeBuildsImage($resource, $imageRef);
         }
         if ($resource->build_pack !== 'dockerimage') {
             return true;
@@ -848,6 +855,44 @@ class ScanImage
         } catch (InvalidArgumentException) {
             return true;
         }
+    }
+
+    /**
+     * A Compose image is built by Coolify when its name is `{app uuid}_{service}` (the name the parser gives a service
+     * with `build` and no `image`), or when a service with `build` in the app's Compose file names the same image
+     * (tag ignored). Every other image of the file is pulled.
+     */
+    private static function composeBuildsImage(Application $application, string $imageRef): bool
+    {
+        $name = self::imageName($imageRef);
+        if (filled($application->uuid) && str_starts_with($name, strtolower($application->uuid).'_')) {
+            return true;
+        }
+
+        try {
+            $compose = Yaml::parse((string) ($application->docker_compose ?: $application->docker_compose_raw));
+        } catch (ParseException) {
+            return false;
+        }
+
+        foreach ((array) data_get($compose, 'services', []) as $service) {
+            $image = data_get($service, 'image');
+            if (data_get($service, 'build') !== null && is_string($image) && $image !== '' && self::imageName($image) === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The image reference without tag and digest, lowercase.
+     */
+    private static function imageName(string $imageRef): string
+    {
+        $name = strtolower(trim(explode('@', $imageRef, 2)[0]));
+
+        return (string) preg_replace('#:[^/]*$#', '', $name);
     }
 
     /**

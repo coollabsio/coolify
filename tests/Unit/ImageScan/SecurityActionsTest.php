@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityActionType;
 use App\Models\Application;
@@ -102,8 +103,13 @@ function actionsFor(ImageScan $scan): array
     return SecurityActions::forScan($scan, IgnoreMatcher::fromIgnores(collect()));
 }
 
-function dockerfileScan(array $findings, ?array $base = null, array $attributes = []): ImageScan
+/**
+ * A Dockerfile app scan. The default base check is for the current base image and found no finding of the base.
+ */
+function dockerfileScan(array $findings, ?array $base = [], array $attributes = []): ImageScan
 {
+    $base = $base === [] ? actionBase([], []) : $base;
+
     return actionScan(actionApp('dockerfile'), $findings, [
         'image_ref' => 'abc123:latest',
         'builds_image' => true,
@@ -111,6 +117,16 @@ function dockerfileScan(array $findings, ?array $base = null, array $attributes 
         'candidates' => $base === null ? null : ['status' => 'skipped', 'checked_at' => now()->toIso8601String(), 'entries' => [], 'base' => $base],
         ...$attributes,
     ]);
+}
+
+function composeApp(): Application
+{
+    $app = actionApp('dockercompose');
+    $app->uuid = 'k8w2c9';
+    $app->docker_compose = "services:\n  web:\n    build: .\n    image: 'k8w2c9_web:4f1c2d3'\n  worker:\n    build:\n      context: ./worker\n    image: 'ghcr.io/acme/worker:2.0'\n  db:\n    image: 'postgres:16'\n";
+    $app->syncOriginal();
+
+    return $app;
 }
 
 function ownDockerImageScan(array $findings, ?array $candidates = null): ImageScan
@@ -263,10 +279,36 @@ describe('own Dockerfile images', function () {
             ->and($action->button)->toBeFalse();
     });
 
-    it('ignores base data of another base image', function () {
-        $scan = dockerfileScan([actionFinding('CVE-1', ['type' => 'npm', 'package' => 'semver', 'version' => '7.5.1', 'fixedIn' => '7.5.2'])], actionBase(['CVE-1'], [actionEntry('node:18.20-alpine', 'line', ['CVE-1'])], 'node:18.1-alpine'));
+    it('gives no package or rebuild action while the base check does not know the base findings', function (?array $base) {
+        $scan = dockerfileScan([
+            actionFinding('CVE-1', ['type' => 'npm', 'package' => 'cross-spawn', 'version' => '7.0.3', 'fixedIn' => '7.0.5']),
+            actionFinding('CVE-2'),
+        ], $base);
 
-        expect(actionsFor($scan)['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpgradePackage);
+        expect(actionsFor($scan)['actions'])->toBe([]);
+    })->with([
+        'not run yet' => [null],
+        'auth required' => [['image' => 'node:20.1-alpine', 'status' => 'auth_required', 'attributable' => null, 'attributable_ids' => [], 'entries' => []]],
+        'failed' => [['image' => 'node:20.1-alpine', 'status' => 'failed', 'attributable' => null, 'attributable_ids' => [], 'entries' => []]],
+        'for another base image' => [actionBase([], [], 'node:18.1-alpine')],
+    ]);
+
+    it('acts on the findings when the base check knows the base has none of them', function () {
+        $scan = dockerfileScan([
+            actionFinding('CVE-1', ['type' => 'npm', 'package' => 'cross-spawn', 'version' => '7.0.3', 'fixedIn' => '7.0.5']),
+            actionFinding('CVE-2'),
+        ], ['image' => 'node:20.1-alpine', 'status' => 'no_better', 'attributable' => 0, 'attributable_ids' => [], 'entries' => []]);
+
+        $result = actionsFor($scan);
+
+        expect($result['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpgradePackage)
+            ->and($result['byFinding']['CVE-2']->type)->toBe(SecurityActionType::Rebuild);
+    });
+
+    it('acts on the findings of a Dockerfile app without a known base image', function () {
+        $scan = dockerfileScan([actionFinding('CVE-1')], null, ['base_image_ref' => null]);
+
+        expect(actionsFor($scan)['byFinding']['CVE-1']->type)->toBe(SecurityActionType::Rebuild);
     });
 
     it('rebuilds without cache for a fixed OS package that is not in the current base', function () {
@@ -335,6 +377,15 @@ describe('own Dockerfile images', function () {
             ->and(actionsFor($scan)['byFinding']['CVE-2']->copy)->toBe('lib 1.2.0');
     });
 
+    it('prefers a fixed version to a value that is not one', function () {
+        $scan = dockerfileScan([
+            actionFinding('CVE-1', ['type' => 'npm', 'package' => 'lib', 'version' => '1.0.0', 'fixedIn' => 'next-release']),
+            actionFinding('CVE-2', ['type' => 'npm', 'package' => 'lib', 'version' => '1.0.0', 'fixedIn' => '1.2.0']),
+        ]);
+
+        expect(actionsFor($scan)['byFinding']['CVE-1']->copy)->toBe('lib 1.2.0');
+    });
+
     it('never upgrades a binary or a language package from the base', function () {
         $scan = dockerfileScan([
             actionFinding('CVE-1', ['type' => 'binary', 'package' => 'node', 'version' => '20.1.0', 'fixedIn' => '20.1.1']),
@@ -387,10 +438,12 @@ describe('own Docker image apps', function () {
 
 describe('compose builds and builder images', function () {
     it('gives the OS packages of a compose build no action, but upgrades its language packages', function () {
-        $scan = actionScan(actionApp('dockercompose'), [
+        $app = composeApp();
+        $imageRef = 'k8w2c9_web:4f1c2d3';
+        $scan = actionScan($app, [
             actionFinding('CVE-1'),
             actionFinding('CVE-2', ['type' => 'php-composer', 'package' => 'guzzlehttp/psr7', 'version' => '2.4.0', 'fixedIn' => '2.4.5']),
-        ], ['image_ref' => 'abc123-web:latest', 'builds_image' => true]);
+        ], ['image_ref' => $imageRef, 'builds_image' => ScanImage::buildsImage($app, $imageRef)]);
 
         $result = actionsFor($scan);
 
@@ -398,14 +451,34 @@ describe('compose builds and builder images', function () {
             ->and($result['byFinding']['CVE-2']->type)->toBe(SecurityActionType::UpgradePackage);
     });
 
-    it('treats a pulled image of a compose app as third-party', function () {
-        $scan = actionScan(actionApp('dockercompose'), [actionFinding('CVE-1')], [
-            'image_ref' => 'redis:7.2', 'builds_image' => false,
-            'candidates' => actionCandidates([actionEntry('redis:7.4', 'line', ['CVE-1'])]),
+    it('treats a pulled image of a compose app as third-party, without a button', function () {
+        $app = composeApp();
+        $scan = actionScan($app, [
+            actionFinding('CVE-1'),
+            actionFinding('CVE-2', ['type' => 'go-module', 'package' => 'stdlib', 'version' => 'go1.22.1', 'fixedIn' => '1.22.5']),
+        ], [
+            'image_ref' => 'postgres:16', 'builds_image' => ScanImage::buildsImage($app, 'postgres:16'),
+            'candidates' => actionCandidates([actionEntry('postgres:16.4', 'line', ['CVE-1'])]),
         ]);
 
-        expect(actionsFor($scan)['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpdateImage);
+        $result = actionsFor($scan);
+
+        expect($scan->builds_image)->toBeFalse()
+            ->and(array_keys($result['byFinding']))->toBe(['CVE-1'])
+            ->and($result['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpdateImage)
+            ->and($result['byFinding']['CVE-1']->button)->toBeFalse();
     });
+
+    it('decides which compose images Coolify builds', function (string $imageRef, bool $builds) {
+        expect(ScanImage::buildsImage(composeApp(), $imageRef))->toBe($builds);
+    })->with([
+        'built service without an image' => ['k8w2c9_web:4f1c2d3', true],
+        'built preview' => ['k8w2c9_web:pr-4', true],
+        'built service with an image' => ['ghcr.io/acme/worker:2.0', true],
+        'built service with an image, other tag' => ['ghcr.io/acme/worker:2.1', true],
+        'pulled image' => ['postgres:16', false],
+        'pulled image of another app' => ['other_web:4f1c2d3', false],
+    ]);
 
     it('gives the OS packages of a builder image no action', function (string $buildPack) {
         $scan = actionScan(actionApp($buildPack), [actionFinding('CVE-1', ['type' => 'deb'])], ['image_ref' => 'abc123:latest', 'builds_image' => true]);
