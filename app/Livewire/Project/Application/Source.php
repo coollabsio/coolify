@@ -163,20 +163,21 @@ class Source extends Component
             $this->dispatch('configurationChanged');
 
             ['repository' => $customRepository] = $this->application->customRepository();
+            $repositorySlug = gitRepositorySlug($customRepository);
             $repository_project_id = null;
 
             if ($sourceType === GithubApp::class) {
-                $repository = githubApi($source, "repos/{$customRepository}");
+                $repository = githubApi($source, "repos/{$repositorySlug}");
                 $repository_project_id = data_get($repository, 'data.id');
             } elseif ($sourceType === GitlabApp::class) {
                 if ($source->isConnected()) {
-                    $encoded = urlencode($customRepository);
+                    $encoded = urlencode($repositorySlug);
                     $project = gitlabApi($source, "/projects/{$encoded}");
                     $repository_project_id = data_get($project, 'data.id');
                 }
             } elseif ($sourceType === GiteaApp::class) {
                 if ($source->isConnected()) {
-                    $repositoryPath = collect(explode('/', $customRepository, 2))->map(fn ($part) => rawurlencode($part))->implode('/');
+                    $repositoryPath = collect(explode('/', $repositorySlug, 2))->map(fn ($part) => rawurlencode($part))->implode('/');
                     $repository = giteaApi($source, "/repos/{$repositoryPath}");
                     $repository_project_id = data_get($repository, 'data.id');
                 }

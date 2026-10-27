@@ -3348,18 +3348,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return 'GIT_SSH_COMMAND="'.$sshCommand.'" git ls-remote '.escapeshellarg($this->fullRepoUrl).' '.escapeshellarg($lsRemoteRef);
     }
 
+    private function update_repository_project_id(): void
+    {
+        $repositorySlug = gitRepositorySlug($this->customRepository);
+        $repository = githubApi($this->source, "repos/{$repositorySlug}");
+        $repository_project_id = data_get($repository, 'data.id');
+        if (isset($repository_project_id) && $this->application->repository_project_id !== $repository_project_id) {
+            $this->application->repository_project_id = $repository_project_id;
+            $this->application->save();
+        }
+    }
+
     private function check_git_if_build_needed()
     {
         if (is_object($this->source) && $this->source->getMorphClass() === GithubApp::class && $this->source->is_public === false) {
-            $repository = githubApi($this->source, "repos/{$this->customRepository}");
-            $data = data_get($repository, 'data');
-            $repository_project_id = data_get($data, 'id');
-            if (isset($repository_project_id)) {
-                if (blank($this->application->repository_project_id) || $this->application->repository_project_id !== $repository_project_id) {
-                    $this->application->repository_project_id = $repository_project_id;
-                    $this->application->save();
-                }
-            }
+            $this->update_repository_project_id();
         }
         $this->resolve_bitbucket_pull_request_commit();
         $this->generate_git_import_commands();
