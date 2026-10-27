@@ -3337,7 +3337,7 @@ class ServicesController extends Controller
         $uuid = new_public_id();
         $name = $request->filled('name')
             ? $request->string('name')->toString()
-            : $service->name.'-clone-'.$uuid;
+            : clone_resource_name($service->name, $uuid);
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
         $newService = clone_service($service, $destination, [

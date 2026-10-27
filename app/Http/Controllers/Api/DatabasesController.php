@@ -5282,7 +5282,7 @@ class DatabasesController extends Controller
         $uuid = new_public_id();
         $name = $request->filled('name')
             ? $request->string('name')->toString()
-            : $database->name.'-clone-'.$uuid;
+            : clone_resource_name($database->name, $uuid);
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
         $newDatabase = $database->replicate([

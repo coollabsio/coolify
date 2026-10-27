@@ -135,6 +135,18 @@ function new_public_id(int $length = 24): string
 }
 
 /**
+ * The name of a clone: the source name without the "-clone-<id>" suffixes of earlier clones, then a new suffix.
+ * Without this, each clone of a clone adds a suffix, and the name soon becomes longer than the 255 characters of the column.
+ */
+function clone_resource_name(string $name, string $uuid): string
+{
+    $suffix = '-clone-'.$uuid;
+    $baseName = preg_replace('/(-clone-[a-z0-9]{7,})+$/i', '', $name);
+
+    return Str::limit($baseName, 255 - strlen($suffix), '').$suffix;
+}
+
+/**
  * Validate that a path or identifier is safe for use in shell commands.
  *
  * This function prevents command injection by rejecting strings that contain

@@ -132,7 +132,7 @@ class ResourceOperations extends Component
                     'updated_at',
                 ])->fill([
                     'uuid' => $uuid,
-                    'name' => $this->resource->name.'-clone-'.$uuid,
+                    'name' => clone_resource_name($this->resource->name, $uuid),
                     'status' => 'exited',
                     'started_at' => null,
                     'environment_id' => $new_environment->id,

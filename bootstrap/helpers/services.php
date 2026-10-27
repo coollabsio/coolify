@@ -695,7 +695,7 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
         'created_at',
         'updated_at',
     ])->fill([
-        'name' => $source->name.'-clone-'.$uuid,
+        'name' => clone_resource_name($source->name, $uuid),
         ...$overrides,
         'uuid' => $uuid,
         'destination_id' => $destination->id,
