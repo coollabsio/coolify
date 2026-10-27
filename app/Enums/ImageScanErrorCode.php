@@ -14,6 +14,7 @@ enum ImageScanErrorCode: string
     case ScanningOff = 'scanning_off';
     case CustomCommand = 'custom_command';
     case ImageMissing = 'image_missing';
+    case Truncated = 'truncated';
     case Unknown = 'unknown';
 
     /**
@@ -37,6 +38,7 @@ enum ImageScanErrorCode: string
             self::ScanningOff => "Turn on image scanning on {$server}.",
             self::CustomCommand => 'Coolify cannot check the image because this application uses a custom build or start command.',
             self::ImageMissing => "The image is not on {$server}.",
+            self::Truncated => 'The scan result was too large to read completely.',
             self::Unknown => 'The scan could not run.',
         };
     }

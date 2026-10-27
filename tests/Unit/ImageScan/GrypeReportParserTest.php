@@ -61,6 +61,38 @@ it('still reads the eol trailer after the cap is reached', function () {
     expect($r['eol'])->toBe(['name' => 'alpine', 'version' => '3.16.2']);
 });
 
+it('reads the eol line when it comes first, as the current template writes it', function () {
+    $lines = explode("\n", trim(imageScanFixture('grype.ndjson')));
+    $eolFirst = implode("\n", [array_pop($lines), ...$lines]);
+
+    $r = (new GrypeReportParser)->parse($eolFirst);
+
+    expect($r['eol'])->toBe(['name' => 'alpine', 'version' => '3.16.2'])
+        ->and($r['findings'])->toHaveCount(166);
+});
+
+it('keeps the findings with an exploit signal first, then the highest risk, when it cuts', function () {
+    $lines = [
+        grypeLine(['id' => 'LOW-RISK', 'risk' => 1.0]),
+        grypeLine(['id' => 'HIGH-RISK', 'risk' => 50.0]),
+        grypeLine(['id' => 'LIKELY', 'risk' => 0.5, 'epss' => 0.5, 'cvss' => [['source' => 'nvd@nist.gov', 'version' => '3.1', 'score' => 8.0]]]),
+        grypeLine(['id' => 'KEV', 'risk' => 0.1, 'kev' => true]),
+    ];
+
+    $r = (new GrypeReportParser)->parse(implode("\n", $lines), 3);
+
+    expect($r['truncated'])->toBeTrue()
+        ->and(array_map(fn (Finding $f) => $f->id, $r['findings']))->toBe(['KEV', 'LIKELY', 'HIGH-RISK']);
+});
+
+it('writes the eol line before the findings and cuts long descriptions in the template', function () {
+    $template = file_get_contents(dirname(__DIR__, 3).'/resources/image-scan/grype.tmpl');
+
+    expect(strpos($template, '"eol"'))->toBeLessThan(strpos($template, 'range .Matches'))
+        ->and($template)->toContain('trunc 400')
+        ->and($template)->not->toContain('trunc 600');
+});
+
 it('drops invalid lines and strips control characters', function () {
     $line = grypeLine(['id' => "CVE-1\u{1b}", 'pkg' => "a\nb\u{1b}[31m", 'fixv' => []]);
     $r = (new GrypeReportParser)->parse("not json\n{$line}\n".json_encode(['id' => '../../etc']));

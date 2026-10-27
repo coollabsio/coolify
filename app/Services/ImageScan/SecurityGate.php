@@ -17,7 +17,8 @@ use App\Models\ImageScan;
  *   EPSS change of a finding that already runs never blocks. Without a running image every finding is new.
  * - Strict: blocks on any relevant finding with an exploit signal, any relevant critical or high finding with a
  *   package fix, and an end-of-life OS.
- * - Off never blocks. A scan that cannot run follows "If the scan cannot run".
+ * - Off never blocks. A scan that cannot run, or whose report was cut (`summary.truncated`), follows "If the scan
+ *   cannot run".
  */
 final class SecurityGate
 {
@@ -41,6 +42,11 @@ final class SecurityGate
 
         if ($error === null && ! $completed) {
             $error = ImageScanErrorCode::Unknown;
+        }
+
+        // A cut report can miss the findings that block, so it counts as a scan that could not run.
+        if ($error === null && (bool) data_get($new->summary, 'truncated', false)) {
+            $error = ImageScanErrorCode::Truncated;
         }
 
         if ($error !== null) {

@@ -245,6 +245,24 @@ it('follows "If the scan cannot run" for a scan error', function (ImageScanOnErr
     'block' => [ImageScanOnError::Block, true, 'Deploy blocked: Not enough disk space on prod: 3 GB needed.'],
 ]);
 
+it('treats a cut scan result as a scan that could not run', function (string $mode, ImageScanOnError $onScanError, bool $blocked, string $headline) {
+    $result = SecurityGate::evaluate(
+        securityGateScan([], ['summary' => ['truncated' => true]]),
+        null,
+        $mode,
+        securityGateIgnores(),
+        onScanError: $onScanError,
+    );
+
+    expect($result['blocked'])->toBe($blocked)
+        ->and($result['scan_ran'])->toBeFalse()
+        ->and($result['error'])->toBe('truncated')
+        ->and($result['headline'])->toBe($headline);
+})->with([
+    'on, deploy anyway' => ['on', ImageScanOnError::Deploy, false, 'Scan skipped: The scan result was too large to read completely.'],
+    'strict, block' => ['strict', ImageScanOnError::Block, true, 'Deploy blocked: The scan result was too large to read completely.'],
+]);
+
 it('treats a failed scan as an unknown error', function () {
     $result = SecurityGate::evaluate(securityGateScan([], ['status' => ImageScanStatus::Failed]), null, 'strict', securityGateIgnores());
 

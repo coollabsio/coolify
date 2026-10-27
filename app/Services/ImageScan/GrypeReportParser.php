@@ -9,12 +9,15 @@ class GrypeReportParser
     private const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 
     /**
+     * The end-of-life line comes first in the current template and last in older outputs; both are read. Over $limit,
+     * the findings with an exploit signal (KEV, then likely) are kept first, then the highest risk, so a cut report
+     * keeps the findings that matter most.
+     *
      * @return array{findings: list<Finding>, truncated: bool, eol: ?array{name: string, version: string}}
      */
     public function parse(string $ndjson, int $limit = 5000): array
     {
         $findings = [];
-        $truncated = false;
         $eol = null;
 
         if (strlen($ndjson) > self::MAX_BYTES) {
@@ -23,7 +26,7 @@ class GrypeReportParser
 
         foreach (explode("\n", $ndjson) as $line) {
             $line = trim($line);
-            if ($line === '' || ($truncated && ! str_starts_with($line, '{"eol"'))) {
+            if ($line === '') {
                 continue;
             }
 
@@ -39,20 +42,36 @@ class GrypeReportParser
             }
 
             $finding = $this->finding($row);
-            if ($finding === null) {
-                continue;
+            if ($finding !== null) {
+                $findings[] = $finding;
             }
+        }
 
-            if (count($findings) >= $limit) {
-                $truncated = true;
-
-                continue;
-            }
-
-            $findings[] = $finding;
+        $truncated = count($findings) > $limit;
+        if ($truncated) {
+            $findings = array_slice($this->mostImportantFirst($findings), 0, $limit);
         }
 
         return ['findings' => $findings, 'truncated' => $truncated, 'eol' => $eol];
+    }
+
+    /**
+     * KEV first, then likely to be exploited, then the highest risk; the report order breaks ties.
+     *
+     * @param  list<Finding>  $findings
+     * @return list<Finding>
+     */
+    private function mostImportantFirst(array $findings): array
+    {
+        $rank = fn (Finding $finding): int => match (SecurityRules::exploitSignal($finding)) {
+            SecurityRules::EXPLOITED => 0,
+            SecurityRules::LIKELY => 1,
+            default => 2,
+        };
+        $keyed = array_map(fn (Finding $finding, int $index): array => [$rank($finding), -($finding->risk ?? 0.0), $index, $finding], $findings, array_keys($findings));
+        usort($keyed, fn (array $a, array $b): int => [$a[0], $a[1], $a[2]] <=> [$b[0], $b[1], $b[2]]);
+
+        return array_map(fn (array $entry): Finding => $entry[3], $keyed);
     }
 
     /**

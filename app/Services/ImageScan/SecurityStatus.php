@@ -50,11 +50,14 @@ final class SecurityStatus
 
     public const REASON_VERSIONS_UNCHECKED = 'versions_unchecked';
 
+    public const REASON_TRUNCATED = 'truncated';
+
     public const NOT_SCANNED = 'not_scanned';
 
     /** The check_needed reasons in the order they are shown. */
     private const REASON_ORDER = [
         self::REASON_IMAGES_UNCHECKED,
+        self::REASON_TRUNCATED,
         self::REASON_STALE,
         self::REASON_DB_OUTDATED,
         self::REASON_IMAGE_CHANGED,
@@ -324,6 +327,9 @@ final class SecurityStatus
             : null;
 
         $reasons = [];
+        if ((bool) data_get($scan->summary, 'truncated', false)) {
+            $reasons[] = self::REASON_TRUNCATED;
+        }
         if (self::databaseWasOld($scan)) {
             $reasons[] = self::REASON_DB_OUTDATED;
         }

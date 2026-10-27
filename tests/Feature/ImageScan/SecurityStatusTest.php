@@ -478,6 +478,21 @@ describe('check needed reasons', function () {
             ->checkReason->toBe('db_outdated');
     });
 
+    it('needs a check when the scan result was cut, also when nothing relevant was read', function (array $findings) {
+        statusTestScan($this->application, $findings, ['summary' => ['truncated' => true, 'eol_distro' => null]]);
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
+
+        $security = SecurityStatus::forResource($this->application);
+
+        expect($security->status)->toBe(SecurityStatusType::CheckNeeded)
+            ->and($security->checkReason)->toBe('truncated')
+            ->and(SecuritySentences::headline($security))->toBe('Coolify needs to check this image again: the scan result was too large to read completely.')
+            ->and(SecurityStatus::stored($this->application->fresh())->checkReason)->toBe('truncated');
+    })->with([
+        'no findings' => [[]],
+        'only an exploited finding without a fix' => [[statusTestFinding('CVE-2026-9', ['kev' => true, 'fixedIn' => null, 'fixState' => 'not-fixed'])]],
+    ]);
+
     it('needs a check when the running image is not the scanned image', function () {
         statusTestScan($this->application, []);
         $this->application->update(['docker_registry_image_tag' => '1.28']);

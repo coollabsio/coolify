@@ -30,7 +30,7 @@ use Throwable;
  * `checkedAt` is the time of the oldest current scan of the resource (null when one has no time); `stale` uses it.
  *
  * `checkReason` is the check_needed reason (`images_unchecked` {checked, total}, `stale` {time}, `db_outdated`,
- * `image_changed`, `versions_unchecked`; context in `checkContext`), or the not_checked reason (`instance`, `server`,
+ * `image_changed`, `versions_unchecked`, `truncated`; context in `checkContext`), or the not_checked reason (`instance`, `server`,
  * `application` for scanning off, `not_scanned`).
  *
  * `why` lists up to 3 findings the primary action fixes (no_fix: the findings with an exploit signal that have no

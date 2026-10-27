@@ -14,6 +14,7 @@ final class SecuritySentences
 {
     private const CHECK_REASONS = [
         SecurityStatus::REASON_IMAGES_UNCHECKED,
+        SecurityStatus::REASON_TRUNCATED,
         SecurityStatus::REASON_STALE,
         SecurityStatus::REASON_DB_OUTDATED,
         SecurityStatus::REASON_IMAGE_CHANGED,
@@ -73,6 +74,7 @@ final class SecuritySentences
     {
         return match ($code) {
             SecurityStatus::REASON_IMAGES_UNCHECKED => (int) ($context['checked'] ?? 0).' of '.(int) ($context['total'] ?? 0).' images were checked',
+            SecurityStatus::REASON_TRUNCATED => 'the scan result was too large to read completely',
             SecurityStatus::REASON_STALE => 'the last check was '.self::ago($context['time'] ?? null),
             SecurityStatus::REASON_DB_OUTDATED => 'the vulnerability database is out of date',
             SecurityStatus::REASON_IMAGE_CHANGED => 'the running image is not the checked image',
