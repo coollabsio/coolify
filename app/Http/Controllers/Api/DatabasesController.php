@@ -4148,6 +4148,7 @@ class DatabasesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
+            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment']);
             if (array_key_exists('key', $item)) {
                 $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
             }
