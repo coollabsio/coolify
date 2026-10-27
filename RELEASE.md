@@ -118,12 +118,33 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > [!IMPORTANT]
 > Cut `v4.x` from `main`, or bring an existing one up to date with `main`, before `release/v5.0` is merged into `main`. Afterwards `main` is v5 and v4 lives on `v4.x` alone.
 
+## Nightlies
+
+The nightly workflow publishes a nightly twice a day when its branch has a new commit, versioned `<base>.<YYYYMMDD>.<N>`:
+
+| State                          | Nightly                    |
+| ------------------------------ | -------------------------- |
+| nothing bumped since 5.0.4     | `5.1.0-alpha.0.20261014.1` |
+| after 5.1.0-alpha.1            | `5.1.0-alpha.1.20261014.1` |
+| after 5.1.0-beta.1             | `5.1.0-beta.1.20261014.1`  |
+| second nightly on the same day | `5.1.0-beta.1.20261014.2`  |
+| after 5.1.0-rc.1               | `5.1.0-rc.1.20261015.1`    |
+| after 5.1.0                    | `5.2.0-alpha.0.20261016.1` |
+
+- It comes from `next`, or from the lowest release branch while one is in progress: `release/v5.1` takes it over once it is cut and hands it back once `5.1.0` is released
+- The base is the prerelease `preview` of that branch sets in `release.json`, else its next version with `-alpha.0`, which is never released
+- N counts up per day and base from the published `nightly` tag
+- No word `nightly` in the version: PHP's `version_compare` sorts words below numbers, plain numbers sort right in semver and PHP
+- No git tag and no GitHub release, only its image tag, the moving `nightly` tag and the nightly channel of the CDN
+
+Print what the next run publishes with `scripts/version.sh --nightly`.
+
 ## Pull requests
 
-Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and before `4.6.0-beta.2`.
+Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and its nightlies and before `4.6.0-beta.2`.
 
 - Pull requests from forks and Dependabot are built, not published
-- Pull requests from `main`, `next`, a release branch or a patch branch are not built, the release workflow builds their commits
+- Pull requests from `main`, `next`, a release branch or a patch branch are not built, the release and nightly workflows build their commits
 - ghcr.io only, no git tag and no GitHub release, the clean manifests workflow keeps the image while the pull request is open
 
 ## CDN
@@ -134,8 +155,9 @@ Every push to a pull request from a branch of this repository publishes `ghcr.io
 | --------- | ------------------- | --------------------------------------------------------- |
 | `stable`  | `/coolify/`         | the release workflow when `latest` moves, a pull request  |
 | `preview` | `/coolify/preview/` | the release workflow when `preview` moves, pushed to main |
+| `nightly` | `/coolify/nightly/` | the nightly workflow after every nightly, pushed to main  |
 
-- The preview channel takes betas and release candidates, no alphas
+- The preview channel takes betas and release candidates, alphas reach the nightly channel only
 - `CDN_TOKEN` in the environment `release` is a fine-grained token for `coollabsio/coollabs-cdn` alone, with read and write access to contents and pull requests
 
 `/coolify/release.json` lists the version of every channel, the way `release.json` of this repository lists `stable` and `preview`. Each sync sets the key of its channel:
@@ -147,6 +169,9 @@ Every push to a pull request from a branch of this repository publishes `ghcr.io
     },
     "preview": {
         "coolify": "4.6.0-beta.2"
+    },
+    "nightly": {
+        "coolify": "4.6.0-beta.2.20261027.1"
     }
 }
 ```
@@ -176,4 +201,6 @@ Git tags carry the `v` prefix, image tags do not.
 | `4.6.0`                    | one release, it never moves                                                             |
 | `latest`                   | the newest stable version                                                               |
 | `preview`                  | the newest prerelease of the lowest version in prerelease above `latest`, else `latest` |
+| `4.7.0-alpha.0.20261026.1` | one nightly, it never moves                                                             |
+| `nightly`                  | the newest nightly                                                                      |
 | `pr-123`                   | the image of the newest push to an open pull request, on ghcr.io only                   |

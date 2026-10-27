@@ -3,6 +3,8 @@ set -euo pipefail
 
 OPTION="$*"
 BRANCH="${BRANCH:-}"
+PUBLISHED_NIGHTLY="${PUBLISHED_NIGHTLY:-}"
+PUBLISHED_NIGHTLY_REVISION="${PUBLISHED_NIGHTLY_REVISION:-}"
 VERSION_FILE=release.json
 ARTIFACT=coolify
 UPSTREAM_FILE=upstream.json
@@ -21,10 +23,11 @@ die() {
 cd "$(dirname "$0")/.."
 
 main() {
-	[[ "$OPTION" =~ ^(--build|--release|--tags)?$ ]] || die "'$OPTION' is not an option, expected --build, --release, --tags or none"
+	[[ "$OPTION" =~ ^(--build|--release|--tags|--nightly)?$ ]] || die "'$OPTION' is not an option, expected --build, --release, --tags, --nightly or none"
 	read_version
 	fetch_origin
 	print_tags
+	print_next_nightly
 	check_branch
 	check_version
 	select_releases
@@ -63,6 +66,43 @@ print_tags() {
 	moved_tags "$(grep -vxF -f <(echo "$released") <<< "$tags" || true)" "$tags" \
 		| jq -Rnc '[inputs | split(" ") | {(.[0]): .[1]}] | add // {}'
 	exit 0
+}
+
+print_next_nightly() {
+	[ "$OPTION" = --nightly ] || return 0
+	select_nightly_branch
+	[ "$revision" != "$PUBLISHED_NIGHTLY_REVISION" ] || exit 0
+	select_nightly_version
+	upstream_lines <(git show "$revision:$UPSTREAM_FILE") | while read -r name upstream; do
+		jq -nc --arg name "$name" --arg version "$upstream" --arg tag "${upstream:+$upstream-}v$nightly" '{$name, $version, $tag}'
+	done | jq -sc --arg branch "$branch" --arg revision "$revision" --arg image "$nightly" '{$branch, $revision, $image, lines: .}'
+	exit 0
+}
+
+select_nightly_branch() {
+	stable="$(tag_versions <<< "$tags" | awk '!/-/' | newest)"
+	stable="${stable:-$(artifact_version stable)}"
+	line="$(git for-each-ref --format='%(refname:lstrip=4)' 'refs/remotes/origin/release/v*' | sed -n 's/^v\([0-9]*\.[0-9]*\)$/\1/p' | sort -V \
+		| while read -r release; do ! newer "$release.0" "$stable" || { echo "$release" && break; }; done)"
+	branch="${line:+release/v$line}"
+	branch="${branch:-next}"
+	revision="$(git rev-parse "origin/$branch")"
+}
+
+select_nightly_version() {
+	local base number=1
+	version="$(artifact_version preview <(git show "$revision:$VERSION_FILE"))"
+	if [ -n "$line" ]; then
+		base="$line.0-alpha.0"
+		[[ "$version" != "$line.0-"* ]] || base="$version"
+	elif [[ "$version" == *-* ]] && newer "$version" "$stable"; then
+		base="$version"
+	else
+		base="$(next_version "$stable" minor)-alpha.0"
+	fi
+	nightly="$base.$(date -u +%Y%m%d)"
+	[[ "$PUBLISHED_NIGHTLY" != "$nightly".* ]] || number=$((${PUBLISHED_NIGHTLY##*.} + 1))
+	nightly+=".$number"
 }
 
 check_branch() {
@@ -175,7 +215,7 @@ print_releases() {
 }
 
 artifact_version() {
-	jq -r --arg channel "$1" --arg artifact "$ARTIFACT" '.[$channel][$artifact] // empty' "$VERSION_FILE"
+	jq -r --arg channel "$1" --arg artifact "$ARTIFACT" '.[$channel][$artifact] // empty' "${2:-$VERSION_FILE}"
 }
 
 upstream_lines() {
@@ -183,7 +223,7 @@ upstream_lines() {
 		echo latest
 		return
 	fi
-	jq -r --arg upstream "$UPSTREAM" '.[$upstream] | to_entries[] | "\(.key) \(.value.version)"' "$UPSTREAM_FILE"
+	jq -r --arg upstream "$UPSTREAM" '.[$upstream] | to_entries[] | "\(.key) \(.value.version)"' "${1:-$UPSTREAM_FILE}"
 }
 
 next_version() {

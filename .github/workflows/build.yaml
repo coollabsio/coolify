@@ -5,6 +5,15 @@ on:
     - cron: "50 7 * * 1"
   workflow_dispatch:
   workflow_call:
+    inputs:
+      ref:
+        description: The commit to build, the commit of the run when empty
+        type: string
+        default: ""
+      coolify:
+        description: The Coolify version to build, the version release.json sets for the branch when empty
+        type: string
+        default: ""
 
 permissions: {}
 
@@ -27,10 +36,11 @@ jobs:
     runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
     timeout-minutes: 10
     outputs:
-      coolify: ${{ steps.version.outputs.coolify }}
+      coolify: ${{ inputs.coolify || steps.version.outputs.coolify }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - id: version
@@ -61,6 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set the build arguments

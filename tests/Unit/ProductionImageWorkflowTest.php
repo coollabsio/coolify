@@ -1,9 +1,19 @@
 <?php
 
+it('orders nightlies after the version they build on and before the next prerelease', function () {
+    expect(version_compare('4.5.0', '4.6.0-alpha.0.20261014.1', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-alpha.0.20261014.1', '4.6.0-alpha.0.20261014.2', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-alpha.0.20261014.2', '4.6.0-alpha.1', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-alpha.1', '4.6.0-alpha.1.20261014.1', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-beta.1.20261014.2', '4.6.0-beta.2', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-rc.1.20261015.1', '4.6.0', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0', '4.7.0-alpha.0.20261016.1', '<'))->toBeTrue();
+});
+
 it('orders the image of a pull request after the version of its base branch and before the next version', function () {
     expect(version_compare('4.5.0', '4.5.0-pr.12', '<'))->toBeTrue()
         ->and(version_compare('4.5.0-pr.12', '4.5.1', '<'))->toBeTrue()
-        ->and(version_compare('4.6.0-beta.1', '4.6.0-beta.1-pr.12', '<'))->toBeTrue()
+        ->and(version_compare('4.6.0-beta.1.20261014.3', '4.6.0-beta.1-pr.12', '<'))->toBeTrue()
         ->and(version_compare('4.6.0-beta.1-pr.12', '4.6.0-beta.2', '<'))->toBeTrue();
 });
 

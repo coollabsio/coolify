@@ -22,8 +22,8 @@ cd "$(dirname "$0")/.."
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 main() {
-	[[ "$OPTION" =~ ^(--stable [0-9]+\.[0-9]+\.[0-9]+|--preview [0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?|--purge)$ ]] \
-		|| die "'$OPTION' is not an option, expected --stable or --preview with the version of the channel, or --purge"
+	[[ "$OPTION" =~ ^(--stable [0-9]+\.[0-9]+\.[0-9]+|--preview [0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?|--nightly [0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+\.[0-9]{8}\.[0-9]+|--purge)$ ]] \
+		|| die "'$OPTION' is not an option, expected --stable, --preview or --nightly with the version of the channel, or --purge"
 	if [ "$OPTION" = --purge ]; then
 		purge_cache
 		return
@@ -44,7 +44,7 @@ select_channel() {
 		channel_path+="/$channel" channel_url+="/$channel" channel_files="$FILES"
 	fi
 	if [[ "$channel:$VERSION" == preview:*-alpha.* ]]; then
-		info "the preview channel takes no alphas, Coolify $VERSION is not synced"
+		info "the preview channel takes no alphas, Coolify $VERSION reaches the nightly channel only"
 		exit 0
 	fi
 	info "syncing $channel_url to Coolify $BOLD$VERSION$RESET"
@@ -68,7 +68,7 @@ clone_cdn() {
 write_release() {
 	local release="$WORK_DIR/cdn/json/coolify/release.json"
 	[ -f "$release" ] || echo '{}' > "$release"
-	jq --tab --arg channel "$channel" --arg version "$VERSION" '.[$channel].coolify = $version | {stable, preview} | with_entries(select(.value))' \
+	jq --tab --arg channel "$channel" --arg version "$VERSION" '.[$channel].coolify = $version | {stable, preview, nightly} | with_entries(select(.value))' \
 		"$release" > "$WORK_DIR/release.json"
 	cp "$WORK_DIR/release.json" "$release"
 	ok "release.json sets the $channel version $BOLD$VERSION$RESET"
@@ -111,13 +111,13 @@ purge_cache() {
 	token="${CLOUDFLARE_API_TOKEN:-$(env_value CLOUDFLARE_API_TOKEN)}"
 	zone="${CLOUDFLARE_ZONE_ID:-$(env_value CLOUDFLARE_ZONE_ID)}"
 	[ -n "$token" ] && [ -n "$zone" ] || die "CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_ID are set neither in the environment nor in .env, expected a token that can purge the cache of the zone"
-	for channel_url in "$CDN_URL/coolify" "$CDN_URL/coolify/preview"; do
+	for channel_url in "$CDN_URL/coolify" "$CDN_URL/coolify/preview" "$CDN_URL/coolify/nightly"; do
 		urls="$(for name in $FILES patch.sh release.json; do echo "$channel_url/$name"; done)"
 		curl --proto '=https' --tlsv1.2 -sSf --retry 3 -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
 			--data "$(jq -Rnc '{files: [inputs]}' <<< "$urls")" "https://api.cloudflare.com/client/v4/zones/$zone/purge_cache" \
 			| jq -e .success > /dev/null || die "Cloudflare did not purge $channel_url"
 	done
-	ok "purged the stable and preview channels from the Cloudflare cache"
+	ok "purged the stable, preview and nightly channels from the Cloudflare cache"
 }
 
 channel_file() {
