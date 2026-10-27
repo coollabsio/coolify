@@ -5,12 +5,14 @@ namespace App\Jobs;
 use App\Actions\ImageScan\RefreshCandidates;
 use App\Models\ImageScan;
 use App\Services\ImageScan\ScanLockBusy;
+use App\Services\ImageScan\ScanNotifications;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 /**
  * Looks for newer versions of a scanned image after the scan, so deploys never wait for it. The job never sleeps on
@@ -55,6 +57,17 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
             RefreshCandidates::run($scan, 0, retryWhenBusy: $this->attempts() < $this->tries);
         } catch (ScanLockBusy) {
             $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
+        }
+    }
+
+    /**
+     * The check stored no result, so an alert that waits for it is sent now (spec 15.8).
+     */
+    public function failed(?Throwable $exception): void
+    {
+        $scan = $this->scan->fresh();
+        if ($scan instanceof ImageScan) {
+            ScanNotifications::reevaluate($scan, checkGaveUp: true);
         }
     }
 }

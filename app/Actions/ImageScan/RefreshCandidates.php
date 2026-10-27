@@ -102,13 +102,21 @@ class RefreshCandidates
     {
         $this->retryWhenBusy = $retryWhenBusy && $lockWaitSeconds <= 0;
         $scan = ImageScan::query()->with(['resource', 'server.settings', 'sbom'])->find($scan->id);
-        if (! $scan instanceof ImageScan || ! self::needsCandidates($scan)) {
+        if (! $scan instanceof ImageScan) {
+            return;
+        }
+        if (! self::needsCandidates($scan)) {
+            ScanNotifications::reevaluate($scan);
+
             return;
         }
 
         $server = $scan->server;
         $resource = $scan->resource;
         if (! $server instanceof Server || ! ImageRescanJob::canRunOn($server) || ! ImageScanPolicyResolver::for($resource, $server)->scanEnabled) {
+            // No check runs, so an alert that waits for it is sent now.
+            ScanNotifications::reevaluate($scan, checkGaveUp: true);
+
             return;
         }
 

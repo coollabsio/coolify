@@ -34,13 +34,17 @@ use Throwable;
  *
  * A resource whose status is check_needed only because its version check did not finish yet (right after a scan) is
  * skipped until the check finished. While a resource needs a check, its new problems and fixing versions wait for
- * the next status.
+ * the next status, at most MAX_HELD_DIGESTS digests; then they are named with "Check needed. {primary action}". Fixes of
+ * problems with an exploit signal never wait: they are named at once the same way.
  */
 class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public const IGNORE_WINDOW_DAYS = 7;
+
+    /** While a resource needs a check, its new problems without an exploit signal wait at most this many digests. */
+    public const MAX_HELD_DIGESTS = 3;
 
     public $tries = 1;
 
@@ -166,18 +170,24 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
         }
 
         $active = $plans->where('baseline', false);
+        $holds = fn (array $plan): bool => count($plan['newFixable']) > count($plan['newSignalFixable']) || count($plan['newCandidates']) > count($plan['newSignalCandidates']);
+        // Fixes of problems with an exploit signal are never held; other new problems are held at most MAX_HELD_DIGESTS digests.
+        $bypass = $needsCheck && $active->contains(fn (array $plan): bool => $plan['newSignalFixable'] !== [] || $plan['newSignalCandidates'] !== []);
+        $release = $needsCheck && $active->contains(fn (array $plan): bool => $plan['heldDigests'] >= self::MAX_HELD_DIGESTS) && $active->contains($holds);
         $report = match ($security->status) {
             SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable => $active->contains(fn (array $plan): bool => $plan['newFixable'] !== [] || $plan['newCandidates'] !== []),
-            SecurityStatusType::CheckNeeded => $active->isNotEmpty() && ! $active->contains('checkReported', true),
+            SecurityStatusType::CheckNeeded => $active->isNotEmpty() && ($bypass || $release || ! $active->contains('checkReported', true)),
             default => false,
         };
 
         foreach ($plans as $plan) {
             $mark = $plan['mark'];
             $mark['check_reported'] = $needsCheck;
-            if ($needsCheck && ! $plan['baseline']) {
-                $mark['add_digest_ids'] = [];
-                $mark['add_candidates'] = [];
+            $mark['held_digests'] = 0;
+            if ($needsCheck && ! $plan['baseline'] && ! $release) {
+                $mark['add_digest_ids'] = array_values(array_unique(array_map(fn ($finding): string => $finding->id, $plan['newSignalFixable'])));
+                $mark['add_candidates'] = $plan['newSignalCandidates'];
+                $mark['held_digests'] = $holds($plan) ? $plan['heldDigests'] + 1 : 0;
             }
             $marks[] = $mark;
         }
@@ -186,14 +196,19 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
             return null;
         }
 
+        $action = TeamVulnerabilities::action($security)['text'] ?? null;
+        if ($needsCheck && ($bypass || $release) && filled($security->primary()?->sentence)) {
+            $action = (string) $security->primary()->sentence;
+        }
+
         return [
             'name' => (string) $resource->getAttribute('name'),
             'uuid' => (string) $resource->getAttribute('uuid'),
             'url' => ScanNotifications::link($resource),
             'status' => $security->status->value,
             'badge' => (string) SecuritySentences::badge($security->status),
-            'action' => TeamVulnerabilities::action($security)['text'] ?? null,
-            'why' => $needsCheck ? [] : $security->why,
+            'action' => $action,
+            'why' => $needsCheck && ! $bypass && ! $release ? [] : $security->why,
         ];
     }
 

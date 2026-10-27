@@ -2,7 +2,9 @@
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ImageRescanJob;
+use App\Jobs\ImageScanAlertCheckJob;
 use App\Jobs\ImageScanDigestJob;
+use App\Jobs\RefreshCandidatesJob;
 use App\Jobs\SendMessageToTelegramJob;
 use App\Jobs\ServerManagerJob;
 use App\Livewire\Notifications\Discord;
@@ -356,7 +358,7 @@ describe('notification state', function () {
         notifyRunDigest();
 
         Notification::assertSentToTimes($this->team, ExploitedProblemFound::class, 1);
-        expect(notifySentAlert()->ids)->toBe(['CVE-2026-0003']);
+        expect(array_column(notifySentAlert()->why, 'display_id'))->toBe(['CVE-2026-0003']);
         Notification::assertNotSentTo($this->team, VulnerabilityDigest::class);
     })->with([
         'new image first' => [['cache', 'web', 'worker']],
@@ -598,7 +600,7 @@ describe('immediate alert', function () {
         Notification::assertSentToTimes($this->team, ExploitedProblemFound::class, 1);
         $alert = notifySentAlert();
         // A finding in CISA KEV is relevant at any severity (spec 15.2).
-        expect($alert->ids)->toBe(['CVE-2026-0001', 'CVE-2026-0002'])
+        expect(array_column($alert->why, 'display_id'))->toBe(['CVE-2026-0001', 'CVE-2026-0002'])
             ->and($alert->title())->toBe('Update now')
             ->and($alert->text(withCount: true))->toBe('api: 2 problems that attackers are using. Rebuild the image in your CI, then redeploy.')
             ->and($alert->text(withCount: false))->toBe('api: problems that attackers are using. Rebuild the image in your CI, then redeploy.');
@@ -663,17 +665,89 @@ describe('immediate alert', function () {
         Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
     });
 
-    it('waits for the version check before it alerts', function () {
-        $scan = notifyScan($this->application, [notifyExploited('CVE-2026-0001', ['fixState' => 'not-fixed', 'fixedIn' => null])], ['candidates' => null]);
+    it('waits for the version check before it alerts a problem without a fix', function () {
+        Queue::fake();
+        $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], ['candidates' => null]);
 
         ScanNotifications::afterScan($scan);
         Notification::assertNothingSent();
+        Queue::assertPushed(ImageScanAlertCheckJob::class, fn (ImageScanAlertCheckJob $job) => $job->scanId === $scan->id && $job->delay !== null);
 
         $scan = notifyRefresh($scan, ['candidates' => notifyCandidates()]);
         ScanNotifications::afterScan($scan, candidateCheck: true);
 
         Notification::assertSentToTimes($this->team, ExploitedProblemFound::class, 1);
         expect(notifySentAlert()->text(withCount: true))->toBe('api: 1 problem that attackers are using. Update to 1.28.');
+    });
+
+    it('does not wait for the version check when the fix does not depend on it', function () {
+        Queue::fake();
+        $scan = notifyScan($this->application, [notifyExploited('CVE-2026-0001')], ['candidates' => null]);
+
+        ScanNotifications::afterScan($scan);
+
+        expect(notifySentAlert()->text(withCount: true))->toBe('api: 1 problem that attackers are using. Rebuild the image in your CI, then redeploy.');
+        Queue::assertNotPushed(ImageScanAlertCheckJob::class);
+    });
+
+    it('alerts with neutral wording when the wait for the version check ends without a result', function () {
+        Queue::fake();
+        $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], ['candidates' => null]);
+        ScanNotifications::afterScan($scan);
+        Notification::assertNothingSent();
+
+        $this->travel(61)->minutes();
+        (new ImageScanAlertCheckJob($scan->id))->handle();
+
+        $alert = notifySentAlert();
+        expect($alert->title())->toBe('Check needed')
+            ->and($alert->text(withCount: true))->toBe('api: 1 problem that attackers are using. Coolify could not check for a fixed version yet.')
+            ->and($alert->toWebhook()['status'])->toBe('check_needed');
+    });
+
+    it('alerts at once when the version check job fails', function () {
+        Queue::fake();
+        $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001', ['epss' => 0.5, 'kev' => false])], ['candidates' => null]);
+        ScanNotifications::afterScan($scan);
+        Notification::assertNothingSent();
+
+        (new RefreshCandidatesJob($scan))->failed(new RuntimeException('registry down'));
+
+        expect(notifySentAlert()->text(withCount: true))->toBe('api: 1 problem that attackers are likely to use. Coolify could not check for a fixed version yet.');
+    });
+
+    it('does not say that no fix exists when the version check failed', function () {
+        $scan = notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], [
+            'candidates' => ['status' => 'failed', 'checked_at' => now()->addSecond()->toIso8601String(), 'error' => 'daily_limit', 'entries' => []],
+        ]);
+
+        ScanNotifications::afterScan($scan);
+
+        $alert = notifySentAlert();
+        expect($alert->title())->toBe('Check needed')
+            ->and($alert->text(withCount: false))->toBe('api: a problem that attackers are using. Coolify could not check for a fixed version yet.');
+    });
+
+    it('alerts a new exploited problem while the resource needs a check for another reason', function () {
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['scanned_at' => now()->subDays(3)]);
+
+        notifyRefresh($scan, ['findings' => [notifyExploited('CVE-2026-0002')], 'scanned_at' => now()->subDays(3)]);
+        ScanNotifications::afterScan($scan->fresh());
+
+        Notification::assertSentToTimes($this->team, ExploitedProblemFound::class, 1);
+    });
+
+    it('alerts a new exploited finding of a later rescan of the first deployed image', function () {
+        $deployment = notifyDeployment($this->application);
+        $scan = notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['is_baseline' => true, 'deployment_queue_id' => $deployment->id], state: false);
+        ScanNotifications::afterScan($scan, $deployment->id);
+
+        $this->travel(3)->hours();
+        $scan = notifyRefresh($scan, ['findings' => [notifyFinding('CVE-2026-0001'), notifyExploited('CVE-2026-0002')], 'scanned_at' => now()]);
+        ScanNotifications::afterScan($scan);
+
+        Notification::assertSentToTimes($this->team, ExploitedProblemFound::class, 1);
+        expect(array_column(notifySentAlert()->why, 'display_id'))->toBe(['CVE-2026-0002']);
     });
 
     it('notifies only the root team for the resources of Coolify', function () {
@@ -775,6 +849,42 @@ describe('digest', function () {
 
         Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 2);
         expect(notifyStateOf($this->application)->check_reported)->toBeFalse()
+            ->and(notifyStateOf($this->application)->digest_ids)->toBe(['CVE-2026-0001']);
+    });
+
+    it('names a fix of an exploited problem at once while the resource needs a check', function () {
+        $key = 'nginx:1.28@sha256:'.str_repeat('b', 64);
+        notifyScan($this->application, [notifyExploitedWithoutFix('CVE-2026-0001')], ['candidates' => notifyCandidates(), 'scanned_at' => now()->subDays(3)]);
+        notifyState($this->application, ['CVE-2026-0001']);
+        notifyStateOf($this->application)->update(['check_reported' => true]);
+
+        notifyRunDigest();
+
+        $resource = notifySentDigest()->digest['resources'][0];
+        expect($resource['status'])->toBe('check_needed')
+            ->and($resource['action'])->toBe('Update to 1.28.')
+            ->and(notifyStateOf($this->application)->digest_ids)->toBe(['CVE-2026-0001'])
+            ->and(notifyStateOf($this->application)->notified_candidates)->toBe([$key]);
+    });
+
+    it('names held problems after 3 digests while the resource still needs a check', function () {
+        notifyScan($this->application, [notifyFinding('CVE-2026-0001')], ['scanned_at' => now()->subDays(3)]);
+
+        foreach (range(1, 3) as $run) {
+            notifyRunDigest();
+        }
+        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 1);
+        expect(notifyStateOf($this->application)->held_digests)->toBe(3)
+            ->and(notifyStateOf($this->application)->digest_ids)->toBe([]);
+
+        notifyRunDigest();
+        notifyRunDigest();
+
+        Notification::assertSentToTimes($this->team, VulnerabilityDigest::class, 2);
+        $sent = Notification::sent($this->team, VulnerabilityDigest::class)->last();
+        expect($sent->digest['resources'][0]['status'])->toBe('check_needed')
+            ->and($sent->digest['resources'][0]['action'])->toBe('Rebuild the image in your CI, then redeploy.')
+            ->and(notifyStateOf($this->application)->held_digests)->toBe(0)
             ->and(notifyStateOf($this->application)->digest_ids)->toBe(['CVE-2026-0001']);
     });
 

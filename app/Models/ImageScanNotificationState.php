@@ -23,6 +23,7 @@ class ImageScanNotificationState extends Model
         'notified_candidates',
         'digest_ids',
         'check_reported',
+        'held_digests',
         'is_baseline',
         'baseline_deployment_queue_id',
     ];
@@ -34,6 +35,7 @@ class ImageScanNotificationState extends Model
             'notified_candidates' => 'array',
             'digest_ids' => 'array',
             'check_reported' => 'boolean',
+            'held_digests' => 'integer',
             'is_baseline' => 'boolean',
             'baseline_deployment_queue_id' => 'integer',
         ];

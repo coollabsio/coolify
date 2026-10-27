@@ -659,7 +659,7 @@ final class SecurityStatus
      * a result. `cannot_compare` and `no_better` count as checked. A Dockerfile app also needs to know which
      * findings come from its current base image.
      */
-    private static function versionsChecked(ImageScan $scan, Model $owner): bool
+    public static function versionsChecked(ImageScan $scan, Model $owner): bool
     {
         $needsImageCheck = ! $owner instanceof Application
             || $owner->build_pack === 'dockerimage'
