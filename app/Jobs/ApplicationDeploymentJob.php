@@ -849,12 +849,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return $service;
             });
             $composeFile['services'] = $services->toArray();
-            if (empty($composeFile)) {
-                $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
-                $this->fail('Failed to parse docker-compose file.');
-
-                return;
-            }
 
             // Add build secrets to compose file if enabled and BuildKit is supported
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
@@ -997,12 +991,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * A deployment of the application also queues one sync of the file storages with the server, which
      * loads the content of the files that come from the repository. A preview uses its own copies of the
      * files, so its deployment does not sync the storages of the application.
+     * The parser gives no services when it cannot parse the file. The deployment stops then, because
+     * an empty Compose file fails later with the unclear Docker error "no service selected".
      *
      * @return Collection<array-key, mixed>
+     *
+     * @throws DeploymentException When the parsed Compose file has no services
      */
     private function parseComposeFileForDeployment(): Collection
     {
         $composeFile = collect($this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit));
+        if (blank(data_get($composeFile, 'services'))) {
+            throw new DeploymentException("The Docker Compose file has no services, or Coolify could not parse it. Check that {$this->application->docker_compose_location} is valid YAML and has a services section.");
+        }
         if ($this->pull_request_id === 0) {
             ServerFilesFromServerJob::dispatch($this->application);
         }
