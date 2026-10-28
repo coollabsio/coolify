@@ -35,6 +35,20 @@ class ScannerText
         return $text;
     }
 
+    /**
+     * Removes the label some advisories start with ("Issue summary:", "Summary:", "Description:", "Vulnerability:"),
+     * also from titles stored before the parser removed it.
+     */
+    public static function stripTitlePrefix(string $text): string
+    {
+        $stripped = preg_replace('/^(?:(?:issue\s+summary|summary|description|vulnerability)\s*:\s*)+/iu', '', $text) ?? $text;
+        if ($stripped === $text) {
+            return $text;
+        }
+
+        return mb_strtoupper(mb_substr($stripped, 0, 1)).mb_substr($stripped, 1);
+    }
+
     public static function fallbackTitle(string $package, string $version, string $severity): string
     {
         $prefix = trim(preg_replace('/\s+/u', ' ', self::clean(trim($package.' '.$version), 80)) ?? '');
@@ -63,7 +77,7 @@ class ScannerText
         $text = preg_replace('/(?<!\w)__(?=\S)([^_]*?\s[^_]*?)(?<=\S)__(?!\w)/u', '$1', $text) ?? '';
         $text = preg_replace('/`(?=\S)([^`]*?)(?<=\S)`/u', '$1', $text) ?? '';
         $text = preg_replace('/^(?:#{1,6}|>)\s+/u', '', $text) ?? '';
-        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+        $text = self::stripTitlePrefix(trim(preg_replace('/\s+/u', ' ', $text) ?? ''));
 
         if (preg_match('/^(.*?(?i:(?<!\be\.g)(?<!\bi\.e))[.!?])\s+\p{Lu}/su', $text, $match) === 1) {
             $text = $match[1];

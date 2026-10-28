@@ -250,13 +250,13 @@ describe('main card', function () {
 
         securityPage($this->admin, $database, 'database')
             ->assertSee('Update now')
-            ->assertSee('This image has a security problem that attackers are using. Update to 15.13 to fix it.')
+            ->assertSeeText('postgres:15.0 has a security problem that attackers are using. Update to 15.13 to fix it.')
             ->assertSee('SQL injection in psql quoting')
             ->assertSee('CVE-2025-1094')
             ->assertSee('8.1 High')
             ->assertSee('Used by attackers')
             ->assertSee('Update to 15.13')
-            ->assertSee('postgres:15.0 → postgres:15.13')
+            ->assertSee('postgres:15.0 '.substr(ResourceScans::current($database)->first()->image_id, 7, 12).' → postgres:15.13')
             ->assertSee('This is a patch release of PostgreSQL 15. Your data stays as it is. The database restarts and is unavailable for a few seconds.')
             ->assertSee('Checked');
     });
@@ -268,7 +268,7 @@ describe('main card', function () {
         ]);
 
         securityPage($this->admin, $application, 'application')
-            ->assertSee('A newer build of this image fixes it. Pull it and restart.')
+            ->assertSeeText('nginx:1.27 has a security problem that attackers are using. A newer build fixes it. Pull it and restart.')
             ->assertSee('Pull latest and restart')
             ->assertSee('Pull the newest build of nginx:1.27.')
             ->assertSeeHtml('updateImage(\\u0027nginx:1.27\\u0027');
@@ -297,7 +297,7 @@ describe('main card', function () {
 
         securityPage($this->admin, $application, 'application')
             ->assertSee('No fix yet')
-            ->assertSee('This image has a security problem that attackers are using. '.SecurityActions::BUILDER_TEXT)
+            ->assertSeeText($application->uuid.':'.$deployment->commit.' has a security problem that attackers are using. '.SecurityActions::BUILDER_TEXT)
             ->assertDontSeeHtml('rebuild');
     });
 
@@ -305,10 +305,12 @@ describe('main card', function () {
         [$service] = securityPageN8nService();
 
         securityPage($this->admin, $service, 'service')
-            ->assertSee('This image has 2 security problems that attackers are using. Update n8n and n8n runners to 1.1 to fix them.')
+            ->assertSee('2 of 2 images need an update')
+            ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. Update to 1.1 to fix it.')
+            ->assertSeeText('n8nio/runners:1.0 has a security problem that attackers are using. Update to 1.1 to fix it.')
             ->assertSee('Update to 1.1')
-            ->assertSee('n8n: n8nio/n8n:1.0 → n8nio/n8n:1.1')
-            ->assertSee('n8n runners: n8nio/runners:1.0 → n8nio/runners:1.1')
+            ->assertSee('Updated with n8n')
+            ->assertSee('Pull the images and restart the service: n8n, n8n runners.')
             ->assertSeeHtml('updateImages(');
     });
 
@@ -317,7 +319,7 @@ describe('main card', function () {
         securityPageScan($application, 'nginx:1.27', [securityPageFinding('CVE-2026-0001', ['kev' => false, 'severity' => 'medium', 'cvssScore' => 5.0])]);
 
         securityPage($this->admin, $application, 'application')
-            ->assertSee('No action needed.')
+            ->assertSeeText('nginx:1.27 needs no action.')
             ->assertDontSee('Update now')
             ->assertDontSee('Security update');
     });
@@ -328,7 +330,7 @@ describe('main card', function () {
 
         securityPage($this->admin, $application, 'application')
             ->assertSee('Check needed')
-            ->assertSee('Coolify needs to check this image again: the last check was 3 days ago.')
+            ->assertSeeText('nginx:1.27 needs another check: the last check was 3 days ago.')
             ->assertSee('Scan now');
     });
 
@@ -348,7 +350,7 @@ describe('main card', function () {
         $application = securityPageApplication();
         securityPageScan($application, 'nginx:1.27', [
             securityPageFinding('CVE-2026-0001'),
-            securityPageFinding('CVE-2026-0002', ['fixedIn' => null, 'fixState' => 'not-fixed', 'package' => 'zlib']),
+            securityPageFinding('CVE-2026-0002', ['fixedIn' => null, 'fixState' => 'not-fixed', 'package' => 'zlib', 'kev' => false]),
             securityPageFinding('CVE-2026-0003', ['severity' => 'low']),
         ]);
 
@@ -719,5 +721,97 @@ describe('deploy gate popover', function () {
         Livewire::test(Heading::class, ['application' => $application])
             ->assertSee('Update to 1.28.')
             ->assertSee('Open Security');
+    });
+});
+
+describe('image list', function () {
+    /**
+     * The n8n service with a third image, postgres, that needs no action.
+     *
+     * @return array{0: Service, 1: ServiceApplication, 2: ServiceApplication, 3: ServiceApplication}
+     */
+    function securityPageThreeImageService(): array
+    {
+        [$service, $main, $runners] = securityPageN8nService();
+        $postgres = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'postgres', 'image' => 'postgres:16-alpine']);
+        securityPageScan($postgres, 'postgres:16-alpine', [securityPageFinding('CVE-2026-0003', ['kev' => false, 'severity' => 'medium', 'cvssScore' => 5.0])]);
+
+        return [$service->fresh(), $main, $runners, $postgres];
+    }
+
+    it('shows one open image with its sentence, attack note, provenance, and running digest, without a list', function () {
+        $database = securityPageDatabase();
+        $database->forceFill(['image' => 'postgres:16-alpine'])->save();
+        $ids = ['CVE-2026-0001', 'CVE-2026-0002'];
+        securityPageScan($database, 'postgres:16-alpine', [
+            securityPageFinding($ids[0], ['kev' => false, 'severity' => 'critical']),
+            securityPageFinding($ids[1], ['kev' => false, 'severity' => 'critical']),
+            securityPageFinding('CVE-2026-0003', ['kev' => false, 'severity' => 'medium', 'fixedIn' => null, 'fixState' => 'not-fixed']),
+        ], [
+            'repo_digest' => 'sha256:3f1a2b4c5d6e'.str_repeat('0', 52),
+            'candidates' => securityPageCandidates([[
+                ...securityPageEntry('postgres:16-alpine', 'same_tag', $ids),
+                'fixes' => ['critical' => 2, 'high' => 0, 'medium' => 0],
+                'left' => ['critical' => 0, 'high' => 0, 'medium' => 0],
+                'scanned_at' => now()->subHours(2)->toIso8601String(),
+            ]]),
+        ]);
+
+        securityPage($this->admin, $database, 'database')
+            ->assertSee('Security update')
+            ->assertSeeText('postgres:16-alpine has a newer build that fixes 2 critical problems.')
+            ->assertSee('No known attacks on these problems.')
+            ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 and adds none.')
+            ->assertSee('Pull latest and restart')
+            ->assertSee('3f1a2b4c5d6e')
+            ->assertSee('3 known issues, 1 has no fix')
+            ->assertDontSee('images need an update')
+            ->assertDontSeeHtml('aria-label="Images"');
+    });
+
+    it('lists the images of a service worst first, opens the first problem, and puts a merged update on its first row', function () {
+        [$service, $main, $runners, $postgres] = securityPageThreeImageService();
+        $this->actingAs($this->admin);
+
+        $card = SecurityCard::for($service, SecurityStatus::forResource($service), ResourceScans::owners($service), ResourceScans::current($service), $this->admin);
+
+        expect($card['header'])->toBe('2 of 3 images need an update')
+            ->and(array_column($card['rows'], 'name'))->toBe(['n8n', 'n8n runners', 'postgres'])
+            ->and(array_column($card['rows'], 'open'))->toBe([true, false, false])
+            ->and($card['rows'][0]['primary']['button']['submit'])->toStartWith('updateImages(')
+            ->and($card['rows'][0]['mergedWith'])->toBeNull()
+            ->and($card['rows'][1]['primary'])->toBeNull()
+            ->and($card['rows'][1]['mergedWith'])->toBe('n8n')
+            ->and($card['rows'][2]['status'])->toBe('ok')
+            ->and($card['rows'][2]['primary'])->toBeNull();
+
+        securityPage($this->admin, $service, 'service')
+            ->assertSee('2 of 3 images need an update')
+            ->assertSeeInOrder(['n8nio/n8n:1.0', 'n8nio/runners:1.0', 'postgres:16-alpine'])
+            ->assertSee('Updated with n8n')
+            ->assertSeeText('postgres:16-alpine needs no action.');
+    });
+
+    it('filters the findings to the image of a row', function () {
+        [$service] = securityPageThreeImageService();
+
+        $page = securityPage($this->admin, $service, 'service')
+            ->set('view', 'cve')
+            ->call('showImageFindings', 'n8nio/runners:1.0')
+            ->assertSet('images', ['n8nio/runners:1.0']);
+        expect(collect($page->viewData('items')->items())->map(fn (array $row): string => $row['finding']->id)->all())->toBe(['CVE-2026-0002']);
+
+        $page->call('showImageFindings', 'not-an-image:1.0')->assertSet('images', ['n8nio/runners:1.0']);
+    });
+
+    it('removes the label of an old stored title', function () {
+        $database = securityPageDatabase();
+        securityPageScan($database, 'postgres:15.0', [
+            securityPageFinding('CVE-2025-1094', ['title' => 'Issue summary: a crafted string can inject SQL into psql']),
+        ], ['candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', ['CVE-2025-1094'])])]);
+
+        securityPage($this->admin, $database, 'database')
+            ->assertSee('A crafted string can inject SQL into psql')
+            ->assertDontSee('Issue summary:');
     });
 });

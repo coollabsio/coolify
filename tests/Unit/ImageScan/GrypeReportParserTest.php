@@ -263,6 +263,15 @@ it('removes Markdown, URLs, and control and format characters from the title', f
         ->toBe('Reads client_encoding from PQescapeLiteral() calls today');
 });
 
+it('removes a leading label from the title', function (string $desc, string $title) {
+    expect(parsedFinding(['desc' => $desc])->title)->toBe($title);
+})->with([
+    'issue summary' => ['Issue summary: a crafted packet crashes the server. Impact: high.', 'A crafted packet crashes the server.'],
+    'summary' => ['SUMMARY: Heap overflow in the parser of headers', 'Heap overflow in the parser of headers'],
+    'description' => ['Description: Vulnerability: the parser reads past the buffer end', 'The parser reads past the buffer end'],
+    'no label' => ['The summary: is not a label in the middle', 'The summary: is not a label in the middle'],
+]);
+
 it('uses the package fallback title for fewer than four words', function (string $desc) {
     expect(parsedFinding(['desc' => $desc, 'rdesc' => '', 'pkg' => 'openssl', 'ver' => '1.0', 'sev' => 'High'])->title)
         ->toBe('openssl 1.0: high vulnerability');

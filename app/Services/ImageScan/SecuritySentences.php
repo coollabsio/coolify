@@ -4,14 +4,23 @@ namespace App\Services\ImageScan;
 
 use App\Enums\SecurityActionType;
 use App\Enums\SecurityStatusType;
+use App\Models\ImageScan;
 use Carbon\CarbonImmutable;
+use InvalidArgumentException;
 use Throwable;
 
 /**
- * The copy of the security status card (spec 15.5, 15.7). Pure functions of the stored `ResourceSecurity`.
+ * The copy of the security status card (spec 15.5, 15.7, 15.11). Pure functions of the stored `ResourceSecurity` and
+ * the stored scan data.
  */
 final class SecuritySentences
 {
+    private const REGISTRY_NAMES = [
+        'docker.io' => 'Docker Hub',
+        'ghcr.io' => 'GitHub Container Registry',
+        'quay.io' => 'Quay',
+    ];
+
     private const CHECK_REASONS = [
         SecurityStatus::REASON_IMAGES_UNCHECKED,
         SecurityStatus::REASON_TRUNCATED,
@@ -122,11 +131,254 @@ final class SecuritySentences
         return "This is a patch release of {$name}. Your data stays as it is. The database restarts and is unavailable for a few seconds.";
     }
 
-    private static function updateNow(ResourceSecurity $security): string
+    /**
+     * The sentence of one image row (spec 15.11): it starts with the image ref.
+     */
+    public static function imageSentence(ResourceSecurity $security, string $imageRef): string
+    {
+        return match ($security->status) {
+            SecurityStatusType::UpdateNow => self::updateNow($security, $imageRef, 'A newer build'),
+            SecurityStatusType::UpdateAvailable => self::imageUpdateAvailable($security, $imageRef),
+            SecurityStatusType::NoFix => self::noFix($security, $imageRef),
+            SecurityStatusType::Ok => "{$imageRef} needs no action.",
+            SecurityStatusType::CheckNeeded => "{$imageRef} needs another check: ".(in_array($security->checkReason, self::CHECK_REASONS, true)
+                ? self::checkReason((string) $security->checkReason, self::checkContext($security))
+                : 'the last check is incomplete').'.',
+            SecurityStatusType::NotChecked => in_array($security->checkReason, [null, SecurityStatus::NOT_SCANNED], true)
+                ? "{$imageRef} has not been checked yet."
+                : self::checkReason((string) $security->checkReason, $security->checkContext),
+        };
+    }
+
+    /**
+     * The short note after the sentence of an image row: whether attackers use the problems.
+     */
+    public static function attackNote(ResourceSecurity $security): ?string
+    {
+        return match ($security->status) {
+            SecurityStatusType::UpdateNow, SecurityStatusType::NoFix => $security->anyExploited
+                ? 'Attackers are using '.($security->problemCount > 1 ? 'these' : 'this').'.'
+                : 'Attackers are likely to use '.($security->problemCount > 1 ? 'these' : 'this').'.',
+            SecurityStatusType::UpdateAvailable => $security->exploitedWithoutFix
+                ? null
+                : 'No known attacks on '.(max(1, $security->fixedByPrimary) > 1 ? 'these problems' : 'this problem').'.',
+            default => null,
+        };
+    }
+
+    /**
+     * How Coolify knows that the action of an image row fixes its problems, or that no fix exists (spec 15.11), from
+     * the stored version and base checks only. Null when there is nothing to say.
+     *
+     * @param  array{fixes?: ?int, adds?: ?int, fixed_in?: ?string}  $counts  What the candidate fixes and adds, and the
+     *                                                                        first fixed version of a package upgrade.
+     */
+    public static function provenance(ImageScan $scan, ?SecurityAction $action, ResourceSecurity $security, array $counts = []): ?string
+    {
+        if ($action === null) {
+            return $security->status === SecurityStatusType::NoFix && ! $security->builderImage ? self::noFixProvenance($scan, $security) : null;
+        }
+
+        $registry = self::registryName((string) $scan->image_ref);
+        $found = '';
+        if (isset($counts['fixes'])) {
+            $found = ': it fixes '.max(0, (int) $counts['fixes']);
+            if (isset($counts['adds'])) {
+                $found .= ' and adds '.($counts['adds'] > 0 ? "{$counts['adds']} less serious" : 'none');
+            }
+        }
+
+        switch ($action->type) {
+            case SecurityActionType::PullLatest:
+            case SecurityActionType::UpdateImage:
+                $entry = self::candidateEntry($scan, $action);
+                $tag = (string) ($action->target ?? self::tagOf((string) $action->ref));
+                $scanned = self::scannedAt($entry['scanned_at'] ?? null);
+                $intro = $action->type === SecurityActionType::PullLatest
+                    ? "{$registry} has a newer build of {$tag}."
+                    : (self::major($tag) === null
+                        ? "{$tag} is the newest release of this line on {$registry}."
+                        : "{$tag} is the newest ".self::major($tag).".x release on {$registry}.");
+
+                return trim("{$intro} Coolify scanned it{$scanned}{$found}.");
+            case SecurityActionType::ChangeBase:
+                $base = data_get($scan->candidates, 'base');
+                $entry = collect(is_array($base) && is_array($base['entries'] ?? null) ? $base['entries'] : [])
+                    ->first(fn ($entry): bool => is_array($entry) && ($entry['kind'] ?? null) === 'line' && ($entry['better'] ?? false) === true);
+
+                return "{$action->target} is the newest release of your base image. Coolify scanned it".self::scannedAt(data_get($entry, 'scanned_at')).'.';
+            case SecurityActionType::UpgradePackage:
+            case SecurityActionType::UpgradeInDockerfile:
+                $fixedIn = $counts['fixed_in'] ?? null;
+
+                return filled($fixedIn) && filled($action->target)
+                    ? "The advisory lists {$action->target} {$fixedIn} as the first fixed version."
+                    : null;
+            case SecurityActionType::Rebuild:
+                return filled($scan->base_image_ref)
+                    ? "The current {$scan->base_image_ref} image already has the fixed system packages."
+                    : 'The current base image already has the fixed system packages.';
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * "Docker Hub" for docker.io, "GitHub Container Registry" for ghcr.io, "Quay" for quay.io, else the host.
+     */
+    public static function registryName(string $imageRef): string
+    {
+        try {
+            $registry = ImageRef::parse($imageRef)->registry;
+        } catch (InvalidArgumentException) {
+            return 'the registry';
+        }
+
+        return self::REGISTRY_NAMES[$registry] ?? $registry;
+    }
+
+    /**
+     * The header of a list of several images: "2 of 3 images need an update". Null when none needs an update.
+     */
+    public static function imagesNeedingUpdate(int $count, int $total): ?string
+    {
+        if ($count < 1) {
+            return null;
+        }
+
+        return "{$count} of {$total} images ".($count === 1 ? 'needs' : 'need').' an update';
+    }
+
+    /**
+     * The counts in the footer of an image row: "12 known issues, 3 have no fix".
+     */
+    public static function knownIssues(int $known, int $noFix): string
+    {
+        if ($known < 1) {
+            return 'No known issues';
+        }
+
+        $text = $known === 1 ? '1 known issue' : "{$known} known issues";
+        if ($noFix > 0) {
+            $text .= ', '.($noFix === 1 ? '1 has' : "{$noFix} have").' no fix';
+        }
+
+        return $text;
+    }
+
+    /**
+     * "sha256:" and the first 12 characters of the digest, without the prefix: "3f1a2b4c5d6e".
+     */
+    public static function shortDigest(?string $digest): ?string
+    {
+        $digest = trim((string) $digest);
+        if ($digest === '') {
+            return null;
+        }
+
+        $hex = str_contains($digest, 'sha256:') ? substr($digest, (int) strpos($digest, 'sha256:') + strlen('sha256:')) : $digest;
+
+        return substr($hex, 0, 12) ?: null;
+    }
+
+    /**
+     * "Coolify checked Docker Hub 2 hours ago. No newer 16.x release fixes this yet." Only for images Coolify checks
+     * for newer versions.
+     */
+    private static function noFixProvenance(ImageScan $scan, ResourceSecurity $security): ?string
+    {
+        $checkedAt = is_array($scan->candidates) && ! array_is_list($scan->candidates) ? ($scan->candidates['checked_at'] ?? null) : null;
+        if (! is_string($checkedAt) || ! in_array($scan->candidateStatus(), ['ok', 'no_better'], true)) {
+            return null;
+        }
+
+        $major = self::major((string) self::tagOf((string) $scan->image_ref));
+        $release = $major === null ? 'release' : "{$major}.x release";
+        $what = $security->problemCount > 1 ? 'them' : 'this';
+
+        return 'Coolify checked '.self::registryName((string) $scan->image_ref).self::scannedAt($checkedAt).". No newer {$release} fixes {$what} yet.";
+    }
+
+    /**
+     * The stored candidate of an update_image or pull_latest action.
+     *
+     * @return array<string, mixed>
+     */
+    private static function candidateEntry(ImageScan $scan, SecurityAction $action): array
+    {
+        $kind = $action->type === SecurityActionType::PullLatest ? 'same_tag' : 'line';
+
+        return collect($scan->updateCandidates())
+            ->first(fn (array $entry): bool => ($entry['kind'] ?? null) === $kind && ($action->ref === null || ($entry['ref'] ?? null) === $action->ref)) ?? [];
+    }
+
+    /**
+     * " 2 hours ago", or nothing when the time is not known.
+     */
+    private static function scannedAt(mixed $time): string
+    {
+        return is_string($time) && $time !== '' ? ' '.self::ago($time) : '';
+    }
+
+    private static function tagOf(string $ref): ?string
+    {
+        try {
+            return ImageRef::parse($ref)->tag;
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    private static function major(?string $tag): ?string
+    {
+        return $tag !== null && preg_match('/^v?(\d+)[.\-]/i', $tag.'.', $matches) === 1 ? $matches[1] : null;
+    }
+
+    /**
+     * update_available in the words of an image row: "postgres:16-alpine has a newer build that fixes 2 critical
+     * problems." or "{ref} has a serious problem. Update to 16.4-alpine to fix it."
+     */
+    private static function imageUpdateAvailable(ResourceSecurity $security, string $imageRef): string
+    {
+        $action = $security->primary();
+        $fixed = max(1, $security->fixedByPrimary);
+        $onlyCritical = $security->primaryCritical > 0 && $security->primaryHigh === 0;
+        $parts = array_values(array_filter([
+            $security->primaryCritical > 0 ? "{$security->primaryCritical} critical" : null,
+            $security->primaryHigh > 0 ? "{$security->primaryHigh} high" : null,
+        ]));
+        $problems = match (true) {
+            $fixed === 1 => $onlyCritical ? 'a critical problem' : 'a serious problem',
+            $onlyCritical => "{$fixed} critical problems",
+            default => "{$fixed} serious problems".($parts === [] ? '' : ' ('.implode(', ', $parts).')'),
+        };
+        $it = $fixed === 1 ? 'it' : 'them';
+
+        $sentence = (string) $action?->sentence;
+        $majorNote = ' This is a major version change. Check for breaking changes.';
+        $note = '';
+        if (str_ends_with($sentence, $majorNote)) {
+            $sentence = substr($sentence, 0, -strlen($majorNote));
+            $note = $majorNote;
+        }
+
+        $text = match (true) {
+            $action === null => "{$imageRef} has {$problems}.",
+            $action->type === SecurityActionType::PullLatest && $sentence !== SecurityActions::COOLIFY_TEXT => "{$imageRef} has a newer build that fixes {$problems}."
+                .(str_contains($sentence, 'Redeploy this app to pull it.') ? ' Redeploy this app to pull it.' : ''),
+            $action->type === SecurityActionType::UpdateImage && str_starts_with($sentence, 'Update to ') && str_ends_with($sentence, '.') => "{$imageRef} has {$problems}. ".substr($sentence, 0, -1)." to fix {$it}.",
+            default => "{$imageRef} has {$problems}. {$sentence}",
+        };
+        $eol = self::eolSentence($security);
+
+        return trim($text.$note.($eol === '' ? '' : " {$eol}"));
+    }
+
+    private static function updateNow(ResourceSecurity $security, string $subject = 'This image', string $newerBuild = 'A newer build of this image'): string
     {
         $problems = self::problems($security->problemCount);
         $use = $security->anyExploited ? 'are using' : 'are likely to use';
-        $headline = "This image has {$problems} that attackers {$use}.";
+        $headline = "{$subject} has {$problems} that attackers {$use}.";
 
         $action = $security->primary();
         if ($action === null) {
@@ -139,7 +391,7 @@ final class SecuritySentences
         if ($action->type === SecurityActionType::UpdateImage && str_starts_with($sentence, 'Update ') && $sentence !== SecurityActions::COOLIFY_TEXT && str_ends_with($sentence, '.')) {
             $sentence = substr($sentence, 0, -1)." to fix {$what}.";
         } elseif ($action->type === SecurityActionType::PullLatest && $sentence !== SecurityActions::COOLIFY_TEXT) {
-            $sentence = "A newer build of this image fixes {$what}. ".self::pullInstruction($sentence);
+            $sentence = "{$newerBuild} fixes {$what}. ".self::pullInstruction($sentence);
         }
 
         return trim("{$headline} {$sentence} ".self::eolSentence($security));
@@ -180,19 +432,19 @@ final class SecuritySentences
         return $text;
     }
 
-    private static function noFix(ResourceSecurity $security): string
+    private static function noFix(ResourceSecurity $security, string $subject = 'This image'): string
     {
         $problems = self::problems($security->problemCount);
         $use = $security->anyExploited ? 'are using' : 'are likely to use';
 
         if ($security->builderImage) {
-            return "This image has {$problems} that attackers {$use}. ".SecurityActions::BUILDER_TEXT;
+            return "{$subject} has {$problems} that attackers {$use}. ".SecurityActions::BUILDER_TEXT;
         }
 
         $many = $security->problemCount > 1;
         $ignore = $many ? 'ignore the problems if the affected parts are not used' : 'ignore the problem if the affected part is not used';
 
-        return "This image has {$problems} that attackers {$use}, and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or {$ignore}.";
+        return "{$subject} has {$problems} that attackers {$use}, and no fixed version exists yet. Coolify checks every day and tells you when a fix is out. Until then, limit who can reach this app, or {$ignore}.";
     }
 
     /**

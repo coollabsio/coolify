@@ -635,9 +635,9 @@ describe('primary action and why-list', function () {
         $security = SecurityStatus::forResource($this->application);
 
         expect($security->why)->toBe([
-            ['title' => 'Problem CVE-2024-0003', 'display_id' => 'CVE-2024-0003', 'link' => 'https://nvd.nist.gov/vuln/detail/CVE-2024-0003', 'score' => 5.0, 'severity' => 'medium', 'signal' => 'exploited'],
-            ['title' => 'Problem CVE-2024-0002', 'display_id' => 'CVE-2024-0002', 'link' => 'https://nvd.nist.gov/vuln/detail/CVE-2024-0002', 'score' => 7.5, 'severity' => 'high', 'signal' => 'likely'],
-            ['title' => 'Problem GHSA-abcd-efgh-ijkl', 'display_id' => 'GHSA-abcd-efgh-ijkl', 'link' => 'https://github.com/advisories/GHSA-abcd-efgh-ijkl', 'score' => 9.9, 'severity' => 'critical', 'signal' => null],
+            ['title' => 'Problem CVE-2024-0003', 'display_id' => 'CVE-2024-0003', 'link' => 'https://nvd.nist.gov/vuln/detail/CVE-2024-0003', 'score' => 5.0, 'severity' => 'medium', 'signal' => 'exploited', 'package' => 'zlib', 'version' => '3.0.1'],
+            ['title' => 'Problem CVE-2024-0002', 'display_id' => 'CVE-2024-0002', 'link' => 'https://nvd.nist.gov/vuln/detail/CVE-2024-0002', 'score' => 7.5, 'severity' => 'high', 'signal' => 'likely', 'package' => 'curl', 'version' => '3.0.1'],
+            ['title' => 'Problem GHSA-abcd-efgh-ijkl', 'display_id' => 'GHSA-abcd-efgh-ijkl', 'link' => 'https://github.com/advisories/GHSA-abcd-efgh-ijkl', 'score' => 9.9, 'severity' => 'critical', 'signal' => null, 'package' => 'lodash', 'version' => '3.0.1'],
         ])->and($security->moreFixed)->toBe(2);
     });
 

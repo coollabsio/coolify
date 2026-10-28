@@ -100,7 +100,7 @@ class Vulnerabilities extends Component
     /** @var Collection<int, ImageScan>|null */
     private ?Collection $scans = null;
 
-    /** @var list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>|null */
+    /** @var list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>|null */
     private ?array $rows = null;
 
     /** @var array<string, IgnoreMatcher> */
@@ -173,6 +173,21 @@ class Vulnerabilities extends Component
     {
         $this->severities = [];
         $this->images = [];
+        $this->resetPage();
+    }
+
+    /**
+     * The "All findings" link of an image row: the findings of that image only. The browser opens the section.
+     */
+    public function showImageFindings(string $image): void
+    {
+        $refs = $this->currentScans()->pluck('image_ref')->map(fn ($ref): string => (string) $ref)->unique();
+        if (! $refs->contains($image)) {
+            return;
+        }
+
+        $this->images = [$image];
+        $this->showIgnored = false;
         $this->resetPage();
     }
 
@@ -684,7 +699,7 @@ class Vulnerabilities extends Component
      * One row per finding of the current scans, with its fix state and the ignore that matches it. Built once per
      * request.
      *
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
+     * @return list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
      */
     private function findingRows(): array
     {
@@ -704,6 +719,7 @@ class Vulnerabilities extends Component
                     ->contains(fn (string $id): bool => isset($baseIds[mb_strtolower($id)]));
                 $rows[] = [
                     'key' => $scan->uuid.'-'.$index,
+                    'scan' => (string) $scan->uuid,
                     'finding' => $finding,
                     'state' => $classify($finding) === ImageScanFixState::NoFix ? 'no_fix' : 'fixed',
                     'ignore' => $matcher->matches($finding),
@@ -734,6 +750,27 @@ class Vulnerabilities extends Component
     }
 
     /**
+     * The findings that are not ignored, and those without a fix, per scan.
+     *
+     * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $activeRows
+     * @return array<string, array{known: int, no_fix: int}>
+     */
+    private function findingCounts(array $activeRows): array
+    {
+        $counts = [];
+        foreach ($activeRows as $row) {
+            $counts[$row['scan']] ??= ['known' => 0, 'no_fix' => 0];
+            $counts[$row['scan']]['known']++;
+            $counts[$row['scan']]['no_fix'] += $row['state'] === 'no_fix' ? 1 : 0;
+        }
+        foreach ($this->currentScans() as $scan) {
+            $counts[(string) $scan->uuid] ??= ['known' => 0, 'no_fix' => 0];
+        }
+
+        return $counts;
+    }
+
+    /**
      * The IDs of the findings that the current base image of a Dockerfile build has too, from the last base check.
      *
      * @return array<string, true>
@@ -756,8 +793,8 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
+     * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
+     * @return list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
      */
     private function filterRows(array $rows): array
     {
@@ -795,7 +832,7 @@ class Vulnerabilities extends Component
     /**
      * Rows of the By package view: one per package version of an image, worst first.
      *
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
+     * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
      * @return list<array<string, mixed>>
      */
     private function packageGroups(array $rows): array
@@ -846,8 +883,8 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * @param  list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
-     * @return list<array{key: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
+     * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $rows
+     * @return list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
      */
     private function sortRows(array $rows): array
     {
@@ -940,8 +977,8 @@ class Vulnerabilities extends Component
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
-            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $user),
-            'versionNotes' => SecurityCard::versionCheckNotes($scans, $user),
+            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows)),
+            'hasSettings' => $resource instanceof Application,
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),
             'truncated' => $scans->contains(fn (ImageScan $scan): bool => (bool) data_get($scan->summary, 'truncated', false)),
             'findingCount' => count($activeRows),

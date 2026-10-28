@@ -2,6 +2,7 @@
 
 use App\Enums\SecurityActionType;
 use App\Enums\SecurityStatusType;
+use App\Models\ImageScan;
 use App\Services\ImageScan\ResourceSecurity;
 use App\Services\ImageScan\SecurityAction;
 use App\Services\ImageScan\SecurityActions;
@@ -346,4 +347,130 @@ it('never writes an em dash, "safe" or "secure" in any sentence', function () {
         expect($text)->not->toContain('—')
             ->and(strtolower($text))->not->toMatch('/\b(safe|secure)\b/');
     }
+});
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function sentenceScan(array $attributes = []): ImageScan
+{
+    return (new ImageScan)->forceFill([
+        'image_ref' => 'postgres:16-alpine',
+        'candidates' => ['status' => 'ok', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []],
+        ...$attributes,
+    ]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function sentenceCandidate(string $ref, string $kind): array
+{
+    return ['ref' => $ref, 'kind' => $kind, 'better' => true, 'fixed_ids' => [], 'scanned_at' => CarbonImmutable::now()->subHours(2)->toIso8601String()];
+}
+
+describe('image rows', function () {
+    it('starts the sentence of an image with its ref', function () {
+        expect(SecuritySentences::imageSentence(sentenceUpdateNow(), 'n8nio/n8n:1.68.0'))
+            ->toBe('n8nio/n8n:1.68.0 has a security problem that attackers are using. Update to 16.4-alpine to fix it.')
+            ->and(SecuritySentences::imageSentence(sentenceUpdateNow(['problemCount' => 2, 'fixedByPrimary' => 2, 'exploitedCount' => 2]), 'n8nio/n8n:1.68.0'))
+            ->toBe('n8nio/n8n:1.68.0 has 2 security problems that attackers are using. Update to 16.4-alpine to fix them.');
+    });
+
+    it('says that a newer build fixes critical problems', function (int $critical, string $problems) {
+        $pull = sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.', '16-alpine');
+        $security = sentenceUpdateAvailable(['actions' => [$pull], 'fixedByPrimary' => $critical, 'primaryCritical' => $critical, 'primaryHigh' => 0]);
+
+        expect(SecuritySentences::imageSentence($security, 'postgres:16-alpine'))->toBe("postgres:16-alpine has a newer build that fixes {$problems}.");
+    })->with([
+        'one' => [1, 'a critical problem'],
+        'two' => [2, '2 critical problems'],
+    ]);
+
+    it('names the severities of an update and the action', function () {
+        expect(SecuritySentences::imageSentence(sentenceUpdateAvailable(), 'postgres:16.1-alpine'))
+            ->toBe('postgres:16.1-alpine has 3 serious problems (1 critical, 2 high). Update to 16.4-alpine to fix them.');
+    });
+
+    it('says whether attackers use the problems of an image', function () {
+        expect(SecuritySentences::attackNote(sentenceUpdateNow()))->toBe('Attackers are using this.')
+            ->and(SecuritySentences::attackNote(sentenceUpdateNow(['anyExploited' => false, 'problemCount' => 2])))->toBe('Attackers are likely to use these.')
+            ->and(SecuritySentences::attackNote(sentenceUpdateAvailable()))->toBe('No known attacks on these problems.')
+            ->and(SecuritySentences::attackNote(sentenceUpdateAvailable(['fixedByPrimary' => 1])))->toBe('No known attacks on this problem.')
+            ->and(SecuritySentences::attackNote(sentenceUpdateAvailable(['exploitedWithoutFix' => true])))->toBeNull()
+            ->and(SecuritySentences::attackNote(sentenceSecurity(SecurityStatusType::Ok)))->toBeNull();
+    });
+
+    it('counts the known issues of an image', function () {
+        expect(SecuritySentences::knownIssues(12, 3))->toBe('12 known issues, 3 have no fix')
+            ->and(SecuritySentences::knownIssues(1, 1))->toBe('1 known issue, 1 has no fix')
+            ->and(SecuritySentences::knownIssues(4, 0))->toBe('4 known issues')
+            ->and(SecuritySentences::knownIssues(0, 0))->toBe('No known issues')
+            ->and(SecuritySentences::imagesNeedingUpdate(2, 3))->toBe('2 of 3 images need an update')
+            ->and(SecuritySentences::imagesNeedingUpdate(1, 3))->toBe('1 of 3 images needs an update')
+            ->and(SecuritySentences::imagesNeedingUpdate(0, 3))->toBeNull()
+            ->and(SecuritySentences::shortDigest('sha256:3f1a2b4c5d6e7f8091a2b3c4d5e6f708'))->toBe('3f1a2b4c5d6e');
+    });
+});
+
+describe('provenance', function () {
+    it('says that the registry has a newer build of the same tag', function () {
+        $scan = sentenceScan(['candidates' => ['status' => 'ok', 'entries' => [sentenceCandidate('postgres:16-alpine', 'same_tag')]]]);
+        $action = new SecurityAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.', '16-alpine', null, [], true, 'postgres:16-alpine', 'postgres:16-alpine');
+
+        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable(), ['fixes' => 2, 'adds' => 0]))
+            ->toBe('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 and adds none.');
+    });
+
+    it('says that the tag is the newest release of the line, and what it adds', function () {
+        $scan = sentenceScan([
+            'image_ref' => 'ghcr.io/n8n-io/n8n:1.68.0',
+            'candidates' => ['status' => 'ok', 'entries' => [sentenceCandidate('ghcr.io/n8n-io/n8n:1.71.2', 'line')]],
+        ]);
+        $action = new SecurityAction(SecurityActionType::UpdateImage, 'Update to 1.71.2.', '1.71.2', null, [], true, 'ghcr.io/n8n-io/n8n:1.68.0', 'ghcr.io/n8n-io/n8n:1.71.2');
+
+        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateNow(), ['fixes' => 1, 'adds' => 3]))
+            ->toBe('1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago: it fixes 1 and adds 3 less serious.')
+            ->and(SecuritySentences::provenance($scan, $action, sentenceUpdateNow(), ['fixes' => 1, 'adds' => null]))
+            ->toBe('1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago: it fixes 1.');
+    });
+
+    it('says that the new base image is the newest release', function () {
+        $scan = sentenceScan([
+            'image_ref' => 'app:abc1234',
+            'base_image_ref' => 'node:20.11-alpine',
+            'candidates' => ['status' => 'skipped', 'entries' => [], 'base' => [
+                'image' => 'node:20.11-alpine', 'status' => 'ok', 'entries' => [sentenceCandidate('node:20.18-alpine', 'line')],
+            ]],
+        ]);
+        $action = new SecurityAction(SecurityActionType::ChangeBase, 'Change the base image to node:20.18-alpine in your Dockerfile, then redeploy.', 'node:20.18-alpine', 'FROM node:20.18-alpine', [], false, 'app:abc1234');
+
+        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable()))
+            ->toBe('node:20.18-alpine is the newest release of your base image. Coolify scanned it 2 hours ago.');
+    });
+
+    it('names the first fixed version of a package upgrade', function (SecurityActionType $type) {
+        $action = new SecurityAction($type, 'Upgrade lodash to 4.17.21 or later, then redeploy.', 'lodash', 'lodash 4.17.21', [], false, 'app:abc1234');
+
+        expect(SecuritySentences::provenance(sentenceScan(), $action, sentenceUpdateAvailable(), ['fixed_in' => '4.17.21']))
+            ->toBe('The advisory lists lodash 4.17.21 as the first fixed version.');
+    })->with([SecurityActionType::UpgradePackage, SecurityActionType::UpgradeInDockerfile]);
+
+    it('says that the current base image has the fixed system packages', function () {
+        $action = new SecurityAction(SecurityActionType::Rebuild, 'Rebuild without cache to get the fixed system packages.', null, null, [], true, 'app:abc1234');
+
+        expect(SecuritySentences::provenance(sentenceScan(['base_image_ref' => 'node:20.18-alpine']), $action, sentenceUpdateAvailable()))
+            ->toBe('The current node:20.18-alpine image already has the fixed system packages.');
+    });
+
+    it('says when Coolify last checked the registry for a fix', function () {
+        $noFix = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true]);
+
+        expect(SecuritySentences::provenance(sentenceScan(['candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]), null, $noFix))
+            ->toBe('Coolify checked Docker Hub 3 hours ago. No newer 16.x release fixes this yet.')
+            ->and(SecuritySentences::provenance(sentenceScan(['image_ref' => 'quay.io/keycloak/keycloak:26.0', 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2])))
+            ->toBe('Coolify checked Quay 3 hours ago. No newer 26.x release fixes them yet.')
+            ->and(SecuritySentences::provenance(sentenceScan(['candidates' => ['status' => 'failed', 'entries' => []]]), null, $noFix))->toBeNull()
+            ->and(SecuritySentences::provenance(sentenceScan(), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'builderImage' => true])))->toBeNull();
+    });
 });

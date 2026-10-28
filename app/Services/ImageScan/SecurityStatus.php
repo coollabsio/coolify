@@ -609,7 +609,7 @@ final class SecurityStatus
     }
 
     /**
-     * @return array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string}
+     * @return array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string, package: string, version: string}
      */
     public static function whyFor(Finding $finding, ?string $signal): array
     {
@@ -620,6 +620,8 @@ final class SecurityStatus
             'score' => $finding->cvssScore,
             'severity' => strtolower($finding->severity),
             'signal' => $signal,
+            'package' => $finding->package,
+            'version' => $finding->version,
         ];
     }
 

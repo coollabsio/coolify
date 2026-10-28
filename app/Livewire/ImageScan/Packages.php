@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -36,6 +37,9 @@ class Packages extends Component
 
     /** @var list<string> */
     public array $types = [];
+
+    /** @var list<string> Image refs, for pages with more than one image. */
+    public array $images = [];
 
     public int $perPage = 10;
 
@@ -85,9 +89,28 @@ class Packages extends Component
         $this->resetPage(self::PAGE_NAME);
     }
 
+    public function toggleImage(string $image): void
+    {
+        $this->images = in_array($image, $this->images, true)
+            ? array_values(array_diff($this->images, [$image]))
+            : [...$this->images, $image];
+        $this->resetPage(self::PAGE_NAME);
+    }
+
+    /**
+     * The "Packages and SBOM" link of an image row on the Security card: the packages of that image only.
+     */
+    #[On('security-show-image-packages')]
+    public function showImage(string $image = ''): void
+    {
+        $this->images = $image === '' ? [] : [$image];
+        $this->resetPage(self::PAGE_NAME);
+    }
+
     public function resetFilters(): void
     {
         $this->types = [];
+        $this->images = [];
         $this->resetPage(self::PAGE_NAME);
     }
 
@@ -154,9 +177,12 @@ class Packages extends Component
         })->values();
 
         $typeOptions = $packages->pluck('type')->filter()->unique()->sort()->values()->all();
+        $imageOptions = $scans->pluck('image_ref')->map(fn ($ref): string => (string) $ref)->unique()->values()->all();
+        $this->images = array_values(array_intersect($this->images, $imageOptions));
         $search = mb_strtolower(trim($this->search));
         $filtered = $packages
             ->when($this->types !== [], fn (Collection $rows) => $rows->filter(fn (array $row): bool => in_array($row['type'], $this->types, true)))
+            ->when($this->images !== [], fn (Collection $rows) => $rows->filter(fn (array $row): bool => in_array($row['image'], $this->images, true)))
             ->when($search !== '', fn (Collection $rows) => $rows->filter(fn (array $row): bool => str_contains(mb_strtolower($row['name'].' '.$row['version'].' '.$row['purl']), $search)))
             ->sortBy([['name', 'asc'], ['version', 'asc']])
             ->values();
@@ -175,6 +201,7 @@ class Packages extends Component
             'total' => $packages->count(),
             'items' => new LengthAwarePaginator($filtered->forPage($page, $this->perPage)->values(), $filtered->count(), $this->perPage, $page, ['pageName' => self::PAGE_NAME]),
             'typeOptions' => $typeOptions,
+            'imageOptions' => count($imageOptions) > 1 ? $imageOptions : [],
             'showsImage' => $scans->pluck('image_ref')->unique()->count() > 1,
             'truncated' => $sboms->contains(fn (ImageSbom $sbom): bool => (bool) $sbom->packages_truncated),
             'downloads' => $scans->map(fn (ImageScan $scan): array => [

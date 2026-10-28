@@ -186,11 +186,17 @@
                                         {{ $stateLabels[$match['state']] }}@if ($match['state'] === 'fixed' && filled($match['fixedIn']))<span class="{{ $muted }}"> → {{ $match['fixedIn'] }}</span>@endif
                                     </span>
                                 @else
-                                    <div class="flex min-w-0 items-center">
+                                    @php
+                                        $imagesLine = \App\Services\ImageScan\TeamVulnerabilities::imagesLine($security, $entry['images']);
+                                    @endphp
+                                    <div class="flex min-w-0 flex-col items-start justify-center gap-0.5">
                                         @if ($badgeType !== null)
                                             <x-status-badge :type="$badgeType" :label="$statusLabel" />
                                         @else
                                             <span class="{{ $muted }}">{{ $statusLabel }}</span>
+                                        @endif
+                                        @if ($imagesLine !== null)
+                                            <span class="{{ $muted }} tabular-nums">{{ $imagesLine }}</span>
                                         @endif
                                     </div>
                                     <div class="image-scan-fleet-action min-w-0">

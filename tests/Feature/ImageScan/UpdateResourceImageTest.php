@@ -406,7 +406,7 @@ describe('service', function () {
         expect($web->fresh()->image)->toBe('nginx:${NGINX_VERSION:-1.27}');
 
         updateImagePage($this->admin, $service, 'service')
-            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.')
+            ->assertSeeText('nginx:1.27 needs another check: the running image is not the checked image.')
             ->assertDontSeeHtml('updateImage(');
     });
 
@@ -466,7 +466,7 @@ describe('main card actions', function () {
 
         updateImagePage($this->admin, $this->database, 'database')
             ->assertSee('Update to 15.15-alpine to fix it.')
-            ->assertSee('postgres:15.0-alpine → postgres:15.15-alpine')
+            ->assertSee('postgres:15.0-alpine aaaaaaaaaaaa → postgres:15.15-alpine')
             ->assertSee('Restart the database.')
             ->assertSee('This is a patch release of PostgreSQL 15. Your data stays as it is. The database restarts and is unavailable for a few seconds.')
             ->assertSeeHtml('updateImage(');
@@ -476,7 +476,7 @@ describe('main card actions', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.0-alpine', 'same_tag')]);
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('A newer build of this image fixes it. Pull it and restart.')
+            ->assertSeeText('postgres:15.0-alpine has a security problem that attackers are likely to use. A newer build fixes it. Pull it and restart.')
             ->assertSee('Pull latest and restart')
             ->assertSee('Coolify pulls the newest build of postgres:15.0-alpine and restarts.');
     });
@@ -494,7 +494,7 @@ describe('main card actions', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [], $status);
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('Coolify needs to check this image again: Coolify could not check for newer versions.')
+            ->assertSeeText('postgres:15.0-alpine needs another check: Coolify could not check for newer versions.')
             ->assertDontSeeHtml('updateImage(');
     })->with(['failed']);
 
@@ -502,7 +502,7 @@ describe('main card actions', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [], 'auth_required');
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertDontSee('Coolify needs to check this image again')
+            ->assertDontSee('needs another check')
             ->assertSee("Coolify cannot read the tags of postgres. Log in to docker.io on {$this->server->name}.")
             ->assertDontSeeHtml('updateImage(');
     });
@@ -523,7 +523,7 @@ describe('main card actions', function () {
         updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
 
         updateImagePage($this->admin, $service, 'service')
-            ->assertSee('web: nginx:1.27 → nginx:1.29')
+            ->assertSee('web: nginx:1.27 aaaaaaaaaaaa → nginx:1.29')
             ->assertSee('worker: nginx:1.27 → nginx:1.29')
             ->assertSee('One-click services pin versions that work together. Check the service template before you update.')
             ->assertSeeHtml($web->uuid);
@@ -555,7 +555,7 @@ describe('main card actions', function () {
         $this->database->forceFill(['image' => 'postgres:15.15-alpine'])->save();
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.')
+            ->assertSeeText('needs another check: the running image is not the checked image.')
             ->assertDontSeeHtml('updateImage(');
     });
 });
@@ -568,7 +568,7 @@ describe('updateImage action', function () {
         updateImagePage($this->admin, $this->database, 'database')
             ->call('updateImage', 'postgres:15.15-alpine', '', '')
             ->assertDispatched('success', 'Update started.')
-            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.')
+            ->assertSeeText('needs another check: the running image is not the checked image.')
             ->assertDontSeeHtml('updateImage(');
 
         expect($this->database->fresh()->image)->toBe('postgres:15.15-alpine');
@@ -703,7 +703,7 @@ describe('base image of a Dockerfile build', function () {
         [$application] = updateImageDockerfileScan(['status' => 'ok', 'entries' => [updateImageBaseEntry()]]);
 
         updateImagePage($this->admin, $application, 'application')
-            ->assertSee('Change the base image to node:20.18-alpine in your Dockerfile, then redeploy. This fixes 5 serious problems (1 critical, 4 high).')
+            ->assertSeeText('has 5 serious problems (1 critical, 4 high). Change the base image to node:20.18-alpine in your Dockerfile, then redeploy.')
             ->assertSeeHtml("copy(await ('FROM node:20.18-alpine'))")
             ->assertDontSee('Update to')
             ->assertDontSeeHtml('updateImage(');

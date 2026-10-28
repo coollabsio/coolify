@@ -20,16 +20,24 @@ use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
 /**
- * What the main card of the Security page shows (spec 15.7): status badge, sentence, primary action with its button
- * or copy text, why-list, and the other actions. Buttons are only offered when the user may run them; the Livewire
- * actions authorize again.
+ * What the main card of the Security page shows (spec 15.7, 15.11): the status of the resource, and one row per image
+ * with its status badge, sentence, primary action with its button or copy text, why-list, provenance, the other
+ * actions, and the running digest. Buttons are only offered when the user may run them; the Livewire actions authorize
+ * again.
  *
  * @phpstan-type ButtonData array{label: string, title: string, submit: string, actions: list<string>, warning: string}
  * @phpstan-type ActionData array{key: string, type: string, sentence: string, copy: ?string, button: ?ButtonData}
+ * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, signal: ?string, package: string, version: string}
+ * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, problem: bool, sentence: string, attackNote: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, filter: ?string}
  */
 final class SecurityCard
 {
     public const OTHER_ACTIONS_LIMIT = 5;
+
+    /** Image rows, worst first (the order of the team page). */
+    private const ROW_ORDER = ['update_now', 'update_available', 'no_fix', 'check_needed', 'ok', 'not_checked'];
+
+    private const PROBLEM_STATUSES = ['update_now', 'update_available', 'no_fix', 'check_needed'];
 
     private const DATABASE_NAMES = [
         'postgresql' => 'PostgreSQL',
@@ -44,48 +52,279 @@ final class SecurityCard
 
     /**
      * @param  Collection<int, Model>  $owners  The applications and databases of a service, else the resource.
-     * @return array{status: string, badge: ?string, badgeType: string, headline: string, lines: list<string>, primary: ?ActionData, why: list<array{title: string, display_id: string, link: ?string, score: string, signal: ?string}>, whyMore: string, others: list<ActionData>, moreActions: int}
+     * @param  Collection<int, ImageScan>  $scans  The current scans of the owners, with their `resource` set.
+     * @param  array<string, array{known: int, no_fix: int}>  $findingCounts  The findings that are not ignored, and those without a fix, by scan UUID.
+     * @return array{status: string, badge: ?string, badgeType: string, header: string, needsUpdate: int, total: int, single: bool, rows: list<ImageRow>}
      */
-    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, User $user): array
+    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = []): array
     {
         $status = $security->status;
-        $showsActions = in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true);
-        $actions = [];
-        if ($showsActions) {
-            foreach ($security->actions as $index => $action) {
-                $actions[] = self::action($resource, $action, (array) data_get($security->facts, "action_stats.{$index}", []), $owners, $user);
-            }
-        }
-        $others = array_slice($actions, 1);
+        $rows = self::images($resource, $security, $owners, $scans, $user, $findingCounts);
+        $total = count($rows) + ($resource instanceof Application ? ResourceScans::uncheckedComposeImages($resource, $scans) : 0);
+        $needsUpdate = count(array_filter($rows, fn (array $row): bool => in_array($row['status'], ['update_now', 'update_available'], true)));
 
         return [
             'status' => $status->value,
             'badge' => SecuritySentences::badge($status),
-            'badgeType' => match ($status) {
-                SecurityStatusType::UpdateNow => 'error',
-                SecurityStatusType::UpdateAvailable => 'warning',
-                default => 'neutral',
+            'badgeType' => self::badgeType($status),
+            'header' => SecuritySentences::imagesNeedingUpdate($needsUpdate, $total) ?? match ($status) {
+                SecurityStatusType::Ok => 'No action needed.',
+                SecurityStatusType::NotChecked => SecuritySentences::headline($security),
+                default => (string) SecuritySentences::badge($status),
             },
-            'headline' => SecuritySentences::headline($security),
-            'lines' => [...SecuritySentences::lines($security), ...self::eolLine($security)],
-            'primary' => $actions[0] ?? null,
-            'why' => in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable, SecurityStatusType::NoFix], true)
-                ? array_map(fn (array $entry): array => [
-                    'title' => $entry['title'],
-                    'display_id' => $entry['display_id'],
-                    'link' => $entry['link'],
-                    'score' => $entry['score'] === null ? 'No score' : number_format($entry['score'], 1).' '.ucfirst($entry['severity']),
-                    'signal' => match ($entry['signal']) {
-                        SecurityRules::EXPLOITED => 'Used by attackers',
-                        SecurityRules::LIKELY => 'Likely to be exploited',
-                        default => null,
-                    },
-                ], $security->why)
-                : [],
-            'whyMore' => $showsActions ? SecuritySentences::whyMore($security->moreFixed) : '',
-            'others' => array_slice($others, 0, self::OTHER_ACTIONS_LIMIT),
-            'moreActions' => max(0, count($others) - self::OTHER_ACTIONS_LIMIT),
+            'needsUpdate' => $needsUpdate,
+            'total' => $total,
+            'single' => $total === 1,
+            'rows' => $rows,
         ];
+    }
+
+    /**
+     * One row per image the status counts: each current scan (of a service, of the applications and databases Coolify
+     * scans), and the scanned owners of a service without a current scan. Worst first; the first row with a problem
+     * is open, and a single image is always open. A service update that merges several images (spec 15.5) has its
+     * button on the first row of the group; the other rows say which row updates them.
+     *
+     * @param  Collection<int, Model>  $owners
+     * @param  Collection<int, ImageScan>  $scans
+     * @param  array<string, array{known: int, no_fix: int}>  $findingCounts
+     * @return list<ImageRow>
+     */
+    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = []): array
+    {
+        $isService = $resource instanceof Service;
+        $statusOwners = $isService ? $owners->filter(fn (Model $owner): bool => ResourceScans::isScanTarget($owner))->values() : $owners;
+        $isStatusOwner = fn (?Model $owner): bool => $owner instanceof Model && $statusOwners->contains(fn (Model $candidate): bool => $candidate->is($owner));
+
+        $digests = [];
+        foreach ($scans as $scan) {
+            $digests[self::ownerKey($scan->resource)] ??= SecuritySentences::shortDigest($scan->repo_digest ?: $scan->image_id);
+        }
+
+        $entries = [];
+        foreach ($scans as $scan) {
+            if ($isService && ! $isStatusOwner($scan->resource)) {
+                continue;
+            }
+            $entries[] = ['scan' => $scan, 'owner' => $scan->resource, 'security' => SecurityStatus::forScan($scan)];
+        }
+        foreach ($statusOwners as $owner) {
+            if (! $scans->contains(fn (ImageScan $scan): bool => $scan->resource instanceof Model && $scan->resource->is($owner))) {
+                $entries[] = ['scan' => null, 'owner' => $owner, 'security' => new ResourceSecurity(SecurityStatusType::NotChecked, SecurityStatus::NOT_SCANNED)];
+            }
+        }
+
+        $rank = array_flip(self::ROW_ORDER);
+        usort($entries, fn (array $a, array $b): int => [$rank[$a['security']->status->value], self::rowName($a, $isService), self::rowRef($a)]
+            <=> [$rank[$b['security']->status->value], self::rowName($b, $isService), self::rowRef($b)]);
+
+        $merged = array_values(array_filter($security->actions, fn (SecurityAction $action): bool => $action->parts !== []));
+        $mergedStats = [];
+        foreach ($security->actions as $index => $action) {
+            if ($action->parts !== []) {
+                $mergedStats[self::key($action)] = (array) data_get($security->facts, "action_stats.{$index}", []);
+            }
+        }
+        $groupFirst = [];
+        $single = count($entries) === 1;
+        $opened = false;
+        $rows = [];
+        foreach ($entries as $entry) {
+            /** @var ResourceSecurity $imageSecurity */
+            $imageSecurity = $entry['security'];
+            /** @var ?ImageScan $scan */
+            $scan = $entry['scan'];
+            $owner = $entry['owner'];
+            $status = $imageSecurity->status;
+            $ref = self::rowRef($entry);
+            $name = $isService ? self::ownerName($owner) : null;
+            $showsActions = in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true);
+
+            $actions = [];
+            if ($showsActions) {
+                foreach ($imageSecurity->actions as $index => $action) {
+                    $actions[] = self::action($resource, $action, (array) data_get($imageSecurity->facts, "action_stats.{$index}", []), $owners, $user, $digests);
+                }
+            }
+
+            $primaryAction = $showsActions ? $imageSecurity->primary() : null;
+            $primary = $actions[0] ?? null;
+            $mergedWith = null;
+            $group = $primaryAction === null ? null : self::mergedGroup($merged, $primaryAction, $owner);
+            if ($group !== null) {
+                $groupKey = self::key($group);
+                if (isset($groupFirst[$groupKey])) {
+                    $mergedWith = $groupFirst[$groupKey];
+                    $primary = null;
+                } else {
+                    $groupFirst[$groupKey] = (string) ($name ?? $ref);
+                    $primary = self::action($resource, $group, $mergedStats[$groupKey] ?? [], $owners, $user, $digests);
+                }
+            }
+
+            $isProblem = in_array($status->value, self::PROBLEM_STATUSES, true);
+            $open = $single || ($isProblem && ! $opened);
+            $opened = $opened || $open;
+            $others = array_slice($actions, 1);
+            $counts = $scan === null ? null : ($findingCounts[(string) $scan->uuid] ?? null);
+            $digestFull = $scan === null ? null : ($scan->repo_digest ?: $scan->image_id);
+
+            $rows[] = [
+                'key' => $scan !== null ? 'scan-'.$scan->uuid : 'owner-'.$owner->getAttribute('uuid'),
+                'name' => $name,
+                'ref' => $ref,
+                'status' => $status->value,
+                'badge' => SecuritySentences::badge($status),
+                'badgeType' => self::badgeType($status),
+                'open' => $open,
+                'problem' => $isProblem,
+                'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref),
+                'attackNote' => SecuritySentences::attackNote($imageSecurity),
+                'lines' => [...SecuritySentences::lines($imageSecurity), ...self::eolLine($imageSecurity)],
+                'primary' => $primary,
+                'mergedWith' => $mergedWith,
+                'why' => in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable, SecurityStatusType::NoFix], true)
+                    ? array_map(fn (array $why): array => self::whyRow($why), $imageSecurity->why)
+                    : [],
+                'whyMore' => $showsActions ? SecuritySentences::whyMore($imageSecurity->moreFixed) : '',
+                'provenance' => $scan === null || ! in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable, SecurityStatusType::NoFix], true)
+                    ? null
+                    : SecuritySentences::provenance($scan, $primaryAction, $imageSecurity, self::provenanceCounts($scan, $primaryAction, $imageSecurity)),
+                'others' => array_slice($others, 0, self::OTHER_ACTIONS_LIMIT),
+                'moreActions' => max(0, count($others) - self::OTHER_ACTIONS_LIMIT),
+                'versionNotes' => $scan === null ? [] : self::versionCheckNotes(collect([$scan]), $user),
+                'digest' => SecuritySentences::shortDigest($digestFull),
+                'digestFull' => $digestFull,
+                'known' => $counts === null ? '' : SecuritySentences::knownIssues($counts['known'], $counts['no_fix']),
+                'filter' => $single ? null : $ref,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private static function badgeType(SecurityStatusType $status): string
+    {
+        return match ($status) {
+            SecurityStatusType::UpdateNow => 'error',
+            SecurityStatusType::UpdateAvailable => 'warning',
+            default => 'neutral',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $why
+     * @return WhyData
+     */
+    private static function whyRow(array $why): array
+    {
+        return [
+            'title' => ScannerText::stripTitlePrefix((string) $why['title']),
+            'display_id' => (string) $why['display_id'],
+            'link' => $why['link'],
+            'score' => $why['score'] === null ? 'No score' : number_format((float) $why['score'], 1).' '.ucfirst((string) $why['severity']),
+            'signal' => match ($why['signal']) {
+                SecurityRules::EXPLOITED => 'Used by attackers',
+                SecurityRules::LIKELY => 'Likely to be exploited',
+                default => null,
+            },
+            'package' => (string) ($why['package'] ?? ''),
+            'version' => (string) ($why['version'] ?? ''),
+        ];
+    }
+
+    /**
+     * The merged service update (from the status of the resource) that contains this image's update.
+     *
+     * @param  list<SecurityAction>  $merged
+     */
+    private static function mergedGroup(array $merged, SecurityAction $action, Model $owner): ?SecurityAction
+    {
+        if ($action->type !== SecurityActionType::UpdateImage) {
+            return null;
+        }
+
+        foreach ($merged as $group) {
+            foreach ($group->parts as $part) {
+                if ($part['owner_type'] === $owner->getMorphClass() && (string) $part['owner_id'] === (string) $owner->getKey() && $part['ref'] === $action->ref) {
+                    return $group;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * What the provenance line counts: the relevant findings the action fixes, the less serious ones the candidate
+     * adds (from the stored candidate scan; unknown for candidates checked before Coolify stored the counts), and the
+     * first fixed version of a package upgrade.
+     *
+     * @return array{fixes?: ?int, adds?: ?int, fixed_in?: ?string}
+     */
+    private static function provenanceCounts(ImageScan $scan, ?SecurityAction $action, ResourceSecurity $security): array
+    {
+        if ($action === null) {
+            return [];
+        }
+
+        if (in_array($action->type, [SecurityActionType::UpgradePackage, SecurityActionType::UpgradeInDockerfile], true)) {
+            $ids = array_flip(array_map('mb_strtolower', $action->fixedIds));
+            $fixedIn = null;
+            foreach (ResourceScans::findings($scan) as $finding) {
+                if ($finding->package === $action->target && isset($ids[mb_strtolower($finding->id)]) && filled($finding->fixedIn)
+                    && ($fixedIn === null || version_compare(ltrim((string) $finding->fixedIn, 'vV'), ltrim($fixedIn, 'vV'), '>'))) {
+                    $fixedIn = (string) $finding->fixedIn;
+                }
+            }
+
+            return ['fixed_in' => $fixedIn];
+        }
+
+        if (! in_array($action->type, [SecurityActionType::UpdateImage, SecurityActionType::PullLatest], true)) {
+            return [];
+        }
+
+        $kind = $action->type === SecurityActionType::PullLatest ? 'same_tag' : 'line';
+        $entry = collect($scan->updateCandidates())->first(fn (array $entry): bool => ($entry['kind'] ?? null) === $kind && ($entry['ref'] ?? null) === $action->ref) ?? [];
+        $stats = (array) data_get($security->facts, 'action_stats.0', []);
+        // The relevant findings the action fixes now, so the line agrees with the sentence after ignores changed.
+        $fixes = max(0, (int) ($stats['relevant'] ?? 0) - (int) ($stats['eol'] ?? 0));
+        if (! is_array($entry['left'] ?? null)) {
+            return ['fixes' => $fixes, 'adds' => null];
+        }
+
+        $owner = $scan->resource;
+        $ignores = IgnoreMatcher::forResource($owner);
+        $current = [];
+        foreach (ResourceScans::findings($scan) as $finding) {
+            if (in_array(strtolower($finding->severity), ['critical', 'high', 'medium'], true) && SecurityRules::isRelevant($finding, $ignores)) {
+                $current[mb_strtolower($finding->id)] = true;
+            }
+        }
+
+        return ['fixes' => $fixes, 'adds' => max(0, (int) array_sum($entry['left']) - (count($current) - $fixes))];
+    }
+
+    /**
+     * @param  array{scan: ?ImageScan, owner: Model, security: ResourceSecurity}  $entry
+     */
+    private static function rowRef(array $entry): string
+    {
+        return $entry['scan'] !== null ? (string) $entry['scan']->image_ref : trim((string) $entry['owner']->getAttribute('image'));
+    }
+
+    /**
+     * @param  array{scan: ?ImageScan, owner: Model, security: ResourceSecurity}  $entry
+     */
+    private static function rowName(array $entry, bool $isService): string
+    {
+        return $isService ? mb_strtolower(self::ownerName($entry['owner'])) : '';
+    }
+
+    private static function ownerKey(?Model $owner): string
+    {
+        return $owner === null ? '' : $owner->getMorphClass().':'.$owner->getKey();
     }
 
     /**
@@ -274,25 +513,27 @@ final class SecurityCard
     /**
      * @param  array<string, mixed>  $stats
      * @param  Collection<int, Model>  $owners
+     * @param  array<string, ?string>  $digests  The short digest of the running image of each owner (morph type and key).
      * @return ActionData
      */
-    private static function action(Model $resource, SecurityAction $action, array $stats, Collection $owners, User $user): array
+    private static function action(Model $resource, SecurityAction $action, array $stats, Collection $owners, User $user, array $digests = []): array
     {
         return [
             'key' => self::key($action),
             'type' => $action->type->value,
             'sentence' => $action->sentence,
             'copy' => $action->copy,
-            'button' => $action->button && (int) $resource->getKey() !== 0 ? self::button($resource, $action, $stats, $owners, $user) : null,
+            'button' => $action->button && (int) $resource->getKey() !== 0 ? self::button($resource, $action, $stats, $owners, $user, $digests) : null,
         ];
     }
 
     /**
      * @param  array<string, mixed>  $stats
      * @param  Collection<int, Model>  $owners
+     * @param  array<string, ?string>  $digests
      * @return ButtonData|null
      */
-    private static function button(Model $resource, SecurityAction $action, array $stats, Collection $owners, User $user): ?array
+    private static function button(Model $resource, SecurityAction $action, array $stats, Collection $owners, User $user, array $digests): ?array
     {
         if ($action->type === SecurityActionType::Rebuild) {
             if (! $resource instanceof Application || ! $user->can('deploy', $resource)) {
@@ -318,7 +559,7 @@ final class SecurityCard
         }
 
         if ($action->parts !== []) {
-            return self::mergedButton($resource, $action, $owners);
+            return self::mergedButton($resource, $action, $owners, $digests);
         }
 
         $image = (string) $action->image;
@@ -334,7 +575,7 @@ final class SecurityCard
         }
         $ownerUuid = $resource instanceof Service ? (string) $owner->getAttribute('uuid') : '';
         $submit = 'updateImage('.self::quote($ref).', '.self::quote($ownerUuid).')';
-        $restart = self::restartLine($resource);
+        $restart = self::restartLine($resource, $owners);
 
         if ($action->type === SecurityActionType::PullLatest) {
             return [
@@ -349,9 +590,9 @@ final class SecurityCard
         $tag = (string) $action->target;
         $changes = $resource instanceof Service
             ? UpdateResourceImage::subResourcesUsing($resource, $image)
-                ->map(fn (Model $subResource): string => self::ownerName($subResource).": {$image} → {$ref}")
+                ->map(fn (Model $subResource): string => self::ownerName($subResource).': '.self::change($image, $digests[self::ownerKey($subResource)] ?? null, $ref))
                 ->all()
-            : ["{$image} → {$ref}"];
+            : [self::change($image, $digests[self::ownerKey($resource)] ?? null, $ref)];
 
         return [
             'label' => "Update to {$tag}",
@@ -366,9 +607,10 @@ final class SecurityCard
      * One confirmation for every image of a merged service update.
      *
      * @param  Collection<int, Model>  $owners
+     * @param  array<string, ?string>  $digests
      * @return ButtonData|null
      */
-    private static function mergedButton(Model $resource, SecurityAction $action, Collection $owners): ?array
+    private static function mergedButton(Model $resource, SecurityAction $action, Collection $owners, array $digests): ?array
     {
         if (! $resource instanceof Service) {
             return null;
@@ -382,7 +624,7 @@ final class SecurityCard
                 return null;
             }
             foreach (UpdateResourceImage::subResourcesUsing($resource, $image) as $subResource) {
-                $changes[$subResource->getMorphClass().':'.$subResource->getKey()] = self::ownerName($subResource).": {$image} → {$ref}";
+                $changes[self::ownerKey($subResource)] = self::ownerName($subResource).': '.self::change($image, $digests[self::ownerKey($subResource)] ?? null, $ref);
             }
         }
         if ($changes === []) {
@@ -395,7 +637,7 @@ final class SecurityCard
             'label' => "Update to {$tag}",
             'title' => "Update to {$tag}?",
             'submit' => 'updateImages('.self::quote(self::key($action)).')',
-            'actions' => [...array_values($changes), self::restartLine($resource)],
+            'actions' => [...array_values($changes), self::restartLine($resource, $owners)],
             'warning' => self::updateWarning($resource, '', ''),
         ];
     }
@@ -419,13 +661,30 @@ final class SecurityCard
         return 'Check the release notes. Some updates need a data migration.';
     }
 
-    private static function restartLine(Model $resource): string
+    /**
+     * What restarts. A service restarts every container, so the line names its images.
+     *
+     * @param  Collection<int, Model>  $owners
+     */
+    private static function restartLine(Model $resource, Collection $owners): string
     {
-        return match (true) {
-            $resource instanceof Application => 'Redeploy the app.',
-            $resource instanceof Service => 'Pull the images and restart the service.',
-            default => 'Restart the database.',
-        };
+        if ($resource instanceof Service) {
+            $names = $owners->map(fn (Model $owner): string => self::ownerName($owner))->filter()->values()->all();
+
+            return $names === []
+                ? 'Pull the images and restart the service.'
+                : 'Pull the images and restart the service: '.implode(', ', $names).'.';
+        }
+
+        return $resource instanceof Application ? 'Redeploy the app.' : 'Restart the database.';
+    }
+
+    /**
+     * "postgres:15.0 3f1a2b4c5d6e → postgres:15.13": the running image, its short digest, and the new image.
+     */
+    private static function change(string $image, ?string $digest, string $ref): string
+    {
+        return trim($image.' '.($digest ?? '')).' → '.$ref;
     }
 
     private static function ownerName(Model $owner): string

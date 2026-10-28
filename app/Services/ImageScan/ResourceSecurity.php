@@ -45,7 +45,7 @@ final readonly class ResourceSecurity
     /**
      * @param  array<string, int|string|null>  $checkContext
      * @param  list<SecurityAction>  $actions  The primary action first.
-     * @param  list<array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string}>  $why
+     * @param  list<array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string, package: string, version: string}>  $why
      * @param  array{name: string, version: string, fixed: bool}|null  $eol  The end-of-life OS, and whether an action leaves it.
      * @param  array<string, mixed>  $facts
      */
@@ -150,17 +150,19 @@ final readonly class ResourceSecurity
 
     /**
      * @param  array<string, mixed>  $entry
-     * @return array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string}
+     * @return array{title: string, display_id: string, link: ?string, score: ?float, severity: string, signal: ?string, package: string, version: string}
      */
     public static function whyEntry(array $entry): array
     {
         return [
-            'title' => (string) ($entry['title'] ?? ''),
+            'title' => ScannerText::stripTitlePrefix((string) ($entry['title'] ?? '')),
             'display_id' => (string) ($entry['display_id'] ?? ''),
             'link' => isset($entry['link']) ? (string) $entry['link'] : null,
             'score' => is_numeric($entry['score'] ?? null) ? (float) $entry['score'] : null,
             'severity' => (string) ($entry['severity'] ?? 'unknown'),
             'signal' => isset($entry['signal']) ? (string) $entry['signal'] : null,
+            'package' => (string) ($entry['package'] ?? ''),
+            'version' => (string) ($entry['version'] ?? ''),
         ];
     }
 

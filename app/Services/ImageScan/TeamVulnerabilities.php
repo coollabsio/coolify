@@ -47,7 +47,7 @@ final class TeamVulnerabilities
     private bool $searchCapped = false;
 
     /**
-     * @param  Collection<int, array{key: string, resource: Model, server: ?Server, project: ?Project, environment: ?Environment, link: ?string, scanned: bool, scans: Collection<int, ImageScan>, security: ResourceSecurity}>  $entries
+     * @param  Collection<int, array{key: string, resource: Model, server: ?Server, project: ?Project, environment: ?Environment, link: ?string, scanned: bool, scans: Collection<int, ImageScan>, security: ResourceSecurity, images: array{update: int, total: int}}>  $entries
      */
     private function __construct(public readonly int $teamId, public readonly Collection $entries) {}
 
@@ -75,10 +75,50 @@ final class TeamVulnerabilities
                 'scanned' => $resourceScans->isNotEmpty(),
                 'scans' => $resourceScans,
                 'security' => $statuses[$key],
+                'images' => self::imageCounts($resource, $owners->get($key, collect()), $scans, $statuses[$key]),
             ];
         })->values();
 
         return new self($teamId, $entries);
+    }
+
+    /**
+     * The images of a resource that the status counts, and how many of them need an update (stored status
+     * update_now or update_available). A scanned owner of a service without a current scan is one image.
+     *
+     * @param  Collection<int, Model>  $owners
+     * @param  Collection<string, Collection<int, ImageScan>>  $scans  Keyed by `ResourceScans::key()` of the owner.
+     * @return array{update: int, total: int}
+     */
+    private static function imageCounts(Model $resource, Collection $owners, Collection $scans, ResourceSecurity $security): array
+    {
+        $update = 0;
+        $total = 0;
+        foreach ($owners as $owner) {
+            if ($resource instanceof Service && ! ResourceScans::isScanTarget($owner)) {
+                continue;
+            }
+            $ownerScans = $scans->get(ResourceScans::key($owner), collect());
+            $total += max(1, $ownerScans->count());
+            $update += $ownerScans->filter(fn (ImageScan $scan): bool => in_array(data_get($scan->summary, 'security.status'), ['update_now', 'update_available'], true))->count();
+        }
+
+        return ['update' => $update, 'total' => max($total, (int) ($security->checkContext['total'] ?? 0))];
+    }
+
+    /**
+     * "2 of 3 images" under the status of a resource with several images that needs an update. Null otherwise.
+     *
+     * @param  array{update: int, total: int}  $images
+     */
+    public static function imagesLine(ResourceSecurity $security, array $images): ?string
+    {
+        if (! in_array($security->status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true)
+            || $images['total'] < 2 || $images['update'] < 1) {
+            return null;
+        }
+
+        return "{$images['update']} of {$images['total']} images";
     }
 
     /**

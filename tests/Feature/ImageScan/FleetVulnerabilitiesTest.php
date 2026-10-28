@@ -11,6 +11,7 @@ use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
+use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -792,3 +794,21 @@ function fleetExpectNotScannedEverywhere(mixed $test, Application $application):
         ->assertDontSeeHtml('<span class="truncate">Update now</span>')
         ->assertSee('1 resource on 1 server was not scanned, so Coolify cannot tell.');
 }
+
+describe('images of a resource', function () {
+    it('says how many images of a service need an update, and nothing for a single image', function () {
+        $service = Service::factory()->create([
+            'name' => 'n8n-service', 'environment_id' => $this->environment->id, 'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        foreach (['n8n' => 'update_now', 'runners' => 'update_now', 'postgres' => 'ok'] as $name => $status) {
+            $owner = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => $name, 'image' => "example/{$name}:1.27"]);
+            fleetScan($owner, $status, ['image_ref' => "example/{$name}:1.27"]);
+        }
+        fleetScan(fleetApplication('single-app'), 'update_now');
+
+        fleetPage($this->admin)
+            ->assertSeeInOrder(['n8n-service', 'Update now', '2 of 3 images'])
+            ->assertDontSee('1 of 1 images');
+    });
+});

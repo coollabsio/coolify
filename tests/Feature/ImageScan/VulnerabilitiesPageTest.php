@@ -513,7 +513,7 @@ describe('states', function () {
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Coolify needs to check this image again: the scan result was too large to read completely.')
+            ->assertSeeText('nginx:1.27 needs another check: the scan result was too large to read completely.')
             ->assertSee('This image uses Alpine 3.12, which no longer gets security fixes.')
             ->assertSee('Only part of the results is shown, with the problems that attackers are using first.');
     });
@@ -552,7 +552,7 @@ describe('states', function () {
         $this->application->forceFill(['docker_registry_image_tag' => '1.28'])->saveQuietly();
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Coolify needs to check this image again: the running image is not the checked image.');
+            ->assertSeeText('nginx:1.27 needs another check: the running image is not the checked image.');
     });
 
     it('does not warn while the scanned image runs', function () {

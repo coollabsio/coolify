@@ -72,7 +72,7 @@ final readonly class Finding
         $severity = (string) ($data['severity'] ?? 'unknown');
         $package = (string) ($data['package'] ?? '');
         $version = (string) ($data['version'] ?? '');
-        $title = trim((string) ($data['title'] ?? ''));
+        $title = ScannerText::stripTitlePrefix(trim((string) ($data['title'] ?? '')));
         $displayId = (string) ($data['displayId'] ?? '');
 
         return new self(

@@ -30,7 +30,7 @@
             $checkNeeded = ($card['status'] ?? null) === 'check_needed';
         @endphp
 
-        {{-- Main card (spec 15.7): status, sentence, the action that fixes the most, why. --}}
+        {{-- Main card (spec 15.7, 15.11): the status, then one row per image with its sentence, action, why, and provenance. --}}
         <x-application.settings-section id="security-section" title="Security">
             @if (filled($card['badge'] ?? null))
                 <x-slot:badges>
@@ -75,83 +75,79 @@
                             @endif
                         </x-empty>
                     @endunless
+                @elseif ($card['single'] && count($card['rows']) === 1)
+                    {{-- One image: the open row without the list frame (spec 15.11). --}}
+                    <div wire:key="security-image-{{ $card['rows'][0]['key'] }}">
+                        @include('livewire.image-scan.partials.security-image', ['row' => $card['rows'][0], 'single' => true])
+                    </div>
                 @else
-                    <div class="flex max-w-3xl flex-col gap-1.5">
-                        <p class="text-[14px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['headline'] }}</p>
-                        @foreach ($card['lines'] as $line)
-                            <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $line }}</p>
-                        @endforeach
-                        @foreach ($versionNotes as $note)
-                            <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
-                                {{ $note['text'] }}
-                                @if ($note['link'] !== null)
-                                    <a href="{{ $note['link'] }}" class="underline underline-offset-4 hover:text-neutral-950 dark:hover:text-fg" {{ wireNavigate() }}>Registry logins</a>
-                                @endif
-                            </p>
-                        @endforeach
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-[14px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['header'] }}</p>
+                        @if ($checkNeeded && $canUpdate)
+                            <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                Scan now
+                            </x-forms.button>
+                        @endif
                     </div>
 
-                    @if ($checkNeeded)
-                        @if ($canUpdate)
-                            <div>
-                                <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Scan now
-                                </x-forms.button>
-                            </div>
-                        @endif
-                    @elseif ($card['primary'] !== null)
-                        @include('livewire.image-scan.partials.security-action', ['action' => $card['primary'], 'primary' => true, 'withSentence' => false])
-                    @endif
-
-                    @if ($card['why'] !== [])
-                        <div class="flex flex-col gap-2">
-                            <ul class="flex flex-col divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
-                                aria-label="Problems">
-                                @foreach ($card['why'] as $entry)
-                                    <li wire:key="security-why-{{ md5($entry['display_id'].$entry['title']) }}"
-                                        class="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                                        <div class="flex min-w-0 flex-col gap-0.5">
-                                            @if ($entry['title'] !== '')
-                                                <span class="text-[13px] leading-5 text-neutral-900 dark:text-fg">{{ $entry['title'] }}</span>
-                                            @endif
-                                            @if ($entry['link'] !== null)
-                                                <a href="{{ $entry['link'] }}" target="_blank" rel="noopener noreferrer"
-                                                    class="w-fit font-mono text-[11px] text-neutral-500 underline-offset-4 hover:text-black hover:underline dark:text-fg-faint dark:hover:text-fg">{{ $entry['display_id'] }}</a>
+                    <ul class="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
+                        aria-label="Images">
+                        @foreach ($card['rows'] as $row)
+                            @php
+                                $bodyId = 'security-image-'.$row['key'].'-body';
+                            @endphp
+                            <li wire:key="security-image-{{ $row['key'] }}" x-data="{ open: @js($row['open']) }">
+                                <div class="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+                                    <button type="button" class="group flex min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coollabs dark:focus-visible:outline-brand"
+                                        x-on:click="open = ! open" aria-expanded="{{ $row['open'] ? 'true' : 'false' }}"
+                                        x-bind:aria-expanded="open ? 'true' : 'false'" aria-controls="{{ $bodyId }}">
+                                        <x-reicon name="chevron-down"
+                                            @class([
+                                                'size-3.5 shrink-0 text-neutral-500 transition-transform duration-[180ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none dark:text-fg-faint',
+                                                '-rotate-90' => ! $row['open'],
+                                            ])
+                                            ::class="{ '-rotate-90': ! open }" />
+                                        <span class="flex min-w-0 flex-col">
+                                            @if ($row['name'] !== null)
+                                                <span class="truncate text-[13px] font-medium text-neutral-950 dark:text-fg">{{ $row['name'] }}</span>
+                                                <code class="truncate font-mono text-[11px] text-neutral-500 dark:text-fg-faint" title="{{ $row['ref'] }}">{{ $row['ref'] }}</code>
                                             @else
-                                                <span class="font-mono text-[11px] text-neutral-500 dark:text-fg-faint">{{ $entry['display_id'] }}</span>
+                                                <code class="truncate font-mono text-[12px] text-neutral-900 dark:text-fg" title="{{ $row['ref'] }}">{{ $row['ref'] }}</code>
                                             @endif
-                                        </div>
-                                        <div class="flex shrink-0 flex-wrap items-center gap-2">
-                                            <span class="text-[12px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $entry['score'] }}</span>
-                                            @if ($entry['signal'] !== null)
-                                                <x-status-badge :type="$entry['signal'] === 'Used by attackers' ? 'error' : 'warning'" :label="$entry['signal']" />
-                                            @endif
-                                        </div>
-                                    </li>
-                                @endforeach
-                            </ul>
-                            @if ($card['whyMore'] !== '')
-                                <p class="{{ $muted }} text-[12px]!">{{ $card['whyMore'] }}</p>
-                            @endif
-                        </div>
-                    @endif
-
-                    @if ($card['others'] !== [])
-                        <div class="flex flex-col gap-2">
-                            <h4 class="text-[12px] font-medium text-neutral-700 dark:text-fg-dim">Other fixes</h4>
-                            <div class="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]">
-                                @foreach ($card['others'] as $other)
-                                    <div class="px-3 py-2.5">
-                                        @include('livewire.image-scan.partials.security-action', ['action' => $other, 'primary' => false, 'withSentence' => true])
+                                        </span>
+                                    </button>
+                                    <div class="flex shrink-0 flex-wrap items-center gap-2 pl-5.5 sm:pl-0">
+                                        @if ($row['badge'] !== null)
+                                            <x-status-badge :type="$row['badgeType']" :label="$row['badge']" />
+                                        @else
+                                            <span class="{{ $muted }}">{{ $row['status'] === 'ok' ? 'No action needed' : 'Not checked' }}</span>
+                                        @endif
+                                        @if ($row['mergedWith'] !== null)
+                                            <span class="{{ $muted }}">Updated with {{ $row['mergedWith'] }}</span>
+                                        @elseif ($row['primary'] !== null)
+                                            @include('livewire.image-scan.partials.security-action', ['action' => $row['primary'], 'primary' => false, 'withSentence' => false, 'keyPrefix' => $row['key']])
+                                        @endif
                                     </div>
-                                @endforeach
-                            </div>
-                            @if ($card['moreActions'] > 0)
-                                <p class="{{ $muted }} text-[12px]!">and {{ $card['moreActions'] }} more</p>
-                            @endif
-                        </div>
-                    @endif
+                                </div>
+                                {{-- Height and opacity animate together (grid rows 0fr → 1fr); nothing animates on load. --}}
+                                <div id="{{ $bodyId }}"
+                                    @class([
+                                        'grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+                                        'grid-rows-[1fr] opacity-100' => $row['open'],
+                                        'grid-rows-[0fr] opacity-0' => ! $row['open'],
+                                    ])
+                                    x-bind:class="{ 'grid-rows-[1fr] opacity-100': open, 'grid-rows-[0fr] opacity-0': ! open }"
+                                    @unless ($row['open']) inert @endunless x-bind:inert="! open">
+                                    <div class="min-h-0 overflow-hidden">
+                                        <div class="px-3 pb-3 pt-1 sm:pl-8.5">
+                                            @include('livewire.image-scan.partials.security-image', ['row' => $row, 'single' => false])
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
                 @endif
             </div>
         </x-application.settings-section>

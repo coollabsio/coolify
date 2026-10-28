@@ -1392,7 +1392,10 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     Action, Server, Checked.
   - Status: the badge of the main card ("Update now" error, "Security update"
     warning, "No fix yet" and "Check needed" neutral), or muted text "No action
-    needed" (ok) and "Not checked".
+    needed" (ok) and "Not checked". A resource with several images that needs
+    an update adds "{k} of {n} images" under the badge (11px muted,
+    `TeamVulnerabilities::imagesLine()`). One row per resource; images are never
+    nested rows.
   - Action: the sentence of the primary action (update_now and
     update_available), as a link to the resource's Security card
     (`#security-section`); muted "Check again: {reason}." as the same link
@@ -1438,31 +1441,78 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   someone with write access to deploy anyway."
 - The Security main card (`livewire/image-scan/vulnerabilities.blade.php`, data
   from `SecurityCard::for()`) is the first layer card of a resource's Security
-  page, for people who are not security experts:
-  - title "Security" with the status badge in the badges slot ("Update now"
-    error, "Security update" warning, "No fix yet" and "Check needed"
-    neutral, none for ok and not checked), and "Checked {time}" (absolute
-    time in the tooltip) and Scan now in the header actions;
-  - the sentence of `SecuritySentences::headline()` in 14px medium, then the
-    extra lines (an exploited problem without a fix, an end-of-life OS the
-    sentence does not name) in 13px muted;
-  - the primary action: a highlighted button that opens `x-modal-confirmation`
-    (the change as `old → new`, one line per image for a merged service update,
-    what restarts, and the warning: the patch release sentence for a database,
-    the template warning for a service), or the copy text in a mono chip with
-    `x-copy-button` (`FROM node:20.18-alpine`, `lodash 4.17.21`), or nothing
-    when the sentence is the action. A check_needed card offers Scan now
-    instead. Buttons show only to users who may run them (Write for updates,
-    Deploy for Rebuild) and never for `id = 0` or a transferred-away server;
-  - the why-list: up to 3 rows in one bordered list, each with the title, the
-    display ID (an NVD or GitHub link), "8.1 High" or "No score", and a
-    status badge "Used by attackers" (error) or "Likely to be exploited"
-    (warning); then "and {n} more serious problems that this update fixes" (a lowercase continuation without a period, like the "and {n} more" of the other actions);
-  - "Other fixes": up to 5 more actions as rows with their sentence and a
-    neutral button or copy chip, then "and {n} more";
-  - no totals and no severity bar: the only finding count is in the "All
-    findings ({n})" header. The collapsed "All findings", "Packages and SBOM",
-    and "Settings" (applications only) cards follow it.
+  page, for people who are not security experts. It is one component for every
+  resource: a list of the images the status counts (spec 15.11).
+  - Card header: title "Security" with the status badge of the resource in the
+    badges slot ("Update now" error, "Security update" warning, "No fix yet"
+    and "Check needed" neutral, none for ok and not checked), and "Checked
+    {time}" (absolute time in the tooltip) and Scan now in the header actions.
+  - One image (a database, a Docker image app, a Dockerfile app): the row
+    is open and has no list frame, no row header, and no chevron. The card
+    badge is the row's badge.
+  - Several images (a service, a Compose app): a 14px medium line "{k} of {n}
+    images need an update" (k = rows with update_now or update_available;
+    for k = 0 the status words only, never "All images are up to date"), then
+    one bordered list (`aria-label="Images"`, rows split by dividers). Rows are
+    worst first (update_now, update_available, no_fix, check_needed, ok,
+    not_checked, then the name). The first row with a problem is open; the
+    others, and every "No action needed" row, are closed.
+  - Row header: a real `<button>` with `aria-expanded` and `aria-controls`
+    that holds the chevron, the name (13px medium; services only) and the
+    image ref (mono, 11px muted under a name, else 12px); then the status
+    badge (muted text "No action needed" or "Not checked" without one) and
+    the primary action as a neutral button or copy chip. A merged service
+    update (spec 15.5) has its button on the first row of the group only; the
+    other rows show muted "Updated with {first name}".
+  - Open row content, from `partials/security-image.blade.php`: the sentence
+    of `SecuritySentences::imageSentence()` in 14px medium, which starts with
+    the image ref in mono ("postgres:16-alpine has a newer build that fixes 2
+    critical problems."); the attack note of `attackNote()` in 13px muted
+    ("Attackers are using this.", "Attackers are likely to use this.", "No
+    known attacks on these problems."); the extra lines (an exploited problem
+    without a fix, an end-of-life OS the sentence does not name) and the
+    version check notes; for a single image the highlighted primary action
+    (or Scan now for check_needed).
+  - Why-list "Fixed by this update" ("No fix yet" for no_fix): up to 3 rows in
+    one bordered list. Line 1: the title (13px) and "8.1 High" or "No score"
+    on the right (12px tabular). Line 2, 11px muted: "{package} {version} ·
+    {display ID} · {signal}"; the ID links to NVD or GitHub, and "Used by
+    attackers" is in `text-error` ("Likely to be exploited" stays muted). Then
+    "and {n} more serious problems that this update fixes" (a lowercase
+    continuation without a period).
+  - Provenance: one 12px muted line with the 12px medium label "How Coolify
+    knows:" and the sentence of `SecuritySentences::provenance()`, from stored
+    data only ("Docker Hub has a newer build of 16-alpine. Coolify scanned it 2
+    hours ago: it fixes 2 and adds none.").
+  - "Other fixes": up to 5 more actions of that image as rows with their
+    sentence and a neutral button or copy chip, then "and {n} more".
+  - Footer, above a divider: "Running {ref} {short digest}" (the first 12
+    characters after `sha256:` of the repo digest, else of the image ID, with
+    `x-copy-button` for the full value) · "{n} known issues, {m} have no fix",
+    and the text links "All findings", "Packages and SBOM", and "Settings"
+    (applications only). A link dispatches `open-settings-section` with the
+    section id: `x-application.settings-section` opens itself and scrolls into
+    view. For several images it also filters the section to that image
+    (`showImageFindings()` and the Packages `security-show-image-packages`
+    event).
+  - Confirmation (`x-modal-confirmation`): one line per image "{ref} {short
+    digest} → {new ref}" (with the name for a service), what restarts (a
+    service names every application and database it restarts), and the
+    warning: the patch release sentence for a database, the template warning
+    for a service. Buttons show only to users who may run them (Write for
+    updates, Deploy for Rebuild) and never for `id = 0` or a transferred-away
+    server.
+  - Motion: a row opens and closes by animating height and opacity together
+    (`grid-rows-[0fr]` → `grid-rows-[1fr]` with `opacity`, 180ms,
+    `cubic-bezier(0.23,1,0.32,1)`); the chevron turns 90° with the same
+    timing. The server renders the open state, so nothing animates on page
+    load, and `motion-reduce:transition-none` makes it instant. A closed body
+    is `inert`. Row keys are the scan UUID (or the owner UUID for an image
+    without a scan), never a position.
+  - No totals and no severity bar: the only finding count of the page is in
+    the "All findings ({n})" header and the row footer. The collapsed "All
+    findings", "Packages and SBOM", and "Settings" (applications only) cards
+    follow it.
 
 ---
 
