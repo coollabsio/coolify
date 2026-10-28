@@ -2050,3 +2050,29 @@ it('does not warn about a PORT mismatch when readonly labels are disabled', func
 
     expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable')))->toBeFalse();
 });
+
+it('gives a preview from before v4.5.1 the production values it had', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'APP_NAME', 'value' => 'coolify', 'is_buildtime' => false]);
+    $application->environment_variables_preview()->where('key', 'APP_NAME')->delete();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+        'remote_secrets_cache' => [],
+        'preview' => ApplicationPreview::create([
+            'application_id' => $application->id,
+            'pull_request_id' => 99,
+            'pull_request_html_url' => 'https://example.com/pr/99',
+            'keeps_production_values' => true,
+        ]),
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=') && str($env)->contains('production-secret')))->toBeTrue()
+        ->and($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=') && str($env)->contains('coolify')))->toBeTrue();
+});

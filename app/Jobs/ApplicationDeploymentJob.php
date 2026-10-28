@@ -2018,6 +2018,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
+            // A preview from before v4.5.1 also gets the production variables that have no preview copy.
+            if ($this->preview?->keeps_production_values && $runtime_environment_variables_preview->isNotEmpty()) {
+                $previewKeys = $runtime_environment_variables_preview->pluck('key')->all();
+                $sorted_environment_variables
+                    ->filter(fn (EnvironmentVariable $env) => $env->is_runtime && ! in_array($env->key, $previewKeys, true) && ! $this->shouldOmitBlankComposeEnvironmentVariable($env))
+                    ->each(fn (EnvironmentVariable $env) => $envs->push($this->runtimeEnvironmentAssignment($env)));
+            }
+
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
                 if ($this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty()) {
@@ -2619,7 +2627,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->previewVariableIdsWithProductionValues;
         }
 
-        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled) {
+        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled || $this->preview?->keeps_production_values) {
             return $this->previewVariableIdsWithProductionValues = [];
         }
 

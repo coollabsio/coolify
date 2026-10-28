@@ -34,6 +34,16 @@ class S3Storage extends BaseModel
      */
     private const PATH_STYLE_REJECTION_ERRORS = ['secondleveldomainforbidden', 'pathstyledomainforbidden', 'virtual hosted style', 'virtual-hosted style', 'virtual-styled'];
 
+    /**
+     * Waits before the second and the third attempt of an upload with the MinIO client.
+     */
+    private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
+
+    /**
+     * The exception code of runSshProcess() when a remote command times out.
+     */
+    private const REMOTE_COMMAND_TIMEOUT_EXIT_CODE = 124;
+
     protected $fillable = [
         'team_id',
         'name',
@@ -349,12 +359,27 @@ class S3Storage extends BaseModel
     }
 
     /**
-     * The `mc alias set` option that makes the MinIO client use virtual-hosted-style URLs, as filesystem() does.
-     * With path-style URLs, mc keeps its own `auto` lookup, as before.
+     * The `mc alias set` options. `--api S3v4` signs as filesystem() does. Without it, mc probes the signature
+     * version on every run, and a network error during the probe makes it try S3v2, which most providers reject.
+     * `--path off` uses virtual-hosted-style URLs, as filesystem() does. With path-style URLs, mc keeps its own
+     * `auto` lookup, as before.
      */
-    public function minioClientPathOption(): string
+    public function minioClientAliasOptions(): string
     {
-        return $this->usesPathStyleEndpoint() ? '' : ' --path off';
+        return ' --api S3v4'.($this->usesPathStyleEndpoint() ? '' : ' --path off');
+    }
+
+    /**
+     * Runs an upload of a local file with the MinIO client again when it fails, for example after a short network
+     * outage. A timeout is not retried, because another full attempt can pass the timeout of the backup job.
+     */
+    public static function retryMinioClientUpload(callable $upload): mixed
+    {
+        return retry(
+            self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS,
+            $upload,
+            when: fn (\Throwable $exception): bool => $exception->getCode() !== self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE,
+        );
     }
 
     /**

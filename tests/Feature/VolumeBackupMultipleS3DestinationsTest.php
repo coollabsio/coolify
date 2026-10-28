@@ -22,12 +22,14 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Server::flushIdentityMap();
     Notification::fake();
+    Sleep::fake();
     config(['broadcasting.default' => 'null']);
     defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
 });
@@ -167,6 +169,28 @@ it('keeps the local archive and cleans the partial upload when one destination f
         ->and($secondReplica->s3_uploaded)->toBeFalse()
         ->and($secondReplica->s3_storage_deleted)->toBeTrue()
         ->and($secondReplica->message)->not->toBeEmpty();
+});
+
+it('uploads again when the first upload to a destination fails', function () {
+    [$backup] = createMultiDestinationVolumeBackup();
+    fakeMultiDestinationS3Disks();
+    $firstBucketUploads = 0;
+    Process::fake(function ($process) use (&$firstBucketUploads) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'mc cp') && str_contains($script, 'temporary/first-bucket/') && ++$firstBucketUploads === 1) {
+            return Process::result(errorOutput: 'dial tcp: connect: network is unreachable', exitCode: 1);
+        }
+
+        return Process::result(output: str_contains($script, 'du -b') ? '128' : '');
+    });
+
+    (new VolumeBackupJob($backup))->handle();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($firstBucketUploads)->toBe(2)
+        ->and($execution->status)->toBe('success')
+        ->and($execution->message)->toBeNull()
+        ->and($execution->s3_uploaded)->toBeTrue();
 });
 
 it('applies S3 retention to each destination separately', function () {

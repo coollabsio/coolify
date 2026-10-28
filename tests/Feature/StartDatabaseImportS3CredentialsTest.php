@@ -300,7 +300,7 @@ it('passes the S3 keys of an import to mc on stdin, not in a command line', func
     $run = importS3ArgvTestRunAliasProcess($aliasProcess);
 
     expect($run['mcStdin'])->toBe(IMPORT_S3_ARGV_KEY."\n".IMPORT_S3_ARGV_SECRET."\n")
-        ->and($run['argv'])->toContain('mc alias set s3temp https://8.8.8.8')
+        ->and($run['argv'])->toContain('mc alias set --api S3v4 s3temp https://8.8.8.8')
         ->and($run['argv'])->not->toContain(IMPORT_S3_ARGV_SECRET)
         ->and($run['argv'])->not->toContain(IMPORT_S3_ARGV_KEY)
         ->and($processes->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], "-e 'MC_REGION=ru-central-1'")))->toBeTrue()

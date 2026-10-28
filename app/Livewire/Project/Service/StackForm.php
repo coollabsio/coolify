@@ -135,7 +135,7 @@ class StackForm extends Component
         $lockedKeys = $this->lockedFieldKeys();
         $this->fields = $this->fields->map(function ($field) use ($lockedKeys) {
             $field['isLocked'] = $lockedKeys->contains(data_get($field, 'key'));
-            if ($field['isLocked'] || ($this->isPasswordHiddenForMember && data_get($field, 'isPassword'))) {
+            if ($field['isLocked'] || $this->isPasswordHiddenForMember) {
                 $field['value'] = null;
             }
 
@@ -190,10 +190,12 @@ class StackForm extends Component
             // Use transaction to ensure atomicity - if parse fails, save is rolled back
             DB::transaction(function () {
                 $this->service->save();
-                $lockedKeys = $this->lockedFieldKeys();
-                $this->service->saveExtraFields(
-                    $this->fields->reject(fn ($field) => $lockedKeys->contains(data_get($field, 'key')))
-                );
+                if (auth()->user()->can('manageEnvironment', $this->service)) {
+                    $lockedKeys = $this->lockedFieldKeys();
+                    $this->service->saveExtraFields(
+                        $this->fields->reject(fn ($field) => $lockedKeys->contains(data_get($field, 'key')))
+                    );
+                }
                 $this->service->parse();
             });
             // Refresh and write files after a successful commit

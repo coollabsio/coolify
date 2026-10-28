@@ -318,7 +318,7 @@ class StartDatabaseImport
     private function setMinioClientAlias(S3Storage $storage, Server $server, string $helper): void
     {
         $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($helper)
-            .' mc alias set'.$storage->minioClientPathOption().' s3temp '.escapeshellarg((string) $storage->endpoint).' >/dev/null';
+            .' mc alias set'.$storage->minioClientAliasOptions().' s3temp '.escapeshellarg((string) $storage->endpoint).' >/dev/null';
         $timeout = (int) config('constants.ssh.command_timeout');
 
         SshRetryHandler::retry(

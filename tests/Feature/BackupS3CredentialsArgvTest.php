@@ -201,8 +201,8 @@ it('makes mc use virtual-hosted-style URLs when the storage turns path-style URL
     $aliasProcess = $processes->sole(fn (array $process) => str_contains($process['command'], 'mc alias set'));
     expect(s3ArgvTestRunAliasProcess($aliasProcess)['argv'])->toContain($expectedAlias);
 })->with([
-    'path-style' => [true, 'mc alias set temporary https://8.8.8.8'],
-    'virtual-hosted-style' => [false, 'mc alias set --path off temporary https://8.8.8.8'],
+    'path-style' => [true, 'mc alias set --api S3v4 temporary https://8.8.8.8'],
+    'virtual-hosted-style' => [false, 'mc alias set --api S3v4 --path off temporary https://8.8.8.8'],
 ]);
 
 it('passes the S3 keys of a volume backup to mc on stdin, not in a command line', function (string $sshUser, bool $streamToS3) {
