@@ -110,26 +110,17 @@ function runRollingUpdateDrainStep(Application $application, bool $newVersionIsH
     return $logs;
 }
 
-it('retries failed connections on another container in Traefik application labels', function (bool $exactLabels) {
-    $application = createApplicationForRollingUpdateDrainTest(ProxyTypes::TRAEFIK->value, $exactLabels);
+it('keeps the application proxy labels of v4.5.0 without a retry, so a redeploy after an upgrade does not change them', function (string $proxyType, bool $exactLabels) {
+    $application = createApplicationForRollingUpdateDrainTest($proxyType, $exactLabels);
 
-    $labels = collect(generateLabelsApplication($application));
-
-    expect($labels)->toContain("traefik.http.middlewares.retry-{$application->uuid}.retry.attempts=5");
-    $routerMiddlewares = $labels->filter(fn (string $label) => str_contains($label, "routers.https-0-{$application->uuid}.middlewares="));
-    expect($routerMiddlewares)->toHaveCount(1)
-        ->and($routerMiddlewares->first())->toContain("retry-{$application->uuid}");
+    expect(implode("\n", generateLabelsApplication($application)))
+        ->not->toContain('retry')
+        ->not->toContain('lb_try_duration');
 })->with([
-    'generic labels' => false,
-    'exact labels' => true,
+    'Traefik generic labels' => [ProxyTypes::TRAEFIK->value, false],
+    'Traefik exact labels' => [ProxyTypes::TRAEFIK->value, true],
+    'Caddy exact labels' => [ProxyTypes::CADDY->value, true],
 ]);
-
-it('retries failed connections on another upstream in Caddy application labels', function () {
-    $application = createApplicationForRollingUpdateDrainTest(ProxyTypes::CADDY->value, exactLabels: true);
-
-    expect(generateLabelsApplication($application))
-        ->toContain('caddy_0.handle_path.0_reverse_proxy.lb_try_duration=5s');
-});
 
 it('does not add retry labels to preview deployments', function () {
     $application = createApplicationForRollingUpdateDrainTest();
