@@ -80,6 +80,20 @@ trait ResolvesTeam
         return $this->mcpError($request, "{$action} requires confirm=true.");
     }
 
+    /**
+     * Same rule as the REST API (ApiSensitiveData): a root or read:sensitive token of a team admin or owner.
+     */
+    protected function canReadSensitiveData(Request $request): bool
+    {
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        if (! $token || ! ($token->can('root') || $token->can('read:sensitive'))) {
+            return false;
+        }
+
+        return $token->team_id !== null && $user->isAdminOfTeam((int) $token->team_id);
+    }
+
     protected function resolveTeamId(Request $request): ?int
     {
         $user = $request->user();
