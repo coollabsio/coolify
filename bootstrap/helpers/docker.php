@@ -2258,6 +2258,21 @@ function railpackBuilderLockedScript(string $command): string
 }
 
 /**
+ * Start the Railpack builder and wait until buildkitd accepts connections. Run it inside
+ * railpackBuilderLockedScript(), so that no other process stops the builder after it starts.
+ *
+ * buildx waits for buildkitd only when it starts the builder itself. A concurrent build that sees
+ * the container already running connects at once and fails while the BuildKit socket is missing.
+ * The lock makes the other builds wait until the first bootstrap is complete.
+ */
+function railpackBuilderBootstrapScript(): string
+{
+    return 'exec 8>/root/.docker/buildx/coolify-railpack-bootstrap.lock; flock -x 8; '
+        .'DOCKER_CONFIG=/root/.docker docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; '
+        .'flock -u 8';
+}
+
+/**
  * The buildx metadata of a server, as the `docker run -v` source that the deployment helper uses.
  */
 function railpackBuildxMetadataVolume(Server $server): string

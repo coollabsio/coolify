@@ -3993,7 +3993,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." {$this->workdir}";
 
         return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            ."\n".railpackBuilderLockedScript('('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
+            ."\n".railpackBuilderLockedScript(railpackBuilderBootstrapScript().'; ('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
     }
 
     private function decode_railpack_config(string $config, string $source): array
