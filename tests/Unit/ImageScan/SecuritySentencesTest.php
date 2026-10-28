@@ -439,10 +439,10 @@ describe('provenance', function () {
         $action = new SecurityAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.', '16-alpine', null, [], true, 'postgres:16-alpine', 'postgres:16-alpine');
 
         expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable()))
-            ->toBe('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 serious problems and adds none.');
+            ->toBe('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.');
     });
 
-    it('says that the tag is the newest release of the line, and leaves out what the entry does not store', function (array $stored, string $found) {
+    it('says that the tag is the newest release of the line, and the other problems it adds', function (array $stored, string $other) {
         $scan = sentenceScan([
             'image_ref' => 'ghcr.io/n8n-io/n8n:1.68.0',
             'candidates' => ['status' => 'ok', 'entries' => [[...sentenceCandidate('ghcr.io/n8n-io/n8n:1.71.2', 'line'), ...$stored]]],
@@ -450,12 +450,12 @@ describe('provenance', function () {
         $action = new SecurityAction(SecurityActionType::UpdateImage, 'Update to 1.71.2.', '1.71.2', null, [], true, 'ghcr.io/n8n-io/n8n:1.68.0', 'ghcr.io/n8n-io/n8n:1.71.2');
 
         expect(SecuritySentences::provenance($scan, $action, sentenceUpdateNow()))
-            ->toBe("1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago{$found}.");
+            ->toBe('1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.'.$other);
     })->with([
-        'fixes and adds' => [['fixes' => ['critical' => 1, 'high' => 0, 'medium' => 0], 'added' => 3], ': it fixes 1 serious problem and adds 3 less serious'],
-        'old entry without added' => [['fixes' => ['critical' => 0, 'high' => 2, 'medium' => 1]], ': it fixes 3 serious problems'],
-        'fixes nothing counted' => [['fixes' => ['critical' => 0, 'high' => 0, 'medium' => 0], 'added' => 0], ': it adds none'],
-        'no counts' => [[], ''],
+        'adds several' => [['fixes' => ['critical' => 1, 'high' => 0, 'medium' => 0], 'added' => 3], ' It has 3 other problems that attackers are not known to use.'],
+        'adds one' => [['added' => 1], ' It has 1 other problem that attackers are not known to use.'],
+        'adds none' => [['added' => 0], ''],
+        'old entry without added' => [['fixes' => ['critical' => 0, 'high' => 2, 'medium' => 1]], ''],
     ]);
 
     it('claims no scan when no candidate entry is stored', function () {
@@ -475,7 +475,7 @@ describe('provenance', function () {
         $action = new SecurityAction(SecurityActionType::ChangeBase, 'Change the base image to node:20.18-alpine in your Dockerfile, then redeploy.', 'node:20.18-alpine', 'FROM node:20.18-alpine', [], false, 'app:abc1234');
 
         expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable()))
-            ->toBe('node:20.18-alpine is the newest release of your base image. Coolify scanned it 2 hours ago.');
+            ->toBe('node:20.18-alpine is the newest release of your base image. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.');
     });
 
     it('names the first fixed version of a package upgrade', function (SecurityActionType $type) {

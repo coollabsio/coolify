@@ -209,7 +209,7 @@ final class SecuritySentences
                         ? "{$tag} is the newest release of this line on {$registry}."
                         : "{$tag} is the newest ".self::major($tag).".x release on {$registry}.");
 
-                return "{$intro} Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).self::candidateFindings($entry).'.';
+                return "{$intro} Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).self::candidateFindings($entry);
             case SecurityActionType::ChangeBase:
                 $base = data_get($scan->candidates, 'base');
                 $entry = collect(is_array($base) && is_array($base['entries'] ?? null) ? $base['entries'] : [])
@@ -219,7 +219,7 @@ final class SecuritySentences
                     return null;
                 }
 
-                return "{$action->target} is the newest release of your base image. Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).'.';
+                return "{$action->target} is the newest release of your base image. Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).self::candidateFindings($entry);
             case SecurityActionType::UpgradePackage:
             case SecurityActionType::UpgradeInDockerfile:
                 $fixedIn = $counts['fixed_in'] ?? null;
@@ -308,23 +308,24 @@ final class SecuritySentences
     }
 
     /**
-     * ": it fixes 2 serious problems and adds none" from a stored candidate entry, with only the clauses it has data
-     * for. Both count relevant critical, high, and medium findings.
+     * What the scan of an offered candidate found, without a count of its own, so it cannot contradict the sentence:
+     * ": it fixes these problems and adds none that attackers use." The "better" rule (spec 15.4) guarantees that an
+     * offered candidate adds no finding with an exploit signal. The other relevant findings it adds (`added`, unique
+     * IDs) follow as their own sentence; none when the entry does not store them.
      *
      * @param  array<string, mixed>  $entry
      */
     private static function candidateFindings(array $entry): string
     {
-        $parts = [];
-        $fixes = is_array($entry['fixes'] ?? null) ? (int) array_sum(array_map('intval', $entry['fixes'])) : 0;
-        if ($fixes > 0) {
-            $parts[] = 'fixes '.($fixes === 1 ? '1 serious problem' : "{$fixes} serious problems");
-        }
-        if (is_int($entry['added'] ?? null)) {
-            $parts[] = 'adds '.($entry['added'] > 0 ? "{$entry['added']} less serious" : 'none');
+        $text = ': it fixes these problems and adds none that attackers use.';
+        $added = $entry['added'] ?? null;
+        if (is_int($added) && $added > 0) {
+            $text .= $added === 1
+                ? ' It has 1 other problem that attackers are not known to use.'
+                : " It has {$added} other problems that attackers are not known to use.";
         }
 
-        return $parts === [] ? '' : ': it '.implode(' and ', $parts);
+        return $text;
     }
 
     /**

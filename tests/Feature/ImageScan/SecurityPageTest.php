@@ -762,7 +762,7 @@ describe('image list', function () {
             ->assertSee('Security update')
             ->assertSeeText('postgres:16-alpine has a newer build that fixes 2 critical problems.')
             ->assertSee('No known attacks on these problems.')
-            ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 serious problems and adds none.')
+            ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.')
             ->assertSee('Pull latest and restart')
             ->assertSee('3f1a2b4c5d6e')
             ->assertSee('3 known issues')
@@ -821,7 +821,7 @@ describe('image list', function () {
             ->assertSee('Scan now');
     });
 
-    it('says how many less serious problems a newer version adds, from its stored scan', function () {
+    it('names the other problems a newer version adds, from its stored scan, without a count of what it fixes', function () {
         $database = securityPageDatabase();
         securityPageScan($database, 'postgres:15.0', [securityPageFinding('CVE-2025-1094')], [
             'candidates' => securityPageCandidates([[
@@ -835,7 +835,7 @@ describe('image list', function () {
         $card = SecurityCard::for($database, SecurityStatus::forResource($database), ResourceScans::owners($database), ResourceScans::current($database), $this->admin);
 
         expect($card['rows'][0]['provenance'])
-            ->toBe('15.13 is the newest 15.x release on Docker Hub. Coolify scanned it 1 hour ago: it fixes 1 serious problem and adds 3 less serious.');
+            ->toBe('15.13 is the newest 15.x release on Docker Hub. Coolify scanned it 1 hour ago: it fixes these problems and adds none that attackers use. It has 3 other problems that attackers are not known to use.');
     });
 
     it('links the Settings section only on the page of an application', function () {

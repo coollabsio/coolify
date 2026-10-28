@@ -1495,11 +1495,13 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   - Provenance: one 12px muted line with the 12px medium label "How Coolify
     knows:" and the sentence of `SecuritySentences::provenance()`, from stored
     data only ("Docker Hub has a newer build of 16-alpine. Coolify scanned it 2
-    hours ago: it fixes 2 serious problems and adds none."). "fixes" and
-    "adds" come from the candidate's stored entry (`fixes` and `added`, both
-    relevant critical, high, and medium findings). A clause the entry does not
-    store is left out, "fixes 0" is never said, and without a stored candidate
-    there is no line, so it never claims a scan.
+    hours ago: it fixes these problems and adds none that attackers use."). It
+    never states a count of its own, so it cannot contradict the sentence; the
+    "better" rule guarantees that an offered update adds no problem with an
+    exploit signal. When the stored entry has `added` > 0 (relevant critical,
+    high, and medium findings the current image does not have, unique IDs), it
+    adds "It has {m} other problems that attackers are not known to use."
+    Without a stored candidate there is no line, so it never claims a scan.
   - Version check notes that only the user can unblock (registry login, daily
     limit) show under the row header as one muted 11px line, also on a
     closed row.
