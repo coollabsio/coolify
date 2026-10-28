@@ -750,21 +750,16 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * The findings that are not ignored, and those without a fix, per scan.
+     * The findings that are not ignored, per scan.
      *
      * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $activeRows
-     * @return array<string, array{known: int, no_fix: int}>
+     * @return array<string, int>
      */
     private function findingCounts(array $activeRows): array
     {
-        $counts = [];
+        $counts = $this->currentScans()->mapWithKeys(fn (ImageScan $scan): array => [(string) $scan->uuid => 0])->all();
         foreach ($activeRows as $row) {
-            $counts[$row['scan']] ??= ['known' => 0, 'no_fix' => 0];
-            $counts[$row['scan']]['known']++;
-            $counts[$row['scan']]['no_fix'] += $row['state'] === 'no_fix' ? 1 : 0;
-        }
-        foreach ($this->currentScans() as $scan) {
-            $counts[(string) $scan->uuid] ??= ['known' => 0, 'no_fix' => 0];
+            $counts[$row['scan']] = ($counts[$row['scan']] ?? 0) + 1;
         }
 
         return $counts;

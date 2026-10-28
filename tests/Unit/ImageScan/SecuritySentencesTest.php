@@ -392,20 +392,38 @@ describe('image rows', function () {
             ->toBe('postgres:16.1-alpine has 3 serious problems (1 critical, 2 high). Update to 16.4-alpine to fix them.');
     });
 
-    it('says whether attackers use the problems of an image', function () {
-        expect(SecuritySentences::attackNote(sentenceUpdateNow()))->toBe('Attackers are using this.')
-            ->and(SecuritySentences::attackNote(sentenceUpdateNow(['anyExploited' => false, 'problemCount' => 2])))->toBe('Attackers are likely to use these.')
-            ->and(SecuritySentences::attackNote(sentenceUpdateAvailable()))->toBe('No known attacks on these problems.')
+    it('adds the attack note only when the sentence does not mention attackers', function () {
+        expect(SecuritySentences::attackNote(sentenceUpdateAvailable()))->toBe('No known attacks on these problems.')
             ->and(SecuritySentences::attackNote(sentenceUpdateAvailable(['fixedByPrimary' => 1])))->toBe('No known attacks on this problem.')
             ->and(SecuritySentences::attackNote(sentenceUpdateAvailable(['exploitedWithoutFix' => true])))->toBeNull()
+            ->and(SecuritySentences::attackNote(sentenceUpdateNow()))->toBeNull()
+            ->and(SecuritySentences::attackNote(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true])))->toBeNull()
             ->and(SecuritySentences::attackNote(sentenceSecurity(SecurityStatusType::Ok)))->toBeNull();
     });
 
+    it('says that no fixed version exists yet, with the advice on its own line', function (int $count, bool $exploited, string $sentence, string $advice) {
+        $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => $count, 'anyExploited' => $exploited]);
+
+        expect(SecuritySentences::imageSentence($security, 'mysql:8'))->toBe($sentence)
+            ->and(SecuritySentences::noFixAdvice($security))->toBe($advice);
+    })->with([
+        'one, using' => [1, true, 'mysql:8 has a security problem that attackers are using. No fixed version exists yet, and Coolify checks every day.',
+            'Until then, limit who can reach this app, or ignore the problem if the affected part is not used.'],
+        'two, likely' => [2, false, 'mysql:8 has 2 security problems that attackers are likely to use. No fixed version exists yet, and Coolify checks every day.',
+            'Until then, limit who can reach this app, or ignore the problems if the affected parts are not used.'],
+    ]);
+
+    it('gives no advice to a builder image, whose sentence names the builder update', function () {
+        $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true, 'builderImage' => true]);
+
+        expect(SecuritySentences::imageSentence($security, 'app:abc'))->toBe('app:abc has a security problem that attackers are using. '.SecurityActions::BUILDER_TEXT)
+            ->and(SecuritySentences::noFixAdvice($security))->toBeNull();
+    });
+
     it('counts the known issues of an image', function () {
-        expect(SecuritySentences::knownIssues(12, 3))->toBe('12 known issues, 3 have no fix')
-            ->and(SecuritySentences::knownIssues(1, 1))->toBe('1 known issue, 1 has no fix')
-            ->and(SecuritySentences::knownIssues(4, 0))->toBe('4 known issues')
-            ->and(SecuritySentences::knownIssues(0, 0))->toBe('No known issues')
+        expect(SecuritySentences::knownIssues(12))->toBe('12 known issues')
+            ->and(SecuritySentences::knownIssues(1))->toBe('1 known issue')
+            ->and(SecuritySentences::knownIssues(0))->toBe('No known issues')
             ->and(SecuritySentences::imagesNeedingUpdate(2, 3))->toBe('2 of 3 images need an update')
             ->and(SecuritySentences::imagesNeedingUpdate(1, 3))->toBe('1 of 3 images needs an update')
             ->and(SecuritySentences::imagesNeedingUpdate(0, 3))->toBeNull()

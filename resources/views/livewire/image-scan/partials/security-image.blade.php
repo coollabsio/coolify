@@ -5,7 +5,7 @@
     $link = 'text-[12px] font-medium text-coollabs hover:underline dark:text-brand-light';
     $refLength = strlen($row['ref']);
     $startsWithRef = $refLength > 0 && str_starts_with($row['sentence'], $row['ref']);
-    $whyTitle = $row['status'] === 'no_fix' ? 'No fix yet' : 'Fixed by this update';
+    $whyTitle = $row['status'] === 'no_fix' ? 'Not fixed yet' : 'Fixed by this update';
 @endphp
 
 <div class="flex flex-col gap-4">
@@ -19,6 +19,9 @@
         </p>
         @if ($row['attackNote'] !== null)
             <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $row['attackNote'] }}</p>
+        @endif
+        @if ($row['advice'] !== null)
+            <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $row['advice'] }}</p>
         @endif
         @foreach ($row['lines'] as $line)
             <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $line }}</p>
@@ -60,20 +63,28 @@
                             <span class="min-w-0 text-[13px] leading-5 text-neutral-900 dark:text-fg">{{ $entry['title'] }}</span>
                             <span class="shrink-0 text-[12px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $entry['score'] }}</span>
                         </div>
+                        {{-- Each separator stays with the part after it, so a wrapped line never ends with "·". On narrow
+                             screens the package gets its own line and no separator after it. --}}
                         <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 {{ $muted }}">
                             @if ($entry['package'] !== '')
-                                <span class="font-mono">{{ trim($entry['package'].' '.$entry['version']) }}</span>
-                                <span aria-hidden="true">·</span>
+                                <span class="min-w-0 break-all font-mono max-sm:w-full">{{ trim($entry['package'].' '.$entry['version']) }}</span>
                             @endif
-                            @if ($entry['link'] !== null)
-                                <a href="{{ $entry['link'] }}" target="_blank" rel="noopener noreferrer"
-                                    class="font-mono underline-offset-4 hover:text-black hover:underline dark:hover:text-fg">{{ $entry['display_id'] }}</a>
-                            @else
-                                <span class="font-mono">{{ $entry['display_id'] }}</span>
-                            @endif
+                            <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                @if ($entry['package'] !== '')
+                                    <span class="max-sm:hidden" aria-hidden="true">·</span>
+                                @endif
+                                @if ($entry['link'] !== null)
+                                    <a href="{{ $entry['link'] }}" target="_blank" rel="noopener noreferrer"
+                                        class="font-mono underline-offset-4 hover:text-black hover:underline dark:hover:text-fg">{{ $entry['display_id'] }}</a>
+                                @else
+                                    <span class="font-mono">{{ $entry['display_id'] }}</span>
+                                @endif
+                            </span>
                             @if ($entry['signal'] !== null)
-                                <span aria-hidden="true">·</span>
-                                <span @class(['text-error' => $entry['signal'] === 'Used by attackers'])>{{ $entry['signal'] }}</span>
+                                <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                    <span aria-hidden="true">·</span>
+                                    <span @class(['text-error' => $entry['signal'] === 'Used by attackers'])>{{ $entry['signal'] }}</span>
+                                </span>
                             @endif
                         </div>
                     </li>
@@ -111,15 +122,19 @@
     @if ($row['digestFull'] !== null)
         <div class="flex flex-col gap-2 border-t border-neutral-200 pt-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between dark:border-white/[0.08]">
             <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-neutral-600 dark:text-fg-dim">
-                <span>Running</span>
-                <code class="min-w-0 truncate font-mono text-neutral-800 dark:text-fg" title="{{ $row['ref'] }}">{{ $row['ref'] }}</code>
-                @if ($row['digest'] !== null)
-                    <code class="font-mono text-neutral-500 dark:text-fg-faint" title="{{ $row['digestFull'] }}">{{ $row['digest'] }}</code>
-                    <x-copy-button :value="$row['digestFull']" label="Copy the digest of the running image" />
-                @endif
+                <span class="inline-flex min-w-0 items-center gap-1.5">
+                    <span>Running</span>
+                    <code class="min-w-0 truncate font-mono text-neutral-800 dark:text-fg" title="{{ $row['ref'] }}">{{ $row['ref'] }}</code>
+                    @if ($row['digest'] !== null)
+                        <code class="font-mono text-neutral-500 dark:text-fg-faint" title="{{ $row['digestFull'] }}">{{ $row['digest'] }}</code>
+                        <x-copy-button :value="$row['digestFull']" label="Copy the digest of the running image" />
+                    @endif
+                </span>
                 @if ($row['known'] !== '')
-                    <span aria-hidden="true">·</span>
-                    <span>{{ $row['known'] }}</span>
+                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap max-sm:w-full">
+                        <span class="max-sm:hidden" aria-hidden="true">·</span>
+                        <span>{{ $row['known'] }}</span>
+                    </span>
                 @endif
             </div>
             @php

@@ -81,15 +81,19 @@
                         @include('livewire.image-scan.partials.security-image', ['row' => $card['rows'][0], 'single' => true])
                     </div>
                 @else
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <p class="text-[14px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['header'] }}</p>
-                        @if ($checkNeeded && $canUpdate)
-                            <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
-                                <x-reicon name="refresh" class="size-3.5" />
-                                Scan now
-                            </x-forms.button>
-                        @endif
-                    </div>
+                    @if ($card['header'] !== null || ($checkNeeded && $canUpdate))
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            @if ($card['header'] !== null)
+                                <p class="text-[14px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['header'] }}</p>
+                            @endif
+                            @if ($checkNeeded && $canUpdate)
+                                <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Scan now
+                                </x-forms.button>
+                            @endif
+                        </div>
+                    @endif
 
                     <ul class="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
                         aria-label="Images">

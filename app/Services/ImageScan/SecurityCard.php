@@ -28,7 +28,7 @@ use InvalidArgumentException;
  * @phpstan-type ButtonData array{label: string, title: string, submit: string, actions: list<string>, warning: string}
  * @phpstan-type ActionData array{key: string, type: string, sentence: string, copy: ?string, button: ?ButtonData}
  * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, signal: ?string, package: string, version: string}
- * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, problem: bool, sentence: string, attackNote: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, filter: ?string}
+ * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, problem: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, filter: ?string}
  */
 final class SecurityCard
 {
@@ -53,8 +53,8 @@ final class SecurityCard
     /**
      * @param  Collection<int, Model>  $owners  The applications and databases of a service, else the resource.
      * @param  Collection<int, ImageScan>  $scans  The current scans of the owners, with their `resource` set.
-     * @param  array<string, array{known: int, no_fix: int}>  $findingCounts  The findings that are not ignored, and those without a fix, by scan UUID.
-     * @return array{status: string, badge: ?string, badgeType: string, header: string, needsUpdate: int, total: int, single: bool, rows: list<ImageRow>}
+     * @param  array<string, int>  $findingCounts  The findings that are not ignored, by scan UUID.
+     * @return array{status: string, badge: ?string, badgeType: string, header: ?string, needsUpdate: int, total: int, single: bool, rows: list<ImageRow>}
      */
     public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = []): array
     {
@@ -67,11 +67,7 @@ final class SecurityCard
             'status' => $status->value,
             'badge' => SecuritySentences::badge($status),
             'badgeType' => self::badgeType($status),
-            'header' => SecuritySentences::imagesNeedingUpdate($needsUpdate, $total) ?? match ($status) {
-                SecurityStatusType::Ok => 'No action needed.',
-                SecurityStatusType::NotChecked => SecuritySentences::headline($security),
-                default => (string) SecuritySentences::badge($status),
-            },
+            'header' => $total > 1 ? SecuritySentences::imagesNeedingUpdate($needsUpdate, $total) : null,
             'needsUpdate' => $needsUpdate,
             'total' => $total,
             'single' => $total === 1,
@@ -87,7 +83,7 @@ final class SecurityCard
      *
      * @param  Collection<int, Model>  $owners
      * @param  Collection<int, ImageScan>  $scans
-     * @param  array<string, array{known: int, no_fix: int}>  $findingCounts
+     * @param  array<string, int>  $findingCounts
      * @return list<ImageRow>
      */
     public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = []): array
@@ -180,6 +176,7 @@ final class SecurityCard
                 'problem' => $isProblem,
                 'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref),
                 'attackNote' => SecuritySentences::attackNote($imageSecurity),
+                'advice' => SecuritySentences::noFixAdvice($imageSecurity),
                 'lines' => [...SecuritySentences::lines($imageSecurity), ...self::eolLine($imageSecurity)],
                 'primary' => $primary,
                 'mergedWith' => $mergedWith,
@@ -195,7 +192,7 @@ final class SecurityCard
                 'versionNotes' => $scan === null ? [] : self::versionCheckNotes(collect([$scan]), $user),
                 'digest' => SecuritySentences::shortDigest($digestFull),
                 'digestFull' => $digestFull,
-                'known' => $counts === null ? '' : SecuritySentences::knownIssues($counts['known'], $counts['no_fix']),
+                'known' => $counts === null ? '' : SecuritySentences::knownIssues($counts),
                 'filter' => $single ? null : $ref,
             ];
         }
@@ -219,7 +216,7 @@ final class SecurityCard
     private static function whyRow(array $why): array
     {
         return [
-            'title' => ScannerText::stripTitlePrefix((string) $why['title']),
+            'title' => ScannerText::tidyTitle((string) $why['title']),
             'display_id' => (string) $why['display_id'],
             'link' => $why['link'],
             'score' => $why['score'] === null ? 'No score' : number_format((float) $why['score'], 1).' '.ucfirst((string) $why['severity']),

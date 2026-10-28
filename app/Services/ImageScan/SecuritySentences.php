@@ -139,7 +139,10 @@ final class SecuritySentences
         return match ($security->status) {
             SecurityStatusType::UpdateNow => self::updateNow($security, $imageRef, 'A newer build'),
             SecurityStatusType::UpdateAvailable => self::imageUpdateAvailable($security, $imageRef),
-            SecurityStatusType::NoFix => self::noFix($security, $imageRef),
+            SecurityStatusType::NoFix => $security->builderImage
+                ? self::noFix($security, $imageRef)
+                : "{$imageRef} has ".self::problems($security->problemCount).' that attackers '.($security->anyExploited ? 'are using' : 'are likely to use')
+                    .'. No fixed version exists yet, and Coolify checks every day.',
             SecurityStatusType::Ok => "{$imageRef} needs no action.",
             SecurityStatusType::CheckNeeded => "{$imageRef} needs another check: ".(in_array($security->checkReason, self::CHECK_REASONS, true)
                 ? self::checkReason((string) $security->checkReason, self::checkContext($security))
@@ -151,19 +154,30 @@ final class SecuritySentences
     }
 
     /**
-     * The short note after the sentence of an image row: whether attackers use the problems.
+     * The short note after the sentence of an image row that does not mention attackers itself (update_available).
      */
     public static function attackNote(ResourceSecurity $security): ?string
     {
-        return match ($security->status) {
-            SecurityStatusType::UpdateNow, SecurityStatusType::NoFix => $security->anyExploited
-                ? 'Attackers are using '.($security->problemCount > 1 ? 'these' : 'this').'.'
-                : 'Attackers are likely to use '.($security->problemCount > 1 ? 'these' : 'this').'.',
-            SecurityStatusType::UpdateAvailable => $security->exploitedWithoutFix
-                ? null
-                : 'No known attacks on '.(max(1, $security->fixedByPrimary) > 1 ? 'these problems' : 'this problem').'.',
-            default => null,
-        };
+        if ($security->status !== SecurityStatusType::UpdateAvailable || $security->exploitedWithoutFix) {
+            return null;
+        }
+
+        return 'No known attacks on '.(max(1, $security->fixedByPrimary) > 1 ? 'these problems' : 'this problem').'.';
+    }
+
+    /**
+     * The advice under a no_fix image row, until a fix exists. Null for other statuses and for builder images, whose
+     * sentence says that a builder update fixes them.
+     */
+    public static function noFixAdvice(ResourceSecurity $security): ?string
+    {
+        if ($security->status !== SecurityStatusType::NoFix || $security->builderImage) {
+            return null;
+        }
+
+        return $security->problemCount > 1
+            ? 'Until then, limit who can reach this app, or ignore the problems if the affected parts are not used.'
+            : 'Until then, limit who can reach this app, or ignore the problem if the affected part is not used.';
     }
 
     /**
@@ -250,20 +264,15 @@ final class SecuritySentences
     }
 
     /**
-     * The counts in the footer of an image row: "12 known issues, 3 have no fix".
+     * The count in the footer of an image row: "12 known issues".
      */
-    public static function knownIssues(int $known, int $noFix): string
+    public static function knownIssues(int $known): string
     {
-        if ($known < 1) {
-            return 'No known issues';
-        }
-
-        $text = $known === 1 ? '1 known issue' : "{$known} known issues";
-        if ($noFix > 0) {
-            $text .= ', '.($noFix === 1 ? '1 has' : "{$noFix} have").' no fix';
-        }
-
-        return $text;
+        return match (true) {
+            $known < 1 => 'No known issues',
+            $known === 1 => '1 known issue',
+            default => "{$known} known issues",
+        };
     }
 
     /**

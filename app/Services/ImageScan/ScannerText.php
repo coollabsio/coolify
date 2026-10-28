@@ -22,17 +22,50 @@ class ScannerText
 
     /**
      * A short single-line title for a finding: the first sentence of the description, else of the related
-     * description, without Markdown, URLs, or invisible characters.
+     * description, without Markdown, URLs, or invisible characters. A description that is a package changelog
+     * (Oracle Linux and similar) yields to the related description.
      */
     public static function title(?string $description, ?string $relatedDescription, string $package, string $version, string $severity): string
     {
-        $text = self::sentence($description) ?: self::sentence($relatedDescription);
+        $own = self::looksLikeChangelog($description) ? '' : self::sentence($description);
+        $text = $own ?: (self::sentence($relatedDescription) ?: self::sentence($description));
 
         if (count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: []) < 4) {
             return self::fallbackTitle($package, $version, $severity);
         }
 
         return $text;
+    }
+
+    /**
+     * A description that is a package changelog entry rather than a text about the vulnerability.
+     */
+    public static function looksLikeChangelog(?string $description): bool
+    {
+        $text = ltrim((string) $description);
+
+        return str_starts_with($text, '[') || str_starts_with($text, '- ')
+            || str_contains($text, 'Orabug') || str_contains($text, 'Resolves:');
+    }
+
+    /**
+     * Cleans a title, also one stored before these rules: leading changelog tokens ("[1.0.9-10.0.1] - ",
+     * "[3.0.7]: ", "- "), "[Orabug: …]" groups, and trailing "[CVE-…]" references. A changelog keeps its first entry
+     * only. Then the label of `stripTitlePrefix()`.
+     */
+    public static function tidyTitle(string $text): string
+    {
+        $text = trim($text);
+        $changelog = preg_match('/^(?:\[[^\]]*\]\s*[-:]|-)\s+/u', $text) === 1;
+        $text = preg_replace('/^(?:(?:\[[^\]]*\]\s*[-:]|-)\s+)+/u', '', $text) ?? $text;
+        $text = preg_replace('/\s*\[Orabug:[^\]]*\]/iu', '', $text) ?? $text;
+        $text = preg_replace('/(?:\s*\[CVE-\d{4}-\d+\])+(?=\s*[.…]?\s*$)/iu', '', $text) ?? $text;
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+        if ($changelog && preg_match('/^(.+?)\s+-\s+\S/u', $text, $match) === 1) {
+            $text = $match[1];
+        }
+
+        return self::stripTitlePrefix($text);
     }
 
     /**
@@ -77,7 +110,7 @@ class ScannerText
         $text = preg_replace('/(?<!\w)__(?=\S)([^_]*?\s[^_]*?)(?<=\S)__(?!\w)/u', '$1', $text) ?? '';
         $text = preg_replace('/`(?=\S)([^`]*?)(?<=\S)`/u', '$1', $text) ?? '';
         $text = preg_replace('/^(?:#{1,6}|>)\s+/u', '', $text) ?? '';
-        $text = self::stripTitlePrefix(trim(preg_replace('/\s+/u', ' ', $text) ?? ''));
+        $text = self::tidyTitle(trim(preg_replace('/\s+/u', ' ', $text) ?? ''));
 
         if (preg_match('/^(.*?(?i:(?<!\be\.g)(?<!\bi\.e))[.!?])\s+\p{Lu}/su', $text, $match) === 1) {
             $text = $match[1];

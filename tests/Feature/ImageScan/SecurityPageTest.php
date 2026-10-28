@@ -764,7 +764,8 @@ describe('image list', function () {
             ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 and adds none.')
             ->assertSee('Pull latest and restart')
             ->assertSee('3f1a2b4c5d6e')
-            ->assertSee('3 known issues, 1 has no fix')
+            ->assertSee('3 known issues')
+            ->assertDontSee('have no fix')
             ->assertDontSee('images need an update')
             ->assertDontSeeHtml('aria-label="Images"');
     });
@@ -804,14 +805,33 @@ describe('image list', function () {
         $page->call('showImageFindings', 'not-an-image:1.0')->assertSet('images', ['n8nio/runners:1.0']);
     });
 
-    it('removes the label of an old stored title', function () {
+    it('cleans old stored titles: labels and changelog tokens', function () {
         $database = securityPageDatabase();
         securityPageScan($database, 'postgres:15.0', [
             securityPageFinding('CVE-2025-1094', ['title' => 'Issue summary: a crafted string can inject SQL into psql']),
-        ], ['candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', ['CVE-2025-1094'])])]);
+            securityPageFinding('CVE-2026-111497', ['title' => '[1.0.9-10.0.1] - Fix out-of-bounds write in the Brotli decoder [CVE-2026-111497]']),
+        ], ['candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', ['CVE-2025-1094', 'CVE-2026-111497'])])]);
 
         securityPage($this->admin, $database, 'database')
             ->assertSee('A crafted string can inject SQL into psql')
-            ->assertDontSee('Issue summary:');
+            ->assertSee('Fix out-of-bounds write in the Brotli decoder')
+            ->assertDontSee('Issue summary:')
+            ->assertDontSee('[1.0.9-10.0.1]')
+            ->assertDontSee('decoder [CVE-2026-111497]');
+    });
+
+    it('shows no header line for a service whose images need no update', function () {
+        [$service, $main, $runners] = securityPageN8nService();
+        foreach ([$main, $runners] as $owner) {
+            ResourceScans::currentFor($owner)->first()->update(['candidates' => securityPageCandidates([], 'no_better')]);
+        }
+
+        securityPage($this->admin, $service, 'service')
+            ->assertSee('No fix yet')
+            ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. No fixed version exists yet, and Coolify checks every day.')
+            ->assertSee('Until then, limit who can reach this app, or ignore the problem if the affected part is not used.')
+            ->assertSee('Not fixed yet')
+            ->assertDontSee('images need an update')
+            ->assertDontSee('Attackers are using this.');
     });
 });

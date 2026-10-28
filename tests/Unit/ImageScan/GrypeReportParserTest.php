@@ -272,6 +272,26 @@ it('removes a leading label from the title', function (string $desc, string $tit
     'no label' => ['The summary: is not a label in the middle', 'The summary: is not a label in the middle'],
 ]);
 
+it('prefers the related description over a changelog, and cleans changelog tokens', function () {
+    $fips = '[3.0.7-28.0.1_fips] - Replace upstream references in fips man pages [Orabug: 35824276] - Add FIPS package change: add a provider';
+    $brotli = '[1.0.9-10.0.1] - Fix out-of-bounds write in the Brotli decoder [CVE-2026-111497]';
+
+    expect(parsedFinding(['desc' => $fips, 'rdesc' => 'Issue summary: Processing a crafted certificate may crash OpenSSL. Impact: denial of service.'])->title)
+        ->toBe('Processing a crafted certificate may crash OpenSSL.')
+        ->and(parsedFinding(['desc' => $fips, 'rdesc' => ''])->title)->toBe('Replace upstream references in fips man pages')
+        ->and(parsedFinding(['desc' => $brotli, 'rdesc' => ''])->title)->toBe('Fix out-of-bounds write in the Brotli decoder')
+        ->and(parsedFinding(['desc' => '- Resolves: RHEL-1234 heap overflow in the zlib inflate code', 'rdesc' => 'A heap overflow in inflate allows a crash'])->title)
+        ->toBe('A heap overflow in inflate allows a crash');
+});
+
+it('cleans changelog tokens of stored titles at render time', function () {
+    expect(ScannerText::tidyTitle('[3.0.7-28.0.1_fips] - Replace upstream references in fips man pages [Orabug: 35824276] - Add FIPS package change: add…'))
+        ->toBe('Replace upstream references in fips man pages')
+        ->and(ScannerText::tidyTitle('[1.0.9-10.0.1] - Fix out-of-bounds write in the Brotli decoder [CVE-2026-111497]'))
+        ->toBe('Fix out-of-bounds write in the Brotli decoder')
+        ->and(ScannerText::tidyTitle('A heap overflow in x-y - and more [see CVE-2026-1]'))->toBe('A heap overflow in x-y - and more [see CVE-2026-1]');
+});
+
 it('uses the package fallback title for fewer than four words', function (string $desc) {
     expect(parsedFinding(['desc' => $desc, 'rdesc' => '', 'pkg' => 'openssl', 'ver' => '1.0', 'sev' => 'High'])->title)
         ->toBe('openssl 1.0: high vulnerability');

@@ -1,5 +1,6 @@
-{{-- One modal for every Ignore button. Rows open it with the open-ignore-modal window event. --}}
-<div x-data="{
+{{-- One modal for every Ignore button. Rows open it with the open-ignore-modal window event. The dialog is teleported
+     to the body, so the wrapper stays hidden and adds no gap to the card stack. --}}
+<div class="hidden" x-data="{
     target: '',
     kind: 'vulnerability',
     owner: null,

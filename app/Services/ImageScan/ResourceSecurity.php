@@ -155,7 +155,7 @@ final readonly class ResourceSecurity
     public static function whyEntry(array $entry): array
     {
         return [
-            'title' => ScannerText::stripTitlePrefix((string) ($entry['title'] ?? '')),
+            'title' => ScannerText::tidyTitle((string) ($entry['title'] ?? '')),
             'display_id' => (string) ($entry['display_id'] ?? ''),
             'link' => isset($entry['link']) ? (string) $entry['link'] : null,
             'score' => is_numeric($entry['score'] ?? null) ? (float) $entry['score'] : null,
