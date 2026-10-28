@@ -26,9 +26,16 @@
 
         @if ($customHealthcheckFound)
             <div class="mb-4">
-                <x-callout type="warning" title="Custom healthcheck detected">
-                    Enabling this configuration replaces the custom healthcheck currently defined by the application.
-                </x-callout>
+                @if ($healthCheckEnabled)
+                    <x-callout type="warning" title="Dockerfile HEALTHCHECK replaced">
+                        This healthcheck replaces the HEALTHCHECK from the Dockerfile. Disable it to use the
+                        Dockerfile HEALTHCHECK again.
+                    </x-callout>
+                @else
+                    <x-callout type="info" title="Dockerfile HEALTHCHECK in use">
+                        The application uses the HEALTHCHECK from its Dockerfile. Enabling this healthcheck replaces it.
+                    </x-callout>
+                @endif
             </div>
         @endif
 

@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ValidateServer
@@ -38,7 +39,13 @@ class ValidateServer
             'validation_logs' => null,
         ]);
         if ($server->hetzner_server_id) {
-            $status = $server->refreshHetznerState();
+            try {
+                $status = $server->refreshHetznerState();
+            } catch (\Throwable $e) {
+                // The provider API can be down or the token revoked; the SSH checks below still decide.
+                Log::warning('Could not refresh the Hetzner server status before validation', ['server_id' => $server->id, 'error' => $e->getMessage()]);
+                $status = null;
+            }
             if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
                 $this->error = $status === 'off'
                     ? 'Hetzner server is off. Power it on before validating.'

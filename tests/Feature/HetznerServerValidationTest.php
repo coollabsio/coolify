@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -83,4 +84,20 @@ it('blocks validation modal connection checks when the Hetzner server is off', f
         'hetzner_server_status' => 'off',
         'validation_logs' => 'Hetzner server is off. Power it on before validating.',
     ]);
+});
+
+it('validates over SSH when the Hetzner API call fails', function () {
+    Http::fake(['https://api.hetzner.cloud/v1/servers/456' => Http::response(['error' => ['code' => 'unauthorized']], 401)]);
+    $this->server->update(['ip' => '203.0.113.10']);
+    Process::fake();
+
+    Livewire::test(ValidateAndInstall::class, ['server' => $this->server])
+        ->call('validateConnection')
+        ->assertSet('error', null)
+        ->assertSet('uptime', true)
+        ->assertDispatched('validateOS');
+
+    Process::fake(['*' => Process::result(errorOutput: 'ssh: connect to host 203.0.113.10 port 22: Connection refused', exitCode: 255)]);
+
+    expect(fn () => ValidateServer::run($this->server))->toThrow(Exception::class, 'Connection refused');
 });
