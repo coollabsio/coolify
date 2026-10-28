@@ -38,6 +38,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\TimeoutExceededException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
@@ -919,7 +920,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
         // Save build-time .env file BEFORE the build
-        $this->save_buildtime_environment_variables($buildEnvironment);
+        $buildEnvironment ??= $this->generate_buildtime_environment_variables();
+        $this->save_buildtime_environment_variables($buildEnvironment->merge($this->compose_build_interpolation_variables($composeFile, $buildEnvironment)));
 
         if ($this->docker_compose_custom_build_command) {
             // Auto-inject -f (compose file) and --env-file flags using helper function
@@ -983,6 +985,46 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
             );
         }
+    }
+
+    /**
+     * `docker compose build` interpolates the whole Compose file, so a required runtime-only variable
+     * (`${KEY:?}` in `environment:`) fails the build when the build-time .env file does not define it.
+     * This gives the build the runtime .env lines of the variables that the file uses outside its build
+     * sections. A variable that a build section or a build secret can read is left out, so a
+     * runtime-only value never becomes a build argument or part of an image.
+     *
+     * @return Collection<int, string>
+     */
+    private function compose_build_interpolation_variables(mixed $composeFile, Collection $buildEnvironment): Collection
+    {
+        $compose = is_string($composeFile) ? parseDockerComposeYaml($composeFile) : convertToArray($composeFile);
+        $references = fn (array $values): Collection => collect(Arr::flatten($values))
+            ->flatMap(fn (mixed $value): Collection => extractDockerComposeEnvironmentVariableReferences($value));
+
+        $readByBuilds = collect(data_get($compose, 'secrets', []))->pluck('environment')->filter();
+        foreach (data_get($compose, 'services', []) as $serviceName => $service) {
+            $build = data_get($service, 'build');
+            if ($build === null) {
+                continue;
+            }
+            $args = data_get($build, 'args', []);
+            $argNames = is_array($args) && array_is_list($args)
+                ? array_map(fn (mixed $arg): string => explode('=', (string) $arg, 2)[0], $args)
+                : array_keys((array) $args);
+            $readByBuilds = $readByBuilds->merge($argNames)->merge($references((array) $build));
+            unset($compose['services'][$serviceName]['build']);
+        }
+
+        $buildKeys = $buildEnvironment->map(fn (string $line): string => explode('=', $line, 2)[0]);
+        $keys = $references($compose)->unique()->diff($readByBuilds)->diff($buildKeys);
+        if ($keys->isEmpty()) {
+            return collect();
+        }
+
+        return $this->generate_runtime_environment_variables()
+            ->filter(fn (string $line): bool => $keys->contains(explode('=', $line, 2)[0]))
+            ->values();
     }
 
     /**

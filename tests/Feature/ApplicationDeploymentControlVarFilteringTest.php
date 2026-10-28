@@ -2076,3 +2076,70 @@ it('gives a preview from before v4.5.1 the production values it had', function (
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=') && str($env)->contains('production-secret')))->toBeTrue()
         ->and($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=') && str($env)->contains('coolify')))->toBeTrue();
 });
+
+it('lets the Compose build interpolate runtime-only variables without passing them to the build', function (int $pullRequestId) {
+    $compose = <<<'YAML'
+services:
+  app:
+    build:
+      context: .
+      args:
+        MAPPED_ARG: '${RUNTIME_IN_BUILD_ARGS}'
+        LISTED_FROM_ENV: null
+    environment:
+      FERNET_KEY: '${FERNET_KEY:?}'
+      OPTIONAL_REQUIRED: '${OPTIONAL_REQUIRED?}'
+      BUILD_VALUE: '${BUILD_VALUE}'
+  worker:
+    build:
+      context: ./worker
+      args:
+        - LISTED_ARG
+    environment:
+      FERNET_KEY: '${FERNET_KEY:?}'
+YAML;
+
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => '[]',
+    ]);
+    $application->settings()->update(['inject_build_args_to_dockerfile' => false]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'FERNET_KEY', 'value' => 'runtime-fernet-key', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'OPTIONAL_REQUIRED', 'value' => '', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'RUNTIME_IN_BUILD_ARGS', 'value' => 'runtime-mapped-arg', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LISTED_FROM_ENV', 'value' => 'runtime-null-arg', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LISTED_ARG', 'value' => 'runtime-listed-arg', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'BUILD_VALUE', 'value' => 'build-value']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => $pullRequestId,
+        'remote_secrets_cache' => [],
+        'force_rebuild' => false,
+        'docker_compose_location' => '/docker-compose.yaml',
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables');
+    $buildEnvironment = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'build_docker_compose_images', parseDockerComposeYaml($compose), $buildEnvironment);
+
+    $buildEnvFile = $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_PATH];
+    $buildCommand = collect($job->recordedCommands)->flatten()->first(fn (mixed $command): bool => is_string($command) && str_contains($command, ' build --pull'));
+    $buildArgs = readDeploymentJobProperty($job, $reflection, 'build_args')->implode(' ');
+
+    expect($buildEnvFile)->toContain('FERNET_KEY="runtime-fernet-key"')
+        ->toContain('OPTIONAL_REQUIRED=""')
+        ->toContain('BUILD_VALUE=')
+        ->not->toContain('runtime-mapped-arg')
+        ->not->toContain('runtime-null-arg')
+        ->not->toContain('runtime-listed-arg')
+        ->and($buildCommand)->toContain('--env-file '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH)
+        ->and($buildArgs)->toContain('BUILD_VALUE')
+        ->not->toContain('FERNET_KEY')
+        ->not->toContain('runtime-');
+})->with([
+    'production' => 0,
+    'preview' => 42,
+]);
