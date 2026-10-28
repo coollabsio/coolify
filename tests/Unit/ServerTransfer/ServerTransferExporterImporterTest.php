@@ -859,6 +859,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         'fqdn' => 'https://pr-42.app.example.com',
         'status' => 'running:healthy',
         'git_type' => 'github',
+        'keeps_production_values' => true,
     ]);
     $preview->uuid = 'preview-pr-42';
     $preview->save();
@@ -969,6 +970,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
     expect($importedApp)->not->toBeNull()
         ->and($importedApp->previews)->toHaveCount(1)
         ->and($importedApp->previews->first()->uuid)->toBe('preview-pr-42')
+        ->and($importedApp->previews->first()->keeps_production_values)->toBeTrue()
         ->and($importedApp->previews->first()->persistentStorages)->toHaveCount(1);
 
     $importedVolBackup = ScheduledVolumeBackup::where('uuid', 'svc-app-vol-backup')->first();

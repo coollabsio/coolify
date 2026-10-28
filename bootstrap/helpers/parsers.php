@@ -1150,8 +1150,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
-    // A public preview can run the compose file of a fork pull request.
-    $isPublicPullRequest = $isPullRequest && (bool) data_get($resource, 'settings.is_pr_deployments_public_enabled');
+    $pullRequestPreview = $isPullRequest
+        ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
+        : null;
+    // A public preview can run the compose file of a fork pull request. A preview from before v4.5.1 keeps the production values.
+    $isPublicPullRequest = $isPullRequest && (bool) data_get($resource, 'settings.is_pr_deployments_public_enabled') && ! $pullRequestPreview?->keeps_production_values;
     $server = data_get($resource, 'destination.server');
     try {
         $yaml = parseDockerComposeYaml($compose);
