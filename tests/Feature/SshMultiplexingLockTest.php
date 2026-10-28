@@ -78,19 +78,28 @@ function muxProcessTimeout(array &$timeouts = []): Closure
     };
 }
 
-it('establishes a master with ssh -fN and never the orphan-prone ssh -fNM', function () {
+/**
+ * The command that starts a mux master. It runs `true`, so it exits when another process owns the socket.
+ */
+function isMuxEstablishCommand(string $command): bool
+{
+    return str_starts_with($command, 'ssh -o ControlMaster=auto ') && str_ends_with($command, ' true');
+}
+
+it('establishes a master with a command that exits, never with an ssh -fN that can stay open forever', function () {
     config(['constants.ssh.mux_enabled' => true]);
     $server = makeMuxServer();
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 1),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN ')
-        && ! str_contains($process->command, 'ssh -fNM'));
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command)
+        && str_contains($process->command, 'ControlPersist=')
+        && ! str_contains($process->command, '-fN'));
 });
 
 it('reuses an existing healthy master without spawning a new one', function () {
@@ -107,7 +116,7 @@ it('reuses an existing healthy master without spawning a new one', function () {
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN'));
+    Process::assertNotRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
 it('reuses a healthy master regardless of its absolute age', function () {
@@ -125,7 +134,7 @@ it('reuses a healthy master regardless of its absolute age', function () {
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertNotRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
 it('bounds mux check commands so a wedged master cannot block callers', function () {
@@ -137,7 +146,7 @@ it('bounds mux check commands so a wedged master cannot block callers', function
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 1),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     SshMultiplexingHelper::ensureMultiplexedConnection($server);
@@ -158,13 +167,13 @@ it('replaces a wedged master whose control check times out', function () {
     $timeouts = [];
     Process::fake([
         '*-O check*' => muxProcessTimeout($timeouts),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue()
         ->and($timeouts)->each->toBe(5);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
     Process::assertNotRan(fn ($process) => str_contains($process->command, '-O stop'));
 });
 
@@ -175,7 +184,7 @@ it('does not delete the control socket when the master is simply absent', functi
     File::partialMock()->shouldNotReceive('delete');
     Process::fake([
         '*-O check*' => Process::result(exitCode: 255),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
@@ -206,13 +215,13 @@ it('replaces a master whose health check times out', function () {
         '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
         '*health_check_ok*' => muxProcessTimeout(),
         '*-O stop*' => Process::result(exitCode: 0),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
 it('gives the mux health check at least the server connection timeout', function () {
@@ -252,7 +261,7 @@ it('does not spawn a master when the per-server lock is already held', function 
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeFalse();
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertNotRan(fn ($process) => isMuxEstablishCommand($process->command));
 
     $held->release();
 });
@@ -274,7 +283,7 @@ it('adds mux options to ssh commands only after the explicit master is ready', f
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 1),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     $command = SshMultiplexingHelper::generateSshCommand($server, 'echo ok');
@@ -286,7 +295,7 @@ it('adds mux options to ssh commands only after the explicit master is ready', f
         ->toContain("'sh -c \"if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi\"' << \\")
         ->not->toContain('<< $delimiter');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
 it('quotes the mux socket and key paths in every local ssh command', function () {
@@ -300,7 +309,7 @@ it('quotes the mux socket and key paths in every local ssh command', function ()
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 1),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     $socket = escapeshellarg('/var/www/html/storage/app/ssh/mux/mux_x;touch /tmp/pwn;#');
@@ -312,7 +321,7 @@ it('quotes the mux socket and key paths in every local ssh command', function ()
     foreach ([$sshCommand, $scpCommand] as $command) {
         expect($command)->toContain("-o ControlPath={$socket} ")->toContain("-i {$key} ");
     }
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN ')
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command)
         && str_contains($process->command, "-o ControlPath={$socket} ")
         && str_contains($process->command, "-i {$key} "));
     Process::assertRan(fn ($process) => str_contains($process->command, "ssh -O check -o ControlPath={$socket} "));
@@ -354,7 +363,7 @@ it('adds mux options to scp commands only after the explicit master is ready', f
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 1),
-        '*-fN *' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
     ]);
 
     $command = SshMultiplexingHelper::generateScpCommand($server, '/tmp/source', '/tmp/dest');
@@ -364,7 +373,7 @@ it('adds mux options to scp commands only after the explicit master is ready', f
         ->toContain("-o ControlPath='/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}'")
         ->toContain('-o ControlPersist=3600');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
 it('kills only old orphaned ssh masters whose control socket no longer exists', function () {

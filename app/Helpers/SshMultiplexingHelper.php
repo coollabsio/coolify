@@ -95,14 +95,17 @@ class SshMultiplexingHelper
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = 'ssh -fN -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
+        // Not `ssh -fN`: when another process holds the control socket, ssh disables multiplexing and an
+        // `-fN` connection then stays open forever. This form runs `true` and exits. Only a master that
+        // ControlPersist moves to the background stays.
+        $establishCommand = 'ssh -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
-        $establishCommand .= self::escapedUserAtHost($server);
+        $establishCommand .= self::escapedUserAtHost($server).' true';
 
         $establishProcess = Process::run($establishCommand);
         if ($establishProcess->exitCode() !== 0) {
