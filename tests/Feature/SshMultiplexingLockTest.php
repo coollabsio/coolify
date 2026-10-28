@@ -409,6 +409,36 @@ it('kills only old orphaned ssh masters whose control socket no longer exists', 
     File::delete($liveSocket);
 });
 
+it('kills a ControlPersist master whose control socket was removed', function () {
+    config(['constants.ssh.mux_orphan_reap_enabled' => true]);
+    $muxDir = storage_path('app/ssh/mux');
+    File::ensureDirectoryExists($muxDir);
+
+    $liveSocket = $muxDir.'/mux_live_'.uniqid();
+    $removedSocket = $muxDir.'/mux_removed_'.uniqid();
+    File::put($liveSocket, 'x');
+
+    // ControlPersist sets the title of a backgrounded master to `ssh: <ControlPath> [mux]`.
+    Process::fake([
+        'ps*' => Process::result(output: "111 1 5000 ssh: {$liveSocket} [mux]\n".
+            "222 1 5000 ssh: {$removedSocket} [mux]\n".
+            "333 1 5000 ssh: /tmp/other/mux_removed [mux]\n"),
+        '*ssh -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
+        'kill*' => Process::result(exitCode: 0),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupOrphanedSshProcesses');
+    $method->setAccessible(true);
+    $method->invoke($job);
+
+    Process::assertRan(fn ($process) => $process->command === 'kill -9 '.escapeshellarg('222'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '111'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '333'));
+
+    File::delete($liveSocket);
+});
+
 it('kills ssh -fN processes that share a live ControlPath but do not own it', function () {
     config(['constants.ssh.mux_orphan_reap_enabled' => true]);
     $muxDir = storage_path('app/ssh/mux');
@@ -599,9 +629,10 @@ it('kills only old cloudflared proxies whose stdin pipe no live ssh holds', func
     $orphanPid = proc_get_status($orphan)['pid'];
     $tunnelSshPid = proc_get_status($tunnelSsh)['pid'];
     $sshPid = getmypid();
+    $muxSocket = storage_path('app/ssh/mux/mux_tunnel');
 
     Process::fake([
-        'ps*' => Process::result(output: "{$sshPid} 1 5000 ssh -fN -o ControlMaster=auto root@1.2.3.4\n".
+        'ps*' => Process::result(output: "{$sshPid} 1 5000 ssh: {$muxSocket} [mux]\n".
             "200 {$sshPid} 5000 cloudflared access ssh --hostname host.example.com\n".
             "{$reparentedPid} 1 5000 cloudflared access ssh --hostname host.example.com\n".
             "{$orphanPid} 1 5000 cloudflared access ssh --hostname host.example.com\n".
