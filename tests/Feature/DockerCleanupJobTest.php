@@ -867,3 +867,19 @@ it('keeps the images of an application while it deploys, because its new images 
         ->and($removals->first())->toContain("'{$idle->uuid}:old'")
         ->not->toContain($deploying->uuid);
 })->with(['queued', 'in_progress']);
+
+it('fails an interrupted cleanup of a deleted server without breaking its broadcast', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $server = dockerCleanupReachableServer();
+    $interrupted = DockerCleanupExecution::create(['server_id' => $server->id]);
+    $server->delete();
+    Carbon::setTestNow(now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() + 1));
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect($interrupted->fresh()->status)->toBe('failed');
+    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof DockerCleanupDone
+        && $job->event->broadcastOn() === []);
+});

@@ -2936,20 +2936,20 @@ function isAnyDeploymentInprogress(bool $showAll = false)
 }
 
 /**
- * Counts scheduled task, database backup, and volume backup runs that are still running.
+ * Counts scheduled task, database backup, and volume backup runs that are still running on this host.
  * A run that started longer ago than its job timeout is stale: the worker has stopped it.
  */
 function runningScheduledJobCount(): int
 {
     $startedWithin = fn (Model $execution, int $timeoutSeconds): bool => $execution->created_at?->gt(now()->subSeconds($timeoutSeconds)) ?? false;
 
-    $tasks = ScheduledTaskExecution::with('scheduledTask')->where('status', 'running')->get()
+    $tasks = ScheduledTaskExecution::with('scheduledTask')->onThisHost()->where('status', 'running')->get()
         ->filter(fn (ScheduledTaskExecution $execution) => $startedWithin($execution, ($execution->scheduledTask?->timeout ?? 300) + ScheduledTaskJob::WORKER_TIMEOUT_MARGIN_SECONDS));
 
-    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->where('status', 'running')->get()
+    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->onThisHost()->where('status', 'running')->get()
         ->filter(fn (ScheduledDatabaseBackupExecution $execution) => $startedWithin($execution, ($execution->scheduledDatabaseBackup?->timeout ?? 3600) + DatabaseBackupJob::WORKER_TIMEOUT_MARGIN_SECONDS));
 
-    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->where('status', 'running')->get()
+    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->onThisHost()->where('status', 'running')->get()
         ->filter(fn (ScheduledVolumeBackupExecution $execution) => $startedWithin($execution, $execution->scheduledVolumeBackup?->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT));
 
     return $tasks->count() + $databaseBackups->count() + $volumeBackups->count();
