@@ -432,25 +432,36 @@ describe('image rows', function () {
 });
 
 describe('provenance', function () {
-    it('says that the registry has a newer build of the same tag', function () {
-        $scan = sentenceScan(['candidates' => ['status' => 'ok', 'entries' => [sentenceCandidate('postgres:16-alpine', 'same_tag')]]]);
+    it('says that the registry has a newer build of the same tag, with what its scan found', function () {
+        $scan = sentenceScan(['candidates' => ['status' => 'ok', 'entries' => [[
+            ...sentenceCandidate('postgres:16-alpine', 'same_tag'), 'fixes' => ['critical' => 2, 'high' => 0, 'medium' => 0], 'added' => 0,
+        ]]]]);
         $action = new SecurityAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.', '16-alpine', null, [], true, 'postgres:16-alpine', 'postgres:16-alpine');
 
-        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable(), ['fixes' => 2, 'adds' => 0]))
-            ->toBe('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 and adds none.');
+        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable()))
+            ->toBe('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 serious problems and adds none.');
     });
 
-    it('says that the tag is the newest release of the line, and what it adds', function () {
+    it('says that the tag is the newest release of the line, and leaves out what the entry does not store', function (array $stored, string $found) {
         $scan = sentenceScan([
             'image_ref' => 'ghcr.io/n8n-io/n8n:1.68.0',
-            'candidates' => ['status' => 'ok', 'entries' => [sentenceCandidate('ghcr.io/n8n-io/n8n:1.71.2', 'line')]],
+            'candidates' => ['status' => 'ok', 'entries' => [[...sentenceCandidate('ghcr.io/n8n-io/n8n:1.71.2', 'line'), ...$stored]]],
         ]);
         $action = new SecurityAction(SecurityActionType::UpdateImage, 'Update to 1.71.2.', '1.71.2', null, [], true, 'ghcr.io/n8n-io/n8n:1.68.0', 'ghcr.io/n8n-io/n8n:1.71.2');
 
-        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateNow(), ['fixes' => 1, 'adds' => 3]))
-            ->toBe('1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago: it fixes 1 and adds 3 less serious.')
-            ->and(SecuritySentences::provenance($scan, $action, sentenceUpdateNow(), ['fixes' => 1, 'adds' => null]))
-            ->toBe('1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago: it fixes 1.');
+        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateNow()))
+            ->toBe("1.71.2 is the newest 1.x release on GitHub Container Registry. Coolify scanned it 2 hours ago{$found}.");
+    })->with([
+        'fixes and adds' => [['fixes' => ['critical' => 1, 'high' => 0, 'medium' => 0], 'added' => 3], ': it fixes 1 serious problem and adds 3 less serious'],
+        'old entry without added' => [['fixes' => ['critical' => 0, 'high' => 2, 'medium' => 1]], ': it fixes 3 serious problems'],
+        'fixes nothing counted' => [['fixes' => ['critical' => 0, 'high' => 0, 'medium' => 0], 'added' => 0], ': it adds none'],
+        'no counts' => [[], ''],
+    ]);
+
+    it('claims no scan when no candidate entry is stored', function () {
+        $action = new SecurityAction(SecurityActionType::UpdateImage, 'Update to 1.71.2.', '1.71.2', null, [], true, 'n8nio/n8n:1.68.0', 'n8nio/n8n:1.71.2');
+
+        expect(SecuritySentences::provenance(sentenceScan(['image_ref' => 'n8nio/n8n:1.68.0']), $action, sentenceUpdateNow()))->toBeNull();
     });
 
     it('says that the new base image is the newest release', function () {

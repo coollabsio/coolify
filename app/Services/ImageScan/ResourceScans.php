@@ -147,9 +147,8 @@ final class ResourceScans
     }
 
     /**
-     * The images of a Compose application without a completed result in its current deployment: rows of that
-     * deployment that failed or did not finish, and images of the stored Compose file without a row of it. Images set
-     * with a variable are left out. 0 for other resources.
+     * The number of images of a Compose application without a completed result in its current deployment (see
+     * `uncheckedComposeRefs()`). 0 for other resources.
      *
      * @param  Collection<int, ImageScan>  $currentScans  The current scans of the application (see `currentFor()`).
      * @param  Collection<string, Collection<int, ImageScan>>|null  $deploymentRows  The rows of `composeDeploymentRows()`
@@ -157,8 +156,24 @@ final class ResourceScans
      */
     public static function uncheckedComposeImages(Model $owner, Collection $currentScans, ?Collection $deploymentRows = null): int
     {
+        return count(self::uncheckedComposeRefs($owner, $currentScans, $deploymentRows));
+    }
+
+    /**
+     * The images of a Compose application without a completed result in its current deployment: rows of that
+     * deployment that failed or did not finish (their image ref), and images of the stored Compose file without a row
+     * of it (the image as the file writes it). `name` is the Compose service when the file names the image. Images set
+     * with a variable are left out. Empty for other resources.
+     *
+     * @param  Collection<int, ImageScan>  $currentScans  The current scans of the application (see `currentFor()`).
+     * @param  Collection<string, Collection<int, ImageScan>>|null  $deploymentRows  The rows of `composeDeploymentRows()`
+     *                                                                               for lists, else one query here.
+     * @return list<array{name: ?string, ref: string}>
+     */
+    public static function uncheckedComposeRefs(Model $owner, Collection $currentScans, ?Collection $deploymentRows = null): array
+    {
         if (! self::isCompose($owner)) {
-            return 0;
+            return [];
         }
 
         $deploymentId = $currentScans->first()?->deployment_queue_id;
@@ -170,10 +185,26 @@ final class ResourceScans
                 ->get(),
         };
 
-        $unfinished = $rows->filter(fn (ImageScan $row): bool => $row->status !== ImageScanStatus::Completed)->count();
-        $rowNames = $rows->map(fn (ImageScan $row): string => ScanImage::imageName((string) $row->image_ref))->unique()->all();
+        $images = self::composeImages($owner);
+        $serviceOf = self::composeServiceNames($owner);
 
-        return $unfinished + count(array_diff(self::composeImageNames($owner), $rowNames));
+        $unchecked = [];
+        // Current scans are completed; only the rows of a deployment can be unfinished (lists load the current scans
+        // without their status).
+        $unfinished = $deploymentId === null ? collect() : $rows->filter(fn (ImageScan $row): bool => $row->status !== ImageScanStatus::Completed);
+        foreach ($unfinished as $row) {
+            $ref = (string) $row->image_ref;
+            $unchecked[] = ['name' => $serviceOf[ScanImage::imageName($ref)] ?? null, 'ref' => $ref];
+        }
+
+        $rowNames = $rows->map(fn (ImageScan $row): string => ScanImage::imageName((string) $row->image_ref))->unique()->all();
+        foreach ($serviceOf as $imageName => $service) {
+            if (! in_array($imageName, $rowNames, true)) {
+                $unchecked[] = ['name' => $service, 'ref' => trim((string) $images[$service])];
+            }
+        }
+
+        return $unchecked;
     }
 
     /**
@@ -219,11 +250,32 @@ final class ResourceScans
     }
 
     /**
-     * The image names (without tag) of the services of the stored Compose file of an application.
+     * The Compose service of each image name (without tag) of the stored Compose file, the first service when several
+     * use the image. Empty for other resources.
      *
-     * @return list<string>
+     * @return array<string, string>
      */
-    private static function composeImageNames(Application $application): array
+    public static function composeServiceNames(Model $owner): array
+    {
+        if (! self::isCompose($owner)) {
+            return [];
+        }
+
+        $serviceOf = [];
+        foreach (self::composeImages($owner) as $service => $image) {
+            $serviceOf[ScanImage::imageName($image)] ??= (string) $service;
+        }
+
+        return $serviceOf;
+    }
+
+    /**
+     * The images of the services of the stored Compose file of an application, keyed by the service name. Images set
+     * with a variable are left out.
+     *
+     * @return array<string, string>
+     */
+    private static function composeImages(Application $application): array
     {
         try {
             $compose = Yaml::parse((string) ($application->docker_compose ?: $application->docker_compose_raw));
@@ -234,9 +286,7 @@ final class ResourceScans
         return collect((array) data_get($compose, 'services', []))
             ->map(fn ($service) => data_get($service, 'image'))
             ->filter(fn ($image): bool => is_string($image) && trim($image) !== '' && ! str_contains($image, '$'))
-            ->map(fn (string $image): string => ScanImage::imageName($image))
-            ->unique()
-            ->values()
+            ->mapWithKeys(fn (string $image, $service): array => [(string) $service => trim($image)])
             ->all();
     }
 

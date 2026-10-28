@@ -26,7 +26,8 @@
         @foreach ($row['lines'] as $line)
             <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">{{ $line }}</p>
         @endforeach
-        @foreach ($row['versionNotes'] as $note)
+        {{-- In a list, the row header shows these notes. --}}
+        @foreach ($single ? $row['versionNotes'] : [] as $note)
             <p class="text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
                 {{ $note['text'] }}
                 @if ($note['link'] !== null)

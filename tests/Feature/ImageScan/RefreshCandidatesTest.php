@@ -446,7 +446,9 @@ it('looks for candidates for a fixable high known exploited finding', function (
     expect($scan->fresh()->candidateStatus())->toBe('ok')
         ->and($line['better'])->toBeTrue()
         ->and($line['fixed_ids'])->toBe(['CVE-2025-1094'])
-        ->and($line['fixes'])->toBe(['critical' => 0, 'high' => 1, 'medium' => 0]);
+        ->and($line['fixes'])->toBe(['critical' => 0, 'high' => 1, 'medium' => 0])
+        // Every relevant critical, high, or medium finding of 15.15 is new: the current image had only the exploited one.
+        ->and($line['added'])->toBe(array_sum($line['left']));
 });
 
 it('does nothing for an application that Coolify builds', function () {

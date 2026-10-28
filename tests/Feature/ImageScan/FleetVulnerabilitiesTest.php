@@ -811,4 +811,17 @@ describe('images of a resource', function () {
             ->assertSeeInOrder(['n8n-service', 'Update now', '2 of 3 images'])
             ->assertDontSee('1 of 1 images');
     });
+
+    it('counts an image of a Compose app without a result', function () {
+        $application = fleetApplication('compose-app', attributes: [
+            'build_pack' => 'dockercompose', 'docker_registry_image_name' => null,
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:1.27\n  cache:\n    image: redis:7\n",
+        ]);
+        fleetScan($application, 'update_now');
+
+        $entry = TeamVulnerabilities::load($this->team->id)->entries->firstWhere('resource.name', 'compose-app');
+
+        expect($entry['images'])->toBe(['update' => 1, 'total' => 2])
+            ->and($entry['security']->checkReason)->toBe('images_unchecked');
+    });
 });

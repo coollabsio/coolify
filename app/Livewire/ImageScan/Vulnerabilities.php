@@ -962,7 +962,9 @@ class Vulnerabilities extends Component
         }
 
         $progress = $this->progress($owners);
-        $security = $scans->isEmpty() ? null : SecurityStatus::forResource($resource);
+        // One status per image, with the matchers of the findings table, shared by the resource status and the rows.
+        $imageStatuses = $scans->mapWithKeys(fn (ImageScan $scan): array => [(string) $scan->uuid => SecurityStatus::forScan($scan, $this->matcherFor($scan->resource))])->all();
+        $security = $scans->isEmpty() ? null : SecurityStatus::forResource($resource, $scans, $imageStatuses);
         $checkedAt = $security?->checkedAt ?? $scans->max('scanned_at');
         $imageOptions = $scans->pluck('image_ref')->map(fn ($ref) => (string) $ref)->unique()->values()->all();
 
@@ -972,7 +974,7 @@ class Vulnerabilities extends Component
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
-            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows)),
+            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows), $imageStatuses, fn (Model $owner): IgnoreMatcher => $this->matcherFor($owner)),
             'hasSettings' => $resource instanceof Application,
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),
             'truncated' => $scans->contains(fn (ImageScan $scan): bool => (bool) data_get($scan->summary, 'truncated', false)),

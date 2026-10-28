@@ -1450,6 +1450,11 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   - One image (a database, a Docker image app, a Dockerfile app): the row
     is open and has no list frame, no row header, and no chevron. The card
     badge is the row's badge.
+  - Rows: every image the status counts. That includes a scanned service
+    application or database without a result and every image of a Compose
+    app without a result in its current deployment (keyed
+    `compose-{md5(service)}`). These rows show "Not checked" and "{ref} has
+    not been checked yet.", and Scan now stays in the card header.
   - Several images (a service, a Compose app): a 14px medium line "{k} of {n}
     images need an update" only when k > 0 (k = rows with update_now or
     update_available). For k = 0 there is no header line: the card badge
@@ -1459,7 +1464,8 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     not_checked, then the name). The first row with a problem is open; the
     others, and every "No action needed" row, are closed.
   - Row header: a real `<button>` with `aria-expanded` and `aria-controls`
-    that holds the chevron, the name (13px medium; services only) and the
+    that holds the chevron, the name (13px medium; the service application or
+    database, or the Compose service) and the
     image ref (mono, 11px muted under a name, else 12px); then the status
     badge (muted text "No action needed" or "Not checked" without one) and
     the primary action as a neutral button or copy chip. A merged service
@@ -1473,8 +1479,9 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     the update_now and no_fix sentences already say that attackers use the
     problems. A no_fix sentence ends with "No fixed version exists yet, and
     Coolify checks every day.", and its advice ("Until then, limit who can
-    reach this app, or ignore the problem if the affected part is not used.",
-    `noFixAdvice()`) follows as its own 13px muted line; the extra lines (an exploited problem
+    reach this app / this service / this database, or ignore the problem if
+    the affected part is not used.", `noFixAdvice()`) follows as its own 13px
+    muted line; the extra lines (an exploited problem
     without a fix, an end-of-life OS the sentence does not name) and the
     version check notes; for a single image the highlighted primary action
     (or Scan now for check_needed).
@@ -1488,7 +1495,14 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   - Provenance: one 12px muted line with the 12px medium label "How Coolify
     knows:" and the sentence of `SecuritySentences::provenance()`, from stored
     data only ("Docker Hub has a newer build of 16-alpine. Coolify scanned it 2
-    hours ago: it fixes 2 and adds none.").
+    hours ago: it fixes 2 serious problems and adds none."). "fixes" and
+    "adds" come from the candidate's stored entry (`fixes` and `added`, both
+    relevant critical, high, and medium findings). A clause the entry does not
+    store is left out, "fixes 0" is never said, and without a stored candidate
+    there is no line, so it never claims a scan.
+  - Version check notes that only the user can unblock (registry login, daily
+    limit) show under the row header as one muted 11px line, also on a
+    closed row.
   - "Other fixes": up to 5 more actions of that image as rows with their
     sentence and a neutral button or copy chip, then "and {n} more".
   - Footer, above a divider: "Running {ref} {short digest}" (the first 12
@@ -1522,7 +1536,9 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     ("[1.0.9-10.0.1] - "), "[Orabug: …]" groups, and trailing "[CVE-…]"
     references, and keeps only the first entry of a changelog. The parser
     takes the related description when the finding's own description is a
-    changelog.
+    changelog. A stored title that still looks like a changelog entry shows
+    the fallback "{package} {version}: {severity} vulnerability" until a
+    rescan (`ScannerText::storedTitle()`).
   - No totals and no severity bar: the only finding count of the page is in
     the "All findings ({n})" header and the row footer. The collapsed "All
     findings", "Packages and SBOM", and "Settings" (applications only) cards

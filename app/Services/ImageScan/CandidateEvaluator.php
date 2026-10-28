@@ -102,6 +102,33 @@ final class CandidateEvaluator
     }
 
     /**
+     * The relevant critical, high, and medium findings of the candidate that the relevant current findings do not have
+     * under any of their IDs, counted once per finding ID. The same basis as `counts()` of `fixed()`.
+     *
+     * @param  list<Finding>  $currentRelevant
+     * @param  list<Finding>  $candidate  All findings of the candidate.
+     */
+    public function added(array $currentRelevant, array $candidate, IgnoreMatcher $ignores): int
+    {
+        $known = [];
+        foreach ($currentRelevant as $finding) {
+            foreach ($this->keys($finding) as $key) {
+                $known[$key] = true;
+            }
+        }
+
+        $added = [];
+        foreach ($this->relevant($candidate, $ignores) as $finding) {
+            if (in_array(strtolower($finding->severity), self::COUNTED_SEVERITIES, true)
+                && array_intersect_key(array_flip($this->keys($finding)), $known) === []) {
+                $added[mb_strtolower($finding->id)] = true;
+            }
+        }
+
+        return count($added);
+    }
+
+    /**
      * @param  list<Finding>  $findings
      * @return array{critical: int, high: int, medium: int}
      */

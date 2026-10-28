@@ -72,22 +72,27 @@ final class SecurityStatus
     private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'relevant_fixed', 'builder_unfixed'];
 
     /**
-     * The status of one scanned image, with the age of the result.
+     * The status of one scanned image, with the age of the result. `$ignores` is the ignore matcher of the scan's
+     * owner, when the caller has it.
      */
-    public static function forScan(ImageScan $scan): ResourceSecurity
+    public static function forScan(ImageScan $scan, ?IgnoreMatcher $ignores = null): ResourceSecurity
     {
         if ($scan->status !== ImageScanStatus::Completed || ! $scan->resource instanceof Model) {
             return self::notChecked(self::NOT_SCANNED);
         }
 
-        return self::evaluate($scan);
+        return self::evaluate($scan, $ignores);
     }
 
     /**
      * The status of a resource from its current scans, computed now. A service combines the images of its
-     * applications and databases.
+     * applications and databases. A caller that loaded the current scans of the owners (`ResourceScans::current()`,
+     * with `resource` set) passes them, and the statuses of `forScan()` it computed already, keyed by scan UUID.
+     *
+     * @param  Collection<int, ImageScan>|null  $currentScans
+     * @param  array<string, ResourceSecurity>  $imageStatuses
      */
-    public static function forResource(Model $resource): ResourceSecurity
+    public static function forResource(Model $resource, ?Collection $currentScans = null, array $imageStatuses = []): ResourceSecurity
     {
         $off = ImageScanPolicyResolver::offState($resource);
         if ($off !== null) {
@@ -95,11 +100,13 @@ final class SecurityStatus
         }
 
         $images = self::statusOwners($resource, ResourceScans::owners($resource))
-            ->map(function (Model $owner): array {
-                $scans = ResourceScans::currentFor($owner);
+            ->map(function (Model $owner) use ($currentScans, $imageStatuses): array {
+                $scans = $currentScans === null
+                    ? ResourceScans::currentFor($owner)
+                    : $currentScans->filter(fn (ImageScan $scan): bool => $scan->resource_type === $owner->getMorphClass() && (string) $scan->resource_id === (string) $owner->getKey())->values();
 
                 return [
-                    'parts' => $scans->map(fn (ImageScan $scan): ResourceSecurity => self::evaluate($scan))->all(),
+                    'parts' => $scans->map(fn (ImageScan $scan): ResourceSecurity => $imageStatuses[(string) $scan->uuid] ?? self::evaluate($scan))->all(),
                     'unchecked' => ResourceScans::uncheckedComposeImages($owner, $scans),
                 ];
             })
@@ -247,11 +254,11 @@ final class SecurityStatus
     /**
      * The status of one scan before it is combined with other images.
      */
-    private static function evaluate(ImageScan $scan): ResourceSecurity
+    private static function evaluate(ImageScan $scan, ?IgnoreMatcher $ignores = null): ResourceSecurity
     {
         /** @var Model $owner */
         $owner = $scan->resource;
-        $ignores = IgnoreMatcher::forResource($owner);
+        $ignores ??= IgnoreMatcher::forResource($owner);
         $result = SecurityActions::forScan($scan, $ignores);
         $actions = $result['actions'];
         $indexes = [];

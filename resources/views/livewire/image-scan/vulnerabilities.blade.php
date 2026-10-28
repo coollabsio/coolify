@@ -134,6 +134,15 @@
                                         @endif
                                     </div>
                                 </div>
+                                {{-- A check only the user can unblock (registry login, daily limit) shows also on a closed row. --}}
+                                @foreach ($row['versionNotes'] as $note)
+                                    <p class="-mt-1 truncate px-3 pb-2 text-[11px] text-neutral-500 sm:pl-8.5 dark:text-fg-faint" title="{{ $note['text'] }}">
+                                        {{ $note['text'] }}
+                                        @if ($note['link'] !== null)
+                                            <a href="{{ $note['link'] }}" class="underline underline-offset-4 hover:text-neutral-950 dark:hover:text-fg" {{ wireNavigate() }}>Registry logins</a>
+                                        @endif
+                                    </p>
+                                @endforeach
                                 {{-- Height and opacity animate together (grid rows 0fr → 1fr); nothing animates on load. --}}
                                 <div id="{{ $bodyId }}"
                                     @class([

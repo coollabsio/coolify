@@ -166,18 +166,18 @@ final class SecuritySentences
     }
 
     /**
-     * The advice under a no_fix image row, until a fix exists. Null for other statuses and for builder images, whose
-     * sentence says that a builder update fixes them.
+     * The advice under a no_fix image row, until a fix exists ("this app", "this service", "this database"). Null for
+     * other statuses and for builder images, whose sentence says that a builder update fixes them.
      */
-    public static function noFixAdvice(ResourceSecurity $security): ?string
+    public static function noFixAdvice(ResourceSecurity $security, string $resourceNoun = 'this app'): ?string
     {
         if ($security->status !== SecurityStatusType::NoFix || $security->builderImage) {
             return null;
         }
 
         return $security->problemCount > 1
-            ? 'Until then, limit who can reach this app, or ignore the problems if the affected parts are not used.'
-            : 'Until then, limit who can reach this app, or ignore the problem if the affected part is not used.';
+            ? "Until then, limit who can reach {$resourceNoun}, or ignore the problems if the affected parts are not used."
+            : "Until then, limit who can reach {$resourceNoun}, or ignore the problem if the affected part is not used.";
     }
 
     /**
@@ -194,33 +194,32 @@ final class SecuritySentences
         }
 
         $registry = self::registryName((string) $scan->image_ref);
-        $found = '';
-        if (isset($counts['fixes'])) {
-            $found = ': it fixes '.max(0, (int) $counts['fixes']);
-            if (isset($counts['adds'])) {
-                $found .= ' and adds '.($counts['adds'] > 0 ? "{$counts['adds']} less serious" : 'none');
-            }
-        }
 
         switch ($action->type) {
             case SecurityActionType::PullLatest:
             case SecurityActionType::UpdateImage:
                 $entry = self::candidateEntry($scan, $action);
+                if ($entry === []) {
+                    return null;
+                }
                 $tag = (string) ($action->target ?? self::tagOf((string) $action->ref));
-                $scanned = self::scannedAt($entry['scanned_at'] ?? null);
                 $intro = $action->type === SecurityActionType::PullLatest
                     ? "{$registry} has a newer build of {$tag}."
                     : (self::major($tag) === null
                         ? "{$tag} is the newest release of this line on {$registry}."
                         : "{$tag} is the newest ".self::major($tag).".x release on {$registry}.");
 
-                return trim("{$intro} Coolify scanned it{$scanned}{$found}.");
+                return "{$intro} Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).self::candidateFindings($entry).'.';
             case SecurityActionType::ChangeBase:
                 $base = data_get($scan->candidates, 'base');
                 $entry = collect(is_array($base) && is_array($base['entries'] ?? null) ? $base['entries'] : [])
-                    ->first(fn ($entry): bool => is_array($entry) && ($entry['kind'] ?? null) === 'line' && ($entry['better'] ?? false) === true);
+                    ->first(fn ($entry): bool => is_array($entry) && ($entry['kind'] ?? null) === 'line' && ($entry['better'] ?? false) === true
+                        && (string) ($entry['ref'] ?? '') !== '' && self::tagOf((string) $entry['ref']) === self::tagOf((string) $action->target));
+                if (! is_array($entry)) {
+                    return null;
+                }
 
-                return "{$action->target} is the newest release of your base image. Coolify scanned it".self::scannedAt(data_get($entry, 'scanned_at')).'.';
+                return "{$action->target} is the newest release of your base image. Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).'.';
             case SecurityActionType::UpgradePackage:
             case SecurityActionType::UpgradeInDockerfile:
                 $fixedIn = $counts['fixed_in'] ?? null;
@@ -306,6 +305,26 @@ final class SecuritySentences
         $what = $security->problemCount > 1 ? 'them' : 'this';
 
         return 'Coolify checked '.self::registryName((string) $scan->image_ref).self::scannedAt($checkedAt).". No newer {$release} fixes {$what} yet.";
+    }
+
+    /**
+     * ": it fixes 2 serious problems and adds none" from a stored candidate entry, with only the clauses it has data
+     * for. Both count relevant critical, high, and medium findings.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private static function candidateFindings(array $entry): string
+    {
+        $parts = [];
+        $fixes = is_array($entry['fixes'] ?? null) ? (int) array_sum(array_map('intval', $entry['fixes'])) : 0;
+        if ($fixes > 0) {
+            $parts[] = 'fixes '.($fixes === 1 ? '1 serious problem' : "{$fixes} serious problems");
+        }
+        if (is_int($entry['added'] ?? null)) {
+            $parts[] = 'adds '.($entry['added'] > 0 ? "{$entry['added']} less serious" : 'none');
+        }
+
+        return $parts === [] ? '' : ': it '.implode(' and ', $parts);
     }
 
     /**

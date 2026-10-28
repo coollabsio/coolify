@@ -3,6 +3,7 @@
 namespace App\Services\ImageScan;
 
 use App\Actions\ImageScan\RefreshCandidates;
+use App\Actions\ImageScan\ScanImage;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
@@ -14,6 +15,7 @@ use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\User;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -28,7 +30,7 @@ use InvalidArgumentException;
  * @phpstan-type ButtonData array{label: string, title: string, submit: string, actions: list<string>, warning: string}
  * @phpstan-type ActionData array{key: string, type: string, sentence: string, copy: ?string, button: ?ButtonData}
  * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, signal: ?string, package: string, version: string}
- * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, problem: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, filter: ?string}
+ * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, filter: ?string}
  */
 final class SecurityCard
 {
@@ -54,13 +56,15 @@ final class SecurityCard
      * @param  Collection<int, Model>  $owners  The applications and databases of a service, else the resource.
      * @param  Collection<int, ImageScan>  $scans  The current scans of the owners, with their `resource` set.
      * @param  array<string, int>  $findingCounts  The findings that are not ignored, by scan UUID.
-     * @return array{status: string, badge: ?string, badgeType: string, header: ?string, needsUpdate: int, total: int, single: bool, rows: list<ImageRow>}
+     * @param  array<string, ResourceSecurity>  $imageStatuses  `SecurityStatus::forScan()` of the scans the caller computed, by scan UUID.
+     * @param  (Closure(Model): IgnoreMatcher)|null  $matcherFor  The ignore matcher of an owner, when the caller keeps them.
+     * @return array{status: string, badge: ?string, badgeType: string, header: ?string, total: int, single: bool, rows: list<ImageRow>}
      */
-    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = []): array
+    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $matcherFor = null): array
     {
         $status = $security->status;
-        $rows = self::images($resource, $security, $owners, $scans, $user, $findingCounts);
-        $total = count($rows) + ($resource instanceof Application ? ResourceScans::uncheckedComposeImages($resource, $scans) : 0);
+        $rows = self::images($resource, $security, $owners, $scans, $user, $findingCounts, $imageStatuses, $matcherFor);
+        $total = count($rows);
         $needsUpdate = count(array_filter($rows, fn (array $row): bool => in_array($row['status'], ['update_now', 'update_available'], true)));
 
         return [
@@ -68,7 +72,6 @@ final class SecurityCard
             'badge' => SecuritySentences::badge($status),
             'badgeType' => self::badgeType($status),
             'header' => $total > 1 ? SecuritySentences::imagesNeedingUpdate($needsUpdate, $total) : null,
-            'needsUpdate' => $needsUpdate,
             'total' => $total,
             'single' => $total === 1,
             'rows' => $rows,
@@ -77,17 +80,21 @@ final class SecurityCard
 
     /**
      * One row per image the status counts: each current scan (of a service, of the applications and databases Coolify
-     * scans), and the scanned owners of a service without a current scan. Worst first; the first row with a problem
+     * scans), the scanned owners of a service without a current scan, and the images of a Compose app without a
+     * result in its current deployment (`ResourceScans::uncheckedComposeRefs()`). Worst first; the first row with a problem
      * is open, and a single image is always open. A service update that merges several images (spec 15.5) has its
      * button on the first row of the group; the other rows say which row updates them.
      *
      * @param  Collection<int, Model>  $owners
      * @param  Collection<int, ImageScan>  $scans
      * @param  array<string, int>  $findingCounts
+     * @param  array<string, ResourceSecurity>  $imageStatuses
+     * @param  (Closure(Model): IgnoreMatcher)|null  $matcherFor
      * @return list<ImageRow>
      */
-    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = []): array
+    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $matcherFor = null): array
     {
+        $matcherFor ??= fn (Model $owner): IgnoreMatcher => IgnoreMatcher::forResource($owner);
         $isService = $resource instanceof Service;
         $statusOwners = $isService ? $owners->filter(fn (Model $owner): bool => ResourceScans::isScanTarget($owner))->values() : $owners;
         $isStatusOwner = fn (?Model $owner): bool => $owner instanceof Model && $statusOwners->contains(fn (Model $candidate): bool => $candidate->is($owner));
@@ -97,22 +104,34 @@ final class SecurityCard
             $digests[self::ownerKey($scan->resource)] ??= SecuritySentences::shortDigest($scan->repo_digest ?: $scan->image_id);
         }
 
+        $notChecked = new ResourceSecurity(SecurityStatusType::NotChecked, SecurityStatus::NOT_SCANNED);
+        $composeServices = ResourceScans::composeServiceNames($resource);
         $entries = [];
         foreach ($scans as $scan) {
             if ($isService && ! $isStatusOwner($scan->resource)) {
                 continue;
             }
-            $entries[] = ['scan' => $scan, 'owner' => $scan->resource, 'security' => SecurityStatus::forScan($scan)];
+            $entries[] = [
+                'key' => 'scan-'.$scan->uuid,
+                'scan' => $scan,
+                'owner' => $scan->resource,
+                'ref' => (string) $scan->image_ref,
+                'name' => $isService ? self::ownerName($scan->resource) : ($composeServices[ScanImage::imageName((string) $scan->image_ref)] ?? null),
+                'security' => $imageStatuses[(string) $scan->uuid] ?? SecurityStatus::forScan($scan, $matcherFor($scan->resource)),
+            ];
         }
         foreach ($statusOwners as $owner) {
-            if (! $scans->contains(fn (ImageScan $scan): bool => $scan->resource instanceof Model && $scan->resource->is($owner))) {
-                $entries[] = ['scan' => null, 'owner' => $owner, 'security' => new ResourceSecurity(SecurityStatusType::NotChecked, SecurityStatus::NOT_SCANNED)];
+            if ($isService && ! $scans->contains(fn (ImageScan $scan): bool => $scan->resource instanceof Model && $scan->resource->is($owner))) {
+                $entries[] = ['key' => 'owner-'.$owner->getAttribute('uuid'), 'scan' => null, 'owner' => $owner, 'ref' => trim((string) $owner->getAttribute('image')), 'name' => self::ownerName($owner), 'security' => $notChecked];
             }
+        }
+        foreach (ResourceScans::uncheckedComposeRefs($resource, $scans) as $image) {
+            $entries[] = ['key' => 'compose-'.md5($image['name'] ?? $image['ref']), 'scan' => null, 'owner' => $resource, 'ref' => $image['ref'], 'name' => $image['name'], 'security' => $notChecked];
         }
 
         $rank = array_flip(self::ROW_ORDER);
-        usort($entries, fn (array $a, array $b): int => [$rank[$a['security']->status->value], self::rowName($a, $isService), self::rowRef($a)]
-            <=> [$rank[$b['security']->status->value], self::rowName($b, $isService), self::rowRef($b)]);
+        usort($entries, fn (array $a, array $b): int => [$rank[$a['security']->status->value], mb_strtolower((string) $a['name']), $a['ref']]
+            <=> [$rank[$b['security']->status->value], mb_strtolower((string) $b['name']), $b['ref']]);
 
         $merged = array_values(array_filter($security->actions, fn (SecurityAction $action): bool => $action->parts !== []));
         $mergedStats = [];
@@ -123,6 +142,11 @@ final class SecurityCard
         }
         $groupFirst = [];
         $single = count($entries) === 1;
+        $noun = match (true) {
+            $resource instanceof Application => 'this app',
+            $resource instanceof Service => 'this service',
+            default => 'this database',
+        };
         $opened = false;
         $rows = [];
         foreach ($entries as $entry) {
@@ -132,8 +156,8 @@ final class SecurityCard
             $scan = $entry['scan'];
             $owner = $entry['owner'];
             $status = $imageSecurity->status;
-            $ref = self::rowRef($entry);
-            $name = $isService ? self::ownerName($owner) : null;
+            $ref = $entry['ref'];
+            $name = $entry['name'];
             $showsActions = in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true);
 
             $actions = [];
@@ -166,17 +190,16 @@ final class SecurityCard
             $digestFull = $scan === null ? null : ($scan->repo_digest ?: $scan->image_id);
 
             $rows[] = [
-                'key' => $scan !== null ? 'scan-'.$scan->uuid : 'owner-'.$owner->getAttribute('uuid'),
+                'key' => $entry['key'],
                 'name' => $name,
                 'ref' => $ref,
                 'status' => $status->value,
                 'badge' => SecuritySentences::badge($status),
                 'badgeType' => self::badgeType($status),
                 'open' => $open,
-                'problem' => $isProblem,
                 'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref),
                 'attackNote' => SecuritySentences::attackNote($imageSecurity),
-                'advice' => SecuritySentences::noFixAdvice($imageSecurity),
+                'advice' => SecuritySentences::noFixAdvice($imageSecurity, $noun),
                 'lines' => [...SecuritySentences::lines($imageSecurity), ...self::eolLine($imageSecurity)],
                 'primary' => $primary,
                 'mergedWith' => $mergedWith,
@@ -186,7 +209,7 @@ final class SecurityCard
                 'whyMore' => $showsActions ? SecuritySentences::whyMore($imageSecurity->moreFixed) : '',
                 'provenance' => $scan === null || ! in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable, SecurityStatusType::NoFix], true)
                     ? null
-                    : SecuritySentences::provenance($scan, $primaryAction, $imageSecurity, self::provenanceCounts($scan, $primaryAction, $imageSecurity)),
+                    : SecuritySentences::provenance($scan, $primaryAction, $imageSecurity, self::provenanceCounts($scan, $primaryAction)),
                 'others' => array_slice($others, 0, self::OTHER_ACTIONS_LIMIT),
                 'moreActions' => max(0, count($others) - self::OTHER_ACTIONS_LIMIT),
                 'versionNotes' => $scan === null ? [] : self::versionCheckNotes(collect([$scan]), $user),
@@ -253,70 +276,27 @@ final class SecurityCard
     }
 
     /**
-     * What the provenance line counts: the relevant findings the action fixes, the less serious ones the candidate
-     * adds (from the stored candidate scan; unknown for candidates checked before Coolify stored the counts), and the
-     * first fixed version of a package upgrade.
+     * The first fixed version of a package upgrade, for the provenance line: the highest fixed version of the findings
+     * of that package the action fixes.
      *
-     * @return array{fixes?: ?int, adds?: ?int, fixed_in?: ?string}
+     * @return array{fixed_in?: ?string}
      */
-    private static function provenanceCounts(ImageScan $scan, ?SecurityAction $action, ResourceSecurity $security): array
+    private static function provenanceCounts(ImageScan $scan, ?SecurityAction $action): array
     {
-        if ($action === null) {
+        if ($action === null || ! in_array($action->type, [SecurityActionType::UpgradePackage, SecurityActionType::UpgradeInDockerfile], true)) {
             return [];
         }
 
-        if (in_array($action->type, [SecurityActionType::UpgradePackage, SecurityActionType::UpgradeInDockerfile], true)) {
-            $ids = array_flip(array_map('mb_strtolower', $action->fixedIds));
-            $fixedIn = null;
-            foreach (ResourceScans::findings($scan) as $finding) {
-                if ($finding->package === $action->target && isset($ids[mb_strtolower($finding->id)]) && filled($finding->fixedIn)
-                    && ($fixedIn === null || version_compare(ltrim((string) $finding->fixedIn, 'vV'), ltrim($fixedIn, 'vV'), '>'))) {
-                    $fixedIn = (string) $finding->fixedIn;
-                }
-            }
-
-            return ['fixed_in' => $fixedIn];
-        }
-
-        if (! in_array($action->type, [SecurityActionType::UpdateImage, SecurityActionType::PullLatest], true)) {
-            return [];
-        }
-
-        $kind = $action->type === SecurityActionType::PullLatest ? 'same_tag' : 'line';
-        $entry = collect($scan->updateCandidates())->first(fn (array $entry): bool => ($entry['kind'] ?? null) === $kind && ($entry['ref'] ?? null) === $action->ref) ?? [];
-        $stats = (array) data_get($security->facts, 'action_stats.0', []);
-        // The relevant findings the action fixes now, so the line agrees with the sentence after ignores changed.
-        $fixes = max(0, (int) ($stats['relevant'] ?? 0) - (int) ($stats['eol'] ?? 0));
-        if (! is_array($entry['left'] ?? null)) {
-            return ['fixes' => $fixes, 'adds' => null];
-        }
-
-        $owner = $scan->resource;
-        $ignores = IgnoreMatcher::forResource($owner);
-        $current = [];
+        $ids = array_flip(array_map('mb_strtolower', $action->fixedIds));
+        $fixedIn = null;
         foreach (ResourceScans::findings($scan) as $finding) {
-            if (in_array(strtolower($finding->severity), ['critical', 'high', 'medium'], true) && SecurityRules::isRelevant($finding, $ignores)) {
-                $current[mb_strtolower($finding->id)] = true;
+            if ($finding->package === $action->target && isset($ids[mb_strtolower($finding->id)]) && filled($finding->fixedIn)
+                && ($fixedIn === null || version_compare(ltrim((string) $finding->fixedIn, 'vV'), ltrim($fixedIn, 'vV'), '>'))) {
+                $fixedIn = (string) $finding->fixedIn;
             }
         }
 
-        return ['fixes' => $fixes, 'adds' => max(0, (int) array_sum($entry['left']) - (count($current) - $fixes))];
-    }
-
-    /**
-     * @param  array{scan: ?ImageScan, owner: Model, security: ResourceSecurity}  $entry
-     */
-    private static function rowRef(array $entry): string
-    {
-        return $entry['scan'] !== null ? (string) $entry['scan']->image_ref : trim((string) $entry['owner']->getAttribute('image'));
-    }
-
-    /**
-     * @param  array{scan: ?ImageScan, owner: Model, security: ResourceSecurity}  $entry
-     */
-    private static function rowName(array $entry, bool $isService): string
-    {
-        return $isService ? mb_strtolower(self::ownerName($entry['owner'])) : '';
+        return ['fixed_in' => $fixedIn];
     }
 
     private static function ownerKey(?Model $owner): string

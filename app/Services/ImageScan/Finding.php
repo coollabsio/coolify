@@ -72,7 +72,7 @@ final readonly class Finding
         $severity = (string) ($data['severity'] ?? 'unknown');
         $package = (string) ($data['package'] ?? '');
         $version = (string) ($data['version'] ?? '');
-        $title = ScannerText::tidyTitle(trim((string) ($data['title'] ?? '')));
+        $title = ScannerText::storedTitle((string) ($data['title'] ?? ''), $package, $version, $severity);
         $displayId = (string) ($data['displayId'] ?? '');
 
         return new self(
@@ -91,7 +91,7 @@ final readonly class Finding
             summary: (string) ($data['summary'] ?? ''),
             layer: (string) ($data['layer'] ?? 'app'),
             cvssScore: is_numeric($data['cvssScore'] ?? null) ? (float) $data['cvssScore'] : null,
-            title: $title !== '' ? $title : ScannerText::fallbackTitle($package, $version, $severity),
+            title: $title,
             displayId: $displayId !== '' ? $displayId : self::displayIdFor($id, $aliases),
             namespace: (string) ($data['namespace'] ?? ''),
             matchType: (string) ($data['matchType'] ?? ''),

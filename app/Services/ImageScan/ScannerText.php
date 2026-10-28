@@ -69,6 +69,22 @@ class ScannerText
     }
 
     /**
+     * A stored title for display: the fallback title while the stored one is a package changelog entry (until a
+     * rescan parses it again), else `tidyTitle()`.
+     */
+    public static function storedTitle(string $title, string $package, string $version, string $severity): string
+    {
+        $title = trim($title);
+        if ($title === '' || self::looksLikeChangelog($title)) {
+            return self::fallbackTitle($package, $version, $severity);
+        }
+
+        $tidy = self::tidyTitle($title);
+
+        return $tidy !== '' ? $tidy : self::fallbackTitle($package, $version, $severity);
+    }
+
+    /**
      * Removes the label some advisories start with ("Issue summary:", "Summary:", "Description:", "Vulnerability:"),
      * also from titles stored before the parser removed it.
      */

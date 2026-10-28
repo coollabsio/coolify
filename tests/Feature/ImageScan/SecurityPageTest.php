@@ -752,6 +752,7 @@ describe('image list', function () {
             'candidates' => securityPageCandidates([[
                 ...securityPageEntry('postgres:16-alpine', 'same_tag', $ids),
                 'fixes' => ['critical' => 2, 'high' => 0, 'medium' => 0],
+                'added' => 0,
                 'left' => ['critical' => 0, 'high' => 0, 'medium' => 0],
                 'scanned_at' => now()->subHours(2)->toIso8601String(),
             ]]),
@@ -761,7 +762,7 @@ describe('image list', function () {
             ->assertSee('Security update')
             ->assertSeeText('postgres:16-alpine has a newer build that fixes 2 critical problems.')
             ->assertSee('No known attacks on these problems.')
-            ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 and adds none.')
+            ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes 2 serious problems and adds none.')
             ->assertSee('Pull latest and restart')
             ->assertSee('3f1a2b4c5d6e')
             ->assertSee('3 known issues')
@@ -793,6 +794,62 @@ describe('image list', function () {
             ->assertSeeText('postgres:16-alpine needs no action.');
     });
 
+    it('shows every image of a Compose app, also the one without a result', function () {
+        $application = securityPageApplication([
+            'build_pack' => 'dockercompose', 'docker_registry_image_name' => null,
+            'docker_compose_raw' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:1.27'], 'cache' => ['image' => 'redis:7']]], 10, 2),
+        ]);
+        $deployment = securityPageDeployment($application);
+        securityPageScan($application, 'nginx:1.27', [securityPageFinding('CVE-2026-0001')], [
+            'deployment_queue_id' => $deployment->id,
+            'candidates' => securityPageCandidates([securityPageEntry('nginx:1.28', 'line', ['CVE-2026-0001'])]),
+        ]);
+        $this->actingAs($this->admin);
+
+        $card = SecurityCard::for($application, SecurityStatus::forResource($application), ResourceScans::owners($application), ResourceScans::current($application), $this->admin);
+
+        expect($card['header'])->toBe('1 of 2 images needs an update')
+            ->and(array_column($card['rows'], 'name'))->toBe(['web', 'cache'])
+            ->and(array_column($card['rows'], 'status'))->toBe(['update_now', 'not_checked'])
+            ->and($card['rows'][1]['key'])->toBe('compose-'.md5('cache'));
+
+        securityPage($this->admin, $application, 'application')
+            ->assertSee('Check needed')
+            ->assertSee('1 of 2 images needs an update')
+            ->assertSeeText('redis:7 has not been checked yet.')
+            ->assertSee('Not checked')
+            ->assertSee('Scan now');
+    });
+
+    it('says how many less serious problems a newer version adds, from its stored scan', function () {
+        $database = securityPageDatabase();
+        securityPageScan($database, 'postgres:15.0', [securityPageFinding('CVE-2025-1094')], [
+            'candidates' => securityPageCandidates([[
+                ...securityPageEntry('postgres:15.13', 'line', ['CVE-2025-1094']),
+                'fixes' => ['critical' => 0, 'high' => 1, 'medium' => 0], 'added' => 3,
+                'scanned_at' => now()->subHour()->toIso8601String(),
+            ]]),
+        ]);
+        $this->actingAs($this->admin);
+
+        $card = SecurityCard::for($database, SecurityStatus::forResource($database), ResourceScans::owners($database), ResourceScans::current($database), $this->admin);
+
+        expect($card['rows'][0]['provenance'])
+            ->toBe('15.13 is the newest 15.x release on Docker Hub. Coolify scanned it 1 hour ago: it fixes 1 serious problem and adds 3 less serious.');
+    });
+
+    it('links the Settings section only on the page of an application', function () {
+        $application = securityPageApplication();
+        securityPageScan($application, 'nginx:1.27', [securityPageFinding('CVE-2026-0001')]);
+        $database = securityPageDatabase();
+        securityPageScan($database, 'postgres:15.0', [securityPageFinding('CVE-2025-1094')]);
+
+        securityPage($this->admin, $application, 'application')->assertSeeHtml("id: 'image-scan-settings-section'");
+        securityPage($this->admin, $database, 'database')
+            ->assertSee('Packages and SBOM')
+            ->assertDontSeeHtml("id: 'image-scan-settings-section'");
+    });
+
     it('filters the findings to the image of a row', function () {
         [$service] = securityPageThreeImageService();
 
@@ -805,7 +862,7 @@ describe('image list', function () {
         $page->call('showImageFindings', 'not-an-image:1.0')->assertSet('images', ['n8nio/runners:1.0']);
     });
 
-    it('cleans old stored titles: labels and changelog tokens', function () {
+    it('cleans old stored titles, and shows the fallback title for a stored changelog entry', function () {
         $database = securityPageDatabase();
         securityPageScan($database, 'postgres:15.0', [
             securityPageFinding('CVE-2025-1094', ['title' => 'Issue summary: a crafted string can inject SQL into psql']),
@@ -814,10 +871,10 @@ describe('image list', function () {
 
         securityPage($this->admin, $database, 'database')
             ->assertSee('A crafted string can inject SQL into psql')
-            ->assertSee('Fix out-of-bounds write in the Brotli decoder')
+            ->assertSee('openssl 3.0.1: high vulnerability')
             ->assertDontSee('Issue summary:')
             ->assertDontSee('[1.0.9-10.0.1]')
-            ->assertDontSee('decoder [CVE-2026-111497]');
+            ->assertDontSee('Brotli decoder');
     });
 
     it('shows no header line for a service whose images need no update', function () {
@@ -829,7 +886,7 @@ describe('image list', function () {
         securityPage($this->admin, $service, 'service')
             ->assertSee('No fix yet')
             ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. No fixed version exists yet, and Coolify checks every day.')
-            ->assertSee('Until then, limit who can reach this app, or ignore the problem if the affected part is not used.')
+            ->assertSee('Until then, limit who can reach this service, or ignore the problem if the affected part is not used.')
             ->assertSee('Not fixed yet')
             ->assertDontSee('images need an update')
             ->assertDontSee('Attackers are using this.');

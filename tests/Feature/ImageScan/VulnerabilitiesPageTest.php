@@ -672,6 +672,38 @@ describe('packages', function () {
     });
 });
 
+describe('packages of one image', function () {
+    it('filters the packages of a service to one image, from the filter and from an image row', function () {
+        $service = vulnerabilitiesService();
+        foreach (['web' => ['nginx:1.27', 'openssl'], 'db' => ['postgres:16', 'libpq']] as $name => [$image, $package]) {
+            $owner = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => $name, 'image' => $image]);
+            $sbom = ImageSbom::factory()->create(['server_id' => $this->server->id, 'packages' => [
+                ['id' => 'p-'.$name, 'name' => $package, 'version' => '1.0', 'type' => 'apk', 'licenses' => [], 'purl' => '', 'layerId' => ''],
+            ]]);
+            vulnerabilitiesScan($owner, [], ['image_ref' => $image, 'builds_image' => false, 'image_sbom_id' => $sbom->id]);
+        }
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(Packages::class, ['resourceType' => 'service', 'resourceUuid' => $service->uuid])
+            ->assertSee('openssl')
+            ->assertSee('libpq')
+            ->call('toggleImage', 'postgres:16')
+            ->assertSet('images', ['postgres:16'])
+            ->assertSee('libpq')
+            ->assertDontSee('openssl')
+            ->dispatch('security-show-image-packages', image: 'nginx:1.27')
+            ->assertSet('images', ['nginx:1.27'])
+            ->assertSee('openssl')
+            ->assertDontSee('libpq')
+            ->dispatch('security-show-image-packages', image: '')
+            ->assertSet('images', [])
+            ->call('showImage', 'not-an-image:1')
+            ->assertSet('images', [])
+            ->assertSee('openssl');
+    });
+});
+
 describe('sidebar', function () {
     it('names the item Security and shows no count', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
