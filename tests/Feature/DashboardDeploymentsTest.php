@@ -178,7 +178,16 @@ it('only includes deployments of applications owned by the current team', functi
 });
 
 it('does not load deployment payload columns when the dashboard list polls', function () {
-    createDashboardDeployment(['logs' => '[{"output":"large deployment log"}]']);
+    createDashboardDeployment([
+        'logs' => json_encode([['output' => str_repeat('large deployment log ', 20000)]]),
+        'configuration_snapshot' => ['docker_compose_raw' => str_repeat('x', 100000)],
+        'configuration_diff' => ['fqdn' => ['old' => null, 'new' => 'https://example.com']],
+    ]);
+    createDashboardDeployment([
+        'application_name' => 'Dashboard App',
+        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        'logs' => json_encode([['output' => str_repeat('large deployment log ', 20000)]]),
+    ]);
 
     $deploymentQueries = [];
     DB::listen(function ($query) use (&$deploymentQueries) {
@@ -190,10 +199,16 @@ it('does not load deployment payload columns when the dashboard list polls', fun
     Livewire::test(ActiveDeployments::class)
         ->assertSee('Dashboard App')
         ->call('refreshDeployments')
-        ->assertSee('Dashboard App');
+        ->assertSee('Dashboard App')
+        ->call('$refresh')
+        ->assertSee('Running or queued right now')
+        ->assertSee('Recent deployments');
 
     expect($deploymentQueries)->not->toBeEmpty();
     foreach ($deploymentQueries as $sql) {
-        expect($sql)->not->toMatch('/select\s+("?\w+"?\.)?\*/i')->not->toContain('logs');
+        expect($sql)->not->toMatch('/select\s+("?\w+"?\.)?\*/i')
+            ->not->toContain('logs')
+            ->not->toContain('configuration_snapshot')
+            ->not->toContain('configuration_diff');
     }
 });
