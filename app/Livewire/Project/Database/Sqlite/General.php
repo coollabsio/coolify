@@ -29,6 +29,8 @@ class General extends Component
 
     public bool $isLogDrainEnabled = false;
 
+    public bool $isPasswordHiddenForMember = false;
+
     public function mount()
     {
         try {
@@ -43,6 +45,8 @@ class General extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     protected function rules(): array
@@ -83,11 +87,12 @@ class General extends Component
             $this->database->save();
             $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->sqliteDatabases = $this->database->sqlite_databases;
             $this->image = $this->database->image;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
         }
     }

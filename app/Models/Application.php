@@ -259,12 +259,31 @@ class Application extends BaseModel
     protected $appends = ['server_status'];
 
     /**
+     * Free-form commands and configuration that can embed credentials. Only users who can
+     * update the application and `read:sensitive` tokens may read them.
+     */
+    public const COMMAND_AND_CONFIGURATION_ATTRIBUTES = [
+        'install_command',
+        'build_command',
+        'start_command',
+        'pre_deployment_command',
+        'post_deployment_command',
+        'health_check_command',
+        'health_check_response_text',
+        'custom_docker_run_options',
+        'docker_compose_custom_start_command',
+        'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability. Internal serializers (deployment
      * job, compose generation) must makeVisible explicitly before toArray().
      */
     protected $hidden = [
+        ...self::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
         'http_basic_auth_password',
         'git_https_password',
         'manual_webhook_secret_github',

@@ -169,10 +169,10 @@ class General extends Component
             $this->database->save();
             $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->postgresUser = $this->database->postgres_user;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->postgresPassword = $canSeeCredentials ? $this->database->postgres_password : '';
             $this->postgresDb = $this->database->postgres_db;
             $this->postgresInitdbArgs = $this->database->postgres_initdb_args;
@@ -185,7 +185,7 @@ class General extends Component
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 

@@ -146,6 +146,7 @@ class General extends Component
             $this->database->save();
             $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->image = $this->database->image;
@@ -154,10 +155,9 @@ class General extends Component
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
             $this->redisVersion = $this->database->getRedisVersion();
             $this->redisUsername = $this->database->redis_username;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->redisConf = $canSeeCredentials ? $this->database->redis_conf : null;
             $this->isPasswordLocked = $this->database->isCredentialLocked();
             $this->redisPassword = $canSeeCredentials && ! $this->isPasswordLocked ? $this->database->redis_password : null;
