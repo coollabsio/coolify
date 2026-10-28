@@ -8,6 +8,7 @@ use App\Models\Team;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -78,11 +79,12 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getServers(): Collection
     {
-        $allServers = Server::with(['settings', 'cloudProviderToken']);
+        $relations = ['settings' => fn (HasOne $query) => $query->withoutPatchCheckResult(), 'cloudProviderToken'];
+        $allServers = Server::with($relations);
 
         if (isCloud()) {
             $servers = $allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
-            $own = Team::find(0)->servers()->with(['settings', 'cloudProviderToken'])->get();
+            $own = Team::find(0)->servers()->with($relations)->get();
 
             return $servers->merge($own)->unique('id')->values();
         } else {
