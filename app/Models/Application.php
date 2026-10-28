@@ -1314,6 +1314,7 @@ class Application extends BaseModel
         ?string $search = null,
         array $filters = [],
         string $sort = 'newest',
+        array $columns = ['*'],
     ): array {
         $deployments = ApplicationDeploymentQueue::query()
             ->where('application_id', $this->id);
@@ -1406,7 +1407,7 @@ class Application extends BaseModel
             ->orderBy('id', $sort === 'oldest' ? 'asc' : 'desc')
             ->skip($skip)
             ->take($take)
-            ->get();
+            ->get($columns);
 
         return [
             'count' => $count,
