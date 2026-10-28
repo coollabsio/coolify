@@ -5,7 +5,7 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.5.1',
+        'version' => env('COOLIFY_VERSION') ?: '4.5.2',
         'helper_version' => '1.0.19',
         'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
