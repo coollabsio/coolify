@@ -116,7 +116,7 @@ function mcpOpsSeedTeam(Team $team): array
     return compact('server', 'destination', 'project', 'environment', 'application', 'database', 'service', 'serviceApplication', 'serviceDatabase', 'volume', 's3');
 }
 
-function mcpOpsToken(User $user, array $abilities = ['read', 'write']): string
+function mcpOpsToken(User $user, array $abilities = ['read', 'write', 'delete']): string
 {
     return $user->createToken('mcp-ops', $abilities)->plainTextToken;
 }
@@ -268,7 +268,7 @@ test('deploy by tag rejects read-only and member tokens', function () {
 // ---------------------------------------------------------------- manage_scheduled_task
 
 test('manage_scheduled_task creates, updates, executes, and deletes tasks of the token team', function (string $resource, string $key) {
-    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy']);
+    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy', 'delete']);
     $owner = $this->own[$key];
 
     $created = mcpOpsCall($token, 'manage_scheduled_task', ['action' => 'create', 'resource' => $resource, 'uuid' => $owner->uuid, 'data' => ['name' => 'cleanup', 'command' => 'echo SECRETCMD', 'frequency' => 'daily']]);
@@ -318,7 +318,7 @@ test('manage_scheduled_task cannot reach tasks or resources of another team', fu
 
 test('manage_scheduled_task needs confirm for delete and execute and rejects read-only tokens', function () {
     $task = ScheduledTask::factory()->create(['team_id' => $this->team->id, 'application_id' => $this->own['application']->id]);
-    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy']);
+    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy', 'delete']);
 
     foreach (['delete', 'execute'] as $action) {
         $response = mcpOpsCall($token, 'manage_scheduled_task', ['action' => $action, 'resource' => 'application', 'uuid' => $this->own['application']->uuid, 'task_uuid' => $task->uuid]);
@@ -339,7 +339,7 @@ test('manage_scheduled_task needs confirm for delete and execute and rejects rea
 // ---------------------------------------------------------------- manage_backup
 
 test('manage_backup creates, updates, runs, and deletes a backup schedule of the token team', function () {
-    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy']);
+    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy', 'delete']);
     $database = $this->own['database'];
 
     $created = mcpOpsCall($token, 'manage_backup', ['action' => 'create', 'uuid' => $database->uuid, 'data' => ['frequency' => 'daily', 'save_s3' => true, 's3_storage_uuid' => $this->own['s3']->uuid]]);
@@ -452,7 +452,7 @@ test('manage_storage creates, updates, and deletes storages of the token team', 
 });
 
 test('manage_storage sets, runs, and removes a volume backup without returning S3 secrets', function () {
-    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy']);
+    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy', 'delete']);
     $args = ['resource' => 'application', 'uuid' => $this->own['application']->uuid, 'storage_uuid' => $this->own['volume']->uuid];
 
     $set = mcpOpsCall($token, 'manage_storage', [...$args, 'action' => 'set_backup', 'data' => ['frequency' => 'daily', 'save_s3' => true, 's3_storage_uuid' => $this->own['s3']->uuid]]);
@@ -517,7 +517,7 @@ test('manage_storage cannot reach storages of another team', function (string $a
 test('manage_storage needs confirm for delete, remove_backup, and run_backup and rejects read-only tokens', function () {
     $this->own['volume']->scheduledBackups()->create(['team_id' => $this->team->id, 'frequency' => 'daily']);
     $args = ['resource' => 'application', 'uuid' => $this->own['application']->uuid, 'storage_uuid' => $this->own['volume']->uuid];
-    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy']);
+    $token = mcpOpsToken($this->user, ['read', 'write', 'deploy', 'delete']);
 
     foreach (['delete', 'remove_backup', 'run_backup'] as $action) {
         $response = mcpOpsCall($token, 'manage_storage', [...$args, 'action' => $action]);

@@ -11,13 +11,13 @@ class ManageService extends RestActionTool
 {
     protected string $name = 'manage_service';
 
-    protected string $description = 'Update, delete, clone, or move a service of the authenticated team, update one of its applications or databases, or import a backup into a service database. Requires write ability; delete and import_database also need deploy, and so do instant_deploy, changing is_public of a service database, and clone_volumes. Same validation and permissions as the REST API.';
+    protected string $description = 'Update, delete, clone, or move a service of the authenticated team, update one of its applications or databases, or import a backup into a service database. Requires write ability, and delete ability for delete; import_database also needs deploy, and so do instant_deploy, changing is_public of a service database, and clone_volumes. Same validation and permissions as the REST API.';
 
     protected function actions(): array
     {
         return [
             'update' => ['method' => 'PATCH', 'path' => 'services/{uuid}', 'ability' => 'write', 'description' => 'update the service (data: name, description, docker_compose_raw base64, connect_to_docker_network, urls, force_domain_override, is_container_label_escape_enabled, include_coolify_default_variables, redact_all_env_values_in_logs, instant_deploy; instant_deploy needs deploy ability)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'services/{uuid}', 'ability' => 'deploy', 'confirm' => true, 'description' => 'delete the service (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
+            'delete' => ['method' => 'DELETE', 'path' => 'services/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete the service (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
             'clone' => ['method' => 'POST', 'path' => 'services/{uuid}/clone', 'ability' => 'write', 'confirm' => true, 'description' => 'clone the service to a destination of the team (data: destination_uuid, name, clone_volumes; clone_volumes stops the source service while volumes are copied and needs deploy ability)'],
             'move' => ['method' => 'POST', 'path' => 'services/{uuid}/move', 'ability' => 'write', 'confirm' => true, 'description' => 'move the service to another environment of the team (data: environment_uuid)'],
             'update_application' => ['method' => 'PATCH', 'path' => 'services/{uuid}/applications/{app_uuid}', 'ability' => 'write', 'description' => 'update a service application (data: url, redirect, noindex_domains, human_name, description, image, exclude_from_status, is_log_drain_enabled, is_gzip_enabled, traefik_certificate_resolver, is_stripprefix_enabled, is_force_https_enabled, max_restart_count)'],

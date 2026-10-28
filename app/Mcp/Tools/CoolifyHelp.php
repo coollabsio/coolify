@@ -157,7 +157,7 @@ class CoolifyHelp extends Tool
      */
     private function visibleTools(): array
     {
-        return collect(CoolifyServer::TOOLS)
+        return collect(CoolifyServer::toolsForCurrentActor())
             ->map(fn (string $class): Tool => app($class))
             ->filter(fn (Tool $tool): bool => $tool->eligibleForRegistration())
             ->mapWithKeys(fn (Tool $tool): array => [$tool->name() => [

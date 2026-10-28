@@ -2,8 +2,11 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\Environment;
+use App\Models\Project;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class EnvironmentPolicy
 {
@@ -20,17 +23,17 @@ class EnvironmentPolicy
      */
     public function view(User $user, Environment $environment): bool
     {
-        $teamId = $this->getTeamId($environment);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        return app(AccessResolver::class)->canOpen($user, $environment);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create environments, in the project when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Project $project = null): bool
     {
-        return $user->isAdmin();
+        return $project === null
+            ? app(ProjectPolicy::class)->create($user)
+            : $user->canAccess(AccessLevel::Write, $project);
     }
 
     /**
@@ -38,9 +41,7 @@ class EnvironmentPolicy
      */
     public function update(User $user, Environment $environment): bool
     {
-        $teamId = $this->getTeamId($environment);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Write, $environment);
     }
 
     /**
@@ -48,9 +49,7 @@ class EnvironmentPolicy
      */
     public function delete(User $user, Environment $environment): bool
     {
-        $teamId = $this->getTeamId($environment);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Delete, $environment);
     }
 
     /**
@@ -67,10 +66,5 @@ class EnvironmentPolicy
     public function forceDelete(User $user, Environment $environment): bool
     {
         return false;
-    }
-
-    private function getTeamId(Environment $environment): ?int
-    {
-        return $environment->project?->team_id;
     }
 }
