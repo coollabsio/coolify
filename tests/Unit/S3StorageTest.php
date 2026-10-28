@@ -3,6 +3,7 @@
 use App\Models\S3Storage;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -114,11 +115,11 @@ test('S3Storage uses path-style URLs unless the storage turns them off', functio
     ]);
 
     expect($s3Storage->filesystem())->toBe($disk)
-        ->and($s3Storage->minioClientPathOption())->toBe($mcOption);
+        ->and($s3Storage->minioClientAliasOptions())->toBe($mcOption);
 })->with([
-    'not saved yet' => [null, true, ''],
-    'path-style' => [true, true, ''],
-    'virtual-hosted-style' => [false, false, ' --path off'],
+    'not saved yet' => [null, true, ' --api S3v4'],
+    'path-style' => [true, true, ' --api S3v4'],
+    'virtual-hosted-style' => [false, false, ' --api S3v4 --path off'],
 ]);
 
 test('S3Storage detects the URL style from the endpoint host', function (?string $endpoint, bool $usesPathStyle) {
@@ -227,3 +228,48 @@ test('S3Storage testConnection rejects invalid bucket before building client', f
     'newline' => ["lab\nid"],
     'underscore' => ['lab_bucket'],
 ]);
+
+test('S3Storage retries a failed MinIO client upload and waits longer before each attempt', function () {
+    Sleep::fake();
+    $attempts = 0;
+
+    $result = S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+        if (++$attempts < 3) {
+            throw new RuntimeException('dial tcp: connect: network is unreachable', 1);
+        }
+
+        return 'uploaded';
+    });
+
+    expect($result)->toBe('uploaded')->and($attempts)->toBe(3);
+    Sleep::assertSequence([Sleep::for(10)->seconds(), Sleep::for(30)->seconds()]);
+});
+
+test('S3Storage stops retrying a MinIO client upload after three attempts', function () {
+    Sleep::fake();
+    $attempts = 0;
+
+    $upload = function () use (&$attempts) {
+        $attempts++;
+
+        throw new RuntimeException('Access Denied.', 1);
+    };
+
+    expect(fn () => S3Storage::retryMinioClientUpload($upload))->toThrow(RuntimeException::class, 'Access Denied.');
+    expect($attempts)->toBe(3);
+});
+
+test('S3Storage does not retry a MinIO client upload that timed out', function () {
+    Sleep::fake();
+    $attempts = 0;
+
+    $upload = function () use (&$attempts) {
+        $attempts++;
+
+        throw new RuntimeException('The command on the server timed out after 3600 seconds.', 124);
+    };
+
+    expect(fn () => S3Storage::retryMinioClientUpload($upload))->toThrow(RuntimeException::class, 'timed out');
+    expect($attempts)->toBe(1);
+    Sleep::assertNeverSlept();
+});

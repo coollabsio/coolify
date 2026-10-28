@@ -949,10 +949,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
-            instant_remote_process(
+            S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
                 ["docker exec backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}"],
                 $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
-            );
+            ));
 
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
@@ -970,7 +970,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function setMinioClientAlias(Server $server, string $container, S3Storage $s3, string $resolveOptions): void
     {
         $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
-            .' mc alias set'.$resolveOptions.$s3->minioClientPathOption().' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
+            .' mc alias set'.$resolveOptions.$s3->minioClientAliasOptions().' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
         $timeout = (int) config('constants.ssh.command_timeout');
 
         SshRetryHandler::retry(
