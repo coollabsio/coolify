@@ -222,6 +222,19 @@ class ApplicationsController extends Controller
         ], 422);
     }
 
+    private function sharedImageNameValidationResponse(Application $application): ?JsonResponse
+    {
+        $otherApplication = $application->otherApplicationBuildingSameImage();
+        if (! $otherApplication) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['docker_registry_image_name' => [$application->sharedImageNameMessage($otherApplication)]],
+        ], 422);
+    }
+
     private function applyApplicationSettings(Application $application, array $settings): void
     {
         if ($settings === []) {
@@ -1665,6 +1678,9 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             if (isset($isStatic)) {
@@ -1925,6 +1941,9 @@ class ApplicationsController extends Controller
             $application->source_id = $githubApp->id;
             $application->repository_project_id = $repository_project_id;
 
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
@@ -2154,6 +2173,9 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
@@ -2302,6 +2324,9 @@ class ApplicationsController extends Controller
 
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
@@ -3524,6 +3549,10 @@ class ApplicationsController extends Controller
         $applicationSettings = $this->applicationSettingsFromRequest($request);
         if ($prefixValidation = $this->containerNamePrefixValidationResponse($applicationSettings, $application->destination->server, $application)) {
             return $prefixValidation;
+        }
+        $requestedImage = (clone $application)->fill($request->only(['docker_registry_image_name', 'build_pack']));
+        if ($requestedImage->isDirty(['docker_registry_image_name', 'build_pack']) && $imageNameValidation = $this->sharedImageNameValidationResponse($requestedImage)) {
+            return $imageNameValidation;
         }
         if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
             return $internalNameValidation;
