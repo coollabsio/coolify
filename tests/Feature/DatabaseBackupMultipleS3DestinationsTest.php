@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
@@ -83,6 +84,31 @@ function fakeMultiS3Deletes(): Collection
  */
 function runMultiS3BackupJob(array $failingStorages): array
 {
+    $backup = createMultiS3Backup();
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $commands->push($command);
+
+        return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
+    });
+
+    $job = Mockery::mock(DatabaseBackupJob::class.'[upload_to_s3]', [$backup])->shouldAllowMockingProtectedMethods();
+    $job->shouldReceive('upload_to_s3')->andReturnUsing(function (S3Storage $storage) use ($failingStorages) {
+        if (in_array($storage->name, $failingStorages, true)) {
+            throw new RuntimeException('access denied');
+        }
+    });
+    $job->handle();
+
+    return [ScheduledDatabaseBackupExecution::query()->sole(), $commands];
+}
+
+/**
+ * Creates an S3-only Postgres backup schedule with the destinations "First" and "Second".
+ */
+function createMultiS3Backup(): ScheduledDatabaseBackup
+{
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
@@ -107,23 +133,8 @@ function runMultiS3BackupJob(array $failingStorages): array
         'team_id' => $team->id,
     ])->save();
     $backup->syncS3Storages([$first->id, $second->id]);
-    $commands = collect();
-    Process::fake(function ($process) use ($commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
-        $commands->push($command);
 
-        return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
-    });
-
-    $job = Mockery::mock(DatabaseBackupJob::class.'[upload_to_s3]', [$backup->fresh()])->shouldAllowMockingProtectedMethods();
-    $job->shouldReceive('upload_to_s3')->andReturnUsing(function (S3Storage $storage) use ($failingStorages) {
-        if (in_array($storage->name, $failingStorages, true)) {
-            throw new RuntimeException('access denied');
-        }
-    });
-    $job->handle();
-
-    return [ScheduledDatabaseBackupExecution::query()->sole(), $commands];
+    return $backup->fresh();
 }
 
 it('applies S3 retention to each destination separately', function () {
@@ -301,6 +312,38 @@ describe('backup job', function () {
         'failed upload' => [['First']],
     ]);
 
+    it('signs each upload with the region of its destination', function () {
+        $backup = createMultiS3Backup();
+        S3Storage::query()->update(['endpoint' => 'https://8.8.8.8']);
+        S3Storage::query()->where('name', 'First')->update(['region' => 'ru-central-1']);
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('files')->andReturn([]);
+        $sshDisk = Storage::disk('ssh-keys');
+        Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+        Storage::shouldReceive('build')->andReturn($disk);
+        $commands = collect();
+        Process::fake(function ($process) use ($commands) {
+            $commands->push(remoteProcessScript($process));
+
+            return Process::result(output: str_contains(remoteProcessScript($process), 'du -b') ? '128' : '');
+        });
+
+        (new DatabaseBackupJob($backup))->handle();
+
+        expect(ScheduledDatabaseBackupExecution::query()->sole()->s3_uploaded)->toBeTrue();
+        $regionOfBucket = [];
+        $region = null;
+        foreach ($commands as $command) {
+            if (preg_match("/-e 'MC_REGION=([^']+)'/", $command, $match)) {
+                $region = $match[1];
+            }
+            if (preg_match("#mc cp .*'temporary/([^/']+)/#", $command, $match)) {
+                $regionOfBucket[$match[1]] = $region;
+            }
+        }
+        expect($regionOfBucket)->toBe(['first-bucket' => 'ru-central-1', 'second-bucket' => 'us-east-1']);
+    });
+
     it('keeps the local file and names the failed destination when one upload fails', function () {
         [$execution, $commands] = runMultiS3BackupJob(['Second']);
 
@@ -411,7 +454,7 @@ it('requires a live S3 copy for local retention only when local backups are disa
     }
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push(is_array($process->command) ? implode(' ', $process->command) : $process->command);
+        $commands->push(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process));
 
         return Process::result();
     });

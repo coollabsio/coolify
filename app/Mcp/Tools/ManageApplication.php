@@ -11,17 +11,17 @@ class ManageApplication extends RestActionTool
 {
     protected string $name = 'manage_application';
 
-    protected string $description = 'Update, delete, clone, or move an application of the authenticated team, or add or remove an additional server destination. Requires write ability; delete, instant_deploy, manual webhook secrets, and clone_volumes also need deploy. Same validation and permissions as the REST API.';
+    protected string $description = 'Update, delete, clone, or move an application of the authenticated team, or add or remove an additional server destination. Requires write ability, and delete ability for delete; instant_deploy, manual webhook secrets, and clone_volumes also need deploy. Same validation and permissions as the REST API.';
 
     protected function actions(): array
     {
         return [
-            'update' => ['method' => 'PATCH', 'path' => 'applications/{uuid}', 'ability' => 'write', 'description' => 'update application settings (data: same fields as the REST update, e.g. name, domains, git_branch, ports_exposes, build_command; instant_deploy and manual_webhook_secret_* need deploy ability)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}', 'ability' => 'deploy', 'confirm' => true, 'description' => 'delete the application and its containers (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
+            'update' => ['method' => 'PATCH', 'path' => 'applications/{uuid}', 'ability' => 'write', 'description' => 'update application settings (data: same fields as the REST update, e.g. name, domains, git_branch, ports_exposes, build_command, is_container_label_readonly_enabled, include_coolify_default_variables; instant_deploy and manual_webhook_secret_* need deploy ability)'],
+            'delete' => ['method' => 'DELETE', 'path' => 'applications/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete the application and its containers (data: delete_volumes, delete_connected_networks, delete_configurations, docker_cleanup)'],
             'clone' => ['method' => 'POST', 'path' => 'applications/{uuid}/clone', 'ability' => 'write', 'description' => 'clone the application to a destination of the team (data: destination_uuid, name, clone_volumes; clone_volumes needs deploy ability)'],
             'move' => ['method' => 'POST', 'path' => 'applications/{uuid}/move', 'ability' => 'write', 'confirm' => true, 'description' => 'move the application to another environment of the team (data: environment_uuid)'],
             'add_server' => ['method' => 'POST', 'path' => 'applications/{uuid}/destinations', 'ability' => 'write', 'description' => 'attach an additional destination on another server (data: destination_uuid)'],
-            'remove_server' => ['method' => 'DELETE', 'path' => 'applications/{uuid}/destinations/{destination_uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'detach an additional destination'],
+            'remove_server' => ['method' => 'DELETE', 'path' => 'applications/{uuid}/destinations/{destination_uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'detach an additional destination'],
         ];
     }
 

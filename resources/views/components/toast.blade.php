@@ -103,14 +103,14 @@
                     x-transition:leave-start="translate-y-0 opacity-100"
                     x-transition:leave-end="translate-y-1 opacity-0"
                     @mouseenter="pauseToast(toast)" @mouseleave="resumeToast(toast)"
-                    class="surface-popover relative flex w-full items-start rounded-lg group"
+                    class="surface-popover toast-card relative flex w-full items-start rounded-lg group"
                     :class="{ 'p-3.5 pr-20': !toast.html, 'p-0': toast.html }">
                     <template x-if="!toast.html">
                         <div class="flex min-w-0 items-start gap-3">
-                            <div class="flex size-8 shrink-0 items-center justify-center rounded-lg"
+                            <div class="toast-icon flex size-8 shrink-0 items-center justify-center rounded-lg"
                                 :class="{
                                     'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400': toast.type === 'success',
-                                    'bg-coollabs/10 text-coollabs dark:bg-warning/10 dark:text-warning': toast.type === 'info',
+                                    'bg-coollabs/10 text-coollabs dark:bg-brand/15 dark:text-brand-light': toast.type === 'info',
                                     'bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning': toast.type === 'warning',
                                     'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400': toast.type === 'danger',
                                     'bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim': toast.type === 'default',

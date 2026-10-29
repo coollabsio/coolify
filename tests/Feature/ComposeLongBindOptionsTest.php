@@ -235,3 +235,22 @@ it('keeps a ${VAR:-default} long-form bind source for Docker Compose when the va
     'variable reference' => ['$BASE_DIR/ao.yaml'],
     'vault reference' => ['{{vault.AO_CONFIG_FILE}}'],
 ]);
+
+it('moves a mode suffix from the target of a long-form bind to read_only', function (string $kind, string $mode, bool $readOnly) {
+    $result = parseLongBind($kind, <<<YAML
+services:
+  probe:
+    image: alpine:3.22
+    volumes:
+      - type: bind
+        source: ./data/users.yml
+        target: /fixture:{$mode}
+        content: 'users: {}'
+YAML);
+
+    expect($result['volume']['target'])->toBe('/fixture')
+        ->and($result['volume']['read_only'])->toBe($readOnly);
+})->with(['service', 'application'])->with([
+    'read-only' => ['ro', true],
+    'read-write' => ['rw', false],
+]);

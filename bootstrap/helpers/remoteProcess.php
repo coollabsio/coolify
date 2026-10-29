@@ -193,8 +193,8 @@ function instant_remote_process_with_timeout(Collection|array $command, Server|N
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = runSshProcess($sshCommand, 30);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server);
+            $process = runSshProcess($sshCommand, 30, SshMultiplexingHelper::sshBatchInput($command_string));
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -217,7 +217,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server|N
     );
 }
 
-function instant_remote_process(Collection|array $command, Server|Node $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
+function instant_remote_process(Collection|array $command, Server|Node $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false, ?int $maxAttempts = null): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -229,8 +229,8 @@ function instant_remote_process(Collection|array $command, Server|Node $server, 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
-            $process = runSshProcess($sshCommand, (int) $effectiveTimeout);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server, $disableMultiplexing, (int) $effectiveTimeout);
+            $process = runSshProcess($sshCommand, (int) $effectiveTimeout, SshMultiplexingHelper::sshBatchInput($command_string));
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -249,7 +249,8 @@ function instant_remote_process(Collection|array $command, Server|Node $server, 
             'command_preview' => substr($command_string, 0, 100),
             'function' => 'instant_remote_process',
         ],
-        $throwError
+        $throwError,
+        $maxAttempts
     );
 }
 

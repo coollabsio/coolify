@@ -52,9 +52,9 @@ function backupDirectoryDumpScript(string $sshUser): string
     ]);
     $commands = new Collection;
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
-        return Process::result(output: str_contains($process->command, 'du -b') ? '100' : '');
+        return Process::result(output: str_contains(remoteProcessScript($process), 'du -b') ? '100' : '');
     });
 
     (new DatabaseBackupJob($backup))->handle();

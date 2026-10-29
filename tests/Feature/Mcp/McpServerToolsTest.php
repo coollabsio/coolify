@@ -108,7 +108,7 @@ afterEach(function () {
     Server::flushIdentityMap();
 });
 
-function mcpSrvToken(User $user, array $abilities = ['read', 'write']): string
+function mcpSrvToken(User $user, array $abilities = ['read', 'write', 'delete']): string
 {
     return $user->createToken('mcp-srv', $abilities)->plainTextToken;
 }
@@ -205,7 +205,7 @@ test('server group write actions reject member tokens', function (string $tool, 
     $response = mcpSrvCall(mcpSrvToken($member, ['read', 'write']), $tool, $arguments + ['confirm' => true]);
 
     expect($response->json('result'))->toBeNull()
-        ->and($response->json('error.message'))->toBe('Missing required team role.');
+        ->and($response->json('error.message'))->toBe('This API token has more access than you have in this team. Revoke it and create a new token.');
 })->with([
     'manage_server update' => ['manage_server', ['action' => 'update', 'data' => ['name' => 'x']]],
     'manage_private_key create' => ['manage_private_key', ['action' => 'create']],
@@ -215,7 +215,7 @@ test('server group write actions reject member tokens', function (string $tool, 
 ]);
 
 test('server group destructive actions need confirm=true', function (string $tool, array $arguments) {
-    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), $tool, $arguments);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy', 'delete']), $tool, $arguments);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('requires confirm=true');
@@ -434,7 +434,7 @@ test('manage_registry logs in on its own server without echoing the password', f
 
     expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response))
         ->and(mcpSrvText($response))->not->toContain('REGISTRY_PASSWORD_VALUE');
-    Process::assertRan(fn ($process) => str_contains(is_array($process->command) ? implode(' ', $process->command) : $process->command, 'docker'));
+    Process::assertRan(fn ($process) => str_contains(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process), 'docker'));
 });
 
 test('manage_registry cannot touch registries on a server of another team', function (string $action, string $ability, array $extra) {
@@ -602,7 +602,7 @@ test('manage_git_source cannot change or delete GitHub apps of another team, inc
 ])->with(['update', 'delete']);
 
 test('manage_git_source creates, updates, and deletes a GitLab app without returning secrets', function () {
-    $token = mcpSrvToken($this->user, ['read', 'write']);
+    $token = mcpSrvToken($this->user, ['read', 'write', 'delete']);
 
     $create = mcpSrvCall($token, 'manage_git_source', ['action' => 'create', 'resource' => 'gitlab', 'data' => [
         'name' => 'mcp-gitlab', 'html_url' => 'https://gitlab.com', 'client_secret' => 'GL_CLIENT_SECRET_VALUE', 'webhook_token' => 'GL_WEBHOOK_TOKEN_VALUE',

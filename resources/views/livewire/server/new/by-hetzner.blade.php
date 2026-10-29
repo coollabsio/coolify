@@ -8,7 +8,7 @@
             <p class="text-[11px] text-neutral-500 dark:text-fg-faint">
                 New to Hetzner?
                 <a href="https://coolify.io/hetzner" target="_blank"
-                    class="font-medium text-coollabs hover:underline dark:text-warning">Create an account</a>
+                    class="font-medium text-coollabs hover:underline dark:text-brand-light">Create an account</a>
                 through Coolify's affiliate link.
             </p>
         </div>
@@ -42,9 +42,11 @@
                             . ' · ' . ($type['cores'] ?? '?') . ' vCPU'
                             . ' · ' . ($type['memory'] ?? '?') . ' GB RAM'
                             . ' · ' . ($type['disk'] ?? '?') . ' GB';
+                        $label = $price ? $label . ' · €' . number_format($price, 2) . '/mo' : $label;
                         return [
                             'value' => $type['name'],
-                            'label' => $price ? $label . ' · €' . number_format($price, 2) . '/mo' : $label,
+                            'label' => $type['out_of_stock'] ? $label . ' · Out of stock' : $label,
+                            'disabled' => $type['out_of_stock'],
                         ];
                     })->values()->all();
                     $imageOptions = collect($this->availableImages)->map(fn ($image) => [

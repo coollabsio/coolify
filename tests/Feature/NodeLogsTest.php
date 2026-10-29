@@ -79,7 +79,7 @@ function fakeJournal(string $output): void
 function assertJournalCommandRan(string $unit, int $limit): void
 {
     Process::assertRan(fn ($process) => str_contains(
-        is_array($process->command) ? implode(' ', $process->command) : $process->command,
+        remoteProcessScript($process),
         "journalctl --unit '{$unit}' --no-pager --output json --lines {$limit}",
     ));
 }

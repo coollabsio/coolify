@@ -305,7 +305,7 @@ class Change extends Component
             $this->authorize('view', $this->github_app);
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
-            $this->applications = $this->github_app->applications;
+            $this->applications = $this->github_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
             $settings = instanceSettings();
 
             // Sync data from model to properties
@@ -431,6 +431,7 @@ class Change extends Component
             $this->syncData(true);
             $this->github_app->save();
             $this->isConnected = $this->github_app->isConnected();
+            $this->dispatch('name-changed', uuid: $this->github_app->uuid, name: $this->github_app->name);
             $this->dispatch('success', 'Github App updated.');
         } catch (ValidationException $e) {
             throw $e;

@@ -3,6 +3,8 @@
 namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Events\ServiceStartFinished;
+use App\Jobs\ServerFilesFromServerJob;
 use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -24,6 +26,7 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
+        self::queueFileStorageSync($service);
         // Fetch remote secrets before stopping: if the secret manager fails, the service keeps running.
         // saveComposeConfigs() below reuses the fetched secrets.
         $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
@@ -47,7 +50,7 @@ class StartService
         // Give Compose no stdin so it uses the default answer (keep the volume). Never pass --yes:
         // it recreates the volume and deletes its data.
         // Pass -f so Compose uses only the file that Coolify wrote.
-        $compose = "docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
+        $compose = serverDockerConfigPrefix($service->server)."docker compose --project-directory {$workdir} -f {$workdir}/docker-compose.yml --project-name {$service->uuid}";
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "{$compose} pull < /dev/null";
@@ -82,7 +85,7 @@ class StartService
             }
         }
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
+        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: ServiceStartFinished::dataFor($service), queue: deployment_queue());
     }
 
     /**
@@ -101,6 +104,18 @@ class StartService
         $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
 
         return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
+    }
+
+    /**
+     * Queues one sync of the file storages with the server for each resource of the service that has
+     * file storages. The sync marks each storage as a file or a directory, as it is on the server.
+     */
+    public static function queueFileStorageSync(Service $service): void
+    {
+        $service->applications()->get()
+            ->concat($service->databases()->get())
+            ->filter(fn (ServiceApplication|ServiceDatabase $resource): bool => $resource->fileStorages()->exists())
+            ->each(fn (ServiceApplication|ServiceDatabase $resource) => ServerFilesFromServerJob::dispatch($resource));
     }
 
     /**

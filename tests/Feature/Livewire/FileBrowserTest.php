@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ContainerFilesystemService;
 use App\Services\FileDownloadStorageService;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Process\Factory;
@@ -141,6 +142,86 @@ function fbRunningDatabase($environment, $destination): StandalonePostgresql
         'destination_type' => $destination->getMorphClass(),
     ]);
 }
+
+function fbNoShellResult(): ProcessResult
+{
+    return Process::result(
+        errorOutput: 'OCI runtime exec failed: exec failed: unable to start container process: exec: "sh": executable file not found in $PATH',
+        exitCode: 127,
+    );
+}
+
+function fbRootProcessStatus(): string
+{
+    return "Uid:\t0\t0\t0\t0\nGid:\t0\t0\t0\t0\nGroups:\t0\nCapPrm:\t00000000a80425fb\n";
+}
+
+it('browses a container without a shell through the helper container', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/'))                  // defaultRoot inspect
+        ->push(fbNoShellResult())                              // docker exec list
+        ->push(Process::result(output: fbRootProcessStatus())) // helper identity
+        ->push(Process::result(output: "directory\t0\t1\t755\troot\troot\t./data\nsymbolic link\t4\t1\t777\troot\troot\t./etc-link"))]); // helper list
+
+    $database = fbRunningDatabase($this->environment, $this->destination);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->assertSet('useHelper', true)
+        ->assertSet('shellUnavailable', false)
+        ->assertSee('data')
+        ->assertSee('Upload a file to this folder')
+        ->call('open', 'etc-link')
+        ->assertDispatched('error', 'Symlinks cannot be opened in a container without a shell. Open the target path instead.')
+        ->assertSet('currentPath', '/');
+});
+
+it('explains when neither the shell nor the helper container can open the files', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/'))
+        ->push(fbNoShellResult())
+        ->push(Process::result(output: fbRootProcessStatus()))
+        ->push(Process::result(errorOutput: 'Unable to find image', exitCode: 125))]);
+
+    $database = fbRunningDatabase($this->environment, $this->destination);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->assertSet('loadFailed', false)
+        ->assertSet('shellUnavailable', true)
+        ->assertSee('Coolify cannot open the files of this container.')
+        ->assertSee('The server could not pull the Coolify helper image')
+        ->assertDontSee('This folder is empty')
+        ->assertDontSee('Upload a file to this folder');
+});
+
+it('keeps helper mode in the download token', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/'))
+        ->push(fbNoShellResult())
+        ->push(Process::result(output: fbRootProcessStatus()))
+        ->push(Process::result(output: "directory\t0\t1\t755\troot\troot\t./data"))
+        ->push(Process::result(output: fbRootProcessStatus()))
+        ->push(Process::result(output: 'dir 4'))]);
+
+    $database = fbRunningDatabase($this->environment, $this->destination);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('loadFiles')
+        ->call('download', 'data');
+
+    $token = Str::afterLast($component->effects['redirect'], '/');
+    expect(Cache::get(FileBrowserDownloadController::cacheKey($token)))->toMatchArray(['use_helper' => true, 'path' => '/data']);
+});
 
 it('creates a directory and re-lists', function () {
     Process::fake(['*' => Process::sequence()
@@ -303,7 +384,7 @@ it('rejects unsafe child names without deleting the current folder', function (s
         ->call('loadFiles')
         ->call('deleteEntry', $name)
         ->assertDispatched('error');
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'rm -rf'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -rf'));
 })->with(['', '.', '..', '../data', 'a/b', 'a\\b']);
 
 it('saves the opened file and clears editor state', function () {
@@ -479,8 +560,8 @@ it('lists files for a running application and excludes stopped and preview conta
     ])->map(fn ($container) => json_encode($container))->implode("\n");
     Process::fake(function ($process) use ($containers) {
         $output = match (true) {
-            str_contains($process->command, 'docker ps') => $containers,
-            str_contains($process->command, 'docker inspect') => '/app',
+            str_contains(remoteProcessScript($process), 'docker ps') => $containers,
+            str_contains(remoteProcessScript($process), 'docker inspect') => '/app',
             default => "file\t12\t1\t644\tconfig.yml",
         };
 
@@ -541,7 +622,7 @@ it('allows retrying a failed initial container lookup', function () {
     ]);
     $fail = true;
     Process::fake(function ($process) use (&$fail) {
-        if (str_contains($process->command, 'docker ps')) {
+        if (str_contains(remoteProcessScript($process), 'docker ps')) {
             if ($fail) {
                 $fail = false;
 
@@ -553,7 +634,7 @@ it('allows retrying a failed initial container lookup', function () {
             ]));
         }
 
-        return Process::result(output: str_contains($process->command, 'docker inspect') ? '/app' : '');
+        return Process::result(output: str_contains(remoteProcessScript($process), 'docker inspect') ? '/app' : '');
     });
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);

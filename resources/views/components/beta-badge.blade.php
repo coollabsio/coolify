@@ -1,6 +1,6 @@
 <span {{ $attributes->merge(['class' => 'inline-flex items-center']) }}>
     <span role="img" aria-label="Beta" data-tooltip="Beta"
-        class="inline-flex items-center justify-center p-0.5 rounded-full cursor-help text-coollabs dark:text-warning">
+        class="inline-flex items-center justify-center p-0.5 rounded-full cursor-help text-coollabs dark:text-brand-light">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
             class="size-4" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round"

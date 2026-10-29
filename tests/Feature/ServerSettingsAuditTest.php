@@ -3,6 +3,7 @@
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Actions\Server\StartSentinel;
 use App\Helpers\SslHelper;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Destination\New\Docker as NewDockerDestination;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Project\Database\Postgresql\StatusInfo as PostgresqlStatusInfo;
@@ -36,6 +37,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
@@ -44,6 +46,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     $this->withoutDefer();
     Server::flushIdentityMap();
     Queue::fake();

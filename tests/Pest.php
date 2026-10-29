@@ -36,6 +36,7 @@ uses(TestCase::class)
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
 require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
 require_once __DIR__.'/Support/StripeTestHelpers.php';
+require_once __DIR__.'/Support/RemoteProcessTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {

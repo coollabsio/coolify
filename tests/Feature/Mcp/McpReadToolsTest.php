@@ -644,6 +644,66 @@ test('get_application omits free-form configuration that can contain secrets', f
         ->and($raw)->not->toContain('custom_nginx_configuration');
 });
 
+function mcpReadCallWithAbilities(array $abilities, string $name, array $arguments = [])
+{
+    auth()->forgetGuards();
+
+    return test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.test()->user->createToken('mcp-abilities', $abilities)->plainTextToken,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => $name, 'arguments' => (object) $arguments],
+    ]);
+}
+
+test('get_application returns commands and configuration to a read:sensitive or root token of an owner', function (array $abilities) {
+    $this->application->update([
+        'build_command' => 'npm run build',
+        'post_deployment_command' => 'php artisan migrate',
+        'custom_docker_run_options' => '--cap-add SYS_ADMIN',
+    ]);
+
+    $response = mcpReadCallWithAbilities($abilities, 'get_application', ['uuid' => $this->application->uuid]);
+    $response->assertOk();
+
+    expect(mcpReadJson($response)['data'])
+        ->toMatchArray([
+            'build_command' => 'npm run build',
+            'post_deployment_command' => 'php artisan migrate',
+            'custom_docker_run_options' => '--cap-add SYS_ADMIN',
+        ])
+        ->not->toHaveKey('git_full_url');
+})->with([
+    'read:sensitive' => [['read', 'read:sensitive']],
+    'root' => [['root']],
+]);
+
+test('get_database returns custom configuration to a read:sensitive token of an owner', function () {
+    $database = StandalonePostgresql::create([
+        'name' => 'Configured database',
+        'postgres_password' => 'database-password',
+        'postgres_conf' => 'max_connections = 200',
+        'custom_docker_run_options' => '--shm-size 1g',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $response = mcpSensitiveReadCall('get_database', ['uuid' => $database->uuid]);
+    $response->assertOk();
+
+    expect(mcpReadJson($response)['data'])
+        ->toMatchArray([
+            'postgres_conf' => 'max_connections = 200',
+            'custom_docker_run_options' => '--shm-size 1g',
+        ])
+        ->not->toHaveKey('postgres_password');
+});
+
 test('get_database omits configuration blobs that can contain secrets', function () {
     $database = StandalonePostgresql::create([
         'name' => 'Secret-bearing config',
@@ -1634,7 +1694,7 @@ test('team members cannot retrieve logs with sensitive read ability', function (
     // Elevated member tokens are rejected as JSON-RPC errors (HTTP 200) so MCP clients can parse them.
     $response->assertOk();
     expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
-        ->toMatch('/team role|Missing required/i');
+        ->toMatch('/more access than you have/');
 });
 
 test('get_logs returns structured next_tools when application is not running', function () {
@@ -1650,7 +1710,20 @@ test('get_logs returns structured next_tools when application is not running', f
     expect($body['data']['ok'])->toBeFalse();
     expect($body['data']['reason'])->toBe('not_running');
     expect($body['data']['next_tools'])->not->toBeEmpty();
-    expect(collect($body['data']['next_tools'])->pluck('tool'))->toContain('list_deployments', 'list_unhealthy_resources');
+    expect(collect($body['data']['next_tools'])->pluck('tool'))->toContain('list_deployments', 'list_unhealthy_resources')
+        ->not->toContain('control');
+});
+
+test('get_application suggests only tools that the token can see', function () {
+    $this->application->update(['status' => 'running:healthy']);
+
+    $readTools = collect(mcpReadJson(mcpReadCall('get_application', ['uuid' => $this->application->uuid]))['_actions'])->pluck('tool');
+    $sensitiveTools = collect(mcpReadJson(mcpSensitiveReadCall('get_application', ['uuid' => $this->application->uuid]))['_actions'])->pluck('tool');
+
+    expect($readTools)->toContain('get_application', 'list_deployments')
+        ->not->toContain('get_logs', 'control')
+        ->and($sensitiveTools)->toContain('get_logs')
+        ->not->toContain('control');
 });
 
 test('get_logs returns structured choices when service has multiple containers', function () {
@@ -1711,6 +1784,18 @@ test('coolify_help topic returns recipe steps and marks tools the token cannot u
     expect($steps['list_projects']['available'])->toBeTrue()
         ->and($steps['create_application']['available'])->toBeFalse()
         ->and($steps['create_application']['action'])->toBe('public');
+});
+
+test('coolify_help marks recipe steps unavailable when the token lacks the action ability', function () {
+    $body = mcpReadJson(mcpReadCall('coolify_help', ['topic' => 'backup_database']));
+    $steps = collect($body['data']['steps'])->mapWithKeys(fn (array $step) => [$step['tool'].':'.($step['action'] ?? '') => $step['available']]);
+
+    expect($steps->all())->toBe([
+        'manage_s3_storage:create' => false,
+        'manage_s3_storage:validate' => false,
+        'manage_backup:create' => false,
+        'list_backup_executions:' => true,
+    ]);
 });
 
 test('coolify_help search filters tools and rejects unknown topics', function () {
@@ -1811,7 +1896,7 @@ test('team member with deploy ability cannot call lifecycle tools', function () 
     $response->assertOk();
     expect($response->json('jsonrpc'))->toBe('2.0');
     expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
-        ->toMatch('/team role|Missing required/i');
+        ->toMatch('/more access than you have/');
 });
 
 test('control start with deploy ability queues application deployment', function () {

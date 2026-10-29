@@ -38,7 +38,7 @@
                     <x-reicon name="variables" class="size-3.5" />
                     Shared variables
                 </a>
-                @can('createAnyResource')
+                @can('createAnyResource', [$environment])
                     <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                         {{ wireNavigate() }}
                         class="button whitespace-nowrap button-highlighted">
@@ -50,7 +50,7 @@
         </header>
 
         @if ($environment->isEmpty())
-            @can('createAnyResource')
+            @can('createAnyResource', [$environment])
                 <x-empty title="No resources yet"
                     description="Add an application, database, or service to this environment."
                     icon-name="layers">
@@ -93,8 +93,8 @@
                                 <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
                                     stroke-linecap="round" />
                             </svg>
-                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'"></span>
-                            <span x-show="activeFilterCount > 0"
+                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'">Filter</span>
+                            <span x-show="activeFilterCount > 0" x-cloak
                                 class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"
                                 x-text="activeFilterCount"></span>
                             </button>
@@ -111,7 +111,7 @@
                                                 <span
                                                     class="flex size-4 shrink-0 items-center justify-center rounded-[5px] border"
                                                     :class="isFilterSelected(group.key, option.value)
-                                                        ? 'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black'
+                                                        ? 'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white'
                                                         : 'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]'">
                                                     <svg x-show="isFilterSelected(group.key, option.value)" class="size-3"
                                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -252,7 +252,7 @@
                         Try a different search or filter.
                     </p>
                 </div>
-                <x-client-pagination x-show="filteredResources.length > 0"
+                <x-client-pagination total="filteredResources.length" x-show="filteredResources.length > 0"
                     summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
                     page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
             </div>
@@ -309,7 +309,7 @@
                         Try a different search or filter.
                     </p>
                 </div>
-                <x-client-pagination x-show="filteredResources.length > 0"
+                <x-client-pagination total="filteredResources.length" x-show="filteredResources.length > 0"
                     class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
                     page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />

@@ -138,6 +138,18 @@ class EnvironmentCanvas
     }
 
     /**
+     * A saved zone position (projects and servers canvas), or null when the zone is auto placed.
+     *
+     * @return array{x: int, y: int}|null
+     */
+    public function zonePosition(mixed $saved): ?array
+    {
+        return is_array($saved) && is_numeric($saved['x'] ?? null) && is_numeric($saved['y'] ?? null)
+            ? ['x' => (int) $saved['x'], 'y' => (int) $saved['y']]
+            : null;
+    }
+
+    /**
      * @return array{id: string, name: string, ip: ?string, is_reachable: bool, is_usable: bool, link: string}
      */
     public function zone(Server $server, bool $canReadSensitive): array

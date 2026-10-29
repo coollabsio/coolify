@@ -30,6 +30,22 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         $this->onQueue('high');
     }
 
+    /**
+     * Explicit tags, so Horizon does not compare the models of the job. In a chain, the job is restored
+     * with two copies of one server for a clone on the same server, and comparing them fails on PHP 8.4
+     * ("Nesting level too deep"), which stops the chain before the copy.
+     *
+     * @return array<int, string>
+     */
+    public function tags(): array
+    {
+        return array_values(array_unique([
+            Server::class.':'.$this->sourceServer->id,
+            ...($this->targetServer ? [Server::class.':'.$this->targetServer->id] : []),
+            LocalPersistentVolume::class.':'.$this->persistentVolume->id,
+        ]));
+    }
+
     public function handle(): void
     {
         try {
@@ -69,7 +85,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
         instant_remote_process([
             $createTargetVolume,
-            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'",
+            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/'",
         ], $this->sourceServer);
         $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
     }
@@ -123,7 +139,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
             instant_remote_process([
                 $createTargetVolume,
-                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz && chown -R 1000:1000 /target'",
+                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz'",
             ], $this->targetServer);
             $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
         } catch (\Exception $e) {

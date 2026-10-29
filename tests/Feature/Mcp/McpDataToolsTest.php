@@ -102,7 +102,7 @@ function mcpDataSeedTeam(Team $team): array
     ];
 }
 
-function mcpDataToken(User $user, array $abilities = ['write']): string
+function mcpDataToken(User $user, array $abilities = ['write', 'delete']): string
 {
     return $user->createToken('mcp-data', $abilities)->plainTextToken;
 }
@@ -308,7 +308,7 @@ test('manage_database clones to an own destination and moves to an own environme
 test('manage_database destructive actions need confirm=true', function (string $action, array $data) {
     $own = $this->mine['database'];
 
-    $denied = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_database', ['action' => $action, 'uuid' => $own->uuid, 'data' => $data]);
+    $denied = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy', 'delete']), 'manage_database', ['action' => $action, 'uuid' => $own->uuid, 'data' => $data]);
 
     expect(mcpDataIsError($denied))->toBeTrue()
         ->and(mcpDataText($denied))->toContain('confirm=true')
@@ -324,12 +324,12 @@ test('manage_database destructive actions need confirm=true', function (string $
 test('manage_database delete with confirm=true deletes an own database', function () {
     $own = $this->mine['database'];
 
-    $writeOnly = mcpDataCall(mcpDataToken($this->user), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
+    $writeOnly = mcpDataCall(mcpDataToken($this->user, ['write']), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
     expect(mcpDataIsError($writeOnly))->toBeTrue()
-        ->and(mcpDataText($writeOnly))->toContain('Missing required permissions: deploy')
+        ->and(mcpDataText($writeOnly))->toContain('Missing required permissions: delete')
         ->and(StandalonePostgresql::find($own->id))->not->toBeNull();
 
-    $response = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
+    $response = mcpDataCall(mcpDataToken($this->user, ['delete']), 'manage_database', ['action' => 'delete', 'uuid' => $own->uuid, 'confirm' => true]);
 
     expect(mcpDataIsError($response))->toBeFalse()
         ->and(StandalonePostgresql::find($own->id))->toBeNull();
@@ -565,7 +565,7 @@ test('manage_service rejects a destination, environment, or S3 storage of anothe
 test('manage_service destructive actions need confirm=true', function (string $action) {
     $own = $this->mine;
 
-    $denied = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_service', ['action' => $action, 'uuid' => $own['service']->uuid, 'database_uuid' => $own['service_db']->uuid, 'data' => ['destination_uuid' => 'x']]);
+    $denied = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy', 'delete']), 'manage_service', ['action' => $action, 'uuid' => $own['service']->uuid, 'database_uuid' => $own['service_db']->uuid, 'data' => ['destination_uuid' => 'x']]);
 
     expect(mcpDataIsError($denied))->toBeTrue()
         ->and(mcpDataText($denied))->toContain('confirm=true')
@@ -573,12 +573,12 @@ test('manage_service destructive actions need confirm=true', function (string $a
 })->with(['delete', 'clone', 'move', 'import_database']);
 
 test('manage_service delete with confirm=true deletes an own service', function () {
-    $writeOnly = mcpDataCall(mcpDataToken($this->user), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
+    $writeOnly = mcpDataCall(mcpDataToken($this->user, ['write']), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
     expect(mcpDataIsError($writeOnly))->toBeTrue()
-        ->and(mcpDataText($writeOnly))->toContain('Missing required permissions: deploy')
+        ->and(mcpDataText($writeOnly))->toContain('Missing required permissions: delete')
         ->and(Service::find($this->mine['service']->id))->not->toBeNull();
 
-    $response = mcpDataCall(mcpDataToken($this->user, ['write', 'deploy']), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
+    $response = mcpDataCall(mcpDataToken($this->user, ['delete']), 'manage_service', ['action' => 'delete', 'uuid' => $this->mine['service']->uuid, 'confirm' => true]);
 
     expect(mcpDataIsError($response))->toBeFalse()
         ->and(Service::find($this->mine['service']->id))->toBeNull();

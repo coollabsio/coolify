@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://www.dolibarr.org/documentation-home.php
 # slogan: Dolibarr is a modern software package to manage your organization's activity (contacts, quotes, invoices, orders, stocks, agenda, hr, expense reports, accountancy, ecm, manufacturing, ...).
 # category: productivity
@@ -28,6 +27,7 @@ services:
       - dolibarr_custom:/var/www/html/custom
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      start_period: 120s
       interval: 2s
       timeout: 10s
       retries: 15

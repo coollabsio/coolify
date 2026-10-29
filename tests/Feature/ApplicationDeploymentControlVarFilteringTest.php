@@ -897,24 +897,12 @@ it('filters docker compose generated service variables from build args', functio
     expect($envArgs->has('SERVICE_URL_APP'))->toBeFalse();
 });
 
-it('filters buildpack control vars from preview runtime env fallback', function () {
+it('does not fall back to production vars when preview copies are deleted', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 
     createApplicationEnvironmentVariable($application, [
         'key' => 'APP_NAME',
         'value' => 'coolify',
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'NIXPACKS_NODE_VERSION',
-        'value' => '22',
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'RAILPACK_NODE_VERSION',
-        'value' => '20',
         'is_runtime' => true,
         'is_buildtime' => false,
     ]);
@@ -926,9 +914,7 @@ it('filters buildpack control vars from preview runtime env fallback', function 
         'is_buildtime' => false,
     ]);
 
-    $application->environment_variables_preview()
-        ->whereIn('key', ['APP_NAME', 'NIXPACKS_NODE_VERSION', 'RAILPACK_NODE_VERSION'])
-        ->delete();
+    $application->environment_variables_preview()->where('key', 'APP_NAME')->delete();
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
         'pull_request_id' => 99,
@@ -937,10 +923,95 @@ it('filters buildpack control vars from preview runtime env fallback', function 
     /** @var Collection $runtimeEnvs */
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBeTrue();
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBeFalse();
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('PREVIEW_FLAG=')))->toBeTrue();
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('NIXPACKS_NODE_VERSION=')))->toBeFalse();
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
+});
+
+it('does not give production runtime values to a preview copy that is not a runtime variable', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n",
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'DB_PASSWORD',
+        'value' => 'production-secret',
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'PREVIEW_FLAG',
+        'value' => 'enabled',
+        'is_preview' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    $application->environment_variables_preview()->where('key', 'DB_PASSWORD')->update(['is_runtime' => false]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->filter(fn (string $env) => str($env)->contains('production-secret')))->toBeEmpty();
+});
+
+it('keeps copied production values out of previews when public PR deployments are on', function (string $buildPack) {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => $buildPack,
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n",
+    ]);
+    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+    createApplicationEnvironmentVariable($application, ['key' => 'API_URL', 'value' => 'https://api.example.com']);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+    $application->environment_variables_preview()->where('key', 'API_URL')->first()
+        ->update(['value' => 'https://preview-api.example.com']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+        'remote_secrets_cache' => [],
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+    /** @var Collection $envArgs */
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+    /** @var Collection $railpackVariables */
+    $railpackVariables = invokeDeploymentJobMethod($job, $reflection, 'railpack_build_variables');
+
+    foreach ([$runtimeEnvs, $buildtimeEnvs] as $envLines) {
+        expect($envLines->filter(fn (string $env) => str($env)->contains('production-secret')))->toBeEmpty()
+            ->and($envLines->contains(fn (string $env) => str($env)->startsWith('API_URL=') && str($env)->contains('preview-api.example.com')))->toBeTrue();
+    }
+    expect($envArgs->has('DB_PASSWORD'))->toBeFalse()
+        ->and($envArgs->get('API_URL'))->toBe('https://preview-api.example.com')
+        ->and($railpackVariables->has('DB_PASSWORD'))->toBeFalse()
+        ->and($railpackVariables->get('API_URL'))->toBe('https://preview-api.example.com');
+    if ($buildPack !== 'dockercompose') {
+        expect($runtimeEnvs)->toContain('PORT='.$application->main_port()[0]);
+    }
+})->with(['dockerfile', 'dockercompose']);
+
+it('keeps copied production values for previews when public PR deployments are off', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=')))->toBeTrue();
 });
 
 it('keeps buildpack variables read at container start in the runtime env', function (int $pullRequestId, bool $isPreview) {
@@ -1249,7 +1320,6 @@ it('keeps invalid build-time names out of the helper container so restarts with 
 
     expect($envFlags)
         ->toContain("-e 'SAFE_KEY=safe-build-value'")
-        ->toContain('COOLIFY_BUILD_SECRETS_HASH=')
         ->not->toContain('MY-VAR')
         ->not->toContain('invalid-build-value');
 });
@@ -1720,39 +1790,6 @@ it('writes compose-safe preview runtime env files for user values', function () 
         ->toContain('PREVIEW_QUOTED_VALUE='.escapeComposeEnvFileValue('preview quotes" \'$`'));
 });
 
-it('writes compose-safe production fallbacks to preview runtime env files', function () {
-    [$application, $server] = makeDeploymentControlVarFixture();
-
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'PREVIEW_TRIGGER',
-        'value' => 'preview-value',
-        'is_preview' => true,
-        'is_literal' => false,
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'FALLBACK_QUOTED_VALUE',
-        'value' => 'fallback quotes" \'$`',
-        'is_literal' => true,
-        'is_runtime' => true,
-        'is_buildtime' => false,
-    ]);
-    $application->environment_variables_preview()
-        ->where('key', 'FALLBACK_QUOTED_VALUE')
-        ->delete();
-
-    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
-        'pull_request_id' => 42,
-    ]);
-
-    /** @var Collection $runtimeEnvs */
-    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
-
-    expect($runtimeEnvs)
-        ->toContain('FALLBACK_QUOTED_VALUE='.escapeComposeEnvFileValue('fallback quotes" \'$`'));
-});
-
 it('writes compose-safe runtime env values for remote secret references', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 
@@ -1901,3 +1938,208 @@ it('includes migrated null Compose overrides in production and preview runtime f
 
     expect(invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables')->contains('LEGACY='.escapeComposeEnvFileValue('')))->toBeTrue();
 })->with([0, 42]);
+
+it('passes the build secrets hash as a build arg so a changed secret value invalidates the Docker cache', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['dockerSecretsSupported' => true]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect(['NEXT_PUBLIC_API_URL' => 'https://old.example.com']));
+    $oldFlags = readDeploymentJobProperty($job, $reflection, 'build_secrets');
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect(['NEXT_PUBLIC_API_URL' => 'https://new.example.com']));
+    $newFlags = readDeploymentJobProperty($job, $reflection, 'build_secrets');
+
+    $hashArg = fn (string $flags): ?string => preg_match("/--build-arg 'COOLIFY_BUILD_SECRETS_HASH=([a-f0-9]{64})'/", $flags, $matches) === 1 ? $matches[1] : null;
+
+    expect($hashArg($oldFlags))->not->toBeNull()
+        ->and($hashArg($newFlags))->not->toBeNull()
+        ->and($hashArg($newFlags))->not->toBe($hashArg($oldFlags))
+        ->and($newFlags)->toContain("--secret 'id=NEXT_PUBLIC_API_URL,env=NEXT_PUBLIC_API_URL'");
+});
+
+it('declares the build secrets hash ARG in every stage when build secrets are used', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['NEXT_PUBLIC_API_URL' => 'https://new.example.com']),
+        'build_secrets' => '--secret id=NEXT_PUBLIC_API_URL,env=NEXT_PUBLIC_API_URL',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "FROM node:22 AS build\nRUN npm run build\nFROM nginx:alpine\nCOPY --from=build /app/dist /usr/share/nginx/html",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/Dockerfile');
+
+    expect(explode("\n", $job->writtenDockerfile))->toBe([
+        '# syntax=docker/dockerfile:1',
+        'FROM node:22 AS build',
+        'ARG COOLIFY_BUILD_SECRETS_HASH',
+        'RUN --mount=type=secret,id=NEXT_PUBLIC_API_URL,env=NEXT_PUBLIC_API_URL npm run build',
+        'FROM nginx:alpine',
+        'ARG COOLIFY_BUILD_SECRETS_HASH',
+        'COPY --from=build /app/dist /usr/share/nginx/html',
+    ]);
+});
+
+it('passes the build secrets hash as a Compose build arg when build secrets are used', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['NEXT_PUBLIC_API_URL' => 'https://new.example.com']),
+    ]);
+
+    $composeFile = invokeDeploymentJobMethod($job, $reflection, 'add_build_secrets_to_compose', [
+        'services' => [
+            'web' => ['build' => '.'],
+            'api' => ['build' => ['context' => './api', 'args' => ['NODE_ENV' => 'production']]],
+            'worker' => ['build' => ['context' => './worker', 'args' => ['NODE_ENV=production']]],
+            'db' => ['image' => 'postgres:17'],
+        ],
+    ]);
+
+    $hash = data_get($composeFile, 'services.web.build.args.COOLIFY_BUILD_SECRETS_HASH');
+
+    expect($hash)->toMatch('/^[a-f0-9]{64}$/')
+        ->and(data_get($composeFile, 'services.api.build.args'))->toBe(['NODE_ENV' => 'production', 'COOLIFY_BUILD_SECRETS_HASH' => $hash])
+        ->and(data_get($composeFile, 'services.worker.build.args'))->toBe(['NODE_ENV=production', "COOLIFY_BUILD_SECRETS_HASH={$hash}"])
+        ->and(data_get($composeFile, 'services.db'))->toBe(['image' => 'postgres:17']);
+});
+
+it('keeps heredoc bodies unchanged when it adds build secrets to a Dockerfile', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['API_URL' => 'https://new.example.com']),
+        'build_secrets' => '--secret id=API_URL,env=API_URL',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "FROM python:3.13\nRUN <<EOF\nfrom app import build\nRUN-like line\nEOF\nRUN python -c 'print(1)'",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/Dockerfile');
+
+    expect(explode("\n", $job->writtenDockerfile))->toBe([
+        '# syntax=docker/dockerfile:1',
+        'FROM python:3.13',
+        'ARG COOLIFY_BUILD_SECRETS_HASH',
+        'RUN --mount=type=secret,id=API_URL,env=API_URL <<EOF',
+        'from app import build',
+        'RUN-like line',
+        'EOF',
+        "RUN --mount=type=secret,id=API_URL,env=API_URL python -c 'print(1)'",
+    ]);
+});
+
+it('warns in the deployment log when PORT does not match ports_exposes', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['ports_exposes' => '80']);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable (3000)')))->toBeTrue();
+});
+
+it('does not warn about a PORT mismatch when readonly labels are disabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['ports_exposes' => '80']);
+    $application->settings()->update(['is_container_label_readonly_enabled' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'PORT', 'value' => '3000']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect(collect($job->recordedLogEntries)->contains(fn (string $entry) => str_contains($entry, 'PORT environment variable')))->toBeFalse();
+});
+
+it('gives a preview from before v4.5.1 the production values it had', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'APP_NAME', 'value' => 'coolify', 'is_buildtime' => false]);
+    $application->environment_variables_preview()->where('key', 'APP_NAME')->delete();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+        'remote_secrets_cache' => [],
+        'preview' => ApplicationPreview::create([
+            'application_id' => $application->id,
+            'pull_request_id' => 99,
+            'pull_request_html_url' => 'https://example.com/pr/99',
+            'keeps_production_values' => true,
+        ]),
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=') && str($env)->contains('production-secret')))->toBeTrue()
+        ->and($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=') && str($env)->contains('coolify')))->toBeTrue();
+});
+
+it('lets the Compose build interpolate runtime-only variables without passing them to the build', function (int $pullRequestId) {
+    $compose = <<<'YAML'
+services:
+  app:
+    build:
+      context: .
+      args:
+        MAPPED_ARG: '${RUNTIME_IN_BUILD_ARGS}'
+        LISTED_FROM_ENV: null
+    environment:
+      FERNET_KEY: '${FERNET_KEY:?}'
+      OPTIONAL_REQUIRED: '${OPTIONAL_REQUIRED?}'
+      BUILD_VALUE: '${BUILD_VALUE}'
+  worker:
+    build:
+      context: ./worker
+      args:
+        - LISTED_ARG
+    environment:
+      FERNET_KEY: '${FERNET_KEY:?}'
+YAML;
+
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => '[]',
+    ]);
+    $application->settings()->update(['inject_build_args_to_dockerfile' => false]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'FERNET_KEY', 'value' => 'runtime-fernet-key', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'OPTIONAL_REQUIRED', 'value' => '', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'RUNTIME_IN_BUILD_ARGS', 'value' => 'runtime-mapped-arg', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LISTED_FROM_ENV', 'value' => 'runtime-null-arg', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LISTED_ARG', 'value' => 'runtime-listed-arg', 'is_buildtime' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'BUILD_VALUE', 'value' => 'build-value']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => $pullRequestId,
+        'remote_secrets_cache' => [],
+        'force_rebuild' => false,
+        'docker_compose_location' => '/docker-compose.yaml',
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables');
+    $buildEnvironment = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'build_docker_compose_images', parseDockerComposeYaml($compose), $buildEnvironment);
+
+    $buildEnvFile = $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_PATH];
+    $buildCommand = collect($job->recordedCommands)->flatten()->first(fn (mixed $command): bool => is_string($command) && str_contains($command, ' build --pull'));
+    $buildArgs = readDeploymentJobProperty($job, $reflection, 'build_args')->implode(' ');
+
+    expect($buildEnvFile)->toContain('FERNET_KEY="runtime-fernet-key"')
+        ->toContain('OPTIONAL_REQUIRED=""')
+        ->toContain('BUILD_VALUE=')
+        ->not->toContain('runtime-mapped-arg')
+        ->not->toContain('runtime-null-arg')
+        ->not->toContain('runtime-listed-arg')
+        ->and($buildCommand)->toContain('--env-file '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH)
+        ->and($buildArgs)->toContain('BUILD_VALUE')
+        ->not->toContain('FERNET_KEY')
+        ->not->toContain('runtime-');
+})->with([
+    'production' => 0,
+    'preview' => 42,
+]);

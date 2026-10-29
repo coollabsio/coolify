@@ -9,13 +9,14 @@ use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneKeydb extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -55,7 +56,16 @@ class StandaloneKeydb extends BaseModel
         'health_check_start_period',
     ];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'keydb_conf',
+        'custom_docker_run_options',
+    ];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
@@ -64,6 +74,7 @@ class StandaloneKeydb extends BaseModel
      */
     protected $hidden = [
         'keydb_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
         // Internal start-command state, not part of the API.
@@ -404,6 +415,15 @@ class StandaloneKeydb extends BaseModel
         }
 
         return $environmentVariable;
+    }
+
+    /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->serverPasswordEnvironmentVariable()?->isLockedForLogs();
     }
 
     /**

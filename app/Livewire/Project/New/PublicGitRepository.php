@@ -73,7 +73,7 @@ class PublicGitRepository extends Component
             'isStatic' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
-            'base_directory' => 'nullable|string',
+            'base_directory' => ValidationPatterns::directoryPathRules(),
             'docker_compose_location' => ValidationPatterns::filePathRules(),
             'git_branch' => ['required', 'string', new ValidGitBranch],
         ];
@@ -277,8 +277,6 @@ class PublicGitRepository extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Application::class);
-
             $this->validate();
 
             // Additional validation for git repository and branch
@@ -313,6 +311,7 @@ class PublicGitRepository extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
             $environment = $project->environments()->where('uuid', $environment_uuid)->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
 
             if ($this->git_source === 'other') {
                 $application_init = [
@@ -352,7 +351,6 @@ class PublicGitRepository extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
             }
             $application = new Application($application_init);
             $application->save();

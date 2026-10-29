@@ -15,11 +15,13 @@ use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
 use App\Http\Middleware\EnsureTeamMcpEnabled;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RequirePassword;
+use App\Http\Middleware\RequireTeamTwoFactor;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\ValidateSignature;
@@ -80,6 +82,7 @@ class Kernel extends HttpKernel
             SubstituteBindings::class,
             CheckForcePasswordReset::class,
             DecideWhatToDoWithUser::class,
+            RequireTeamTwoFactor::class,
 
         ],
 
@@ -116,6 +119,7 @@ class Kernel extends HttpKernel
         'can.create.resources' => CanCreateResources::class,
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,
+        'access.team-wide' => EnsureTeamWideAccess::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
         'api.ip.allowed' => ApiIpAllowed::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,

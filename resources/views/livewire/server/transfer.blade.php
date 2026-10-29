@@ -34,6 +34,14 @@
                     </x-slot:actions>
 
                     <div class="flex flex-col gap-4">
+                        @if (! $server->isTransferredAway() && ($markerConflict = data_get($server->server_metadata, 'transfer.owner_marker_conflict')))
+                            <x-callout type="warning" title="Another instance may claim this server" data-testid="owner-marker-conflict">
+                                The owner file on the server names a claim of
+                                {{ data_get($markerConflict, 'instance_url') ?: 'an unknown instance' }}, but it is older than the
+                                claim of this instance or its URL is not valid, so this instance keeps managing the server.
+                                If you did not transfer the server, check who can write files on it.
+                            </x-callout>
+                        @endif
                         @if ($server->isTransferredAway())
                             <div>
                                 <h3 class="text-sm font-semibold text-neutral-950 dark:text-fg">Transfer back</h3>
@@ -51,11 +59,18 @@
                                     placeholder="Paste token from that instance" autocomplete="off"
                                     helper="A token with root, or with read:sensitive and write, from an admin or owner of that instance." />
                                 <x-forms.input id="thisInstanceUrl" label="URL of this instance" required
-                                    helper="The URL at which the other instance reaches this instance. This instance gives it a token that expires in 3 hours." />
+                                    helper="The URL at which the other instance reaches this instance. This instance gives it a token that expires in 1 hour." />
                             </div>
                             <div>
+                                @php
+                                    // A static string: x-text shows the typed host as text, also after the modal was rendered.
+                                    $transferBackWarning = 'This instance sends a new API token of your team to '
+                                        .'<strong data-testid="transfer-back-host" x-text="(() => { try { return new URL($wire.managerUrl).host } catch (e) { return \'an invalid URL\' } })()"></strong>. '
+                                        .'Continue only if you trust that instance.';
+                                @endphp
                                 <x-modal-confirmation title="Transfer this server back?" submitAction="transferBack"
                                     :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Transfer back"
+                                    :warningMessage="$transferBackWarning"
                                     :actions="[
                                         'The other instance checks the server, this instance, and the tokens. If a check fails, nothing changes.',
                                         'The other instance transfers the server, its resources, and its credentials back here.',
@@ -99,13 +114,14 @@
                         <div>
                             <x-modal-confirmation title="Transfer this server?" submitAction="migrateServer"
                                 :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Transfer server"
+                                warningMessage="All secrets of this server and its resources are sent to the target instance: private keys, credentials, and every environment variable value, also locked ones. Continue only if you trust that instance."
                                 :actions="[
                                     'Coolify first checks this server, the target instance, and the token. If a check fails, nothing is changed.',
                                     'The server will be transferred to the target instance.',
                                     'Automations for this server will be disabled on this instance.',
                                 ]">
                                 <x-slot:trigger>
-                                    <x-forms.button canGate="update" :canResource="$server" wire:loading.attr="disabled"
+                                    <x-forms.button canGate="transfer" :canResource="$server" wire:loading.attr="disabled"
                                         wire:target="migrateServer">
                                         <span wire:loading.remove wire:target="migrateServer">Transfer server</span>
                                         <span wire:loading wire:target="migrateServer">Running checks…</span>
@@ -150,7 +166,7 @@
                                     <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
                                         The target shows these steps on the server page, checks them where it can, and keeps
                                         their state.
-                                        @if ($targetServerUrl = data_get($migration, 'target_server_url'))
+                                        @if ($targetServerUrl = $this->targetServerUrl)
                                             <a href="{{ $targetServerUrl }}" target="_blank" rel="noopener noreferrer"
                                                 class="underline">Open the server on the target</a>.
                                         @endif

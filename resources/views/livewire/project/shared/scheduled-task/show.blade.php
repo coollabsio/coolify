@@ -36,7 +36,7 @@
                     label="Name" required />
                 <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
                     placeholder="0 0 * * * or daily" id="frequency" label="Schedule"
-                    helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression."
+                    helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression. Runs in the server timezone ({{ $serverTimezone }}). Change it in the server settings."
                     required />
                 <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" type="number"
                     placeholder="300" id="timeout" helper="Maximum execution time from 60 to 36,000 seconds."

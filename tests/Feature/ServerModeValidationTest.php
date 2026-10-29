@@ -43,7 +43,7 @@ it('uses Docker for legacy server connection checks', function () {
     (new ServerConnectionCheckJob($server, disableMux: false))->handle();
 
     expect($server->settings->fresh()->is_usable)->toBeTrue();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker version --format json'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker version --format json'));
 });
 
 it('validates Podman only through the node action', function () {
@@ -53,5 +53,5 @@ it('validates Podman only through the node action', function () {
     expect(ValidateNode::run($node))->toBeTrue()
         ->and($node->fresh()->is_reachable)->toBeTrue()
         ->and($node->fresh()->is_usable)->toBeTrue();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'podman info --format json'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'podman info --format json'));
 });

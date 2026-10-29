@@ -449,7 +449,8 @@ class ServerTransferExporter
     private function collectManagedDnsRecords(Server $server, Collection $applications, Collection $services): array
     {
         // Keyed by "morph type:id". Soft-deleted previews are covered, but their references are not exported.
-        $resourceKeys = [];
+        // The server itself owns the DNS record of its Cloudflare tunnel.
+        $resourceKeys = [$server->getMorphClass().':'.$server->id => ['kind' => 'server', 'uuid' => $server->uuid]];
         foreach ($applications as $application) {
             $resourceKeys[$application->getMorphClass().':'.$application->id] = ['kind' => 'application', 'uuid' => $application->uuid];
             foreach (ApplicationPreview::withTrashed()->where('application_id', $application->id)->get() as $preview) {
@@ -461,10 +462,6 @@ class ServerTransferExporter
                 $resourceKeys[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['kind' => 'service_application', 'uuid' => $serviceApplication->uuid];
             }
         }
-        if ($resourceKeys === []) {
-            return ['records' => collect(), 'resource_keys' => [], 'warnings' => []];
-        }
-
         $records = ManagedDnsRecord::query()
             ->whereHas('references', function ($query) use ($resourceKeys) {
                 $query->where(function ($query) use ($resourceKeys) {
@@ -567,6 +564,8 @@ class ServerTransferExporter
             $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
                 .'Enabling them stops runners that another Coolify instance started on this server.';
         }
+        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, '
+            .'then remove the old public key from ~/.ssh/authorized_keys on the server.';
 
         return $steps;
     }
@@ -900,6 +899,7 @@ class ServerTransferExporter
         // Ensure hidden encrypted fields are included as plaintext.
         foreach ([
             'http_basic_auth_password',
+            'git_https_password',
             'manual_webhook_secret_github',
             'manual_webhook_secret_gitlab',
             'manual_webhook_secret_bitbucket',
@@ -1489,6 +1489,7 @@ class ServerTransferExporter
             'secret' => $storage->secret,
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
+            'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'is_usable' => (bool) $storage->is_usable,
         ];
     }
@@ -1644,6 +1645,7 @@ class ServerTransferExporter
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
+                'keeps_production_values' => $preview->keeps_production_values,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

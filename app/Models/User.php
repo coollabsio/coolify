@@ -3,14 +3,17 @@
 namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
+use App\Enums\AccessLevel;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\EmailChangeVerification;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Services\Access\AccessResolver;
 use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -173,7 +176,6 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
                             if ($found_other_member_who_is_not_owner) {
                                 $found_other_member_who_is_not_owner->pivot->role = 'owner';
                                 $found_other_member_who_is_not_owner->pivot->save();
-                                RevokeUserTeamTokens::forUserTeam($found_other_member_who_is_not_owner, $team->id);
                                 $team->members()->detach($user->id);
                             } else {
                                 static::finalizeTeamDeletion($user, $team);
@@ -287,7 +289,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
 
     public function teams()
     {
-        return $this->belongsToMany(Team::class)->withPivot('role');
+        return $this->belongsToMany(Team::class)->withPivot('role', 'access');
     }
 
     public function changelogReads()
@@ -484,6 +486,14 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
         $team = $this->teams->where('id', $teamId)->first();
 
         return data_get($team, 'pivot.role');
+    }
+
+    /**
+     * Check the access grants of the user (and the API token of the request) on a project, environment, or resource.
+     */
+    public function canAccess(AccessLevel $level, Model $target): bool
+    {
+        return app(AccessResolver::class)->allows($this, $level, $target);
     }
 
     /**

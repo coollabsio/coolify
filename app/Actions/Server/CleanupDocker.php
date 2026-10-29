@@ -2,6 +2,8 @@
 
 namespace App\Actions\Server;
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Support\Actions\UniqueUntilProcessingJobDecorator;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -40,6 +42,11 @@ class CleanupDocker implements ShouldBeUnique
      * window. The scheduled cleanup still runs.
      */
     public const STOP_CLEANUP_COOLDOWN = 3600;
+
+    /**
+     * Cleanup log command of the entry that records a skipped build cache prune.
+     */
+    public const BUILD_CACHE_KEPT_LOG_COMMAND = 'docker builder prune, docker buildx prune';
 
     public int $jobTries = 1;
 
@@ -84,6 +91,29 @@ class CleanupDocker implements ShouldBeUnique
     }
 
     /**
+     * The deployment that is queued or running on the server (as target or build server), if any.
+     * Pruning the build caches fails a build that uses them, so the cleanup keeps them while such a
+     * deployment exists. A deployment that wrote no log for longer than the deployment timeout is
+     * stuck and does not count.
+     */
+    public static function activeDeployment(Server $server): ?ApplicationDeploymentQueue
+    {
+        return ApplicationDeploymentQueue::query()
+            ->where(fn ($query) => $query->where('server_id', $server->id)->orWhere('build_server_id', $server->id))
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->where('updated_at', '>=', now()->subSeconds($server->settings->dynamic_timeout ?? 3600))
+            ->first(['id', 'deployment_uuid']);
+    }
+
+    /**
+     * The reason the build cache was kept, read from a cleanup log, if it was kept.
+     */
+    public static function buildCacheKeptReason(array $cleanupLog): ?string
+    {
+        return collect($cleanupLog)->firstWhere('command', self::BUILD_CACHE_KEPT_LOG_COMMAND)['output'] ?? null;
+    }
+
+    /**
      * Cleanup after a resource stop: skipped when a cleanup ran recently, and the queued run
      * only cleans when the disk usage is at or above the server cleanup threshold.
      */
@@ -120,7 +150,11 @@ class CleanupDocker implements ShouldBeUnique
         ];
     }
 
-    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false, bool $onlyAboveThreshold = false)
+    /**
+     * @param  bool  $pruneBuildCacheDuringDeployment  Also prune the build caches while a deployment is active
+     *                                                 (a manual cleanup). Otherwise they stay until the next run.
+     */
+    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false, bool $onlyAboveThreshold = false, bool $pruneBuildCacheDuringDeployment = false)
     {
         $this->deadline = now()->getTimestamp() + self::REMOTE_COMMANDS_DEADLINE;
 
@@ -157,11 +191,21 @@ class CleanupDocker implements ShouldBeUnique
         $commands = [
             $this->buildContainerPruneCommand(),
             $imagePruneCmd,
-            'docker builder prune -af',
-            // The prune fails on a stopped builder, so start it first.
-            railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, 'docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; docker buildx prune --builder coolify-railpack -af'),
-            $this->buildCoolifyImageCleanupCommand($helperImageVersion),
         ];
+
+        $activeDeployment = $pruneBuildCacheDuringDeployment ? null : self::activeDeployment($server);
+        if (! $activeDeployment) {
+            $commands[] = 'docker builder prune -af';
+            // The prune fails on a stopped builder, so start it first.
+            $commands[] = railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, railpackBuilderBootstrapScript().'; docker buildx prune --builder coolify-railpack -af');
+        } else {
+            $cleanupLog[] = [
+                'command' => self::BUILD_CACHE_KEPT_LOG_COMMAND,
+                'output' => 'Skipped: the build cache was not pruned because deployment '.$activeDeployment->deployment_uuid.' is queued or running on this server.',
+            ];
+        }
+
+        $commands[] = $this->buildCoolifyImageCleanupCommand($helperImageVersion);
 
         if ($deleteUnusedVolumes) {
             $commands[] = 'docker volume prune -af';
@@ -304,14 +348,11 @@ class CleanupDocker implements ShouldBeUnique
 
         $disableRetention = $server->settings->disable_application_image_retention ?? false;
 
-        // Image of each container, keyed by container name
+        // Images that a container uses, running or stopped
         $containerImages = collect(explode("\n", $this->runRemoteCommand("docker ps -a --format '{{.Names}}#{{.Image}}' 2>/dev/null || true", $server) ?? ''))
             ->filter()
-            ->mapWithKeys(function (string $line) {
-                [$name, $image] = array_pad(explode('#', $line, 2), 2, '');
-
-                return [$name => $image];
-            });
+            ->map(fn (string $line) => array_pad(explode('#', $line, 2), 2, '')[1])
+            ->unique();
 
         $serverImages = collect(explode("\n", $this->runRemoteCommand("docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' 2>/dev/null || true", $server) ?? ''))
             ->filter()
@@ -327,49 +368,58 @@ class CleanupDocker implements ShouldBeUnique
             })
             ->filter(fn ($image) => $image['tag'] !== '' && $image['tag'] !== '<none>');
 
+        // A deployment starts the containers of its new images only after the build or pull,
+        // so the images of an application with a queued or running deployment all stay.
+        $deployingApplicationIds = ApplicationDeploymentQueue::query()
+            ->whereIn('application_id', $applications->map(fn ($application) => (string) $application->id))
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->where('updated_at', '>=', now()->subSeconds($server->settings->dynamic_timeout ?? 3600))
+            ->pluck('application_id');
+
         $imagesToDelete = collect();
 
         foreach ($applications as $application) {
-            $imagesToKeep = $disableRetention ? 0 : ($application->settings->docker_images_to_keep ?? 2);
-            $imageRepository = $application->docker_registry_image_name ?? $application->uuid;
-
-            // Tag of the image of the running container (named after the application uuid)
-            $currentTag = preg_match('/:([^:]+)$/', $containerImages->get($application->uuid, ''), $matches) ? $matches[1] : '';
-
-            // Matches both uuid:tag and uuid_servicename:tag (Docker Compose with build), like
-            // the docker images --filter reference='<repository>*' filter
-            $images = $serverImages->filter(fn ($image) => str_starts_with($image['repository'], $imageRepository)
-                && ! str_contains(substr($image['repository'], strlen($imageRepository)), '/'));
-
-            if ($images->isEmpty()) {
+            if ($deployingApplicationIds->contains((string) $application->id)) {
                 continue;
             }
 
-            // Separate images into categories
-            // PR images (pr-*) are always deleted
-            // Build images (*-build) are cleaned up to match retained regular images
-            $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
-            $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
-            $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+            $imagesToKeep = $disableRetention ? 0 : ($application->settings->docker_images_to_keep ?? 2);
+            $imageRepository = $application->docker_registry_image_name ?? $application->uuid;
 
-            // Filter out current running image from regular images and sort by creation date
-            $sortedRegularImages = $regularImages
-                ->filter(fn ($image) => $image['tag'] !== $currentTag)
-                ->sortByDesc('created_at')
-                ->values();
+            // Matches both uuid:tag and uuid_servicename:tag (Docker Compose with build), like
+            // the docker images --filter reference='<repository>*' filter. Each repository (the
+            // application, or one Docker Compose service) has its own retention.
+            $repositories = $serverImages
+                ->filter(fn ($image) => str_starts_with($image['repository'], $imageRepository)
+                    && ! str_contains(substr($image['repository'], strlen($imageRepository)), '/'))
+                ->groupBy('repository');
 
-            // Clean up build images (-build suffix) that don't correspond to retained regular images
-            // Build images are intermediate artifacts (e.g. Nixpacks) not used by running containers.
-            // If a build is in progress, docker rmi will fail silently since the image is in use.
-            $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag');
-            if ($currentTag !== '') {
-                $keptTags->push($currentTag);
+            foreach ($repositories as $images) {
+                // Tags that a container uses
+                $currentTags = $images->filter(fn ($image) => $containerImages->contains($image['image_ref']))->pluck('tag');
+
+                // Separate images into categories
+                // PR images (pr-*) are always deleted
+                // Build images (*-build) are cleaned up to match retained regular images
+                $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
+                $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
+                $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+
+                // Filter out the images in use from regular images and sort by creation date
+                $sortedRegularImages = $regularImages
+                    ->reject(fn ($image) => $currentTags->contains($image['tag']))
+                    ->sortByDesc('created_at')
+                    ->values();
+
+                // Clean up build images (-build suffix) that don't correspond to retained regular images
+                // Build images are intermediate artifacts (e.g. Nixpacks) not used by running containers.
+                $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag')->concat($currentTags);
+
+                $imagesToDelete = $imagesToDelete
+                    ->concat($prImages)
+                    ->concat($sortedRegularImages->skip($imagesToKeep))
+                    ->concat($buildImages->reject(fn ($image) => $keptTags->contains(preg_replace('/-build$/', '', $image['tag']))));
             }
-
-            $imagesToDelete = $imagesToDelete
-                ->concat($prImages)
-                ->concat($sortedRegularImages->skip($imagesToKeep))
-                ->concat($buildImages->reject(fn ($image) => $keptTags->contains(preg_replace('/-build$/', '', $image['tag']))));
         }
 
         // Images in use fail silently; docker rmi continues with the next image

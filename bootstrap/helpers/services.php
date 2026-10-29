@@ -25,6 +25,8 @@ function service_logo_urls(mixed $logo): array
     ];
 }
 
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
+use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -32,6 +34,8 @@ use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
@@ -55,7 +59,8 @@ function resource_logo_url(string $name): string
  * the service template, or how the application is built. Null when there is no specific logo.
  *
  * Applications with a domain also get the favicon URL of their first domain. The browser loads it
- * and shows it in place of the logo when it loads. Coolify itself never requests it.
+ * and shows it in place of the logo when it loads. Coolify itself never requests it. Applications
+ * behind HTTP basic auth get no favicon: the request makes the browser ask for the credentials.
  *
  * @return array{src: string, dark: ?string, fallback: ?string, padded: bool, favicon: ?string}|null
  */
@@ -93,7 +98,9 @@ function resource_logo(Model $resource): ?array
             default => $resourceLogo('public-repo'),
         };
 
-        return [...$logo, 'favicon' => resource_favicon_url($resource->fqdn)];
+        $favicon = $resource->is_http_basic_auth_enabled ? null : resource_favicon_url($resource->fqdn);
+
+        return [...$logo, 'favicon' => $favicon];
     }
 
     if (! method_exists($resource, 'type')) {
@@ -294,45 +301,53 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $server = $oneService->service->server;
         }
         $fileVolumes = $oneService->fileStorages()->get();
-        $escapedWorkdir = escapeshellarg($workdir);
-        $commands = collect([
-            "mkdir -p -- {$escapedWorkdir} > /dev/null 2>&1 || true",
-        ]);
-        instant_remote_process($commands, $server);
-        foreach ($fileVolumes as $fileVolume) {
-            $content = data_get($fileVolume, 'content');
-            // A relative path is inside the resource directory, never in the SSH user's working
-            // directory. A persisted Compose expression (`${VAR:-/path}`) stays as it is.
+        if ($isInit) {
+            instant_remote_process(['mkdir -p -- '.escapeshellarg($workdir).' > /dev/null 2>&1 || true'], $server);
+        }
+        if ($fileVolumes->isEmpty()) {
+            return;
+        }
+        // A relative path is inside the resource directory, never in the SSH user's working
+        // directory. A persisted Compose expression (`${VAR:-/path}`) stays as it is.
+        $fileLocations = $fileVolumes->map(function (LocalFileVolume $fileVolume) use ($workdir): string {
             $fsPath = trim((string) $fileVolume->fs_path);
-            $fileLocation = str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
-            $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
+
+            return str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
+        })->values()->all();
+        $states = LocalFileVolume::remoteFileStates($fileLocations, $server, filesystemVolumeShellArgument(...));
+        foreach ($fileVolumes->values() as $index => $fileVolume) {
+            $content = data_get($fileVolume, 'content');
+            $fileLocation = $fileLocations[$index];
+            $escapedFileLocation = filesystemVolumeShellArgument($fileLocation);
             // A token with only the write permission can save a Compose file, so Coolify does not
             // write outside the resource directory here. A deployment or start writes those paths.
             $isOutsideResourceDirectory = fn (): bool => $fileVolume->isOutsideResourceDirectory();
-            // Exists and is a file
-            $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
-            // Exists and is a directory
-            $isDir = instant_remote_process(["test -d {$escapedFileLocation} && echo OK || echo NOK"], $server);
+            $state = $states[$index];
+            // A symbolic link to a directory, a special file, or a failed check: Coolify changes nothing.
+            if ($state === 'other' || $state === 'unknown') {
+                continue;
+            }
+            $isDir = in_array($state, ['directory', 'empty-directory'], true);
 
-            if ($isFile === 'OK') {
+            if ($state === 'file') {
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 if ($fileVolume->is_based_on_git) {
                     $fileVolume->loadStorageOnServer();
                 }
-            } elseif ($isDir === 'OK' && ! $fileVolume->is_directory && filled($content)) {
+            } elseif ($isDir && ! $fileVolume->is_directory && filled($content)) {
                 // A configured file must not lose its content because a directory is at its path.
                 // Docker leaves an empty directory when it starts before the file exists: replace it.
                 // A directory with files stays; the start or deployment shows a warning for it.
-                if (! $isOutsideResourceDirectory() && LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
+                if (! $isOutsideResourceDirectory() && $state === 'empty-directory') {
                     $fileVolume->saveStorageOnServer();
                 }
-            } elseif ($isDir === 'OK') {
+            } elseif ($isDir) {
                 // If its a directory & exists
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
+            } elseif ($state === 'missing' && ! $fileVolume->is_directory && $isInit && $content) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has content
                 if ($isOutsideResourceDirectory()) {
                     continue;
@@ -345,7 +360,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                     'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
                     "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                 ], $server);
-            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
+            } elseif ($state === 'missing' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
@@ -353,7 +368,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 if (! $isOutsideResourceDirectory()) {
                     instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
                 }
-            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
+            } elseif ($state === 'missing' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
@@ -662,4 +677,118 @@ function applyServiceApplicationPrerequisites(Service $service): void
             'trace' => $e->getTraceAsString(),
         ]);
     }
+}
+
+/**
+ * Clones a service to a destination. The applications, databases, and volumes of the clone come from parse(),
+ * so their names are the names that the compose file of the clone uses.
+ *
+ * @param  array<string, mixed>  $overrides  Attributes for the new service, for example uuid, name, and environment_id.
+ */
+function clone_service(Service $source, StandaloneDocker|SwarmDocker $destination, array $overrides = [], bool $cloneVolumeData = false): Service
+{
+    $teamId = $source->team()->id;
+    $uuid = $overrides['uuid'] ?? new_public_id();
+
+    $newService = $source->replicate([
+        'id',
+        'created_at',
+        'updated_at',
+    ])->fill([
+        'name' => clone_resource_name($source->name, $uuid),
+        ...$overrides,
+        'uuid' => $uuid,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'server_id' => $destination->server_id,
+    ]);
+    $newService->save();
+
+    foreach ($source->tags as $tag) {
+        $newService->tags()->attach($tag->id);
+    }
+
+    foreach ($source->scheduled_tasks()->get() as $task) {
+        $task->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'uuid' => new_public_id(),
+            'service_id' => $newService->id,
+            'team_id' => $teamId,
+        ])->save();
+    }
+
+    foreach ($source->environment_variables()->get() as $environmentVariable) {
+        $environmentVariable->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'resourceable_id' => $newService->id,
+            'resourceable_type' => $newService->getMorphClass(),
+        ])->save();
+    }
+
+    $source->cloneSecretManagerLinkTo($newService);
+
+    // Service::replicate() does not copy the child rows, so parse() creates them for the clone.
+    $newService->parse();
+    $newService->refresh();
+
+    $sourceApplicationsByName = $source->applications()->get()->keyBy('name');
+    $sourceDatabasesByName = $source->databases()->get()->keyBy('name');
+    $pendingVolumeClones = [];
+
+    foreach ([
+        [$newService->applications()->get(), $sourceApplicationsByName],
+        [$newService->databases()->get(), $sourceDatabasesByName],
+    ] as [$newResources, $sourcesByName]) {
+        foreach ($newResources as $newResource) {
+            $newResource->fill(['status' => 'exited'])->save();
+
+            $sourceResource = $sourcesByName->get($newResource->name);
+            if (! $sourceResource || ! $cloneVolumeData) {
+                continue;
+            }
+
+            $targetVolumesByMount = $newResource->persistentStorages()->get()->keyBy('mount_path');
+            foreach ($sourceResource->persistentStorages()->get() as $sourceVolume) {
+                $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
+                if ($targetVolume) {
+                    $pendingVolumeClones[] = [$sourceVolume->name, $targetVolume];
+                }
+            }
+        }
+    }
+
+    foreach ($newService->databases()->get() as $database) {
+        $sourceDatabase = $sourceDatabasesByName->get($database->name);
+        foreach ($sourceDatabase?->scheduledBackups()->get() ?? [] as $backup) {
+            $newBackup = $backup->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'uuid' => new_public_id(),
+                'database_id' => $database->id,
+                'database_type' => $database->getMorphClass(),
+                'team_id' => $teamId,
+            ]);
+            $newBackup->save();
+            $backup->copyS3StoragesTo($newBackup);
+        }
+    }
+
+    $sourceServer = $source->destination?->server;
+    $targetServer = $newService->destination?->server;
+    if ($sourceServer && $targetServer) {
+        CloneVolumeDataWithSourceStopped::run($source, array_map(
+            fn (array $clone) => new VolumeCloneJob($clone[0], $clone[1]->name, $sourceServer, $targetServer, $clone[1]),
+            $pendingVolumeClones,
+        ));
+    }
+
+    return $newService;
 }

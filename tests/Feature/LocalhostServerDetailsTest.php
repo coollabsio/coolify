@@ -182,7 +182,7 @@ it('collects localhost server details after a successful connection check', func
 
     // The connection check also runs SSH multiplexing commands, so answer by command, not by order.
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return str_contains($command, '---PRETTY_NAME---')
             ? Process::result(output: localhostMetadataProcessOutput(), exitCode: 0)
@@ -207,16 +207,53 @@ it('shows validation-only menus as disabled until the server is validated', func
         'is_usable' => false,
     ]);
 
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+    $validationOnlyRoutes = collect([
+        'server.docker-cleanup',
+        'server.ca-certificate',
+        'server.proxy',
+        'server.resources',
+        'server.registries',
+        'server.security.patches',
+        'server.command',
+    ])->map(fn (string $name): string => 'href="'.route($name, ['server_uuid' => $this->server->uuid]).'"');
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->assertSee('Docker Cleanup')
-        ->assertSee('aria-disabled="true"', false)
-        ->assertDontSee(route('server.docker-cleanup', ['server_uuid' => $this->server->uuid]), false);
+        ->assertSee('aria-disabled="true"', false);
+    $validationOnlyRoutes->each(fn (string $href) => $component->assertDontSee($href, false));
 
     $this->server->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
     ]);
 
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee(route('server.docker-cleanup', ['server_uuid' => $this->server->uuid]), false);
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid]);
+    $validationOnlyRoutes->each(fn (string $href) => $component->assertSee($href, false));
+});
+
+it('disables remote-only menus until a remote server is validated', function () {
+    $remoteServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $remoteServer->settings()->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    $remoteOnlyRoutes = collect(['server.github-runners', 'server.transfer', 'server.command'])
+        ->map(fn (string $name): string => 'href="'.route($name, ['server_uuid' => $remoteServer->uuid]).'"');
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $remoteServer->uuid])
+        ->assertSee('GitHub Runners')
+        ->assertSee('Transfer');
+    $remoteOnlyRoutes->each(fn (string $href) => $component->assertDontSee($href, false));
+
+    $remoteServer->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $remoteServer->uuid]);
+    $remoteOnlyRoutes->each(fn (string $href) => $component->assertSee($href, false));
 });

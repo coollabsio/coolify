@@ -133,6 +133,8 @@ class Danger extends Component
                     'environment_uuid' => $this->environmentUuid,
                 ]);
             }
+            // Soft delete first, so the environment page after the redirect does not list the resource.
+            $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,
@@ -156,24 +158,13 @@ class Danger extends Component
             return 'The provided password is incorrect.';
         }
 
-        if (! $this->resource instanceof Service && ! $this->resource instanceof NodeWorkload) {
-            return 'Service not found.';
+        if (! $this->resource instanceof NodeWorkload) {
+            return 'Application not found.';
         }
 
         try {
             $this->authorize('delete', $this->resource);
-            if ($this->resource instanceof NodeWorkload) {
-                DeleteNodeWorkloadJob::dispatch($this->resource->id, auth()->id(), deleteFromCoolifyOnly: true);
-
-                return redirectRoute($this, 'project.resource.index', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
-                ]);
-            }
-            DeleteResourceJob::dispatch(
-                resource: $this->resource,
-                deleteFromCoolifyOnly: true,
-            )->afterResponse();
+            DeleteNodeWorkloadJob::dispatch($this->resource->id, auth()->id(), deleteFromCoolifyOnly: true);
 
             return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,

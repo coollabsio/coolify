@@ -79,16 +79,9 @@
         @endif
         <div class="ml-auto flex flex-wrap items-center gap-2">
             @can('update', $service)
-                @if ($configuredCount > 0)
-                    <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled"
-                        wire:target="checkAllDns,checkDomainDns">
-                        <x-reicon name="refresh" class="size-3.5" />
-                        Check all DNS
-                    </x-forms.button>
-                @endif
                 @if ($serviceAppCount > 0)
                     <div class="relative shrink-0">
-                        @include('livewire.project.shared.cloudflare-autoconfigure')
+                        @include('livewire.project.shared.cloudflare-autoconfigure', ['showCheckAllDns' => $configuredCount > 0])
                     </div>
                     <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                         canGate="update" :canResource="$service">
@@ -180,7 +173,7 @@
                                 <label for="service-force-https-{{ $appId }}-trigger" class="mb-0! whitespace-nowrap text-[12px]!">Redirect HTTP to HTTPS</label>
                                 <x-helper helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL." />
                                 <x-forms.listbox canGate="update" :canResource="$service" id="forceHttpsRedirects.{{ $appId }}"
-                                    htmlId="service-force-https-{{ $appId }}" preserveValue
+                                    htmlId="service-force-https-{{ $appId }}" preserveValue portal
                                     onChange="updateForceHttps"
                                     :onChangeArgs="[(int) $appId]"
                                     :options="[
@@ -193,7 +186,7 @@
                             <label for="service-permanent-redirect-{{ $appId }}-trigger" class="mb-0! whitespace-nowrap text-[12px]!">Redirect type</label>
                             <x-helper helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect." />
                             <x-forms.listbox canGate="update" :canResource="$service" id="permanentRedirects.{{ $appId }}"
-                                htmlId="service-permanent-redirect-{{ $appId }}" preserveValue
+                                htmlId="service-permanent-redirect-{{ $appId }}" preserveValue portal
                                 onChange="updatePermanentRedirect"
                                 :onChangeArgs="[(int) $appId]"
                                 :options="[

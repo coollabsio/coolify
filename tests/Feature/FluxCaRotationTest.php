@@ -379,7 +379,7 @@ it('repairs trust over SSH with the bundle of the current phase', function () {
         $bundle = ResolveFluxTrustBundle::run();
         RepairFluxTrust::run($node);
         $script = RepairFluxTrust::repairScript($bundle['certificate_pem'], $bundle['version']);
-        Process::assertRan(fn ($process) => str_contains($process->command, base64_encode($script)));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode($script)));
 
         return [$bundle['version'], bundleFingerprints($bundle['certificate_pem'])];
     };

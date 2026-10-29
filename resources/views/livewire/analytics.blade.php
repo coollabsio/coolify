@@ -1,7 +1,9 @@
 <?php
-$tabButtonBase = 'relative inline-flex h-7 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
-$tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
-$tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
+$rangeListboxOptions = [
+    ['value' => '24h', 'label' => 'Last 24 hours'],
+    ['value' => '7d', 'label' => 'Last 7 days'],
+    ['value' => '30d', 'label' => 'Last 30 days'],
+];
 
 $dimensionLabels = [
     'referer' => 'Referrers',
@@ -61,28 +63,16 @@ $appListboxOptions = array_merge(
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 sm:ml-auto">
-                    @include('livewire.traffic._live-toggle')
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        <button type="button" wire:click="setRange('24h')"
-                            wire:loading.attr="disabled" wire:target="setRange"
-                            @class([$tabButtonBase, $range === '24h' ? $tabButtonActive : $tabButtonInactive])>
-                            <span wire:loading.class="invisible" wire:target="setRange('24h')">24 hours</span>
-                            <x-loading compact class="absolute" wire:loading wire:target="setRange('24h')" aria-label="Loading analytics" />
-                        </button>
-                        <button type="button" wire:click="setRange('7d')"
-                            wire:loading.attr="disabled" wire:target="setRange"
-                            @class([$tabButtonBase, $range === '7d' ? $tabButtonActive : $tabButtonInactive])>
-                            <span wire:loading.class="invisible" wire:target="setRange('7d')">7 days</span>
-                            <x-loading compact class="absolute" wire:loading wire:target="setRange('7d')" aria-label="Loading analytics" />
-                        </button>
-                        <button type="button" wire:click="setRange('30d')"
-                            wire:loading.attr="disabled" wire:target="setRange"
-                            @class([$tabButtonBase, $range === '30d' ? $tabButtonActive : $tabButtonInactive])>
-                            <span wire:loading.class="invisible" wire:target="setRange('30d')">30 days</span>
-                            <x-loading compact class="absolute" wire:loading wire:target="setRange('30d')" aria-label="Loading analytics" />
-                        </button>
+                <div class="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+                    <div class="relative w-full transition-opacity sm:w-44"
+                        wire:loading.class="pointer-events-none opacity-60" wire:target="setRange">
+                        <x-forms.listbox id="range" onChange="setRange" :onChangeArgs="[]" :options="$rangeListboxOptions" />
+                        <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                            wire:loading.flex wire:target="setRange">
+                            <x-loading compact aria-label="Loading analytics" />
+                        </div>
                     </div>
+                    <x-live-toggle :active="$live" storageKey="traffic-live" title="Turn live refresh on or off (updates every 60 seconds)" />
                 </div>
             </div>
         @endif
@@ -139,7 +129,7 @@ $appListboxOptions = array_merge(
             description="We could not load traffic analytics for the selected filters and range. Try a different range or check back shortly."
             icon-name="analytics" />
     @else
-        @if ($this->isLivePollable())
+        @if ($live)
             <div wire:poll.60s="loadData" class="hidden"></div>
         @endif
 
@@ -149,7 +139,7 @@ $appListboxOptions = array_merge(
             <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-5 dark:bg-white/[0.07]">
                 <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['requests'] ?? 0) }} requests">{{ compactNumber($overview['requests'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-requests',
@@ -167,7 +157,7 @@ $appListboxOptions = array_merge(
                             {!! $approxBadge('Summed across servers or services; visitors seen on more than one may be double-counted.') !!}
                         @endif
                     </span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['uniqueVisitors'] ?? 0) }} unique visitors">{{ compactNumber($overview['uniqueVisitors'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-visitors',
@@ -211,7 +201,7 @@ $appListboxOptions = array_merge(
                             {!! $approxBadge('Highest p95 latency across servers or services; not a true merged percentile.') !!}
                         @endif
                     </span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatLatency($overview['latencyP95'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-latency',

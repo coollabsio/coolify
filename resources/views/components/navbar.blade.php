@@ -10,7 +10,7 @@
         if (!collapsed) return;
         const el = $event.target.closest('.menu-item, .menu-subitem');
         if (!el) { tooltip.show = false; return; }
-        const text = el.getAttribute('title') || el.getAttribute('aria-label') || '';
+        const text = el.getAttribute('title') || el.getAttribute('aria-label') || el.querySelector('.menu-item-label')?.textContent.trim() || '';
         if (!text) return;
         const rect = el.getBoundingClientRect();
         tooltip.text = text;
@@ -24,7 +24,7 @@
         // Label of the open submenu ('' = main menu). It starts on the submenu of the current page
         // ([data-active-submenu], read in init). Back opens the main menu.
         submenu: '',
-        // Depth of the open resource menu on wide screens (-1 = main menu or submenu). It starts on the
+        // Depth of the open resource menu (-1 = main menu or submenu). It starts on the
         // deepest menu of the current page; Back opens the menu one depth lower.
         navLevel: -1,
         // Direction of the last menu swap ('forward' or 'back'); it selects the enter animation of every menu.
@@ -35,47 +35,53 @@
             const ua = navigator.userAgent || '';
             return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
         })(),
+        // Shows the menu of the current page: its deepest resource menu, or the submenu that holds it.
+        showCurrentPageMenu() {
+            this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
+            this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+        },
         init() {
-                this.submenu = this.$root.querySelector('[data-active-submenu]')?.dataset.activeSubmenu || '';
-                this.navLevel = Number([...this.$root.querySelectorAll('[data-nav-level]')].pop()?.dataset.navLevel ?? -1);
+                this.showCurrentPageMenu();
                 if (@js($desktop)) {
                     // The open resource menu depth is kept across page loads: a page that opens a deeper menu
                     // (e.g. a backup) plays the forward swap, and a page that opens a lower one plays the back swap.
                     const previousLevel = sessionStorage.getItem('navLevel');
-                    if (previousLevel !== null && window.matchMedia('(min-width: 80rem)').matches) {
+                    if (previousLevel !== null && window.matchMedia('(min-width: 64rem)').matches) {
                         const levelChange = this.navLevel - Number(previousLevel);
                         this.navSwap = levelChange > 0 ? 'forward' : (levelChange < 0 ? 'back' : '');
                     }
                     sessionStorage.setItem('navLevel', this.navLevel);
                     this.$watch('navLevel', level => sessionStorage.setItem('navLevel', level));
-                }
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                    const userSettings = localStorage.getItem('theme');
-                    if (userSettings !== 'system') { return; }
-                    document.documentElement.classList.toggle('dark', e.matches);
-                    document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
-                });
-                this.queryTheme();
-            },
-            queryTheme() {
-                const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const userSettings = localStorage.getItem('theme') || 'dark';
-                localStorage.setItem('theme', userSettings);
-                let isDark = false;
-                if (userSettings === 'dark' || userSettings === 'custom') {
-                    document.documentElement.classList.add('dark');
-                    isDark = true;
-                } else if (userSettings === 'light') {
-                    document.documentElement.classList.remove('dark');
-                } else if (darkModePreference) {
-                    document.documentElement.classList.add('dark');
-                    isDark = true;
                 } else {
-                    document.documentElement.classList.remove('dark');
+                    // The resource menus teleport into the desktop sidebar. The mobile drawer moves them into
+                    // its own slots when it opens, and gives them back when the desktop sidebar shows.
+                    const moveResourceMenus = toDrawer => this.$root.querySelectorAll('[data-mobile-nav-context]').forEach(drawerSlot => {
+                        const desktopSlot = document.getElementById('main-nav-context-' + drawerSlot.dataset.mobileNavContext);
+                        if (desktopSlot) {
+                            toDrawer ? drawerSlot.append(...desktopSlot.childNodes) : desktopSlot.append(...drawerSlot.childNodes);
+                        }
+                    });
+                    this.desktopQuery = window.matchMedia('(min-width: 64rem)');
+                    this.onDesktopChange = event => event.matches && moveResourceMenus(false);
+                    this.desktopQuery.addEventListener('change', this.onDesktopChange);
+                    // A closed drawer forgets where Back went: it opens again on the menu of the current page.
+                    this.$watch('open', isOpen => {
+                        if (isOpen) {
+                            moveResourceMenus(true);
+                        } else {
+                            this.navSwap = '';
+                            this.showCurrentPageMenu();
+                        }
+                    });
                 }
-                document.documentElement.dataset.theme = userSettings === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
-            }
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                    if (localStorage.getItem('theme') === 'system') { window.applyStoredTheme(); }
+                });
+                window.applyStoredTheme();
+            },
+        destroy() {
+            this.desktopQuery?.removeEventListener('change', this.onDesktopChange);
+        },
     }">
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
@@ -87,12 +93,12 @@
                 :title="hasPageSearch
                     ? 'Search this page and everything (Press / or ' + modKeyLabel + 'K, then Tab to switch)'
                     : 'Search (Press / or ' + modKeyLabel + 'K)'"
-                class="menu-item menu-search justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
+                class="menu-item menu-search justify-between !rounded-lg !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
                 <span class="flex items-center gap-2.5 min-w-0">
                     <x-reicon name="search" class="menu-item-icon" />
                     <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search</span>
                 </span>
-                <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
+                <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-lg border border-transparent dark:border-white/5"
                     :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
             </button>
         </div>
@@ -101,42 +107,44 @@
     <ul role="list" class="sidebar-menu -mx-1 flex min-h-0 flex-1 flex-col gap-y-0.5 overflow-y-auto px-1 pb-2">
         @if (isSubscribed() || !isCloud())
             @php
+                // Members limited to some projects only see project pages; team-level pages return 403 for them.
+                $teamWide = app(App\Services\Access\AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
                 // An entry with children opens a submenu in place of the main menu (back button + its pages).
                 $navSections = collect([
                     'Workspace' => [
                         ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'canvas')],
                         ['label' => 'Projects', 'icon' => 'projects', 'href' => route('project.index'), 'active' => request()->is('projects', 'projects/*', 'project/*')],
-                        ['label' => 'Monitoring', 'icon' => 'graph', 'children' => [
+                        ['label' => 'Monitoring', 'icon' => 'graph', 'visible' => $teamWide, 'children' => [
                             ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics')],
                             ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics')],
                         ]],
-                        ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+                        ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [
-                        ['label' => 'Servers', 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*')],
-                        ['label' => 'Integrations', 'icon' => 'link', 'children' => [
+                        ['label' => 'Servers', 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*'), 'visible' => $teamWide],
+                        ['label' => 'Integrations', 'icon' => 'link', 'visible' => $teamWide, 'children' => [
                             ['label' => 'Sources', 'icon' => 'sources', 'href' => route('source.all'), 'active' => request()->is('sources', 'source/*')],
                             ['label' => 'Destinations', 'icon' => 'destinations', 'href' => route('destination.index'), 'active' => request()->is('destinations', 'destination/*')],
                             ['label' => 'Registries', 'icon' => 'layers', 'href' => route('registries.index'), 'active' => request()->is('registries'), 'visible' => auth()->user()?->isAdmin()],
                             ['label' => 'S3 Storage', 'icon' => 'storages', 'href' => route('storage.index'), 'active' => request()->is('storages', 'storages/*')],
                         ]],
                         ['label' => 'Shared Variables', 'icon' => 'variables', 'children' => [
-                            ['label' => 'Overview', 'icon' => 'dashboard', 'href' => route('shared-variables.index'), 'active' => request()->is('shared-variables')],
-                            ['label' => 'Team', 'icon' => 'teams', 'href' => route('shared-variables.team.index'), 'active' => request()->is('shared-variables/team*')],
+                            ['label' => 'Overview', 'icon' => 'dashboard', 'href' => route('shared-variables.index'), 'active' => request()->is('shared-variables'), 'visible' => $teamWide],
+                            ['label' => 'Team', 'icon' => 'teams', 'href' => route('shared-variables.team.index'), 'active' => request()->is('shared-variables/team*'), 'visible' => $teamWide],
                             ['label' => 'Projects', 'icon' => 'projects', 'href' => route('shared-variables.project.index'), 'active' => request()->is('shared-variables/projects', 'shared-variables/project/*')],
                             ['label' => 'Environments', 'icon' => 'layers', 'href' => route('shared-variables.environment.index'), 'active' => request()->is('shared-variables/environments*')],
-                            ['label' => 'Servers', 'icon' => 'servers', 'href' => route('shared-variables.server.index'), 'active' => request()->is('shared-variables/servers', 'shared-variables/server/*')],
+                            ['label' => 'Servers', 'icon' => 'servers', 'href' => route('shared-variables.server.index'), 'active' => request()->is('shared-variables/servers', 'shared-variables/server/*'), 'visible' => $teamWide],
                         ]],
                     ],
                     'Manage' => [
-                        ['label' => 'Team', 'icon' => 'teams', 'children' => [
+                        ['label' => 'Team', 'icon' => 'teams', 'visible' => $teamWide, 'children' => [
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('team.index'), 'active' => request()->is('team')],
                             ['label' => 'Members', 'icon' => 'teams', 'href' => route('team.member.index'), 'active' => request()->is('team/members*')],
                             ['label' => 'Audit log', 'icon' => 'time-back', 'href' => route('team.audit-log'), 'active' => request()->is('team/audit-log'), 'visible' => auth()->user()?->isAdminOfTeam(currentTeam()->id)],
                             ['label' => 'Admin View', 'icon' => 'admin', 'href' => route('team.admin-view'), 'active' => request()->is('team/admin'), 'visible' => isInstanceAdmin()],
                             ['label' => 'Danger Zone', 'icon' => 'danger', 'href' => route('team.danger-zone'), 'active' => request()->is('team/danger'), 'visible' => auth()->user()?->can('delete', currentTeam()), 'sectionStart' => true],
                         ]],
-                        ['label' => 'Notifications', 'icon' => 'notifications', 'children' => [
+                        ['label' => 'Notifications', 'icon' => 'notifications', 'visible' => $teamWide, 'children' => [
                             ['label' => 'Email', 'icon' => 'mail', 'href' => route('notifications.email'), 'active' => request()->is('notifications/email')],
                             ['label' => 'Discord', 'brandIcon' => 'discord', 'href' => route('notifications.discord'), 'active' => request()->is('notifications/discord')],
                             ['label' => 'Telegram', 'brandIcon' => 'telegram', 'href' => route('notifications.telegram'), 'active' => request()->is('notifications/telegram')],
@@ -145,15 +153,15 @@
                             ['label' => 'Webhook', 'icon' => 'destinations', 'href' => route('notifications.webhook'), 'active' => request()->is('notifications/webhook')],
                         ]],
                         ['label' => 'Keys & Tokens', 'icon' => 'keys', 'children' => [
-                            ['label' => 'Private Keys', 'icon' => 'keys', 'href' => route('security.private-key.index'), 'active' => request()->is('security/private-key*')],
-                            ['label' => 'Cloud Tokens', 'icon' => 'cloud', 'href' => route('security.cloud-tokens'), 'active' => request()->is('security/cloud-tokens*'), 'visible' => auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class)],
-                            ['label' => 'Integration Tokens', 'icon' => 'network', 'href' => route('security.integration-tokens'), 'active' => request()->is('security/integration-tokens'), 'visible' => auth()->user()?->can('viewAny', App\Models\IntegrationToken::class)],
-                            ['label' => 'Cloud-Init Scripts', 'icon' => 'file-content', 'href' => route('security.cloud-init-scripts'), 'active' => request()->is('security/cloud-init-scripts*'), 'visible' => auth()->user()?->can('viewAny', App\Models\CloudInitScript::class)],
+                            ['label' => 'Private Keys', 'icon' => 'keys', 'href' => route('security.private-key.index'), 'active' => request()->is('security/private-key*'), 'visible' => $teamWide],
+                            ['label' => 'Cloud Tokens', 'icon' => 'cloud', 'href' => route('security.cloud-tokens'), 'active' => request()->is('security/cloud-tokens*'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class)],
+                            ['label' => 'Integration Tokens', 'icon' => 'network', 'href' => route('security.integration-tokens'), 'active' => request()->is('security/integration-tokens'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\IntegrationToken::class)],
+                            ['label' => 'Cloud-Init Scripts', 'icon' => 'file-content', 'href' => route('security.cloud-init-scripts'), 'active' => request()->is('security/cloud-init-scripts*'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\CloudInitScript::class)],
                             ['label' => 'API Tokens', 'icon' => 'code', 'href' => route('security.api-tokens'), 'active' => request()->is('security/api-tokens')],
                         ]],
-                        ['label' => 'Subscription', 'icon' => 'subscription', 'href' => isCloud() ? route('subscription.show') : '', 'active' => request()->is('subscription*'), 'visible' => isCloud() && auth()->user()->isAdmin()],
-                        ['label' => 'Tags', 'icon' => 'tags', 'href' => route('tags.show'), 'active' => request()->is('tags*', 'canvas/tags')],
-                        ['label' => 'Settings', 'icon' => 'settings', 'visible' => isInstanceAdmin(), 'children' => [
+                        ['label' => 'Subscription', 'icon' => 'subscription', 'href' => isCloud() ? route('subscription.show') : '', 'active' => request()->is('subscription*'), 'visible' => $teamWide && isCloud() && auth()->user()->isAdmin()],
+                        ['label' => 'Tags', 'icon' => 'tags', 'href' => route('tags.show'), 'active' => request()->is('tags*', 'canvas/tags'), 'visible' => $teamWide],
+                        ['label' => 'Settings', 'icon' => 'settings', 'visible' => $teamWide && isInstanceAdmin(), 'children' => [
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->is('settings')],
                             ['label' => 'Advanced', 'icon' => 'grid', 'href' => route('settings.advanced'), 'active' => request()->is('settings/advanced')],
                             ['label' => 'Updates', 'icon' => 'refresh3', 'href' => route('settings.updates'), 'active' => request()->is('settings/updates')],
@@ -176,18 +184,18 @@
                     ->all());
                 $activeSubmenu = $navSections->flatten(1)->first(fn (array $item): bool => isset($item['children']) && $item['active']);
                 // Resource menus by depth, registered by registerMainNavContext() (e.g. from
-                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth};
-                // only the desktop sidebar has the slots.
-                $navContext = $desktop ? request()->attributes->get('mainNavContext', []) : [];
+                // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth}
+                // (the desktop sidebar); the mobile drawer moves it into its own slot while it shows (see init).
+                $navContext = request()->attributes->get('mainNavContext', []);
             @endphp
-            {{-- Wide screens on a resource page: the deepest resource menu replaces the main menu. Back shows the
+            {{-- On a resource page the deepest resource menu replaces the main menu. Back shows the
                  menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
             @foreach ($navContext as $depth => $navMenu)
                 @php
                     $previousDepth = collect($navContext)->keys()->filter(fn (int $key): bool => $key < $depth)->last() ?? -1;
                 @endphp
                 <li x-show="navLevel === {{ $depth }}" data-nav-level="{{ $depth }}" @unless ($loop->last) x-cloak @endunless
-                    class="hidden xl:contents">
+                    class="contents">
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="navLevel = {{ $previousDepth }}; navSwap = 'back'"
@@ -200,7 +208,8 @@
                                     :class="collapsed && 'lg:hidden'">{{ $navMenu['label'] }}</span>
                             </button>
                         </li>
-                        <li id="main-nav-context-{{ $depth }}" class="nav-context min-w-0"></li>
+                        <li @if ($desktop) id="main-nav-context-{{ $depth }}" @else data-mobile-nav-context="{{ $depth }}" @endif
+                            class="nav-context min-w-0"></li>
                     </ul>
                 </li>
             @endforeach
@@ -210,9 +219,9 @@
                 $renderedSubmenus = $navSections->flatten(1)->filter(fn (array $item): bool => isset($item['children']));
             @endphp
             @foreach ($renderedSubmenus as $submenuItem)
-                <li x-show="submenu === @js($submenuItem['label'])"
-                    @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @else x-cloak @endif
-                    @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+                <li x-show="navLevel === -1 && submenu === @js($submenuItem['label'])"
+                    @if ($submenuItem['active']) data-active-submenu="{{ $submenuItem['label'] }}" @endif
+                    @if (! $submenuItem['active'] || $navContext) x-cloak @endif class="contents">
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="submenu = ''; navSwap = 'back'" title="Back to the main menu" aria-label="Back to the main menu"
@@ -254,7 +263,7 @@
                     </ul>
                 </li>
             @endforeach
-            <li x-show="!submenu" @if ($activeSubmenu) x-cloak @endif @class(['contents', 'xl:hidden' => $navContext]) :class="{ 'xl:hidden': navLevel !== -1 }">
+            <li x-show="navLevel === -1 && !submenu" @if ($activeSubmenu || $navContext) x-cloak @endif class="contents">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
             @foreach ($navSections as $sectionLabel => $sectionItems)
                 {{-- The first section needs no title. --}}
@@ -292,8 +301,7 @@
         @endif
         @if (auth()->id() === 0 && (isCloud() || isDev()))
             {{-- Part of the main menu: hidden while a submenu or a resource menu shows. --}}
-            <li x-show="!submenu" @if ($activeSubmenu ?? null) x-cloak @endif @class(['xl:hidden' => $navContext ?? []])
-                :class="{ 'xl:hidden': navLevel !== -1 }">
+            <li x-show="navLevel === -1 && !submenu" @if (($activeSubmenu ?? null) || ($navContext ?? [])) x-cloak @endif>
                 <a title="Admin" {{ wireNavigate() }}
                     class="nav-admin {{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">
@@ -332,7 +340,7 @@
                 class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
                 <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
                     <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
-                    <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                    <path :d="collapsed ? 'M16 9v6' : 'M8 9v6'" d="M8 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
             </button>
         </div>

@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://snipe-it.readme.io/docs/introduction
 # slogan: Snipe-IT is an open-source asset management platform built for IT departments.
 # category: productivity
@@ -8,7 +7,7 @@
 
 services:
   app:
-    image: snipe/snipe-it:v8.7.1
+    image: snipe/snipe-it:v8.8.3
     environment:
       - SERVICE_URL_SNIPEIT_80
       - APP_ENV=production

@@ -68,7 +68,7 @@ beforeEach(function () {
 
     $this->remoteCommands = [];
     Process::fake(function (PendingProcess $process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $this->remoteCommands[] = $command;
 
         return Process::result(str_contains($command, 'docker ps -a') ? 'cancel-cleanup-uuid' : '');

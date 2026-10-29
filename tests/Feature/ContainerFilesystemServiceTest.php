@@ -1,6 +1,7 @@
 <?php
 
 use App\Data\FileEntry;
+use App\Exceptions\ContainerShellUnavailableException;
 use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -114,6 +115,108 @@ it('lists a directory by running the built command over SSH', function () {
     expect($entries[0]->name)->toBe('src');
 });
 
+it('reports a container without a shell instead of an empty folder', function (int $exitCode) {
+    Process::fake(['*' => Process::result(
+        errorOutput: 'OCI runtime exec failed: exec failed: unable to start container process: exec: "sh": executable file not found in $PATH',
+        exitCode: $exitCode,
+    )]);
+
+    (new ContainerFilesystemService(fsServer(), 'app-123'))->list('/');
+})->with([126, 127])->throws(ContainerShellUnavailableException::class);
+
+it('lists other docker exec failures as an empty folder', function () {
+    Process::fake(['*' => Process::result(errorOutput: 'Error response from daemon: container is not running', exitCode: 1)]);
+
+    expect((new ContainerFilesystemService(fsServer(), 'app-123'))->list('/'))->toBe([]);
+});
+
+function fsProcessStatus(string $uid, string $gid, string $groups, string $capPrm): string
+{
+    return "Name:\tapp\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\nGid:\t{$gid}\t{$gid}\t{$gid}\t{$gid}\nGroups:\t{$groups} \nCapInh:\t0000000000000000\nCapPrm:\t{$capPrm}\nCapEff:\t{$capPrm}\n";
+}
+
+it('reads the user, groups and capabilities of the container process for the helper', function () {
+    // Docker's default capability set for a root process.
+    expect(fsService()->parseProcessStatus(fsProcessStatus('0', '0', '0 1 2', '00000000a80425fb')))->toBe([
+        'user' => '0:0',
+        'groups' => ['1', '2'],
+        'capabilities' => ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'FSETID', 'KILL', 'SETGID', 'SETUID', 'SETPCAP', 'NET_BIND_SERVICE', 'NET_RAW', 'SYS_CHROOT', 'MKNOD', 'AUDIT_WRITE', 'SETFCAP'],
+    ]);
+    expect(fsService()->parseProcessStatus(fsProcessStatus('65532', '0', '0', '0000000000000000')))
+        ->toBe(['user' => '65532:0', 'groups' => [], 'capabilities' => []]);
+    expect(fsService()->parseProcessStatus(fsProcessStatus('0', '0', '', '000001ffffffffff'))['capabilities'])
+        ->toHaveCount(41);
+});
+
+it('rejects an unreadable process status', function (string $status) {
+    fsService()->parseProcessStatus($status);
+})->with(['', fsProcessStatus('x', '0', '', '0'), fsProcessStatus('0', '0', '', 'zz')])->throws(RuntimeException::class);
+
+it('lists through a locked-down helper container that runs as the container process', function () {
+    $server = fsServer();
+    $server->update(['user' => 'root']);
+    $commands = [];
+    Process::fake(function ($process) use (&$commands) {
+        $commands[] = remoteProcessScript($process);
+
+        return str_contains(remoteProcessScript($process), '/status')
+            ? Process::result(output: fsProcessStatus('65532', '0', '0 1000', '0000000000000000'))
+            : Process::result(output: "regular file\t9\t1\t644\troot\troot\t./users.yml");
+    });
+
+    $entries = (new ContainerFilesystemService($server, 'app-123', useHelper: true))->list('/data');
+
+    expect($entries)->toHaveCount(1)
+        ->and($entries[0]->name)->toBe('users.yml')
+        ->and($commands[0])->toContain("cat /proc/$(docker inspect --format '{{.State.Pid}}' 'app-123')/status")
+        ->and($commands[1])->toContain("docker run --rm --pid container:'app-123' --user '65532:0' --group-add '1000' --cap-drop ALL --security-opt no-new-privileges --network none --ipc none --read-only --log-driver none --pids-limit 64")
+        ->not->toContain('--cap-add')
+        ->not->toContain('docker exec')
+        ->toContain('/proc/1/root/data')
+        ->toContain('exit 126');
+});
+
+it('reports every helper failure instead of an empty folder', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: fsProcessStatus('0', '0', '0', '00000000a80425fb')))
+        ->push(Process::result(errorOutput: 'Unable to find image', exitCode: 125))]);
+
+    (new ContainerFilesystemService(fsServer(), 'app-123', useHelper: true))->list('/');
+})->throws(ContainerShellUnavailableException::class, 'Unable to find image');
+
+it('wraps the helper command in one sudo shell for non-root servers', function () {
+    $server = fsServer();
+    $server->update(['user' => 'deploy']);
+    $commands = [];
+    Process::fake(function ($process) use (&$commands) {
+        $commands[] = remoteProcessScript($process);
+
+        return count($commands) === 1
+            ? Process::result(output: fsProcessStatus('0', '0', '0', '00000000a80425fb'))
+            : Process::result(output: '');
+    });
+
+    (new ContainerFilesystemService($server, 'app-123', useHelper: true))->list('/');
+
+    expect($commands[0])->toContain("sudo cat /proc/$(sudo docker inspect --format '{{.State.Pid}}' 'app-123')/status")
+        ->and($commands[1])->toContain("sudo bash -c 'docker run --rm")
+        ->and(substr_count($commands[1], 'sudo'))->toBe(1);
+});
+
+it('streams downloads through the helper container in helper mode', function () {
+    Process::fake(['*' => Process::result(output: fsProcessStatus('0', '0', '0', '00000000a80425fb'))]);
+    $service = new ContainerFilesystemService(fsServer(), 'app-123', useHelper: true);
+
+    expect($service->buildDownloadCommand('/data', true))->toStartWith('docker run --rm')->toContain("tar czf - -C '\\''/proc/1/root/data'\\'' .")
+        ->and($service->buildDownloadCommand('/data/users.yml', false))->toContain("cat -- '\\''/proc/1/root/data/users.yml'\\''");
+});
+
+it('rejects a binary file that passes a grep without -I support', function () {
+    Process::fake(['*' => Process::result(output: "OK\n".base64_encode("ELF\0binary"))]);
+
+    (new ContainerFilesystemService(fsServer(), 'app-123'))->read('/pause');
+})->throws(RuntimeException::class, 'File is not editable');
+
 it('falls back to / when the container has no WorkingDir', function () {
     Process::fake(['*' => Process::result(output: '')]);
 
@@ -161,7 +264,7 @@ it('writes content near or above the shell argument limit via docker cp', functi
 
     (new ContainerFilesystemService($server, 'app-123'))->write('/app/big.txt', str_repeat('a', $size));
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker cp'));
 })->with([96 * 1024, 200_000]);
 
 it('base64-encodes content in the write command', function () {
@@ -260,8 +363,8 @@ it('uploads by scp-ing to the server then docker cp into the container', functio
 
     (new ContainerFilesystemService($server, 'app-123'))->upload($local, '/app/plugins/x.jar');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp')
-        && str_contains($process->command, 'app-123'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker cp')
+        && str_contains(remoteProcessScript($process), 'app-123'));
     @unlink($local);
 });
 
@@ -276,7 +379,7 @@ it('executes read guards for real file bytes through the non-root sudo parser', 
     $path = tempnam(sys_get_temp_dir(), 'fs-read-');
     file_put_contents($path, $content);
     Process::fake(function ($process) {
-        $lines = explode("\n", $process->command);
+        $lines = explode("\n", remoteProcessScript($process));
         $body = implode("\n", array_slice($lines, 1, -1));
         $local = new Symfony\Component\Process\Process([
             'bash', '-c',
@@ -312,7 +415,7 @@ it('rejects a symlink to an oversized file before reading its content', function
     fclose($handle);
     symlink($path, $link);
     Process::fake(function ($process) {
-        $body = implode("\n", array_slice(explode("\n", $process->command), 1, -1));
+        $body = implode("\n", array_slice(explode("\n", remoteProcessScript($process)), 1, -1));
         $local = new Symfony\Component\Process\Process(['bash', '-c', 'sudo() { "$@"; }; docker() { shift 2; "$@"; }; export -f sudo docker;'."\n".$body]);
         $local->run();
 
@@ -358,13 +461,13 @@ it('streams the remote command output to the writer in chunks', function () {
     $server = fsServer();
     $svc = new class($server, 'app-123') extends ContainerFilesystemService
     {
-        public ?string $remoteCommand = null;
+        public string $stdinFile;
 
-        protected function sshCommand(string $command): string
+        protected function sshCommand(): string
         {
-            $this->remoteCommand = $command;
+            $this->stdinFile = tempnam(sys_get_temp_dir(), 'fs-stream-');
 
-            return 'head -c 200000 /dev/zero';
+            return 'cat > '.escapeshellarg($this->stdinFile).'; head -c 200000 /dev/zero';
         }
     };
     $received = '';
@@ -375,7 +478,9 @@ it('streams the remote command output to the writer in chunks', function () {
         $chunks++;
     });
 
-    expect($svc->remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'");
+    $remoteCommand = file_get_contents($svc->stdinFile);
+    unlink($svc->stdinFile);
+    expect($remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'\n");
     expect(strlen($received))->toBe(200000);
     expect($chunks)->toBeGreaterThan(1);
 });

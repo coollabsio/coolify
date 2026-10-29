@@ -204,8 +204,8 @@ it('validates the served leaf after restart for root and non-root SSH users', fu
     $previous->update(['valid_until' => now()->addDays(10)]);
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = $process->command;
-        $output = str_contains($process->command, 'openssl s_client')
+        $commands[] = remoteProcessScript($process);
+        $output = str_contains(remoteProcessScript($process), 'openssl s_client')
             ? file_get_contents($this->directory.'/flux/pki/server.pem') : 'coolify-flux';
 
         return Process::result(output: $output);
@@ -255,7 +255,7 @@ it('rolls back when Flux serves the old leaf instead of the replacement', functi
     $previous = IssueFluxCertificate::run(['flux.example.test']);
     MaterializeFluxCertificate::run($previous);
     $previous->update(['valid_until' => now()->addDays(10)]);
-    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'openssl s_client') ? $previous->certificate_pem : 'coolify-flux'));
+    Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'openssl s_client') ? $previous->certificate_pem : 'coolify-flux'));
 
     expect(fn () => RenewFluxCertificate::run())->toThrow(RuntimeException::class, 'Flux did not serve the expected TLS certificate.');
     expect($previous->fresh()->state)->toBe('active')

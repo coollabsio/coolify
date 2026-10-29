@@ -29,19 +29,31 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\SslCertificate;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
+use App\Models\User;
 use App\Services\ServerTransfer\ServerTransferCoverage;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\ServerTransferFuzzer;
+use Tests\Support\ServerTransferSnapshot;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -209,3 +221,77 @@ test('every column of a transferred model is in the bundle or has a reason why n
         ->and(array_values(array_diff(array_keys(ServerTransferCoverage::NOT_EXPORTED_COLUMNS[$modelClass] ?? []), $columns)))
         ->toBe([], "These {$modelClass} columns no longer exist, so remove them from ServerTransferCoverage::NOT_EXPORTED_COLUMNS.");
 })->with(array_keys(ServerTransferCoverage::TRANSFERRED));
+
+test('every exported value arrives unchanged on the target', function () {
+    $keep = [
+        Server::class => ['ip', 'port', 'user', 'name'],
+        PrivateKey::class => ['private_key', 'fingerprint'],
+        GithubApp::class => ['is_system_wide'],
+        GitlabApp::class => ['is_system_wide'],
+        GiteaApp::class => ['is_system_wide'],
+        EnvironmentVariable::class => ['key', 'value', 'is_preview'],
+        SharedEnvironmentVariable::class => ['key', 'type'],
+        Environment::class => ['canvas_positions'],
+    ];
+    $values = [
+        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test']],
+        Application::class => ['fqdn' => 'https://fuzz-a.example.test,https://fuzz-b.example.test', 'domain_port_overrides' => null, 'noindex_domains' => ['https://fuzz-b.example.test']],
+        ApplicationPreview::class => ['fqdn' => 'https://pr-fuzz.example.test', 'domain_port_overrides' => null],
+        ServiceApplication::class => ['fqdn' => 'https://fuzz-service.example.test', 'domain_port_overrides' => null, 'noindex_domains' => []],
+        GithubRunnerConfig::class => ['labels' => ['fuzz-label'], 'max_runners' => 5, 'runner_image' => 'ghcr.io/fuzz/runner:2', 'cpu_limit' => '1.5', 'memory_limit' => '2g', 'capacity_wait_timeout' => 33, 'idle_timeout' => 44, 'job_timeout' => 55],
+        LocalFileVolume::class => ['fs_path' => '/data/coolify/applications/fuzz/app.conf', 'mount_path' => '/etc/fuzz/app.conf', 'chown' => '1000:1000', 'chmod' => '0640'],
+        // The import validates these values like the API does.
+        GithubApp::class => ['html_url' => 'https://github.fuzz.example.test', 'api_url' => 'https://api.github.fuzz.example.test'],
+        GitlabApp::class => ['html_url' => 'https://gitlab.fuzz.example.test', 'api_url' => 'https://gitlab.fuzz.example.test/api/v4'],
+        GiteaApp::class => ['html_url' => 'https://gitea.fuzz.example.test', 'api_url' => 'https://gitea.fuzz.example.test/api/v1'],
+        ScheduledTask::class => ['frequency' => '*/7 * * * *'],
+        ScheduledDatabaseBackup::class => ['frequency' => '0 3 * * *'],
+        ScheduledVolumeBackup::class => ['frequency' => '0 4 * * *'],
+        StandalonePostgresql::class => ['postgres_user' => 'fuzz_user', 'postgres_db' => 'fuzz_db', 'ports_mappings' => '15432:5432', 'public_port' => 15432],
+        StandaloneMongodb::class => ['mongo_initdb_root_username' => 'fuzz_user', 'mongo_initdb_database' => 'fuzz_db', 'ports_mappings' => '17017:27017', 'public_port' => 17017],
+        StandaloneMysql::class => ['mysql_user' => 'fuzz_user', 'mysql_database' => 'fuzz_db', 'ports_mappings' => '13306:3306', 'public_port' => 13306],
+        StandaloneMariadb::class => ['mariadb_user' => 'fuzz_user', 'mariadb_database' => 'fuzz_db', 'ports_mappings' => '13307:3306', 'public_port' => 13307],
+        StandaloneClickhouse::class => ['clickhouse_admin_user' => 'fuzz_user', 'ports_mappings' => '18123:8123', 'public_port' => 18123],
+        StandaloneRedis::class => ['ports_mappings' => '16379:6379', 'public_port' => 16379],
+        StandaloneKeydb::class => ['ports_mappings' => '16380:6379', 'public_port' => 16380],
+        StandaloneDragonfly::class => ['ports_mappings' => '16381:6379', 'public_port' => 16381],
+    ];
+    foreach (array_keys(ServerTransferCoverage::TRANSFERRED) as $class) {
+        $class::query()->withoutGlobalScopes()->get()
+            // Coolify sets the predefined server variables itself.
+            ->reject(fn (Model $record) => $record instanceof SharedEnvironmentVariable && str_starts_with($record->key, 'COOLIFY_'))
+            ->each(fn (Model $record) => ServerTransferFuzzer::fill($record, $keep[$class] ?? [], $values[$class] ?? []));
+    }
+    $s3 = S3Storage::query()->firstOrFail();
+    ScheduledDatabaseBackup::query()->firstOrFail()->s3Storages()->attach($s3->id);
+    ScheduledVolumeBackup::query()->firstOrFail()->s3Storages()->attach($s3->id);
+    // Coolify sets is_shared when it saves a variable.
+    EnvironmentVariable::query()->get()->each(fn (EnvironmentVariable $variable) => $variable->forceFill(['is_shared' => $variable->is_shared])->saveQuietly());
+    $teamId = $this->server->team_id;
+    $user = User::factory()->create();
+    Team::find($teamId)->members()->attach($user->id, ['role' => 'owner']);
+    session(['currentTeam' => Team::find($teamId)]);
+    $token = $user->createToken('round-trip', ['*', 'read:sensitive'])->plainTextToken;
+    $before = ServerTransferSnapshot::take($this->server->uuid);
+    $bundle = app(ServerTransferExporter::class)->export($this->server->fresh());
+
+    Schema::disableForeignKeyConstraints();
+    foreach (array_keys(ServerTransferCoverage::TRANSFERRED) as $class) {
+        DB::table((new $class)->getTable())->delete();
+    }
+    foreach (['taggables', 'scheduled_database_backup_s3_storage', 'scheduled_volume_backup_s3_storage'] as $pivot) {
+        DB::table($pivot)->delete();
+    }
+    Schema::enableForeignKeyConstraints();
+    Server::flushIdentityMap();
+
+    $response = $this->withHeaders(['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'])
+        ->postJson('/api/v1/servers/import', ['bundle' => $bundle]);
+    expect($response->status())->toBe(201, (string) $response->json('message'));
+
+    $changedOnPurpose = [
+        'last_online_at' => 'The import sets the status, which sets the time.',
+        'GithubRunnerConfig.is_enabled' => 'The target disables the runners until the user enables them.',
+    ];
+    expect(ServerTransferSnapshot::diff($before, ServerTransferSnapshot::take($this->server->uuid), $changedOnPurpose)['unexplained'])->toBe([]);
+});

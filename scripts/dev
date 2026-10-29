@@ -25,6 +25,7 @@
 # checkout and 17000 + slot for worktrees.
 #
 # Env: COOLIFY_DEV_SERVER_BACKEND=auto|lima|testing-host, COOLIFY_DEV_KVM_PROFILE=<profile>
+#      COOLIFY_DEV_GPU=1 passes the host NVIDIA GPU through to the KVM VM (ubuntu-root only)
 #
 # Side by side: COOLIFY_DEV_INSTANCE=<name> COOLIFY_DEV_SIDE_BY_SIDE=1 starts a second instance of
 # this checkout without stopping the other ones (for example a transfer target, see
@@ -461,7 +462,9 @@ start_backend() {
   tailscale_serve on
   if [[ "$backend" == "kvm" ]]; then
     echo "Using KVM profile: $profile"
-    host_qemu_artisan dev:qemu "$profile" --as-localhost
+    local gpu=()
+    [[ "${COOLIFY_DEV_GPU:-}" == 1 ]] && gpu=(--gpu)
+    host_qemu_artisan dev:qemu "$profile" --as-localhost "${gpu[@]}"
     if node_workers_enabled; then
       start_node_workers
     fi

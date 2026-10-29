@@ -49,6 +49,8 @@ $quiet(SecretManagerLink::class, ['resourceable_type' => $app->getMorphClass(), 
 // Server: Cloudflare tunnel token + custom proxy error page
 $server->settings->forceFill(['cloudflare_tunnel_integration_token_id' => $cloudflare->id, 'cloudflare_tunnel_id' => 'fake-tunnel', 'cloudflare_tunnel_account_id' => 'fake-account'])->saveQuietly();
 $server->forceFill(['proxy_error_page' => '<h1>fake error page</h1>'])->saveQuietly();
+// The server owns the DNS record of the SSH hostname of its tunnel
+$quiet(ManagedDnsRecord::class, ['team_id' => $teamId, 'integration_token_id' => $cloudflare->id, 'dns_provider_zone_id' => $zone->id, 'provider_record_id' => 'fake-ssh-record-id', 'type' => 'CNAME', 'name' => 'ssh-debian.example.test', 'content' => 'fake-tunnel.cfargotunnel.com', 'owned' => true])->addReference($server);
 
 // GitHub App + runner config (enabled) + one idle runner
 $githubApp = $quiet(GithubApp::class, ['name' => 'fake-gh-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'organization' => 'fake-org', 'app_id' => 123, 'installation_id' => 456, 'client_id' => 'fake-client', 'client_secret' => 'fake-secret', 'webhook_secret' => 'fake-webhook', 'is_system_wide' => false, 'is_public' => false, 'team_id' => $teamId, 'private_key_id' => $server->private_key_id]);
@@ -79,12 +81,11 @@ $app->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>fa
 
 // A git application that uses a system-wide GitHub App, which the transfer does not move
 $systemApp = $quiet(GithubApp::class, ['name' => 'fake-system-wide-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 0, 'is_system_wide' => true, 'is_public' => false]);
-$gitApp = new Application;
-$gitApp->forceFill([
-    'uuid' => new_public_id(), 'name' => 'git-shop', 'build_pack' => 'nixpacks', 'git_repository' => 'acme/shop', 'git_branch' => 'main', 'ports_exposes' => '3000',
+$gitApp = Application::create([
+    'name' => 'git-shop', 'build_pack' => 'nixpacks', 'git_repository' => 'acme/shop', 'git_branch' => 'main', 'ports_exposes' => '3000',
     'environment_id' => $environment->id, 'destination_id' => $app->destination_id, 'destination_type' => $app->destination_type,
-    'source_type' => GithubApp::class, 'source_id' => $systemApp->id,
-])->saveQuietly();
+]);
+$gitApp->forceFill(['source_type' => GithubApp::class, 'source_id' => $systemApp->id])->saveQuietly();
 
 // Project icon: a 1x1 JPEG
 app(ProjectIconStorageService::class)->storeProjectContents($project, base64_decode('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='));

@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -174,4 +175,25 @@ it('only includes deployments of applications owned by the current team', functi
         ->assertSee('Team Deployment')
         ->assertDontSee('Other Team Deployment')
         ->assertDontSee('Running or queued right now');
+});
+
+it('does not load deployment payload columns when the dashboard list polls', function () {
+    createDashboardDeployment(['logs' => '[{"output":"large deployment log"}]']);
+
+    $deploymentQueries = [];
+    DB::listen(function ($query) use (&$deploymentQueries) {
+        if (str_contains($query->sql, 'application_deployment_queues')) {
+            $deploymentQueries[] = $query->sql;
+        }
+    });
+
+    Livewire::test(ActiveDeployments::class)
+        ->assertSee('Dashboard App')
+        ->call('refreshDeployments')
+        ->assertSee('Dashboard App');
+
+    expect($deploymentQueries)->not->toBeEmpty();
+    foreach ($deploymentQueries as $sql) {
+        expect($sql)->not->toMatch('/select\s+("?\w+"?\.)?\*/i')->not->toContain('logs');
+    }
 });

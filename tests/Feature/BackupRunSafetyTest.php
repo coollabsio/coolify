@@ -65,7 +65,7 @@ function backupRunSafetyFakeRemoteCommands(array $outputs = []): Collection
 {
     $commands = collect();
     Process::fake(function ($process) use ($commands, $outputs) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands->push($command);
         foreach ($outputs as $needle => $output) {
             if (str_contains($command, $needle)) {
@@ -303,6 +303,30 @@ it('backs up a service PostgreSQL database as the user from PGUSER or POSTGRESQL
     'POSTGRES_USER wins' => ["POSTGRES_USER=app\nPGUSER=pguser", 'app'],
 ]);
 
+it('keeps owners and privileges in a single PostgreSQL database backup', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'supabase-db',
+        'image' => 'supabase/postgres:15.14.1.163',
+        'status' => 'running:healthy',
+    ]);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    $commands = backupRunSafetyFakeRemoteCommands(['| grep -E' => "POSTGRES_USER=postgres\nPOSTGRES_DB=postgres"]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect($commands->first(fn (string $command) => str_contains($command, 'pg_dump')))
+        ->toContain('pg_dump --format=custom --username')
+        ->not->toContain('--no-acl')
+        ->not->toContain('--no-owner');
+});
+
 function backupRunSafetyServiceDatabase(Server $server, StandaloneDocker $destination, Environment $environment, string $image): ServiceDatabase
 {
     $service = Service::factory()->create([
@@ -379,7 +403,7 @@ it('fails the running backup execution and notifies the team when the worker tim
     $team = $this->team;
     $atTimeout = null;
     Process::fake(function ($process) use ($queuedCopy, $team, &$atTimeout) {
-        if (str_contains($process->command, 'pg_dump')) {
+        if (str_contains(remoteProcessScript($process), 'pg_dump')) {
             $queuedCopy->failed(new TimeoutExceededException('App\Jobs\DatabaseBackupJob has timed out.'));
             $execution = ScheduledDatabaseBackupExecution::query()->sole();
             $atTimeout = [

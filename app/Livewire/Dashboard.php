@@ -8,7 +8,9 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\TeamInvitation;
+use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -21,16 +23,24 @@ class Dashboard extends Component
 
     public Collection $privateKeys;
 
+    /**
+     * Members limited to some projects do not see team-level sections such as servers.
+     */
+    #[Locked]
+    public bool $showsTeamSections = true;
+
     public function mount()
     {
-        if ($this->prefersCanvasView('dashboard')) {
+        $this->showsTeamSections = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
+
+        if ($this->showsTeamSections && $this->prefersCanvasView('dashboard')) {
             $this->redirectRoute('dashboard.canvas', navigate: true);
 
             return;
         }
 
-        $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
-        $this->servers = Server::ownedByCurrentTeamCached();
+        $this->privateKeys = $this->showsTeamSections ? PrivateKey::ownedByCurrentTeamCached() : collect();
+        $this->servers = $this->showsTeamSections ? Server::ownedByCurrentTeamCached() : collect();
         $this->projects = Project::ownedByCurrentTeam()
             ->with(['environments:id,uuid,name,project_id'])
             ->withCount([

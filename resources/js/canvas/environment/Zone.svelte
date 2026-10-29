@@ -1,16 +1,18 @@
 <script>
   // A zone frame (server, or a group of the connect view) with its header; the header drags the zone.
+  // grabBody (projects canvas): the whole frame drags the zone, so a press on its empty space does not pan the canvas.
   // Server canvas zones (zone.details) add a second row: host facts, proxy, live usage and a status summary.
   import { formatMemory, formatUptime, NO_SERVER, statusSummary, zoneHeader } from '../../environment-canvas.js';
   import Icon from './Icon.svelte';
 
-  let { box, movable, onpress, nodes = [], usage = null } = $props();
+  let { box, movable, grabBody = false, onpress, nodes = [], usage = null } = $props();
+  let frame;
   let header;
   // The server IP stays hidden until the user asks for it (screen sharing, screenshots).
   let showIp = $state(false);
   const zone = $derived(box.zone);
   const ok = $derived(zone?.is_reachable && zone?.is_usable);
-  const title = $derived(movable ? 'Drag to move every card in this zone' : !zone ? 'Resources without a server' : undefined);
+  const title = $derived(movable ? (grabBody ? 'Drag to move this zone' : 'Drag to move every card in this zone') : !zone ? 'Resources without a server' : undefined);
   const details = $derived(zone?.details);
   const host = $derived(details
     ? [details.os, details.arch, details.cpus ? `${details.cpus} ${details.cpus === 1 ? 'CPU' : 'CPUs'}` : null, formatMemory(details.memory_bytes), details.uptime_since && formatUptime(details.uptime_since) ? `up ${formatUptime(details.uptime_since)}` : null].filter(Boolean)
@@ -29,14 +31,19 @@
   const sep = 'h-3 w-px shrink-0 bg-neutral-200 dark:bg-white/[0.1]';
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="absolute rounded-2xl border border-neutral-200 bg-[color-mix(in_oklab,var(--color-neutral-50),white_50%)] dark:border-white/[0.07] dark:bg-[color-mix(in_oklab,var(--color-app),var(--color-panel)_35%)]"
+  bind:this={frame}
+  class="absolute rounded-2xl border border-neutral-200 bg-[color-mix(in_oklab,var(--color-neutral-50),white_50%)] dark:border-white/[0.07] dark:bg-[color-mix(in_oklab,var(--color-app),var(--color-panel)_35%)] {grabBody ? 'cursor-grab active:cursor-grabbing' : ''}"
+  data-ec-zone-drag={grabBody || undefined}
+  title={grabBody ? title : undefined}
+  onpointerdown={grabBody ? e => onpress(e, frame) : undefined}
   style:left="{box.x}px"
   style:top="{box.y}px"
   style:width="{box.width}px"
   style:height="{box.height}px"
 >
-  <div bind:this={header} class="px-4 {movable ? 'cursor-grab active:cursor-grabbing' : ''}" style:height="{zoneHeader(zone)}px" data-ec-zone-header {title} role="presentation" onpointerdown={e => onpress(e, header)}>
+  <div bind:this={header} class="px-4 {movable ? 'cursor-grab active:cursor-grabbing' : ''}" style:height="{zoneHeader(zone)}px" data-ec-zone-header title={grabBody ? undefined : title} role="presentation" onpointerdown={grabBody ? undefined : e => onpress(e, header)}>
     <div class="flex h-10 items-center gap-2 text-[12px]">
       <Icon name={zone?.icon || 'server'} class="size-3.5 text-neutral-400 dark:text-fg-faint" />
       <a class="truncate font-semibold text-neutral-700 dark:text-fg [&[href]]:cursor-pointer [&[href]]:underline-offset-2 [&[href]]:hover:underline" href={zone?.link || undefined} draggable="false">{box.name || NO_SERVER}</a>

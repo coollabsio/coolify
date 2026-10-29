@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ValidateServer
@@ -37,6 +38,25 @@ class ValidateServer
         $server->update([
             'validation_logs' => null,
         ]);
+        if ($server->hetzner_server_id) {
+            try {
+                $status = $server->refreshHetznerState();
+            } catch (\Throwable $e) {
+                // The provider API can be down or the token revoked; the SSH checks below still decide.
+                Log::warning('Could not refresh the Hetzner server status before validation', ['server_id' => $server->id, 'error' => $e->getMessage()]);
+                $status = null;
+            }
+            if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
+                $this->error = $status === 'off'
+                    ? 'Hetzner server is off. Power it on before validating.'
+                    : "Hetzner server is {$status}. Wait until it is running, then validate.";
+                $server->update([
+                    'validation_logs' => $this->error,
+                ]);
+                throw new \Exception($this->error);
+            }
+        }
+
         if ($server->vultr_instance_id) {
             $status = $server->refreshVultrState();
             if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
@@ -114,7 +134,7 @@ class ValidateServer
         if ($this->docker_version) {
             return 'OK';
         } else {
-            $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="text-black underline dark:text-white" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = $server->dockerEngineVersionError();
             $server->update([
                 'validation_logs' => $this->error,
             ]);

@@ -205,7 +205,9 @@ it('keeps domain settings out of the overview and supports editing and removal',
     $url = serviceConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->service).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertVisible('[aria-label="Internal port 8080"]')
         ->assertDontSee('Search engine indexing')
         ->assertDontSee('Remove domain')

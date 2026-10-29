@@ -527,7 +527,7 @@ describe('storage page', function () {
         $volume = LocalPersistentVolume::where('name', $name)->sole();
         $commands = [];
         Process::fake(function ($process) use (&$commands) {
-            $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+            $commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
             return Process::result(output: '');
         });

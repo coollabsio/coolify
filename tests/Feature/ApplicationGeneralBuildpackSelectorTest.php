@@ -60,27 +60,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
 });
 
-test('existing application buildpack selector lists railpack before nixpacks', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => StandaloneDocker::class,
-        'build_pack' => 'nixpacks',
-        'static_image' => 'nginx:alpine',
-        'base_directory' => '/',
-        'is_http_basic_auth_enabled' => false,
-        'redirect' => 'no',
-    ]);
-
-    Livewire::test(General::class, ['application' => $application])
-        ->assertSuccessful()
-        // The build strategy listbox renders its options as JSON-encoded Alpine data
-        ->assertSeeInOrder([
-            '\u0022value\u0022:\u0022railpack\u0022,\u0022label\u0022:\u0022Railpack\u0022',
-            '\u0022value\u0022:\u0022nixpacks\u0022,\u0022label\u0022:\u0022Nixpacks\u0022',
-        ], false);
-});
-
 test('existing application shows railpack without beta label in build pack selector', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,

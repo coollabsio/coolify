@@ -69,6 +69,8 @@
                 @can('manageEnvironment', $resource)
                     <x-callout type="info" title="Note">
                         Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
+                        To set flags, put <code class="font-mono"># coolify: literal buildtime=false runtime=false</code>
+                        directly above a variable line. Without this line, the flags of a variable do not change.
                     </x-callout>
                     <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
                         wire:model="variables" label="Production"></x-forms.textarea>
@@ -114,7 +116,7 @@
                                 @endphp
                                 <span @class([
                                     'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                    'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $selected,
                                     'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
                                 ])>
                                     @if ($selected)
@@ -132,7 +134,7 @@
                                     <span>{{ $label }}</span>
                                     <span @class([
                                         'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $environmentFilter === $value,
+                                        'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $environmentFilter === $value,
                                         'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => $environmentFilter !== $value,
                                     ])>
                                         @if ($environmentFilter === $value)
@@ -155,7 +157,7 @@
                                     @endphp
                                     <span @class([
                                         'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $serviceSelected,
+                                        'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $serviceSelected,
                                         'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $serviceSelected,
                                     ])>
                                         @if ($serviceSelected)

@@ -63,6 +63,9 @@
 - When the user defers workload scheduling hardening, return to the agreed Node networking architecture roadmap instead of continuing move-specific work.
 - When the user returns to the networking architecture firewall part, focus on scoped nftables policy, published-port intent, reconciliation, rollback, and verification before service routing work.
 - After the V5 network foundation, the approved focus is a plain image deploy: bug fixes, ports/env/command, pull policy, then ingress, container logs, and workload delete. Do not add volumes, secrets, or builds unless the user asks for them.
+## Keep imported data exact
+- The global `TrimStrings` and `ConvertEmptyStringsToNull` middleware change every string of a JSON request. An endpoint that receives stored records (for example the server transfer import) must skip them with `skipWhen()`; otherwise text loses its edge whitespace and an empty value becomes null.
+- Code that creates models from stored data with model events on also runs their `created` hooks and set-mutators (default destinations, settings, variables, parser versions, ports). Compare the result with the source record by record, and restore or remove what the hooks changed.
 
 ## Prove regressions before changing code
 - Reproduce the reported failure on the unchanged baseline before adding a fix.
@@ -79,16 +82,26 @@
 - SSH retries replay the full command batch. Only exit code 255 is an SSH transport failure; other exit codes come from the remote command, so do not retry them. Keep batches safe to run twice (for example `docker rm -f <name> || true` before `docker run --name <name>`).
 - Do not put `pkill -f "playwright run-server"` in the same shell command as other work; the pattern matches that shell and kills it. Run it as its own command.
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
-- Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors.
+- Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors. `click()` also hung on a button far down the long `/analytics` page; click it with `$page->script("document.querySelector('...').click()")` there.
 - A new worktree has no `vendor/` or `public/build/`. Run `composer install --ignore-platform-req=ext-zip` on the host and copy `public/build` from the main checkout before page-rendering tests; otherwise they fail with a Vite manifest error.
+- A running dev instance mounts the checkout, and its scheduled `CheckForUpdatesJob` writes the CDN data to `base_path('versions.json')`. Check `git diff versions.json` before you commit a version change.
+- A dev deployment that stays `in_progress` with no log lines and no `horizon_job_id` is waiting in a queue that Horizon does not serve. With `SELF_HOSTED=false` in `.env`, deployments go to the cloud `deployments` queue; run `./scripts/dev exec php artisan queue:work redis --queue=deployments --once` or fix the env.
 - Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
 - The helper image runs `docker compose` for deployments and for the Coolify upgrade itself. Before you bump its Docker CLI or Compose, test them against the oldest supported Docker Engine (for example a `docker:<version>-dind` container); newer clients can reject data from older daemons.
 - Do not symlink `vendor` into another worktree. Composer resolves the base path from the real `vendor` path, so the tests load the app classes of the other checkout. Run `composer install --ignore-platform-req=ext-zip` in the worktree.
 - To assert that the unsaved-changes bar shows, check `el.classList.contains('is-dirty')`. Playwright treats the hidden bar (`opacity-0`) as visible, and its class attribute always contains the text `is-dirty` from Tailwind variants.
+- In browser tests, address `x-forms.input` fields by `name` (`type('fieldName', ...)`); its HTML `id` is not always the Livewire property, so `#property` waits forever.
+- For load tests against a dev VM, use your own instance (`COOLIFY_DEV_INSTANCE=<name> COOLIFY_DEV_SIDE_BY_SIDE=1 ./scripts/dev start`); other sessions can reseed the localhost VM of a shared instance. The 1 GiB VM drops packets when its conntrack table is full (`dmesg`: `nf_conntrack: table full`), so raise `net.netfilter.nf_conntrack_max` on it and run an idle load first to prove a clean baseline.
 - Do not call `sleep()` in a browser test. The app server runs in the test process, so `sleep()` stops it; use `$page->wait()`.
+- `Queue::fake()` also captures `dispatchSync()` of a `ShouldQueue` job, so the job never runs. Fake only the jobs to block (`Queue::fake([SomeJob::class])`). Exception: actions (`AsAction`) are queued as `JobDecorator`, so `Queue::fake([SomeAction::class])` does not stop them; use `Queue::fake()` and `SomeAction::assertPushed()`.
+- `Notification::fake()` records nothing for a team that has no enabled channel. Turn one on (for example `emailNotificationSettings()->update(['use_instance_email_settings' => true, '<event>_email_notifications' => true])`) before `assertSentTo`.
 - In tests, turning on `is_metrics_enabled` (and other Sentinel settings) with `save()`/`update()` runs the settings hook, which starts Sentinel over a real SSH connection on the sync queue. Use `saveQuietly()` or `Queue::fake()`.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
+- The root team (id 0) has `personal_team = true`, so `personal_team` does not identify a user's own team. To clean up test users, detach them from shared teams and then delete the user; never delete a team selected by a filter. A Team delete revokes the team's API tokens and deletes its private keys before any guard can stop it.
 - SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely.
+- SQLite does not enforce `varchar(255)` lengths, while Postgres rejects a longer value (`SQLSTATE[22001]`). Tests cannot show a too-long name, so assert the length or the exact value of generated strings.
+
+- The Compose parsers (`parse()`, `applicationParser`, `serviceParser`) run on page mounts, refreshes, and deployments. Do not dispatch jobs or run server commands from them; let the caller that changes data start the work. Code that only needs the service names reads `docker_compose_raw` (`Application::composeServicesWithoutParse()`).
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
@@ -97,6 +110,8 @@
 - When a change alters how stored data reaches running containers, simulate the upgrade on the dev VM: start resources on the old code, then migrate and restart them on the new code, and compare the results.
 - Horizon workers in a dev instance keep the code they loaded. Run `./scripts/dev exec php artisan horizon:terminate` after a code change and before a live test of queued jobs.
 - To prove that a server side effect is blocked, check the server itself after the request. A model hook or job can be one of several write paths (for example `ServerStorageSaveJob` and `ServerFilesFromServerJob` both write file storages).
+
+- When you add a gate that lets a user through only after a step (2FA, password reset, onboarding), test it with users who have no known password (OAuth, magic-link invites) and together with the other redirecting gates. Two gates that each allow only their own page make a redirect loop, and a step that needs password confirmation blocks users who cannot confirm one.
 
 ## Preserve product scope
 - Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.
@@ -212,6 +227,8 @@
 - Bind native event callbacks from an Alpine component's `init()` method so closures mutate Alpine's reactive proxy. Callbacks bound on the raw object returned by an `Alpine.data` factory can change backing values without updating the DOM.
 - Protect complex Alpine-owned SVG or `x-for` subtrees with `wire:ignore` when the client keeps them synchronized from Livewire action results. Livewire morphing client-created SVG clones can remove reactive bindings while leaving partial marker elements.
 - A drift repair must inspect live kernel and service state, not only persisted hashes. Increment the desired revision before reconciliation so idempotent state files cannot suppress repair of missing live resources.
+## Report failures of queued actions
+- A value that an action returns when it runs as a queued job (`::dispatch()`) goes nowhere. Do not report a failure only with a return string or `throwError: false`; log it and broadcast it to the page that started the action.
 
 ## Format only your own files
 - `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.
@@ -247,3 +264,9 @@
 
 ## Session writes are last-writer-wins
 - Laravel saves the whole session payload at the end of every request, and pages run concurrent `wire:poll` requests. A value that one request changes can be overwritten by a request that started earlier. `KeepConcurrentTeamSwitch` protects `currentTeam`; protect any new session value that changes mid-session the same way, or keep it out of the session.
+
+## Keep `:has()` off page-wide ancestors
+- A `:has()` on `html`, `body`, `.app-shell`, or a sibling of `<main>` (for example `html:has(.x) .y`) makes Chrome restyle the page on every DOM change. Chart libraries read layout many times per render, so one ApexCharts render took ~400 ms and blocked navigation. Use a class set by the Blade layout instead, and keep `:has()` on small, local subjects.
+
+## Validate input safely
+- In PCRE, `$` also matches before a final `\n`. In validation regexes, use `\z` or reject control characters first, or a trailing newline passes.

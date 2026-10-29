@@ -95,6 +95,15 @@
                                 ['value' => false, 'label' => 'Fail the deployment'],
                             ]" />
                     </div>
+                    <div class="lg:col-span-2">
+                        <x-forms.listbox canGate="update" :canResource="$team" id="is_two_factor_required"
+                            label="Two-factor authentication"
+                            helper="When required, members without two-factor authentication must configure it before they can use this team."
+                            :disabled="! auth()->user()->can('update', $team)" :options="[
+                                ['value' => false, 'label' => 'Optional for members'],
+                                ['value' => true, 'label' => 'Required for all members'],
+                            ]" />
+                    </div>
                 </div>
             </x-application.settings-section>
         </form>

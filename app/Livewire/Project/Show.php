@@ -60,11 +60,10 @@ class Show extends Component
 
     public function render(): View
     {
-        $canUpdateProject = auth()->user()->can('update', $this->project);
-        $canCreateResource = auth()->user()->can('createAnyResource');
+        $user = auth()->user();
 
         return view('livewire.project.show', [
-            'environmentsJs' => $this->project->environments->map(function (Environment $environment) use ($canCreateResource, $canUpdateProject): array {
+            'environmentsJs' => $this->project->environments->sort(fn (Environment $first, Environment $second): int => Environment::compareNames($first->name, $second->name))->values()->map(function (Environment $environment) use ($user): array {
                 $resourceCount = collect([
                     $environment->applications_count,
                     $environment->services_count,
@@ -88,13 +87,13 @@ class Show extends Component
                         'project_uuid' => $this->project->uuid,
                         'environment_uuid' => $environment->uuid,
                     ]),
-                    'settingsHref' => $canUpdateProject
+                    'settingsHref' => $user->can('update', $environment)
                         ? route('project.environment.edit', [
                             'project_uuid' => $this->project->uuid,
                             'environment_uuid' => $environment->uuid,
                         ])
                         : null,
-                    'addResourceHref' => $canCreateResource
+                    'addResourceHref' => $user->can('createAnyResource', [$environment])
                         ? route('project.resource.create', [
                             'project_uuid' => $this->project->uuid,
                             'environment_uuid' => $environment->uuid,

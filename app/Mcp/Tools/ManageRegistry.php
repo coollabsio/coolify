@@ -19,7 +19,7 @@ class ManageRegistry extends RestActionTool
             'list' => ['method' => 'GET', 'path' => 'servers/{uuid}/registries', 'ability' => 'read:sensitive', 'description' => 'registry logins on the server (registry and username only)'],
             'create' => ['method' => 'POST', 'path' => 'servers/{uuid}/registries', 'ability' => 'deploy', 'description' => 'log in to a registry on the server (data: registry, username, password)'],
             'check' => ['method' => 'POST', 'path' => 'servers/{uuid}/registries/{registry}/check', 'ability' => 'write', 'description' => 'check that a registry login works'],
-            'delete' => ['method' => 'DELETE', 'path' => 'servers/{uuid}/registries/{registry}', 'ability' => 'write', 'confirm' => true, 'description' => 'log out of a registry; private image pulls can fail afterwards'],
+            'delete' => ['method' => 'DELETE', 'path' => 'servers/{uuid}/registries/{registry}', 'ability' => 'delete', 'confirm' => true, 'description' => 'log out of a registry; private image pulls can fail afterwards'],
         ];
     }
 

@@ -157,8 +157,6 @@ class DockerImage extends Component
 
     public function submit()
     {
-        $this->authorize('create', Application::class);
-
         $this->validate([
             'deploymentTarget' => ['required', 'string', 'regex:/^(cluster|node|destination):.+$/'],
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
@@ -232,6 +230,7 @@ class DockerImage extends Component
         $destination_class = $destination->getMorphClass();
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         // Append @sha256 to image name if using digest and not already present
         $imageName = $parser->getFullImageNameWithoutTag();

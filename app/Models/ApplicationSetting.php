@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Access\AccessResolver;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
@@ -52,6 +53,7 @@ use Symfony\Component\Yaml\Yaml;
         'include_source_commit_in_build' => ['type' => 'boolean'],
         'docker_images_to_keep' => ['type' => 'integer'],
         'stop_grace_period' => ['type' => 'integer', 'nullable' => true],
+        'rolling_update_drain_seconds' => ['type' => 'integer', 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off.'],
     ]
 )]
 class ApplicationSetting extends Model
@@ -84,6 +86,7 @@ class ApplicationSetting extends Model
         'is_git_shallow_clone_enabled' => 'boolean',
         'docker_images_to_keep' => 'integer',
         'stop_grace_period' => 'integer',
+        'rolling_update_drain_seconds' => 'integer',
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
         'is_include_timestamps' => 'boolean',
@@ -142,6 +145,7 @@ class ApplicationSetting extends Model
         'include_source_commit_in_build',
         'docker_images_to_keep',
         'stop_grace_period',
+        'rolling_update_drain_seconds',
     ];
 
     /**
@@ -150,10 +154,11 @@ class ApplicationSetting extends Model
      */
     public static function isContainerNamePrefixInUse(string $prefix, Server $server, ?int $ignoreApplicationId = null): bool
     {
-        return $server->applications()->contains(function (Application $application) use ($prefix, $ignoreApplicationId) {
+        // Hidden applications of a scoped member still count, or two names on one server could collide.
+        return app(AccessResolver::class)->withoutVisibilityScope(fn () => $server->applications()->contains(function (Application $application) use ($prefix, $ignoreApplicationId) {
             return $application->id !== $ignoreApplicationId
                 && in_array($prefix, [$application->uuid, $application->settings->custom_container_name_prefix, $application->settings->custom_internal_name], true);
-        });
+        }));
     }
 
     public function stopGracePeriodSeconds(): int
@@ -166,6 +171,11 @@ class ApplicationSetting extends Model
         }
 
         return DEFAULT_STOP_GRACE_PERIOD_SECONDS;
+    }
+
+    public function rollingUpdateDrainSeconds(): int
+    {
+        return min(max($this->rolling_update_drain_seconds ?? DEFAULT_ROLLING_UPDATE_DRAIN_SECONDS, 0), MAX_ROLLING_UPDATE_DRAIN_SECONDS);
     }
 
     public function deploymentStopGracePeriodSeconds(): int

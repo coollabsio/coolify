@@ -17,8 +17,6 @@ class Create extends Component
 
     public function mount()
     {
-        $this->authorize('createAnyResource');
-
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
         $database_image = request()->query('database_image');
@@ -32,6 +30,7 @@ class Create extends Component
         if (! $environment) {
             return redirect()->route('dashboard');
         }
+        $this->authorize('createAnyResource', [$environment]);
         if ($type->value() === 'docker-image' && (request()->filled('cluster') || request()->filled('server'))) {
             $this->type = $type->value();
 

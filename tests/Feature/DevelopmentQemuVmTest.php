@@ -143,8 +143,8 @@ it('points reused instance node workers at the instance flux gateway', function 
     Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'coolify-main' ssh")
         && str_contains($process->command, "'root@10.221.3.51'")
         && str_contains($process->command, "'\\''10.221.3.1'\\'' >> /etc/hosts"));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh destroy'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, '192.168.122'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh destroy'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), '192.168.122'));
 });
 
 it('removes the legacy single node worker vm before creating a node worker', function () {
@@ -164,7 +164,7 @@ it('removes the legacy single node worker vm before creating a node worker', fun
 
     Process::assertRan(fn ($process) => $process->command === "virsh destroy 'coolify-dev-node-worker'");
     Process::assertRan(fn ($process) => $process->command === "virsh undefine 'coolify-dev-node-worker'");
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'coolify-dev-ubuntu-root'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-root'));
     expect(File::exists("{$storagePath}/coolify-dev-node-worker.qcow2"))->toBeFalse()
         ->and(File::get("{$storagePath}/coolify-dev-ubuntu-root.qcow2"))->toBe('other vm data');
 });
@@ -175,19 +175,19 @@ it('stores vm disks in a libvirt-accessible directory', function () {
 
 it('automatically configures the qemu host', function () {
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'command -v')) {
+        if (str_contains(remoteProcessScript($process), 'command -v')) {
             return Process::result();
         }
 
-        if (str_contains($process->command, 'net-info')) {
+        if (str_contains(remoteProcessScript($process), 'net-info')) {
             return Process::result(exitCode: 1);
         }
 
-        if (str_contains($process->command, 'network inspect')) {
+        if (str_contains(remoteProcessScript($process), 'network inspect')) {
             return Process::result(output: "172.18.0.0/16\n");
         }
 
-        if (str_contains($process->command, 'iptables -C')) {
+        if (str_contains(remoteProcessScript($process), 'iptables -C')) {
             return Process::result(exitCode: 1);
         }
 
@@ -196,24 +196,24 @@ it('automatically configures the qemu host', function () {
 
     ConfigureDevelopmentQemuHost::run();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'command -v') && str_contains($process->command, 'xorriso'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'systemctl enable --now libvirtd'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virsh net-define'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virsh net-start'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virsh net-autostart'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'sysctl -w net.ipv4.ip_forward=1'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -I LIBVIRT_FWI'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'net.ipv4.conf.virbr0.route_localnet=1'));
-    Process::assertRan(fn ($process) => str_contains($process->command, '-t nat -I PREROUTING') && str_contains($process->command, '--dport 8000') && str_contains($process->command, '127.0.0.1:8000'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'command -v') && str_contains(remoteProcessScript($process), 'xorriso'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'systemctl enable --now libvirtd'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh net-define'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh net-start'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh net-autostart'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'sysctl -w net.ipv4.ip_forward=1'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'iptables -I LIBVIRT_FWI'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'net.ipv4.conf.virbr0.route_localnet=1'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '-t nat -I PREROUTING') && str_contains(remoteProcessScript($process), '--dport 8000') && str_contains(remoteProcessScript($process), '127.0.0.1:8000'));
 });
 
 it('does not restart an active libvirt network', function () {
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'net-info')) {
+        if (str_contains(remoteProcessScript($process), 'net-info')) {
             return Process::result(output: "Name: default\nActive:          yes\n");
         }
 
-        if (str_contains($process->command, 'network inspect')) {
+        if (str_contains(remoteProcessScript($process), 'network inspect')) {
             return Process::result(output: "172.18.0.0/16\n");
         }
 
@@ -222,9 +222,9 @@ it('does not restart an active libvirt network', function () {
 
     ConfigureDevelopmentQemuHost::run();
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh net-start'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -D LIBVIRT_FWI'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -I LIBVIRT_FWI 1'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh net-start'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'iptables -D LIBVIRT_FWI'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'iptables -I LIBVIRT_FWI 1'));
 });
 
 it('seeds one predefined root qemu server', function () {
@@ -237,6 +237,21 @@ it('seeds one predefined root qemu server', function () {
         ->and($server->user)->toBe('root')
         ->and($server->team_id)->toBe(0)
         ->and(Server::query()->where('uuid', 'like', 'development-qemu-%')->count())->toBe(1);
+});
+
+it('seeds a new qemu server with the caddy proxy', function () {
+    $server = SeedDevelopmentQemuServer::run('debian-root');
+
+    expect($server->proxyType())->toBe('CADDY')
+        ->and($server->proxy->get('status'))->toBe('exited');
+});
+
+it('keeps the proxy of an existing server when it seeds a qemu vm for it', function () {
+    $this->seed(ServerSeeder::class);
+
+    $server = SeedDevelopmentQemuServer::run('ubuntu-root', true, true);
+
+    expect($server->proxyType())->toBe('TRAEFIK');
 });
 
 it('uses a qemu vm as the localhost sentinel without changing its identity', function () {
@@ -275,8 +290,8 @@ it('seeds localhost through the container command', function () {
     ]))->toBe(Command::SUCCESS)
         ->and(Server::query()->findOrFail(0)->ip)->toBe('192.168.122.10');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker run -d --name coolify-db')
-        && str_contains($process->command, 'POSTGRES_DB='));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker run -d --name coolify-db')
+        && str_contains(remoteProcessScript($process), 'POSTGRES_DB='));
 });
 
 it('starts the instance database container with sudo on a non-root localhost vm', function () {
@@ -285,9 +300,9 @@ it('starts the instance database container with sudo on a non-root localhost vm'
 
     Artisan::call('dev:qemu:seed', ['profile' => 'ubuntu-non-root', '--as-localhost' => true]);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'if ! sudo docker inspect coolify-db')
-        && str_contains($process->command, 'sudo docker run -d --name coolify-db')
-        && str_contains($process->command, 'sudo docker start coolify-db'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'if ! sudo docker inspect coolify-db')
+        && str_contains(remoteProcessScript($process), 'sudo docker run -d --name coolify-db')
+        && str_contains(remoteProcessScript($process), 'sudo docker start coolify-db'));
 });
 
 it('still seeds localhost when the instance database container cannot start', function () {
@@ -377,7 +392,7 @@ it('starts the onboarding node without seeding a server or node', function () {
         ->and(Server::query()->where('uuid', 'development-qemu-node-onboarding')->exists())->toBeFalse()
         ->and(Node::query()->where('uuid', 'development-qemu-node-worker-a')->exists())->toBeTrue();
     Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-node-onboarding'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'dev:qemu:seed'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'dev:qemu:seed'));
 });
 
 it('never seeds the onboarding node or uses it as localhost', function () {
@@ -390,7 +405,7 @@ it('never seeds the onboarding node or uses it as localhost', function () {
 
 it('tells the developer where to onboard the clean node', function () {
     config(['app.env' => 'local']);
-    ManageDevelopmentQemuVm::shouldRun()->once()->with(['node-onboarding'], false, false);
+    ManageDevelopmentQemuVm::shouldRun()->once()->with(['node-onboarding'], false, false, false);
 
     $this->artisan('dev:qemu', ['profiles' => ['node-onboarding']])
         ->expectsOutputToContain('Add it at /servers/new/cluster-server')
@@ -511,13 +526,13 @@ it('reuses an existing vm without touching other managed vms', function () {
 
     $ran = [];
     Process::fake(function ($process) use (&$ran) {
-        $ran[] = $process->command;
+        $ran[] = remoteProcessScript($process);
 
         return match (true) {
-            str_contains($process->command, ' net-dumpxml ') => Process::result(output: '<network></network>'),
-            str_contains($process->command, ' network inspect ') => Process::result(output: "172.18.0.0/16\n"),
-            str_contains($process->command, ' dominfo ') => Process::result(output: 'exists'),
-            str_contains($process->command, ' domstate ') => Process::result(output: "shut off\n"),
+            str_contains(remoteProcessScript($process), ' net-dumpxml ') => Process::result(output: '<network></network>'),
+            str_contains(remoteProcessScript($process), ' network inspect ') => Process::result(output: "172.18.0.0/16\n"),
+            str_contains(remoteProcessScript($process), ' dominfo ') => Process::result(output: 'exists'),
+            str_contains(remoteProcessScript($process), ' domstate ') => Process::result(output: "shut off\n"),
             default => Process::result(),
         };
     });
@@ -529,12 +544,12 @@ it('reuses an existing vm without touching other managed vms', function () {
     expect($resize)->not->toBeFalse()
         ->and($commands->search("virsh setmem 'coolify-dev-ubuntu-non-root' 1024M --config"))->toBeGreaterThan($resize)
         ->and($commands->search("virsh start 'coolify-dev-ubuntu-non-root'"))->toBeGreaterThan($resize);
-    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install '));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh destroy'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh undefine'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'coolify-dev-ubuntu-root'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -I LIBVIRT_FWI'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec') && str_contains($process->command, 'coolify'));
+    Process::assertNotRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-install '));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh destroy'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh undefine'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-root'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'iptables -I LIBVIRT_FWI'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker exec') && str_contains(remoteProcessScript($process), 'coolify'));
     expect(File::get("{$storagePath}/coolify-dev-ubuntu-root.qcow2"))->toBe('other vm data')
         ->and(File::get("{$storagePath}/coolify-dev-ubuntu-non-root.qcow2"))->toBe('vm data');
 });
@@ -551,10 +566,10 @@ it('does not restart an already running vm', function () {
 
     StartDevelopmentQemuVm::run('ubuntu-root');
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh start'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh setmem'));
-    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install '));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec') && str_contains($process->command, 'fsockopen'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh start'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh setmem'));
+    Process::assertNotRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-install '));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker exec') && str_contains(remoteProcessScript($process), 'fsockopen'));
 });
 
 it('freshly recreates only the selected vm', function () {
@@ -574,13 +589,13 @@ it('freshly recreates only the selected vm', function () {
 
     StartDevelopmentQemuVm::run('ubuntu-non-root', true);
 
-    Process::assertRan(fn ($process) => $process->command === "virsh destroy 'coolify-dev-ubuntu-non-root'");
-    Process::assertRan(fn ($process) => $process->command === "virsh undefine 'coolify-dev-ubuntu-non-root'");
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'coolify-dev-ubuntu-root'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh start'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-ubuntu-non-root'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'cloud-init status --wait'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'net-update') && str_contains($process->command, 'ip-dhcp-host') && str_contains($process->command, '192.168.122.11'));
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh destroy 'coolify-dev-ubuntu-non-root'");
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh undefine 'coolify-dev-ubuntu-non-root'");
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-root'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh start'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install') && str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-non-root'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'cloud-init status --wait'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'net-update') && str_contains(remoteProcessScript($process), 'ip-dhcp-host') && str_contains(remoteProcessScript($process), '192.168.122.11'));
     expect(File::get("{$storagePath}/coolify-dev-ubuntu-root.qcow2"))->toBe('other vm data')
         ->and(File::exists("{$storagePath}/coolify-dev-ubuntu-non-root.qcow2"))->toBeFalse()
         ->and(File::exists("{$storagePath}/coolify-dev-ubuntu-non-root-prepared.qcow2"))->toBeTrue();
@@ -597,9 +612,9 @@ it('passes the fresh option from the command to the selected vms only', function
 
     expect(Artisan::call('dev:qemu', ['profiles' => ['debian-root'], '--fresh' => true]))->toBe(Command::SUCCESS);
 
-    Process::assertRan(fn ($process) => $process->command === "virsh undefine 'coolify-dev-debian-root'");
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-debian-root'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh destroy') && ! str_contains($process->command, 'coolify-dev-debian-root'));
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh undefine 'coolify-dev-debian-root'");
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install') && str_contains(remoteProcessScript($process), 'coolify-dev-debian-root'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh destroy') && ! str_contains(remoteProcessScript($process), 'coolify-dev-debian-root'));
 });
 
 it('rejects qemu vm management outside development', function () {
@@ -615,19 +630,19 @@ it('can create a vm without a host database connection', function () {
     ]);
     DB::enableQueryLog();
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'net-dumpxml')) {
+        if (str_contains(remoteProcessScript($process), 'net-dumpxml')) {
             return Process::result(output: '<network></network>');
         }
 
-        if (str_contains($process->command, 'network inspect')) {
+        if (str_contains(remoteProcessScript($process), 'network inspect')) {
             return Process::result(output: "172.18.0.0/16\n");
         }
 
-        if (str_contains($process->command, 'virsh dominfo')) {
+        if (str_contains(remoteProcessScript($process), 'virsh dominfo')) {
             return Process::result(exitCode: 1);
         }
 
-        if (str_contains($process->command, 'iptables -C')) {
+        if (str_contains(remoteProcessScript($process), 'iptables -C')) {
             return Process::result(exitCode: 1);
         }
 
@@ -637,14 +652,14 @@ it('can create a vm without a host database connection', function () {
     StartDevelopmentQemuVm::run('ubuntu-root');
 
     expect(DB::getQueryLog())->toBeEmpty();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -I LIBVIRT_FWI'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virsh domstate') && str_contains($process->command, 'shut off'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mv ') && str_contains($process->command, 'prepared.qcow2'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'qemu-img create') && str_contains($process->command, 'prepared.qcow2'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'xorriso -as mkisofs -V cidata -graft-points'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'bus=virtio,readonly=on'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mac_in_use'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'iptables -I LIBVIRT_FWI'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh domstate') && str_contains(remoteProcessScript($process), 'shut off'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mv ') && str_contains(remoteProcessScript($process), 'prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'qemu-img create') && str_contains(remoteProcessScript($process), 'prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'xorriso -as mkisofs -V cidata -graft-points'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install') && str_contains(remoteProcessScript($process), 'bus=virtio,readonly=on'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'mac_in_use'));
     $userData = File::get(config('development-qemu.storage_path').'/coolify-dev-ubuntu-root-user-data.yaml');
     expect($userData)->toContain('docker compose version', 'docker buildx version', 'docker info', 'cloud-init.disabled');
     $cloudInit = Yaml::parse($userData);
@@ -665,10 +680,10 @@ it('reuses a prepared vm image without reinstalling docker', function () {
 
     StartDevelopmentQemuVm::run('ubuntu-root');
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'curl --fail --location'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh domstate'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'qemu-img create') && str_contains($process->command, 'coolify-dev-ubuntu-root-prepared.qcow2'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && ! str_contains($process->command, '--cloud-init'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'curl --fail --location'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh domstate'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'qemu-img create') && str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-root-prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install') && ! str_contains(remoteProcessScript($process), '--cloud-init'));
     expect(File::exists("{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2"))->toBeTrue();
 });
 
@@ -694,26 +709,26 @@ it('prepares alpine with the compose and buildx packages for a non-root user', f
 it('does not cache a vm when preparation does not finish', function () {
     config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-failed-preparation-'.uniqid()]);
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'net-dumpxml')) {
+        if (str_contains(remoteProcessScript($process), 'net-dumpxml')) {
             return Process::result(output: '<network></network>');
         }
 
-        if (str_contains($process->command, 'network inspect')) {
+        if (str_contains(remoteProcessScript($process), 'network inspect')) {
             return Process::result(output: "172.18.0.0/16\n");
         }
 
-        if (str_contains($process->command, 'virsh dominfo')) {
+        if (str_contains(remoteProcessScript($process), 'virsh dominfo')) {
             return Process::result(exitCode: 1);
         }
 
-        return str_contains($process->command, 'timeout 900 bash')
+        return str_contains(remoteProcessScript($process), 'timeout 900 bash')
             ? Process::result(exitCode: 124)
             : Process::result();
     });
 
     expect(fn () => StartDevelopmentQemuVm::run('ubuntu-root'))->toThrow(RuntimeException::class);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mv ') && str_contains($process->command, 'prepared.qcow2'));
-    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install ') && ! str_contains($process->command, 'readonly=on'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'mv ') && str_contains(remoteProcessScript($process), 'prepared.qcow2'));
+    Process::assertNotRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-install ') && ! str_contains(remoteProcessScript($process), 'readonly=on'));
 });
 
 it('seeds through the coolify container when the host database is unavailable', function () {
@@ -731,7 +746,7 @@ it('seeds through the coolify container when the host database is unavailable', 
 
     ManageDevelopmentQemuVm::run('ubuntu-root');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'coolify' php artisan dev:qemu:seed") && str_contains($process->command, 'ubuntu-root'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'coolify' php artisan dev:qemu:seed") && str_contains(remoteProcessScript($process), 'ubuntu-root'));
 });
 
 it('passes localhost mode to the container when the host database is unavailable', function () {
@@ -748,7 +763,7 @@ it('passes localhost mode to the container when the host database is unavailable
 
     ManageDevelopmentQemuVm::run('ubuntu-root', true);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'dev:qemu:seed') && str_contains($process->command, '--as-localhost'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'dev:qemu:seed') && str_contains(remoteProcessScript($process), '--as-localhost'));
 });
 
 it('starts and seeds root and non-root profiles together', function () {
@@ -766,8 +781,8 @@ it('starts and seeds root and non-root profiles together', function () {
         'development-qemu-ubuntu-root',
         'development-qemu-ubuntu-non-root',
     ])->count())->toBe(2);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-ubuntu-root'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-ubuntu-non-root'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install') && str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-root'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'virt-install') && str_contains(remoteProcessScript($process), 'coolify-dev-ubuntu-non-root'));
 });
 
 it('seeds through the instance coolify container when the host database is unavailable', function () {
@@ -787,9 +802,9 @@ it('seeds through the instance coolify container when the host database is unava
 
     ManageDevelopmentQemuVm::run('ubuntu-root');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'coolify-fix-deploy-env' php artisan dev:qemu:seed"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'coolify-fix-deploy-env' php -r"));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, "docker exec 'coolify' "));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'coolify-fix-deploy-env' php artisan dev:qemu:seed"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'coolify-fix-deploy-env' php -r"));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'coolify' "));
 });
 
 it('resolves legacy values when no dev instance is configured', function () {
@@ -860,14 +875,14 @@ it('configures the instance libvirt network and forwarding rule', function () {
         '<ip address="10.221.3.1" netmask="255.255.255.0">',
         '<range start="10.221.3.2" end="10.221.3.254"/>',
     )->not->toContain('virbr0', '192.168.122');
-    Process::assertRan(fn ($process) => $process->command === "virsh net-info 'coolify-dev-3'");
-    Process::assertRan(fn ($process) => $process->command === "virsh net-start 'coolify-dev-3'");
-    Process::assertRan(fn ($process) => $process->command === "virsh net-autostart 'coolify-dev-3'");
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker network inspect 'coolify-main'"));
-    Process::assertRan(fn ($process) => $process->command === "iptables -I LIBVIRT_FWI 1 -s '172.30.0.0/16' -d '10.221.3.0/24' -o 'cdevbr3' -j ACCEPT");
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virbr0'));
-    Process::assertRan(fn ($process) => $process->command === 'sysctl -w net.ipv4.conf.cdevbr3.route_localnet=1');
-    Process::assertRan(fn ($process) => $process->command === 'iptables -t nat -I PREROUTING 1 -i cdevbr3 -p tcp --dport 8000 -j DNAT --to-destination 127.0.0.1:8000');
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh net-info 'coolify-dev-3'");
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh net-start 'coolify-dev-3'");
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh net-autostart 'coolify-dev-3'");
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker network inspect 'coolify-main'"));
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "iptables -I LIBVIRT_FWI 1 -s '172.30.0.0/16' -d '10.221.3.0/24' -o 'cdevbr3' -j ACCEPT");
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virbr0'));
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === 'sysctl -w net.ipv4.conf.cdevbr3.route_localnet=1');
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === 'iptables -t nat -I PREROUTING 1 -i cdevbr3 -p tcp --dport 8000 -j DNAT --to-destination 127.0.0.1:8000');
 });
 
 it('keeps the legacy libvirt network definition unchanged', function () {
@@ -887,7 +902,7 @@ it('keeps the legacy libvirt network definition unchanged', function () {
         '<ip address="192.168.122.1" netmask="255.255.255.0">',
         '<range start="192.168.122.2" end="192.168.122.254"/>',
     );
-    Process::assertRan(fn ($process) => $process->command === "iptables -I LIBVIRT_FWI 1 -s '172.18.0.0/16' -d '192.168.122.0/24' -o 'virbr0' -j ACCEPT");
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "iptables -I LIBVIRT_FWI 1 -s '172.18.0.0/16' -d '192.168.122.0/24' -o 'virbr0' -j ACCEPT");
 });
 
 it('creates instance vms with instance domains, ips, and shared prepared images', function () {
@@ -904,17 +919,17 @@ it('creates instance vms with instance domains, ips, and shared prepared images'
 
     StartDevelopmentQemuVm::run('ubuntu-root');
 
-    Process::assertRan(fn ($process) => $process->command === "virsh dominfo 'coolify-dev-main--ubuntu-root'");
-    Process::assertRan(fn ($process) => str_starts_with($process->command, "virsh net-update 'coolify-dev-3' add-last ip-dhcp-host") && str_contains($process->command, '52:54:00:ca:00:01') && str_contains($process->command, '10.221.3.10'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'qemu-img create')
-        && str_contains($process->command, "'{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2'")
-        && str_contains($process->command, "'{$storagePath}/coolify-dev-main--ubuntu-root.qcow2'"));
-    Process::assertRan(fn ($process) => str_starts_with($process->command, 'virt-install ')
-        && str_contains($process->command, "--name 'coolify-dev-main--ubuntu-root'")
-        && str_contains($process->command, "--network network='coolify-dev-3',model=virtio,mac='52:54:00:ca:00:01'")
-        && str_ends_with($process->command, '--check mac_in_use=off'));
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'coolify-main' php -r") && str_contains($process->command, "'10.221.3.10'"));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'curl --fail --location'));
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === "virsh dominfo 'coolify-dev-main--ubuntu-root'");
+    Process::assertRan(fn ($process) => str_starts_with(remoteProcessScript($process), "virsh net-update 'coolify-dev-3' add-last ip-dhcp-host") && str_contains(remoteProcessScript($process), '52:54:00:ca:00:01') && str_contains(remoteProcessScript($process), '10.221.3.10'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'qemu-img create')
+        && str_contains(remoteProcessScript($process), "'{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2'")
+        && str_contains(remoteProcessScript($process), "'{$storagePath}/coolify-dev-main--ubuntu-root.qcow2'"));
+    Process::assertRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-install ')
+        && str_contains(remoteProcessScript($process), "--name 'coolify-dev-main--ubuntu-root'")
+        && str_contains(remoteProcessScript($process), "--network network='coolify-dev-3',model=virtio,mac='52:54:00:ca:00:01'")
+        && str_ends_with(remoteProcessScript($process), '--check mac_in_use=off'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'coolify-main' php -r") && str_contains(remoteProcessScript($process), "'10.221.3.10'"));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'curl --fail --location'));
 });
 
 it('rejects invalid instance names and slots', function (string $instance, int $slot) {
@@ -967,3 +982,133 @@ function useDevelopmentQemuInstance(string $instance, int $slot, string $storage
         'storage_path' => $storagePath,
     ]]);
 }
+
+function fakeQemuHostWithGpu(string $domainState = 'running', string $domainXml = '<domain></domain>'): void
+{
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(output: 'exists'),
+        '* domstate *' => Process::result(output: "{$domainState}\n"),
+        '* dumpxml *' => Process::result(output: $domainXml),
+        'lspci *' => Process::result(output: implode("\n", [
+            '0000:01:00.0 "0300" "10de" "2584" -ra1 -p00 "1043" "8976"',
+            '0000:01:00.1 "0403" "10de" "2291" -ra1 -p00 "1043" "8976"',
+        ])."\n"),
+        '*' => Process::result(),
+    ]);
+}
+
+it('creates a vm with every function of the host nvidia gpu and more memory', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-gpu-create-test-'.uniqid();
+    config(['development-qemu.storage_path' => $storagePath, 'development-qemu.memory' => 1024, 'development-qemu.gpu_memory' => 4096]);
+    File::ensureDirectoryExists($storagePath);
+    File::put("{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2", 'prepared image');
+    fakeQemuHostWithGpu();
+
+    StartDevelopmentQemuVm::run('ubuntu-root', true, true);
+
+    Process::assertRan(fn ($process) => remoteProcessScript($process) === 'systemctl stop nvidia-persistenced');
+    Process::assertRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-install ')
+        && str_contains(remoteProcessScript($process), '--memory 4096 ')
+        && str_contains(remoteProcessScript($process), "--hostdev 'pci_0000_01_00_0' --hostdev 'pci_0000_01_00_1'"));
+});
+
+it('stops an existing vm to attach the host gpu and starts it with the gpu memory', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-attach-test-'.uniqid(), 'development-qemu.gpu_memory' => 4096]);
+    $hostdevAttached = false;
+    $ran = [];
+    Process::fake(function ($process) use (&$hostdevAttached, &$ran) {
+        $ran[] = remoteProcessScript($process);
+        $hostdevAttached = $hostdevAttached || str_starts_with(remoteProcessScript($process), 'virt-xml ');
+
+        return match (true) {
+            str_contains(remoteProcessScript($process), ' net-dumpxml ') => Process::result(output: '<network></network>'),
+            str_contains(remoteProcessScript($process), ' network inspect ') => Process::result(output: "172.18.0.0/16\n"),
+            str_contains(remoteProcessScript($process), ' dominfo ') => Process::result(output: 'exists'),
+            str_contains(remoteProcessScript($process), ' domstate ') => Process::result(output: $hostdevAttached ? "shut off\n" : "running\n"),
+            str_contains(remoteProcessScript($process), ' dumpxml ') => Process::result(output: $hostdevAttached ? "<domain><hostdev mode='subsystem'/></domain>" : '<domain></domain>'),
+            str_starts_with(remoteProcessScript($process), 'lspci ') => Process::result(output: "0000:01:00.0 \"0300\" \"10de\" \"2584\"\n0000:01:00.1 \"0403\" \"10de\" \"2291\"\n"),
+            default => Process::result(),
+        };
+    });
+
+    StartDevelopmentQemuVm::run('ubuntu-root', false, true);
+
+    $commands = collect($ran);
+    $shutdown = $commands->search("virsh shutdown 'coolify-dev-ubuntu-root'");
+    $attach = $commands->search("virt-xml 'coolify-dev-ubuntu-root' --add-device --hostdev 'pci_0000_01_00_0'");
+    expect($shutdown)->not->toBeFalse()
+        ->and($attach)->toBeGreaterThan($shutdown)
+        ->and($commands)->toContain("virt-xml 'coolify-dev-ubuntu-root' --add-device --hostdev 'pci_0000_01_00_1'")
+        ->and($commands->search("virsh setmem 'coolify-dev-ubuntu-root' 4096M --config"))->toBeGreaterThan($attach)
+        ->and($commands->search("virsh start 'coolify-dev-ubuntu-root'"))->toBeGreaterThan($commands->search('systemctl stop nvidia-persistenced'));
+    Process::assertNotRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-install '));
+});
+
+it('keeps the gpu memory of a gpu vm that starts without the gpu option', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-restart-test-'.uniqid(), 'development-qemu.memory' => 1024, 'development-qemu.gpu_memory' => 4096]);
+    fakeQemuHostWithGpu('shut off', "<domain><hostdev mode='subsystem'/></domain>");
+
+    StartDevelopmentQemuVm::run('ubuntu-root');
+
+    Process::assertRan("virsh setmem 'coolify-dev-ubuntu-root' 4096M --config");
+    Process::assertRan('systemctl stop nvidia-persistenced');
+    Process::assertNotRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-xml '));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), '1024M'));
+});
+
+it('fails before it changes the vm when the host has no nvidia gpu', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-no-gpu-test-'.uniqid()]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(output: 'exists'),
+        '* domstate *' => Process::result(output: "shut off\n"),
+        '*' => Process::result(),
+    ]);
+
+    expect(fn () => StartDevelopmentQemuVm::run('ubuntu-root', false, true))
+        ->toThrow(RuntimeException::class, 'No NVIDIA GPU found');
+    Process::assertNotRan(fn ($process) => str_starts_with(remoteProcessScript($process), 'virt-xml ') || str_contains(remoteProcessScript($process), 'virsh start'));
+});
+
+it('allows gpu passthrough only for one ubuntu root profile', function (array $profiles) {
+    Process::fake();
+
+    expect(Artisan::call('dev:qemu', ['profiles' => $profiles, '--gpu' => true]))->toBe(Command::FAILURE);
+
+    Process::assertNothingRan();
+})->with([
+    'non-root' => [['ubuntu-non-root']],
+    'other distribution' => [['debian-root']],
+    'two profiles' => [['ubuntu-root', 'debian-root']],
+]);
+
+it('seeds a gpu vm through the container so it installs the driver', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-seed-test-'.uniqid()]);
+    SeedDevelopmentQemuServer::mock()->shouldNotReceive('handle');
+    fakeQemuHostWithGpu('shut off', "<domain><hostdev mode='subsystem'/></domain>");
+
+    ManageDevelopmentQemuVm::run('ubuntu-root', true, false, true);
+
+    Process::assertRan("docker exec 'coolify' php artisan dev:qemu:seed 'ubuntu-root' --as-localhost --gpu");
+});
+
+it('does not start a gpu vm while host processes still use the gpu', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-gpu-busy-test-'.uniqid()]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(output: 'exists'),
+        '* domstate *' => Process::result(output: "shut off\n"),
+        '* dumpxml --inactive *' => Process::result(output: "<hostdev mode='subsystem' type='pci' managed='yes'>"),
+        'fuser *' => Process::result(output: "/dev/nvidia0: root 1210 F...m Xorg\n"),
+        '*' => Process::result(),
+    ]);
+
+    expect(fn () => StartDevelopmentQemuVm::run('ubuntu-root'))
+        ->toThrow(RuntimeException::class, 'Xorg');
+
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'virsh start'));
+});

@@ -34,6 +34,7 @@ class ApplicationPreview extends BaseModel
         'last_online_at',
         'domain_dns_statuses',
         'domain_port_overrides',
+        'keeps_production_values',
     ];
 
     protected $hidden = [
@@ -44,6 +45,7 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'keeps_production_values' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -196,8 +198,23 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domains from the preview URL template.
+     *
+     * With $keepExistingDomains, domains already stored on the preview (for example custom
+     * domains set in the UI) are kept, and only an empty preview gets generated domains.
+     */
+    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
+        if ($keepExistingDomains && filled($this->fqdn)) {
+            $normalized = DomainPortOverrides::normalize($this->fqdn, $this->domain_port_overrides);
+            $this->fqdn = $normalized['fqdn'];
+            $this->domain_port_overrides = $normalized['overrides'];
+            $this->save();
+
+            return $this;
+        }
+
         $applicationFqdn = $this->application->fqdn;
         if (! $applicationFqdn && $generateWithoutApplicationDomain) {
             $applicationFqdn = generateUrl(
@@ -221,7 +238,13 @@ class ApplicationPreview extends BaseModel
         return $this;
     }
 
-    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domain of every compose service from the preview URL template.
+     *
+     * With $keepExistingDomains, a service that already has domains on the preview keeps them,
+     * and only services without a preview domain get generated domains.
+     */
+    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
         $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
         $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
@@ -262,6 +285,21 @@ class ApplicationPreview extends BaseModel
         $docker_compose_domains = [];
         $previewPortOverrides = [];
         foreach ($serviceNames as $service_name) {
+            $existingPreviewDomains = $keepExistingDomains
+                ? DomainPortOverrides::normalize(getComposeServiceDomainString($previewDomains, $service_name), $this->domain_port_overrides)
+                : ['fqdn' => null, 'overrides' => null];
+            if (filled($existingPreviewDomains['fqdn'])) {
+                $docker_compose_domains = putComposeServiceDomain(
+                    $docker_compose_domains,
+                    $service_name,
+                    $existingPreviewDomains['fqdn'],
+                    $serviceNames,
+                );
+                $previewPortOverrides = array_merge($previewPortOverrides, $existingPreviewDomains['overrides'] ?? []);
+
+                continue;
+            }
+
             $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
             if (empty($domain_string)) {

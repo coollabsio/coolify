@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use OpenApi\Attributes as OA;
@@ -24,7 +25,7 @@ use OpenApi\Attributes as OA;
 class Environment extends BaseModel
 {
     use Auditable, HasFactory;
-    use ClearsGlobalSearchCache;
+    use ClearsGlobalSearchCache, ScopedByAccessGrants;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -54,6 +55,18 @@ class Environment extends BaseModel
                 $shared_variable->delete();
             }
         });
+    }
+
+    /**
+     * Sort order of environment names: production, staging, and development first, then the others by name.
+     * resources/js/environment-order.js has the same order for the canvases.
+     */
+    public static function compareNames(string $first, string $second): int
+    {
+        $order = ['production', 'staging', 'development'];
+        $rank = fn (string $name): int => ($index = array_search(strtolower($name), $order, true)) === false ? count($order) : $index;
+
+        return $rank($first) <=> $rank($second) ?: strnatcasecmp($first, $second);
     }
 
     public static function ownedByCurrentTeam()

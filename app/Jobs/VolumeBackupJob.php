@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Events\BackupCreated;
+use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
 use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
@@ -102,7 +104,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $archiveScript = self::archiveScript($compressionCpuPercentage);
             if ($streamToS3) {
                 $this->execution->update(['local_storage_deleted' => true]);
-                $archiveCommand = $this->streamToS3Command($destinations->first(), $archiveScript, $backupLocation, $source, $containerName, $image);
+                $archiveCommand = $this->streamToS3Command($destinations->first(), $archiveScript, $backupLocation, $containerName);
                 $this->execution->update(['s3_cleanup_pending' => true]);
             } else {
                 $archiveCommand = 'docker run --rm --name '.escapeshellarg($containerName)
@@ -124,11 +126,20 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            $archiveOutput = instant_remote_process(array_filter([
-                $verifySourceCommand,
-                $streamToS3 ? null : 'mkdir -p '.escapeshellarg($backupDirectory),
-                $archiveCommand,
-            ]), $server, timeout: $this->timeout, disableMultiplexing: true);
+            try {
+                if ($streamToS3) {
+                    $this->startStreamHelper($destinations->first(), $verifySourceCommand, $source, $containerName, $image, $server);
+                }
+                $archiveOutput = instant_remote_process(array_filter([
+                    $verifySourceCommand,
+                    $streamToS3 ? null : 'mkdir -p '.escapeshellarg($backupDirectory),
+                    $archiveCommand,
+                ]), $server, timeout: $this->timeout, disableMultiplexing: true);
+            } finally {
+                if ($streamToS3) {
+                    instant_remote_process(['docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true'], $server, throwError: false, disableMultiplexing: true);
+                }
+            }
             $this->execution->update([
                 'stop_container_ids' => null,
                 'stop_recovery_pending' => false,
@@ -429,21 +440,19 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
         $image = coolifyHelperImage().':'.getHelperVersion();
-        $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($s3->endpoint, $s3->trustedInternalHosts()))
-            ->map(fn (string $option): string => '--resolve '.escapeshellarg($option))
-            ->implode(' ');
-        $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
+        $resolveOptions = $this->minioClientResolveOptions($s3);
 
         try {
             instant_remote_process([
                 'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
-                'docker run -d --name '.escapeshellarg($containerName).' --rm -v '
+                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientRegionOption().' -v '
                     .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
-                'docker exec '.escapeshellarg($containerName).' mc alias set'.$resolveOptions.' temporary '
-                    .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret),
+            ], $server, timeout: $this->timeout, disableMultiplexing: true);
+            $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
+            S3Storage::retryMinioClientUpload(fn () => instant_remote_process([
                 'docker exec '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
                     .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/'),
-            ], $server, timeout: $this->timeout, disableMultiplexing: true);
+            ], $server, timeout: $this->timeout, disableMultiplexing: true));
         } finally {
             instant_remote_process(
                 ['docker rm -f '.escapeshellarg($containerName)],
@@ -454,31 +463,75 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function streamToS3Command(S3Storage $s3, string $archiveScript, string $backupLocation, string $source, string $containerName, string $image): string
+    /**
+     * Starts the helper container that streams the volume to S3 and sets its mc alias. The archive then
+     * runs in it with `docker exec`, so the S3 keys are never part of a command line.
+     */
+    private function startStreamHelper(S3Storage $s3, string $verifySourceCommand, string $source, string $containerName, string $image, Server $server): void
     {
-        $s3->testConnection(shouldSave: true);
+        instant_remote_process([
+            $verifySourceCommand,
+            'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
+            'docker run -d --rm --name '.escapeshellarg($containerName)
+                .' '.$s3->minioClientRegionOption()
+                .' -v '.escapeshellarg($source.':/volume:ro')
+                .' '.escapeshellarg($image).' >/dev/null',
+        ], $server, timeout: $this->timeout, disableMultiplexing: true);
+        $this->setMinioClientAlias($server, $containerName, $s3, $this->minioClientResolveOptions($s3));
+    }
+
+    /**
+     * Sets the `temporary` mc alias in a helper container. The S3 keys go to mc through the stdin of the
+     * SSH process, so they are not in the arguments of any process on Coolify or on the server.
+     */
+    private function setMinioClientAlias(Server $server, string $container, S3Storage $s3, string $resolveOptions): void
+    {
+        $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
+            .' mc alias set'.$resolveOptions.$s3->minioClientAliasOptions().' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
+        $timeout = (int) config('constants.ssh.command_timeout');
+
+        SshRetryHandler::retry(
+            function () use ($server, $remoteCommand, $s3, $timeout) {
+                $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+                $process = runSshProcess($sshCommand, $timeout, $s3->key."\n".$s3->secret."\n");
+
+                if ($process->exitCode() !== 0) {
+                    excludeCertainErrors($process->errorOutput(), $process->exitCode());
+                }
+            },
+            [
+                'server' => $server->ip,
+                'function' => 'setMinioClientAlias',
+            ],
+        );
+    }
+
+    private function minioClientResolveOptions(S3Storage $s3): string
+    {
         $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($s3->endpoint, $s3->trustedInternalHosts()))
             ->map(fn (string $option): string => '--resolve '.escapeshellarg($option))
             ->implode(' ');
-        $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
+
+        return $resolveOptions === '' ? '' : ' '.$resolveOptions;
+    }
+
+    private function streamToS3Command(S3Storage $s3, string $archiveScript, string $backupLocation, string $containerName): string
+    {
+        $s3->testConnection(shouldSave: true);
+        $resolveOptions = $this->minioClientResolveOptions($s3);
         $destination = 'temporary/'.$s3->bucket.$backupLocation;
         // `mc pipe --quiet` panics in recent mc releases, so keep its progress bar out of the error output instead.
         // Each progress frame starts with "\r", so printing the last field per line keeps only the final frame and real errors.
         $mcPipeLog = '/tmp/mc-pipe.log';
         // Object Lock buckets need Content-MD5 on each upload. `mc cp` adds it when the bucket lock is enabled, `mc pipe` only with `--checksum=MD5`.
-        $streamScript = 'set -o pipefail; mc alias set'.$resolveOptions.' temporary '
-            .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret)
-            .' >/dev/null && lock=$(mc retention info --default --json'.$resolveOptions.' '.escapeshellarg('temporary/'.$s3->bucket).' 2>/dev/null || true)'
+        $streamScript = 'set -o pipefail; lock=$(mc retention info --default --json'.$resolveOptions.' '.escapeshellarg('temporary/'.$s3->bucket).' 2>/dev/null || true)'
             .' && case "$lock" in *\'"enabled":"Enabled"\'*) checksum=--checksum=MD5 ;; *) checksum= ;; esac'
             .' && ('.$archiveScript.' | mc pipe'.$resolveOptions.' $checksum '.escapeshellarg($destination).' >/dev/null 2>'.$mcPipeLog
             .' || { status=$?; awk -F '.escapeshellarg('\r').' '.escapeshellarg('{ print $NF }').' '.$mcPipeLog.' >&2; exit $status; })'
             .' && mc stat --json'.$resolveOptions.' '.escapeshellarg($destination)
             .' | sed -n '.escapeshellarg('s/.*"size":\([0-9][0-9]*\).*/\1/p');
 
-        return 'docker run --rm --name '.escapeshellarg($containerName)
-            .' -v '.escapeshellarg($source.':/volume:ro')
-            .' '.escapeshellarg($image)
-            .' sh -c '.escapeshellarg($streamScript);
+        return 'docker exec '.escapeshellarg($containerName).' sh -c '.escapeshellarg($streamScript);
     }
 
     private function logCompressorInDevelopment(string $image, Server $server, int $compressionCpuPercentage): void

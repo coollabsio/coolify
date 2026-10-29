@@ -9,7 +9,7 @@ import {
 import {
     TERMINAL_CONNECT_TIMEOUT_MS,
     TERMINAL_CONNECTION_ERRORS,
-    classifyTerminalServerMessage,
+    isTerminalStartupRejection,
     resolveTerminalCloseOutcome,
     terminalSessionStartMethods,
 } from './terminal-connection.js';
@@ -70,16 +70,15 @@ function customThemeAccent() {
     return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// A custom theme can be light or dark: it sets only the cursor accent, and the page brightness picks the text colors.
 function createSystemTerminalTheme() {
-    if (document.documentElement.dataset.theme === 'custom') {
-        return createApplicationTerminalTheme(customThemeAccent());
-    }
+    const isCustomTheme = document.documentElement.dataset.theme === 'custom';
 
     if (document.documentElement.classList.contains('dark')) {
-        return createApplicationTerminalTheme('#8C8E9C');
+        return createApplicationTerminalTheme(isCustomTheme ? customThemeAccent() : '#8C8E9C');
     }
 
-    return createApplicationTerminalTheme('#52525b', {
+    return createApplicationTerminalTheme(isCustomTheme ? customThemeAccent() : '#52525b', {
         black: '#18181b',
         red: '#dc2626',
         green: '#15803d',
@@ -89,6 +88,12 @@ function createSystemTerminalTheme() {
         cyan: '#0e7490',
         white: '#52525b',
         brightBlack: '#71717a',
+        brightRed: '#b91c1c',
+        brightGreen: '#166534',
+        brightYellow: '#854d0e',
+        brightBlue: '#1d4ed8',
+        brightMagenta: '#7e22ce',
+        brightCyan: '#155e75',
         brightWhite: '#18181b',
         foreground: '#18181b',
     });
@@ -1102,18 +1107,12 @@ export function initializeTerminalComponent() {
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
-                } else if (classifyTerminalServerMessage(event.data) !== null) {
+                } else if (isTerminalStartupRejection(event.data)) {
                     logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
                     this.pendingCommand = null;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
-                    // Newer servers follow an auth rejection with a 4401/4403 close.
-                    this.failTerminalConnection(
-                        classifyTerminalServerMessage(event.data) === 'auth-rejected'
-                            ? TERMINAL_CONNECTION_ERRORS.authRejected
-                            : event.data,
-                        { override: true },
-                    );
+                    this.failTerminalConnection(event.data, { override: true });
                 } else {
                     try {
                         this.pendingWrites++;

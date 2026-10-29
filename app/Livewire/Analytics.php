@@ -56,8 +56,7 @@ class Analytics extends Component
     #[Url(as: 'app')]
     public string $appUuid = '';
 
-    // Realtime refresh; off by default (click "Live" to arm it). Only meaningful on the
-    // 24h range, which matches the 60s Sentinel cache TTL.
+    // Realtime refresh every 60s (the Sentinel cache TTL); off by default, works with every range.
     public bool $live = false;
 
     public ?array $overview = null;
@@ -186,12 +185,11 @@ class Analytics extends Component
         $this->loadData();
     }
 
-    public function toggleLive(): void
+    public function updatedLive(): void
     {
-        if ($this->range !== '24h') {
-            return;
+        if ($this->live) {
+            $this->loadData();
         }
-        $this->live = ! $this->live;
     }
 
     #[On('trafficAnalyticsStateChanged')]
@@ -209,11 +207,6 @@ class Analytics extends Component
             $this->refreshAppOptions();
             $this->loadData();
         }
-    }
-
-    public function isLivePollable(): bool
-    {
-        return $this->live && $this->range === '24h';
     }
 
     public function updatedServerUuid(): void
@@ -355,9 +348,14 @@ class Analytics extends Component
         $appRows = [];
         $hostTotals = [];
 
+        $clients = $servers->mapWithKeys(fn (Server $server) => [$server->uuid => $this->trafficClient($server)]);
+        if ($resource === null) {
+            SentinelTrafficClient::prefetchServerWideConcurrently($clients, $from, $to, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
+        }
+
         foreach ($servers as $server) {
             try {
-                $client = $this->trafficClient($server);
+                $client = $clients[$server->uuid];
 
                 if ($resource !== null) {
                     // One server in Sentinel's resource scope is exact; a merge across servers

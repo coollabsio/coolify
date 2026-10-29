@@ -10,8 +10,6 @@
             <x-slot:actions>
                 @if ($isTrafficAnalyticsEnabled)
                     <div class="flex items-center gap-3">
-                        <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
-                            text="Restarting Sentinel and proxy..." compact />
                         <x-modal-confirmation title="Disable traffic analytics?"
                             buttonTitle="Disable traffic analytics" submitAction="toggleTrafficAnalytics"
                             :actions="[
@@ -80,8 +78,6 @@
                                     Enable traffic analytics
                                 </x-forms.button>
                             @else
-                            <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
-                                text="Restarting Sentinel and proxy..." compact />
                             <x-modal-confirmation title="Enable traffic analytics?"
                                 buttonTitle="Enable traffic analytics" submitAction="toggleTrafficAnalytics"
                                 :actions="[

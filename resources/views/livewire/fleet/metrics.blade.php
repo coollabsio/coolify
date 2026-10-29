@@ -6,6 +6,16 @@ $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:
 // Tiles read "Fleet …" across all servers, but just "CPU / Memory / …" when scoped to one.
 $scoped = $serverUuid !== '';
 
+$cpuHelper = $scoped
+    ? 'Average usage of all CPU cores on this server. 100% means that all cores are fully busy.'
+    : 'Average CPU usage of the servers. The value of each server is the average of all its CPU cores, so 100% means that all cores are fully busy. Servers are not weighted by their number of cores.';
+
+$rangeListboxOptions = [
+    ['value' => '24h', 'label' => 'Last 24 hours'],
+    ['value' => '7d', 'label' => 'Last 7 days'],
+    ['value' => '30d', 'label' => 'Last 30 days'],
+];
+
 $serverListboxOptions = array_merge(
     [['value' => '', 'label' => 'All servers']],
     collect($serverOptions)->map(fn ($name, $uuid) => ['value' => $uuid, 'label' => $name])->values()->all(),
@@ -37,46 +47,23 @@ $serverListboxOptions = array_merge(
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 sm:ml-auto">
-                    @if ($range === '24h')
-                        <div x-data="{ live: $wire.entangle('live').live }"
-                            x-init="
-                                const stored = localStorage.getItem('metrics-live');
-                                if (stored === '0') { live = false; }
-                                if (stored === '1') { live = true; }
-                                $watch('live', value => localStorage.setItem('metrics-live', value ? '1' : '0'));
-                            ">
-                            <button type="button" @click="live = !live" :aria-pressed="live ? 'true' : 'false'"
-                                title="Toggle realtime refresh (updates every 60s)"
-                                class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium ring-1 transition-colors"
-                                :class="live
-                                    ? 'bg-white text-black shadow-sm ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]'
-                                    : 'text-neutral-500 ring-neutral-200 hover:text-black dark:text-fg-faint dark:ring-white/[0.08] dark:hover:text-fg'">
-                                <span class="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
-                                    <span x-show="live" class="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 motion-safe:animate-ping"></span>
-                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full" :class="live ? 'bg-emerald-500' : 'bg-neutral-400 dark:bg-white/40'"></span>
-                                </span>
-                                <span>Live Refresh</span>
-                            </button>
+                <div class="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+                    <div class="relative w-full transition-opacity sm:w-44"
+                        wire:loading.class="pointer-events-none opacity-60" wire:target="setRange">
+                        <x-forms.listbox id="range" onChange="setRange" :onChangeArgs="[]" :options="$rangeListboxOptions" />
+                        <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                            wire:loading.flex wire:target="setRange">
+                            <x-loading compact aria-label="Loading metrics" />
                         </div>
-                    @endif
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        @foreach (['24h' => '24 hours', '7d' => '7 days', '30d' => '30 days'] as $value => $label)
-                            <button type="button" wire:click="setRange('{{ $value }}')"
-                                wire:loading.attr="disabled" wire:target="setRange"
-                                @class([$tabButtonBase, $range === $value ? $tabButtonActive : $tabButtonInactive])>
-                                <span wire:loading.class="invisible" wire:target="setRange('{{ $value }}')">{{ $label }}</span>
-                                <x-loading compact class="absolute" wire:loading wire:target="setRange('{{ $value }}')" aria-label="Loading metrics" />
-                            </button>
-                        @endforeach
                     </div>
+                    <x-live-toggle :active="$live" storageKey="metrics-live" :restoreLive="$range === '24h'" title="Turn live refresh on or off (updates every 60 seconds)" />
                 </div>
             </div>
         @endif
     </div>
 
-    @if ($this->isLivePollable())
-        <div wire:poll.60s="loadData" class="hidden"></div>
+    @if ($this->pollSeconds())
+        <div wire:poll.{{ $this->pollSeconds() }}s="pollData" class="hidden"></div>
     @endif
 
     @if ($servers->isEmpty())
@@ -109,8 +96,10 @@ $serverListboxOptions = array_merge(
                     @php
                         $sTotal = max(1, (int) ($kpis['serversTotal'] ?? 0));
                         $sOnline = (int) ($kpis['serversOnline'] ?? 0);
-                        $sAttention = min($sOnline, (int) ($kpis['needsAttention'] ?? 0));
-                        $sHealthy = max(0, $sOnline - $sAttention);
+                        $sReporting = min($sOnline, (int) ($kpis['serversReporting'] ?? 0));
+                        $sAttention = min($sReporting, (int) ($kpis['needsAttention'] ?? 0));
+                        $sHealthy = max(0, $sReporting - $sAttention);
+                        $sNoMetrics = $sOnline - $sReporting;
                         $sOffline = max(0, $sTotal - $sOnline);
                     @endphp
                     <div class="mt-auto pt-3">
@@ -118,11 +107,13 @@ $serverListboxOptions = array_merge(
                             <div class="flex h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08] [&>div]:transition-[width] [&>div]:duration-700 [&>div]:ease-out">
                                 @if ($sHealthy > 0)<div class="bg-emerald-500" style="width: {{ $sHealthy / $sTotal * 100 }}%"></div>@endif
                                 @if ($sAttention > 0)<div class="bg-orange-400 dark:bg-warning" style="width: {{ $sAttention / $sTotal * 100 }}%"></div>@endif
+                                @if ($sNoMetrics > 0)<div class="bg-neutral-400 dark:bg-white/30" style="width: {{ $sNoMetrics / $sTotal * 100 }}%"></div>@endif
                                 @if ($sOffline > 0)<div class="bg-red-500 dark:bg-red-400" style="width: {{ $sOffline / $sTotal * 100 }}%"></div>@endif
                             </div>
                             <div class="flex flex-wrap items-center gap-x-2 text-[10px] text-neutral-500 dark:text-fg-dim">
                                 <span>{{ $sHealthy }} healthy</span>
                                 @if ($sAttention > 0)<span class="text-orange-500 dark:text-warning">{{ $sAttention }} attention</span>@endif
+                                @if ($sNoMetrics > 0)<span title="Coolify can reach these servers, but Sentinel did not return current metrics.">{{ $sNoMetrics }} no metrics</span>@endif
                                 @if ($sOffline > 0)<span class="text-red-500 dark:text-red-400">{{ $sOffline }} offline</span>@endif
                             </div>
                         </div>
@@ -226,7 +217,10 @@ $serverListboxOptions = array_merge(
              fleet series fall into a clean 2x2 below (no orphaned cell). --}}
         <div class="grid gap-6 lg:grid-cols-2">
             @foreach (['cpu' => 'CPU', 'memory' => 'Memory used', 'network' => 'Network throughput', 'load' => 'Load average', 'disk' => 'Disk usage'] as $key => $label)
-                <x-application.settings-section :title="$label" @class(['lg:col-span-2' => $key === 'cpu'])>
+                <x-application.settings-section :title="$label" :helper="$key === 'cpu' ? $cpuHelper : null" @class(['lg:col-span-2' => $key === 'cpu'])>
+                    <x-slot:actions>
+                        <div wire:ignore id="fleet-chart-{{ $key }}-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                    </x-slot:actions>
                     <div wire:ignore>
                         <div id="fleet-chart-{{ $key }}" class="min-h-[240px] w-full"></div>
                     </div>
@@ -241,7 +235,7 @@ $serverListboxOptions = array_merge(
                 <div class="data-table-header fleet-servers-table-grid border-b-0!">
                     @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Server', 'text' => true, 'class' => 'justify-self-start'])
                     @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'load' => 'Load', 'network' => 'Network'] as $column => $label)
-                        @include('livewire.traffic._sort-header', ['column' => $column, 'label' => $label, 'text' => true, 'dir' => 'desc', 'class' => 'justify-self-start'])
+                        @include('livewire.traffic._sort-header', ['column' => $column, 'label' => $label, 'text' => true, 'dir' => 'desc', 'class' => 'justify-self-start', 'title' => $column === 'cpu' ? 'Sort by CPU. 100% means that all cores of the server are fully busy.' : null])
                     @endforeach
                     @include('livewire.traffic._sort-header', ['column' => 'containers', 'label' => 'Containers', 'class' => 'justify-self-end'])
                 </div>
@@ -259,16 +253,18 @@ $serverListboxOptions = array_merge(
                                 'containers' => $row['containers'],
                             ];
                         @endphp
-                        {{-- Offline servers have no values, so they stay last in each sort. --}}
-                        <div wire:key="fleet-server-{{ $row['uuid'] }}" data-row="{{ json_encode($sortValues) }}" @unless ($row['online']) data-pinned @endunless
+                        {{-- Servers without metrics have no values, so they stay last in each sort. --}}
+                        <div wire:key="fleet-server-{{ $row['uuid'] }}" data-row="{{ json_encode($sortValues) }}" @unless ($row['reporting']) data-pinned @endunless
                             x-show="shown($el)"
                             class="data-table-row fleet-servers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
                             <div class="flex min-w-0 items-center gap-2">
                                 <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}"
                                     class="min-w-0 truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $row['name'] }}</a>
-                                @unless ($row['online'])
+                                @if (! $row['online'])
                                     <span class="table-badge table-badge-warning shrink-0">Offline</span>
-                                @endunless
+                                @elseif (! $row['reporting'])
+                                    <span class="table-badge shrink-0" title="Coolify can reach this server, but Sentinel did not return current metrics.">No metrics</span>
+                                @endif
                             </div>
                             <div>@include('livewire.fleet._usage-cell', ['percent' => $row['cpu'], 'kind' => 'cpu'])</div>
                             <div>@include('livewire.fleet._usage-cell', ['percent' => $memPercent, 'kind' => 'memory'])</div>
@@ -284,22 +280,7 @@ $serverListboxOptions = array_merge(
 
         {{-- Hottest containers --}}
         <x-application.settings-section id="metrics-containers-section" title="Hottest containers" flush
-            helper="{{ $scoped ? 'Busiest containers on this server, ranked by the selected metric.' : 'Busiest containers across the fleet, ranked by the selected metric.' }}">
-            <x-slot:actions>
-                <div class="flex items-center gap-2">
-                    <x-loading compact class="text-neutral-400 dark:text-fg-faint"
-                        wire:loading.flex wire:target="containerMetric" />
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'] as $m => $mlabel)
-                            <button type="button" wire:click="$set('containerMetric', '{{ $m }}')"
-                                wire:loading.attr="disabled" wire:target="containerMetric"
-                                @class([$tabButtonBase, $containerMetric === $m ? $tabButtonActive : $tabButtonInactive])>
-                                {{ $mlabel }}
-                            </button>
-                        @endforeach
-                    </div>
-                </div>
-            </x-slot:actions>
+            helper="{{ $scoped ? 'Busiest containers on this server, sortable by resource usage.' : 'Busiest containers across the fleet, sortable by resource usage.' }}">
             @if (empty($topContainers))
                 <div class="p-4">
                     <x-empty size="sm" title="No container metrics"
@@ -307,37 +288,28 @@ $serverListboxOptions = array_merge(
                 </div>
             @else
                 @php
-                    $metricOf = fn ($c) => match ($containerMetric) {
-                        'memory' => $c['memUsed'] ?? 0,
-                        'disk' => $c['diskBytes'] ?? 0,
-                        'network' => $c['net'] ?? 0,
-                        default => $c['cpu'] ?? 0,
-                    };
-                    // Bars are scaled to the leader so the row length reads as "share of the hottest".
-                    $maxMetric = max(1, collect($topContainers)->map($metricOf)->max());
+                    $containerMetrics = ['cpu' => 'CPU', 'memUsed' => 'Memory', 'diskBytes' => 'Disk', 'net' => 'Network'];
+                    $maxMetrics = [];
+                    foreach ($containerMetrics as $key => $label) {
+                        $maxMetrics[$key] = max(1, collect($topContainers)->max($key) ?? 0);
+                    }
                 @endphp
-                <div class="data-table transition-opacity" wire:loading.class="pointer-events-none opacity-50"
-                    wire:target="containerMetric" x-data="trafficTable({ per: Number.MAX_SAFE_INTEGER, key: 'value' })">
+                <div class="data-table" x-data="trafficTable({ per: Number.MAX_SAFE_INTEGER, key: 'cpu' })">
                     <div class="data-table-header fleet-containers-table-grid border-b-0!">
                         <span class="text-center">#</span>
                         @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Container', 'text' => true, 'class' => 'justify-self-start'])
                         @include('livewire.traffic._sort-header', ['column' => 'server', 'label' => 'Server', 'text' => true, 'class' => 'justify-self-start'])
-                        @include('livewire.traffic._sort-header', ['column' => 'value', 'label' => ['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'][$containerMetric], 'class' => 'justify-self-end'])
+                        @foreach ($containerMetrics as $key => $label)
+                            @include('livewire.traffic._sort-header', ['column' => $key, 'label' => $label, 'class' => 'justify-self-end', 'title' => $key === 'cpu' ? 'Sort by CPU. 100% means one CPU core is fully busy, so a container can go above 100%.' : null])
+                        @endforeach
                     </div>
                     <div class="flex flex-col">
                         @foreach ($topContainers as $c)
                             @php
                                 $meta = $this->containerMeta($c['id']);
-                                $pct = min(100, round($metricOf($c) / $maxMetric * 100, 1));
-                                $display = match ($containerMetric) {
-                                    'memory' => formatBytes($c['memUsed'] ?? 0),
-                                    'disk' => formatBytes($c['diskBytes'] ?? 0),
-                                    'network' => formatBytes($c['net'] ?? 0).'/s',
-                                    default => round($c['cpu'] ?? 0).'%',
-                                };
                             @endphp
                             <div wire:key="fleet-container-{{ $c['serverUuid'] ?? $c['server'] }}-{{ $c['id'] }}"
-                                data-row="{{ json_encode(['name' => $meta['name'], 'server' => $c['server'], 'value' => $metricOf($c)]) }}"
+                                data-row="{{ json_encode(['name' => $meta['name'], 'server' => $c['server'], 'cpu' => $c['cpu'] ?? 0, 'memUsed' => $c['memUsed'] ?? 0, 'diskBytes' => $c['diskBytes'] ?? 0, 'net' => $c['net'] ?? 0]) }}"
                                 x-show="shown($el)"
                                 class="data-table-row fleet-containers-table-grid border-t border-neutral-200 dark:border-white/[0.07]">
                                 <div class="self-center text-center text-[12px] tabular-nums text-neutral-400 dark:text-fg-faint">{{ $loop->iteration }}</div>
@@ -352,13 +324,23 @@ $serverListboxOptions = array_merge(
                                     @endif
                                 </div>
                                 <div class="min-w-0 self-center truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
-                                <div class="flex items-center justify-end gap-2.5 self-center">
-                                    <div class="hidden h-1.5 w-full max-w-[6rem] overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]"
-                                        title="{{ $pct }}% of the busiest">
-                                        <div class="h-full rounded-full bg-[var(--chart-status-3xx)] transition-[width] duration-700 ease-out" style="width: {{ $pct }}%"></div>
+                                @foreach ($containerMetrics as $key => $label)
+                                    @php
+                                        $pct = min(100, round(($c[$key] ?? 0) / $maxMetrics[$key] * 100, 1));
+                                        $display = match ($key) {
+                                            'cpu' => round($c[$key] ?? 0).'%',
+                                            'net' => formatBytes($c[$key] ?? 0).'/s',
+                                            default => formatBytes($c[$key] ?? 0),
+                                        };
+                                    @endphp
+                                    <div class="flex items-center justify-end gap-2.5 self-center">
+                                        <div class="hidden h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-neutral-100 xl:block dark:bg-white/[0.06]"
+                                            title="{{ $pct }}% of the busiest">
+                                            <div class="h-full rounded-full bg-[var(--chart-status-3xx)] transition-[width] duration-700 ease-out" style="width: {{ $pct }}%"></div>
+                                        </div>
+                                        <span class="whitespace-nowrap text-right text-[13px] tabular-nums text-black dark:text-fg">{{ $display }}</span>
                                     </div>
-                                    <span class="w-20 shrink-0 whitespace-nowrap text-right text-[13px] tabular-nums text-black dark:text-fg">{{ $display }}</span>
-                                </div>
+                                @endforeach
                             </div>
                         @endforeach
                     </div>
@@ -388,9 +370,6 @@ $serverListboxOptions = array_merge(
                 };
                 const fmtRate = v => `${fmtBytes(v)}/s`;
 
-                const fmtLocalTime = ts => new Date(ts).toLocaleString(undefined, { hour12: false, timeZoneName: 'short' });
-                const fmtUtcTime = ts => new Date(ts).toLocaleString(undefined, { hour12: false, timeZone: 'UTC', timeZoneName: 'short' });
-
                 // The app strips the default ApexCharts tooltip background (utilities.css), so
                 // every chart must render its own `apexcharts-tooltip-custom` markup.
                 const customTooltip = formatter => ({ series, dataPointIndex, w }) => {
@@ -402,8 +381,7 @@ $serverListboxOptions = array_merge(
                         rows += `<div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames[i]}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>`;
                     });
                     return `<div class="apexcharts-tooltip-custom">${rows}
-                        <div class="apexcharts-tooltip-custom-title">Your time: ${fmtLocalTime(timestamp)}</div>
-                        <div class="apexcharts-tooltip-custom-title">UTC: ${fmtUtcTime(timestamp)}</div>
+                        ${window.chartTooltipTime(timestamp)}
                     </div>`;
                 };
 
@@ -415,7 +393,7 @@ $serverListboxOptions = array_merge(
                     fill: { type: 'gradient', gradient: { opacityFrom: 0.28, opacityTo: 0.02, stops: [0, 90, 100] } },
                     dataLabels: { enabled: false },
                     grid: { borderColor: 'rgba(128, 128, 128, 0.14)', strokeDashArray: 4 },
-                    legend: { show: series.length > 1, labels: { colors: axisColor } },
+                    legend: { show: false },
                     xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: axisColor } } },
                     yaxis: { min: 0, max: max => max > 0 ? max * 1.2 : 1, forceNiceScale: true, tickAmount: 4, labels: { style: { colors: axisColor }, formatter } },
                     noData: { text: 'No data for this range', style: { color: axisColor } },
@@ -441,6 +419,16 @@ $serverListboxOptions = array_merge(
                     chart.render();
                     charts[key] = chart;
                 }
+                window.syncChartTooltips('{!! $chartId !!}', Object.values(charts));
+
+                const renderLegends = specs => {
+                    for (const [key, spec] of Object.entries(specs)) {
+                        renderChartLegend(document.getElementById(`fleet-chart-${key}-legend`), spec.series.map((series, i) => ({
+                            name: series.name, color: spec.colors[i], data: series.data, formatter: spec.formatter,
+                        })));
+                    }
+                };
+                renderLegends(specs);
 
                 Livewire.on('refreshChartData-{!! $chartId !!}', payload => {
                     if (typeof checkTheme === 'function') { checkTheme(); }
@@ -450,6 +438,7 @@ $serverListboxOptions = array_merge(
                     for (const [key, chart] of Object.entries(charts)) {
                         chart.updateSeries(next[key].series);
                     }
+                    renderLegends(next);
                 });
                 });
             })();

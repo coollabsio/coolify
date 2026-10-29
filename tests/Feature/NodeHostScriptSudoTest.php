@@ -46,11 +46,11 @@ beforeEach(function () {
 
     $this->sentScripts = [];
     Process::fake(function (PendingProcess $process) {
-        $lines = explode(PHP_EOL, (string) $process->command);
-        if (count($lines) < 3) {
+        // The SSH command batch goes to the server on stdin.
+        if (! is_string($process->input) || $process->input === '') {
             return Process::result();
         }
-        $body = implode(PHP_EOL, array_slice($lines, 1, -1));
+        $body = rtrim($process->input, PHP_EOL);
         $this->sentScripts[] = $body;
 
         $shell = new ShellProcess(['bash', '-se'], $this->sandbox, ['PATH' => $this->bin, 'ELEVATED' => false], $body, 30);

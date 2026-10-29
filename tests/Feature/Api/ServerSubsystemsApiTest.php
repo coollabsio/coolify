@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StartSentinel;
+use App\Actions\Server\StopLogDrain;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\InstanceSettings;
@@ -186,6 +188,39 @@ describe('Log drains API', function () {
         $settings = $this->server->settings->fresh();
         expect($settings->logdrain_axiom_dataset_name)->toBe('api-dataset')
             ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
+    });
+
+    test('PATCH sets the Axiom edge domain and rejects a value that is not a hostname', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => 'eu-central-1.aws.edge.axiom.co',
+            ])
+            ->assertOk()
+            ->assertJsonPath('logdrain_axiom_domain', 'eu-central-1.aws.edge.axiom.co');
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => "evil.example.com\nAXIOM_API_KEY=x",
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_axiom_domain');
+
+        expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('eu-central-1.aws.edge.axiom.co');
+    });
+
+    test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_axiom_enabled' => false,
+            ])
+            ->assertOk();
+
+        StopLogDrain::assertNotPushed();
+        StartLogDrain::assertNotPushed();
     });
 
     test('PATCH requires the deploy permission to change the custom log drain config', function (string $field) {

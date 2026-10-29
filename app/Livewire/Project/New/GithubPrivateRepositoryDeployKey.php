@@ -40,9 +40,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public ?string $publish_directory = null;
 
-    // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
+    // In case of docker compose
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
 
@@ -71,6 +71,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
+            'base_directory' => ValidationPatterns::directoryPathRules(),
             'docker_compose_location' => ValidationPatterns::filePathRules(),
         ];
     }
@@ -82,6 +83,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'is_static' => 'Is static',
         'publish_directory' => 'Publish directory',
         'build_pack' => 'Build pack',
+        'base_directory' => 'Base directory',
     ];
 
     public function mount()
@@ -128,7 +130,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function setPrivateKey($private_key_id)
     {
-        $this->authorize('create', Application::class);
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($private_key_id);
         $this->private_key_id = $privateKey->id;
@@ -149,8 +153,6 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function submit()
     {
-        $this->authorize('create', Application::class);
-
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
         $this->validate();
@@ -169,6 +171,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),
@@ -181,6 +184,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
                     'private_key_id' => $privateKey->id,
+                    'base_directory' => $this->base_directory,
                 ];
             } else {
                 $application_init = [
@@ -196,6 +200,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'private_key_id' => $privateKey->id,
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
+                    'base_directory' => $this->base_directory,
                 ];
             }
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
@@ -206,7 +211,6 @@ class GithubPrivateRepositoryDeployKey extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
             }
             $application = new Application($application_init);
             $application->save();

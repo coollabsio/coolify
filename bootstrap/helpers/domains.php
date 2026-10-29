@@ -1,10 +1,14 @@
 <?php
 
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\Access\AccessResolver;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Count domains in a comma-separated FQDN string (e.g. "https://a.com,https://b.com").
@@ -115,6 +119,29 @@ function applicationDomainEntries(Application $application): Collection
     return $entries->values();
 }
 
+/**
+ * True when the authenticated user cannot see the resource, so a conflict must not reveal its name.
+ */
+function domainConflictResourceIsHidden(Model $resource): bool
+{
+    return auth()->check() && Gate::denies('view', $resource);
+}
+
+/**
+ * @return array{domain: string, resource_name: string, resource_link: null, resource_uuid: null, resource_type: string, message: string}
+ */
+function hiddenDomainConflict(string $domain, string $type): array
+{
+    return [
+        'domain' => $domain,
+        'resource_name' => 'another resource',
+        'resource_link' => null,
+        'resource_uuid' => null,
+        'resource_type' => $type,
+        'message' => "Domain $domain is already in use by another resource in this team",
+    ];
+}
+
 function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     $conflicts = [];
@@ -145,79 +172,72 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
         return domainConflictKey((string) $domain);
     });
 
-    // Filter applications by team if we have a current team
-    $appsQuery = Application::query();
-    if ($currentTeam) {
-        $appsQuery = $appsQuery->whereHas('environment.project', function ($query) use ($currentTeam) {
-            $query->where('team_id', $currentTeam->id);
-        });
-    }
-    $apps = $appsQuery->get();
+    // A member limited to some projects must still see conflicts with every resource of the team.
+    [$apps, $serviceApps] = app(AccessResolver::class)->withoutVisibilityScope(function () use ($currentTeam) {
+        $appsQuery = Application::query();
+        $serviceAppsQuery = ServiceApplication::query()->with('service');
+        if ($currentTeam) {
+            $appsQuery->whereHas('environment.project', function ($query) use ($currentTeam) {
+                $query->where('team_id', $currentTeam->id);
+            });
+            $serviceAppsQuery->whereHas('service.environment.project', function ($query) use ($currentTeam) {
+                $query->where('team_id', $currentTeam->id);
+            });
+        }
+
+        return [$appsQuery->get(), $serviceAppsQuery->get()];
+    });
+
     foreach ($apps as $app) {
         foreach (applicationDomainEntries($app) as $domainEntry) {
             $naked_domain = $domainEntry['domain'];
-            if ($domains->contains(domainConflictKey($naked_domain))) {
-                if (data_get($resource, 'uuid')) {
-                    if ($resource->uuid !== $app->uuid) {
-                        $conflicts[] = [
-                            'domain' => $naked_domain,
-                            'resource_name' => $app->name,
-                            'resource_link' => $app->link(),
-                            'resource_type' => 'application',
-                            'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
-                            ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
-                        ];
-                    }
-                } else {
-                    $conflicts[] = [
-                        'domain' => $naked_domain,
-                        'resource_name' => $app->name,
-                        'resource_link' => $app->link(),
-                        'resource_type' => 'application',
-                        'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
-                        ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
-                    ];
-                }
+            if (! $domains->contains(domainConflictKey($naked_domain))) {
+                continue;
             }
+            if (data_get($resource, 'uuid') && $resource->uuid === $app->uuid) {
+                continue;
+            }
+            if (domainConflictResourceIsHidden($app)) {
+                $conflicts[] = hiddenDomainConflict($naked_domain, 'application');
+
+                continue;
+            }
+            $conflicts[] = [
+                'domain' => $naked_domain,
+                'resource_name' => $app->name,
+                'resource_link' => $app->link(),
+                'resource_type' => 'application',
+                'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
+                ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
+            ];
         }
     }
 
-    // Filter service applications by team if we have a current team
-    $serviceAppsQuery = ServiceApplication::query();
-    if ($currentTeam) {
-        $serviceAppsQuery = $serviceAppsQuery->whereHas('service.environment.project', function ($query) use ($currentTeam) {
-            $query->where('team_id', $currentTeam->id);
-        });
-    }
-    $apps = $serviceAppsQuery->get();
-    foreach ($apps as $app) {
+    foreach ($serviceApps as $app) {
         $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
         foreach ($list_of_domains as $domain) {
             if (str($domain)->endsWith('/')) {
                 $domain = str($domain)->beforeLast('/');
             }
             $naked_domain = str($domain)->value();
-            if ($domains->contains(domainConflictKey($naked_domain))) {
-                if (data_get($resource, 'uuid')) {
-                    if ($resource->uuid !== $app->uuid) {
-                        $conflicts[] = [
-                            'domain' => $naked_domain,
-                            'resource_name' => $app->service->name,
-                            'resource_link' => $app->service->link(),
-                            'resource_type' => 'service',
-                            'message' => "Domain $naked_domain is already in use by service '{$app->service->name}'",
-                        ];
-                    }
-                } elseif ($domain) {
-                    $conflicts[] = [
-                        'domain' => $naked_domain,
-                        'resource_name' => $app->service->name,
-                        'resource_link' => $app->service->link(),
-                        'resource_type' => 'service',
-                        'message' => "Domain $naked_domain is already in use by service '{$app->service->name}'",
-                    ];
-                }
+            if (! $domains->contains(domainConflictKey($naked_domain))) {
+                continue;
             }
+            if (data_get($resource, 'uuid') && $resource->uuid === $app->uuid) {
+                continue;
+            }
+            if (domainConflictResourceIsHidden($app->service)) {
+                $conflicts[] = hiddenDomainConflict($naked_domain, 'service');
+
+                continue;
+            }
+            $conflicts[] = [
+                'domain' => $naked_domain,
+                'resource_name' => $app->service->name,
+                'resource_link' => $app->service->link(),
+                'resource_type' => 'service',
+                'message' => "Domain $naked_domain is already in use by service '{$app->service->name}'",
+            ];
         }
     }
 
@@ -266,8 +286,11 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
         return domainConflictKey((string) $domain);
     });
 
-    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id', 'docker_compose_domains', 'build_pack']);
-    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->with('service:id,name')->get(['fqdn', 'uuid', 'id', 'service_id']);
+    // A token or member limited to some projects must still see conflicts with every resource of the team.
+    [$applications, $serviceApplications] = app(AccessResolver::class)->withoutVisibilityScope(fn () => [
+        Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id', 'docker_compose_domains', 'build_pack', 'environment_id']),
+        ServiceApplication::ownedByCurrentTeamAPI($teamId)->with('service:id,name,uuid,environment_id')->get(['fqdn', 'uuid', 'id', 'service_id']),
+    ]);
 
     if ($uuid) {
         $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
@@ -278,6 +301,11 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
         foreach (applicationDomainEntries($app) as $domainEntry) {
             $naked_domain = $domainEntry['domain'];
             if ($domains->contains(domainConflictKey($naked_domain))) {
+                if (domainConflictResourceIsHidden($app)) {
+                    $conflicts[] = hiddenDomainConflict($naked_domain, 'application');
+
+                    continue;
+                }
                 $conflicts[] = [
                     'domain' => $naked_domain,
                     'resource_name' => $app->name,
@@ -301,6 +329,11 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
             }
             $naked_domain = str($domain)->value();
             if ($domains->contains(domainConflictKey($naked_domain))) {
+                if ($app->service !== null && domainConflictResourceIsHidden($app->service)) {
+                    $conflicts[] = hiddenDomainConflict($naked_domain, 'service');
+
+                    continue;
+                }
                 $conflicts[] = [
                     'domain' => $naked_domain,
                     'resource_name' => $app->service->name ?? 'Unknown Service',
@@ -674,4 +707,41 @@ function putComposeServiceDomain(
     $domains[$storageKey] = $merged;
 
     return $domains;
+}
+
+/**
+ * Set the stored SERVICE_URL_ and SERVICE_FQDN_ variables of a compose service from its domain.
+ * Port variables (SERVICE_URL_API_8000) get the same URL or host with their port appended.
+ * A null URL and host clear the variables.
+ */
+function syncComposeServiceUrlVariables(Application $application, string $serviceEnvKey, ?string $url, ?string $host): void
+{
+    if ($url !== null) {
+        foreach (['URL' => $url, 'FQDN' => $host] as $type => $value) {
+            $application->environment_variables()->updateOrCreate([
+                'resourceable_type' => Application::class,
+                'resourceable_id' => $application->id,
+                'key' => "SERVICE_{$type}_{$serviceEnvKey}",
+            ], [
+                'value' => $value,
+                'is_preview' => false,
+            ]);
+        }
+    }
+
+    $pattern = '/^SERVICE_(URL|FQDN)_'.preg_quote($serviceEnvKey, '/').'(?:_(\d+))?$/';
+    $application->environment_variables()
+        ->where(fn ($query) => $query->where('key', 'LIKE', "SERVICE_URL_{$serviceEnvKey}%")
+            ->orWhere('key', 'LIKE', "SERVICE_FQDN_{$serviceEnvKey}%"))
+        ->get()
+        ->each(function (EnvironmentVariable $variable) use ($pattern, $url, $host) {
+            if (! preg_match($pattern, $variable->key, $matches)) {
+                return;
+            }
+            $value = $matches[1] === 'URL' ? $url : $host;
+            if ($value !== null && isset($matches[2])) {
+                $value = "{$value}:{$matches[2]}";
+            }
+            $variable->update(['value' => $value]);
+        });
 }

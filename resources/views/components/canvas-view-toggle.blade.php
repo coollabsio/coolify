@@ -6,8 +6,8 @@
     // One list view (no table / grid choice): nothing to switch to on the list page.
     $singleList = count($views) === 1;
 @endphp
-{{-- Table / grid / canvas switcher. On the list page, table and grid switch the
-     parent's Alpine viewMode; the canvas page shows one "List view" link back
+{{-- Table / grid / canvas switcher. On the list page, an icon button switches the
+     parent's Alpine viewMode to the other view; the canvas page shows one "List view" link back
      (?view= makes the list the remembered view again, see RemembersCanvasView).
      Pages with one list view pass :views="['list' => [...]]". Without a
      canvasUrl it is only a table / grid switcher. --}}
@@ -22,18 +22,18 @@
             List view
         </a>
     @else
-        {{-- Every view stays visible. The current one is the selected pill. --}}
-        @unless ($singleList)
+        {{-- Only the view that is not current shows, as an icon: the button switches to that view.
+             The fixed-width slot keeps its width before Alpine starts, so the toolbar does not jump. --}}
+        @unless ($singleList || count($views) === 0)
+            <span class="flex w-7.5 shrink-0">
             @foreach ($views as $mode => [$label, $icon])
-                <button type="button" x-on:click="setViewMode(@js($mode))"
-                    class="{{ $canvasItem }}"
-                    :class="viewMode === @js($mode) ? 'is-selected' : @js($idle)"
-                    :aria-pressed="(viewMode === @js($mode)).toString()"
-                    title="{{ $label }}">
+                <button type="button" x-on:click="setViewMode(@js($mode))" x-show="viewMode !== @js($mode)" x-cloak
+                    class="{{ $canvasItem }} {{ $idle }} w-7.5 justify-center px-0!"
+                    title="{{ $label }}" aria-label="{{ $label }}">
                     <x-reicon :name="$icon" class="size-3.5" />
-                    {{ $label }}
                 </button>
             @endforeach
+            </span>
         @endunless
         @if (filled($canvasUrl))
             {{-- A label and a purple "Try it" badge, so people notice the canvas view. --}}

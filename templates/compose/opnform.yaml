@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://docs.opnform.com/introduction
 # slogan: OpnForm is an open-source form builder that lets you create beautiful forms and share them anywhere. It's super fast, you don't need to know how to code
 # category: productivity
@@ -56,7 +55,7 @@ x-shared-env: &shared-api-env
 
 services:
   opnform-api:
-    image: jhumanj/opnform-api:2.2.4
+    image: jhumanj/opnform-api:2.6.1
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -83,7 +82,7 @@ services:
       start_period: 60s
 
   api-worker:
-    image: jhumanj/opnform-api:2.2.4
+    image: jhumanj/opnform-api:2.6.1
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -104,7 +103,7 @@ services:
       start_period: 30s
 
   api-scheduler:
-    image: jhumanj/opnform-api:2.2.4
+    image: jhumanj/opnform-api:2.6.1
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -128,7 +127,7 @@ services:
       start_period: 70s # Allow time for first scheduled run and cache write
 
   opnform-ui:
-    image: jhumanj/opnform-client:2.2.4
+    image: jhumanj/opnform-client:2.6.1
     environment:
       - NUXT_PUBLIC_APP_URL=/
       - NUXT_PUBLIC_API_BASE=/api
@@ -203,6 +202,17 @@ services:
               index index.html index.htm index.php;
 
               location / {
+                  proxy_http_version 1.1;
+                  proxy_pass http://opnform-ui:3000;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-Host $host;
+                  proxy_set_header X-Forwarded-Port $server_port;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "Upgrade";
+              }
+
+              # Proxy Nuxt icon requests to client container
+              location ^~ /api/_nuxt_icon/ {
                   proxy_http_version 1.1;
                   proxy_pass http://opnform-ui:3000;
                   proxy_set_header X-Real-IP $remote_addr;

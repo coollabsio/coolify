@@ -57,7 +57,9 @@ tinker "$A" 'foreach (App\Models\Server::where("id", "!=", 0)->get() as $s) { $s
 for side in source target; do
   C="$A"
   [[ "$side" == target ]] && C="$B"
-  tinker "$C" '$s = App\Models\InstanceSettings::get(); $s->is_api_enabled = true; $s->save(); session(["currentTeam" => App\Models\Team::find(0)]); echo App\Models\User::find(0)->createToken("transfer-test", ["root"])->plainTextToken;' | tail -1 >"$STATE_DIR/$side.token"
+  # The dev .env runs Cloud mode, where the import check refuses private addresses unless the
+  # instance allows them. The VMs of A are on a private network.
+  tinker "$C" '$s = App\Models\InstanceSettings::get(); $s->is_api_enabled = true; $s->webhook_allowed_internal_hosts = ["10.221.'"$A_SLOT"'.0/24"]; $s->save(); session(["currentTeam" => App\Models\Team::find(0)]); echo App\Models\User::find(0)->createToken("transfer-test", ["root"])->plainTextToken;' | tail -1 >"$STATE_DIR/$side.token"
   chmod 600 "$STATE_DIR/$side.token"
   docker exec -u www-data "$C" php artisan horizon:terminate >/dev/null
 done

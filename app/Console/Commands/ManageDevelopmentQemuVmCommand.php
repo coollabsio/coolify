@@ -9,7 +9,7 @@ use function Laravel\Prompts\multiselect;
 
 class ManageDevelopmentQemuVmCommand extends Command
 {
-    protected $signature = 'dev:qemu {profiles?* : Profile keys from config/development-qemu.php} {--as-localhost : Use the VM for the localhost server (id 0)} {--fresh : Destroy and recreate the selected VMs instead of reusing them}';
+    protected $signature = 'dev:qemu {profiles?* : Profile keys from config/development-qemu.php} {--as-localhost : Use the VM for the localhost server (id 0)} {--fresh : Destroy and recreate the selected VMs instead of reusing them} {--gpu : Pass the NVIDIA GPU of the host through to the VM and install its driver}';
 
     protected $description = 'Start (or create) selected development QEMU VMs and seed their Coolify servers';
 
@@ -34,7 +34,17 @@ class ManageDevelopmentQemuVmCommand extends Command
             return self::FAILURE;
         }
 
-        ManageDevelopmentQemuVm::run($profileNames, (bool) $this->option('as-localhost'), (bool) $this->option('fresh'));
+        if ($this->option('gpu')) {
+            $profile = $profiles[$profileNames[0]] ?? null;
+
+            if (count($profileNames) !== 1 || $profile === null || $profile['user'] !== 'root' || ! str_starts_with($profile['os_variant'], 'ubuntu')) {
+                $this->error('GPU passthrough needs exactly one Ubuntu root profile (ubuntu-root).');
+
+                return self::FAILURE;
+            }
+        }
+
+        ManageDevelopmentQemuVm::run($profileNames, (bool) $this->option('as-localhost'), (bool) $this->option('fresh'), (bool) $this->option('gpu'));
 
         foreach ($profileNames as $profileName) {
             $profile = $profiles[$profileName];

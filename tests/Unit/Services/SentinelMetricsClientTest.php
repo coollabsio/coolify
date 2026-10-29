@@ -12,8 +12,12 @@ class FakeMetricsClient extends SentinelMetricsClient
     /** @var array<int, string> */
     public array $failing = [];
 
+    /** @var array<int, string> */
+    public array $urls = [];
+
     protected function raw(string $url): string
     {
+        $this->urls[] = $url;
         foreach ($this->failing as $needle) {
             if (str_contains($url, $needle)) {
                 throw new RuntimeException('boom');
@@ -74,7 +78,8 @@ it('normalizes containers, parsing the stringified cpu percent', function () {
             ['id' => 'app-a', 'cpu' => ['time' => 't', 'percent' => '12.5'],
                 'memory' => ['used' => 500, 'usedPercent' => 5.0],
                 'disk' => ['writableLayer' => 3, 'volumesTotal' => 7],
-                'network' => ['rxBytesPerSec' => 4.0, 'txBytesPerSec' => 1.0]],
+                'network' => ['rxBytesPerSec' => 4.0, 'txBytesPerSec' => 1.0],
+                'status' => ['state' => 'running', 'health' => 'healthy', 'restartCount' => 0]],
         ]),
     ];
 
@@ -85,6 +90,20 @@ it('normalizes containers, parsing the stringified cpu percent', function () {
     expect($rows[0]['memUsed'])->toBe(500);
     expect($rows[0]['diskBytes'])->toBe(10); // writableLayer + volumesTotal
     expect($rows[0]['net'])->toBe(5.0);      // rx + tx
+});
+
+it('lists only running containers, not removed or stopped ones', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/containers/current' => json_encode([
+            ['id' => 'app-running', 'cpu' => ['percent' => '1.0'], 'status' => ['state' => 'running']],
+            // Sentinel keeps the last samples of a removed container until retention, without a status.
+            ['id' => 'volume-backup-removed', 'cpu' => ['percent' => '79.0'], 'status' => null],
+            ['id' => 'exciting_mclaren', 'cpu' => ['percent' => '1.0'], 'status' => ['state' => 'exited']],
+        ]),
+    ];
+
+    expect(array_column($client->containersCurrent(), 'id'))->toBe(['app-running']);
 });
 
 it('returns an empty container list when the endpoint 404s', function () {
@@ -179,3 +198,69 @@ it('does not substitute another disk mount in the summary', function () {
 
     expect($client->summary()['diskPercent'])->toBeNull();
 });
+
+it('uses the Sentinel data mount as the root disk when no root mount is reported', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/summary' => json_encode(['disk' => [
+            ['mount' => '/app/db', 'used' => 30, 'total' => 100, 'usedPercent' => 30],
+        ]]),
+        '/disk/history' => json_encode([
+            ['time' => 1700000000000, 'mount' => '/app/db', 'usedPercent' => 30],
+            ['time' => 1700000000000, 'mount' => '/boot', 'usedPercent' => 90],
+        ]),
+    ];
+
+    expect($client->summary()['diskPercent'])->toBe(30.0)
+        ->and($client->history('disk', '24h'))->toBe([[1699999800000, 30.0]]);
+});
+
+it('prefers the root mount over the Sentinel data mount', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = ['/disk/history' => json_encode([
+        ['time' => 1700000000000, 'mount' => '/app/db', 'usedPercent' => 30],
+        ['time' => 1700000000000, 'mount' => '/', 'usedPercent' => 60],
+    ])];
+
+    expect($client->history('disk', '24h'))->toBe([[1699999800000, 60.0]]);
+});
+
+it('uses the host mount of the Coolify data directory when it is on its own disk', function (string $dataMount) {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/summary' => json_encode(['disk' => [
+            ['mount' => $dataMount, 'used' => 20, 'total' => 100, 'usedPercent' => 20],
+            ['mount' => '/boot', 'used' => 90, 'total' => 100, 'usedPercent' => 90],
+        ]]),
+        '/disk/history' => json_encode([
+            ['time' => 1700000000000, 'mount' => $dataMount, 'usedPercent' => 20],
+            ['time' => 1700000000000, 'mount' => '/boot', 'usedPercent' => 90],
+        ]),
+    ];
+
+    expect($client->summary()['diskPercent'])->toBe(20.0)
+        ->and($client->history('disk', '24h'))->toBe([[1699999800000, 20.0]]);
+})->with(['/data', '/data/coolify']);
+
+it('prefers the root mount over the host mount of the Coolify data directory', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = ['/disk/history' => json_encode([
+        ['time' => 1700000000000, 'mount' => '/data', 'usedPercent' => 20],
+        ['time' => 1700000000000, 'mount' => '/', 'usedPercent' => 60],
+    ])];
+
+    expect($client->history('disk', '24h'))->toBe([[1699999800000, 60.0]]);
+});
+
+it('asks sentinel to bucket history rows by range', function (string $range, int $bucketMs) {
+    $client = fakeMetricsClient();
+
+    $client->history('memory', $range);
+    $client->networkHistory($range);
+
+    expect($client->urls)->each->toContain("bucket_ms={$bucketMs}");
+})->with([
+    ['24h', 300_000],
+    ['7d', 1_800_000],
+    ['30d', 7_200_000],
+]);

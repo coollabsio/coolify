@@ -143,7 +143,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     private function syncData(bool $toModel = false): void
@@ -167,24 +167,25 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->postgresUser = $this->database->postgres_user;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->postgresPassword = $canSeeCredentials ? $this->database->postgres_password : '';
             $this->postgresDb = $this->database->postgres_db;
             $this->postgresInitdbArgs = $this->database->postgres_initdb_args;
             $this->postgresHostAuthMethod = $this->database->postgres_host_auth_method;
-            $this->postgresConf = $this->database->postgres_conf;
-            $this->initScripts = $this->database->init_scripts;
+            $this->postgresConf = $canSeeCredentials ? $this->database->postgres_conf : null;
+            $this->initScripts = $canSeeCredentials ? $this->database->init_scripts : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 

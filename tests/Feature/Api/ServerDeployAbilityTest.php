@@ -41,6 +41,7 @@ beforeEach(function () {
     ]);
     $this->server->proxy->set('type', ProxyTypes::TRAEFIK->value);
     $this->server->save();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
 function serverDeployAbilityHeaders(User $user, int $teamId, array $abilities): array
@@ -156,11 +157,11 @@ describe('validate with install', function () {
 });
 
 describe('delete', function () {
-    test('write-only token cannot delete with force or delete_from_provider', function (string $query) {
+    test('token without the deploy permission cannot delete with force or delete_from_provider', function (string $query) {
         CloudProviderToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'hetzner']);
         $this->server->update(['hetzner_server_id' => 123]);
 
-        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write']))
+        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write', 'delete']))
             ->deleteJson("/api/v1/servers/{$this->server->uuid}?{$query}")
             ->assertForbidden()
             ->assertJsonPath('message', 'Missing required permissions: deploy. Deleting the resources or the cloud server needs a token with the deploy permission.');
@@ -168,16 +169,16 @@ describe('delete', function () {
         expect(Server::query()->whereKey($this->server->id)->exists())->toBeTrue();
     })->with(['force=true', 'delete_from_provider=true']);
 
-    test('write-only token can delete an empty server', function () {
-        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write']))
+    test('delete token can delete an empty server', function () {
+        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['delete']))
             ->deleteJson("/api/v1/servers/{$this->server->uuid}")
             ->assertOk();
 
         expect(Server::query()->whereKey($this->server->id)->exists())->toBeFalse();
     });
 
-    test('write and deploy token can delete with force', function () {
-        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
+    test('delete and deploy token can delete with force', function () {
+        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['delete', 'deploy']))
             ->deleteJson("/api/v1/servers/{$this->server->uuid}?force=true")
             ->assertOk();
 
@@ -209,7 +210,7 @@ describe('destination create', function () {
             ->assertJsonPath('errors.network.0', 'A Docker network with this name already exists on the server. Use a new network name.');
 
         expect(StandaloneDocker::query()->count())->toBe($countBefore);
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker network ls'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker network ls'));
     });
 
     test('rejects the destination when the server networks cannot be read', function () {

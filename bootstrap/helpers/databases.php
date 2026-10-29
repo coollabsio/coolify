@@ -17,6 +17,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -282,7 +283,7 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'region' => $s3->region,
         'bucket' => $s3->bucket,
         'endpoint' => $s3->endpoint,
-        'use_path_style_endpoint' => true,
+        'use_path_style_endpoint' => $s3->usesPathStyleEndpoint(),
         'aws_url' => $s3->awsUrl(),
         'throw' => true,
     ]);
@@ -500,14 +501,13 @@ function deleteOldBackupsFromS3($backup): Collection
 
 function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null): bool
 {
+    // A member limited to some projects must still see the ports of every database on the server.
+    $databases = app(AccessResolver::class)->withoutVisibilityScope(fn () => $server->databases());
+
+    $query = $databases->where('public_port', $port)->where('is_public', true);
     if ($id) {
-        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->where('id', '!=', $id)->first();
-    } else {
-        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->first();
-    }
-    if ($foundDatabase) {
-        return true;
+        $query = $query->where('id', '!=', $id);
     }
 
-    return false;
+    return $query->isNotEmpty();
 }

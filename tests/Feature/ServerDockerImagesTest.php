@@ -29,7 +29,7 @@ $nginxId = 'sha256:'.str_repeat('a', 64);
 $danglingId = 'sha256:'.str_repeat('b', 64);
 
 $fakeDocker = function (string $nginxId, string $danglingId) {
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker image ls*' => Process::result(output: implode("\n", [
             json_encode(['Repository' => 'nginx', 'Tag' => '1.27', 'ID' => $nginxId, 'Size' => '52.5MB', 'CreatedSince' => '3 weeks ago']),
             json_encode(['Repository' => '<none>', 'Tag' => '<none>', 'ID' => $danglingId, 'Size' => '11MB', 'CreatedSince' => '2 days ago']),
@@ -78,7 +78,7 @@ it('deletes an unused image', function () use ($fakeDocker, $nginxId, $danglingI
         ->call('delete', $danglingId)
         ->assertDispatched('success');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker image rm '{$danglingId}'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker image rm '{$danglingId}'"));
 });
 
 it('refuses to delete an image that a container is using', function () use ($fakeDocker, $nginxId, $danglingId) {
@@ -89,7 +89,7 @@ it('refuses to delete an image that a container is using', function () use ($fak
         ->call('delete', 'nginx:1.27')
         ->assertDispatched('error');
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'docker image rm'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker image rm'));
 });
 
 it('filters images by the search term', function () use ($fakeDocker, $nginxId, $danglingId) {
@@ -103,7 +103,7 @@ it('filters images by the search term', function () use ($fakeDocker, $nginxId, 
 });
 
 it('paginates images and returns to the first page when the search changes', function () {
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker image ls*' => Process::result(output: collect(range(1, 12))
             ->map(fn (int $i) => json_encode([
                 'Repository' => sprintf('app-%02d', $i), 'Tag' => 'latest', 'ID' => 'sha256:'.str_repeat(dechex($i), 64),

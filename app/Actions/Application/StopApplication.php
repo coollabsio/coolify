@@ -3,8 +3,10 @@
 namespace App\Actions\Application;
 
 use App\Actions\Server\CleanupDocker;
+use App\Events\ApplicationStopFailed;
 use App\Events\ServiceStatusChanged;
 use App\Models\Application;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
@@ -50,7 +52,11 @@ class StopApplication
                         $commands[] = "docker rm -f {$escapedContainerName}";
                     }
 
-                    instant_remote_process(command: $commands, server: $server, throwError: false);
+                    try {
+                        instant_remote_process(command: $commands, server: $server);
+                    } catch (\Exception $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
 
                 if ($removeContainers && $application->build_pack === 'dockercompose') {
@@ -64,8 +70,13 @@ class StopApplication
                 $errors[] = $e->getMessage();
             }
         }
+        $teamId = $application->environment->project->team->id;
         if ($errors !== []) {
-            return implode(' ', $errors);
+            $message = implode(' ', $errors);
+            Log::warning('Failed to stop application', ['application_uuid' => $application->uuid, 'error' => $message]);
+            ApplicationStopFailed::dispatch($teamId, $application->uuid, $message);
+
+            return $message;
         }
 
         $status = [
@@ -82,7 +93,7 @@ class StopApplication
         }
         $application->update($status);
 
-        ServiceStatusChanged::dispatch($application->environment->project->team->id);
+        ServiceStatusChanged::dispatch($teamId);
 
         return null;
     }

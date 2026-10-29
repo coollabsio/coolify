@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -518,6 +519,8 @@ class ByDigitalOcean extends Component
                 // Non-fatal: the server page polling backfills the IP later.
                 report($e);
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 currentTeam()->update([

@@ -1,15 +1,22 @@
 <div class="flex flex-col gap-6" x-init="$wire.loadImages">
-    <form wire:submit="saveSettings" class="application-settings-form flex flex-col">
-        <x-unsaved-bar action="saveSettings" />
-        <x-application.settings-section id="rollback-retention-section" title="Image retention"
-            helper="Keep previously built Docker images available for fast rollbacks.">
+    <x-application.settings-section title="Rollback images"
+        helper="Keep previously built Docker images available for fast rollbacks. Rollback uses an existing image without rebuilding the application. Images in the Docker registry are pulled to the server first." flush>
+        <x-slot:actions>
+            @can('view', $application)
+                <x-forms.button wire:click="loadImages(true)">
+                    Reload images
+                </x-forms.button>
+            @endcan
+        </x-slot:actions>
+
+        <form wire:submit="saveSettings"
+            class="flex flex-col gap-4 border-b border-neutral-200 px-4 py-3.5 dark:border-white/[0.07]">
+            <x-unsaved-bar action="saveSettings" />
             @if ($serverRetentionDisabled)
-                <div class="mb-4">
-                    <x-callout type="warning" title="Disabled by the server">
-                        Image retention is disabled at the server level. This setting has no effect until a server
-                        administrator enables it.
-                    </x-callout>
-                </div>
+                <x-callout type="warning" title="Disabled by the server">
+                    Image retention is disabled at the server level. This setting has no effect until a server
+                    administrator enables it.
+                </x-callout>
             @endif
 
             <div class="max-w-sm">
@@ -18,18 +25,7 @@
                     helper="Set to 0 to keep only the running image. Pull request images are always removed during cleanup."
                     canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
             </div>
-        </x-application.settings-section>
-    </form>
-
-    <x-application.settings-section id="rollback-images-section" title="Available images"
-        helper="Rollback uses an existing image without rebuilding the application. Images in the Docker registry are pulled to the server first." flush>
-        <x-slot:actions>
-            @can('view', $application)
-                <x-forms.button wire:click="loadImages(true)">
-                    Reload images
-                </x-forms.button>
-            @endcan
-        </x-slot:actions>
+        </form>
 
         <div wire:target="loadImages" wire:loading.remove>
             @forelse ($images as $image)

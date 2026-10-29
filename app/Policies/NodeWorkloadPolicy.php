@@ -33,6 +33,14 @@ class NodeWorkloadPolicy
     }
 
     /**
+     * Determine whether the user can view sensitive values, such as environment variable values.
+     */
+    public function viewSensitive(User $user, NodeWorkload $nodeWorkload): bool
+    {
+        return $user->isAdminOfTeam($nodeWorkload->team_id);
+    }
+
+    /**
      * Determine whether the user can manage environment variables.
      */
     public function manageEnvironment(User $user, NodeWorkload $nodeWorkload): bool

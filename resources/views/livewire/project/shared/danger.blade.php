@@ -9,7 +9,6 @@
             default => 'resource',
         };
         $isClusterApplication = $resource instanceof \App\Models\NodeWorkload;
-        $offersRemoveFromCoolifyOnly = $resource instanceof \App\Models\Service || $isClusterApplication;
     @endphp
     @if ($resource && ! $isClusterApplication && !data_get($resource, 'destination.server')?->isFunctional())
         <x-callout type="warning" title="Server is not reachable" class="mb-4">
@@ -79,16 +78,13 @@
                             confirmationText="{{ $resourceName }}"
                             confirmationLabel="Enter the resource name to confirm permanent deletion"
                             shortConfirmationLabel="Resource name" />
-                        @if ($offersRemoveFromCoolifyOnly)
+                        @if ($isClusterApplication)
                             <x-modal-confirmation title="Remove {{ $resourceLabel }} from Coolify only?"
                                 buttonTitle="Remove from Coolify only"
                                 isErrorButton submitAction="deleteFromCoolifyOnly"
-                                :actions="$isClusterApplication ? [
+                                :actions="[
                                     'Permanently remove this application from Coolify.',
                                     'Leave its containers on the servers.',
-                                ] : [
-                                    'Permanently remove this service from Coolify.',
-                                    'Leave all containers, volumes, networks, and configuration files on the server.',
                                 ]"
                                 warningMessage="Coolify will no longer track or manage the Docker resources for this {{ $resourceLabel }}. Use this only when normal cleanup cannot complete."
                                 confirmationText="{{ $resourceName }}"
