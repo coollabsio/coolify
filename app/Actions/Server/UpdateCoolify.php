@@ -2,8 +2,10 @@
 
 namespace App\Actions\Server;
 
+use App\Jobs\DatabaseBackupJob;
 use App\Models\Server;
-use Illuminate\Support\Facades\Http;
+use App\Models\StandalonePostgresql;
+use App\Services\CoolifyUpgradeStatus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -21,6 +23,7 @@ class UpdateCoolify
     public function handle($manual_update = false)
     {
         if (isDev()) {
+            $this->backupDatabase();
             Sleep::for(10)->seconds();
 
             return;
@@ -33,7 +36,8 @@ class UpdateCoolify
 
         // Fetch fresh version from CDN instead of using cache
         try {
-            $response = Http::retry(3, 1000)->timeout(10)
+            // A manual update runs in the web request, so it does not wait for a retry; it falls back to the cache.
+            $response = cdn_http(tries: $manual_update ? 1 : 3)
                 ->get(config('constants.coolify.versions_url'));
 
             if ($response->successful()) {
@@ -109,13 +113,32 @@ class UpdateCoolify
             );
         }
 
+        $this->backupDatabase();
         $this->update();
         $settings->new_version_available = false;
         $settings->save();
     }
 
+    private function backupDatabase(): void
+    {
+        $backup = StandalonePostgresql::find(0)?->scheduledBackups()->first();
+        if (! $backup || ! instanceSettings()->is_backup_before_update_enabled) {
+            return;
+        }
+
+        // Runs inline so the update waits for the result. dispatchSync() would go through the job's
+        // WithoutOverlapping middleware, which silently drops the run while the scheduled backup is running.
+        $job = new DatabaseBackupJob($backup);
+        $job->handle();
+        if ($job->backup_log?->status !== 'success') {
+            throw new \Exception('The database backup failed, so the update was not started.');
+        }
+    }
+
     private function update()
     {
+        $this->ensureNoUpgradeIsRunning();
+
         $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
         $registryUrl = coolifyRegistryUrl();
@@ -127,5 +150,30 @@ class UpdateCoolify
                 escapeshellarg($latestHelperImageVersion).' '.
                 escapeshellarg($registryUrl),
         ], $this->server);
+    }
+
+    private function ensureNoUpgradeIsRunning(): void
+    {
+        $status = $this->readUpgradeStatus();
+
+        if (CoolifyUpgradeStatus::isRunning((string) $status)) {
+            Log::warning('Upgrade skipped because another upgrade is running', [
+                'target_version' => $this->latestVersion,
+                'status' => $status,
+            ]);
+            throw new \Exception(
+                'Another Coolify upgrade is already running. Wait for it to finish. '.
+                'If it has stopped, you can upgrade again '.CoolifyUpgradeStatus::RUNNING_LOCK_EXPIRES_AFTER_MINUTES.' minutes after its last status update.'
+            );
+        }
+    }
+
+    protected function readUpgradeStatus(): ?string
+    {
+        return instant_remote_process(
+            ['cat '.CoolifyUpgradeStatus::FILE.' 2>/dev/null || true'],
+            $this->server,
+            false
+        );
     }
 }

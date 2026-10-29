@@ -5,6 +5,7 @@ use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderTokenForm;
 use App\Livewire\Security\CloudProviderTokens;
 use App\Models\Application;
+use App\Models\AuditEvent;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\Environment;
@@ -246,7 +247,7 @@ describe('webhook signature failure logging', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 
     test('GitLab manual webhook with bad token logs to audit channel', function () {
@@ -274,7 +275,7 @@ describe('webhook signature failure logging', function () {
         ]);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 
     test('Bitbucket manual webhook with malformed signature logs to audit channel', function () {
@@ -303,7 +304,7 @@ describe('webhook signature failure logging', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 
     test('Gitea manual webhook with bad signature logs to audit channel', function () {
@@ -334,7 +335,7 @@ describe('webhook signature failure logging', function () {
         ], $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Invalid signature');
+        expect($response->getContent())->toContain('No matching application or invalid signature.');
     });
 });
 
@@ -375,48 +376,20 @@ describe('API mutation audit logging', function () {
         expect($response->status())->toBeIn([201, 422]);
     });
 
-    test('enable_api denial for non-root team emits warning audit event', function () {
+    test('POST /api/v1/enable no longer exists', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
         auth()->forgetGuards();
 
-        $auditChannel = Mockery::mock();
-        $auditChannel->shouldReceive('warning')
-            ->atLeast()
-            ->once()
-            ->with('api.instance.enable_denied', Mockery::any());
-
-        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
-        Log::shouldReceive('warning')->andReturnNull();
-        Log::shouldReceive('info')->andReturnNull();
-        Log::shouldReceive('error')->andReturnNull();
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$token,
-        ])->postJson('/api/v1/enable');
-
-        $response->assertStatus(403);
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/v1/enable')
+            ->assertNotFound();
     });
 
-    test('project creation emits api.project.created audit event', function () {
+    test('project creation records api.project.created audit event', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
         auth()->forgetGuards();
-
-        $auditChannel = Mockery::mock();
-        $auditChannel->shouldReceive('info')
-            ->atLeast()
-            ->once()
-            ->with('api.project.created', Mockery::on(function ($context) {
-                return $context['event'] === 'api.project.created'
-                    && ! empty($context['project_uuid'])
-                    && $context['project_name'] === 'audit-project';
-            }));
-
-        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
-        Log::shouldReceive('warning')->andReturnNull();
-        Log::shouldReceive('info')->andReturnNull();
-        Log::shouldReceive('error')->andReturnNull();
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$token,
@@ -427,6 +400,11 @@ describe('API mutation audit logging', function () {
         ]);
 
         $response->assertStatus(201);
+
+        $event = AuditEvent::query()->where('event', 'api.project.created')->sole();
+        expect($event->team_id)->toBe($team->id)
+            ->and($event->resource_uuid)->toBe($response->json('uuid'))
+            ->and($event->resource_name)->toBe('audit-project');
     });
 });
 

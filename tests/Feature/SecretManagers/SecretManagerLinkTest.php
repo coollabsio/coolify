@@ -150,6 +150,26 @@ test('a doppler link fetches secrets with the stored token', function () {
         && str_contains($request->url(), 'project=proj'));
 });
 
+test('a link never fetches secrets with a token of another team', function () {
+    Http::fake();
+    $otherToken = IntegrationToken::query()->create([
+        'team_id' => Team::factory()->create()->id,
+        'provider' => 'doppler',
+        'name' => 'Other team Doppler',
+        'token' => 'dp.st.other',
+        'capabilities' => ['secrets'],
+    ]);
+    // For example a link saved before this check, or written by another code path.
+    $link = $this->application->secretManagerLink()->create([
+        'integration_token_id' => $otherToken->id,
+        'settings' => ['project' => 'proj', 'config' => 'prd'],
+    ]);
+
+    expect(fn () => $link->fetchSecrets())
+        ->toThrow(RuntimeException::class, 'The secret manager token does not belong to the team of this resource.');
+    Http::assertNothingSent();
+});
+
 test('a vault link uses the base url and namespace from the token metadata', function () {
     Http::fake([
         'https://example.com:8200/v1/kv/data/apps/web' => Http::response([
@@ -165,6 +185,25 @@ test('a vault link uses the base url and namespace from the token metadata', fun
     expect($link->fetchSecrets())->toBe(['KEY' => 'value']);
 
     Http::assertSent(fn ($request) => $request->hasHeader('X-Vault-Namespace', 'team-a'));
+});
+
+test('an infisical link uses the request timeout from the token metadata', function () {
+    $timeouts = [];
+    Http::fake(function ($request, array $options) use (&$timeouts) {
+        $timeouts[] = [$options['connect_timeout'], $options['timeout']];
+
+        return str_contains($request->url(), '/auth/universal-auth/login')
+            ? Http::response(['accessToken' => 'short-lived-token'])
+            : Http::response(['secrets' => [['secretKey' => 'KEY', 'secretValue' => 'value']]]);
+    });
+
+    $link = createSecretManagerLink('infisical',
+        ['project_id' => 'project-1', 'environment' => 'prod'],
+        ['base_url' => 'https://example.com', 'client_id' => 'client-id', 'timeout' => '30'],
+    );
+
+    expect($link->fetchSecrets())->toBe(['KEY' => 'value'])
+        ->and($timeouts)->toBe([[30, 30], [30, 30]]);
 });
 
 test('services resolve environment variables from their configured secret manager', function () {
@@ -242,9 +281,9 @@ test('redis remote credentials stay deployment-local and use raw values in the s
     expect($password->fresh()->value)->toBe('{{team.REDIS_PASSWORD}}')
         ->and($sharedPassword->fresh()->value)->toBe('{{vault.REDIS_PASSWORD}}')
         ->and($username->fresh()->value)->toBe('{{vault.REDIS_USERNAME}}')
-        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
+        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$$$word')
         ->and($environmentVariables)->toContain('REDIS_USERNAME=remote-user')
-        ->and($startCommand)->toContain('--requirepass p4$$word');
+        ->and($startCommand)->toContain("--requirepass 'p4\$\$\$\$word'");
 });
 
 test('all deployable environment-variable resources support secret managers', function (string $resourceClass) {
@@ -455,11 +494,28 @@ test('import creates reference variables for missing keys only', function () {
 
     $imported = $this->application->secretManagerLink->importMissingReferences();
 
-    expect($imported)->toBe(['NEW_KEY']);
+    expect($imported)->toBe(['imported' => ['NEW_KEY'], 'skipped' => []]);
 
     $created = $this->application->environment_variables()->where('key', 'NEW_KEY')->firstOrFail();
     expect($created->value)->toBe('{{vault.NEW_KEY}}')
         ->and($this->application->environment_variables()->where('key', 'EXISTING')->firstOrFail()->value)->toBe('local');
+});
+
+test('import skips remote names that are not valid variable keys and imports the rest', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/apps/web' => Http::response([
+            'data' => ['data' => ['ZED' => 'z', 'db-password' => 'p', 'API_KEY' => 'a']],
+        ]),
+    ]);
+
+    $link = createSecretManagerLink('vault', ['mount' => 'secret', 'path' => 'apps/web'], ['base_url' => 'https://example.com:8200']);
+
+    $result = $link->importMissingReferences();
+
+    expect($result)->toBe(['imported' => ['API_KEY', 'ZED'], 'skipped' => ['db-password']])
+        ->and($this->application->environment_variables()->whereIn('key', ['API_KEY', 'ZED'])->pluck('value', 'key')->sortKeys()->all())
+        ->toBe(['API_KEY' => '{{vault.API_KEY}}', 'ZED' => '{{vault.ZED}}'])
+        ->and($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
 });
 
 test('secret references are not marked as shared variables', function () {

@@ -121,7 +121,7 @@
                                 <div class="flex min-w-0 items-center gap-2">
                                     <x-reicon name="globe" class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" />
                                     <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank" rel="noopener noreferrer"
-                                        class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                        class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
                                         title="{{ getFqdnWithoutPort($row['url']) }}">{{ getFqdnWithoutPort($row['url']) }}</a>
                                 </div>
                             </div>

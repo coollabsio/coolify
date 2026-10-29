@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -466,10 +467,16 @@ class ByDigitalOcean extends Component
             if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
+                ]);
+
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
             }
 
@@ -512,6 +519,8 @@ class ByDigitalOcean extends Component
                 // Non-fatal: the server page polling backfills the IP later.
                 report($e);
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 currentTeam()->update([

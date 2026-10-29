@@ -1,10 +1,11 @@
-<form wire:submit="submit">
+<form wire:submit="submit" class="flex flex-col gap-6">
     <x-unsaved-bar action="submit" />
 
     <x-application.settings-section title="Backup schedule"
         description="Choose what to back up, when it runs, and how long it may run.">
         <x-slot:actions>
-            <div class="flex items-center gap-2">
+            {{-- Below xl the header bar is hidden, so keep the buttons here. --}}
+            <div @class(['flex items-center gap-2', 'xl:hidden' => $actionsInHeader])>
                 @if (! $backupEnabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
                         wire:target="toggleEnabled" isHighlighted>
@@ -33,7 +34,7 @@
                     ]" />
                     @if (! $backup->dump_all)
                         <div class="w-full" x-data="{
-                            value: @entangle('databasesToBackup').live,
+                            value: @entangle('databasesToBackup'),
                             draft: '',
                             get databases() {
                                 return (this.value || '').split(',').map(name => name.trim()).filter(Boolean);
@@ -96,7 +97,9 @@
                     min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
                     helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
-            <x-next-run :at="$backup->next_run_at" :timezone="$timezone" :enabled="$backup->enabled" :frequency="$backup->frequency" />
         </div>
     </x-application.settings-section>
+
+    @include('livewire.project.database.backup-edit.s3')
+    @include('livewire.project.database.backup-edit.retention')
 </form>

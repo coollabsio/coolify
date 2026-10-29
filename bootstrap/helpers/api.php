@@ -2,18 +2,24 @@
 
 use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
+use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\Environment;
+use App\Models\EnvironmentVariable;
+use App\Models\ServerSetting;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -40,7 +46,7 @@ function serializeApiResponse($data)
 {
     if ($data instanceof Collection) {
         return $data->map(function ($d) {
-            $d = collect($d)->sortKeys();
+            $d = collect(apiEnvironmentVariableDisplayValue($d))->sortKeys();
             $created_at = data_get($d, 'created_at');
             $updated_at = data_get($d, 'updated_at');
             if ($created_at) {
@@ -65,10 +71,10 @@ function serializeApiResponse($data)
                 $d = $d->prepend($d['id'], 'id');
             }
 
-            return $d;
+            return removeServerProxySecretsFromApiPayload($d);
         });
     } else {
-        $d = collect($data)->sortKeys();
+        $d = collect(apiEnvironmentVariableDisplayValue($data))->sortKeys();
         $created_at = data_get($d, 'created_at');
         $updated_at = data_get($d, 'updated_at');
         if ($created_at) {
@@ -93,8 +99,69 @@ function serializeApiResponse($data)
             $d = $d->prepend($d['id'], 'id');
         }
 
-        return $d;
+        return removeServerProxySecretsFromApiPayload($d);
     }
+}
+
+/**
+ * Serialize an environment variable with its display value, so a reference to a
+ * locked shared variable keeps its reference text instead of the locked value.
+ */
+function apiEnvironmentVariableDisplayValue(mixed $data): mixed
+{
+    if (! $data instanceof EnvironmentVariable || in_array('real_value', $data->getHidden(), true)) {
+        return $data;
+    }
+
+    return [...$data->toArray(), 'real_value' => $data->displayRealValue()];
+}
+
+/**
+ * Remove the saved proxy configuration and validation logs from every
+ * serialized server in an API payload, including nested ones such as
+ * `destination.server`, unless the token can read sensitive data.
+ * The saved proxy configuration often contains DNS provider API tokens.
+ *
+ * @template T
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true) {
+        return $payload;
+    }
+
+    return removeServerProxySecrets($payload);
+}
+
+/**
+ * @template T
+ *
+ * @param  T  $value
+ * @return T
+ */
+function removeServerProxySecrets(mixed $value): mixed
+{
+    if (! is_array($value) && ! $value instanceof SupportCollection) {
+        return $value;
+    }
+
+    $proxy = $value['proxy'] ?? null;
+    if (is_array($proxy)) {
+        unset($proxy['last_saved_proxy_configuration']);
+        $value['proxy'] = $proxy;
+        unset($value['validation_logs']);
+    }
+
+    foreach ($value as $key => $item) {
+        if (is_array($item) || $item instanceof SupportCollection) {
+            $value[$key] = removeServerProxySecrets($item);
+        }
+    }
+
+    return $value;
 }
 
 /**
@@ -111,7 +178,13 @@ function exposeSensitiveFields(Model $model): Model
     return $model;
 }
 
-function sharedDataApplications()
+/**
+ * Shared validation rules for application create and update API endpoints.
+ *
+ * Pass the existing application on update so unchanged manual webhook secrets
+ * are accepted even when they predate the minimum length.
+ */
+function sharedDataApplications(?Application $application = null): array
 {
     return [
         'git_repository' => 'string',
@@ -130,22 +203,32 @@ function sharedDataApplications()
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
+        'include_coolify_default_variables' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
+        'is_permanent_redirect_enabled' => 'boolean',
+        'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
+        'is_container_label_readonly_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',
         'is_log_drain_enabled' => 'boolean',
         'is_gpu_enabled' => 'boolean',
         'gpu_driver' => 'string|nullable',
-        'gpu_count' => 'string|nullable',
+        'gpu_count' => ['string', 'nullable', 'regex:'.ApplicationSetting::GPU_COUNT_PATTERN],
         'gpu_device_ids' => 'string|nullable',
-        'gpu_options' => 'string|nullable',
+        'gpu_options' => ['string', 'nullable', function (string $attribute, mixed $value, Closure $fail): void {
+            if (ApplicationSetting::parseGpuOptions($value) === null) {
+                $fail('The gpu_options must be key=value pairs or a YAML mapping.');
+            }
+        }],
         'is_consistent_container_name_enabled' => 'boolean',
         'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
+        'rolling_update_drain_seconds' => 'integer|min:0|max:'.MAX_ROLLING_UPDATE_DRAIN_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => ValidationPatterns::applicationDomainRules(),
@@ -168,7 +251,11 @@ function sharedDataApplications()
         'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
         'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
         'health_check_port' => 'integer|nullable|min:1|max:65535',
-        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_host' => ['string', function (string $attribute, mixed $value, Closure $fail): void {
+            if (! ValidationPatterns::isValidHealthCheckHost($value)) {
+                $fail('The health check host must be a hostname or an IP address.');
+            }
+        }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
         'health_check_scheme' => 'string|in:http,https',
@@ -192,10 +279,10 @@ function sharedDataApplications()
         'post_deployment_command_container' => ValidationPatterns::containerNameRules(),
         'pre_deployment_command' => 'string|nullable',
         'pre_deployment_command_container' => ValidationPatterns::containerNameRules(),
-        'manual_webhook_secret_github' => 'string|nullable',
-        'manual_webhook_secret_gitlab' => 'string|nullable',
-        'manual_webhook_secret_bitbucket' => 'string|nullable',
-        'manual_webhook_secret_gitea' => 'string|nullable',
+        'manual_webhook_secret_github' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_github)],
+        'manual_webhook_secret_gitlab' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitlab)],
+        'manual_webhook_secret_bitbucket' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_bitbucket)],
+        'manual_webhook_secret_gitea' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitea)],
         'dockerfile_location' => ValidationPatterns::filePathRules(),
         'dockerfile_target_build' => ValidationPatterns::dockerTargetRules(),
         'docker_compose_location' => ValidationPatterns::filePathRules(),
@@ -205,6 +292,10 @@ function sharedDataApplications()
         'docker_compose_custom_build_command' => ValidationPatterns::shellSafeCommandRules(),
         'is_container_label_escape_enabled' => 'boolean',
         'is_preserve_repository_enabled' => 'boolean',
+        'http_basic_auth_hash_algorithm' => Rule::enum(HttpBasicAuthHashAlgorithm::class),
+        'http_basic_auth_bcrypt_cost' => 'integer|min:4|max:14',
+        'http_basic_auth_argon2id_memory_cost' => 'integer|min:8192|max:262144',
+        'http_basic_auth_argon2id_time_cost' => 'integer|min:1|max:12',
     ];
 }
 
@@ -396,11 +487,17 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('disable_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
+    $request->offsetUnset('redact_all_env_values_in_logs');
+    $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
     $request->offsetUnset('stop_grace_period');
+    $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');
+    $request->offsetUnset('is_permanent_redirect_enabled');
+    $request->offsetUnset('traefik_certificate_resolver');
+    $request->offsetUnset('is_container_label_readonly_enabled');
     $request->offsetUnset('is_raw_compose_deployment_enabled');
     $request->offsetUnset('is_log_drain_enabled');
     $request->offsetUnset('is_gpu_enabled');

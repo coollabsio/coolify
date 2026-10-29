@@ -44,8 +44,7 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
             Log::info('Starting Coolify update process...');
             UpdateCoolify::run(false); // false means it's not a manual update
 
-            $settings->update(['new_version_available' => false]);
-            Log::info('Coolify update completed successfully.');
+            Log::info('Coolify upgrade script started. Result: /data/coolify/source/.upgrade-status, log: /data/coolify/source/upgrade-*.log.');
         } catch (\Throwable $e) {
             Log::error('UpdateCoolifyJob failed: '.$e->getMessage());
             // Consider implementing a notification to administrators

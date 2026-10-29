@@ -29,7 +29,7 @@ Docker Compose-based dev setup with services: coolify (app, which also runs Reve
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. To pass the host NVIDIA GPU through to the KVM localhost VM (`ubuntu-root` only), start with `COOLIFY_DEV_GPU=1 ./scripts/dev start` (or `php artisan dev:qemu ubuntu-root --as-localhost --gpu`). This attaches every PCI function of the GPU, gives the VM 4 GiB, stops `nvidia-persistenced` on the host, and installs the NVIDIA driver and container toolkit in the VM. The host cannot use the GPU while the VM runs. Remove it with `--fresh` without `--gpu`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 
@@ -65,6 +65,22 @@ vendor/bin/pint --dirty --format agent              # format changed files
 npm run dev                     # vite dev server
 npm run build                   # production build
 ```
+
+## Testing the Service Parser
+
+`tests/Feature/ServiceParserReferenceTest.php` is a golden test for both compose parsers (`serviceParser` with `updateCompose`, and `applicationParser`) and the proxy label and magic-variable helpers. It parses `tests/Fixtures/parser/service-reference.yaml` and `application-reference.yaml` (one service per parser feature, with setting variations and error fixtures) and every template in `templates/compose`, then compares the output with `tests/Fixtures/parser/expected/`. Only the reference expected files are committed. Template expected files are gitignored, so CI checks only that each template parses.
+
+```bash
+./scripts/parser-snapshot-diff save       # before a parser change: save the output of all cases (~90 s)
+./scripts/parser-snapshot-diff baseline   # after the change: one line per changed case, full diff in storage/framework/testing/parser-snapshot-diff.diff
+php artisan test --compact tests/Feature/ServiceParserReferenceTest.php    # before you commit
+UPDATE_PARSER_SNAPSHOTS=1 php artisan test --compact tests/Feature/ServiceParserReferenceTest.php   # accept an intended change, then review git diff tests/Fixtures/parser/
+```
+
+- A refactor must give "No differences". For an intended change, check every changed line in the diff file.
+- When you add a parser feature, add a small service that uses it to `service-reference.yaml` or `application-reference.yaml` and regenerate the expected files.
+- `./scripts/parser-snapshot-diff <git-ref>` compares with a commit instead of a saved baseline.
+- It covers only the latest compose parsing version. Older parsing versions are not covered.
 
 ## Browser Tests (Pest Browser Plugin)
 
@@ -150,10 +166,35 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - Multi-tenancy via Teams — team auto-initializes notification settings on creation
 - Authorize every server-side read and mutation where access can vary by user, role, team, or resource. Use policies, gates, or `$this->authorize(...)`; never rely on hidden Blade/Livewire controls such as `@can` for security.
 - Scope queries to the current team before returning records. Treat route and model identifiers as untrusted, and prevent users from reading or changing resources owned by another team.
+- Use the session team (`currentTeam()`, `Model::ownedByCurrentTeam()`) only to find or open records, for "my team" lists, to create new top-level records, and on team pages. A user can switch teams in another tab while a page stays open, and every user owns a personal team.
+- Once a component, action, or controller works on a loaded resource, use that resource's team for everything after it:
+  - Roles and redaction: use the policy (`$this->authorize('update', $resource)`) or `auth()->user()->isAdminOfTeam($resource->team()->id)`. Never use `isMember()`, `isAdmin()`, or `role()` for resource permissions; they read the role in the session team.
+  - Related records the user can pick (S3 storages, keys, servers, sources, tags, tokens): query with `->where('team_id', $resource->team()->id)` and validate submitted IDs against that team.
+  - New rows that belong to the resource: set `team_id` from the resource's team, not `currentTeam()->id`.
+- Test this with a user who is a member of the resource's team and the owner of another team, with the session switched to the other team after mount.
 - Apply authorization consistently across Livewire actions, API and web controllers, actions, downloads, exports, search, event listeners, and any other path that exposes or changes protected data.
 - Default to denying access when a policy or ownership relationship is missing or ambiguous. Members must not gain access to administrative, credential, security, billing, or instance-wide data merely because they belong to the team.
 - Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
 - Do not add a `TRUSTED_PROXIES` setting or change `TrustProxies` to use one. This caused problems in supported Coolify deployments. Fix IP-based rate limits and allow-lists at their call sites instead of changing proxy trust as a shortcut.
+
+### Security threat model (read before you report or rate a vulnerability)
+
+Before you rate a vulnerability or write an advisory, find the security boundary that the attack crosses. The boundary decides the severity. A finding that crosses no boundary is still a valid finding, but its severity is low. The full scope is in [`SECURITY.md`](SECURITY.md).
+
+- Trusted by design (attacks that need these roles are low severity):
+  - A team admin or owner, and an API token with `write` or `root` ability, already has root on every server of that team (terminal, any Compose file with host mounts, scheduled commands, all team secrets).
+  - An instance admin (admin or owner of the root team) already controls the Coolify instance and its host.
+  - Repository, Dockerfile, and Compose content that a team admin deploys is trusted for that deployment.
+- Real boundaries:
+  - No login -> any access.
+  - Team member (read-only) -> write, command execution, or secrets in the own team.
+  - One team -> another team.
+  - Team user -> the Coolify container or the Coolify host, when the user is not an instance admin.
+  - Token -> more than its abilities allow.
+- Rate with the real role that the attack needs, not the role that the reporter claims. Read the policy or gate that protects the path. Admin needed means `PR:H`. Use `S:C` only when the impact reaches another team, the Coolify instance, or a server that the attacker does not manage.
+- If a path is reachable by a member only because of a different missing authorization check, report that check as the main issue, with high severity. Rate each injection behind it by the role it needs when the check works.
+- Always fix low-severity findings (escape shell arguments, validate input, confine paths) when you find them. Do not dismiss them because the attacker is an admin.
+- Do not put exploit details, payloads, or unreleased advisory IDs in commits, PR descriptions, code comments, or this file.
 
 ### Event Broadcasting
 - Laravel Reverb WebSocket server for real-time updates (port 6001) and a Node terminal WebSocket server (port 6002), both run inside the `coolify` container as s6 services
@@ -168,6 +209,22 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly, SQLite).
 - **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
 - **Proxy** — Traefik reverse proxy managed per server.
+
+### Server transfer (keep it complete)
+
+A server transfer moves a server and every record that belongs to it to another Coolify instance: `ServerTransferExporter` writes the bundle, `ServerTransferImporter` reads it (`app/Services/ServerTransfer/`). `ServerTransferCoverage` records the transfer decision for every model and every column.
+
+- When you add a model, a column, or a relation that belongs to a server or to a resource on a server (application, preview, database, service, volume, environment variable, backup, scheduled task, tag, or setting), decide whether a transfer moves it:
+  - **Moved:** export and import it, and add a round-trip assertion to `tests/Unit/ServerTransfer/ServerTransferExporterImporterTest.php`. For a new model, also add it to `ServerTransferCoverage::TRANSFERRED`.
+  - **Not moved:** add the model to `ServerTransferCoverage::NOT_TRANSFERRED`, or the column to `NOT_EXPORTED_COLUMNS`, with the reason. If the data is lost for the user, also add an export warning.
+- `tests/Unit/ServerTransfer/ServerTransferCoverageTest.php` exports a server with one record of every transferred model. It fails when a model or a column has no decision. When you add a transferred model, add a record of it to the fixture of that test.
+- `docs/server-transfer-full-coverage.md` lists what to set up on a source server for a manual transfer test that covers every transferred model and setting. Add new transferred models and settings to it.
+- `scripts/transfer-test/` has live end-to-end transfer tests between two dev instances (see its README). Run them after a change to the transfer flow. When you add transferred data that the unit tests cannot prove (remote commands, provider calls, queue behavior), add a check to `extras-e2e.sh`.
+- Application, Service, and the standalone databases export their `$fillable` columns, plus hand-written lists for hidden columns. A column that is not fillable is lost unless you add it to those lists.
+- Do not copy a foreign key as a raw ID. IDs are different on the target. Link the record by UUID, or leave the column out with a reason.
+- Team credentials that a moved record needs (integration tokens, S3 storages, git sources, private keys, cloud provider tokens) move with it.
+- When the user must do a step after the transfer (for example, change a webhook URL at GitHub), add an item type to `TransferFinishChecklist`: the "Finish the transfer" list on the server page of the instance that manages the server now. Give it a check where Coolify can verify the step, and a fix where it can do the step. Also add it to the `post_transfer_checklist` of the bundle (`{target_url}` stands for the URL of the target), which the source shows as text.
+- On the source, a transferred server (`Server::isTransferredAway()`) is only an archive, because another instance manages the host. Do not run remote commands, cloud provider calls, or DNS provider calls for it, also not when the archive is deleted.
 
 ### Instance sentinels (`id = 0`)
 
@@ -224,12 +281,13 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- Nixpacks is deprecated. Never recommend it to users (issue replies, docs, UI copy, workarounds). Recommend the Dockerfile build pack, or Railpack where it fits.
 - When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 
 - Production branch: `main`
-- Development branch: `next`
+- Development branch: `next`. Do not create `release/v*` branches.
 - Fix PRs should target the current production branch; feature PRs should target `next`
 
 <laravel-boost-guidelines>
@@ -241,24 +299,11 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 
 ## Foundational Context
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
 
-- php - 8.5
-- laravel/fortify (FORTIFY) - v1
-- laravel/framework (LARAVEL) - v12
-- laravel/horizon (HORIZON) - v5
-- laravel/mcp (MCP) - v0
-- laravel/pail (PAIL) - v1
-- laravel/prompts (PROMPTS) - v0
-- laravel/sanctum (SANCTUM) - v4
-- laravel/socialite (SOCIALITE) - v5
-- livewire/livewire (LIVEWIRE) - v3
-- laravel/boost (BOOST) - v2
-- laravel/pint (PINT) - v1
-- pestphp/pest (PEST) - v4
-- phpunit/phpunit (PHPUNIT) - v12
-- rector/rector (RECTOR) - v2
-- tailwindcss (TAILWINDCSS) - v4
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
 
 ## Skills Activation
 
@@ -305,7 +350,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Searching Documentation (IMPORTANT)
 
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
 - Pass a `packages` array to scope results when you know which packages are relevant.
 - Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
 - Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
@@ -316,6 +361,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
 3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
 4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+
+## Project Rules
+
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+- Record a rule with `record-rule` only when the user explicitly asks for one. Instructions for the work at hand are not rules, no matter how emphatic: "remove this typo", "use X here" are work to do, not rules to record. Never record a rule on your own initiative, as a byproduct of a change, or to summarize what you just did. When the user does ask, pass a `glob` (e.g. `app/Http/Controllers/**`), a short `title`, and a few-line `note`. Use `record-rule` rather than your native memory or notes tool, because native memory is personal and session-scoped, while only `.ai/rules` is shared with the team and persists in the repo.
 
 ## Artisan
 
@@ -345,13 +395,17 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 # Deployment
 
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
+- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
 
 === tests rules ===
 
 # Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+- Add or update tests for behavior and logic changes when a test provides meaningful regression coverage.
+- Pure copy, styling, and layout-only changes do not require new or updated tests.
+- When test coverage applies, run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
 
 === laravel/core rules ===
 
@@ -403,6 +457,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 ## Database
 
 - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
+
 - Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
 
 ### Models
@@ -413,7 +468,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Livewire
 
-- Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
+- Livewire allows you to build dynamic, reactive interfaces in PHP without writing JavaScript.
 - You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
 - Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
 
@@ -426,11 +481,18 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 === pest/core rules ===
 
-## Pest
+# Pest
 
-- This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
-- The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
-- Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
-- Do NOT delete tests without approval.
+- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
+- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
+- Do not delete tests or test files without approval. They are part of the application.
+
+## Running Tests
+
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Rerun a test after each change to it.
+- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
 
 </laravel-boost-guidelines>

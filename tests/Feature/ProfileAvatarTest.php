@@ -100,7 +100,7 @@ it('loads an S3 profile picture from the configured CDN', function () {
     expect(profile_avatar_url($user))->toBe("https://avatars.example.com/media/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
 });
 
-it('loads an S3 profile picture directly from S3 when the CDN is not configured', function () {
+it('falls back to the authenticated proxy route for an S3 profile picture when the CDN is not configured', function () {
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -118,7 +118,9 @@ it('loads an S3 profile picture directly from S3 when the CDN is not configured'
         'avatar_s3_storage_id' => $storage->id,
     ]);
 
-    expect(profile_avatar_url($user))->toBe("https://s3.example.com/avatars/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
+    // Direct S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests,
+    // so without a CDN the browser must use the app's authenticated proxy route.
+    expect(profile_avatar_url($user))->toBe(route('profile.avatar', ['v' => $user->updated_at->timestamp]));
 });
 
 it('does not use an unrelated S3 storage URL for a profile picture', function () {
@@ -169,5 +171,43 @@ it('falls back cleanly when the avatars S3 storage no longer exists', function (
 
     $this->withoutMiddleware()->actingAs($user)
         ->get(route('profile.avatar'))
+        ->assertNotFound();
+});
+
+it('serves a team members profile picture to other members of the same team', function () {
+    Storage::fake('images');
+    $team = Team::factory()->create();
+    $viewer = User::factory()->create();
+    $member = User::factory()->create([
+        'avatar_path' => 'avatars/2/avatar.jpg',
+        'avatar_storage_type' => 'local',
+    ]);
+    $team->members()->attach($viewer->id, ['role' => 'member']);
+    $team->members()->attach($member->id, ['role' => 'member']);
+    Storage::disk('images')->put($member->avatar_path, 'avatar-content');
+
+    $this->actingAs($viewer);
+
+    expect(profile_avatar_url($member))->toBe(route('team.member.avatar', ['user_id' => $member->id, 'v' => $member->updated_at->timestamp]));
+
+    $this->withoutMiddleware()
+        ->get(route('team.member.avatar', ['user_id' => $member->id]))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'image/jpeg');
+});
+
+it('does not serve the profile picture of a user who shares no team', function () {
+    Storage::fake('images');
+    $viewer = User::factory()->create();
+    $viewer->teams()->attach(Team::factory()->create()->id, ['role' => 'owner']);
+    $stranger = User::factory()->create([
+        'avatar_path' => 'avatars/3/avatar.jpg',
+        'avatar_storage_type' => 'local',
+    ]);
+    $stranger->teams()->attach(Team::factory()->create()->id, ['role' => 'owner']);
+    Storage::disk('images')->put($stranger->avatar_path, 'avatar-content');
+
+    $this->withoutMiddleware()->actingAs($viewer)
+        ->get(route('team.member.avatar', ['user_id' => $stranger->id]))
         ->assertNotFound();
 });

@@ -20,35 +20,17 @@ export const TERMINAL_CONNECTION_ERRORS = Object.freeze({
     timeout: 'Timed out while connecting to the terminal. Reload the page and try again.',
 });
 
-const AUTH_REJECTION_MESSAGES = new Set([
-    'Unauthorized: Missing required tokens',
-    'Unauthorized: Invalid terminal token',
-    'Unauthorized: Terminal token was rejected',
-]);
-
 export function isTerminalAuthRejectionCode(code) {
     return code === TERMINAL_CLOSE_CODES.AUTH_REJECTED || code === TERMINAL_CLOSE_CODES.TOKEN_REJECTED;
 }
 
 /**
- * Classifies a plain-text message from the terminal server.
- *
- * @returns {'auth-rejected'|'startup-rejected'|null}
+ * Whether a plain-text message from the terminal server rejects a session start,
+ * for example a target host that is not authorized or an invalid SSH command.
+ * Authentication rejections arrive as close codes instead.
  */
-export function classifyTerminalServerMessage(data) {
-    if (typeof data !== 'string') {
-        return null;
-    }
-
-    if (AUTH_REJECTION_MESSAGES.has(data)) {
-        return 'auth-rejected';
-    }
-
-    if (data.startsWith('Unauthorized:') || data.startsWith('Invalid SSH command:')) {
-        return 'startup-rejected';
-    }
-
-    return null;
+export function isTerminalStartupRejection(data) {
+    return typeof data === 'string' && (data.startsWith('Unauthorized:') || data.startsWith('Invalid SSH command:'));
 }
 
 /**

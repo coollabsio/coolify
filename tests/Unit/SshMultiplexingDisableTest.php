@@ -15,14 +15,39 @@ use Tests\TestCase;
  */
 class SshMultiplexingDisableTest extends TestCase
 {
-    public function test_remote_shell_prefers_bash_and_falls_back_to_sh()
+    /**
+     * sshd runs the remote command with the SSH user's login shell (`$SHELL -c '<command>'`),
+     * which can be fish or csh/tcsh. The wrapper must work in each of them.
+     */
+    public function test_remote_shell_runs_the_script_from_stdin_in_every_login_shell()
     {
-        $reflection = new \ReflectionMethod(SshMultiplexingHelper::class, 'remoteShellCommand');
+        $wrapper = (new \ReflectionMethod(SshMultiplexingHelper::class, 'remoteShellCommand'))->invoke(null);
+        $tested = [];
 
-        $this->assertSame(
-            'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi',
-            $reflection->invoke(null)
-        );
+        foreach (['sh', 'bash', 'dash', 'zsh', 'fish', 'tcsh', 'csh'] as $loginShell) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($loginShell).' 2>/dev/null'));
+            if ($path === '') {
+                continue;
+            }
+
+            $output = shell_exec('echo "echo remote-ok" | '.escapeshellarg($path).' -c '.escapeshellarg($wrapper).' 2>&1');
+            $this->assertSame('remote-ok', trim((string) $output), "Login shell {$loginShell} could not run the wrapper.");
+            $tested[] = $loginShell;
+        }
+
+        $this->assertContains('sh', $tested);
+    }
+
+    /**
+     * fish and csh/tcsh cannot parse POSIX `if ...; then ...; fi`. A single `sh -c "..."` command
+     * with only double quotes (it is wrapped in single quotes on the ssh command line) is a simple
+     * command that every login shell can run.
+     */
+    public function test_remote_shell_is_one_simple_sh_command()
+    {
+        $wrapper = (new \ReflectionMethod(SshMultiplexingHelper::class, 'remoteShellCommand'))->invoke(null);
+
+        $this->assertMatchesRegularExpression('/^sh -c "[^"\'$`!]*"$/', $wrapper);
     }
 
     public function test_generate_ssh_command_accepts_disable_multiplexing_parameter()

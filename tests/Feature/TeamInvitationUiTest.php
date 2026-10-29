@@ -49,3 +49,32 @@ it('preserves a provisional user when revoking their invitation fails', function
     $this->assertDatabaseHas('users', ['id' => $provisionalUser->id]);
     $this->assertDatabaseHas('team_invitations', ['id' => $invitation->id]);
 });
+
+it('sorts pending invitations by the chosen column and ignores unknown sort values', function () {
+    $invite = fn (string $email, string $role, string $via) => TeamInvitation::create([
+        'team_id' => $this->team->id,
+        'uuid' => $email,
+        'email' => $email,
+        'role' => $role,
+        'link' => "http://example.test/invitations/{$email}",
+        'via' => $via,
+    ]);
+    $invitations = collect([
+        $invite('carol@example.com', 'member', 'email'),
+        $invite('alice@example.com', 'owner', 'link'),
+        $invite('bob@example.com', 'admin', 'email'),
+    ]);
+
+    Livewire::test(Invitations::class, ['invitations' => $invitations])
+        ->assertSeeInOrder(['carol@example.com', 'alice@example.com', 'bob@example.com'])
+        ->call('setSort', 'email-asc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'role-desc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'role-asc')
+        ->assertSeeInOrder(['carol@example.com', 'bob@example.com', 'alice@example.com'])
+        ->call('setSort', 'via-desc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'link-asc')
+        ->assertSet('sort', 'via-desc');
+});

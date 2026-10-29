@@ -10,7 +10,7 @@ use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Yaml\Exception\ParseException;
 
 class ServiceApplication extends BaseModel
 {
@@ -39,6 +39,8 @@ class ServiceApplication extends BaseModel
         'is_gzip_enabled',
         'is_stripprefix_enabled',
         'is_force_https_enabled',
+        'is_permanent_redirect_enabled',
+        'traefik_certificate_resolver',
         'last_online_at',
         'is_migrated',
     ];
@@ -65,6 +67,7 @@ class ServiceApplication extends BaseModel
             'domain_port_overrides' => 'array',
             'noindex_domains' => 'array',
             'is_force_https_enabled' => 'boolean',
+            'is_permanent_redirect_enabled' => 'boolean',
         ];
     }
 
@@ -144,6 +147,11 @@ class ServiceApplication extends BaseModel
     public function isForceHttpsEnabled(): bool
     {
         return $this->is_force_https_enabled;
+    }
+
+    public function isPermanentRedirectEnabled(): bool
+    {
+        return (bool) $this->is_permanent_redirect_enabled;
     }
 
     public function type()
@@ -351,6 +359,33 @@ class ServiceApplication extends BaseModel
     }
 
     /**
+     * Whether the proxy labels of this container in the Compose file add HTTP basic auth
+     * (a Traefik `basicauth` middleware or a Caddy `basic_auth` directive).
+     */
+    public function hasProxyBasicAuth(): bool
+    {
+        try {
+            $dockerCompose = parseDockerComposeYaml((string) data_get($this->service, 'docker_compose_raw'));
+        } catch (ParseException) {
+            return false;
+        }
+
+        $labels = $dockerCompose['services'][$this->name]['labels'] ?? [];
+        if (! is_array($labels)) {
+            return false;
+        }
+
+        foreach ($labels as $key => $value) {
+            $label = is_int($key) ? (string) $value : (string) $key;
+            if (preg_match('/basic_?auth/i', $label) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Get the required port for this service application.
      * Extracts port from SERVICE_URL_* or SERVICE_FQDN_* environment variables
      * stored at the Service level, filtering by normalized container name.
@@ -367,7 +402,7 @@ class ServiceApplication extends BaseModel
                 return $this->service->getRequiredPort();
             }
 
-            $dockerCompose = Yaml::parse($dockerComposeRaw);
+            $dockerCompose = parseDockerComposeYaml($dockerComposeRaw);
             $serviceConfig = $dockerCompose['services'][$this->name] ?? null;
             if (! $serviceConfig) {
                 return $this->service->getRequiredPort();
@@ -448,7 +483,7 @@ class ServiceApplication extends BaseModel
      */
     private function getSavedLegacyRoutingPort(array $serviceConfig): ?int
     {
-        $savedCompose = Yaml::parse($this->service->docker_compose ?? '');
+        $savedCompose = parseDockerComposeYaml($this->service->docker_compose ?? '');
         $savedService = $savedCompose['services'][$this->name] ?? null;
         $image = $serviceConfig['image'] ?? null;
         if (! is_string($image) || $image === '' || ($savedService['image'] ?? null) !== $image) {

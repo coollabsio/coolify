@@ -11,6 +11,7 @@ use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class PreviewDomains extends Component
@@ -19,11 +20,22 @@ class PreviewDomains extends Component
 
     public ApplicationPreview $preview;
 
+    /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
     public ?string $newDomainService = null;
+
+    /**
+     * Parsed once on mount and on save. Each parse queues a file sync job, so the
+     * 2-second DNS poll must not parse the compose file on every render.
+     *
+     * @var array<int, string>
+     */
+    #[Locked]
+    public array $composeServices = [];
 
     public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
@@ -42,7 +54,8 @@ class PreviewDomains extends Component
         $this->authorize('view', $this->preview->application);
         $this->refreshDomains();
         if ($this->preview->application->build_pack === 'dockercompose') {
-            $this->newDomainService = $this->composeServices()[0] ?? null;
+            $this->composeServices = $this->composeServices();
+            $this->newDomainService = $this->composeServices[0] ?? null;
         }
     }
 
@@ -50,7 +63,6 @@ class PreviewDomains extends Component
     {
         return view('livewire.project.application.preview-domains', [
             'isCompose' => $this->preview->application->build_pack === 'dockercompose',
-            'composeServices' => $this->composeServices(),
         ]);
     }
 
@@ -58,7 +70,7 @@ class PreviewDomains extends Component
     {
         $this->authorize('update', $this->preview->application);
         if ($this->preview->application->build_pack === 'dockercompose'
-            && ($this->newDomainService === null || ! in_array($this->newDomainService, $this->composeServices(), true))) {
+            && ($this->newDomainService === null || ! in_array($this->newDomainService, $this->composeServices, true))) {
             $this->addError('newDomainService', 'Select a valid Compose service.');
 
             return;
@@ -93,7 +105,7 @@ class PreviewDomains extends Component
         $domain = $this->domainRows[$index]['url'] ?? DomainPortOverrides::withoutPort($domain);
         $this->newDomainParts = DomainUrlParts::empty();
         $this->newDomainService = $this->preview->application->build_pack === 'dockercompose'
-            ? ($this->composeServices()[0] ?? null)
+            ? ($this->composeServices[0] ?? null)
             : null;
         $this->forceUseUnknownPort = false;
         $this->dispatch('close-preview-domain-add', previewId: $this->preview->id);
@@ -452,6 +464,7 @@ class PreviewDomains extends Component
         if ($this->preview->application->build_pack === 'dockercompose') {
             try {
                 $composeServices = $this->composeServices(failOnError: true);
+                $this->composeServices = $composeServices;
             } catch (\Throwable) {
                 $this->refreshDomains();
                 $this->dispatch('error', 'Compose configuration could not be parsed. Preview domains were not changed.');
@@ -489,8 +502,21 @@ class PreviewDomains extends Component
         foreach ($this->domainRows as $index => $row) {
             $this->domainRows[$index]['url'] = DomainPortOverrides::withoutPort($row['url']);
         }
+        $changedFields = array_values(array_intersect(
+            auditChangedFields($this->preview),
+            ['fqdn', 'docker_compose_domains', 'domain_port_overrides'],
+        ));
         $this->preview->save();
-        $dnsCleanup->queueReleaseOfRemovedHostnames($this->preview, $previousDnsHostnames, currentTeam()->id);
+        if ($changedFields !== []) {
+            auditLog('ui.application.preview_updated', [
+                'team_id' => $this->preview->application->team()?->id,
+                'application_uuid' => $this->preview->application->uuid,
+                'application_name' => $this->preview->application->name,
+                'pull_request_id' => $this->preview->pull_request_id,
+                'changed_fields' => $changedFields,
+            ]);
+        }
+        $dnsCleanup->queueReleaseOfRemovedHostnames($this->preview, $previousDnsHostnames, $this->preview->application->team()->id);
         $this->persistDnsStatuses();
         $this->refreshDomains();
         $this->dispatch('update_links');

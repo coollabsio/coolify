@@ -4,9 +4,13 @@ namespace App\Rules;
 
 use App\Models\InstanceSettings;
 use Closure;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\UriComparator;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Log;
-use PurplePixie\PhpDns\DNSQuery;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 use PurplePixie\PhpDns\DNSTypes;
 use Throwable;
 
@@ -161,6 +165,32 @@ class SafeWebhookUrl implements ValidationRule
         ];
 
         return $options;
+    }
+
+    /**
+     * Redirect options that follow up to five redirects on the same scheme, host and port.
+     * The DNS pin from httpClientOptions() covers only that host and port, so a redirect
+     * to another origin is refused. Git providers use such redirects for renamed repositories.
+     *
+     * @return array<string, mixed>
+     */
+    public static function sameOriginRedirectOptions(): array
+    {
+        return [
+            'max' => 5,
+            'strict' => true,
+            'referer' => false,
+            'protocols' => ['http', 'https'],
+            'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $target): void {
+                if (UriComparator::isCrossOrigin($request->getUri(), $target)) {
+                    throw new RequestException(
+                        "Refused a redirect to another host ({$target->getScheme()}://{$target->getAuthority()}).",
+                        $request,
+                        $response,
+                    );
+                }
+            },
+        ];
     }
 
     /**
@@ -331,10 +361,9 @@ class SafeWebhookUrl implements ValidationRule
         foreach ($dnsServers as $dnsServer) {
             foreach ([DNSTypes::NAME_A, DNSTypes::NAME_AAAA] as $type) {
                 try {
-                    $query = new DNSQuery($dnsServer, 53, 5);
-                    $records = $query->query($host, $type);
+                    $records = queryDnsServer($dnsServer, $host, $type);
 
-                    if ($records === false || $query->hasError()) {
+                    if ($records === false) {
                         continue;
                     }
 
@@ -364,7 +393,7 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         return array_values(array_filter(array_map(
-            fn (string $server): string => trim($server),
+            fn (string $server): string => normalizeIpAddress($server),
             explode(',', $servers),
         ), fn (string $server): bool => filter_var($server, FILTER_VALIDATE_IP) !== false));
     }

@@ -3,6 +3,7 @@
 use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Models\S3Storage;
 use App\Models\Team;
+use Carbon\Carbon;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -60,4 +61,49 @@ it('does not test storages that are already usable', function () {
     Storage::shouldReceive('build')->never();
 
     (new RevalidateUnusableS3StoragesJob)->handle();
+});
+
+it('includes the storage with id 0 on the first run', function () {
+    $storage = revalidationStorage(Team::factory()->create());
+    S3Storage::query()->whereKey($storage->id)->update(['id' => 0]);
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('files')->once()->andReturn([]);
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+
+    (new RevalidateUnusableS3StoragesJob)->handle();
+
+    expect(S3Storage::find(0)->is_usable)->toBeTrue();
+});
+
+it('stops when the time budget is used and continues with the next storage on the next run', function () {
+    $team = Team::factory()->create();
+    $first = revalidationStorage($team, ['bucket' => 'first-bucket']);
+    $second = revalidationStorage($team, ['bucket' => 'second-bucket']);
+    $tested = [];
+    Storage::shouldReceive('build')->andReturnUsing(function (array $config) use (&$tested) {
+        $tested[] = $config['bucket'];
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('files')->andReturnUsing(function () {
+            // A slow endpoint uses the whole time budget of the run.
+            Carbon::setTestNow(now()->addSeconds(RevalidateUnusableS3StoragesJob::TIME_BUDGET_SECONDS + 1));
+
+            throw new RuntimeException('Connection timed out');
+        });
+
+        return $disk;
+    });
+
+    (new RevalidateUnusableS3StoragesJob)->handle();
+    expect($tested)->toBe(['first-bucket']);
+
+    (new RevalidateUnusableS3StoragesJob)->handle();
+    expect($tested)->toBe(['first-bucket', 'second-bucket']);
+
+    // After the last storage, the next run starts from the beginning again.
+    (new RevalidateUnusableS3StoragesJob)->handle();
+    expect($tested)->toBe(['first-bucket', 'second-bucket', 'first-bucket'])
+        ->and($first->fresh()->is_usable)->toBeFalse()
+        ->and($second->fresh()->is_usable)->toBeFalse();
+
+    Carbon::setTestNow();
 });

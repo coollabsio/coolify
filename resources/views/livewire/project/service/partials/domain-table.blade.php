@@ -45,17 +45,15 @@
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
             $publicUrl = getFqdnWithoutPort($row['url']);
-            $domainParts = $isSuggested ? null : parse_url($publicUrl);
-            $isNoindexed = $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']);
+            $serviceApplication = $service->applications->firstWhere('id', $row['service_application_id']);
+            $isNoindexed = $serviceApplication?->isDomainNoindexed($row['url']);
             $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
             $directionLabel = match ($rowDirection) {
                 'www' => 'Redirect to www',
                 'non-www' => 'Redirect to non-www',
                 default => 'Both www and non-www',
             };
-            $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
-                ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
-                : null;
+            $faviconUrl = $isSuggested || $serviceApplication?->hasProxyBasicAuth() ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
             $editingParts = \App\Support\DomainUrlParts::split($row['url']);
             if ($row['has_port_override'] ?? false) {
@@ -92,7 +90,7 @@
                                 </span>
                             @endif
                             <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
-                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
                                 title="{{ $publicUrl }}">
                                 {{ $publicUrl }}
                             </a>

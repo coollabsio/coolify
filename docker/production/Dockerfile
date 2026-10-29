@@ -1,13 +1,17 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.0.3
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2026.7.3
+ARG CLOUDFLARED_VERSION=2026.10.3
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.2-r1
+ARG NGINX_VERSION=1.31.8-r1
+# https://nodejs.org/en/about/previous-releases
+ARG NODE_VERSION=24.22.1
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.0
 
 # Add user/group
 ARG USER_ID=9999
@@ -46,10 +50,15 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
+# Temporary: the node:24.22.1 multi-arch manifest is not published yet, pull the per-arch image instead
+FROM amd64/node:${NODE_VERSION}-alpine3.24 AS nodejs-amd64
+FROM arm64v8/node:${NODE_VERSION}-alpine3.24 AS nodejs-arm64
+FROM nodejs-${TARGETARCH} AS nodejs
+
 # =================================================================
 # Stage 2: Frontend assets compilation
 # =================================================================
-FROM node:24-alpine AS static-assets
+FROM nodejs AS static-assets
 
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
@@ -64,6 +73,27 @@ RUN npm run build
 FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 
 # =================================================================
+# Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
+# =================================================================
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+
+USER root
+
+RUN apk upgrade && \
+    apk add --no-cache make g++ python3
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+COPY docker/coolify-terminal/package*.json /terminal/
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefix /terminal && \
+    npm rebuild node-pty --prefix /terminal --update-binary && \
+    rm -rf /terminal/node_modules/node-pty/prebuilds/darwin-* \
+        /terminal/node_modules/node-pty/prebuilds/win32-*
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
+
+# =================================================================
 # Final Stage: Production image
 # =================================================================
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
@@ -74,6 +104,7 @@ ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG PHP_UV_VERSION
 ARG COOLIFY_VERSION
 ARG CI=true
 
@@ -108,17 +139,18 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
-    nodejs \
-    npm \
-    make \
-    g++ \
-    python3 \
+    libstdc++ \
     openssh-client \
     git \
     git-lfs \
     jq \
     lsof \
+    procps \
     vim
+
+# Install PHP extensions
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions uv-${PHP_UV_VERSION}
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
@@ -137,6 +169,11 @@ RUN mkdir -p /usr/local/bin && \
 # Configure PHP
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=1
+# v5 defaults this to 0. Keep 1: app:init rebuilds the Laravel caches while php-fpm already runs.
+ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
+# v5 defaults to 256 MB with 32 MB interned strings. Every PHP CLI process has its own cache, so keep it small.
+ENV PHP_OPCACHE_MEMORY_CONSUMPTION=128
+ENV PHP_OPCACHE_INTERNED_STRINGS_BUFFER=16
 
 # Configure entrypoint
 COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d
@@ -160,16 +197,14 @@ COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
+# Version data for Traefik, Sentinel, and helper checks until CheckForUpdatesJob refreshes it
+COPY --chown=www-data:www-data versions.json ./versions.json
 
 RUN composer dump-autoload
 
 # Install terminal WebSocket server dependencies
-COPY docker/coolify-terminal/package*.json /terminal/
-RUN npm ci --prefix /terminal && \
-    npm rebuild node-pty --prefix /terminal --update-binary
-COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
-COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
-RUN chown -R www-data:www-data /terminal
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf

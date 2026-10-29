@@ -112,6 +112,13 @@ describe('registry image guard', function () {
         callMultiServerDeploymentJob($job, 'ensureRegistryImageForMultipleServers');
     })->throwsNoExceptions();
 
+    test('allows docker compose applications, which build on each server', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        $job = makeMultiServerDeploymentJob(['application' => $this->application->fresh()]);
+
+        callMultiServerDeploymentJob($job, 'ensureRegistryImageForMultipleServers');
+    })->throwsNoExceptions();
+
     test('allows preview deployments, which run only on the main server', function () {
         $job = makeMultiServerDeploymentJob(['application' => $this->application, 'pull_request_id' => 7]);
 
@@ -273,6 +280,65 @@ describe('combined deployment notification', function () {
         Notification::assertNotSentTo($this->team, DeploymentFailed::class);
     });
 
+    test('sends the summary when the last additional server deployment is cancelled while running', function () {
+        $parentUuid = new_public_id();
+        Cache::put("multi-server-deployment-queued:{$parentUuid}", true);
+        createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::FINISHED->value, $parentUuid);
+        $cancelled = createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::CANCELLED_BY_USER->value, $parentUuid);
+        $job = makeMultiServerDeploymentJob(['application' => $this->application, 'application_deployment_queue' => $cancelled]);
+
+        expect(fn () => callMultiServerDeploymentJob($job, 'failDeployment'))
+            ->toThrow(DeploymentException::class, 'Deployment cancelled by user');
+
+        Notification::assertSentToTimes($this->team, DeploymentFailed::class, 1);
+        Notification::assertSentTo($this->team, DeploymentFailed::class, fn (DeploymentFailed $notification) => $notification->deployment_uuid === $cancelled->deployment_uuid);
+        Notification::assertNotSentTo($this->team, DeploymentSuccess::class);
+    });
+
+    test('sends the summary when the last additional server deployment is cancelled before it starts', function () {
+        $parentUuid = new_public_id();
+        Cache::put("multi-server-deployment-queued:{$parentUuid}", true);
+        createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::FINISHED->value, $parentUuid);
+        $cancelled = createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::CANCELLED_BY_USER->value, $parentUuid);
+        [$job] = makeMultiServerDeploymentJob(['application' => $this->application, 'application_deployment_queue' => $cancelled]);
+
+        $job->handle();
+
+        Notification::assertSentToTimes($this->team, DeploymentFailed::class, 1);
+        Notification::assertSentTo($this->team, DeploymentFailed::class, fn (DeploymentFailed $notification) => $notification->deployment_uuid === $cancelled->deployment_uuid);
+    });
+
+    test('does not notify when a cancelled additional server deployment is not the last one', function () {
+        $parentUuid = new_public_id();
+        Cache::put("multi-server-deployment-queued:{$parentUuid}", true);
+        createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::IN_PROGRESS->value, $parentUuid);
+        $cancelled = createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::CANCELLED_BY_USER->value, $parentUuid);
+        [$job] = makeMultiServerDeploymentJob(['application' => $this->application, 'application_deployment_queue' => $cancelled]);
+
+        $job->handle();
+
+        Notification::assertNothingSent();
+    });
+
+    test('takes commit details for the summary from the main deployment', function () {
+        $parent = ApplicationDeploymentQueue::create([
+            'application_id' => $this->application->id,
+            'deployment_uuid' => new_public_id(),
+            'server_id' => $this->mainServer->id,
+            'status' => ApplicationDeploymentStatus::FINISHED->value,
+            'commit' => 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+            'commit_message' => 'Add checkout page',
+        ]);
+        Cache::put("multi-server-deployment-queued:{$parent->deployment_uuid}", true);
+        $child = createMultiServerDeployment($this->application, $this->extraServer, ApplicationDeploymentStatus::FINISHED->value, $parent->deployment_uuid);
+        $job = makeMultiServerDeploymentJob(['application' => $this->application, 'application_deployment_queue' => $child]);
+
+        callMultiServerDeploymentJob($job, 'sendMultiServerDeploymentNotification', $parent->deployment_uuid);
+
+        Notification::assertSentTo($this->team, DeploymentSuccess::class, fn (DeploymentSuccess $notification) => $notification->commit_sha === $parent->commit
+            && $notification->commit_message === 'Add checkout page');
+    });
+
     test('sends a failed notification that links to the failed server deployment', function () {
         $parentUuid = new_public_id();
         Cache::put("multi-server-deployment-queued:{$parentUuid}", true);
@@ -297,15 +363,27 @@ class MultiServerRecordingDeploymentJob extends ApplicationDeploymentJob
 
     public function __construct() {}
 
+    /** Output that `docker images -q` returns; empty means the image is missing. */
+    public string $localImageOutput = 'sha256:0123456789ab';
+
+    public bool $failImagePull = false;
+
     public function execute_remote_command(...$commands): void
     {
         foreach ($commands as $command) {
-            $this->recordedCommands[] = $command['command'] ?? $command[0];
+            $remoteCommand = $command['command'] ?? $command[0];
+            $this->recordedCommands[] = $remoteCommand;
+            if ($this->failImagePull && str_starts_with($remoteCommand, 'docker pull ') && ! ($command['ignore_errors'] ?? false)) {
+                throw new RuntimeException('Registry image pull failed.');
+            }
+            if (isset($command['save'])) {
+                (new ReflectionProperty(ApplicationDeploymentJob::class, 'saved_outputs'))->getValue($this)->put($command['save'], $this->localImageOutput);
+            }
         }
     }
 }
 
-function makeInlineDockerfileJob(Application $application, bool $isAdditionalServer): array
+function makeInlineDockerfileJob(Application $application, bool $isAdditionalServer, ?Server $server = null): array
 {
     $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
     $job = new MultiServerRecordingDeploymentJob;
@@ -316,6 +394,8 @@ function makeInlineDockerfileJob(Application $application, bool $isAdditionalSer
         'application_deployment_queue' => $queue,
         'is_this_additional_server' => $isAdditionalServer,
         'pull_request_id' => 0,
+        'saved_outputs' => collect(),
+        'server' => $server ?? $application->destination->server,
     ] as $name => $value) {
         $reflection->getProperty($name)->setValue($job, $value);
     }
@@ -336,7 +416,31 @@ describe('inline Dockerfile image on additional servers', function () {
         [$job, $reflection] = makeInlineDockerfileJob($this->application->fresh(), true);
 
         expect($reflection->getMethod('pull_image_for_additional_server')->invoke($job))->toBeTrue()
-            ->and($job->recordedCommands)->toBe(["docker pull 'registry.example.com/nginx-multi:latest'"]);
+            ->and($job->recordedCommands)->toBe([
+                "docker pull 'registry.example.com/nginx-multi:latest'",
+                "docker images -q 'registry.example.com/nginx-multi:latest' 2>/dev/null",
+            ]);
+    });
+
+    test('an additional server fails when pulling the image fails even if an old image is cached', function () {
+        [$job, $reflection] = makeInlineDockerfileJob($this->application->fresh(), true);
+        $job->failImagePull = true;
+        $job->localImageOutput = 'sha256:stale-cached-image';
+
+        expect(fn () => $reflection->getMethod('pull_image_for_additional_server')->invoke($job))
+            ->toThrow(RuntimeException::class, 'Registry image pull failed.');
+        expect($job->recordedCommands)->toBe([
+            "docker pull 'registry.example.com/nginx-multi:latest'",
+        ]);
+    });
+
+    test('a deployments only server explains that the main server must push a missing image', function () {
+        $this->extraServer->settings->update(['server_role' => 'deployment']);
+        [$job, $reflection] = makeInlineDockerfileJob($this->application->fresh(), true, $this->extraServer->fresh());
+        $job->localImageOutput = '';
+
+        expect(fn () => $reflection->getMethod('pull_image_for_additional_server')->invoke($job))
+            ->toThrow(DeploymentException::class, 'Image (registry.example.com/nginx-multi:latest) not found in the registry; the main server must push it first. The server (extra-server) is set to deployments only and cannot build it.');
     });
 
     test('the main server builds the image', function () {

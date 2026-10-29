@@ -36,6 +36,9 @@
                 });
                 this.on('complete', function (file) {
                     $wire.filename = file.name;
+                    if (file.status === Dropzone.SUCCESS) {
+                        $wire.selectUploadedFile(file.name);
+                    }
                     $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
                     $wire.isUploading = false;
                 });
@@ -56,9 +59,9 @@
                 description="Configure how the selected backup is applied to this database.">
                 <div class="space-y-4">
             @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
-                            <x-callout type="warning" title="Full restore overwrites administrator passwords">
-                                The backup replaces PostgreSQL administrator role passwords, including the destination administrator password.
-                                <span class="mt-1 block">If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
+                            <x-callout type="warning" title="Full restore runs as a superuser">
+                                Restoring all databases needs a PostgreSQL superuser (it recreates databases and roles), so Coolify cannot restrict it. Only use a backup you trust.
+                                <span class="mt-1 block">The backup also replaces PostgreSQL administrator role passwords, including the destination administrator password. If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
                             </x-callout>
             @endif
                             <x-forms.textarea rows="10" readonly label="Import command"
@@ -75,14 +78,40 @@
                     @endif
                     @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
                         <div class="max-w-sm">
-                            <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
+                            <x-forms.checkbox id="replaceExisting" live label="Replace objects that already exist"
                                 helper="Archive backups: drops matching tables, functions, types, and other PostgreSQL objects before restoring them. SQL backups: recreates the database before the restore."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="keepOwners" live label="Keep owners and privileges"
+                                helper="Archive backups: restores object owners and GRANTs from the backup. Leave this off for backups from another server (for example Amazon RDS): its roles usually do not exist here, and the whole restore would be rolled back."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if (in_array($resourceDbType, ['standalone-mysql', 'standalone-mariadb', 'mysql', 'mariadb'], true) && $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="restoreMysqlUsers" live label="Restore users and privileges (mysql system database)"
+                                helper="Off: the system databases (mysql, sys) of the backup are skipped, so this database keeps its own users and passwords. On: the users, passwords, and privileges of the backup replace the current ones."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        @if ($restoreMysqlUsers)
+                            <x-callout type="warning" title="Restoring users changes passwords">
+                                The backup replaces all users, passwords, and privileges, including the root password. After the next restart of the database, the passwords from the backup apply, so the credentials Coolify stores for this database, and its health check, may stop working.
+                                <span class="mt-1 block">Update the passwords in Coolify's database configuration after the restore.</span>
+                            </x-callout>
+                        @endif
+                    @endif
+                    @if ($resourceDbType === 'standalone-sqlite' && count($this->sqliteDatabaseFiles) > 0)
+                        <div class="max-w-sm">
+                            <x-forms.listbox id="sqliteDatabase" label="Restore into" live
+                                helper="The database file the backup replaces. Coolify preselects the file named in the backup file name."
+                                :options="collect($this->sqliteDatabaseFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()"
                                 canGate="update" :canResource="$this->resource" />
                         </div>
                     @endif
                     @if ($resourceDbType === 'standalone-mongodb')
                         <div class="max-w-sm">
-                            <x-forms.checkbox id="replaceExisting" label="Replace collections that already exist"
+                            <x-forms.checkbox id="replaceExisting" live label="Replace collections that already exist"
                                 helper="Drops each collection from the backup before restoring it. Without this option, documents that already exist are skipped."
                                 canGate="update" :canResource="$this->resource" />
                         </div>
@@ -96,7 +125,7 @@
                     <button type="button" @click="restoreType = 'file'"
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
-                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
                             : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                         <span
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
@@ -113,7 +142,7 @@
                         <button type="button" @click="restoreType = 's3'"
                             class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                             :class="restoreType === 's3'
-                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
                                 : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                             <span
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
@@ -155,7 +184,7 @@
                         @csrf
                     </form>
                     <div x-show="isUploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
-                        <div class="h-full rounded-full bg-coollabs dark:bg-warning"
+                        <div class="h-full rounded-full bg-coollabs dark:bg-brand"
                             :style="`width: ${progress}%`"></div>
                     </div>
 
@@ -252,7 +281,7 @@
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
                     <div class="flex h-full min-h-0 flex-col" wire:ignore>
-                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" header="Logs" fullHeight />
+                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" fullHeight />
                     </div>
                 </x-slot:content>
             </x-process-dialog>

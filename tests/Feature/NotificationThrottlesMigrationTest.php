@@ -5,9 +5,11 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Database\BackupMissing;
+use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
@@ -65,4 +67,32 @@ it('moves the old notification markers into notification_throttles and back', fu
         ->toBeNull();
 
     $migration->up();
+});
+
+it('keeps a migrated unreachable marker until the server is reachable again, however long ago it was set', function () {
+    Notification::fake();
+    $team = Team::factory()->create();
+    $team->emailNotificationSettings()->update([
+        'use_instance_email_settings' => true,
+        'server_unreachable_email_notifications' => true,
+        'server_reachable_email_notifications' => true,
+    ]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    $migration = require database_path('migrations/2026_09_29_083244_create_notification_throttles_table.php');
+    $migration->down();
+    DB::table('servers')->where('id', $server->id)->update(['unreachable_notification_sent' => true, 'updated_at' => now()]);
+    $migration->up();
+
+    $server->settings()->update(['is_reachable' => false]);
+    $server->forceFill(['unreachable_count' => 5])->save();
+
+    $this->travel(400)->days();
+    $server->fresh()->isReachableChanged();
+    Notification::assertNothingSent();
+
+    $server->settings()->update(['is_reachable' => true]);
+    $server->fresh()->isReachableChanged();
+    Notification::assertSentTo($team, Reachable::class);
+    expect(NotificationThrottle::wasSent($server, Unreachable::class))->toBeFalse();
 });

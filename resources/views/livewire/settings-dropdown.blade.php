@@ -163,11 +163,8 @@
                     <div
                         class="flex shrink-0 items-center gap-3 border-b border-neutral-200 p-3 dark:border-white/[0.06]">
                         <div class="relative w-full max-w-sm">
-                            <svg class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                            <x-reicon name="search"
+                                class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400" />
                             <input x-model="search" @input="page = 1" type="search" placeholder="Search updates"
                                 class="input !pl-9" />
                         </div>

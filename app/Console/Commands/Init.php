@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
 use App\Support\ResourceStartActivity;
+use App\Support\RootSetupWindow;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -35,6 +36,12 @@ class Init extends Command
     {
         Artisan::call('optimize:clear');
         Artisan::call('optimize');
+
+        try {
+            RootSetupWindow::openIfNoUserExists();
+        } catch (\Throwable $e) {
+            echo "Could not open the root setup window: {$e->getMessage()}\n";
+        }
 
         try {
             $this->pullTemplatesFromCDN();
@@ -257,10 +264,8 @@ class Init extends Command
                 $database = StandalonePostgresql::withTrashed()->find(0);
                 if ($database && $database->trashed()) {
                     $database->restore();
-                    $scheduledBackup = ScheduledDatabaseBackup::find(0);
-                    if (! $scheduledBackup) {
+                    if (! $database->scheduledBackups()->exists()) {
                         ScheduledDatabaseBackup::create([
-                            'id' => 0,
                             'enabled' => true,
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',

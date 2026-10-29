@@ -16,6 +16,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 
 uses(RefreshDatabase::class);
@@ -67,7 +68,7 @@ describe('label producers', function () {
 });
 
 describe('container lookups for services and databases', function () {
-    test('database and service lookups match the UUID label, the compose project, and the older id label', function () {
+    test('database and service lookups match the UUID label and the compose project, never a numeric id', function () {
         $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
         $this->server->update(['private_key_id' => $privateKey->id]);
         $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
@@ -86,7 +87,7 @@ describe('container lookups for services and databases', function () {
         ]);
         $commands = collect();
         Process::fake(function ($process) use ($commands) {
-            $commands->push($process->command);
+            $commands->push(remoteProcessScript($process));
 
             return Process::result(output: '');
         });
@@ -97,13 +98,13 @@ describe('container lookups for services and databases', function () {
         expect($commands->implode("\n"))
             ->toContain("label=coolify.databaseUuid={$database->uuid}")
             ->toContain("label=com.docker.compose.project={$database->uuid}")
-            ->toContain("label=coolify.databaseId={$database->id}")
+            ->not->toContain("label=coolify.databaseId={$database->id}")
             ->toContain("label=coolify.serviceUuid={$service->uuid}")
             ->toContain("label=com.docker.compose.project={$service->uuid}")
-            ->toContain("label=coolify.serviceId={$service->id}");
+            ->not->toContain("label=coolify.serviceId={$service->id}");
     });
 
-    test('service part containers are matched by UUID label, compose service name, then older id', function () {
+    test('service part containers are matched by UUID label, then compose service name', function () {
         $service = Service::factory()->create([
             'environment_id' => $this->environment->id,
             'server_id' => $this->server->id,
@@ -117,8 +118,8 @@ describe('container lookups for services and databases', function () {
         expect($partOf(['coolify.serviceUuid' => $service->uuid, 'coolify.service.subType' => 'application', 'coolify.service.subUuid' => $part->uuid]))->toBe($part->id)
             // Moved from another instance: foreign ids, but compose project and service name still match.
             ->and($partOf(['coolify.serviceId' => '999', 'coolify.service.subType' => 'application', 'coolify.service.subId' => '999', 'com.docker.compose.project' => $service->uuid, 'com.docker.compose.service' => 'web']))->toBe($part->id)
-            // Older container with another compose project: local ids.
-            ->and($partOf(['coolify.serviceId' => (string) $service->id, 'coolify.service.subType' => 'application', 'coolify.service.subId' => (string) $part->id, 'com.docker.compose.project' => 'other']))->toBe($part->id);
+            // Another instance's container with the same numeric ids: not ours.
+            ->and($partOf(['coolify.serviceId' => (string) $service->id, 'coolify.service.subType' => 'application', 'coolify.service.subId' => (string) $part->id, 'com.docker.compose.project' => 'other']))->toBeNull();
     });
 });
 
@@ -138,26 +139,39 @@ describe('owner resolution', function () {
             ->toBe('app-uuid');
     });
 
-    test('containers from before mid-2024 fall back to their local numeric id', function () {
+    test('a local numeric id never makes another instance\'s container ours', function () {
         $applications = collect([$this->application]);
-        $olderContainer = ['coolify.applicationId' => (string) $this->application->id, 'com.docker.compose.project' => 'deployment-uuid'];
+        $localId = (string) $this->application->id;
 
-        expect(resolveContainerOwner($applications, $olderContainer, 'application')?->id)->toBe($this->application->id)
-            // A UUID label is never overridden by the numeric id.
-            ->and(resolveContainerOwner($applications, ['coolify.applicationUuid' => 'unknown', 'coolify.applicationId' => (string) $this->application->id], 'application'))->toBeNull()
-            ->and(dockerPsByOwnerCommands('application', 'app-uuid', legacyId: 42))->toHaveCount(3)
-            ->and(dockerPsByOwnerCommands('application', 'app-uuid', legacyId: 42)[2])->toContain("--filter 'label=coolify.applicationId=42'");
+        expect(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'other-instance-uuid'], 'application'))->toBeNull()
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId], 'application'))->toBeNull()
+            ->and(resolveContainerOwner($applications, ['coolify.applicationUuid' => 'unknown', 'coolify.applicationId' => $localId], 'application'))->toBeNull()
+            ->and(resolveContainerApplicationId($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'other-instance-uuid']))->toBeNull()
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => '999999', 'com.docker.compose.project' => $this->application->uuid], 'application')?->id)->toBe($this->application->id)
+            // Deployed before mid-2024: compose project was the deployment directory, the compose service starts with the UUID.
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => '999999', 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => $this->application->uuid.'-104512123456'], 'application')?->id)->toBe($this->application->id)
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => 'other-instance-uuid-104512123456'], 'application'))->toBeNull()
+            // Compose application with a custom start command: the compose project is the deployment directory, the container name is `{service}-{uuid}-{suffix}`.
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => '999999', 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => 'public-api', 'coolify.name' => 'public-api-'.$this->application->uuid.'-104512123456'], 'application')?->id)->toBe($this->application->id)
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'deployment-dir', 'com.docker.compose.service' => 'public-api', 'coolify.name' => 'public-api-other-instance-uuid-104512123456'], 'application'))->toBeNull()
+            ->and(resolveContainerOwner($applications, ['coolify.applicationId' => $localId, 'com.docker.compose.project' => 'deployment-dir', 'coolify.name' => 'public-api-'.$this->application->uuid.'x-104512123456'], 'application'))->toBeNull()
+            ->and(implode("\n", dockerPsByOwnerCommands('application', 'app-uuid')))->not->toContain('label=coolify.applicationId=');
     });
 
     test('docker ps commands match the UUID label and the compose project of older containers', function () {
         $commands = dockerPsByOwnerCommands('application', 'app-uuid', ['label=coolify.pullRequestId=0']);
 
-        expect($commands)->toHaveCount(2)
+        expect($commands)->toHaveCount(3)
             ->and($commands[0])->toContain("--filter 'label=coolify.applicationUuid=app-uuid'")
             ->toContain("--filter 'label=coolify.pullRequestId=0'")
             ->and($commands[1])->toContain("--filter 'label=coolify.applicationId'")
             ->toContain("--filter 'label=com.docker.compose.project=app-uuid'")
-            ->toContain("--filter 'label=coolify.pullRequestId=0'");
+            ->toContain("--filter 'label=coolify.pullRequestId=0'")
+            // Compose project is the deployment directory: the container name contains the application UUID.
+            ->and($commands[2])->toContain("--filter 'label=coolify.applicationId'")
+            ->toContain("--filter 'name=app-uuid'")
+            ->toContain("--filter 'label=coolify.pullRequestId=0'")
+            ->and(dockerPsByOwnerCommands('service', 'service-uuid'))->toHaveCount(2);
     });
 });
 
@@ -189,6 +203,53 @@ describe('status updates after a server transfer', function () {
             ->and($this->application->fresh()->status)->toStartWith('running');
     });
 
+    test('Sentinel push looks up foreign application owners with one query for all containers', function () {
+        $deleted = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $deleted->delete();
+
+        $containers = collect(range(1, 5))->map(fn (int $i) => [
+            'name' => "foreign-{$i}",
+            'state' => 'running',
+            'health_status' => 'healthy',
+            'labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => "foreign-app-{$i}",
+                'coolify.pullRequestId' => '0',
+                'com.docker.compose.service' => "foreign-app-{$i}",
+            ],
+        ])->push([
+            'name' => $deleted->uuid.'-pr-3',
+            'state' => 'running',
+            'health_status' => 'healthy',
+            'labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => $deleted->uuid,
+                'coolify.pullRequestId' => '3',
+                'com.docker.compose.service' => $deleted->uuid.'-pr-3',
+            ],
+        ])->all();
+
+        $job = new PushServerUpdateJob($this->server, ['containers' => $containers]);
+
+        DB::enableQueryLog();
+        $job->handle();
+        $ownerLookups = collect(DB::getQueryLog())
+            ->filter(fn (array $query) => str_contains($query['query'], 'from "applications"') && preg_match('/"uuid" (=|in) /', $query['query']) === 1)
+            ->count();
+        DB::disableQueryLog();
+
+        $previewLabels = end($containers)['labels'];
+        expect($ownerLookups)->toBe(1)
+            // A trashed owner still resolves, with and without the preloaded ids.
+            ->and(resolveContainerApplicationId(collect(), $previewLabels))->toBe($deleted->id)
+            ->and(resolveContainerApplicationId(collect(), $previewLabels, containerApplicationIdsByUuid(collect(), [$previewLabels])))->toBe($deleted->id)
+            ->and(containerApplicationIdsByUuid(collect([$this->application]), [['coolify.applicationUuid' => $this->application->uuid]]))->toBe([]);
+    });
+
     test('Sentinel push matches a new application container by its UUID label', function () {
         $job = new PushServerUpdateJob($this->server, ['containers' => [[
             'name' => $this->application->uuid,
@@ -207,7 +268,7 @@ describe('status updates after a server transfer', function () {
             ->and($this->application->fresh()->status)->toStartWith('running');
     });
 
-    test('Sentinel push and status check still match containers from before mid-2024 by their local id', function () {
+    test('Sentinel push and status check still match containers from before mid-2024 by the UUID in their name', function () {
         $labels = [
             'coolify.managed' => 'true',
             'coolify.applicationId' => (string) $this->application->id,
@@ -227,6 +288,35 @@ describe('status updates after a server transfer', function () {
         $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
         GetContainersStatus::run($this->server->fresh(), collect([[
             'Name' => '/'.$this->application->uuid,
+            'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
+            'RestartCount' => 0,
+            'Config' => ['Labels' => $labels],
+        ]]), collect());
+        expect($this->application->fresh()->status)->toStartWith('running');
+    });
+
+    test('Sentinel push and status check match a 4.3 compose container deployed with a custom start command', function () {
+        $containerName = 'public-api-'.$this->application->uuid.'-104512123456';
+        $labels = [
+            'coolify.managed' => 'true',
+            'coolify.applicationId' => (string) $this->application->id,
+            'coolify.pullRequestId' => '0',
+            'coolify.name' => $containerName,
+            // Without --project-name, the compose project is the deployment directory.
+            'com.docker.compose.project' => 'r8wkc0gk0o4ws8gs4s8wwgs4',
+            'com.docker.compose.service' => 'public-api',
+        ];
+
+        $job = new PushServerUpdateJob($this->server, ['containers' => [[
+            'name' => $containerName, 'state' => 'running', 'health_status' => 'healthy', 'labels' => $labels,
+        ]]]);
+        $job->handle();
+        expect($this->application->fresh()->status)->toStartWith('running');
+
+        $this->application->update(['status' => 'exited']);
+        $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+        GetContainersStatus::run($this->server->fresh(), collect([[
+            'Name' => '/'.$containerName,
             'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
             'RestartCount' => 0,
             'Config' => ['Labels' => $labels],
@@ -254,6 +344,57 @@ describe('status updates after a server transfer', function () {
 
         expect($this->application->fresh()->status)->toStartWith('running');
     });
+
+    test('container status check looks up foreign preview owners with one query for all containers', function () {
+        $deleted = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $preview = ApplicationPreview::forceCreate([
+            'application_id' => $deleted->id,
+            'pull_request_id' => 3,
+            'pull_request_html_url' => 'https://example.com/pr/3',
+            'status' => 'exited',
+        ]);
+        $deleted->delete();
+
+        $containers = collect(range(1, 5))->map(fn (int $i) => [
+            'Name' => "/foreign-app-{$i}-pr-{$i}",
+            'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
+            'RestartCount' => 0,
+            'Config' => ['Labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => "foreign-app-{$i}",
+                'coolify.pullRequestId' => (string) $i,
+                'com.docker.compose.service' => "foreign-app-{$i}-pr-{$i}",
+            ]],
+        ])->push([
+            'Name' => '/'.$deleted->uuid.'-pr-3',
+            'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
+            'RestartCount' => 0,
+            'Config' => ['Labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => $deleted->uuid,
+                'coolify.pullRequestId' => '3',
+                'com.docker.compose.service' => $deleted->uuid.'-pr-3',
+            ]],
+        ]);
+
+        $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+        $server = $this->server->fresh();
+
+        DB::enableQueryLog();
+        GetContainersStatus::run($server, $containers, collect());
+        $ownerLookups = collect(DB::getQueryLog())
+            ->filter(fn (array $query) => str_contains($query['query'], 'from "applications"') && preg_match('/"uuid" (=|in) /', $query['query']) === 1)
+            ->count();
+        DB::disableQueryLog();
+
+        expect($ownerLookups)->toBe(1)
+            // The preview of a trashed owner still resolves.
+            ->and($preview->fresh()->status)->toBe('running:healthy');
+    });
 });
 
 describe('orphaned preview cleanup', function () {
@@ -269,8 +410,8 @@ describe('orphaned preview cleanup', function () {
         expect($isOrphaned(['Labels' => "coolify.applicationId=999999,coolify.pullRequestId=7,com.docker.compose.project={$this->application->uuid}"]))->toBeFalse()
             ->and($isOrphaned(['Labels' => "coolify.applicationUuid={$this->application->uuid},coolify.pullRequestId=7"]))->toBeFalse()
             ->and($isOrphaned(['Labels' => "coolify.applicationUuid={$this->application->uuid},coolify.pullRequestId=8"]))->toBeTrue()
-            // Containers from before mid-2024: another compose project, so the local id is used, as before.
-            ->and($isOrphaned(['Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId=7,com.docker.compose.project=deployment-uuid"]))->toBeFalse()
-            ->and($isOrphaned(['Labels' => 'coolify.applicationId=999999,coolify.pullRequestId=7']))->toBeTrue();
+            // Another instance's preview container with the same numeric id: not ours, so never removed.
+            ->and($isOrphaned(['Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId=8,com.docker.compose.project=other-instance-uuid"]))->toBeFalse()
+            ->and($isOrphaned(['Labels' => 'coolify.applicationId=999999,coolify.pullRequestId=7']))->toBeFalse();
     });
 });

@@ -68,6 +68,32 @@ trait ResolvesTeam
         return Response::error("Missing required permissions: {$ability}");
     }
 
+    /**
+     * Destructive tools must call this so agents cannot cause damage or downtime without an explicit confirm=true.
+     */
+    protected function ensureConfirmed(Request $request, string $action): ?Response
+    {
+        if (filter_var($request->get('confirm'), FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        return $this->mcpError($request, "{$action} requires confirm=true.");
+    }
+
+    /**
+     * Same rule as the REST API (ApiSensitiveData): a root or read:sensitive token of a team admin or owner.
+     */
+    protected function canReadSensitiveData(Request $request): bool
+    {
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        if (! $token || ! ($token->can('root') || $token->can('read:sensitive'))) {
+            return false;
+        }
+
+        return $token->team_id !== null && $user->isAdminOfTeam((int) $token->team_id);
+    }
+
     protected function resolveTeamId(Request $request): ?int
     {
         $user = $request->user();

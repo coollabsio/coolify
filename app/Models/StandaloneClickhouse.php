@@ -5,18 +5,22 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Throwable;
 
 class StandaloneClickhouse extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     protected array $auditExclude = ['last_online_at'];
+
+    public const DATA_DIRECTORY = '/var/lib/clickhouse';
 
     protected $fillable = [
         'uuid',
@@ -59,17 +63,27 @@ class StandaloneClickhouse extends BaseModel
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'custom_docker_run_options',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
         'clickhouse_admin_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
@@ -183,6 +197,57 @@ class StandaloneClickhouse extends BaseModel
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
+    }
+
+    /**
+     * Name of the unnamed Docker volume that holds this database's data, or null.
+     *
+     * Before v4.4, adding a file mount removed the data volume from the compose file, so the
+     * container keeps its data in an unnamed volume. Recreating the container leaves that volume
+     * behind and starts on the configured data volume, so the current data seems lost.
+     */
+    public function anonymousDataVolume(): ?string
+    {
+        $server = data_get($this, 'destination.server');
+        if (! $server?->isFunctional()) {
+            return null;
+        }
+
+        $format = '{{range .Mounts}}{{if eq .Destination "'.self::DATA_DIRECTORY.'"}}{{.Type}} {{.Name}}{{end}}{{end}}';
+        try {
+            $output = instant_remote_process_with_timeout([
+                'docker inspect --format '.escapeshellarg($format).' '.escapeshellarg($this->uuid).' 2>/dev/null || true',
+            ], $server, false);
+        } catch (Throwable) {
+            return null;
+        }
+
+        [$type, $name] = array_pad(explode(' ', trim((string) $output), 2), 2, '');
+        if ($type !== 'volume' || $name === '' || $this->persistentStorages()->where('name', $name)->exists()) {
+            return null;
+        }
+
+        return $name;
+    }
+
+    /**
+     * Use the unnamed volume that holds the current data as the data volume, so a restart keeps that data.
+     */
+    public function keepAnonymousDataVolume(string $volumeName): void
+    {
+        $storage = $this->persistentStorages()->where('mount_path', self::DATA_DIRECTORY)->first();
+        if ($storage) {
+            $storage->update(['name' => $volumeName]);
+
+            return;
+        }
+
+        LocalPersistentVolume::create([
+            'name' => $volumeName,
+            'mount_path' => self::DATA_DIRECTORY,
+            'resource_id' => $this->id,
+            'resource_type' => $this->getMorphClass(),
+        ]);
     }
 
     public function deleteVolumes()
@@ -325,11 +390,12 @@ class StandaloneClickhouse extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
                     $database = $this->clickhouse_db ?? 'default';
 
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$database}";
                 }
 
                 return null;

@@ -5,22 +5,6 @@
 
     <x-security.settings-layout>
 
-    @if (!$isApiEnabled)
-        <div class="application-settings-form">
-            <x-application.settings-section title="API disabled"
-                description="Enable the Coolify API before creating access tokens.">
-                <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
-                    size="sm">
-                    <x-slot:actions>
-                        <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                            Open settings
-                        </a>
-                    </x-slot:actions>
-                </x-empty>
-            </x-application.settings-section>
-        </div>
-    @else
         @php
             $expirationList = collect($expirationOptions)
                 ->map(fn ($label, $days) => ['value' => (string) $days, 'label' => $label])
@@ -30,6 +14,9 @@
         @endphp
 
         <div class="application-settings-form flex flex-col gap-6">
+            <x-api-disabled-callout
+                message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
+
             @can('create', App\Models\PersonalAccessToken::class)
                 <form wire:submit="addNewToken">
                     <x-application.settings-section title="New API token">
@@ -81,7 +68,7 @@
                                     <div class="listbox-option p-0!">
                                         <x-forms.checkbox id="permission-deploy" label="Deploy" fullWidth
                                             wire:model.live="permissions" domValue="deploy"
-                                            helper="Trigger deployments through webhooks."
+                                            helper="Deploy, start, stop, and restart resources. With Write, also apply changes that run on servers immediately, such as scheduled tasks, proxy configuration, and imports."
                                             :checked="in_array('deploy', $permissions)"
                                             :disabled="in_array('root', $permissions) || !$canUseDeployPermissions" />
                                     </div>
@@ -203,7 +190,7 @@
                                                 'inline-flex min-h-5 items-center rounded-md border px-2 py-0.5 text-[10px] font-medium',
                                                 'border-error/20 bg-error/10 text-error' => $ability === 'root',
                                                 'border-warning/20 bg-warning/10 text-warning' => in_array($ability, ['write', 'write:sensitive']),
-                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-warning/20 dark:bg-warning/10 dark:text-warning' => $ability === 'deploy',
+                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-brand-light/20 dark:bg-brand/15 dark:text-brand-light' => $ability === 'deploy',
                                                 'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim' => in_array($ability, ['read', 'read:sensitive']),
                                             ])>{{ $ability }}</span>
                                         @endforeach
@@ -251,7 +238,7 @@
                                 description="Try a different description or permission." />
                         </div>
 
-                        <x-client-pagination x-cloak x-show="filteredTokens.length > 0"
+                        <x-client-pagination total="filteredTokens.length" x-cloak x-show="filteredTokens.length > 0"
                             summary="`${firstVisibleRow}-${lastVisibleRow} of ${filteredTokens.length}`"
                             page-size-model="perPage" storage-key="coolify.page-size.api-tokens"
                             previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"
@@ -260,6 +247,5 @@
                 </div>
             </x-application.settings-section>
         </div>
-    @endif
     </x-security.settings-layout>
 </div>

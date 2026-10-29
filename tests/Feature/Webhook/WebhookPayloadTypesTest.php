@@ -285,7 +285,6 @@ function webhookTypesFields(): array
             ['number', 'id', null],
             ['pull_request.html_url', 'url', null],
             ['pull_request.title', 'string', null],
-            ['pull_request.author_association', 'string', null],
             ['pull_request.head.ref', 'branch', 'No branch'],
             ['pull_request.base.ref', 'branch', 'No branch'],
             ['pull_request.head.sha', 'sha', null],
@@ -311,7 +310,6 @@ function webhookTypesFields(): array
             ['number', 'id', null],
             ['pull_request.html_url', 'url', null],
             ['pull_request.title', 'string', null],
-            ['pull_request.author_association', 'string', null],
             ['pull_request.head.ref', 'branch', 'No id or branch'],
             ['pull_request.base.ref', 'branch', 'No id or branch'],
             ['pull_request.head.sha', 'sha', null],
@@ -473,10 +471,19 @@ describe('Webhook payload value types', function () {
             && $job->pullRequestHtmlUrl === 'https://github.com/test-org/test-repo/pull/42'
             && $job->pullRequestTitle === 'Add feature'
             && $job->commitSha === webhookTypesSha()
-            && $job->authorAssociation === 'OWNER'
             && $job->fullName === 'test-org/test-repo'
             && $job->isForkPullRequest === false);
     })->with(['github manual', 'github app'])->with(['open', 'closed']);
+
+    test('a github pull request is queued as a fork when its head repository is unknown', function (string $handler) {
+        $application = webhookTypesApplication($handler);
+        $payload = webhookTypesPayload($handler, 'pr');
+        unset($payload['pull_request']['head']['repo']);
+
+        webhookTypesSend($this, $handler, 'pr', 'open', $application, $payload)->assertOk();
+
+        Queue::assertPushed(ProcessGithubPullRequestWebhook::class, fn (ProcessGithubPullRequestWebhook $job): bool => $job->isForkPullRequest === true);
+    })->with(['github manual', 'github app']);
 
     test('a github pull request with a numeric string number and sync shas is queued', function (string $handler) {
         $application = webhookTypesApplication($handler);

@@ -5,10 +5,10 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
-use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
-use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Support\PasskeyRelyingParty;
+use App\Support\RootSetupWindow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ServiceProvider;
@@ -52,6 +52,7 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.register', [
                 'isFirstUser' => $isFirstUser,
+                'isRootSetupWindowClosed' => $isFirstUser && ! RootSetupWindow::isOpen(),
             ]);
         });
 
@@ -66,7 +67,11 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
+                'can_register_with_oauth' => $enabled_oauth_providers->contains(
+                    fn (OauthSetting $oauthSetting) => $oauthSetting->couldBeEnabled() && $oauthSetting->allowsUserCreation()
+                ),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
+                'passkeys_available' => PasskeyRelyingParty::isAvailable(),
             ]);
         });
 
@@ -80,29 +85,18 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->updated_at = now();
                 $user->save();
 
-                // Check if user has a pending invitation they haven't accepted yet
-                $invitation = TeamInvitation::whereEmail($email)->first();
-                if ($invitation && $invitation->isValid()) {
-                    // User is logging in for the first time after being invited
-                    // Attach them to the invited team if not already attached
-                    if (! $user->teams()->where('team_id', $invitation->team->id)->exists()) {
-                        $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
-                    }
-                    $team = $invitation->team;
-                    $invitation->delete();
-                    session(['currentTeam' => $team]);
-                } else {
-                    // Restore the last active team; only fall back when unambiguous.
-                    $team = $user->resolveStoredTeam();
-                    if (! $team && $user->teams->isEmpty()) {
-                        $team = $user->recreate_personal_team();
-                    }
-                    if ($team) {
-                        session(['currentTeam' => $team]);
-                    }
-                    // Otherwise (multiple teams, no stored choice) leave the session
-                    // team unset so the user is sent to the team-selection screen.
+                // Pending team invitations are not accepted here; the user accepts
+                // them explicitly on the invitation page (team.invitation.show).
+                // Restore the last active team; only fall back when unambiguous.
+                $team = $user->resolveStoredTeam();
+                if (! $team && $user->teams->isEmpty()) {
+                    $team = $user->recreate_personal_team();
                 }
+                if ($team) {
+                    session(['currentTeam' => $team]);
+                }
+                // Otherwise (multiple teams, no stored choice) leave the session
+                // team unset so the user is sent to the team-selection screen.
 
                 return $user;
             }
@@ -115,11 +109,13 @@ class FortifyServiceProvider extends ServiceProvider
         });
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
-        Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
 
         Fortify::confirmPasswordView(function () {
-            return view('auth.confirm-password');
+            return view('auth.confirm-password', [
+                'can_confirm_with_passkey' => PasskeyRelyingParty::isAvailable()
+                    && auth()->user()->hasPasskeysEnabled(),
+            ]);
         });
 
         Fortify::twoFactorChallengeView(function () {

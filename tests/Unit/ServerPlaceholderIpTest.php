@@ -4,10 +4,8 @@ use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\ScheduledJobManager;
 use App\Models\PrivateKey;
 use App\Models\Server;
-use App\Models\ServerSetting;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -101,13 +99,10 @@ it('excludes every placeholder address from scheduled Docker cleanup', function 
         ]);
     }
 
-    ServerSetting::query()->update(['docker_cleanup_next_run_at' => null]);
-    Queue::fake();
+    $method = new ReflectionMethod(ScheduledJobManager::class, 'getServersForCleanupQuery');
+    $servers = $method->invoke(new ScheduledJobManager)->get();
 
-    (new ScheduledJobManager)->handle();
-
-    // The dispatcher calculates the next cleanup only for servers that it selects.
-    expect(ServerSetting::query()->whereNotNull('docker_cleanup_next_run_at')->pluck('server_id')->all())->toBe([$realServer->id]);
+    expect($servers->modelKeys())->toBe([$realServer->id]);
 });
 
 it('excludes every placeholder address from orphaned preview cleanup', function () {

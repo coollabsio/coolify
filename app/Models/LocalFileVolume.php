@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
-use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Stringable;
 
 class LocalFileVolume extends BaseModel
 {
@@ -72,6 +72,11 @@ class LocalFileVolume extends BaseModel
         done
         SH;
 
+    /**
+     * The pull request whose preview this copy writes. Not saved: see forPullRequest().
+     */
+    protected int $previewPullRequestId = 0;
+
     protected $casts = [
         // 'fs_path' => 'encrypted',
         // 'mount_path' => 'encrypted',
@@ -105,6 +110,11 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             if ($fileVolume->is_host_file) {
+                return;
+            }
+            // A token with only the write permission can save a Compose file. A mount outside the resource
+            // directory is written when the resource is deployed or started, not when it is saved.
+            if ($fileVolume->isOutsideResourceDirectory()) {
                 return;
             }
 
@@ -170,15 +180,14 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
+        $path = $this->resolvedFsPath($workdir);
 
         if (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
+            [$hostPath, $resourceDirectory] = $this->hostPathAndResourceDirectory();
+            if ($resourceDirectory !== null) {
+                $this->assertRemotePathIsConfined($resourceDirectory, $hostPath, $server);
+            }
+            $path = str($hostPath);
         }
 
         // Validate and escape path to prevent command injection
@@ -208,7 +217,7 @@ class LocalFileVolume extends BaseModel
     protected function remoteFileExceedsLimit(string $escapedPath, $server): bool
     {
         $sizeOutput = instant_remote_process(
-            ["stat -c%s {$escapedPath} 2>/dev/null || wc -c < {$escapedPath}"],
+            ["stat -c%s {$escapedPath} 2>/dev/null"],
             $server,
             false,
         );
@@ -240,6 +249,7 @@ class LocalFileVolume extends BaseModel
 
     /**
      * Without a server, Coolify deletes the file on every server of the resource.
+     * Host paths outside the resource directory are never deleted.
      */
     public function deleteStorageOnServer(?Server $server = null)
     {
@@ -254,10 +264,10 @@ class LocalFileVolume extends BaseModel
         $isService = data_get($this->resource, 'service');
         $workdir = $isService ? $this->resource->service->workdir() : $this->resource->workdir();
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
+        $path = $this->resolvedFsPath($workdir);
+
+        if ($this->isOutsideResourceDirectory()) {
+            return null;
         }
 
         if (! $this->isAdminControlledComposeMount()) {
@@ -286,6 +296,7 @@ class LocalFileVolume extends BaseModel
 
     /**
      * Without a server, Coolify writes the file on every server of the resource.
+     * Outside the resource directory, nothing is deleted or written through a symlink.
      */
     public function saveStorageOnServer(?Server $server = null)
     {
@@ -302,32 +313,31 @@ class LocalFileVolume extends BaseModel
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
 
-        if ($this->is_directory) {
-            // Validate fs_path early before any shell interpolation
-            validateShellSafePath($this->fs_path, 'storage path');
-            $escapedFsPath = escapeshellarg($this->fs_path);
-            $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
-            $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
-            $commands->push("cd {$escapedWorkdir}");
-        }
-        $path = data_get_str($this, 'fs_path');
+        $path = $this->resolvedFsPath($workdir);
         $content = data_get($this, 'content');
-        $writesContent = $this->writesContentOnServer();
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
+
+        // A Compose bind mount (also with `content:`) uses the host path that the administrator wrote.
+        if (! $this->isAdminControlledComposeMount()) {
+            [$hostPath, $resourceDirectory] = $this->hostPathAndResourceDirectory();
+            if ($resourceDirectory === null) {
+                if (! $this->is_directory) {
+                    self::assertRemotePathIsNotSymlink($hostPath, $server);
+                }
+            } else {
+                $this->assertRemotePathIsConfined($resourceDirectory, $hostPath, $server);
+            }
+            $path = str($hostPath);
+        }
+        $isOutsideResourceDirectory = $this->isOutsideResourceDirectory();
+
+        if ($this->is_directory) {
+            validateShellSafePath($path, 'storage path');
+            $commands->push('mkdir -p '.escapeshellarg($path).' > /dev/null 2>&1 || true');
+            $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
         }
 
-        if ($writesContent) {
-            $path = str($this->confinedContentPath($path->value(), $server));
-        } elseif (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
-        }
-
-        $pathForParentDirectory = $writesContent ? $path : str($this->fs_path);
-        if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
-            $parent_dir = $pathForParentDirectory->beforeLast('/');
+        if ($path->startsWith('/') || $path->startsWith('~')) {
+            $parent_dir = $path->beforeLast('/');
             if ($parent_dir != '') {
                 $escapedParentDir = escapeshellarg($parent_dir);
                 $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
@@ -338,10 +348,17 @@ class LocalFileVolume extends BaseModel
         validateShellSafePath($path, 'storage path');
         $escapedPath = escapeshellarg($path);
 
-        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
-        $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
+        $state = self::remoteFileStates([(string) $path], $server)[0];
+        if ($state === 'unknown') {
+            throw new \Exception("Coolify cannot check the file {$path} on the server.");
+        }
+        if ($state === 'other' && ! $this->is_directory) {
+            throw new \Exception("A symbolic link or a special file is at {$path} on the server. Coolify did not write the file.");
+        }
+        $isFile = $state === 'file';
+        $isDir = in_array($state, ['directory', 'empty-directory'], true);
         $replacesEmptyDirectory = false;
-        if ($isFile === 'OK' && $this->is_directory) {
+        if ($isFile && $this->is_directory) {
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
@@ -351,20 +368,20 @@ class LocalFileVolume extends BaseModel
             $this->save();
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
-        } elseif ($isDir === 'OK' && ! $this->is_directory) {
+        } elseif ($isDir && ! $this->is_directory) {
             if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
                 $this->is_directory = true;
                 $this->save();
                 throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');
             }
             // Docker creates a missing bind source as an empty directory. Replace only an empty
-            // directory; never delete files that are on the server.
-            if (self::remoteFileStates([(string) $path], $server)[0] !== 'empty-directory') {
+            // directory inside the resource directory; never delete files that are on the server.
+            if ($isOutsideResourceDirectory || $state !== 'empty-directory') {
                 throw new \Exception("The following file is a directory on the server, but you are trying to mark it as a file: {$path}<br><br>Please delete the directory on the server or mark it as directory.");
             }
             $replacesEmptyDirectory = true;
         }
-        if (($isDir === 'NOK' || $replacesEmptyDirectory) && ! $this->is_directory) {
+        if ((! $isDir || $replacesEmptyDirectory) && ! $this->is_directory) {
             if ($replacesEmptyDirectory) {
                 $commands->push("rmdir {$escapedPath}");
             }
@@ -383,7 +400,7 @@ class LocalFileVolume extends BaseModel
             if ($chmod) {
                 $commands->push('chmod -- '.escapeshellarg($chmod)." {$escapedPath}");
             }
-        } elseif ($isDir === 'NOK' && $this->is_directory) {
+        } elseif (! $isDir && $this->is_directory) {
             $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
         }
 
@@ -400,22 +417,24 @@ class LocalFileVolume extends BaseModel
      * front of it and never changes the script. See REMOTE_FILE_STATE_SCRIPT for the output.
      *
      * @param  list<string>  $paths
+     * @param  (Closure(string): string)|null  $quote  Makes a shell argument of a path. The default is escapeshellarg().
      */
-    public static function remoteFileStateCommand(array $paths): string
+    public static function remoteFileStateCommand(array $paths, ?Closure $quote = null): string
     {
-        return 'sh -c '.escapeshellarg(self::REMOTE_FILE_STATE_SCRIPT).' sh '.implode(' ', array_map('escapeshellarg', $paths));
+        return 'sh -c '.escapeshellarg(self::REMOTE_FILE_STATE_SCRIPT).' sh '.implode(' ', array_map($quote ?? escapeshellarg(...), $paths));
     }
 
     /**
      * Gets the state of each path with one server command. A path without a state in the output is `unknown`.
      *
      * @param  list<string>  $paths
+     * @param  (Closure(string): string)|null  $quote  Makes a shell argument of a path. The default is escapeshellarg().
      * @return list<string>
      */
-    public static function remoteFileStates(array $paths, Server $server): array
+    public static function remoteFileStates(array $paths, Server $server, ?Closure $quote = null): array
     {
         $states = [];
-        $output = (string) instant_remote_process([self::remoteFileStateCommand($paths)], $server, false);
+        $output = (string) instant_remote_process([self::remoteFileStateCommand($paths, $quote)], $server, false);
         foreach (preg_split('/\R/', trim($output)) as $line) {
             if (preg_match('/^(\d+):([a-z-]+)$/', trim($line), $matches)) {
                 $states[(int) $matches[1] - 1] = $matches[2];
@@ -426,19 +445,157 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
-     * The absolute path where Coolify writes the content of this file on the server. This check is
-     * only on the Coolify side; saveStorageOnServer() checks the path on the server again.
+     * The path where saveStorageOnServer() writes the content of this file on the server.
      *
-     * @throws \RuntimeException If the path is not inside the resource directory
+     * @throws \Exception If the path is not allowed
      */
     public function contentPathOnServer(): string
     {
-        $path = (string) $this->fs_path;
-        if (str_starts_with($path, '.')) {
-            $path = $this->ownerResource()->workdir().substr($path, 1);
+        if ($this->isAdminControlledComposeMount()) {
+            return $this->resolvedFsPath($this->ownerResource()->workdir())->value();
         }
 
-        return $this->localConfinedContentPath($path)[1];
+        return $this->hostPathAndResourceDirectory()[0];
+    }
+
+    /**
+     * `~` is not allowed because it depends on the home directory of the SSH user.
+     *
+     * @param  string|list<string>  $resourceDirectories  The first directory resolves relative paths.
+     *
+     * @throws \Exception If the path is not allowed
+     */
+    public static function resolveHostPath(string|array $resourceDirectories, string $path, string $context = 'storage path'): string
+    {
+        $resourceDirectories = array_map(normalizeUnixPath(...), (array) $resourceDirectories);
+        $path = trim($path);
+        if ($path === '') {
+            throw new \Exception("Invalid {$context}: the path is empty.");
+        }
+        if (str_starts_with($path, '~')) {
+            throw new \Exception("Invalid {$context}: use an absolute path instead of ~.");
+        }
+        validateShellSafePath($path, $context);
+
+        $isAbsolute = str_starts_with($path, '/');
+        $resolvedPath = normalizeUnixPath($isAbsolute ? $path : $resourceDirectories[0].'/'.$path);
+        if (self::resourceDirectoryContaining($resolvedPath, $resourceDirectories) !== null) {
+            return $resolvedPath;
+        }
+
+        if (! $isAbsolute) {
+            throw new \Exception("Invalid {$context}: a relative path must stay inside the resource directory.");
+        }
+        if (array_intersect(explode('/', $path), ['.', '..']) !== []) {
+            throw new \Exception("Invalid {$context}: '.' and '..' segments are not allowed.");
+        }
+        if ($resolvedPath === '/') {
+            throw new \Exception("Invalid {$context}: the root directory cannot be mounted.");
+        }
+
+        return $resolvedPath;
+    }
+
+    /**
+     * @throws \RuntimeException If Coolify must not use the path
+     */
+    public static function assertHostPathOnServer(string $resourceDirectory, string $path, Server $server, bool $isDirectory): void
+    {
+        if (self::resourceDirectoryContaining($path, [normalizeUnixPath($resourceDirectory)]) !== null) {
+            self::assertRemotePathIsConfined($resourceDirectory, $path, $server);
+        } elseif (! $isDirectory) {
+            self::assertRemotePathIsNotSymlink($path, $server);
+        }
+    }
+
+    /**
+     * @throws \RuntimeException If the path is a symbolic link on the server
+     */
+    public static function assertRemotePathIsNotSymlink(string $path, Server $server): void
+    {
+        $escapedPath = escapeshellarg($path);
+        $result = instant_remote_process(["test -L {$escapedPath} && echo LINK || echo OK"], $server);
+
+        if (trim((string) $result) !== 'OK') {
+            throw new \RuntimeException("{$path} is a symbolic link on the server. Coolify does not write a file through a symbolic link. Remove the link or use another path.");
+        }
+    }
+
+    /**
+     * A path that cannot be resolved counts as outside.
+     */
+    public function isOutsideResourceDirectory(): bool
+    {
+        $directories = $this->contentBaseDirectories();
+        try {
+            $path = normalizeUnixPath($this->resolvedFsPath($directories[0])->value());
+            $directories = array_map(normalizeUnixPath(...), $directories);
+        } catch (\Throwable) {
+            return true;
+        }
+
+        return str_starts_with($path, '~') || self::resourceDirectoryContaining($path, $directories) === null;
+    }
+
+    /**
+     * The resource directory is null when the host path is outside it.
+     *
+     * @return array{0: string, 1: string|null}
+     *
+     * @throws \Exception If the path is not allowed
+     */
+    protected function hostPathAndResourceDirectory(): array
+    {
+        $directories = $this->contentBaseDirectories();
+        $path = self::resolveHostPath($directories, $this->resolvedFsPath($directories[0])->value());
+
+        return [$path, self::resourceDirectoryContaining($path, array_map(normalizeUnixPath(...), $directories))];
+    }
+
+    /**
+     * @param  list<string>  $directories  Normalized directories
+     */
+    protected static function resourceDirectoryContaining(string $path, array $directories): ?string
+    {
+        foreach ($directories as $directory) {
+            if ($path === $directory || str_starts_with($path, $directory.'/')) {
+                return $directory;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The host path of this mount. Like a relative bind source in Compose, a relative path is inside
+     * the resource directory. Remote commands run in the home directory of the SSH user, so they
+     * must never get the relative path. A `~` path stays in the home directory.
+     */
+    public function resolvedFsPath(string $workdir): Stringable
+    {
+        $path = trim((string) $this->fs_path);
+        if (! str_starts_with($path, '/') && ! str_starts_with($path, '~')) {
+            if (str_starts_with($path, '.')) {
+                $path = substr($path, 1);
+            }
+            $path = ltrim($path, '/');
+            $path = rtrim($workdir, '/').($path === '' ? '' : '/'.$path);
+        }
+
+        return str(addPreviewDeploymentSuffix($path, $this->previewPullRequestId));
+    }
+
+    /**
+     * A copy that uses the path of the preview of a pull request, as the Compose parser mounts it
+     * (`<path>-pr-<id>` unless the PR suffix is off for this storage). The row keeps the path of
+     * the application, so saving the copy never stores the preview path.
+     */
+    public function forPullRequest(int $pullRequestId): static
+    {
+        $copy = clone $this;
+        $copy->previewPullRequestId = $pullRequestId !== 0 && ($this->is_preview_suffix_enabled ?? true) ? $pullRequestId : 0;
+
+        return $copy;
     }
 
     /**
@@ -474,67 +631,6 @@ class LocalFileVolume extends BaseModel
     public static function remotePathConfinementCommand(string $baseDirectory, string $path): string
     {
         return 'sh -c '.escapeshellarg(self::REMOTE_PATH_CONFINEMENT_SCRIPT).' sh '.escapeshellarg($baseDirectory).' '.escapeshellarg($path);
-    }
-
-    /**
-     * Coolify writes file content (from Compose `content:`, the UI or the API) to the server.
-     */
-    public function writesContentOnServer(): bool
-    {
-        return ! $this->is_directory && (string) $this->content !== '';
-    }
-
-    /**
-     * Coolify writes file content only inside the resource directory, also for Compose bind mounts
-     * that an administrator can point anywhere. The path must be below the directory (not the
-     * directory itself), and it must stay inside it after the server resolves symlinks.
-     *
-     * @throws \RuntimeException If the path is not inside the resource directory
-     */
-    public function confinedContentPath(string $path, Server $server): string
-    {
-        [$baseDirectory, $confinedPath] = $this->localConfinedContentPath($path);
-
-        try {
-            self::assertRemotePathIsConfined($baseDirectory, $confinedPath, $server);
-        } catch (\RuntimeException) {
-            throw $this->contentOutsideResourceDirectoryException($path);
-        }
-
-        return $confinedPath;
-    }
-
-    /**
-     * The first resource base directory that contains the path (not the directory itself), and the
-     * normalized path. This check is only on the Coolify side.
-     *
-     * @return array{0: string, 1: string}
-     *
-     * @throws \RuntimeException If the path is not inside the resource directory
-     */
-    protected function localConfinedContentPath(string $path): array
-    {
-        foreach ($this->contentBaseDirectories() as $baseDirectory) {
-            try {
-                $confinedPath = confinePathToBase($baseDirectory, $path, 'storage path');
-            } catch (\Exception) {
-                continue;
-            }
-            if ($confinedPath === normalizeUnixPath($baseDirectory)) {
-                continue;
-            }
-
-            return [$baseDirectory, $confinedPath];
-        }
-
-        throw $this->contentOutsideResourceDirectoryException($path);
-    }
-
-    protected function contentOutsideResourceDirectoryException(string $path): \RuntimeException
-    {
-        return new \RuntimeException(
-            "Coolify writes file content only inside the resource directory. The path {$path} is outside of it. Use a relative source such as ./config/app.conf."
-        );
     }
 
     /**
@@ -625,7 +721,7 @@ class LocalFileVolume extends BaseModel
         }
 
         try {
-            $services = data_get(Yaml::parse($compose), 'services', []);
+            $services = data_get(parseDockerComposeYaml($compose), 'services', []);
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     if (is_string($volume)) {
@@ -641,8 +737,17 @@ class LocalFileVolume extends BaseModel
                         continue;
                     }
 
-                    $resolvedSource = replaceLocalSource(str((string) $source), str($this->composeSourceDirectory()));
-                    if (normalizeUnixPath($resolvedSource->value()) === normalizeUnixPath($this->fs_path)) {
+                    $sourceDirectory = str($this->composeSourceDirectory());
+                    $fsPath = normalizeUnixPath($this->fs_path);
+                    if (normalizeUnixPath(legacyReplaceLocalSource(str((string) $source), $sourceDirectory)->value()) === $fsPath) {
+                        return true;
+                    }
+                    try {
+                        $resolvedSource = replaceLocalSource(str((string) $source), $sourceDirectory)->value();
+                    } catch (\Throwable) {
+                        continue;
+                    }
+                    if (normalizeUnixPath($resolvedSource) === $fsPath) {
                         return true;
                     }
                 }
@@ -702,7 +807,7 @@ class LocalFileVolume extends BaseModel
             }
 
             // Parse the docker-compose content
-            $compose = Yaml::parse($actualService->docker_compose_raw);
+            $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
             if (! isset($compose['services'])) {
                 return false;
             }

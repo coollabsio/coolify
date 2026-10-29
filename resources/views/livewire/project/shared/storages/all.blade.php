@@ -59,12 +59,14 @@
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
-                                @if (blank($storage->host_path))
-                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
-                                @endif
                                 @if ($form['replacedExternalVolume'])
                                     <span class="block text-xs text-amber-800 dark:text-amber-300/90">
                                         Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
+                                    </span>
+                                @endif
+                                @if ($form['ignoresDriverOptions'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Coolify does not apply the driver options of this volume because it was created before they were supported. To apply them: stop the resource, back up any data you need, delete this entry together with the Docker volume, then redeploy.
                                     </span>
                                 @endif
                             </div>
@@ -163,6 +165,22 @@
                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                             shortConfirmationLabel="Storage Name" />
                                     @endif
+
+                                    @if ($form['canDeleteToApplyDriverOptions'])
+                                        <x-modal-confirmation title="Delete volume entry to apply driver options?" isErrorButton
+                                            buttonTitle="Delete" submitAction="delete({{ $id }})"
+                                            :checkboxes="[[
+                                                'id' => 'deleteDockerVolume',
+                                                'label' => 'Permanently delete the Docker volume and all data in it. The next deployment creates the volume again with the driver options.',
+                                                'default_warning' => 'The Docker volume and its data stay on the server. The driver options are not applied, because Docker keeps using the existing volume.',
+                                            ]]"
+                                            :actions="[
+                                                'Remove the storage entry from Coolify.',
+                                            ]"
+                                            warningMessage="Stop the resource first: Docker cannot delete a volume that a running container uses. If the volume contains data you need, use Backup before you delete it." confirmationText="{{ $form['name'] }}"
+                                            confirmationLabel="Please confirm by entering the Storage Name below"
+                                            shortConfirmationLabel="Storage Name" />
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -181,8 +199,6 @@
                                     <a href="{{ $storage->standaloneSqlite->link() }}"
                                         class="block text-xs text-neutral-500 underline underline-offset-2 hover:text-black dark:text-fg-dim dark:hover:text-fg">SQLite
                                         database {{ $storage->standaloneSqlite->name }}</a>
-                                @elseif (blank($storage->host_path))
-                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
                                 @endif
                             </div>
 

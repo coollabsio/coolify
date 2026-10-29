@@ -117,7 +117,7 @@ it('stores a parsed compose version on the server settings', function () {
 it('records docker and compose versions during connection checks', function () {
     $server = createServerForDockerVersionStorageTest();
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*compose*' => Process::result(output: 'v2.32.4', exitCode: 0),
         '*' => Process::result(
             output: '{"Server":{"Version":"29.4.3"}}',

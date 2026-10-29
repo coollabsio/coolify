@@ -1,0 +1,5 @@
+# Reference compose for the service parser: invalid YAML gives an empty result.
+services:
+  web:
+    image: nginx:alpine
+    environment: [unclosed

@@ -18,6 +18,14 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 1800;
+
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), so the next hourly run is not
+     * blocked until the queue retry_after.
+     */
+    public int $uniqueFor = 1800;
+
     public function handle(): void
     {
         ScheduledDatabaseBackup::query()
@@ -50,11 +58,17 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
             return;
         }
 
-        // Send once for each period without backup activity.
-        if (! NotificationThrottle::claim($backup, BackupMissing::class, $lastActivityAt)) {
+        // Another Coolify instance backs up the databases of a transferred server.
+        if ($backup->server()?->isTransferredAway()) {
             return;
         }
 
-        $backup->team->notify(new BackupMissing($backup, $lastExecutionAt));
+        // Send once for each period without backup activity.
+        NotificationThrottle::sendOnce(
+            $backup,
+            BackupMissing::class,
+            $lastActivityAt,
+            fn () => $backup->team->notify(new BackupMissing($backup, $lastExecutionAt)),
+        );
     }
 }

@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
+use App\Actions\Proxy\StartProxy;
+use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
@@ -31,7 +33,10 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         return [(new WithoutOverlapping('restart-proxy-'.$this->server->uuid))->expireAfter(120)->dontRelease()];
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue(deployment_queue());
+    }
 
     public function handle()
     {
@@ -41,6 +46,8 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 throw new \Exception('Configuration is not synced');
             }
             ProxyPortParser::fromConfiguration($configuration);
+
+            $this->server->markProxyTransitionStarted();
 
             // Set status to restarting
             $this->server->proxy->status = 'restarting';
@@ -56,7 +63,8 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 $commands,
                 $this->server,
                 callEventOnFinish: 'ProxyStatusChanged',
-                callEventData: $this->server->id
+                callEventData: ProxyStatusChanged::dataFor($this->server),
+                queue: deployment_queue(),
             );
 
             // Store activity ID and notify UI immediately with it
@@ -64,8 +72,12 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             ProxyStatusChangedUI::dispatch($this->server->team_id, $this->activity_id);
 
         } catch (\InvalidArgumentException $e) {
+            $this->server->markProxyTransitionFinished();
+
             return handleError($e);
         } catch (\Throwable $e) {
+            $this->server->markProxyTransitionFinished();
+
             // Set error status
             $this->server->proxy->status = 'error';
             $this->server->save();
@@ -87,7 +99,6 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
     private function buildRestartCommands(string $configuration): array
     {
         $containerName = $this->server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
-        $proxy_path = $this->server->proxyPath();
         $stopTimeout = 30;
 
         SaveProxyConfiguration::run($this->server, $configuration);
@@ -121,36 +132,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         ]);
 
         // === START PHASE ===
-        if ($this->server->isSwarmManager()) {
-            $commands = $commands->merge([
-                "echo 'Starting proxy (Swarm mode)...'",
-                "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
-                "echo 'Creating required Docker Compose file.'",
-                "echo 'Starting coolify-proxy.'",
-                'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
-                "echo 'Successfully started coolify-proxy.'",
-            ]);
-        } else {
-            $caddyfile = 'import /dynamic/*.caddy';
-            $commands = $commands->merge([
-                "echo 'Starting proxy...'",
-                "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
-                "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
-                "echo 'Creating required Docker Compose file.'",
-                "echo 'Pulling docker image.'",
-                'docker compose pull',
-            ]);
-            // Ensure required networks exist BEFORE docker compose up
-            $commands = $commands->merge(ensureProxyNetworksExist($this->server));
-            $commands = $commands->merge([
-                "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --wait --remove-orphans',
-                "echo 'Successfully started coolify-proxy.'",
-            ]);
-            $commands = $commands->merge(connectProxyToNetworks($this->server));
-        }
+        $commands = $commands->merge(StartProxy::startCommands($this->server));
 
         return $commands->toArray();
     }

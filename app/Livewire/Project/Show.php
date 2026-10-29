@@ -2,9 +2,10 @@
 
 namespace App\Livewire\Project;
 
+use App\Livewire\Concerns\CreatesEnvironments;
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
-use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -12,25 +13,10 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use CreatesEnvironments;
+    use RemembersCanvasView;
 
     public Project $project;
-
-    public string $name;
-
-    public ?string $description = null;
-
-    protected function rules(): array
-    {
-        return [
-            'name' => ValidationPatterns::nameRules(),
-            'description' => ValidationPatterns::descriptionRules(),
-        ];
-    }
-
-    protected function messages(): array
-    {
-        return ValidationPatterns::combinedMessages();
-    }
 
     public function mount(string $project_uuid)
     {
@@ -55,28 +41,12 @@ class Show extends Component
                         ->orderBy('created_at'),
                 ])
                 ->firstOrFail();
+
+            if ($this->prefersCanvasView('project')) {
+                return $this->redirectRoute('project.canvas', ['project_uuid' => $this->project->uuid], navigate: true);
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        }
-    }
-
-    public function submit()
-    {
-        try {
-            $this->authorize('create', Environment::class);
-            $this->validate();
-            $environment = Environment::create([
-                'name' => $this->name,
-                'project_id' => $this->project->id,
-                'uuid' => new_public_id(),
-            ]);
-
-            return redirectRoute($this, 'project.resource.index', [
-                'project_uuid' => $this->project->uuid,
-                'environment_uuid' => $environment->uuid,
-            ]);
-        } catch (\Throwable $e) {
-            handleError($e, $this);
         }
     }
 
@@ -94,7 +64,7 @@ class Show extends Component
         $canCreateResource = auth()->user()->can('createAnyResource');
 
         return view('livewire.project.show', [
-            'environmentsJs' => $this->project->environments->map(function (Environment $environment) use ($canCreateResource, $canUpdateProject): array {
+            'environmentsJs' => $this->project->environments->sort(fn (Environment $first, Environment $second): int => Environment::compareNames($first->name, $second->name))->values()->map(function (Environment $environment) use ($canCreateResource, $canUpdateProject): array {
                 $resourceCount = collect([
                     $environment->applications_count,
                     $environment->services_count,

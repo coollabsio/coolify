@@ -192,28 +192,6 @@ it('denies team member to manage service environment variables', function () {
     expect($policy->manageEnvironment($user, $service))->toBeFalse();
 });
 
-it('allows team admin to access terminal', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
-
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
-    $policy = new ServicePolicy;
-    expect($policy->accessTerminal($user, $service))->toBeTrue();
-});
-
-it('denies team member to access terminal', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
-
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
-
-    $policy = new ServicePolicy;
-    expect($policy->accessTerminal($user, $service))->toBeFalse();
-});
-
 it('denies restore for any user', function () {
     $user = Mockery::mock(User::class)->makePartial();
 

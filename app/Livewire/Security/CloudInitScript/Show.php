@@ -67,7 +67,7 @@ class Show extends Component
         ]);
 
         auditLog('ui.cloud_init_script.updated', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudInitScript->team_id,
             'cloud_init_script_id' => $this->cloudInitScript->id,
             'cloud_init_script_name' => $this->cloudInitScript->name,
         ]);
@@ -86,7 +86,7 @@ class Show extends Component
         $this->cloudInitScript->delete();
 
         auditLog('ui.cloud_init_script.deleted', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudInitScript->team_id,
             'cloud_init_script_id' => $scriptId,
             'cloud_init_script_name' => $scriptName,
         ]);

@@ -52,7 +52,13 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            if ($this->server->serverStatus() === false) {
+            // ServerConnectionCheckJob owns reachability. Do not probe SSH again here: one failed
+            // probe would mark the server unreachable without UNREACHABLE_THRESHOLD.
+            if ($this->server->isFunctional() === false) {
+                if ($this->server->settings->is_reachable === false) {
+                    $this->server->markResourcesAsExited();
+                }
+
                 return 'Server is not reachable or not ready.';
             }
 
@@ -67,11 +73,11 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     CheckAndStartSentinelJob::dispatch($this->server);
                 }
 
-                if ($this->server->isLogDrainEnabled()) {
+                if ($this->server->isFluentBitLogDrainEnabled()) {
                     $this->checkLogDrainContainer();
                 }
 
-                if ($this->server->proxySet() && ! $this->server->proxy->force_stop) {
+                if ($this->server->proxySet() && ! $this->server->proxy->force_stop && ! $this->server->isProxyTransitionInProgress()) {
                     $this->server->proxyType();
                     $foundProxyContainer = $this->containers->filter(function ($value, $key) {
                         if ($this->server->isSwarm()) {
@@ -92,7 +98,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                         $this->server->save();
-                        ConnectProxyToNetworksJob::dispatchSync($this->server);
                     }
                 }
             }
@@ -108,7 +113,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         })->first();
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
-            if ($status !== 'running') {
+            if ($status !== 'running' || StartLogDrain::claimOutdatedRefresh($this->server, data_get($foundLogDrainContainer, 'Config.Labels'))) {
                 StartLogDrain::dispatch($this->server);
             }
         } else {

@@ -6,6 +6,7 @@ use App\Models\IntegrationToken;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -27,6 +28,8 @@ class IntegrationTokenForm extends Component
 
     public bool $automaticDns = true;
 
+    public bool $proxiedDns = false;
+
     public function mount(): void
     {
         $this->authorize('create', IntegrationToken::class);
@@ -38,6 +41,7 @@ class IntegrationTokenForm extends Component
             $this->capabilities = ['dns'];
             $this->metadata = [];
             $this->automaticDns = true;
+            $this->proxiedDns = false;
         } else {
             $this->capabilities = ['secrets'];
             $this->metadata = $this->provider === 'infisical'
@@ -46,22 +50,36 @@ class IntegrationTokenForm extends Component
         }
     }
 
+    /**
+     * Cloudflare Tunnel setup also writes DNS records, so selecting `tunnel` also selects `dns`.
+     */
+    public function updatedCapabilities(): void
+    {
+        if (in_array('tunnel', $this->capabilities, true) && ! in_array('dns', $this->capabilities, true)) {
+            $this->capabilities[] = 'dns';
+        }
+    }
+
     protected function rules(): array
     {
-        $allowedCapability = $this->provider === 'cloudflare' ? 'dns' : 'secrets';
-
         $rules = [
             'provider' => ['required', 'in:'.implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))],
             'name' => ['required', 'string', 'max:255'],
             'token' => ['required', 'string'],
-            'capabilities' => ['required', 'array', 'min:1'],
-            'capabilities.*' => ['required', 'in:'.$allowedCapability],
+            'capabilities' => ['required', 'array', 'min:1', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_array($value) && in_array('tunnel', $value, true) && ! in_array('dns', $value, true)) {
+                    $fail('Cloudflare Tunnel also needs the DNS capability.');
+                }
+            }],
+            'capabilities.*' => ['required', 'in:'.implode(',', IntegrationToken::allowedCapabilities($this->provider))],
             'automaticDns' => ['boolean'],
+            'proxiedDns' => ['boolean'],
         ];
 
         if ($this->provider === 'infisical') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         if ($this->provider === 'doppler') {
@@ -71,6 +89,7 @@ class IntegrationTokenForm extends Component
         if ($this->provider === 'vault') {
             $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
+            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
         }
 
         return $rules;
@@ -87,10 +106,15 @@ class IntegrationTokenForm extends Component
 
     public function addToken(IntegrationTokenValidator $validator, CloudflareDnsProvider $cloudflare): void
     {
+        $this->authorize('create', IntegrationToken::class);
+
         $validated = $this->validate();
         $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
         if ($validated['provider'] === 'cloudflare' && ! $validated['automaticDns']) {
             $metadata['automatic_dns'] = false;
+        }
+        if ($validated['provider'] === 'cloudflare' && $validated['proxiedDns']) {
+            $metadata['proxied_dns'] = true;
         }
 
         try {
@@ -120,13 +144,15 @@ class IntegrationTokenForm extends Component
             ]);
 
             $this->reset(['name', 'token']);
-            $this->dispatch('integrationTokenAdded')->to(IntegrationTokens::class);
+            $this->dispatch('integrationTokenAdded');
 
             if ($this->modal_mode) {
                 $this->dispatch('close-modal');
             }
 
             $this->dispatch('success', 'Integration token added successfully.');
+        } catch (ConnectionException) {
+            $this->dispatch('error', $validator->connectionErrorMessage($validated['provider']));
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 
 class EmailNotificationSettings extends Model
 {
+    use TracksDeliveryFailures;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -30,6 +33,7 @@ class EmailNotificationSettings extends Model
 
         'deployment_success_email_notifications',
         'deployment_failure_email_notifications',
+        'deployment_commit_details_email_notifications',
         'status_change_email_notifications',
         'restart_limit_reached_email_notifications',
         'backup_success_email_notifications',
@@ -73,6 +77,7 @@ class EmailNotificationSettings extends Model
 
         'deployment_success_email_notifications' => 'boolean',
         'deployment_failure_email_notifications' => 'boolean',
+        'deployment_commit_details_email_notifications' => 'boolean',
         'status_change_email_notifications' => 'boolean',
         'restart_limit_reached_email_notifications' => 'boolean',
         'backup_success_email_notifications' => 'boolean',
@@ -92,5 +97,16 @@ class EmailNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Email';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->smtp_enabled = false;
+        $this->resend_enabled = false;
     }
 }

@@ -36,6 +36,8 @@ class Change extends Component
 
     public ?bool $administration = false;
 
+    public ?bool $github_runners = false;
+
     public $parameters;
 
     public ?GithubApp $github_app = null;
@@ -303,11 +305,15 @@ class Change extends Component
             $this->authorize('view', $this->github_app);
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
-            $this->applications = $this->github_app->applications;
+            $this->applications = $this->github_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
             $settings = instanceSettings();
 
             // Sync data from model to properties
             $this->syncData(false);
+            if (! $this->github_app->app_id) {
+                $this->preview_deployment_permissions = request()->boolean('previews', true);
+                $this->github_runners = filled($this->github_app->organization) && request()->boolean('runners');
+            }
             $this->isConnected = $this->github_app->isConnected();
 
             // Override name with kebab case for display
@@ -319,7 +325,7 @@ class Change extends Component
                 $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
             }
             if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+                $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
             }
             if ($this->github_app->installation_id && session('from')) {
                 $source_id = data_get(session('from'), 'source_id');
@@ -366,14 +372,7 @@ class Change extends Component
 
     public function getGithubAppNameUpdatePath()
     {
-        $name = encodeGithubPathSegment($this->github_app->name);
-        $organization = normalizeGithubOrganization($this->github_app->organization);
-
-        if (filled($organization)) {
-            return rtrim($this->github_app->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
-        }
-
-        return rtrim($this->github_app->html_url, '/')."/settings/apps/{$name}";
+        return $this->github_app->settingsUrl();
     }
 
     public function updateGithubAppName()
@@ -391,7 +390,7 @@ class Change extends Component
                 return;
             }
 
-            if (! PrivateKey::ownedByCurrentTeam()->find($this->privateKeyId)) {
+            if (! PrivateKey::where('team_id', $this->github_app->team_id)->find($this->privateKeyId)) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;
@@ -410,10 +409,18 @@ class Change extends Component
         }
     }
 
+    private function authorizeSystemWideChange(): void
+    {
+        if ($this->isSystemWide && ! $this->github_app->is_system_wide) {
+            $this->authorize('makeSystemWide', GithubApp::class);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->github_app);
+            $this->authorizeSystemWideChange();
 
             $this->organization = normalizeGithubOrganization($this->organization);
             $this->apiUrl = filled($this->apiUrl)
@@ -424,6 +431,7 @@ class Change extends Component
             $this->syncData(true);
             $this->github_app->save();
             $this->isConnected = $this->github_app->isConnected();
+            $this->dispatch('name-changed', uuid: $this->github_app->uuid, name: $this->github_app->name);
             $this->dispatch('success', 'Github App updated.');
         } catch (ValidationException $e) {
             throw $e;
@@ -449,6 +457,7 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->github_app);
+            $this->authorizeSystemWideChange();
 
             $this->validateOnly('privateKeyId');
 
@@ -480,5 +489,17 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * After a delete, the confirmation modal refreshes the component before the redirect runs.
+     */
+    public function render()
+    {
+        if (! $this->github_app) {
+            return '<div></div>';
+        }
+
+        return view('livewire.source.github.change');
     }
 }

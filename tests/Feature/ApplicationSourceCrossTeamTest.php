@@ -3,6 +3,7 @@
 use App\Livewire\Project\Application\Source;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -168,3 +169,121 @@ test('privateKeyId is locked so submit() cannot persist a client-supplied foreig
     Livewire::test(Source::class, ['application' => $this->applicationA])
         ->set('privateKeyId', $this->victimPrivateKey->id);
 })->throws(CannotUpdateLockedPropertyException::class);
+
+describe('after the user switches the session team', function () {
+    beforeEach(function () {
+        Http::fake([
+            'https://api.github.com/repos/*' => Http::response(['id' => 123]),
+        ]);
+        $this->teamB->members()->attach($this->userA->id, ['role' => 'owner']);
+        $this->applicationA->update(['git_repository' => 'coollabsio/coolify']);
+
+        $this->ownKey = makePrivateKey('own-ssh-key', 'OWN_KEY_MATERIAL', 'own-fingerprint', $this->teamA->id);
+        $this->ownGithubApp = GithubApp::create([
+            'name' => 'own-github-app',
+            'team_id' => $this->teamA->id,
+            'app_id' => 1,
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => false,
+        ]);
+        $this->victimGithubApp->update(['app_id' => 2]);
+        $this->systemWideGithubApp = GithubApp::create([
+            'name' => 'system-wide-github-app',
+            'team_id' => Team::factory()->create()->id,
+            'app_id' => 3,
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => false,
+            'is_system_wide' => true,
+        ]);
+
+        $this->component = Livewire::test(Source::class, ['application' => $this->applicationA->fresh()]);
+        session(['currentTeam' => $this->teamB]);
+    });
+
+    test('lists only keys and sources of the application team and system-wide sources', function () {
+        $component = Livewire::test(Source::class, ['application' => $this->applicationA->fresh()]);
+
+        expect($component->get('privateKeys')->pluck('id')->all())->toBe([$this->ownKey->id])
+            ->and($component->get('sources')->pluck('id')->sort()->values()->all())
+            ->toBe([$this->ownGithubApp->id, $this->systemWideGithubApp->id]);
+    });
+
+    test('setPrivateKey rejects a key of the session team', function () {
+        $this->component->call('setPrivateKey', $this->victimPrivateKey->id);
+
+        expect($this->applicationA->refresh()->private_key_id)->toBeNull();
+    });
+
+    test('setPrivateKey accepts a key of the application team', function () {
+        $this->component->call('setPrivateKey', $this->ownKey->id);
+
+        expect($this->applicationA->refresh()->private_key_id)->toBe($this->ownKey->id);
+    });
+
+    test('changeSource rejects a source of the session team', function () {
+        try {
+            $this->component->call('changeSource', $this->victimGithubApp->id, GithubApp::class);
+        } catch (Throwable $e) {
+        }
+
+        expect($this->applicationA->refresh()->source_id)->toBeNull();
+    });
+
+    test('changeSource accepts a source of the application team', function () {
+        $this->component->call('changeSource', $this->ownGithubApp->id, GithubApp::class);
+
+        expect($this->applicationA->refresh()->source_id)->toBe($this->ownGithubApp->id);
+    });
+
+    test('changeSource accepts a system-wide source', function () {
+        $this->component->call('changeSource', $this->systemWideGithubApp->id, GithubApp::class);
+
+        expect($this->applicationA->refresh()->source_id)->toBe($this->systemWideGithubApp->id);
+    });
+});
+
+function applicationSourceGiteaAppForTeam(int $teamId, string $name): GiteaApp
+{
+    // Http::GitSource() pins DNS before Http::fake() answers, so use an IP literal.
+    return GiteaApp::create([
+        'name' => $name,
+        'team_id' => $teamId,
+        'api_url' => 'https://1.1.1.1/api/v1',
+        'html_url' => 'https://1.1.1.1',
+        'access_token' => 'gitea-access-token',
+        'refresh_token' => 'gitea-refresh-token',
+        'expires_at' => time() + 3600,
+        'is_public' => false,
+    ]);
+}
+
+test('changeSource switches to an owned GiteaApp and stores the Gitea repository id', function () {
+    Http::fake([
+        '1.1.1.1/api/v1/repos/acme/web' => Http::response(['id' => 314, 'full_name' => 'acme/web']),
+    ]);
+    $source = applicationSourceGiteaAppForTeam($this->teamA->id, 'own-gitea-app');
+    $this->applicationA->update(['git_repository' => 'acme/web']);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA->fresh()])
+        ->call('changeSource', $source->id, GiteaApp::class)
+        ->assertDispatched('configurationChanged');
+
+    $this->applicationA->refresh();
+    expect($this->applicationA->source_type)->toBe(GiteaApp::class)
+        ->and($this->applicationA->source_id)->toBe($source->id)
+        ->and($this->applicationA->repository_project_id)->toBe(314);
+});
+
+test('changeSource rejects a GiteaApp owned by another team', function () {
+    Http::fake();
+    $victimSource = applicationSourceGiteaAppForTeam($this->teamB->id, 'victim-gitea-app');
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->call('changeSource', $victimSource->id, GiteaApp::class);
+
+    $this->applicationA->refresh();
+    expect($this->applicationA->source_type)->not->toBe(GiteaApp::class);
+    Http::assertNothingSent();
+});

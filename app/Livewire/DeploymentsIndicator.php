@@ -3,25 +3,34 @@
 namespace App\Livewire;
 
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\Server;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class DeploymentsIndicator extends Component
 {
     /**
-     * Where the indicator is rendered: 'sidebar' (desktop sidebar footer) or 'mobile' (mobile top bar).
+     * Where the indicator is rendered: 'topbar' (desktop top bar) or 'mobile' (mobile top bar).
      */
-    public string $variant = 'sidebar';
+    public string $variant = 'topbar';
+
+    /**
+     * The application on the current page. Its heading has its own "Deploying…" indicator.
+     */
+    #[Locked]
+    public ?string $currentApplicationUuid = null;
+
+    public function mount(): void
+    {
+        $this->currentApplicationUuid = request()->route('application_uuid');
+    }
 
     #[Computed]
     public function deployments()
     {
-        $servers = Server::ownedByCurrentTeamCached();
-
         return ApplicationDeploymentQueue::with(['application.environment.project'])
+            ->ownedByTeam(currentTeam()->id)
             ->whereIn('status', ['in_progress', 'queued'])
-            ->whereIn('server_id', $servers->pluck('id'))
             ->orderBy('id')
             ->get([
                 'id',
@@ -39,6 +48,16 @@ class DeploymentsIndicator extends Component
     public function deploymentCount()
     {
         return $this->deployments->count();
+    }
+
+    /**
+     * Hide the counter when it would only repeat the current page's "Deploying…" indicator.
+     */
+    #[Computed]
+    public function isOnlyCurrentApplicationDeploying(): bool
+    {
+        return $this->currentApplicationUuid !== null
+            && $this->deployments->every(fn ($deployment) => $deployment->application?->uuid === $this->currentApplicationUuid);
     }
 
     public function render()

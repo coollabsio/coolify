@@ -2,7 +2,7 @@
     <form wire:submit.prevent="saveTrafficAnalyticsSettings" class="contents">
         @if ($isTrafficAnalyticsEnabled)
             <x-unsaved-bar action="saveTrafficAnalyticsSettings"
-                targets="trafficTopn,trafficSampleThreshold,trafficRetention1hDays,trafficRetention1dDays,isGeoipEnabled,geoipRefreshDays,geoipMaxmindLicenseKey" />
+                targets="trafficTopn,trafficSampleThreshold,trafficRetention1hDays,trafficRetention1dDays,isGeoipEnabled,geoipRefreshDays,geoipMaxmindLicenseKey,trafficIpMode" />
         @endif
 
         <x-application.settings-section id="server-traffic-analytics-settings-section" title="Traffic analytics"
@@ -10,8 +10,6 @@
             <x-slot:actions>
                 @if ($isTrafficAnalyticsEnabled)
                     <div class="flex items-center gap-3">
-                        <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
-                            text="Restarting Sentinel and proxy..." compact />
                         <x-modal-confirmation title="Disable traffic analytics?"
                             buttonTitle="Disable traffic analytics" submitAction="toggleTrafficAnalytics"
                             :actions="[
@@ -54,6 +52,14 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]"
                         helper="Country enrichment from visitor IPs. Disable to skip GeoIP lookups." />
+                    <x-forms.listbox canGate="update" :canResource="$server"
+                        id="trafficIpMode" label="Client IP addresses"
+                        :options="[
+                            ['value' => 'full', 'label' => 'Full'],
+                            ['value' => 'anonymized', 'label' => 'Anonymized (/24 IPv4, /48 IPv6)'],
+                            ['value' => 'off', 'label' => 'Disabled'],
+                        ]"
+                        helper="How Sentinel stores visitor IPs for the Top IPs list. Anonymized keeps only the network. Disabled does not store IPs or visitor cities. When you change this setting, Sentinel deletes the stored IPs that the new setting does not allow." />
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="geoipRefreshDays" label="GeoIP refresh interval" required
                         helper="Days between GeoIP database update checks." />
@@ -72,8 +78,6 @@
                                     Enable traffic analytics
                                 </x-forms.button>
                             @else
-                            <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
-                                text="Restarting Sentinel and proxy..." compact />
                             <x-modal-confirmation title="Enable traffic analytics?"
                                 buttonTitle="Enable traffic analytics" submitAction="toggleTrafficAnalytics"
                                 :actions="[

@@ -2,7 +2,9 @@
 
 namespace App\Livewire\SharedVariables\Project;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Project;
+use App\Models\SharedEnvironmentVariable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -10,6 +12,7 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Project $project;
 
@@ -35,7 +38,7 @@ class Show extends Component
                 'is_literal' => $data['is_literal'],
                 'comment' => $data['comment'] ?? null,
                 'type' => 'project',
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->project->team_id,
             ]);
             $this->project->refresh();
             $this->getDevView();
@@ -53,6 +56,9 @@ class Show extends Component
             return redirect()->route('dashboard');
         }
         $this->project = $project;
+        if ($this->prefersCanvasView('project_variables')) {
+            return $this->redirectRoute('shared-variables.project.canvas', ['project_uuid' => $project->uuid], navigate: true);
+        }
         $this->getDevView();
     }
 
@@ -74,28 +80,23 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
+        $canViewValues = auth()->user()?->isAdminOfTeam($this->project->team_id) ?? false;
 
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
-
-            return "$item->key=$item->value";
-        })->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, $canViewValues))->join("\n");
     }
 
     public function submit()
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('update', $this->project);
-            $this->handleBulkSubmit();
+            $variables = parseEnvDevView($this->variables, SharedEnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            $this->handleBulkSubmit($variables);
             $this->getDevView();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -104,10 +105,8 @@ class Show extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables)
     {
-        $variables = parseEnvFormatToArray($this->variables);
-
         $changesMade = DB::transaction(function () use ($variables) {
             // Delete removed variables
             $deletedCount = $this->deleteRemovedVariables($variables);
@@ -145,9 +144,12 @@ class Show extends Component
             $found = $this->project->environment_variables()->where('key', $key)->first();
 
             if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     if ($found->value !== $value) {
                         $found->value = $value;
+                    }
+                    $found->fill($data['settings']);
+                    if ($found->isDirty()) {
                         $found->save();
                         $count++;
                     }
@@ -158,8 +160,9 @@ class Show extends Component
                     'value' => $value,
                     'is_multiline' => false,
                     'is_literal' => false,
+                    ...$data['settings'],
                     'type' => 'project',
-                    'team_id' => currentTeam()->id,
+                    'team_id' => $this->project->team_id,
                 ]);
                 $count++;
             }

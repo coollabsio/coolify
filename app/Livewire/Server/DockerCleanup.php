@@ -5,7 +5,9 @@ namespace App\Livewire\Server;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\Server;
+use Cron\CronExpression;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
@@ -37,21 +39,35 @@ class DockerCleanup extends Component
     #[Validate('boolean')]
     public bool $disableApplicationImageRetention = false;
 
-    /**
-     * The scheduled cleanup is stale when its next run is more than 10 minutes overdue,
-     * meaning the scheduled job dispatcher did not run it.
-     */
     #[Computed]
     public function isCleanupStale(): bool
     {
-        // The dispatcher does not run cleanups on servers without a real IP address.
-        if (blank($this->server->ip) || $this->server->hasPlaceholderIp()) {
+        try {
+            $lastExecution = DockerCleanupExecution::where('server_id', $this->server->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (! $lastExecution) {
+                return false;
+            }
+
+            $frequency = $this->server->settings->docker_cleanup_frequency ?? '0 0 * * *';
+            if (isset(VALID_CRON_STRINGS[$frequency])) {
+                $frequency = VALID_CRON_STRINGS[$frequency];
+            }
+
+            $cron = new CronExpression($frequency);
+            $now = Carbon::now();
+            $nextRun = Carbon::parse($cron->getNextRunDate($now));
+            $afterThat = Carbon::parse($cron->getNextRunDate($nextRun));
+            $intervalMinutes = $nextRun->diffInMinutes($afterThat);
+
+            $threshold = max($intervalMinutes * 2, 10);
+
+            return Carbon::parse($lastExecution->created_at)->diffInMinutes($now) > $threshold;
+        } catch (\Throwable) {
             return false;
         }
-
-        $nextRunAt = $this->server->settings->docker_cleanup_next_run_at;
-
-        return $nextRunAt !== null && $nextRunAt->lt(now()->subMinutes(10));
     }
 
     #[Computed]
@@ -91,7 +107,9 @@ class DockerCleanup extends Component
             $this->server->settings->delete_unused_volumes = $this->deleteUnusedVolumes;
             $this->server->settings->delete_unused_networks = $this->deleteUnusedNetworks;
             $this->server->settings->disable_application_image_retention = $this->disableApplicationImageRetention;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->forceDockerCleanup = $this->server->settings->force_docker_cleanup;
             $this->dockerCleanupFrequency = $this->server->settings->docker_cleanup_frequency;
@@ -149,5 +167,22 @@ class DockerCleanup extends Component
     public function render()
     {
         return view('livewire.server.docker-cleanup');
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.docker_cleanup.updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

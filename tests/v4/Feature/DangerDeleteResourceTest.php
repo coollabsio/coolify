@@ -64,7 +64,7 @@ test('delete returns error string when password is incorrect', function () {
     expect(Application::find($this->application->id))->not->toBeNull();
 });
 
-test('delete redirects before dispatching resource cleanup after the response', function () {
+test('delete hides the resource before the redirect and dispatches cleanup after the response', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
         'server_id' => $this->server->id,
@@ -84,11 +84,13 @@ test('delete redirects before dispatching resource cleanup after the response', 
 
     expect($component->effects)->toHaveKey('redirectUsingNavigate', true);
 
-    expect(Service::find($service->id))->not->toBeNull();
+    // The redirected environment page must not list the resource while the cleanup job still runs.
+    expect(Service::find($service->id))->toBeNull()
+        ->and(Service::withTrashed()->find($service->id))->not->toBeNull();
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
 });
 
-test('delete succeeds without password for an oauth user', function () {
+test('delete succeeds without a password for a user with a linked oauth identity', function () {
     OauthIdentity::create([
         'user_id' => $this->user->id,
         'provider' => 'oidc',
@@ -97,11 +99,47 @@ test('delete succeeds without password for an oauth user', function () {
     ]);
 
     Livewire::test(Danger::class, ['resource' => $this->application])
+        ->set('projectUuid', $this->project->uuid)
+        ->set('environmentUuid', $this->environment->uuid)
         ->call('delete', '')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->assertRedirectToRoute('project.resource.index', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+        ]);
 
-    expect(Application::find($this->application->id))->not->toBeNull();
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($this->application));
+});
+
+test('delete still asks a user with a linked oauth identity for the typed confirmation but not for a password', function () {
+    OauthIdentity::create([
+        'user_id' => $this->user->id,
+        'provider' => 'oidc',
+        'issuer' => 'https://idp.example.com',
+        'provider_user_id' => 'oauth-user-id',
+    ]);
+
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->assertSee('x-model="userConfirmationText"', false)
+        ->assertSee('confirmWithText: true', false)
+        ->assertSee('confirmWithPassword: false', false)
+        ->assertDontSee('type="password"', false)
+        ->assertDontSee('Confirm with', false);
+});
+
+test('delete rejects an empty password for a user without a linked oauth identity', function () {
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->call('delete', '')
+        ->assertHasErrors('password')
+        ->assertReturned('The provided password is incorrect.');
+
+    Queue::assertNotPushed(DeleteResourceJob::class);
+});
+
+test('delete asks a user without a linked oauth identity for the password', function () {
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->assertSee('confirmWithPassword: true', false)
+        ->assertSee('type="password"', false);
 });
 
 test('delete applies selectedActions from checkbox state', function () {
@@ -112,30 +150,4 @@ test('delete applies selectedActions from checkbox state', function () {
     expect($component->get('delete_connected_networks'))->toBeFalse();
     expect($component->get('delete_configurations'))->toBeTrue();
     expect($component->get('docker_cleanup'))->toBeTrue();
-});
-
-test('service can be removed from Coolify without remote cleanup', function () {
-    $service = Service::factory()->create([
-        'environment_id' => $this->environment->id,
-        'server_id' => $this->server->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-    ]);
-
-    Livewire::test(Danger::class, ['resource' => $service])
-        ->set('projectUuid', $this->project->uuid)
-        ->set('environmentUuid', $this->environment->uuid)
-        ->assertSee('Server is not reachable')
-        ->assertSee('Remove from Coolify only')
-        ->call('deleteFromCoolifyOnly', 'test-password')
-        ->assertHasNoErrors()
-        ->assertRedirectToRoute('project.resource.index', [
-            'project_uuid' => $this->project->uuid,
-            'environment_uuid' => $this->environment->uuid,
-        ]);
-
-    Queue::assertPushed(
-        DeleteResourceJob::class,
-        fn (DeleteResourceJob $job): bool => $job->resource->is($service) && $job->deleteFromCoolifyOnly
-    );
 });

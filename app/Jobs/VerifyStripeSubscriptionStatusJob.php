@@ -85,7 +85,7 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
 
                     $team = $this->subscription->team;
                     if ($team) {
-                        $team->subscriptionEnded();
+                        $team->subscriptionEnded($this->subscription);
                     }
                     break;
 

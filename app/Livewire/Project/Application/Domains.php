@@ -12,15 +12,18 @@ use App\Models\Server;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Domains extends Component
 {
+    use AuditsApplicationSettings;
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
     use InteractsWithDnsProviders;
@@ -33,6 +36,8 @@ class Domains extends Component
     public string $redirect = 'both';
 
     public bool $isForceHttpsEnabled = true;
+
+    public bool $isPermanentRedirectEnabled = false;
 
     /**
      * Per compose-service www/non-www redirect direction.
@@ -73,10 +78,15 @@ class Domains extends Component
 
     public ?string $editingGeneratedHost = null;
 
-    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool}> */
+    /** The internal port the edited domain uses when its Port field is empty. */
+    public ?int $editingInheritedPort = null;
+
+    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool, inherited_port?: ?int}> */
+    #[Locked]
     public array $domainRows = [];
 
     /** When set, the next addSuggestedDomain call for this index skips the DNS block. */
+    #[Locked]
     public ?int $forceAddSuggestedIndex = null;
 
     /** @var array<int, string> */
@@ -119,12 +129,15 @@ class Domains extends Component
 
     public bool $isCheckingDns = false;
 
+    #[Locked]
     public bool $dnsValidationEnabled = true;
 
     /** Resolved or literal IP users should point DNS at. */
+    #[Locked]
     public ?string $serverIp = null;
 
     /** Raw server IP/hostname as configured (may be a hostname). */
+    #[Locked]
     public ?string $serverIpConfigured = null;
 
     protected $listeners = [
@@ -146,6 +159,7 @@ class Domains extends Component
             'editingRedirect' => 'string|required|in:both,www,non-www',
             'redirect' => 'string|required|in:both,www,non-www',
             'isForceHttpsEnabled' => 'boolean',
+            'isPermanentRedirectEnabled' => 'boolean',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
         ];
@@ -170,11 +184,11 @@ class Domains extends Component
         $this->loadDomainState();
     }
 
-    public function refreshDomains(): void
+    public function refreshDomains(bool $parseCompose = true): void
     {
         $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
 
-        $this->loadDomainState();
+        $this->loadDomainState($parseCompose);
 
         if ($editingRow !== null) {
             $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
@@ -191,7 +205,9 @@ class Domains extends Component
             ->where('dns_status', 'checking')
             ->values();
 
-        $this->refreshDomains();
+        // The poll only refreshes DNS results. Parsing the compose file here would
+        // queue file sync jobs on every tick and starve the DNS check jobs.
+        $this->refreshDomains(parseCompose: false);
 
         foreach ($checkingRows as $checkingRow) {
             $row = collect($this->domainRows)->first(fn (array $row): bool => $row['url'] === $checkingRow['url']
@@ -244,13 +260,25 @@ class Domains extends Component
         $this->validateOnly('isForceHttpsEnabled');
 
         $this->application->settings->is_force_https_enabled = $this->isForceHttpsEnabled;
-        $this->application->settings->save();
+        $this->saveApplicationSettingsWithAudit($this->application);
         $this->resetDefaultLabels();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
     }
 
-    public function loadDomainState(): void
+    public function updatePermanentRedirect(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validateOnly('isPermanentRedirectEnabled');
+
+        $this->application->settings->is_permanent_redirect_enabled = $this->isPermanentRedirectEnabled;
+        $this->saveApplicationSettingsWithAudit($this->application);
+        $this->resetDefaultLabels();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Redirect type updated.');
+    }
+
+    public function loadDomainState(bool $parseCompose = true): void
     {
         $this->application->refresh();
         $this->application->loadMissing(['destination.server', 'settings', 'additional_servers']);
@@ -261,6 +289,7 @@ class Domains extends Component
             $this->redirect = $this->application->redirect ?? 'both';
         }
         $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
+        $this->isPermanentRedirectEnabled = $this->application->isPermanentRedirectEnabled();
 
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
@@ -285,23 +314,21 @@ class Domains extends Component
             $this->serverIpConfigured = null;
         }
 
-        $this->composeServices = [];
         $pendingRedirect = $this->pendingRedirectService !== null
             ? ($this->serviceRedirects[$this->serviceRedirectWireKey($this->pendingRedirectService)] ?? null)
             : null;
         $this->serviceRedirects = [];
-        if ($this->isCompose) {
-            try {
-                $parsed = $this->application->parse() ?? [];
-            } catch (\Throwable) {
-                $parsed = [];
-            }
-            $services = data_get($parsed, 'services', []);
-            foreach ($services as $serviceName => $service) {
+        if (! $this->isCompose) {
+            $this->composeServices = [];
+        } elseif ($parseCompose) {
+            $this->composeServices = [];
+            foreach ($this->application->composeServicesWithoutParse() as $serviceName => $service) {
                 if (! isDatabaseImage(data_get($service, 'image'))) {
-                    $this->composeServices[] = $serviceName;
+                    $this->composeServices[] = (string) $serviceName;
                 }
             }
+        }
+        if ($this->isCompose) {
             if ($this->newDomainService === null && count($this->composeServices) > 0) {
                 $this->newDomainService = $this->composeServices[0];
             }
@@ -531,7 +558,7 @@ class Domains extends Component
 
     /**
      * @param  array<string, array{status?: string, message?: string, expected_ip?: ?string, checked_at?: ?string}>  $stored
-     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool}
+     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool, inherited_port?: ?int}
      */
     protected function domainRowFromStored(string $url, ?string $service, array $stored): array
     {
@@ -544,6 +571,7 @@ class Domains extends Component
             'service' => $service,
             'internal_port' => $port['internal_port'],
             'has_port_override' => $port['has_port_override'],
+            'inherited_port' => $this->inheritedDomainInternalPort($service),
             'dns_status' => 'pending',
             'dns_message' => 'Not checked yet.',
             'expected_ip' => $this->serverIp,
@@ -591,37 +619,35 @@ class Domains extends Component
             ];
         }
 
+        return [
+            'internal_port' => $this->inheritedDomainInternalPort($service),
+            'has_port_override' => false,
+        ];
+    }
+
+    /**
+     * The internal port a domain uses when it has no per-domain override.
+     */
+    protected function inheritedDomainInternalPort(?string $service = null): ?int
+    {
         $composePort = dockerComposeServicePort($this->application->docker_compose_raw, $service);
         if ($composePort !== null) {
-            return [
-                'internal_port' => $composePort,
-                'has_port_override' => false,
-            ];
+            return $composePort;
         }
 
         if ($this->isCompose && $service !== null) {
-            return [
-                'internal_port' => null,
-                'has_port_override' => false,
-            ];
+            return null;
         }
 
         if ($this->application->settings?->is_static) {
-            return [
-                'internal_port' => 80,
-                'has_port_override' => false,
-            ];
+            return 80;
         }
 
         $exposed = $this->application->ports_exposes_array;
-        $defaultPort = isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
+
+        return isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
             ? (int) $exposed[0]
             : null;
-
-        return [
-            'internal_port' => $defaultPort,
-            'has_port_override' => false,
-        ];
     }
 
     /**
@@ -1312,6 +1338,7 @@ class Domains extends Component
         $this->editingOriginalRedirect = $this->editingRedirect;
         $this->editingDomainWasRegenerated = false;
         $this->editingGeneratedHost = null;
+        $this->editingInheritedPort = $this->domainRows[$index]['inherited_port'] ?? null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
@@ -1402,6 +1429,7 @@ class Domains extends Component
         $this->editingOriginalRedirect = 'both';
         $this->editingDomainWasRegenerated = false;
         $this->editingGeneratedHost = null;
+        $this->editingInheritedPort = null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         if ($this->pendingAction === 'update') {
@@ -2050,7 +2078,7 @@ class Domains extends Component
         $lowerHost = strtolower($host);
 
         // Always skip bare IPs and localhost.
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
             return null;
         }
 

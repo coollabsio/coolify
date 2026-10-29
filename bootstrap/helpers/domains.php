@@ -1,8 +1,10 @@
 <?php
 
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 
 /**
@@ -592,6 +594,47 @@ function findServiceApplicationForEnvName(Service $resource, string $envServiceN
 }
 
 /**
+ * Check if a service copies a SERVICE_FQDN_ / SERVICE_URL_ declaration of the application named in it.
+ * The copy (same name, port and value; URL or FQDN) must not generate a domain or overwrite the variable (#11924).
+ * Declarations with another port or path share the host on purpose (for example Appwrite).
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $services  Parsed compose services
+ */
+function isCopiedServiceUrlDeclaration(
+    Service $resource,
+    array|Collection $services,
+    ServiceApplication|ServiceDatabase $current,
+    string $key,
+): bool {
+    $owner = findServiceApplicationForEnvName($resource, parseServiceEnvironmentVariable($key)['service_name']);
+    if (! $owner || $owner->name === $current->name) {
+        return false;
+    }
+
+    // Same declaration sources as serviceParser: environment and build arguments.
+    $declarationsOf = fn (string $serviceName) => convertToKeyValueCollection(
+        collect(data_get($services, [$serviceName, 'environment'], []))
+            ->merge(data_get($services, [$serviceName, 'build', 'args'], []))
+    );
+    $ownerDeclarations = $declarationsOf($owner->name);
+    $currentDeclarations = $declarationsOf($current->name);
+
+    if (! $currentDeclarations->has($key)) {
+        return false;
+    }
+
+    // SERVICE_URL_X_3000 and SERVICE_FQDN_X_3000 write the same variable pair, so either one counts.
+    $twinKey = str_starts_with($key, 'SERVICE_URL_')
+        ? 'SERVICE_FQDN_'.substr($key, strlen('SERVICE_URL_'))
+        : 'SERVICE_URL_'.substr($key, strlen('SERVICE_FQDN_'));
+    $value = (string) $currentDeclarations->get($key);
+
+    return collect([$key, $twinKey])->contains(
+        fn (string $ownerKey) => $ownerDeclarations->has($ownerKey) && (string) $ownerDeclarations->get($ownerKey) === $value
+    );
+}
+
+/**
  * Put/update a service domain entry under the original compose service name,
  * removing legacy twin keys that resolve unambiguously to the same name.
  *
@@ -632,4 +675,41 @@ function putComposeServiceDomain(
     $domains[$storageKey] = $merged;
 
     return $domains;
+}
+
+/**
+ * Set the stored SERVICE_URL_ and SERVICE_FQDN_ variables of a compose service from its domain.
+ * Port variables (SERVICE_URL_API_8000) get the same URL or host with their port appended.
+ * A null URL and host clear the variables.
+ */
+function syncComposeServiceUrlVariables(Application $application, string $serviceEnvKey, ?string $url, ?string $host): void
+{
+    if ($url !== null) {
+        foreach (['URL' => $url, 'FQDN' => $host] as $type => $value) {
+            $application->environment_variables()->updateOrCreate([
+                'resourceable_type' => Application::class,
+                'resourceable_id' => $application->id,
+                'key' => "SERVICE_{$type}_{$serviceEnvKey}",
+            ], [
+                'value' => $value,
+                'is_preview' => false,
+            ]);
+        }
+    }
+
+    $pattern = '/^SERVICE_(URL|FQDN)_'.preg_quote($serviceEnvKey, '/').'(?:_(\d+))?$/';
+    $application->environment_variables()
+        ->where(fn ($query) => $query->where('key', 'LIKE', "SERVICE_URL_{$serviceEnvKey}%")
+            ->orWhere('key', 'LIKE', "SERVICE_FQDN_{$serviceEnvKey}%"))
+        ->get()
+        ->each(function (EnvironmentVariable $variable) use ($pattern, $url, $host) {
+            if (! preg_match($pattern, $variable->key, $matches)) {
+                return;
+            }
+            $value = $matches[1] === 'URL' ? $url : $host;
+            if ($value !== null && isset($matches[2])) {
+                $value = "{$value}:{$matches[2]}";
+            }
+            $variable->update(['value' => $value]);
+        });
 }

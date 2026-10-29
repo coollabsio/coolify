@@ -137,18 +137,30 @@ class ValidationPatterns
      * Pattern for Docker image repository names without a tag.
      *
      * Allows an optional registry host/port followed by lowercase repository
-     * path components. A trailing @sha256 marker is accepted for existing
+     * path components. A bracketed IPv6 registry host ([2a01:4f8::1]:5000) may
+     * only hold hex digits, ':' and '.'. A trailing @sha256 marker is accepted for existing
      * digest-based dockerimage records that store the digest hash separately.
      */
-    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
+    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
 
     /**
-     * Pattern for Docker image tags.
+     * Pattern for literal Docker image tags.
      *
      * Docker tags may contain letters, digits, underscores, dots, and hyphens,
      * must start with an alphanumeric/underscore, and are limited to 128 chars.
      */
-    public const DOCKER_IMAGE_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+    public const DOCKER_IMAGE_LITERAL_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+
+    /**
+     * Pattern for Docker image tags of applications.
+     *
+     * Same as DOCKER_IMAGE_LITERAL_TAG_PATTERN, but
+     * $VAR, ${VAR}, ${VAR:-default} and ${VAR-default} references are also allowed,
+     * because Docker Compose fills them in from the application's environment
+     * variables at deploy time. A default may only hold tag characters. Other
+     * expansions ($(...), ${VAR:?...}, nested references, $1, $$) are rejected.
+     */
+    public const DOCKER_IMAGE_TAG_PATTERN = '/\A(?=.{1,128}\z)(?:[A-Za-z0-9_]|\$(?:[A-Za-z_][A-Za-z0-9_]*+|\{[A-Za-z_][A-Za-z0-9_]*+(?::?-[A-Za-z0-9_.-]*+)?\}))(?:[A-Za-z0-9_.-]|\$(?:[A-Za-z_][A-Za-z0-9_]*+|\{[A-Za-z_][A-Za-z0-9_]*+(?::?-[A-Za-z0-9_.-]*+)?\}))*\z/';
 
     /**
      * Normalize environment variable keys before validation and storage.
@@ -311,7 +323,7 @@ class ValidationPatterns
     {
         return [
             "{$nameField}.regex" => 'The Docker registry image name must be a valid image repository without a tag and may not contain shell metacharacters.',
-            "{$tagField}.regex" => 'The Docker registry image tag must be a valid Docker tag and may not contain shell metacharacters.',
+            "{$tagField}.regex" => 'The Docker registry image tag must be a valid Docker tag or a $VARIABLE reference and may not contain shell metacharacters.',
         ];
     }
 
@@ -328,15 +340,36 @@ class ValidationPatterns
     }
 
     /**
-     * Check if a string is a valid Docker image tag.
+     * Check if a string is a safe health check host: a hostname or IPv4 address, or an IPv6 address
+     * with or without brackets (::1, [::1]).
      */
-    public static function isValidDockerImageTag(?string $value): bool
+    public static function isValidHealthCheckHost(?string $value): bool
+    {
+        if (! is_string($value)) {
+            return false;
+        }
+
+        if (preg_match('/^[a-zA-Z0-9.\-_]+$/', $value) === 1) {
+            return true;
+        }
+
+        return preg_match('/^(?:\[[0-9a-fA-F:.]+\]|[0-9a-fA-F:.]+)$/', $value) === 1
+            && filter_var(trim($value, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+    }
+
+    /**
+     * Check if a string is a valid Docker image tag.
+     *
+     * Set $allowVariables to false where Docker Compose does not fill in the tag,
+     * for example for images that Coolify runs with docker run.
+     */
+    public static function isValidDockerImageTag(?string $value, bool $allowVariables = true): bool
     {
         if (blank($value)) {
             return true;
         }
 
-        return preg_match(self::DOCKER_IMAGE_TAG_PATTERN, $value) === 1;
+        return preg_match($allowVariables ? self::DOCKER_IMAGE_TAG_PATTERN : self::DOCKER_IMAGE_LITERAL_TAG_PATTERN, $value) === 1;
     }
 
     /**

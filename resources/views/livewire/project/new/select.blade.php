@@ -1,6 +1,6 @@
 <div class="application-settings-form" x-data x-init="$wire.loadServers">
-    <div x-data="searchResources()">
-        @if ($current_step === 'type')
+    @if ($current_step === 'type')
+        <div x-data="searchResources()">
             <x-application.settings-section title="Choose a resource" flush>
                 <x-slot:actions>
                     <button type="button" class="button" :disabled="loading" @click="loadResources">
@@ -35,7 +35,7 @@
                                         :aria-selected="resourceType === option.value"
                                         @click="resourceType = option.value; close()">
                                         <span x-text="option.label"></span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check" class="size-3.5 text-black dark:text-fg"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
@@ -71,7 +71,7 @@
                                         :aria-selected="selectedCategory === ''"
                                         @click="selectedCategory = ''; categorySearch = ''; categoryOpen = false">
                                         <span>All categories</span>
-                                        <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                        <x-reicon name="check" class="size-3.5 text-black dark:text-fg"
                                             x-show="selectedCategory === ''" />
                                     </button>
                                     <template
@@ -81,7 +81,7 @@
                                             :aria-selected="selectedCategory === category"
                                             @click="selectedCategory = category; categorySearch = ''; categoryOpen = false">
                                             <span class="truncate" x-text="category"></span>
-                                            <x-reicon name="check-circle" class="size-3.5 text-accent"
+                                            <x-reicon name="check" class="size-3.5 text-black dark:text-fg"
                                                 x-show="selectedCategory === category" />
                                         </button>
                                     </template>
@@ -92,8 +92,31 @@
                 </div>
             </x-application.settings-section>
 
-            <div x-show="loading" class="flex items-center justify-center py-8">
-                <x-loading text="Loading resources..." />
+            {{-- A full page load: the canvas uses the minimal layout. --}}
+            <a href="{{ route('deploy-canvas', ['project' => data_get($parameters, 'project_uuid'), 'environment' => data_get($parameters, 'environment_uuid')]) }}"
+                x-show="search === ''"
+                class="mt-6 flex items-center gap-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-none dark:hover:border-white/[0.14]">
+                <div
+                    class="flex size-11 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                    <x-reicon name="deploy-canvas" class="size-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-[14px]! leading-5! font-semibold! text-black! dark:text-fg!">Deploy canvas</h2>
+                        <x-beta-badge />
+                    </div>
+                    <p class="mt-0.5 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim">
+                        Connect a server, a source, and its settings step by step, then deploy every resource at once.
+                    </p>
+                </div>
+                <span class="button button-highlighted shrink-0 max-sm:hidden">
+                    Try it
+                    <x-reicon name="arrow-right" class="size-3.5" />
+                </span>
+            </a>
+
+            <div x-show="loading" class="mt-6">
+                <x-skeleton.cards :count="6" label="Loading resources" />
             </div>
             <div x-show="!loading" class="mt-6 flex flex-col gap-6">
                 <section
@@ -317,7 +340,7 @@
                                             class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
                                             Docs
                                         </a>
-                                        <a x-show="serviceWebsiteUrl(service)" :href="serviceWebsiteUrl(service)"
+                                        <a x-show="service.website" :href="service.website"
                                             target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
@@ -471,16 +494,6 @@
                         databaseWebsiteUrl(database) {
                             return this.databaseLinks[database.id]?.website;
                         },
-                        serviceWebsiteUrl(service) {
-                            const source = service.website || service.homepage || service.documentation;
-                            if (!source) return null;
-
-                            try {
-                                return new URL(source).origin;
-                            } catch (error) {
-                                return null;
-                            }
-                        },
                         async checkUrlExists(url) {
                             if (!url) return false;
                             try {
@@ -621,8 +634,8 @@
                     }
                 }
             </script>
-        @endif
-    </div>
+        </div>
+    @endif
     @if ($current_step === 'servers')
         <x-application.settings-section title="Select a server"
             description="Choose the machine that will host this resource." flush>
@@ -635,7 +648,7 @@
             @endif
             <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
                 @forelse($servers as $server)
-                    <button type="button" wire:click="setServer({{ $server }})"
+                    <button type="button" wire:click="setServer({{ $server->id }})"
                         class="group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                         <span
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -741,7 +754,7 @@
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 18 <span
-                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-warning/15 dark:text-warning">Default</span>
+                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">Default</span>
                         </div>
                         <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
                             PostgreSQL is a powerful, open-source object-relational database system (no extensions).

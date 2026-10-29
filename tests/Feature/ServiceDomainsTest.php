@@ -160,10 +160,24 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->toContain('<span>DNS status</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain("service-domain-group-{$this->webApp->id}")
-        ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(substr_count($html, '<span>Domain</span>'))->toBe(1)
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
+
+it('loads no domain favicon when proxy labels add HTTP basic auth to the service', function (string $labels) {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n    labels:\n{$labels}",
+    ]);
+
+    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSee('https://api.example.com')
+        ->html();
+
+    expect($html)->not->toContain('https://api.example.com/favicon.ico');
+})->with([
+    'traefik list' => ["      - traefik.http.middlewares.auth.basicauth.users=admin:hash\n"],
+    'caddy map' => ["      caddy.basic_auth.admin: hash\n"],
+]);
 
 it('removes consecutive service domains by stable row identity after indexes change', function () {
     $this->apiApp->update([
@@ -260,6 +274,17 @@ it('shows and persists the HTTP redirect control for HTTPS service applications'
     expect($this->service->fresh()->docker_compose)->not->toContain('middlewares=redirect-to-https');
 });
 
+it('persists the redirect type for service applications', function () {
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet("permanentRedirects.{$this->apiApp->id}", false)
+        ->assertSee('Redirect type')
+        ->call('updatePermanentRedirect', $this->apiApp->id, true)
+        ->assertHasNoErrors();
+
+    expect($this->apiApp->fresh()->is_permanent_redirect_enabled)->toBeTrue()
+        ->and($this->service->fresh()->docker_compose)->toContain('middlewares=redirect-to-https-permanent');
+});
+
 it('hides the HTTP redirect control for HTTP-only service applications', function () {
     $this->apiApp->update(['fqdn' => 'http://api.example.com']);
 
@@ -316,7 +341,7 @@ it('does not add a single-label hostname as a service domain', function () {
 it('shows dns entries control next to Add', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 
@@ -1003,7 +1028,6 @@ it('shows an inherited internal port badge from the coolify service env port', f
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSet('domainRows.0.internal_port', 3000)
         ->assertSet('domainRows.0.has_port_override', false)
-        ->set('dnsValidationEnabled', false)
         ->call('startEdit', 0)
         ->assertSet('editingDomainParts.port', '3000')
         ->call('updateDomain')
@@ -1213,4 +1237,21 @@ it('restarts a service dns check when the domain already has a completed result'
     expect($this->apiApp->fresh()->domain_dns_statuses[$domain]['status'])->toBe('checking');
 
     Queue::assertPushed(CheckDomainDnsJob::class);
+});
+
+it('does not suggest a www counterpart for bare IP hosts', function (string $url) {
+    $wwwCounterpartUrl = new ReflectionMethod(Domains::class, 'wwwCounterpartUrl');
+
+    expect($wwwCounterpartUrl->invoke(new Domains, $url))->toBeNull()
+        ->and($wwwCounterpartUrl->invoke(new Domains, $url, true))->toBeNull();
+})->with([
+    'IPv4' => 'http://192.0.2.10:3000',
+    'IPv6' => 'http://[2a01:4f8::1]',
+    'IPv6 with port' => 'http://[2a01:4f8::1]:8080/app',
+]);
+
+it('still suggests a www counterpart for a hostname', function () {
+    $wwwCounterpartUrl = new ReflectionMethod(Domains::class, 'wwwCounterpartUrl');
+
+    expect($wwwCounterpartUrl->invoke(new Domains, 'https://example.com:8443/app'))->toBe('https://www.example.com:8443/app');
 });

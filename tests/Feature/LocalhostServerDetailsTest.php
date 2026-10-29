@@ -95,7 +95,7 @@ it('renders stored localhost server details instead of the fetch action', functi
         ->assertSee('29.4.3')
         ->assertSee('Compose version')
         ->assertSee('2.32.4')
-        ->assertSee('Refresh server details')
+        ->assertSee('Refresh details')
         ->assertDontSee('Fetch server details');
 });
 
@@ -123,6 +123,22 @@ it('fetches localhost server details from the overview action', function () {
     expect($server->server_metadata['os'])->toBe('Ubuntu 22.04.3 LTS')
         ->and($server->dockerVersion())->toBe('29.4.3')
         ->and($server->composeVersion())->toBe('2.32.4');
+});
+
+it('does not fetch server details before the server is validated', function () {
+    $this->server->settings()->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    Process::fake();
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('refreshServerMetadata')
+        ->assertDispatched('error', 'Validate the server connection before fetching details.');
+
+    Process::assertNothingRan();
+    expect($this->server->fresh()->server_metadata)->toBeNull();
 });
 
 it('refetches localhost compose version from the overview refresh action', function () {
@@ -164,12 +180,14 @@ it('collects localhost server details after a successful connection check', func
         'connection_timeout' => 10,
     ]);
 
-    Process::fake([
-        '*' => Process::sequence([
-            Process::result(output: 'bin', exitCode: 0),
-            Process::result(output: localhostMetadataProcessOutput(), exitCode: 0),
-        ]),
-    ]);
+    // The connection check also runs SSH multiplexing commands, so answer by command, not by order.
+    Process::fake(function ($process) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+
+        return str_contains($command, '---PRETTY_NAME---')
+            ? Process::result(output: localhostMetadataProcessOutput(), exitCode: 0)
+            : Process::result(output: 'bin', exitCode: 0);
+    });
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->call('checkLocalhostConnection');
@@ -181,4 +199,61 @@ it('collects localhost server details after a successful connection check', func
         ->and($server->composeVersion())->toBe('2.32.4')
         ->and($server->settings->is_reachable)->toBeTrue()
         ->and($server->settings->is_usable)->toBeTrue();
+});
+
+it('shows validation-only menus as disabled until the server is validated', function () {
+    $this->server->settings()->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    $validationOnlyRoutes = collect([
+        'server.docker-cleanup',
+        'server.ca-certificate',
+        'server.proxy',
+        'server.resources',
+        'server.registries',
+        'server.security.patches',
+        'server.command',
+    ])->map(fn (string $name): string => 'href="'.route($name, ['server_uuid' => $this->server->uuid]).'"');
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Docker Cleanup')
+        ->assertSee('aria-disabled="true"', false);
+    $validationOnlyRoutes->each(fn (string $href) => $component->assertDontSee($href, false));
+
+    $this->server->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid]);
+    $validationOnlyRoutes->each(fn (string $href) => $component->assertSee($href, false));
+});
+
+it('disables remote-only menus until a remote server is validated', function () {
+    $remoteServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $remoteServer->settings()->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    $remoteOnlyRoutes = collect(['server.github-runners', 'server.transfer', 'server.command'])
+        ->map(fn (string $name): string => 'href="'.route($name, ['server_uuid' => $remoteServer->uuid]).'"');
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $remoteServer->uuid])
+        ->assertSee('GitHub Runners')
+        ->assertSee('Transfer');
+    $remoteOnlyRoutes->each(fn (string $href) => $component->assertDontSee($href, false));
+
+    $remoteServer->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    $component = Livewire::test(Show::class, ['server_uuid' => $remoteServer->uuid]);
+    $remoteOnlyRoutes->each(fn (string $href) => $component->assertSee($href, false));
 });

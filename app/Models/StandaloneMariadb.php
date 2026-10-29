@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMariadb extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -60,6 +61,15 @@ class StandaloneMariadb extends BaseModel
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'mariadb_conf',
+        'custom_docker_run_options',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability.
@@ -67,17 +77,20 @@ class StandaloneMariadb extends BaseModel
     protected $hidden = [
         'mariadb_password',
         'mariadb_root_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
         'health_check_retries' => 'integer',
         'health_check_start_period' => 'integer',
         'mariadb_password' => 'encrypted',
+        'mariadb_root_password' => 'encrypted',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
@@ -321,10 +334,11 @@ class StandaloneMariadb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->mariadb_user);
                     $encodedPass = rawurlencode($this->mariadb_password);
 
-                    return "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mariadb_database}";
+                    return "mysql://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$this->mariadb_database}";
                 }
 
                 return null;

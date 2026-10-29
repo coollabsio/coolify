@@ -2,7 +2,6 @@
 
 use App\Livewire\Analytics as GlobalAnalytics;
 use App\Livewire\Project\Application\Analytics as ApplicationAnalytics;
-use App\Livewire\Project\Application\TrafficOverview;
 use App\Livewire\Project\Service\Analytics as ServiceAnalytics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -232,45 +231,10 @@ it('serves every resource endpoint from one resource dashboard exec', function (
         ->and($client->fetched)->toHaveCount(1);
 });
 
-it('falls back to one batch of individual resource endpoints when the resource dashboard is absent', function () {
-    $client = new class($this->server) extends SentinelTrafficClient
-    {
-        public int $batchCalls = 0;
-
-        protected function remoteFetch(string $url): string
-        {
-            if (str_contains($url, '/traffic/dashboard')) {
-                return '';
-            }
-            throw new RuntimeException("unexpected fetch: {$url}");
-        }
-
-        protected function batchRemoteFetch(array $urls): string
-        {
-            $this->batchCalls++;
-
-            return implode("\x1e", array_map(fn ($url) => match (true) {
-                str_contains($url, '/resource/res/traffic/overview') => json_encode(resourceScopeOverview(3, 2)),
-                str_contains($url, '/attribution') => '{"attribution":"demo"}',
-                str_contains($url, '/resource/res/traffic/') => '[]',
-                default => throw new RuntimeException("unexpected batch url: {$url}"),
-            }, $urls))."\x1e";
-        }
-    };
-
-    expect($client->prefetchResourceScope('res', 'F', 'T', ['country'], '24h'))->toBeTrue()
-        ->and($client->batchCalls)->toBe(1)
-        ->and($client->resourceOverview('res', 'F', 'T')->requests)->toBe(3)
-        ->and($client->attribution())->toBe('demo');
-    $client->resourceBreakdown('res', 'country', 'F', 'T');
-});
-
 it('remembers absent resource routes and does not probe them again within the ttl', function () {
     $client = new class($this->server) extends SentinelTrafficClient
     {
         public int $remoteFetches = 0;
-
-        public int $batchCalls = 0;
 
         protected function remoteFetch(string $url): string
         {
@@ -278,20 +242,12 @@ it('remembers absent resource routes and does not probe them again within the tt
 
             return '';
         }
-
-        protected function batchRemoteFetch(array $urls): string
-        {
-            $this->batchCalls++;
-
-            return implode("\x1e", array_fill(0, count($urls), ''))."\x1e";
-        }
     };
 
     expect($client->prefetchResourceScope('res', 'F', 'T', ['country'], '24h'))->toBeFalse()
         ->and($client->prefetchResourceScope('res', 'F', 'T', ['country'], '24h'))->toBeFalse()
         ->and($client->tryResourceOverview('res', 'F', 'T'))->toBeNull()
         ->and($client->remoteFetches)->toBe(1)
-        ->and($client->batchCalls)->toBe(1)
         ->and($client->supportsResourceScope())->toBeFalse();
 
     $this->travel(SentinelTrafficClient::RESOURCE_SCOPE_ABSENCE_TTL + 1)->seconds();
@@ -369,29 +325,9 @@ it('falls back to the per-key merge with approximate badges when Sentinel lacks 
 
     // The absence is cached: a refresh within the ttl goes straight to the per-key path.
     $component->call('loadData')->assertSet('uniquesApproximate', true);
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $this->application]))->assertOk();
+    loadLazy(Livewire::test(ApplicationAnalytics::class, ['application' => $this->application]))->assertOk();
 
     expect(requestedResourceScopeUrls('/resource/'))->toHaveCount($probes);
-});
-
-it('shows the resource overview in the application traffic card', function () {
-    bindResourceScopeFake(resourceScopeResponses($this->application->uuid, resourceScopeOverview(4200, 33)));
-
-    $component = loadLazy(Livewire::test(TrafficOverview::class, ['application' => $this->application]))
-        ->assertOk()
-        ->assertSee('4,200');
-
-    expect($component->instance()->overview['uniqueVisitors'])->toBe(33)
-        ->and(requestedResourceScopeUrls('/resource/'))->toHaveCount(1)
-        ->and(requestedResourceScopeUrls('/traffic/dashboard'))->toBeEmpty();
-});
-
-it('sums the keys in the application traffic card when Sentinel lacks the resource routes', function () {
-    bindResourceScopeFake(perKeyFallbackResponses($this->application->uuid, $this->apiKey, $this->webKey));
-
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $this->application]))
-        ->assertOk()
-        ->assertSee('150');
 });
 
 it('uses the resource scope when the global analytics filter selects a resource', function () {
@@ -415,7 +351,10 @@ it('uses the resource scope when the global analytics filter selects a resource'
 it('keeps the unfiltered leaderboard on per-key rows without resource queries', function () {
     bindResourceScopeFake([
         '/resource/' => new RuntimeException('the leaderboard must not query the resource scope'),
-        '/traffic/apps' => json_encode([$this->apiKey, $this->webKey]),
+        '/traffic/dashboard' => json_encode([
+            'overview' => [],
+            'apps' => [['uuid' => $this->apiKey, 'overview' => []], ['uuid' => $this->webKey, 'overview' => []]],
+        ]),
         "/app/{$this->apiKey}/traffic/overview" => json_encode(resourceScopeOverview(100, 10)),
         "/app/{$this->webKey}/traffic/overview" => json_encode(resourceScopeOverview(50, 8)),
         '/traffic/overview' => json_encode(resourceScopeOverview(150, 15)),

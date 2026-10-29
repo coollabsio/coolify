@@ -229,14 +229,15 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: rabbitmq-diagnostics -q check_port_connectivity
       interval: 30s
       timeout: 30s
       retries: 3
+      start_period: 60s
 
   # Comment this if you using any external s3 compatible storage
   plane-minio:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z
     command: server /export --console-address ":9090"
     environment:
       <<: *minio-env

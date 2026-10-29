@@ -8,12 +8,14 @@ use App\Models\Server;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Sleep;
 use Tests\TestCase;
 
 uses(TestCase::class);
 
 beforeEach(function () {
     Carbon::setTestNow('2025-01-15 12:00:00');
+    Sleep::fake();
 });
 
 afterEach(function () {
@@ -127,7 +129,7 @@ describe('shouldSkipDueToBackoff', function () {
 });
 
 describe('ServerConnectionCheckJob unreachable_count', function () {
-    it('marks servers unreachable when SSH is unavailable', function () {
+    it('marks servers unreachable when SSH fails at the threshold', function () {
         Event::fake([ServerReachabilityChanged::class]);
 
         $settings = Mockery::mock();
@@ -145,7 +147,7 @@ describe('ServerConnectionCheckJob unreachable_count', function () {
             'ip' => '203.0.113.10',
             'id' => 1,
             'name' => 'test-server',
-            'unreachable_count' => 1,
+            'unreachable_count' => ServerConnectionCheckJob::UNREACHABLE_THRESHOLD,
             default => null,
         });
         $server->shouldReceive('increment')->with('unreachable_count')->once();

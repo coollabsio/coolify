@@ -5,7 +5,11 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Actions\Server\ConfigureTrafficAnalytics;
 use App\Actions\Server\StartSentinel;
 use App\Jobs\RestartProxyJob;
+use App\Models\Application;
+use App\Models\Environment;
+use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -184,3 +188,37 @@ it('restarts a running proxy to apply the configuration', function (string $prox
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeTrue();
     Queue::assertPushed(RestartProxyJob::class);
 })->with(['TRAEFIK', 'CADDY']);
+
+it('regenerates the stored Caddy labels of applications with read-only labels', function () {
+    Queue::fake();
+    StartSentinel::partialMock()->shouldReceive('handle');
+    GetProxyConfiguration::partialMock()->shouldReceive('handle')->andReturn("services:\n  caddy:\n    volumes: []\n");
+    SaveProxyConfiguration::partialMock()->shouldReceive('handle');
+
+    $server = trafficAnalyticsProxyServer($this, 'CADDY');
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $createApplication = fn (): Application => Application::factory()->createOne([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://example.com',
+    ]);
+    $readonly = $createApplication();
+    $readonly->update(['custom_labels' => base64_encode(implode("\n", generateLabelsApplication($readonly->fresh())))]);
+    $editable = $createApplication();
+    $editable->settings->update(['is_container_label_readonly_enabled' => false]);
+    $editable->update(['custom_labels' => base64_encode('caddy_0=https://custom.example.com')]);
+    $logsTraffic = fn (Application $application): bool => str_contains(base64_decode($application->fresh()->custom_labels), 'log.output=file /traffic/access.log');
+
+    expect($logsTraffic($readonly))->toBeFalse();
+
+    ConfigureTrafficAnalytics::run($server, true);
+
+    expect($logsTraffic($readonly))->toBeTrue()
+        ->and(base64_decode($editable->fresh()->custom_labels))->toBe('caddy_0=https://custom.example.com');
+
+    ConfigureTrafficAnalytics::run($server->fresh(), false);
+
+    expect($logsTraffic($readonly))->toBeFalse();
+});

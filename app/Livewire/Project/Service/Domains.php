@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Domains extends Component
@@ -44,10 +45,14 @@ class Domains extends Component
     /** @var array<int|string, bool> */
     public array $forceHttpsRedirects = [];
 
+    /** @var array<int|string, bool> */
+    public array $permanentRedirects = [];
+
     /** Service application id when a pending domain conflict belongs to setServiceRedirect. */
     public ?int $pendingRedirectServiceApplicationId = null;
 
     /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public ?int $newServiceApplicationId = null;
@@ -108,10 +113,13 @@ class Domains extends Component
 
     public bool $isCheckingDns = false;
 
+    #[Locked]
     public bool $dnsValidationEnabled = true;
 
+    #[Locked]
     public ?string $serverIp = null;
 
+    #[Locked]
     public ?string $serverIpConfigured = null;
 
     /** Pending save payload after conflict/port confirmation */
@@ -140,6 +148,8 @@ class Domains extends Component
             'serviceRedirects.*' => 'string|in:both,www,non-www',
             'forceHttpsRedirects' => 'array',
             'forceHttpsRedirects.*' => 'boolean',
+            'permanentRedirects' => 'array',
+            'permanentRedirects.*' => 'boolean',
         ];
     }
 
@@ -207,7 +217,9 @@ class Domains extends Component
         $domains = $noindex ? $domains->push($domain) : $domains->reject(fn (string $item) => $item === $domain);
 
         $application->setNoindexDomains($domains);
+        $changedFields = auditChangedFields($application);
         $application->save();
+        $this->auditServiceApplicationUpdate($application, $changedFields);
         $this->service->parse();
         $this->refreshDomains();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
@@ -223,11 +235,31 @@ class Domains extends Component
         $this->validateOnly("forceHttpsRedirects.{$serviceApplicationId}");
 
         $application->is_force_https_enabled = $enabled;
+        $changedFields = auditChangedFields($application);
         $application->save();
+        $this->auditServiceApplicationUpdate($application, $changedFields);
         $this->service->parse();
         $this->refreshDomains();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
+    }
+
+    public function updatePermanentRedirect(int $serviceApplicationId, bool $enabled): void
+    {
+        $application = $this->service->applications()->findOrFail($serviceApplicationId);
+        $this->authorize('update', $application);
+
+        $this->permanentRedirects[$serviceApplicationId] = $enabled;
+        $this->validateOnly("permanentRedirects.{$serviceApplicationId}");
+
+        $application->is_permanent_redirect_enabled = $enabled;
+        $changedFields = auditChangedFields($application);
+        $application->save();
+        $this->auditServiceApplicationUpdate($application, $changedFields);
+        $this->service->parse();
+        $this->refreshDomains();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Redirect type updated.');
     }
 
     public function loadDomainState(): void
@@ -256,6 +288,10 @@ class Domains extends Component
 
         $this->forceHttpsRedirects = $this->service->applications
             ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isForceHttpsEnabled()])
+            ->all();
+
+        $this->permanentRedirects = $this->service->applications
+            ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isPermanentRedirectEnabled()])
             ->all();
 
         $this->serviceApps = $this->service->applications
@@ -802,7 +838,8 @@ class Domains extends Component
             $this->pendingRedirectServiceApplicationId = $serviceApplicationId;
 
             $addedDomains = [];
-            $saved = DB::transaction(function () use ($app, $redirect, &$addedDomains): bool {
+            $changedFields = [];
+            $saved = DB::transaction(function () use ($app, $redirect, &$addedDomains, &$changedFields): bool {
                 // Promote the optional www/non-www suggestion to a real domain for redirects.
                 if (in_array($redirect, ['www', 'non-www'], true)) {
                     $domainsBeforePairing = collect($this->splitDomains($app->fqdn));
@@ -819,6 +856,7 @@ class Domains extends Component
                 }
 
                 $app->redirect = $redirect;
+                $changedFields = auditChangedFields($app);
                 $app->save();
                 updateCompose($app);
                 $this->service->parse();
@@ -829,6 +867,7 @@ class Domains extends Component
             if (! $saved) {
                 return;
             }
+            $this->auditServiceApplicationUpdate($app, $changedFields);
 
             $this->pendingAction = null;
             $this->pendingRedirectServiceApplicationId = null;
@@ -1592,11 +1631,14 @@ class Domains extends Component
             $this->dispatch('warning', __('warning.sslipdomain'));
         }
 
-        DB::transaction(function () use ($app): void {
+        $changedFields = [];
+        DB::transaction(function () use ($app, &$changedFields): void {
+            $changedFields = auditChangedFields($app);
             $app->save();
             updateCompose($app);
             $this->service->parse();
         });
+        $this->auditServiceApplicationUpdate($app, $changedFields);
 
         if (str($app->fqdn)->contains(',')) {
             $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
@@ -1711,6 +1753,27 @@ class Domains extends Component
         return null;
     }
 
+    /**
+     * Records `ui.service_application.updated`; nothing is recorded when no attribute changed.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditServiceApplicationUpdate(ServiceApplication $application, array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.service_application.updated', [
+            'team_id' => $this->service->team()?->id,
+            'service_uuid' => $this->service->uuid,
+            'service_name' => $this->service->name,
+            'service_application_uuid' => $application->uuid,
+            'service_application_name' => $application->name,
+            'changed_fields' => $changedFields,
+        ]);
+    }
+
     protected function findServiceApp(?int $id): ?ServiceApplication
     {
         if (! $id) {
@@ -1744,7 +1807,7 @@ class Domains extends Component
 
         $lowerHost = strtolower($host);
 
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
+        if (filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
             return null;
         }
 

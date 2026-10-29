@@ -119,14 +119,14 @@ test('provider token pages defer provider api data loading until wire init', fun
         ->assertSet('loading_data', true)
         ->assertSee($loadingText)
         ->assertSee($wireInitCall, false)
-        ->assertSee('loading-indicator shrink-0 animate-spin', false)
+        ->assertSee('role="status"', false)
         ->assertDontSee('border-b-2 border-primary', false);
 
     Http::assertNothingSent();
 })->with([
-    'hetzner' => [ByHetzner::class, 'hetzner', 'hetzner', 'Loading Hetzner data...', 'wire:init="loadHetznerData"'],
-    'vultr' => [ByVultr::class, 'vultr', 'vultr', 'Loading Vultr data...', 'wire:init="loadVultrData"'],
-    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean', 'Loading DigitalOcean data...', 'wire:init="loadDigitalOceanData"'],
+    'hetzner' => [ByHetzner::class, 'hetzner', 'hetzner', 'Loading Hetzner data', 'wire:init="loadHetznerData"'],
+    'vultr' => [ByVultr::class, 'vultr', 'vultr', 'Loading Vultr data', 'wire:init="loadVultrData"'],
+    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean', 'Loading DigitalOcean data', 'wire:init="loadDigitalOceanData"'],
 ]);
 
 test('provider token pages render api error details when a selected token is invalid', function (string $component, string $provider, string $type, string $loadMethod, string $providerName, string $apiMessage, array $responseBody) {

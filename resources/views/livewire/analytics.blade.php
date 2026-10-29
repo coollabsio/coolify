@@ -1,7 +1,9 @@
 <?php
-$tabButtonBase = 'relative inline-flex h-7 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
-$tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
-$tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
+$rangeListboxOptions = [
+    ['value' => '24h', 'label' => 'Last 24 hours'],
+    ['value' => '7d', 'label' => 'Last 7 days'],
+    ['value' => '30d', 'label' => 'Last 30 days'],
+];
 
 $dimensionLabels = [
     'referer' => 'Referrers',
@@ -61,28 +63,16 @@ $appListboxOptions = array_merge(
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 sm:ml-auto">
-                    @include('livewire.traffic._live-toggle')
-                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        <button type="button" wire:click="setRange('24h')"
-                            wire:loading.attr="disabled" wire:target="setRange"
-                            @class([$tabButtonBase, $range === '24h' ? $tabButtonActive : $tabButtonInactive])>
-                            <span wire:loading.class="invisible" wire:target="setRange('24h')">24 hours</span>
-                            <x-loading compact class="absolute" wire:loading wire:target="setRange('24h')" aria-label="Loading analytics" />
-                        </button>
-                        <button type="button" wire:click="setRange('7d')"
-                            wire:loading.attr="disabled" wire:target="setRange"
-                            @class([$tabButtonBase, $range === '7d' ? $tabButtonActive : $tabButtonInactive])>
-                            <span wire:loading.class="invisible" wire:target="setRange('7d')">7 days</span>
-                            <x-loading compact class="absolute" wire:loading wire:target="setRange('7d')" aria-label="Loading analytics" />
-                        </button>
-                        <button type="button" wire:click="setRange('30d')"
-                            wire:loading.attr="disabled" wire:target="setRange"
-                            @class([$tabButtonBase, $range === '30d' ? $tabButtonActive : $tabButtonInactive])>
-                            <span wire:loading.class="invisible" wire:target="setRange('30d')">30 days</span>
-                            <x-loading compact class="absolute" wire:loading wire:target="setRange('30d')" aria-label="Loading analytics" />
-                        </button>
+                <div class="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+                    <div class="relative w-full transition-opacity sm:w-44"
+                        wire:loading.class="pointer-events-none opacity-60" wire:target="setRange">
+                        <x-forms.listbox id="range" onChange="setRange" :onChangeArgs="[]" :options="$rangeListboxOptions" />
+                        <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                            wire:loading.flex wire:target="setRange">
+                            <x-loading compact aria-label="Loading analytics" />
+                        </div>
                     </div>
+                    <x-live-toggle :active="$live" storageKey="traffic-live" title="Turn live refresh on or off (updates every 60 seconds)" />
                 </div>
             </div>
         @endif
@@ -139,7 +129,7 @@ $appListboxOptions = array_merge(
             description="We could not load traffic analytics for the selected filters and range. Try a different range or check back shortly."
             icon-name="analytics" />
     @else
-        @if ($this->isLivePollable())
+        @if ($live)
             <div wire:poll.60s="loadData" class="hidden"></div>
         @endif
 
@@ -149,7 +139,7 @@ $appListboxOptions = array_merge(
             <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-5 dark:bg-white/[0.07]">
                 <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['requests'] ?? 0) }} requests">{{ compactNumber($overview['requests'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-requests',
@@ -167,7 +157,7 @@ $appListboxOptions = array_merge(
                             {!! $approxBadge('Summed across servers or services; visitors seen on more than one may be double-counted.') !!}
                         @endif
                     </span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['uniqueVisitors'] ?? 0) }} unique visitors">{{ compactNumber($overview['uniqueVisitors'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-visitors',
@@ -211,7 +201,7 @@ $appListboxOptions = array_merge(
                             {!! $approxBadge('Highest p95 latency across servers or services; not a true merged percentile.') !!}
                         @endif
                     </span>
-                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatLatency($overview['latencyP95'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
                             'id' => $chartId.'-spark-latency',
@@ -254,7 +244,15 @@ $appListboxOptions = array_merge(
                             icon-name="unordered-list" />
                     @else
                         @php $maxAppRequests = max(1, (int) collect($topApps)->max('requests')); @endphp
-                        <div x-data="{ page: 0, per: 10, total: {{ count($topApps) }} }">
+                        <div x-data="trafficTable()">
+                            <div class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Application / service', 'text' => true, 'class' => 'min-w-0 flex-1'])
+                                <span class="hidden w-16 shrink-0 sm:inline" aria-hidden="true"></span>
+                                @include('livewire.traffic._sort-header', ['column' => 'requests', 'label' => 'Requests', 'class' => 'w-16 shrink-0'])
+                                @include('livewire.traffic._sort-header', ['column' => 'bytesOut', 'label' => 'Bandwidth', 'class' => 'hidden w-16 shrink-0 sm:inline-flex', 'title' => 'Total response data sent'])
+                                <span class="size-3.5 shrink-0" aria-hidden="true"></span>
+                            </div>
+                            <div class="flex flex-col">
                             @foreach ($topApps as $row)
                                 @php
                                     $appHref = $row['link'] ?? null;
@@ -262,11 +260,9 @@ $appListboxOptions = array_merge(
                                 @endphp
                                 <{{ $appHref ? 'a' : 'div' }} wire:key="analytics-app-{{ $row['uuid'] }}"
                                     @if ($appHref) href="{{ $appHref }}" {{ wireNavigate() }} @endif
-                                    x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
-                                    @class([
-                                        'flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]',
-                                        'transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.03]' => $appHref,
-                                    ])>
+                                    data-row="{{ json_encode(['name' => (string) $row['name'], 'requests' => (int) $row['requests'], 'bytesOut' => (int) $row['bandwidth']]) }}"
+                                    x-show="shown($el)"
+                                    class="flex min-h-11 items-center gap-3 border-t border-neutral-200 px-4 py-2 transition-colors hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.03]">
                                     <span class="flex min-w-0 flex-1 items-baseline gap-1.5">
                                         <span class="truncate text-[12px] text-black dark:text-fg">{{ $row['name'] }}</span>
                                         @if (! empty($row['isService']))
@@ -279,7 +275,7 @@ $appListboxOptions = array_merge(
                                     <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
                                         <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $appWidth }}%;"></div>
                                     </div>
-                                    <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                                    <span class="w-16 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
                                         title="{{ number_format($row['requests']) }} requests">{{ compactNumber($row['requests']) }}</span>
                                     <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($row['bandwidth']) }}</span>
                                     @if ($appHref)
@@ -287,9 +283,12 @@ $appListboxOptions = array_merge(
                                             fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                                         </svg>
+                                    @else
+                                        <span class="size-3.5 shrink-0" aria-hidden="true"></span>
                                     @endif
                                 </{{ $appHref ? 'a' : 'div' }}>
                             @endforeach
+                            </div>
                             @include('livewire.traffic._pager')
                         </div>
                     @endif
@@ -303,14 +302,12 @@ $appListboxOptions = array_merge(
             @include('livewire.traffic._paths-list', ['paths' => $topPaths])
         </x-application.settings-section>
 
-        {{-- Countries --}}
-        <x-application.settings-section id="analytics-country-section" title="Countries"
-            helper="Request volume by visitor country for the selected range." flush>
-            @include('livewire.traffic._geo', [
-                'countries' => data_get($breakdowns, 'country', []),
-                'attribution' => $attribution,
-            ])
-        </x-application.settings-section>
+        {{-- Locations (countries and cities) --}}
+        @include('livewire.traffic._geo', [
+            'countries' => data_get($breakdowns, 'country', []),
+            'cities' => trafficCityRows(data_get($breakdowns, 'city', [])),
+            'attribution' => $attribution,
+        ])
 
         {{-- Requests by device type (donut) + HTTP versions / cache / status. --}}
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -361,12 +358,15 @@ $appListboxOptions = array_merge(
                 'rows' => data_get($breakdowns, 'agent', []),
                 'helper' => 'Bot and AI-crawler traffic (GPTBot, ClaudeBot, Googlebot, …) by request count.',
             ])
-            @include('livewire.traffic._breakdown-section', [
-                'dimension' => 'ip',
-                'label' => 'Top IPs',
-                'rows' => data_get($breakdowns, 'ip', []),
-                'helper' => 'Busiest client IPs (real visitor IP, resolved behind Cloudflare / reverse proxies).',
-            ])
+            @php($ipModeEnum = \App\Enums\TrafficIpMode::tryFrom($ipMode) ?? \App\Enums\TrafficIpMode::Full)
+            @if ($ipModeEnum !== \App\Enums\TrafficIpMode::Off)
+                @include('livewire.traffic._breakdown-section', [
+                    'dimension' => 'ip',
+                    'label' => $ipModeEnum->breakdownLabel(),
+                    'rows' => data_get($breakdowns, 'ip', []),
+                    'helper' => $ipModeEnum->breakdownHelper(),
+                ])
+            @endif
         </div>
 
         {{-- User agents (full width — raw UA strings are long). --}}

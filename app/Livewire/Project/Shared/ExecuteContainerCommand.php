@@ -31,6 +31,13 @@ class ExecuteContainerCommand extends Component
 
     public bool $containersLoaded = false;
 
+    /**
+     * Container picker entries. Alpine reads them through entangle, because containers load after the first render.
+     *
+     * @var list<array{value: string, label: string}>
+     */
+    public array $containerOptions = [];
+
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
@@ -69,9 +76,6 @@ class ExecuteContainerCommand extends Component
             $this->type = 'service';
             $this->resource = Service::ownedByCurrentTeam()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->resource);
-            if (! $this->resource->isRunning()) {
-                $this->containersLoaded = true;
-            }
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
@@ -133,7 +137,7 @@ class ExecuteContainerCommand extends Component
                     }
                 });
                 $this->resource->databases()->get()->each(function ($database) {
-                    if ($database->isRunning()) {
+                    if ($database->isRunning() && $this->resource->server->isTerminalEnabled()) {
                         $this->containers->push([
                             'server' => $this->resource->server,
                             'container' => [
@@ -149,6 +153,10 @@ class ExecuteContainerCommand extends Component
         $this->containers = $this->containers->sortBy(function ($container) {
             return data_get($container, 'container.Names');
         });
+        $this->containerOptions = $this->containers->map(fn (array $container) => [
+            'value' => $this->containerTarget($container),
+            'label' => data_get($container, 'container.Names').' · '.data_get($container, 'server.name'),
+        ])->values()->all();
 
         if ($this->containers->count() === 1) {
             $this->selected_container = $this->containerTarget($this->containers->first());

@@ -16,10 +16,7 @@
     };
     $gridClass = 'service-domains-overview-grid';
     $publicUrl = getFqdnWithoutPort($row['url']);
-    $domainParts = $isSuggested ? null : parse_url($publicUrl);
-    $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
-        ? $domainParts['scheme'].'://'.$domainParts['host'].'/favicon.ico'
-        : null;
+    $faviconUrl = $isSuggested || $application->is_http_basic_auth_enabled ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
     $rowDirection = $isCompose
         ? ($serviceRedirects[$this->serviceRedirectWireKey($row['service'])] ?? 'both')
         : $redirect;
@@ -60,7 +57,7 @@
                         </span>
                     @endif
                     <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
-                        class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                        class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
                         title="{{ $publicUrl }}">
                         {{ $publicUrl }}
                     </a>
@@ -153,7 +150,7 @@
                         @endif
                     @else
                         <button type="button"
-                            @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection))"
+                            @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection), @js($row['inherited_port'] ?? null))"
                             class="icon-button shrink-0"
                             title="Domain settings" aria-label="Settings for {{ $publicUrl }}">
                             <x-reicon name="settings" class="size-3.5" />

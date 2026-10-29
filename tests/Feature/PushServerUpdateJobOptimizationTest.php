@@ -1,12 +1,18 @@
 <?php
 
-use App\Jobs\ConnectProxyToNetworksJob;
+use App\Actions\Proxy\CheckProxy;
+use App\Actions\Proxy\StartProxy;
+use App\Events\ProxyStatusChanged;
+use App\Events\ServiceChecked;
 use App\Jobs\PushServerUpdateJob;
 use App\Jobs\ServerStorageCheckJob;
+use App\Listeners\ProxyStatusChangedNotification;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -121,81 +127,7 @@ it('dispatches storage check when disk percentage changes from cached value', fu
     });
 });
 
-it('rate-limits ConnectProxyToNetworksJob dispatch to every 10 minutes', function () {
-    $team = Team::factory()->create();
-    $server = Server::factory()->create(['team_id' => $team->id]);
-    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    // First push: should dispatch ConnectProxyToNetworksJob
-    $containersWithProxy = [
-        [
-            'name' => 'coolify-proxy',
-            'state' => 'running',
-            'health_status' => 'healthy',
-            'labels' => ['coolify.managed' => true],
-        ],
-    ];
-
-    $data = [
-        'containers' => $containersWithProxy,
-        'filesystem_usage_root' => ['used_percentage' => 10],
-    ];
-
-    $job = new PushServerUpdateJob($server, $data);
-    $job->handle();
-
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
-
-    // Second push: should NOT dispatch ConnectProxyToNetworksJob (rate-limited)
-    Queue::fake();
-    $job2 = new PushServerUpdateJob($server, $data);
-    $job2->handle();
-
-    Queue::assertNotPushed(ConnectProxyToNetworksJob::class);
-});
-
-it('dispatches ConnectProxyToNetworksJob again after cache expires', function () {
-    $team = Team::factory()->create();
-    $server = Server::factory()->create(['team_id' => $team->id]);
-    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-
-    $containersWithProxy = [
-        [
-            'name' => 'coolify-proxy',
-            'state' => 'running',
-            'health_status' => 'healthy',
-            'labels' => ['coolify.managed' => true],
-        ],
-    ];
-
-    $data = [
-        'containers' => $containersWithProxy,
-        'filesystem_usage_root' => ['used_percentage' => 10],
-    ];
-
-    // First push
-    $job = new PushServerUpdateJob($server, $data);
-    $job->handle();
-
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
-
-    // Clear cache to simulate expiration
-    Cache::forget('connect-proxy:'.$server->id);
-
-    // Next push: should dispatch again
-    Queue::fake();
-    $job2 = new PushServerUpdateJob($server, $data);
-    $job2->handle();
-
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
-});
-
-it('respects the configured proxy connect interval', function () {
-    // Interval 0 → the connect-proxy gate key expires immediately, so every
-    // push re-dispatches without a manual Cache::forget. Proves the TTL is
-    // driven by config('constants.proxy.connect_networks_interval_seconds').
-    config(['constants.proxy.connect_networks_interval_seconds' => 0]);
-
+it('does not dispatch proxy network work when the proxy is running', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
@@ -212,12 +144,81 @@ it('respects the configured proxy connect interval', function () {
         'filesystem_usage_root' => ['used_percentage' => 10],
     ];
 
-    (new PushServerUpdateJob($server, $data))->handle();
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
+    Event::fake([ServiceChecked::class]);
 
-    Queue::fake();
     (new PushServerUpdateJob($server, $data))->handle();
-    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
+
+    Queue::assertNothingPushed();
+});
+
+it('marks a stale proxy status as running when sentinel reports a running proxy', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->proxy->set('status', 'exited');
+    $server->save();
+
+    $data = [
+        'containers' => [
+            [
+                'name' => 'coolify-proxy',
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => ['coolify.managed' => true],
+            ],
+        ],
+        'filesystem_usage_root' => ['used_percentage' => 10],
+    ];
+
+    Event::fake([ServiceChecked::class]);
+
+    (new PushServerUpdateJob($server, $data))->handle();
+
+    expect($server->fresh()->proxy->get('status'))->toBe('running');
+});
+
+it('does not start a second proxy while a proxy restart runs', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->proxy->set('status', 'restarting');
+    $server->save();
+    $server->markProxyTransitionStarted();
+
+    CheckProxy::shouldNotRun();
+    StartProxy::shouldNotRun();
+    Event::fake([ServiceChecked::class]);
+
+    (new PushServerUpdateJob($server, ['containers' => [], 'filesystem_usage_root' => ['used_percentage' => 10]]))->handle();
+
+    expect($server->fresh()->proxy->get('status'))->toBe('restarting');
+});
+
+it('starts a missing proxy when no proxy restart runs', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    CheckProxy::shouldRun()->once()->andReturn(true);
+    StartProxy::shouldRun()->once();
+    Event::fake([ServiceChecked::class]);
+
+    (new PushServerUpdateJob($server, ['containers' => [], 'filesystem_usage_root' => ['used_percentage' => 10]]))->handle();
+});
+
+it('ends the proxy restart when the proxy status listener runs', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->markProxyTransitionStarted();
+    Process::fake();
+
+    (new ProxyStatusChangedNotification)->handle(new ProxyStatusChanged(ProxyStatusChanged::dataFor($server)));
+
+    expect($server->isProxyTransitionInProgress())->toBeFalse();
 });
 
 it('uses default queue for PushServerUpdateJob', function () {

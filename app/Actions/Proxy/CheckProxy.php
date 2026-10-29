@@ -53,19 +53,6 @@ class CheckProxy
 
             return true;
         } else {
-            $portsToCheck = [];
-
-            try {
-                if ($server->proxyType() !== ProxyTypes::NONE->value) {
-                    $proxyCompose = GetProxyConfiguration::run($server);
-                    $portsToCheck = ProxyPortParser::fromConfiguration($proxyCompose);
-                }
-            } catch (\Throwable $e) {
-                Log::error('Error checking proxy: '.$e->getMessage());
-
-                return false;
-            }
-
             $status = getContainerStatus($server, $proxyContainerName);
             if ($status === 'running') {
                 $server->proxy->set('status', 'running');
@@ -76,8 +63,24 @@ class CheckProxy
             if ($server->settings->is_cloudflare_tunnel) {
                 return false;
             }
-            if (count($portsToCheck) === 0) {
+
+            $portsToCheck = [];
+            $publishesOnlyUncheckedPorts = false;
+
+            try {
+                if ($server->proxyType() !== ProxyTypes::NONE->value) {
+                    $proxyCompose = GetProxyConfiguration::run($server);
+                    $portsToCheck = ProxyPortParser::fromConfiguration($proxyCompose);
+                    $publishesOnlyUncheckedPorts = $portsToCheck === [] && ProxyPortParser::publishesOnlyUncheckedPorts($proxyCompose);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Error checking proxy: '.$e->getMessage());
+
                 return false;
+            }
+            if (count($portsToCheck) === 0) {
+                // Variable ports such as `${HTTP_PORT}:80` are only resolved by Compose on start.
+                return $publishesOnlyUncheckedPorts;
             }
             $portsToCheck = array_values(array_unique($portsToCheck));
             // Check port conflicts in parallel

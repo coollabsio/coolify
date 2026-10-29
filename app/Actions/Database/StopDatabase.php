@@ -20,12 +20,17 @@ class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true): string
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true, bool $keepAnonymousDataVolume = true): string
     {
         try {
             $server = $database->destination->server;
             if (! $server->isFunctional()) {
                 return 'Server is not functional';
+            }
+
+            // A removed container loses the link to the unnamed volume that holds the current data.
+            if ($removeContainer && $keepAnonymousDataVolume && $database instanceof StandaloneClickhouse && $database->anonymousDataVolume() !== null) {
+                $removeContainer = false;
             }
 
             $this->stopContainer($database, $database->uuid, 30, $removeContainer);
@@ -41,7 +46,7 @@ class StopDatabase
             }
 
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, false, false);
+                CleanupDocker::dispatchAfterStop($server);
             }
 
             if ($database->is_public) {

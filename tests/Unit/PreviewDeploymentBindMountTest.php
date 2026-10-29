@@ -78,9 +78,9 @@ describe('replaceLocalSource', function () {
         expect((string) $result)->toBe('/app/scripts');
     });
 
-    it('replaces dot-dot-slash prefix with target path', function () {
+    it('resolves dot-dot-slash prefix against the parent of the target path', function () {
         $result = replaceLocalSource(str('../config'), str('/app'));
-        expect((string) $result)->toBe('/app./config');
+        expect((string) $result)->toBe('/config');
     });
 
     it('replaces tilde prefix with target path', function () {

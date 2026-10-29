@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMongodb extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -60,18 +61,30 @@ class StandaloneMongodb extends BaseModel
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'mongo_conf',
+        'custom_docker_run_options',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
         'mongo_initdb_root_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
+        'mongo_initdb_root_password' => 'encrypted',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
         'health_check_retries' => 'integer',
@@ -281,22 +294,6 @@ class StandaloneMongodb extends BaseModel
         return null;
     }
 
-    public function mongoInitdbRootPassword(): Attribute
-    {
-        return Attribute::make(
-            get: function ($value) {
-                try {
-                    return decrypt($value);
-                } catch (\Throwable $th) {
-                    $this->mongo_initdb_root_password = encrypt($value);
-                    $this->save();
-
-                    return $value;
-                }
-            }
-        );
-    }
-
     public function portsMappings(): Attribute
     {
         return Attribute::make(
@@ -354,9 +351,10 @@ class StandaloneMongodb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->mongo_initdb_root_username);
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
-                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {

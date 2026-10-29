@@ -35,7 +35,13 @@ trait MatchesManualWebhookApplications
      */
     protected function manualWebhookApplications(Builder $query, string $fullName): Collection
     {
-        return $query->get()
+        // Every repository form that manualWebhookRepositoryMatches() accepts
+        // contains the repository name, so the database discards unrelated
+        // applications that share the branch. The full match stays in PHP.
+        $pattern = '%'.str_replace('_', '\\_', mb_strtolower($fullName)).'%';
+
+        return $query->whereRaw("LOWER(git_repository) LIKE ? ESCAPE '\\'", [$pattern])
+            ->get()
             ->filter(fn (Application $application): bool => $this->manualWebhookRepositoryMatches($application->git_repository, $fullName))
             ->values();
     }
@@ -50,7 +56,13 @@ trait MatchesManualWebhookApplications
 
         // Git hosts (GitHub, GitLab, Gitea, Bitbucket) treat owner/repo names
         // case-insensitively, so compare the canonical paths case-insensitively.
-        return hash_equals(mb_strtolower($fullName), mb_strtolower($repositoryPath));
+        $fullName = mb_strtolower($fullName);
+        $repositoryPath = mb_strtolower($repositoryPath);
+
+        // A self-hosted Git host can serve repositories under a sub-path
+        // (https://example.com/gitea/owner/repo), which is not part of the
+        // repository name in the webhook payload.
+        return $repositoryPath === $fullName || str_ends_with($repositoryPath, '/'.$fullName);
     }
 
     /**
@@ -60,13 +72,14 @@ trait MatchesManualWebhookApplications
     {
         return [
             'status' => 'failed',
-            'message' => 'Invalid signature.',
+            'message' => 'No matching application or invalid signature.',
         ];
     }
 
     /**
      * Respond to a delivery that could not be authenticated (no matching
-     * application or no signature) and count it as a failed attempt.
+     * application or no valid signature). A locked scope gets a 429 without
+     * counting again; otherwise the delivery is counted as a failed attempt.
      *
      * Deliveries without a matching application are counted too: the failure
      * key is scoped to the repository and branch, so this cannot lock out other
@@ -77,12 +90,19 @@ trait MatchesManualWebhookApplications
      */
     protected function unauthenticatedManualWebhookResponse(string $failureKey, string $attempt): Response
     {
+        if ($this->hasTooManyManualWebhookFailures($failureKey)) {
+            return $this->tooManyManualWebhookFailuresResponse($failureKey);
+        }
+
         $this->recordManualWebhookFailure($failureKey, $attempt);
 
         return response([$this->unauthenticatedManualWebhookFailurePayload()]);
     }
 
     /**
+     * Return the authorized payloads. When no matched application authorized
+     * the delivery, respond as an unauthenticated delivery.
+     *
      * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
      */
     protected function manualWebhookResponse(Collection $payloads, string $failureKey, string $attempt): Response

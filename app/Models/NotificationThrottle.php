@@ -4,8 +4,11 @@ namespace App\Models;
 
 use App\Contracts\ThrottledNotification;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Throwable;
 
 /**
  * Records when a notification was last sent for a resource, so repeated checks
@@ -63,6 +66,29 @@ class NotificationThrottle extends Model
     }
 
     /**
+     * Claim the throttle, then run $send. When $send throws, the claim is released so the
+     * next attempt is not throttled, and the exception is rethrown.
+     *
+     * Returns false when the claim failed and $send did not run.
+     */
+    public static function sendOnce(Model $notifiable, string $notification, ?CarbonInterface $sentBefore, Closure $send): bool
+    {
+        if (! static::claim($notifiable, $notification, $sentBefore)) {
+            return false;
+        }
+
+        try {
+            $send();
+        } catch (Throwable $exception) {
+            static::release($notifiable, $notification);
+
+            throw $exception;
+        }
+
+        return true;
+    }
+
+    /**
      * Claim the throttle a notification declares. Notifications without a throttle subject are always allowed.
      */
     public static function claimFor(ThrottledNotification $notification): bool
@@ -107,5 +133,37 @@ class NotificationThrottle extends Model
             ->whereMorphedTo('notifiable', $notifiable)
             ->where('notification', $notification)
             ->exists();
+    }
+
+    /**
+     * Delete rows whose subject no longer exists. Subjects are often removed with bulk or cascading
+     * deletes that skip model events, so this sweep is the reliable cleanup. Soft-deleted subjects are kept.
+     *
+     * Returns the number of deleted rows.
+     */
+    public static function deleteOrphans(): int
+    {
+        $deleted = 0;
+
+        foreach (static::query()->distinct()->pluck('notifiable_type') as $type) {
+            $class = Relation::getMorphedModel($type) ?? $type;
+            $throttles = static::query()->where('notifiable_type', $type);
+
+            if (! is_a($class, Model::class, true)) {
+                $deleted += $throttles->delete();
+
+                continue;
+            }
+
+            $subject = new $class;
+            $deleted += $throttles->whereNotExists(
+                $class::query()
+                    ->withoutGlobalScopes()
+                    ->selectRaw('1')
+                    ->whereColumn($subject->getQualifiedKeyName(), (new static)->qualifyColumn('notifiable_id'))
+            )->delete();
+        }
+
+        return $deleted;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profile;
 
+use App\Actions\User\DeleteUserAccount;
 use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -150,7 +151,7 @@ class Index extends Component
                 }
 
                 // Additional rate limit by IP address (5 requests per hour)
-                $ipKey = 'email-change:ip:'.request()->ip();
+                $ipKey = 'email-change:ip:'.client_ip(request());
                 if (! RateLimiter::attempt($ipKey, 5, function () {}, 3600)) {
                     $this->dispatch('error', 'Too many requests from your IP address. Please try again later.');
 
@@ -347,6 +348,29 @@ class Index extends Component
         }
     }
 
+    public function deleteAccount(string $password, array $selectedActions = []): mixed
+    {
+        try {
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            $deleteUserAccount = app(DeleteUserAccount::class);
+            $deleteUserAccount->handle(Auth::user(), removeTeamResources: $deleteUserAccount->removesTeamResources(Auth::user()));
+            auditLog('ui.user.account_deleted', ['resource' => 'user']);
+
+            Auth::guard('web')->logout();
+            session()->invalidate();
+            session()->regenerateToken();
+
+            $this->redirect(route('login'));
+
+            return true;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     private function providerLabel(string $provider): string
     {
         return match ($provider) {
@@ -368,6 +392,11 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.profile.index');
+        $deleteUserAccount = app(DeleteUserAccount::class);
+
+        return view('livewire.profile.index', [
+            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user(), $deleteUserAccount->removesTeamResources(Auth::user())),
+            'accountDeletionActions' => $deleteUserAccount->confirmationActions(Auth::user()),
+        ]);
     }
 }

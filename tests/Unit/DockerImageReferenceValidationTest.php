@@ -15,6 +15,9 @@ it('accepts valid docker registry image names', function (string $imageName) {
     'ghcr image' => 'ghcr.io/coollabsio/coolify',
     'repository component with repeated hyphens' => 'ghcr.io/acme/my--service',
     'registry with port' => 'registry.example.com:5000/team/app',
+    'IPv6 registry' => '[2a01:4f8::1]/team/app',
+    'IPv6 registry with port' => '[2a01:4f8::1]:5000/app',
+    'IPv4-mapped IPv6 registry' => '[::ffff:192.0.2.1]:5000/app',
     'digest marker used by existing dockerimage records' => 'nginx@sha256',
 ]);
 
@@ -29,6 +32,10 @@ it('rejects docker registry image names with shell metacharacters', function (st
     'newline' => "coolify/poc\nid",
     'space' => 'coolify/poc image',
     'tag in image-name-only field' => 'coolify/poc:latest',
+    'IPv6 registry with command substitution' => '[2a01:4f8::1$(id)]:5000/app',
+    'IPv6 registry with letters outside hex' => '[2a01:4f8::zz]/app',
+    'unclosed IPv6 registry' => '[2a01:4f8::1:5000/app',
+    'bare IPv6 registry' => '2a01:4f8::1/app',
 ]);
 
 it('accepts valid docker registry image tags', function (string $tag) {
@@ -39,6 +46,11 @@ it('accepts valid docker registry image tags', function (string $tag) {
     'uppercase and underscore' => 'PR_123',
     'sha256 hash' => '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     'legacy sha256 prefixed hash' => 'sha256-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+    'environment variable reference' => '$API_VERSION',
+    'braced environment variable reference' => '${API_VERSION}',
+    'environment variable reference with literal parts' => 'v${API_VERSION}-alpine',
+    'environment variable reference with default for empty or unset' => '${API_VERSION:-latest}',
+    'environment variable reference with default for unset' => '${API_VERSION-1.27-alpine}',
 ]);
 
 it('rejects docker registry image tags with shell metacharacters', function (string $tag) {
@@ -50,6 +62,14 @@ it('rejects docker registry image tags with shell metacharacters', function (str
     'pipe' => 'latest|id',
     'logical and' => 'latest&&id',
     'newline' => "latest\nid",
+    'bare dollar' => '$',
+    'positional parameter' => '$1',
+    'special parameter' => '$$',
+    'unclosed braced reference' => '${API_VERSION',
+    'parameter expansion with command substitution default' => '${API_VERSION:-$(id)}',
+    'parameter expansion with nested reference default' => '${API_VERSION:-${OTHER}}',
+    'parameter expansion with required error' => '${API_VERSION:?missing}',
+    'parameter expansion with assignment' => '${API_VERSION:=latest}',
 ]);
 
 it('accepts supported full docker image reference formats', function (string $imageReference) {
@@ -66,7 +86,23 @@ it('accepts supported full docker image reference formats', function (string $im
     'image with sha256 digest' => 'nginx@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     'registry image with sha256 digest' => 'ghcr.io/user/app@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     'registry port image with tag' => 'localhost:5000/app:latest',
+    'IPv6 registry port image with tag' => '[2a01:4f8::1]:5000/app:latest',
 ]);
+
+it('accepts an environment variable tag in a full docker image reference only when variable tags are allowed', function () {
+    $validate = function (DockerImageFormat $rule): array {
+        $failures = [];
+
+        $rule->validate('image', 'ghcr.io/user/app:${API_VERSION:-latest}', function (string $message) use (&$failures): void {
+            $failures[] = $message;
+        });
+
+        return $failures;
+    };
+
+    expect($validate(new DockerImageFormat(allowVariableTag: true)))->toBeEmpty()
+        ->and($validate(new DockerImageFormat))->not->toBeEmpty();
+});
 
 it('rejects unsupported full docker image reference formats', function (string $imageReference) {
     $failures = [];
@@ -107,3 +143,20 @@ it('stops deployments when a stored docker registry image value is unsafe', func
 
     expect(fn () => $method->invoke($job))->toThrow(DeploymentException::class);
 });
+
+it('allows deployments when the stored docker registry image tag is an environment variable reference', function () {
+    $job = (new ReflectionClass(ApplicationDeploymentJob::class))->newInstanceWithoutConstructor();
+
+    $jobReflection = new ReflectionClass($job);
+    foreach ([
+        'application' => new Application([
+            'docker_registry_image_name' => 'ghcr.io/user/app',
+            'docker_registry_image_tag' => '$API_VERSION',
+        ]),
+        'dockerImagePreviewTag' => null,
+    ] as $property => $value) {
+        $jobReflection->getProperty($property)->setValue($job, $value);
+    }
+
+    $jobReflection->getMethod('validateDockerRegistryImageConfiguration')->invoke($job);
+})->throwsNoExceptions();

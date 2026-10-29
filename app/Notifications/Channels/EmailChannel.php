@@ -3,13 +3,17 @@
 namespace App\Notifications\Channels;
 
 use App\Exceptions\NonReportableException;
+use App\Models\EmailNotificationSettings;
 use App\Models\Team;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\SmtpTransportFactory;
 use Exception;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 use Resend;
 use Resend\Exceptions\ErrorException;
 use Resend\Exceptions\TransporterException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Email;
 
@@ -19,6 +23,10 @@ class EmailChannel
 
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
+        $settings = null;
+        // Test notifications always show their error and never count as delivery failures.
+        $isTestNotification = data_get($notification, 'isTestNotification', false);
+
         try {
             // Get team and validate membership before proceeding
             $team = data_get($notifiable, 'id');
@@ -49,8 +57,6 @@ class EmailChannel
             }
 
             // Skip team membership validation for test notifications
-            $isTestNotification = data_get($notification, 'isTestNotification', false);
-
             if (! $isTestNotification) {
                 foreach ($recipients as $recipient) {
                     // Check if the recipient is part of the team
@@ -103,6 +109,10 @@ class EmailChannel
 
                 $mailer->send($email);
             }
+
+            if (! $isTestNotification && $settings instanceof EmailNotificationSettings) {
+                $settings->recordDeliverySuccess();
+            }
         } catch (ErrorException $e) {
             ['status' => $statusCode, 'name' => $errorName] = self::resendErrorDetails($e);
 
@@ -116,6 +126,24 @@ class EmailChannel
                 default => 'Failed to send email via Resend: '.$e->getErrorMessage(),
             };
 
+            if (! $isTestNotification && $settings instanceof EmailNotificationSettings) {
+                // The team's own settings: an invalid key or domain counts as a delivery failure, and
+                // other client errors are only logged. Neither is retried, because a retry fails again.
+                if (in_array($statusCode, [401, 403], true)) {
+                    $settings->recordDeliveryFailure($userMessage);
+
+                    return;
+                }
+
+                if (in_array($statusCode, [400, 422], true)) {
+                    Log::warning('Resend rejected the email', ['team_id' => $settings->team_id, 'reason' => $userMessage]);
+
+                    return;
+                }
+
+                throw new Exception($userMessage, $e->getCode(), $e);
+            }
+
             // Log detailed error for admin debugging (redact sensitive data)
             $emailSettings = $notifiable->emailNotificationSettings ?? instanceSettings();
             data_set($emailSettings, 'smtp_password', '********');
@@ -124,24 +152,33 @@ class EmailChannel
             send_internal_notification(sprintf(
                 "Resend Error\nStatus Code: %s\nMessage: %s\nNotification: %s\nEmail Settings:\n%s",
                 $statusCode,
-                $e->getErrorMessage(),
+                remove_iip($e->getErrorMessage()),
                 get_class($notification),
-                json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                json_encode(app(SensitiveDataRedactor::class)->redactValue($emailSettings), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             ));
 
-            // Don't report expected errors (invalid keys, validation) to Sentry
+            // Don't report expected errors (invalid keys, validation) to error tracking
             if (in_array($statusCode, [403, 401, 400, 422], true)) {
                 throw NonReportableException::fromException(new Exception($userMessage, $e->getCode(), $e));
             }
 
             throw new Exception($userMessage, $e->getCode(), $e);
+        } catch (TransportExceptionInterface $e) {
+            // SMTP 530/535: the SMTP server does not accept the username or password.
+            if (! $isTestNotification && $settings instanceof EmailNotificationSettings && in_array($e->getCode(), [530, 535], true)) {
+                $settings->recordDeliveryFailure('SMTP authentication failed. Please verify the SMTP username and password.');
+
+                return;
+            }
+
+            throw $e;
         } catch (TransporterException $e) {
-            send_internal_notification("Resend Transport Error: {$e->getMessage()}");
+            send_internal_notification('Resend Transport Error: '.remove_iip($e->getMessage()));
             throw new Exception('Unable to connect to Resend API. Please check your internet connection and try again.');
         } catch (\Throwable $e) {
             // Check if this is a Resend domain verification error on cloud instances
             if (isCloud() && str_contains($e->getMessage(), 'domain is not verified')) {
-                // Throw as NonReportableException so it won't go to Sentry
+                // Throw as NonReportableException so it won't go to error tracking
                 throw NonReportableException::fromException($e);
             }
             throw $e;

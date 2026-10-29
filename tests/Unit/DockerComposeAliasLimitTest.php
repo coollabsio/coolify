@@ -49,3 +49,22 @@ it('keeps a finite collection alias limit for Docker Compose files', function ()
 
     $application->oldRawParser();
 })->throws(RuntimeException::class, 'Maximum number of collection aliases (256) exceeded');
+
+it('accepts Docker Compose files with more than 128 collection aliases during the safety check', function () {
+    $services = collect(range(1, 129))
+        ->map(fn (int $index): string => "  service-{$index}:\n    <<: *defaults\n")
+        ->implode('');
+
+    validateDockerComposeForInjection("x-defaults: &defaults\n  image: alpine:latest\nservices:\n{$services}");
+
+    expect(parseDockerComposeYaml("x-defaults: &defaults\n  image: alpine:latest\nservices:\n{$services}"))
+        ->toHaveKey('services.service-129.image', 'alpine:latest');
+});
+
+it('keeps a finite collection alias limit during the Docker Compose safety check', function () {
+    $services = collect(range(1, Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES + 1))
+        ->map(fn (int $index): string => "  service-{$index}:\n    <<: *defaults\n")
+        ->implode('');
+
+    validateDockerComposeForInjection("x-defaults: &defaults\n  image: alpine:latest\nservices:\n{$services}");
+})->throws(Exception::class, 'Maximum number of collection aliases (256) exceeded');

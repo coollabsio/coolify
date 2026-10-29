@@ -17,6 +17,12 @@
             'scope' => mb_strtolower(str($type)->headline()),
         ])
         ->values();
+    $canvasUrl = match ($type) {
+        'team' => route('shared-variables.team.canvas'),
+        'project' => route('shared-variables.project.canvas', ['project_uuid' => $resource->uuid]),
+        'environment' => route('shared-variables.environment.canvas', ['project_uuid' => $resource->project->uuid, 'environment_uuid' => $resource->uuid]),
+        'server' => route('shared-variables.server.canvas', ['server_uuid' => $resource->uuid]),
+    };
 @endphp
 
 <x-shared-variables.layout>
@@ -38,6 +44,8 @@
                 <span class="max-sm:hidden">{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</span>
                 <span class="sm:hidden">{{ $view === 'normal' ? 'Developer' : 'Normal' }}</span>
             </x-forms.button>
+            <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]" :list-url="url()->current()"
+                :canvas-url="$canvasUrl" />
         </x-slot:actions>
         @if ($view === 'normal')
             <div
@@ -123,7 +131,7 @@
                                     <span class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">{{ str($type)->headline() }}</span>
                                     <span class="min-w-0 truncate font-mono text-[13px]" title="{{ $env->value }}">{{ $env->value }}</span>
                                     <span class="data-table-cell-dash">-</span>
-                                    <span class="justify-self-end text-neutral-400 dark:text-fg-faint" title="Built-in variable, managed by Coolify"><x-reicon name="lock" class="size-3.5" /></span>
+                                    <span class="justify-self-end text-neutral-400 dark:text-fg-faint" title="Built-in variable, managed by Coolify"><x-reicon name="keys" class="size-3.5" /></span>
                                 </div>
                             </div>
                         @else
@@ -148,8 +156,12 @@
                     @endforeach
                 </div>
             @endif
-            <form wire:submit="submit" class="p-4">
+            <form wire:submit="submit" class="flex flex-col gap-4 p-4">
                 <x-unsaved-bar action="submit" />
+                <x-callout type="info" title="Note">
+                    To make a variable literal, put <code class="font-mono"># coolify: literal</code> directly above
+                    its line. Without this line, the flag does not change.
+                </x-callout>
                 <x-forms.textarea canGate="update" :canResource="$resource" rows="20"
                     class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
                     :label="$variablesLabel" />

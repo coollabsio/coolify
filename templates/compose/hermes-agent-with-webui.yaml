@@ -7,7 +7,7 @@
 
 services:
   hermes-agent:
-    image: 'nousresearch/hermes-agent:v2026.6.5'
+    image: 'nousresearch/hermes-agent:v2026.9.24'
     command: 'gateway run'
     environment:
       - HERMES_HOME=/home/hermes/.hermes
@@ -25,6 +25,9 @@ services:
       - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'
       - 'OPENAI_API_KEY=${OPENAI_API_KEY:-}'
       - 'GOOGLE_API_KEY=${GOOGLE_API_KEY:-}'
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - 'API_SERVER_KEY=${SERVICE_PASSWORD_64_HERMESAPI}'
     volumes:
       - 'hermes-home:/home/hermes/.hermes'
       - 'hermes-skills:/home/hermes/.hermes/skills'
@@ -37,7 +40,7 @@ services:
       timeout: 5s
       retries: 5
   hermes-webui:
-    image: 'ghcr.io/nesquena/hermes-webui:0.51.489'
+    image: 'ghcr.io/nesquena/hermes-webui:0.52.458'
     depends_on:
       - hermes-agent
     environment:
@@ -51,6 +54,8 @@ services:
       - WANTED_GID=1000
       - HERMES_WEBUI_USERNAME=${SERVICE_USER_HERMESWEBUI}
       - HERMES_WEBUI_PASSWORD=${SERVICE_PASSWORD_HERMESWEBUI}
+      - HERMES_API_URL=http://hermes-agent:8642
+      - 'HERMES_WEBUI_GATEWAY_API_KEY=${SERVICE_PASSWORD_64_HERMESAPI}'
     volumes:
       - 'hermes-home:/home/hermeswebui/.hermes'
       - 'hermes-agent-src:/home/hermeswebui/.hermes/hermes-agent:ro'

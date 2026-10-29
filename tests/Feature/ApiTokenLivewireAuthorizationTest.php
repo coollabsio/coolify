@@ -144,3 +144,42 @@ test('owner can deselect root and falls back to read permission', function () {
         ->set('permissions', [])
         ->assertSet('permissions', ['read']);
 });
+
+test('deploy permission can be combined with write permission', function (array $steps) {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(ApiTokens::class)->set('permissions', ['read']);
+
+    foreach ($steps as $permission) {
+        $component->set('permissions.'.count($component->get('permissions')), $permission);
+    }
+
+    $component->assertSet('permissions', ['deploy', 'read', 'write']);
+})->with([
+    'write then deploy' => [['write', 'deploy']],
+    'deploy then write' => [['deploy', 'write']],
+]);
+
+test('owner can create token with read, write, and deploy permissions', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)
+        ->set('description', 'deploy-write-token')
+        ->set('expiresInDays', 30)
+        ->set('permissions', ['read', 'write', 'deploy'])
+        ->call('addNewToken')
+        ->assertHasNoErrors();
+
+    $token = $owner->tokens()->latest()->first();
+
+    expect($token)->not->toBeNull()
+        ->and($token->abilities)->toEqualCanonicalizing(['read', 'write', 'deploy']);
+});

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Show how a code change alters the service parser output for every template and the reference fixture.
+#
+# Usage:
+#   ./scripts/parser-snapshot-diff save                 # 1. before you change code: save the current output
+#   ./scripts/parser-snapshot-diff baseline             # 2. after the change: compare with the saved output
+#   ./scripts/parser-snapshot-diff [git-ref]            # or compare with a git ref (default: main)
+#   ./scripts/parser-snapshot-diff baseline -- --filter='"template appwrite"'   # extra Pest arguments
+#
+# Each run parses everything with tests/Feature/ServiceParserReferenceTest.php (about 90 seconds).
+# A git ref is exported with git archive to a temporary directory and parsed with the current test,
+# fixtures and templates, so the diff shows only the effect of the code change.
+# The terminal shows one line per changed case; the full diff is written to storage/framework/testing/.
+set -euo pipefail
+
+repo="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)"
+mode="${1:-main}"
+shift || true
+[[ "${1:-}" == "--" ]] && shift
+pest_args=("$@")
+
+testing="$repo/storage/framework/testing"   # gitignored, same file system as the repository
+saved="$testing/parser-snapshots-baseline"
+report="$testing/parser-snapshot-diff.diff"
+work="$(mktemp -d "$testing/parser-snapshot-diff.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
+
+# Run the golden test in <dir> with UPDATE_PARSER_SNAPSHOTS=1 and copy its expected files to <target>.
+parse_into() {
+  local dir="$1" target="$2" label="$3" expected="$1/tests/Fixtures/parser/expected" backup="$work/expected-backup" status=0
+  echo "==> Parsing on $label (about 90 seconds)"
+  # The run rewrites the expected files: put the previous ones back afterwards, so the repository is unchanged.
+  rm -rf "$backup"
+  cp -r "$expected" "$backup"
+  rm -rf "$expected/templates"
+  (cd "$dir" && UPDATE_PARSER_SNAPSHOTS=1 php -d memory_limit=2G artisan test --compact \
+    tests/Feature/ServiceParserReferenceTest.php "${pest_args[@]}" >"$work/run.log" 2>&1) || status=$?
+  rm -rf "$target"
+  cp -r "$expected" "$target"
+  rm -rf "$expected"
+  mv "$backup" "$expected"
+  if [[ $status -ne 0 ]]; then
+    echo "Test run on $label failed:" >&2
+    tail -30 "$work/run.log" >&2
+    exit 1
+  fi
+}
+
+case "$mode" in
+  save)
+    parse_into "$repo" "$saved" "working tree"
+    echo "Saved baseline: $saved"
+    echo "Change the code, then run: ./scripts/parser-snapshot-diff baseline"
+    exit 0
+    ;;
+  baseline)
+    [[ -d "$saved" ]] || { echo "No saved baseline. Run ./scripts/parser-snapshot-diff save first." >&2; exit 1; }
+    base_label="saved baseline"
+    cp -r "$saved" "$work/base-expected"
+    ;;
+  *)
+    base_label="$mode"
+    base="$work/base"
+    mkdir -p "$base"
+    echo "==> Exporting $mode ($(git -C "$repo" rev-parse --short "$mode"))"
+    git -C "$repo" archive "$mode" | tar -x -C "$base"
+    # Hard links: fast and no extra disk space. A symlink would make Composer load the classes of $repo.
+    cp -al "$repo/vendor" "$base/vendor"
+    [[ -f "$repo/.env" ]] && cp "$repo/.env" "$base/.env"
+    rm -rf "$base/templates/compose" "$base/tests/Fixtures/parser"
+    cp -r "$repo/templates/compose" "$base/templates/compose"
+    mkdir -p "$base/tests/Fixtures/parser"
+    cp "$repo"/tests/Fixtures/parser/*.yaml "$base/tests/Fixtures/parser/"
+    cp -r "$repo/tests/Fixtures/parser/expected" "$base/tests/Fixtures/parser/expected"
+    cp "$repo/tests/Feature/ServiceParserReferenceTest.php" "$base/tests/Feature/"
+    parse_into "$base" "$work/base-expected" "$mode"
+    ;;
+esac
+
+parse_into "$repo" "$work/current-expected" "working tree"
+
+echo
+if diff -ru "$work/base-expected" "$work/current-expected" | sed -E "s#$work/(base|current)-expected/##g" >"$report"; then
+  echo "No differences from $base_label: the parser output of every case is the same."
+  exit 0
+fi
+
+# Line 2 is the first step (1_deploy): an error there means the case did not parse at all on that side.
+first_step_error() { sed -n 2p "$1" | grep '^  error:' | cut -c10-130 || true; }
+
+summary() {
+  local file="$1" base_file="$work/base-expected/$1" current_file="$work/current-expected/$1" base_error current_error
+  [[ -f "$base_file" ]] || { echo "  new case        $file"; return; }
+  [[ -f "$current_file" ]] || { echo "  removed case    $file"; return; }
+  base_error="$(first_step_error "$base_file")"
+  current_error="$(first_step_error "$current_file")"
+  if [[ -n "$base_error" && -z "$current_error" ]]; then
+    echo "  base error      $file: $base_error"
+  elif [[ -n "$current_error" && -z "$base_error" ]]; then
+    echo "  CURRENT ERROR   $file: $current_error"
+  else
+    echo "  changed         $file (+$(diff "$base_file" "$current_file" | grep -c '^>' || true) -$(diff "$base_file" "$current_file" | grep -c '^<' || true))"
+  fi
+}
+
+changed_cases=()
+while IFS= read -r file; do
+  cmp -s "$work/base-expected/$file" "$work/current-expected/$file" || changed_cases+=("$file")
+done < <( (cd "$work/base-expected" && find . -name '*.yaml'; cd "$work/current-expected" && find . -name '*.yaml') | sed 's|^\./||' | sort -u)
+
+lines="$(for file in "${changed_cases[@]}"; do summary "$file"; done)"
+echo "${#changed_cases[@]} case(s) differ from $base_label:"
+echo "$lines"
+echo
+echo "Full diff: $report"
+if grep -q '^  base error' <<<"$lines"; then
+  echo "Note: 'base error' cases did not parse on $base_label, so there is no base output to compare with."
+fi
+exit 1

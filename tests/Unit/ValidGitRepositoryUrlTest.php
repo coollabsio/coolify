@@ -110,6 +110,10 @@ it('validates SSH URLs when allowed', function () {
         'custom-user@git.example.com:organization/repository.git',
         'custom-user@git.example.com:2222/organization/repository.git',
         'enterprise-user@enterprise.ghe.com:organization/repository.git',
+        'ssh://git@gitea.example.local:2222/myuser/my-repository.git',
+        'ssh://git@github.com/user/repo.git',
+        'ssh://git@192.168.1.10:22/~user/repo.git',
+        'ssh://git@[2001:db8::10]:2222/group/project.git',
     ];
 
     foreach ($validUrls as $url) {
@@ -133,6 +137,7 @@ it('rejects SSH URLs when not allowed', function () {
         'git@github.com:user/repo.git',
         'git@gitlab.com:user/repo.git',
         'custom-user@git.example.com:organization/repository.git',
+        'ssh://git@gitea.example.com:2222/organization/repository.git',
     ];
 
     foreach ($invalidUrls as $url) {
@@ -241,6 +246,89 @@ it('allows IP addresses when explicitly allowed', function () {
     }
 });
 
+it('allows IP addresses by default', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://192.168.1.10/org/repo.git',
+        'http://10.0.0.5:3000/org/repo.git',
+        'https://203.0.113.7/org/repo',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("IP address URL should be allowed: {$url}");
+    }
+});
+
+it('rejects loopback and reserved IP addresses even when IP addresses are allowed', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://127.0.0.1/org/repo',
+        'https://127.0.0.2/org/repo',
+        'https://0.0.0.0/org/repo',
+        'https://169.254.169.254/org/repo',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("Reserved IP URL should be rejected: {$url}");
+        expect($validator->errors()->first('url'))->toBe('The url cannot point to internal hosts.');
+    }
+});
+
+it('allows IPv6 addresses in every URL format', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://[2a01:4f8::1]/org/repo.git',
+        'http://[fd00::5]:3000/org/repo.git',
+        'git://[2a01:4f8::1]/org/repo.git',
+        'git://[2a01:4f8::1]:9418/org/repo.git',
+        'git@[2a01:4f8::1]:org/repo.git',
+        'git@[fd00::5]:2222/org/repo.git',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("IPv6 URL should be allowed: {$url}");
+    }
+});
+
+it('rejects loopback and reserved IPv6 addresses', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://[::1]/org/repo',
+        'http://[fe80::1]/org/repo',
+        'https://[::ffff:127.0.0.1]/org/repo',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("Reserved IPv6 URL should be rejected: {$url}");
+        expect($validator->errors()->first('url'))->toBe('The url cannot point to internal hosts.');
+    }
+});
+
+it('rejects brackets that are not an IPv6 host', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://[not-an-ip]/org/repo',
+        'https://github.com/[2a01:4f8::1]/repo',
+        'git@[::1;id]:org/repo.git',
+        'https://[2a01:4f8::1]/org/[repo]',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("URL should be rejected: {$url}");
+        expect($validator->errors()->first('url'))->toContain('invalid characters');
+    }
+});
+
 it('rejects dangerous shell metacharacters', function () {
     $rule = new ValidGitRepositoryUrl;
 
@@ -288,6 +376,11 @@ it('rejects invalid URL formats', function () {
         'ftp://github.com/user/repo',
         'file:///path/to/repo',
         'ssh://github.com/user/repo',
+        'ssh://git@github.com',
+        'ssh://git@github.com:2222',
+        'ssh://git@github.com:port/user/repo.git',
+        'ssh://git@github.com:2222:user/repo.git',
+        'ssh://git@[not-an-ip]:2222/user/repo.git',
         'https://',
         'http://',
         'git@',
@@ -365,5 +458,102 @@ it('provides meaningful error messages', function () {
         $validator = Validator::make(['url' => $testCase['url']], ['url' => $rule]);
         expect($validator->fails())->toBeTrue("Should fail for: {$testCase['url']}");
         expect($validator->errors()->first('url'))->toContain($testCase['expectedError']);
+    }
+});
+
+it('allows percent-encoded repository paths', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://dev.azure.com/org/My%20Project/_git/repo',
+        'https://org@dev.azure.com/org/My%20Project/_git/My%20Repo',
+        'https://org.visualstudio.com/My%20Project/_git/repo',
+        'git@ssh.dev.azure.com:v3/org/My%20Project/repo',
+        'ssh://git@ssh.dev.azure.com/v3/org/My%20Project/repo',
+        'https://git.example.com/group/caf%C3%A9.git',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("Percent-encoded URL should be allowed: {$url}");
+    }
+});
+
+it('validates repository URL formats of common git hosts', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validUrls = [
+        'https://dev.azure.com/org/project/_git/repo',
+        'https://org@dev.azure.com/org/project/_git/repo',
+        'git@ssh.dev.azure.com:v3/org/project/repo',
+        'https://org.visualstudio.com/DefaultCollection/project/_git/repo',
+        'org@vs-ssh.visualstudio.com:v3/org/project/repo',
+        'https://git-codecommit.us-east-2.amazonaws.com/v1/repos/MyDemoRepo',
+        'ssh://APKAEIBAERJR2EXAMPLE@git-codecommit.us-east-2.amazonaws.com/v1/repos/MyDemoRepo',
+        'https://bitbucket.example.com/scm/PROJ/repo.git',
+        'ssh://git@bitbucket.example.com:7999/PROJ/repo.git',
+        'https://gerrit.example.com/a/project',
+        'ssh://user@gerrit.example.com:29418/project',
+        'git@git.sr.ht:~user/repo',
+        'https://gitlab.com/group/subgroup/subsubgroup/project.git',
+        'https://gitea.example.com:3000/user/repo.git',
+        'ssh://git@codeberg.org/user/repo.git',
+    ];
+
+    foreach ($validUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->passes())->toBeTrue("Git host URL should be allowed: {$url}");
+    }
+});
+
+it('rejects malformed or dangerous percent-encoding', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        'https://github.com/user/repo%',
+        'https://github.com/user/repo%2',
+        'https://github.com/user/repo%zz',
+        'https://github.com/user/repo%0A',
+        'https://github.com/user/repo%0d%0aprotocol=https',
+        'https://github.com/user/repo%00',
+        'https://github.com/user/repo%09',
+        'https://github.com/user/repo%7F',
+        'https://github.com/user/repo%3Bid',
+        'https://github.com/user/%24%28whoami%29',
+        'https://github.com/user/%60id%60',
+        'https://github.com/user/%2e%2e%2fetc',
+        'https://github.com/user/..%2Fetc',
+        'https://github.com/user/repo%2527',
+        'https://github.com/user/repo%27',
+        'https://github.com/user/repo%3Fref=main',
+        'https://git%68ub.com/user/repo',
+        'https://us%40er@github.com/user/repo',
+        'git@github.com:user/repo%0A',
+        'git@github.com:user/%3Bid',
+        'ssh://git@github.com/user/repo%0A',
+        'ssh://git@github.com/user/%2e%2e%2frepo',
+        'git://github.com/user/repo%0A',
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue("URL should be rejected: {$url}");
+    }
+});
+
+it('rejects raw control characters', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $invalidUrls = [
+        "ssh://git@github.com/user/repo.git\n",
+        "git@github.com:user/repo.git\n",
+        "git://github.com/user/repo.git\n",
+        "https://github.com/user/repo\t",
+    ];
+
+    foreach ($invalidUrls as $url) {
+        $validator = Validator::make(['url' => $url], ['url' => $rule]);
+        expect($validator->fails())->toBeTrue('URL with a control character should be rejected: '.json_encode($url));
+        expect($validator->errors()->first('url'))->toContain('invalid characters');
     }
 });

@@ -2,22 +2,32 @@
 
 namespace App\Http\Controllers\Webhook;
 
+use App\Enums\GithubRunnerStatus;
 use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
+use App\Jobs\ProvisionGithubRunnerJob;
 use App\Models\Application;
 use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
+use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
+use App\Services\GithubRunner\GithubRunnerApi;
+use App\Services\GithubRunner\GithubRunnerContainer;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Github extends Controller
@@ -62,7 +72,6 @@ class Github extends Controller
                     'before_sha' => $before_sha,
                     'after_sha' => $after_sha,
                     'commit_sha' => $commit_sha,
-                    'author_association' => $author_association,
                     'is_fork_pull_request' => $is_fork_pull_request,
                 ] = $this->readPullRequestPayload($payload);
                 $full_name = data_get($payload, 'repository.full_name');
@@ -87,9 +96,6 @@ class Github extends Controller
                 default => $base_branch,
             };
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'github', $full_name, $matched_branch);
-            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
-                return $this->tooManyManualWebhookFailuresResponse($failure_key);
-            }
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
             $applications = Application::query();
@@ -130,6 +136,7 @@ class Github extends Controller
 
                         continue;
                     }
+                    TransferFinishChecklist::recordWebhook('application', $application->uuid);
                     $isFunctional = $application->destination->server->isFunctional();
                     if (! $isFunctional) {
                         $return_payloads->push([
@@ -233,7 +240,6 @@ class Github extends Controller
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: $commit_sha,
-                            authorAssociation: $author_association,
                             fullName: $full_name,
                             isForkPullRequest: $is_fork_pull_request,
                         );
@@ -255,6 +261,131 @@ class Github extends Controller
         }
     }
 
+    /**
+     * Cuts a webhook string to the varchar(255) column of the runner tables.
+     */
+    private function limitRunnerColumn(mixed $value): ?string
+    {
+        return is_scalar($value) ? mb_substr((string) $value, 0, 255) : null;
+    }
+
+    /**
+     * Handles GitHub Actions runner demand. Every lookup is scoped to the App whose signature was verified.
+     * GitHub can give a job to any idle runner with matching labels, so progress is matched by runner name.
+     */
+    private function handleWorkflowJob(GithubApp $githubApp, Collection $payload)
+    {
+        $action = data_get($payload, 'action');
+        $jobId = (int) data_get($payload, 'workflow_job.id', 0);
+        $runnerName = (string) data_get($payload, 'workflow_job.runner_name', '');
+        if ($jobId <= 0) {
+            return response('Nothing to do. No workflow job found.');
+        }
+        // A public App can be installed by other accounts; only its own installation may use the runners.
+        $installationId = data_get($payload, 'installation.id');
+        if (blank($githubApp->installation_id) || ! is_numeric($installationId) || (int) $installationId !== (int) $githubApp->installation_id) {
+            return response('Nothing to do. The job belongs to another installation of the GitHub App.');
+        }
+
+        // The columns are varchar(255). A cut URL would be a broken link, so a longer one is not stored.
+        $htmlUrl = data_get($payload, 'workflow_job.html_url');
+        $jobDetails = array_filter([
+            'workflow_job_id' => $jobId,
+            'workflow_job_html_url' => is_string($htmlUrl) && mb_strlen($htmlUrl) <= 255 ? $htmlUrl : null,
+            'workflow_name' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.workflow_name')),
+            'job_name' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.name')),
+            'repository_full_name' => $this->limitRunnerColumn(data_get($payload, 'repository.full_name')),
+        ], fn ($value) => filled($value));
+
+        if ($action === 'queued') {
+            $labels = array_values(array_filter((array) data_get($payload, 'workflow_job.labels', []), 'is_string'));
+            $matchingConfigs = $githubApp->runnerConfigs()
+                ->where('is_enabled', true)
+                ->get()
+                ->filter(fn (GithubRunnerConfig $config) => $config->matchesLabels($labels));
+            if ($matchingConfigs->isEmpty()) {
+                return response('Nothing to do. No runner configuration matches the job labels.');
+            }
+            $isPullRequest = $matchingConfigs->contains(fn (GithubRunnerConfig $config) => ! $config->allow_pull_requests)
+                && $this->isPullRequestWorkflowJob($githubApp, $payload);
+            if ($isPullRequest && ! $matchingConfigs->contains('allow_pull_requests', true)) {
+                return response('Nothing to do. The runner configuration does not allow pull request jobs.');
+            }
+
+            $execution = GithubRunnerExecution::createOrFirst(
+                ['github_app_id' => $githubApp->id, 'trigger_workflow_job_id' => $jobId],
+                [...$jobDetails, 'labels' => $labels, 'is_pull_request' => $isPullRequest, 'status' => GithubRunnerStatus::Queued, 'queued_at' => now()],
+            );
+            if ($execution->wasRecentlyCreated) {
+                ProvisionGithubRunnerJob::dispatch($execution->id);
+            }
+
+            return response('Runner queued.');
+        }
+
+        $execution = filled($runnerName)
+            ? GithubRunnerExecution::query()->where('github_app_id', $githubApp->id)->where('runner_name', $runnerName)->first()
+            : null;
+
+        // The completed hook can arrive before the in_progress hook.
+        if (in_array($action, ['in_progress', 'completed'], true) && $execution && in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
+            $replacement = $execution->assignJob($jobId, $jobDetails);
+            if ($replacement) {
+                ProvisionGithubRunnerJob::dispatch($replacement->id);
+            }
+            if ($action === 'in_progress') {
+                return response('Runner marked running.');
+            }
+        }
+
+        if ($action === 'completed') {
+            if ($execution) {
+                $execution->update([...$jobDetails, 'conclusion' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.conclusion'))]);
+                if ($execution->isActive() || $execution->status === GithubRunnerStatus::Failed) {
+                    $execution->finish(GithubRunnerStatus::Completed);
+                    CleanupGithubRunnerJob::dispatch($execution->id);
+                }
+
+                return response('Runner cleanup queued.');
+            }
+
+            // The job ended without a Coolify runner, so its queued runner is no longer needed.
+            GithubRunnerExecution::query()
+                ->where('github_app_id', $githubApp->id)
+                ->where('trigger_workflow_job_id', $jobId)
+                ->where('status', GithubRunnerStatus::Queued)
+                ->first()
+                ?->finish(GithubRunnerStatus::Cancelled, 'The job ended before a runner started.');
+
+            return response('Queued runner cancelled.');
+        }
+
+        return response('Nothing to do.');
+    }
+
+    /**
+     * Whether a queued job belongs to a workflow run started by a pull request, so no runner is started
+     * for a job that the job-started hook would refuse. The `workflow_job` payload has no event, so the
+     * run is read from GitHub. When that fails, the job counts as no pull request job and the hook still
+     * refuses it in the runner.
+     */
+    private function isPullRequestWorkflowJob(GithubApp $githubApp, Collection $payload): bool
+    {
+        $runId = (int) data_get($payload, 'workflow_job.run_id', 0);
+        $repository = (string) data_get($payload, 'repository.full_name', '');
+        if ($runId <= 0 || ! str_contains($repository, '/')) {
+            return false;
+        }
+
+        try {
+            $event = (new GithubRunnerApi($githubApp))->workflowRunEvent($repository, $runId);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return in_array($event, GithubRunnerContainer::PULL_REQUEST_EVENTS, true);
+    }
+
     public function normal(Request $request)
     {
         try {
@@ -269,7 +400,12 @@ class Github extends Controller
                 // Just pong
                 return response('pong');
             }
-            $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
+            // One GitHub App can be installed on several accounts, each added as its own source.
+            $installation_id = data_get($payload, 'installation.id');
+            $github_app = is_numeric($installation_id)
+                ? GithubApp::where('app_id', $x_github_hook_installation_target_id)->where('installation_id', (int) $installation_id)->first()
+                : null;
+            $github_app ??= GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
             if (is_null($github_app)) {
                 return response('Nothing to do. No GitHub App found.');
             }
@@ -285,18 +421,17 @@ class Github extends Controller
                 return response('Invalid signature.');
             }
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-            if (config('app.env') !== 'local') {
-                if (! hash_equals($x_hub_signature_256, $hmac)) {
-                    auditLogWebhookFailure('github', 'invalid_signature', [
-                        'mode' => 'app',
-                        'github_app_id' => $github_app->id,
-                        'github_app_name' => $github_app->name,
-                        'installation_target_id' => $x_github_hook_installation_target_id,
-                    ]);
+            if (! hash_equals($x_hub_signature_256, $hmac)) {
+                auditLogWebhookFailure('github', 'invalid_signature', [
+                    'mode' => 'app',
+                    'github_app_id' => $github_app->id,
+                    'github_app_name' => $github_app->name,
+                    'installation_target_id' => $x_github_hook_installation_target_id,
+                ]);
 
-                    return response('Invalid signature.');
-                }
+                return response('Invalid signature.');
             }
+            TransferFinishChecklist::recordWebhook('github_app', $github_app->uuid);
             if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
                 // Installation handled by setup redirect url. Repositories queried on-demand.
                 $action = data_get($payload, 'action');
@@ -305,6 +440,9 @@ class Github extends Controller
                 }
 
                 return response('cool');
+            }
+            if ($x_github_event === 'workflow_job') {
+                return $this->handleWorkflowJob($github_app, $payload);
             }
             if ($x_github_event === 'push') {
                 $id = $this->webhookPayloadDatabaseId($payload, 'repository.id');
@@ -325,7 +463,6 @@ class Github extends Controller
                     'before_sha' => $before_sha,
                     'after_sha' => $after_sha,
                     'commit_sha' => $commit_sha,
-                    'author_association' => $author_association,
                     'is_fork_pull_request' => $is_fork_pull_request,
                 ] = $this->readPullRequestPayload($payload);
                 $full_name = $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
@@ -344,11 +481,15 @@ class Github extends Controller
             }
             $applications = Application::where('repository_project_id', $id)
                 ->where('source_id', $github_app->id)
+                ->where('source_type', GithubApp::class)
                 ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$branch'.");
+                }
+                if ($applications->contains(fn (Application $application): bool => filled($application->watch_paths))) {
+                    $changed_files = $this->githubPushComparedFiles($github_app, $payload) ?? $changed_files;
                 }
             }
             if ($x_github_event === 'pull_request') {
@@ -464,7 +605,6 @@ class Github extends Controller
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: $commit_sha,
-                            authorAssociation: $author_association,
                             fullName: $full_name,
                             isForkPullRequest: $is_fork_pull_request,
                         );
@@ -487,9 +627,38 @@ class Github extends Controller
     }
 
     /**
+     * Files that the push changes between its before and after commits, from
+     * the GitHub compare API.
+     *
+     * The file lists of the pushed commits are not the net change: a merge
+     * commit names the files that it changes relative to its first parent,
+     * also when the push does not change them. Returns null for a new branch,
+     * a missing repository name or an API failure; the caller then uses the
+     * file lists of the pushed commits.
+     *
+     * @return Collection<int, string>|null
+     *
+     * @throws InvalidWebhookPayloadException When the before or after value is not a commit SHA.
+     */
+    private function githubPushComparedFiles(GithubApp $githubApp, mixed $payload): ?Collection
+    {
+        $before = $this->webhookCommitSha($payload, 'before');
+        $after = $this->webhookCommitSha($payload, 'after');
+        $fullName = $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
+        if ($before === null || $after === null || $fullName === null || preg_match('/\A0+\z/', $before) === 1) {
+            return null;
+        }
+
+        [$owner, $repo] = explode('/', $fullName, 2);
+        $files = getGithubCommitRangeFiles($githubApp, $owner, $repo, $before, $after);
+
+        return $files === null ? null : collect($files);
+    }
+
+    /**
      * Read and validate the pull_request payload fields that the handlers use.
      *
-     * @return array{action: string, pull_request_id: int, pull_request_html_url: string, pull_request_title: ?string, branch: ?string, base_branch: ?string, before_sha: ?string, after_sha: ?string, commit_sha: string, author_association: ?string, is_fork_pull_request: bool}
+     * @return array{action: string, pull_request_id: int, pull_request_html_url: string, pull_request_title: ?string, branch: ?string, base_branch: ?string, before_sha: ?string, after_sha: ?string, commit_sha: string, is_fork_pull_request: bool}
      *
      * @throws InvalidWebhookPayloadException When a field has a wrong type or format.
      */
@@ -507,7 +676,6 @@ class Github extends Controller
             'before_sha' => $this->webhookCommitSha($payload, 'before'),
             'after_sha' => $this->webhookCommitSha($payload, 'after') ?? $head_sha,
             'commit_sha' => $head_sha ?? 'HEAD',
-            'author_association' => $this->webhookPayloadString($payload, 'pull_request.author_association'),
             'is_fork_pull_request' => $this->isForkPullRequest($payload),
         ];
     }
@@ -515,13 +683,15 @@ class Github extends Controller
     /**
      * Determine whether a pull_request webhook payload originates from a fork.
      *
-     * GitHub's `author_association` is not a reliable trust signal (it grants
-     * CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
-     * detection is gated on whether the PR crosses repository boundaries.
+     * A same-repository PR branch can only be pushed by users with write access,
+     * so this is the trust signal for preview deployments. GitHub's
+     * `author_association` is not reliable for this: users with access through a
+     * team or a private organization membership arrive as CONTRIBUTOR or NONE.
      *
      * The repository id comparison is the canonical signal; the `head.repo.fork`
      * flag and a case-insensitive full_name comparison are fallbacks for payloads
-     * where the ids are unavailable (e.g. a deleted head repository).
+     * where the ids are unavailable. A PR whose head repository is unknown (e.g.
+     * a deleted fork) is treated as a fork.
      *
      * @throws InvalidWebhookPayloadException When a repository id is not a positive integer.
      */
@@ -545,7 +715,7 @@ class Github extends Controller
             return Str::lower($headRepoFullName) !== Str::lower($baseRepoFullName);
         }
 
-        return false;
+        return true;
     }
 
     public function redirect(Request $request)
@@ -565,7 +735,6 @@ class Github extends Controller
         $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
-            ->connectTimeout(5)
             ->post("$api_url/app-manifests/$code/conversions")
             ->throw()
             ->json();
@@ -614,11 +783,21 @@ class Github extends Controller
             action: 'install',
         );
 
-        abort_unless(
-            $this->githubInstallationBelongsToApp($github_app, $installation_id),
-            403,
-            'GitHub App installation could not be verified.'
-        );
+        $verification_error = $this->githubInstallationVerificationError($github_app, $installation_id);
+        if ($verification_error) {
+            Log::warning('GitHub App installation could not be verified.', [
+                'github_app_id' => $github_app->id,
+                'installation_id' => $installation_id,
+                'reason' => $verification_error,
+            ]);
+
+            $message = "GitHub App installation could not be verified: {$verification_error}";
+            abort_if($request->expectsJson(), 403, $message);
+
+            return redirect()
+                ->route('source.github.show', ['github_app_uuid' => $github_app->uuid])
+                ->with('error', $message);
+        }
 
         $github_app->installation_id = $installation_id;
         $github_app->save();
@@ -645,11 +824,13 @@ class Github extends Controller
      * The installation id arrives as an untrusted query parameter on an
      * unauthenticated-reachable GET callback, so it must be confirmed against
      * the GitHub API using the App's own credentials before it is persisted.
+     *
+     * @return string|null The reason the verification failed, or null when it passed.
      */
-    private function githubInstallationBelongsToApp(GithubApp $github_app, string $installation_id): bool
+    private function githubInstallationVerificationError(GithubApp $github_app, string $installation_id): ?string
     {
-        if (blank($github_app->app_id) || blank($github_app->privateKey?->private_key)) {
-            return false;
+        if (blank($github_app->app_id) || blank(githubAppPrivateKey($github_app)?->private_key)) {
+            return 'The GitHub App ID or private key is missing.';
         }
 
         try {
@@ -659,14 +840,20 @@ class Github extends Controller
                 'Accept' => 'application/vnd.github+json',
             ])
                 ->timeout(10)
-                ->connectTimeout(5)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
-
-            return $response->successful()
-                && (string) data_get($response->json(), 'app_id') === (string) $github_app->app_id;
-        } catch (\Throwable) {
-            return false;
+        } catch (\Throwable $e) {
+            return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
         }
+
+        if (! $response->successful()) {
+            return "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found');
+        }
+
+        if ((string) data_get($response->json(), 'app_id') !== (string) $github_app->app_id) {
+            return 'The installation belongs to a different GitHub App.';
+        }
+
+        return null;
     }
 
     private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp
@@ -680,12 +867,20 @@ class Github extends Controller
             $this->rejectInvalidGithubAppSetupState($request);
         }
 
-        $team_id = $request->user()?->currentTeam()?->id;
-        abort_unless(! is_null($team_id) && (int) data_get($payload, 'team_id') === $team_id, 403);
+        // The state is bound to the team that started the setup. The user may have switched
+        // teams while on GitHub, so check membership of that team, not the session team.
+        $team_id = (int) data_get($payload, 'team_id');
+        abort_unless((bool) $request->user()?->teams->contains('id', $team_id), 403);
 
-        return GithubApp::whereKey(data_get($payload, 'github_app_id'))
-            ->where('team_id', data_get($payload, 'team_id'))
+        $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
+            ->where('team_id', $team_id)
             ->firstOrFail();
+
+        if ($request->user()->currentTeam()?->id !== $team_id) {
+            refreshSession($github_app->team);
+        }
+
+        return $github_app;
     }
 
     private function rejectInvalidGithubAppSetupState(Request $request): never

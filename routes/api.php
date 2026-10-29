@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ApplicationPreviewsController;
 use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\ApplicationSecretManagerController;
 use App\Http\Controllers\Api\AuditEventsController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\HostingerController;
 use App\Http\Controllers\Api\InstanceEmailSettingsController;
 use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServerCloudflareTunnelController;
 use App\Http\Controllers\Api\ServerDockerCleanupController;
+use App\Http\Controllers\Api\ServerDockerRegistriesController;
 use App\Http\Controllers\Api\ServerLogDrainsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
@@ -51,12 +54,10 @@ Route::post('/feedback', [OtherController::class, 'feedback'])
     ->middleware('throttle:feedback');
 
 Route::group([
-    'middleware' => ['auth:sanctum', 'api.token.team', 'api.ability:write'],
+    'middleware' => ['api.ip.allowed', 'auth:sanctum', 'api.token.team', 'api.ability:write'],
     'prefix' => 'v1',
 ], function () {
-    Route::get('/enable', [OtherController::class, 'post_required']);
     Route::get('/disable', [OtherController::class, 'post_required']);
-    Route::post('/enable', [OtherController::class, 'enable_api']);
     Route::post('/disable', [OtherController::class, 'disable_api']);
     Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
     Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
@@ -166,14 +167,14 @@ Route::group([
     // Server subsystem APIs (Docker cleanup, log drains, Sentinel, Cloudflare Tunnel).
     Route::get('/servers/{uuid}/docker-cleanup', [ServerDockerCleanupController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/docker-cleanup', [ServerDockerCleanupController::class, 'update'])->middleware(['api.ability:write']);
-    Route::post('/servers/{uuid}/docker-cleanup/run', [ServerDockerCleanupController::class, 'run'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/docker-cleanup/run', [ServerDockerCleanupController::class, 'run'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::get('/servers/{uuid}/docker-cleanup/executions', [ServerDockerCleanupController::class, 'executions'])->middleware(['api.ability:read']);
 
     Route::get('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'show'])->middleware(['api.ability:read']);
-    Route::patch('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'update'])->middleware(['api.ability:write']);
+    Route::patch('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'update'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
     Route::get('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'show'])->middleware(['api.ability:read']);
-    Route::patch('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'update'])->middleware(['api.ability:write']);
+    Route::patch('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'update'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
     Route::get('/servers/{uuid}/cloudflare-tunnel', [ServerCloudflareTunnelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/cloudflare-tunnel', [ServerCloudflareTunnelController::class, 'update'])->middleware(['api.ability:write']);
@@ -191,15 +192,20 @@ Route::group([
     Route::get('/servers/{uuid}/validate', [OtherController::class, 'post_required'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
 
+    Route::get('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'index'])->middleware(['api.ability:read:sensitive']);
+    Route::post('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'login'])->middleware(['api.ability:write', 'api.ability:deploy']);
+    Route::post('/servers/{uuid}/registries/{registry}/check', [ServerDockerRegistriesController::class, 'check'])->middleware(['api.ability:write']);
+    Route::delete('/servers/{uuid}/registries/{registry}', [ServerDockerRegistriesController::class, 'logout'])->middleware(['api.ability:write']);
+
     Route::get('/servers/{uuid}/proxy', [ServerProxyController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/proxy', [ServerProxyController::class, 'update'])->middleware(['api.ability:write']);
     Route::put('/servers/{uuid}/proxy/configuration', [ServerProxyController::class, 'saveConfiguration'])->middleware(['api.ability:write']);
-    Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:deploy']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
-    Route::post('/servers/import', [ServerTransferController::class, 'import'])->middleware(['api.ability:write']);
-    Route::get('/servers/{uuid}/export', [ServerTransferController::class, 'export'])->middleware(['api.ability:read']);
-    Route::post('/servers/{uuid}/export/mailbox', [ServerTransferController::class, 'writeMailbox'])->middleware(['api.ability:write']);
+    Route::get('/servers/import/check', [ServerTransferController::class, 'check'])->middleware(['api.ability:write', 'api.ability:deploy']);
+    Route::post('/servers/import', [ServerTransferController::class, 'import'])->middleware(['api.ability:write', 'api.ability:deploy']);
+    Route::get('/servers/{uuid}/transfer', [ServerTransferController::class, 'status'])->middleware(['api.ability:read,write']);
     Route::post('/servers/{uuid}/transfer/complete', [ServerTransferController::class, 'complete'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/migrate', [ServerTransferController::class, 'migrate'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
@@ -225,6 +231,13 @@ Route::group([
     Route::get('/digitalocean/ssh-keys', [DigitalOceanController::class, 'sshKeys'])->middleware(['api.ability:read']);
     Route::post('/servers/digitalocean', [DigitalOceanController::class, 'createServer'])->middleware(['api.ability:write']);
 
+    Route::get('/hostinger/data-centers', [HostingerController::class, 'dataCenters'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/catalog', [HostingerController::class, 'catalog'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/templates', [HostingerController::class, 'templates'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/ssh-keys', [HostingerController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/post-install-scripts', [HostingerController::class, 'postInstallScripts'])->middleware(['api.ability:read']);
+    Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
+
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
 
     Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
@@ -241,7 +254,7 @@ Route::group([
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
-    Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::patch('/applications/{uuid}/secret-manager', [ApplicationSecretManagerController::class, 'update'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs'])->middleware(['api.ability:read']);
@@ -260,7 +273,7 @@ Route::group([
         ->middleware(['api.ability:write']);
     Route::post('/applications/{uuid}/storages/{storage_uuid}/backups/run', [VolumeBackupsController::class, 'run'])
         ->defaults('resource_type', 'application')
-        ->middleware(['api.ability:write']);
+        ->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::delete('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
         ->defaults('resource_type', 'application')
         ->middleware(['api.ability:write']);
@@ -284,8 +297,11 @@ Route::group([
     Route::post('/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::post('/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
+    Route::get('/applications/{uuid}/previews', [ApplicationPreviewsController::class, 'index'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/previews', [ApplicationPreviewsController::class, 'store'])->middleware(['api.ability:deploy']);
+    Route::get('/applications/{uuid}/previews/{pull_request_id}', [ApplicationPreviewsController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'update_preview_by_pull_request_id'])->middleware(['api.ability:write']);
-    Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
     Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
     Route::post('/github-apps', [GithubController::class, 'create_github_app'])->middleware(['api.ability:write']);
@@ -311,15 +327,15 @@ Route::group([
     Route::post('/databases/sqlite', [DatabasesController::class, 'create_database_sqlite'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
-    Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:deploy'])->name('api.databases.imports.upload');
-    Route::post('/databases/{uuid}/imports', [DatabasesController::class, 'create_import'])->middleware(['api.ability:deploy'])->name('api.databases.imports.store');
-    Route::get('/databases/{uuid}/imports/{activity_id}', [DatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->name('api.databases.imports.show');
+    Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:write'])->name('api.databases.imports.upload');
+    Route::post('/databases/{uuid}/imports', [DatabasesController::class, 'create_import'])->middleware(['api.ability:write'])->name('api.databases.imports.store');
+    Route::get('/databases/{uuid}/imports/{activity_id}', [DatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->whereNumber('activity_id')->name('api.databases.imports.show');
     Route::get('/databases/{uuid}/backups', [DatabasesController::class, 'database_backup_details_uuid'])->middleware(['api.ability:read']);
     Route::get('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions', [DatabasesController::class, 'list_backup_executions'])->middleware(['api.ability:read']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/backups', [DatabasesController::class, 'create_backup'])->middleware(['api.ability:write']);
     Route::patch('/databases/{uuid}/backups/{scheduled_backup_uuid}', [DatabasesController::class, 'update_backup'])->middleware(['api.ability:write']);
-    Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::get('/databases/{uuid}/logs', [DatabasesController::class, 'logs_by_uuid'])->middleware(['api.ability:read:sensitive']);
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}', [DatabasesController::class, 'delete_backup_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}', [DatabasesController::class, 'delete_execution_by_uuid'])->middleware(['api.ability:write']);
@@ -333,7 +349,7 @@ Route::group([
         ->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/storages/{storage_uuid}/backups/run', [VolumeBackupsController::class, 'run'])
         ->defaults('resource_type', 'database')
-        ->middleware(['api.ability:write']);
+        ->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::delete('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
         ->defaults('resource_type', 'database')
         ->middleware(['api.ability:write']);
@@ -363,7 +379,7 @@ Route::group([
 
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
-    Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
     Route::get('/services/{uuid}/storages', [ServicesController::class, 'storages'])->middleware(['api.ability:read']);
     Route::post('/services/{uuid}/storages', [ServicesController::class, 'create_storage'])->middleware(['api.ability:write']);
@@ -374,7 +390,7 @@ Route::group([
         ->middleware(['api.ability:write']);
     Route::post('/services/{uuid}/storages/{storage_uuid}/backups/run', [VolumeBackupsController::class, 'run'])
         ->defaults('resource_type', 'service')
-        ->middleware(['api.ability:write']);
+        ->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::delete('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
         ->defaults('resource_type', 'service')
         ->middleware(['api.ability:write']);
@@ -413,9 +429,9 @@ Route::group([
 
     Route::get('/services/{uuid}/databases', [ServiceDatabasesController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/services/{uuid}/databases/{database_uuid}', [ServiceDatabasesController::class, 'show'])->middleware(['api.ability:read']);
-    Route::post('/services/{uuid}/databases/{database_uuid}/imports/uploads', [ServiceDatabasesController::class, 'upload_import'])->middleware(['api.ability:deploy'])->name('api.service-databases.imports.upload');
-    Route::post('/services/{uuid}/databases/{database_uuid}/imports', [ServiceDatabasesController::class, 'create_import'])->middleware(['api.ability:deploy'])->name('api.service-databases.imports.store');
-    Route::get('/services/{uuid}/databases/{database_uuid}/imports/{activity_id}', [ServiceDatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->name('api.service-databases.imports.show');
+    Route::post('/services/{uuid}/databases/{database_uuid}/imports/uploads', [ServiceDatabasesController::class, 'upload_import'])->middleware(['api.ability:write'])->name('api.service-databases.imports.upload');
+    Route::post('/services/{uuid}/databases/{database_uuid}/imports', [ServiceDatabasesController::class, 'create_import'])->middleware(['api.ability:write'])->name('api.service-databases.imports.store');
+    Route::get('/services/{uuid}/databases/{database_uuid}/imports/{activity_id}', [ServiceDatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->whereNumber('activity_id')->name('api.service-databases.imports.show');
     Route::patch('/services/{uuid}/databases/{database_uuid}', [ServiceDatabasesController::class, 'update'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/databases/{database_uuid}/logs', [ServiceDatabasesController::class, 'logs'])->middleware(['api.ability:read:sensitive']);
     Route::post('/services/{uuid}/databases/{database_uuid}/start', [ServiceDatabasesController::class, 'start'])->middleware(['api.ability:deploy']);
@@ -427,14 +443,14 @@ Route::group([
     Route::patch('/applications/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'update_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'delete_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/scheduled-tasks/{task_uuid}/executions', [ScheduledTasksController::class, 'executions_by_application_uuid'])->middleware(['api.ability:read']);
-    Route::post('/applications/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_application_uuid'])->middleware(['api.ability:deploy']);
 
     Route::get('/services/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'scheduled_tasks_by_service_uuid'])->middleware(['api.ability:read']);
     Route::post('/services/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'create_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
     Route::patch('/services/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'update_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/scheduled-tasks/{task_uuid}', [ScheduledTasksController::class, 'delete_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/scheduled-tasks/{task_uuid}/executions', [ScheduledTasksController::class, 'executions_by_service_uuid'])->middleware(['api.ability:read']);
-    Route::post('/services/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_service_uuid'])->middleware(['api.ability:write']);
+    Route::post('/services/{uuid}/scheduled-tasks/{task_uuid}/execute', [ScheduledTasksController::class, 'execute_scheduled_task_by_service_uuid'])->middleware(['api.ability:deploy']);
 });
 
 Route::group([

@@ -32,6 +32,15 @@ class Project extends BaseModel
         'uuid',
     ];
 
+    protected array $auditExclude = ['canvas_position'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_position' => 'array',
+        ];
+    }
+
     /**
      * Get query builder for projects owned by current team.
      * If you need all projects without further query chaining, use ownedByCurrentTeamCached() instead.

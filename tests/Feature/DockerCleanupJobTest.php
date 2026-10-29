@@ -1,12 +1,86 @@
 <?php
 
+use App\Actions\Server\CleanupDocker;
+use App\Events\DockerCleanupDone;
 use App\Jobs\DockerCleanupJob;
+use App\Jobs\ScheduledJobManager;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\DockerCleanupExecution;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\ScheduledJobDelivery;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Server\DockerCleanupFailed;
+use App\Services\ScheduledJobDeliveryService;
+use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Broadcasting\BroadcastEvent;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Jobs\FakeJob;
+use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Server::flushIdentityMap();
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+});
+
+afterEach(function () {
+    Server::flushIdentityMap();
+    Carbon::setTestNow();
+});
+
+function dockerCleanupReachableServer(): Server
+{
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
+    $team = Team::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+    ]);
+    $server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
+    return $server->fresh();
+}
+
+/**
+ * @return Collection<int, string> The local commands (SSH invocations) that ran.
+ */
+function dockerCleanupFakeProcesses(?Closure $onRun = null): Collection
+{
+    $commands = collect();
+    Process::fake(function ($process) use ($commands, $onRun) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $commands->push($command);
+        if ($onRun) {
+            $onRun($command);
+        }
+
+        return Process::result(output: '');
+    });
+
+    return $commands;
+}
 
 it('persists the server id when creating an execution record', function () {
     $user = User::factory()->create();
@@ -65,24 +139,837 @@ it('creates a failed execution record when server is force disabled', function (
         ->and($execution->message)->toContain('not functional');
 });
 
-it('finishes the latest running execution when the job fails after a timeout', function () {
-    $user = User::factory()->create();
-    $team = $user->teams()->first();
-    $server = Server::factory()->create(['team_id' => $team->id]);
+function dockerCleanupQueueJob(string $uuid): FakeJob
+{
+    return new class($uuid) extends FakeJob
+    {
+        public function __construct(private string $jobUuid) {}
 
-    $olderExecution = DockerCleanupExecution::create([
+        public function getRawBody()
+        {
+            return json_encode(['uuid' => $this->jobUuid]);
+        }
+    };
+}
+
+it('finishes its own execution when the job fails after a timeout, not a newer running cleanup', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $queueJob = dockerCleanupQueueJob('prr-fix-timed-out-cleanup');
+    $statesWhenTimedOut = null;
+    dockerCleanupFakeProcesses(function () use ($server, $queueJob, &$statesWhenTimedOut) {
+        if ($statesWhenTimedOut !== null) {
+            return;
+        }
+        $ownExecution = DockerCleanupExecution::query()->sole();
+        $scheduledExecution = DockerCleanupExecution::create(['server_id' => $server->id]);
+
+        // The worker timeout calls failed() on a fresh job copy built from the same queue payload.
+        (new DockerCleanupJob($server, true))->setJob($queueJob)->failed(new RuntimeException('Docker cleanup job has timed out.'));
+
+        $statesWhenTimedOut = [
+            'own' => $ownExecution->fresh()->only(['status', 'message']),
+            'ownFinished' => $ownExecution->fresh()->finished_at !== null,
+            'scheduled' => $scheduledExecution->fresh()->only(['status', 'finished_at']),
+        ];
+    });
+
+    (new DockerCleanupJob($server, true))->setJob($queueJob)->handle();
+
+    expect($statesWhenTimedOut['own'])->toBe(['status' => 'failed', 'message' => 'Docker cleanup job has timed out.'])
+        ->and($statesWhenTimedOut['ownFinished'])->toBeTrue()
+        ->and($statesWhenTimedOut['scheduled'])->toBe(['status' => 'running', 'finished_at' => null]);
+});
+
+it('leaves a running scheduled cleanup untouched when a manual cleanup fails before it started', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $scheduledExecution = DockerCleanupExecution::create(['server_id' => $server->id]);
+
+    (new DockerCleanupJob($server, true))
+        ->setJob(dockerCleanupQueueJob('prr-fix-waiting-manual-cleanup'))
+        ->failed(new MaxAttemptsExceededException('App\Jobs\DockerCleanupJob has been attempted too many times.'));
+
+    expect($scheduledExecution->fresh()->status)->toBe('running')
+        ->and($scheduledExecution->fresh()->finished_at)->toBeNull();
+    Notification::assertNothingSent();
+    Event::assertNotDispatched(DockerCleanupDone::class);
+});
+
+it('fails a cleanup execution whose worker was killed once the server lock has expired, so it does not stay running', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 16, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $interrupted = DockerCleanupExecution::create(['server_id' => $server->id]);
+    Carbon::setTestNow(now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() - 1));
+    $live = DockerCleanupExecution::create(['server_id' => $server->id]);
+    $finished = DockerCleanupExecution::create(['server_id' => $server->id, 'status' => 'success', 'finished_at' => now()]);
+
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+
+    expect($interrupted->fresh()->status)->toBe('running');
+
+    Carbon::setTestNow(now()->addSeconds(2));
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+    (new ScheduledJobManager('docker-cleanups'))->handle();
+
+    expect($interrupted->fresh()->only(['status', 'message']))->toBe(['status' => 'failed', 'message' => DockerCleanupJob::INTERRUPTED_MESSAGE])
+        ->and($interrupted->fresh()->finished_at)->not->toBeNull()
+        ->and($live->fresh()->only(['status', 'finished_at']))->toBe(['status' => 'running', 'finished_at' => null])
+        ->and($finished->fresh()->status)->toBe('success');
+    Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
+});
+
+it('skips a scheduled cleanup occurrence while another cleanup holds the server lock, so it is not reported missed later', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+    Notification::fake();
+    $server = dockerCleanupReachableServer();
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "docker-cleanup:{$server->id}",
+        'scheduled_for' => now()->startOfMinute(),
+        'job_type' => 'docker-cleanup',
+        'resource_id' => $server->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now(),
+    ]);
+    $job = new DockerCleanupJob($server, false, false, false, $occurrence->uuid);
+    $runningCleanupLock = Cache::lock($job->middleware()[0]->getLockKey($job), 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    dispatch_sync($job);
+    $runningCleanupLock->release();
+
+    expect($occurrence->fresh()->status)->toBe('skipped')
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
+        ->and($commands)->toBeEmpty();
+
+    Carbon::setTestNow(now()->addMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1));
+    Queue::fake();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    Queue::assertNothingPushed();
+    expect(DockerCleanupExecution::query()->exists())->toBeFalse();
+    Notification::assertNotSentTo($server->team, DockerCleanupFailed::class);
+});
+
+function dockerCleanupDatabaseQueue(): void
+{
+    Schema::create('jobs', function (Blueprint $table) {
+        $table->id();
+        $table->string('queue')->index();
+        $table->longText('payload');
+        $table->unsignedTinyInteger('attempts');
+        $table->unsignedInteger('reserved_at')->nullable();
+        $table->unsignedInteger('available_at');
+        $table->unsignedInteger('created_at');
+    });
+    config(['queue.default' => 'database']);
+}
+
+function dockerCleanupWorkOnce(): void
+{
+    Artisan::call('queue:work', ['connection' => 'database', '--once' => true, '--queue' => maintenance_queue(), '--sleep' => 0]);
+}
+
+it('runs a manual cleanup after another cleanup releases the server lock instead of dropping it', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    dockerCleanupDatabaseQueue();
+    $server = dockerCleanupReachableServer();
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    DockerCleanupJob::dispatch($server, true);
+    dockerCleanupWorkOnce();
+
+    expect(DB::table('jobs')->count())->toBe(1)
+        ->and(DB::table('jobs')->value('available_at'))->toBe(now()->addSeconds(DockerCleanupJob::MANUAL_RELEASE_DELAY)->getTimestamp())
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
+        ->and($commands)->toBeEmpty();
+
+    $runningCleanupLock->release();
+    Carbon::setTestNow(now()->addSeconds(DockerCleanupJob::MANUAL_RELEASE_DELAY + 1));
+    dockerCleanupWorkOnce();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
+        ->and(DockerCleanupExecution::query()->sole()->status)->toBe('success')
+        ->and(ScheduledJobDelivery::query()->exists())->toBeFalse();
+});
+
+it('fails a waiting manual cleanup instead of running it after its wait window', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+    dockerCleanupDatabaseQueue();
+    $server = dockerCleanupReachableServer();
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    DockerCleanupJob::dispatch($server, true);
+    dockerCleanupWorkOnce();
+    $runningCleanupLock->release();
+    Carbon::setTestNow(now()->addDay());
+    dockerCleanupWorkOnce();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(1)
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
+        ->and($commands)->toBeEmpty();
+});
+
+it('drops a stop-triggered cleanup and a scheduled run while another cleanup holds the server lock', function () {
+    dockerCleanupDatabaseQueue();
+    $server = dockerCleanupReachableServer();
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    DockerCleanupJob::dispatch($server);
+    dockerCleanupWorkOnce();
+    $runningCleanupLock->release();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
+        ->and(DockerCleanupExecution::query()->exists())->toBeFalse()
+        ->and($commands)->toBeEmpty();
+});
+
+it('shares one server lock between scheduled cleanups and queued CleanupDocker runs that outlives the job timeout', function () {
+    $server = dockerCleanupReachableServer();
+    $cleanupJob = new DockerCleanupJob($server);
+    $actionJob = CleanupDocker::makeJob($server, false, false);
+
+    $cleanupLock = $cleanupJob->middleware()[0];
+    $actionLock = $actionJob->middleware()[0];
+
+    expect($cleanupLock->getLockKey($cleanupJob))
+        ->toBe('laravel-queue-overlap:docker-cleanup-'.$server->uuid)
+        ->toBe($actionLock->getLockKey($actionJob))
+        ->and($cleanupLock->expiresAfter)->toBeGreaterThan($cleanupJob->timeout)
+        ->and($actionLock->expiresAfter)->toBeGreaterThan($actionJob->timeout)
+        ->and($cleanupLock->releaseAfter)->toBeNull()
+        ->and($actionLock->releaseAfter)->toBeNull()
+        ->and($actionJob->timeout)->toBe(CleanupDocker::JOB_TIMEOUT)
+        ->and($actionJob->tries)->toBe(1);
+});
+
+it('drops a queued CleanupDocker run while a scheduled cleanup holds the server lock', function () {
+    $server = dockerCleanupReachableServer();
+    $actionJob = CleanupDocker::makeJob($server, false, false);
+    $runningCleanupLock = Cache::lock('laravel-queue-overlap:docker-cleanup-'.$server->uuid, 3600);
+    $runningCleanupLock->get();
+    $commands = dockerCleanupFakeProcesses();
+
+    dispatch_sync($actionJob);
+    $runningCleanupLock->release();
+
+    expect($commands)->toBeEmpty();
+});
+
+it('routes docker cleanups to the maintenance queue on cloud and to high on self-hosted', function (bool $selfHosted, string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
+    Queue::fake();
+    $server = dockerCleanupReachableServer();
+
+    DockerCleanupJob::dispatch($server, true);
+    CleanupDocker::dispatch($server, false, false);
+
+    expect(maintenance_queue())->toBe($queue);
+    Queue::assertPushedOn($queue, DockerCleanupJob::class);
+    Queue::assertPushedOn($queue, UniqueUntilProcessingJobDecorator::class, fn (JobDecorator $job) => $job->decorates(CleanupDocker::class));
+})->with([
+    'cloud' => [false, 'maintenance'],
+    'self-hosted' => [true, 'high'],
+]);
+
+it('gives remote cleanup commands a local timeout and fails once the cleanup deadline has passed', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+    $server = dockerCleanupReachableServer();
+    $commands = dockerCleanupFakeProcesses(function (string $command) {
+        if (str_contains($command, 'docker ')) {
+            Carbon::setTestNow(now()->addSeconds(300));
+        }
+    });
+
+    expect(fn () => CleanupDocker::run($server))
+        ->toThrow(RuntimeException::class, 'Docker cleanup did not finish within '.CleanupDocker::REMOTE_COMMANDS_DEADLINE.' seconds');
+
+    $sshCommands = $commands->filter(fn (string $command) => str_contains($command, 'label=coolify.managed=true') || str_contains($command, 'docker image prune'))->values();
+
+    expect(CleanupDocker::REMOTE_COMMANDS_DEADLINE)->toBeLessThan(CleanupDocker::JOB_TIMEOUT)
+        ->and($sshCommands)->toHaveCount(2)
+        ->and($sshCommands[0])->toContain('timeout '.CleanupDocker::REMOTE_COMMANDS_DEADLINE.' ssh')
+        ->and($sshCommands[1])->toContain('timeout '.(CleanupDocker::REMOTE_COMMANDS_DEADLINE - 300).' ssh')
+        ->and($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeFalse();
+});
+
+it('coalesces queued cleanups per server and delays them until a bulk stop is over', function () {
+    Queue::fake();
+    $first = dockerCleanupReachableServer();
+    $second = dockerCleanupReachableServer();
+
+    foreach (range(1, 30) as $stop) {
+        CleanupDocker::dispatch($first, false, false);
+    }
+    CleanupDocker::dispatch($second, false, false);
+
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, 2);
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, fn (JobDecorator $job) => $job->delay === CleanupDocker::QUEUED_DELAY);
+});
+
+it('accepts a new queued cleanup once the waiting one is lost', function () {
+    Queue::fake();
+    $server = dockerCleanupReachableServer();
+
+    CleanupDocker::dispatch($server, false, false);
+    $this->travel(CleanupDocker::QUEUED_DELAY + 241)->seconds();
+    CleanupDocker::dispatch($server, false, false);
+
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, 2);
+});
+
+it('does not queue a cleanup after a stop when a cleanup ran on the server recently', function () {
+    Queue::fake();
+    $cleanedServer = dockerCleanupReachableServer();
+    $otherServer = dockerCleanupReachableServer();
+    Cache::put(CleanupDocker::lastRunCacheKey($cleanedServer), true, CleanupDocker::STOP_CLEANUP_COOLDOWN);
+
+    CleanupDocker::dispatchAfterStop($cleanedServer);
+    CleanupDocker::dispatchAfterStop($otherServer);
+
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, 1);
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, fn (JobDecorator $job) => $job->getParameters()[0]->is($otherServer));
+});
+
+it('cleans after a stop only when the disk usage reaches the server threshold', function (string $diskUsage, bool $cleans) {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['docker_cleanup_threshold' => 80]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands, $diskUsage) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $commands->push($command);
+
+        return Process::result(output: str_contains($command, 'df / --output=pcent') ? $diskUsage : '');
+    });
+
+    CleanupDocker::run($server->fresh(), false, false, true);
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBe($cleans)
+        ->and(Cache::has(CleanupDocker::lastRunCacheKey($server)))->toBe($cleans);
+})->with([
+    'below threshold' => ['79', false],
+    'at threshold' => ['80', true],
+    'unknown usage' => ['', true],
+]);
+
+it('scans application images with a fixed number of remote commands and keeps the retention rules', function () {
+    $server = dockerCleanupReachableServer();
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $server->team_id]);
+    $environment = $project->environments()->first() ?? Environment::factory()->create(['project_id' => $project->id]);
+    $applications = collect(range(1, 5))->map(fn () => Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]));
+    $app = $applications->first();
+    $app->settings()->update(['docker_images_to_keep' => 1]);
+
+    $containers = "{$app->uuid}#{$app->uuid}:v2";
+    $images = implode("\n", [
+        "{$app->uuid}#v1#2026-01-01 00:00:00 +0000 UTC",
+        "{$app->uuid}#v2#2026-01-02 00:00:00 +0000 UTC",
+        "{$app->uuid}#v3#2026-01-03 00:00:00 +0000 UTC",
+        "{$app->uuid}#v4#2026-01-04 00:00:00 +0000 UTC",
+        "{$app->uuid}#pr-7#2026-01-05 00:00:00 +0000 UTC",
+        "{$app->uuid}#v1-build#2026-01-01 00:00:00 +0000 UTC",
+        "{$app->uuid}#v2-build#2026-01-02 00:00:00 +0000 UTC",
+        "{$app->uuid}#v4-build#2026-01-04 00:00:00 +0000 UTC",
+        "{$app->uuid}_web#v1#2026-01-01 00:00:00 +0000 UTC",
+        "{$app->uuid}/other#v1#2026-01-01 00:00:00 +0000 UTC",
+    ]);
+
+    $commands = collect();
+    Process::fake(function ($process) use ($commands, $containers, $images) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $commands->push($command);
+
+        return match (true) {
+            str_contains($command, 'docker ps -a --format') => Process::result(output: $containers),
+            str_contains($command, "docker images --format '{{.Repository}}#") => Process::result(output: $images),
+            default => Process::result(output: ''),
+        };
+    });
+
+    CleanupDocker::run($server);
+
+    $applicationScanCommands = $commands->filter(fn (string $command) => str_contains($command, 'docker ps -a --format')
+        || str_contains($command, "docker images --format '{{.Repository}}#")
+        || str_contains($command, 'docker inspect --format=')
+        || str_contains($command, "--filter reference='"));
+    $removals = $commands->filter(fn (string $command) => str_contains($command, 'docker rmi \''))->values();
+
+    expect($applicationScanCommands)->toHaveCount(2)
+        ->and($removals)->toHaveCount(1);
+
+    $removal = $removals->first();
+    foreach (["{$app->uuid}:v1", "{$app->uuid}:v3", "{$app->uuid}:pr-7", "{$app->uuid}:v1-build"] as $deleted) {
+        expect($removal)->toContain("'{$deleted}'");
+    }
+    foreach (["{$app->uuid}:v2'", "{$app->uuid}:v4'", "{$app->uuid}:v2-build", "{$app->uuid}:v4-build", "{$app->uuid}_web:v1", "{$app->uuid}/other"] as $kept) {
+        expect($removal)->not->toContain($kept);
+    }
+});
+
+it('removes stopped Coolify containers but keeps the proxy, databases, applications and services', function (bool $nonRoot) {
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildContainerPruneCommand'))->invoke(new CleanupDocker);
+    preg_match("/--format '([^']+)'/", $command, $format);
+    $stoppedContainers = collect([
+        ['proxy', 'true', ''],
+        ['database', '', 'database'],
+        ['application', '', 'application'],
+        ['service', '', 'service'],
+        ['helper', '', ''],
+    ])->map(fn (array $container) => str_replace(['{{.ID}}', '{{.Label "coolify.proxy"}}', '{{.Label "coolify.type"}}'], $container, $format[1]));
+
+    // Fake docker on PATH: `docker ps` prints the stopped containers, `docker rm` prints what it is asked to remove
+    $bin = sys_get_temp_dir().'/docker-cleanup-'.bin2hex(random_bytes(4));
+    mkdir($bin);
+    file_put_contents("$bin/containers", $stoppedContainers->implode("\n")."\n");
+    file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = ps ]; then cat $bin/containers; else echo \"\$@\"; fi\n");
+    chmod("$bin/docker", 0755);
+
+    if ($nonRoot) {
+        $server = new Server;
+        $server->user = 'coolify';
+        $command = parseCommandsByLineForSudo(collect([$command]), $server)[0];
+        file_put_contents("$bin/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+        chmod("$bin/sudo", 0755);
+    }
+
+    $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
+
+    array_map('unlink', glob("$bin/*"));
+    rmdir($bin);
+
+    expect($command)->toContain('--filter label=coolify.managed=true')
+        ->and(trim((string) $output))->toBe('rm helper');
+})->with(['root' => false, 'non-root sudo parser' => true]);
+
+it('broadcasts DockerCleanupDone without the cleanup log so large logs fit the Reverb message size', function () {
+    $server = dockerCleanupReachableServer();
+    $execution = DockerCleanupExecution::create([
+        'server_id' => $server->id,
+        'status' => 'success',
+        'cleanup_log' => str_repeat('x', 50_000),
+    ]);
+    $event = new DockerCleanupDone($execution);
+    $event->broadcastOn();
+
+    $payload = (fn () => $this->getPayloadFromEvent($event))->call(new BroadcastEvent($event), $event);
+
+    expect($payload)->toBe([
+        'executionId' => $execution->id,
+        'serverId' => $server->id,
+        'status' => 'success',
+        'socket' => null,
+    ])->and(strlen(json_encode($payload)))->toBeLessThan(10_000);
+});
+
+/**
+ * Runs a cleanup command with a fake docker on PATH: `docker images` prints $images, `docker rmi`
+ * prints what it is asked to remove, other docker commands print nothing.
+ */
+function dockerCleanupRunImageCommand(string $command, array $images): string
+{
+    $bin = sys_get_temp_dir().'/docker-cleanup-'.bin2hex(random_bytes(4));
+    mkdir($bin);
+    file_put_contents("$bin/images", implode("\n", $images)."\n");
+    file_put_contents("$bin/docker", "#!/bin/sh\nif [ \"\$1\" = images ]; then cat $bin/images; elif [ \"\$1\" = rmi ]; then echo \"\$@\"; fi\n");
+    chmod("$bin/docker", 0755);
+    file_put_contents("$bin/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("$bin/sudo", 0755);
+
+    $output = shell_exec('PATH='.escapeshellarg("$bin:".getenv('PATH')).' /bin/sh -c '.escapeshellarg($command));
+
+    array_map('unlink', glob("$bin/*"));
+    rmdir($bin);
+
+    return trim((string) $output);
+}
+
+it('removes old helper, realtime and sentinel images from any registry but keeps the current helper', function () {
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildCoolifyImageCleanupCommand'))->invoke(new CleanupDocker, '1.0.17');
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'coollabsio/coolify-helper:1.0.17',
+        'ghcr.io/coollabsio/coolify-helper:1.0.17',
+        'coollabsio/coolify-helper:1.0.14',
+        'ghcr.io/coollabsio/coolify-helper:1.0.15',
+        'coollabsio/coolify-helper:1.0.170',
+        'coollabsio/coolify-realtime:1.0.19',
+        'ghcr.io/coollabsio/coolify-realtime:1.0.17',
+        'coollabsio/sentinel:1.0.1',
+        'ghcr.io/coollabsio/sentinel:0.0.22',
+        'coollabsio/sentinel:<none>',
+        'coollabsio/coolify:4.4.6',
+        'postgres:16',
+    ]);
+
+    expect($command)->not->toContain('awk')
+        ->and($output)->toBe('rmi coollabsio/coolify-helper:1.0.14 ghcr.io/coollabsio/coolify-helper:1.0.15 coollabsio/coolify-helper:1.0.170 coollabsio/coolify-realtime:1.0.19 ghcr.io/coollabsio/coolify-realtime:1.0.17 coollabsio/sentinel:1.0.1 ghcr.io/coollabsio/sentinel:0.0.22');
+});
+
+it('removes unused images pulled by digest but keeps application images', function () {
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildImagePruneCommand'))->invoke(new CleanupDocker, collect(['app-uuid']), '1.0.17');
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'gtstef/filebrowser@sha256:abc',
+        '<none>@<none>',
+        'app-uuid@sha256:def',
+        'app-uuid:v1',
+        'postgres:16',
+    ]);
+
+    expect($command)->toContain('docker images --digests')
+        ->and(explode("\n", $output))->toBe(['rmi gtstef/filebrowser@sha256:abc', 'rmi postgres:16']);
+});
+
+it('keeps an application image name with a single quote inside the grep pattern', function (bool $nonRootUser) {
+    $marker = sys_get_temp_dir().'/docker-cleanup-injected-'.bin2hex(random_bytes(4));
+    $imageName = "evil'; touch {$marker}; echo '";
+
+    $command = (new ReflectionMethod(CleanupDocker::class, 'buildImagePruneCommand'))->invoke(new CleanupDocker, collect([$imageName, 'app-uuid']), '1.0.17');
+    if ($nonRootUser) {
+        $command = implode("\n", parseCommandsByLineForSudo(collect([$command]), new Server(['user' => 'deploy'])));
+    }
+
+    $output = dockerCleanupRunImageCommand($command, [
+        'app-uuid:v1',
+        'postgres:16',
+    ]);
+
+    expect(file_exists($marker))->toBeFalse()
+        ->and(explode("\n", $output))->toBe(['rmi postgres:16']);
+})->with(['root user' => false, 'non-root user' => true]);
+
+function dockerCleanupDeployment(Server $server, string $status, string $column = 'server_id', ?Carbon $updatedAt = null): ApplicationDeploymentQueue
+{
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => '1',
+        'deployment_uuid' => 'deployment-'.str()->random(8),
+        'status' => $status,
+        $column => $server->id,
+    ]);
+    if ($updatedAt) {
+        $deployment->forceFill(['updated_at' => $updatedAt])->saveQuietly();
+    }
+
+    return $deployment;
+}
+
+/**
+ * @param  Collection<int, string>  $commands
+ */
+function dockerCleanupPrunedBuildCache(Collection $commands): bool
+{
+    return $commands->contains(fn (string $command) => str_contains($command, 'docker builder prune') || str_contains($command, 'docker buildx prune'));
+}
+
+/**
+ * @param  Collection<int, string>  $commands
+ */
+function dockerCleanupPrunedImagesAndContainers(Collection $commands): bool
+{
+    return $commands->contains(fn (string $command) => str_contains($command, 'docker image prune -f'))
+        && $commands->contains(fn (string $command) => str_contains($command, 'xargs -r docker rm'));
+}
+
+it('cleans a forced scheduled cleanup while a deployment is queued or running on the server, but keeps the build cache', function (string $status, string $column) {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => true]);
+    $deployment = dockerCleanupDeployment($server, $status, $column);
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    $execution = DockerCleanupExecution::query()->sole();
+    expect(dockerCleanupPrunedImagesAndContainers($commands))->toBeTrue()
+        ->and(dockerCleanupPrunedBuildCache($commands))->toBeFalse()
+        ->and($execution->status)->toBe('success')
+        ->and($execution->message)->toContain('Forced Docker cleanup')
+        ->and($execution->message)->toContain('build cache was not pruned')
+        ->and($execution->message)->toContain($deployment->deployment_uuid)
+        ->and(collect(json_decode($execution->cleanup_log, true))->pluck('output')->implode("\n"))->toContain($deployment->deployment_uuid)
+        ->and($execution->finished_at)->not->toBeNull();
+})->with([
+    'running on the server' => ['in_progress', 'server_id'],
+    'queued on the server' => ['queued', 'server_id'],
+    'building on the server' => ['in_progress', 'build_server_id'],
+]);
+
+it('cleans a scheduled cleanup above the disk threshold while a deployment is running, but keeps the build cache', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => false, 'docker_cleanup_threshold' => 80]);
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $commands->push($command);
+
+        return Process::result(output: str_contains($command, 'df / --output=pcent') ? '90' : '');
+    });
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    expect(dockerCleanupPrunedImagesAndContainers($commands))->toBeTrue()
+        ->and(dockerCleanupPrunedBuildCache($commands))->toBeFalse()
+        ->and(DockerCleanupExecution::query()->sole()->message)->toContain('build cache was not pruned');
+});
+
+it('runs a forced scheduled cleanup when the only deployments are finished, on another server, or stuck', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['force_docker_cleanup' => true, 'dynamic_timeout' => 3600]);
+    dockerCleanupDeployment($server, 'finished');
+    dockerCleanupDeployment(dockerCleanupReachableServer(), 'in_progress');
+    dockerCleanupDeployment($server, 'in_progress', updatedAt: now()->subSeconds(3601));
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh()))->handle();
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeTrue()
+        ->and(DockerCleanupExecution::query()->sole()->message)->toContain('Forced Docker cleanup');
+});
+
+it('runs a manual cleanup while a deployment is running, because the user started it', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = dockerCleanupFakeProcesses();
+
+    (new DockerCleanupJob($server->fresh(), true))->handle();
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBeTrue();
+});
+
+it('cleans after a stop while a deployment is running on the server, but keeps the build cache', function () {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['docker_cleanup_threshold' => 10]);
+    dockerCleanupDeployment($server, 'in_progress');
+    $commands = dockerCleanupFakeProcesses();
+
+    CleanupDocker::run($server->fresh(), false, false, true);
+
+    expect(dockerCleanupPrunedImagesAndContainers($commands))->toBeTrue()
+        ->and(dockerCleanupPrunedBuildCache($commands))->toBeFalse()
+        ->and(Cache::has(CleanupDocker::lastRunCacheKey($server)))->toBeTrue();
+});
+
+/**
+ * Runs a cleanup with the given `docker ps` and `docker images` output and returns the image
+ * removal commands.
+ *
+ * @param  array<int, string>  $containers  name#image lines
+ * @param  array<int, string>  $images  repository#tag#created lines
+ * @return Collection<int, string>
+ */
+function dockerCleanupImageRemovals(Server $server, array $containers, array $images): Collection
+{
+    $commands = collect();
+    Process::fake(function ($process) use ($commands, $containers, $images) {
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $commands->push($command);
+
+        return match (true) {
+            str_contains($command, 'docker ps -a --format') => Process::result(output: implode("\n", $containers)),
+            str_contains($command, "docker images --format '{{.Repository}}#") => Process::result(output: implode("\n", $images)),
+            default => Process::result(output: ''),
+        };
+    });
+
+    CleanupDocker::run($server);
+
+    return $commands->filter(fn (string $command) => str_contains($command, 'docker rmi \''))->values();
+}
+
+function dockerCleanupApplication(Server $server): Application
+{
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $server->team_id]);
+    $environment = $project->environments()->first() ?? Environment::factory()->create(['project_id' => $project->id]);
+
+    return Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
+it('keeps the images of each Docker Compose service separately, so a new build of one service does not remove the build of another', function () {
+    $server = dockerCleanupReachableServer();
+    $app = dockerCleanupApplication($server);
+    $app->settings()->update(['docker_images_to_keep' => 1]);
+
+    $containers = [];
+    $images = [];
+    foreach (['web', 'api', 'worker'] as $service) {
+        $containers[] = "{$service}-{$app->uuid}-123456789#{$app->uuid}_{$service}:old";
+        $images[] = "{$app->uuid}_{$service}#oldest#2026-01-01 00:00:00 +0000 UTC";
+        $images[] = "{$app->uuid}_{$service}#old#2026-01-02 00:00:00 +0000 UTC";
+        $images[] = "{$app->uuid}_{$service}#new#2026-01-03 00:00:00 +0000 UTC";
+    }
+
+    $removals = dockerCleanupImageRemovals($server, $containers, $images);
+
+    expect($removals)->toHaveCount(1);
+    foreach (['web', 'api', 'worker'] as $service) {
+        expect($removals->first())->toContain("'{$app->uuid}_{$service}:oldest'")
+            ->not->toContain("{$app->uuid}_{$service}:new")
+            ->not->toContain("{$app->uuid}_{$service}:old'");
+    }
+});
+
+it('keeps the images of an application while it deploys, because its new images are not used by a container yet', function (string $status) {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['disable_application_image_retention' => true]);
+    $deploying = dockerCleanupApplication($server);
+    $idle = dockerCleanupApplication($server);
+    ApplicationDeploymentQueue::create([
+        'application_id' => (string) $deploying->id,
+        'deployment_uuid' => 'deployment-'.str()->random(8),
+        'status' => $status,
         'server_id' => $server->id,
     ]);
-    $timedOutExecution = DockerCleanupExecution::create([
-        'server_id' => $server->id,
+
+    $removals = dockerCleanupImageRemovals($server, [], [
+        "{$deploying->uuid}_api#new#2026-01-03 00:00:00 +0000 UTC",
+        "{$deploying->uuid}#new#2026-01-03 00:00:00 +0000 UTC",
+        "{$idle->uuid}#old#2026-01-01 00:00:00 +0000 UTC",
     ]);
 
-    $job = new DockerCleanupJob($server);
-    $job->failed(new RuntimeException('Docker cleanup job has timed out.'));
+    expect($removals)->toHaveCount(1)
+        ->and($removals->first())->toContain("'{$idle->uuid}:old'")
+        ->not->toContain($deploying->uuid);
+})->with(['queued', 'in_progress']);
 
-    expect($timedOutExecution->refresh()->status)->toBe('failed')
-        ->and($timedOutExecution->message)->toBe('Docker cleanup job has timed out.')
-        ->and($timedOutExecution->finished_at)->not->toBeNull()
-        ->and($olderExecution->refresh()->status)->toBe('running')
-        ->and($olderExecution->finished_at)->toBeNull();
+it('fails an interrupted cleanup of a deleted server without breaking its broadcast', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $server = dockerCleanupReachableServer();
+    $interrupted = DockerCleanupExecution::create(['server_id' => $server->id]);
+    $server->delete();
+    Carbon::setTestNow(now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() + 1));
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect($interrupted->fresh()->status)->toBe('failed');
+    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof DockerCleanupDone
+        && $job->event->broadcastOn() === []);
+});
+
+/**
+ * Creates an execution at an exact age, so tests can place it on either side of the stale cutoff.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function dockerCleanupExecutionCreatedSecondsAgo(Server $server, int $secondsAgo, array $attributes = []): DockerCleanupExecution
+{
+    $execution = DockerCleanupExecution::create(['server_id' => $server->id, ...$attributes]);
+    $execution->forceFill(['created_at' => now()->subSeconds($secondsAgo)])->saveQuietly();
+
+    return $execution;
+}
+
+it('fails only running, unfinished cleanups that are older than the server lock and sends one event and notification each', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Event::fake([DockerCleanupDone::class]);
+    Notification::fake();
+    $server = dockerCleanupReachableServer();
+    $server->team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $cutoff = CleanupDocker::overlapLockExpiresAfter();
+
+    $stale = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 1, ['message' => 'still running', 'cleanup_log' => '["kept"]']);
+    $atCutoff = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff);
+    $recent = dockerCleanupExecutionCreatedSecondsAgo($server, 60);
+    $finished = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 3600, ['finished_at' => now()->subHour()]);
+    $succeeded = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 3600, ['status' => 'success', 'message' => 'Saved 3%']);
+    $failed = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 3600, ['status' => 'failed', 'message' => 'original error']);
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    $stale->refresh();
+    expect($stale->status)->toBe('failed')
+        ->and($stale->message)->toBe(DockerCleanupJob::INTERRUPTED_MESSAGE)
+        ->and($stale->finished_at)->not->toBeNull()
+        ->and($stale->cleanup_log)->toBe('["kept"]');
+    foreach ([$atCutoff, $recent] as $running) {
+        expect($running->fresh()->only(['status', 'finished_at']))->toBe(['status' => 'running', 'finished_at' => null]);
+    }
+    expect($finished->fresh()->status)->toBe('running')
+        ->and($succeeded->fresh()->only(['status', 'message', 'finished_at']))->toBe(['status' => 'success', 'message' => 'Saved 3%', 'finished_at' => null])
+        ->and($failed->fresh()->only(['status', 'message', 'finished_at']))->toBe(['status' => 'failed', 'message' => 'original error', 'finished_at' => null]);
+
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
+    Event::assertDispatched(DockerCleanupDone::class, fn (DockerCleanupDone $event) => $event->execution->is($stale)
+        && $event->execution->status === 'failed'
+        && $event->teamId === $server->team_id);
+    Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
+    Notification::assertSentTo($server->team, DockerCleanupFailed::class, fn (DockerCleanupFailed $notification) => $notification->server->is($server)
+        && str_contains($notification->message, DockerCleanupJob::INTERRUPTED_MESSAGE));
+});
+
+it('fails interrupted cleanups across more than one batch', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $count = DockerCleanupJob::INTERRUPTED_EXECUTIONS_CHUNK_SIZE * 2 + 1;
+    $staleAge = CleanupDocker::overlapLockExpiresAfter() + 1;
+    foreach (range(1, $count) as $ignored) {
+        dockerCleanupExecutionCreatedSecondsAgo($server, $staleAge);
+    }
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect(DockerCleanupExecution::query()->where('status', 'failed')->whereNotNull('finished_at')->count())->toBe($count)
+        ->and(DockerCleanupExecution::query()->where('status', 'running')->count())->toBe(0);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, $count);
+});
+
+it('does not fail a cleanup again when it finished after the stale lookup read it', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $staleAge = CleanupDocker::overlapLockExpiresAfter() + 1;
+    $first = dockerCleanupExecutionCreatedSecondsAgo($server, $staleAge);
+    $finishesMeanwhile = dockerCleanupExecutionCreatedSecondsAgo($server, $staleAge);
+    DB::listen(function ($query) use ($first, $finishesMeanwhile) {
+        static $done = false;
+        if (! $done && str_starts_with(strtolower($query->sql), 'update') && in_array($first->id, $query->bindings, true)) {
+            $done = true;
+            DockerCleanupExecution::query()->whereKey($finishesMeanwhile->id)->update(['status' => 'success', 'message' => 'done', 'finished_at' => now()]);
+        }
+    });
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect($first->fresh()->status)->toBe('failed')
+        ->and($finishesMeanwhile->fresh()->only(['status', 'message']))->toBe(['status' => 'success', 'message' => 'done']);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
 });

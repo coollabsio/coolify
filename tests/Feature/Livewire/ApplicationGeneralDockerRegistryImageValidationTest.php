@@ -53,3 +53,17 @@ it('uses safe docker registry image validation rules in the application general 
         ->and($validator->errors()->has('dockerRegistryImageName'))->toBeTrue()
         ->and($validator->errors()->has('dockerRegistryImageTag'))->toBeTrue();
 });
+
+it('accepts an environment variable reference as the docker registry image tag in the application general form', function () {
+    $component = new General;
+    $method = new ReflectionMethod($component, 'rules');
+    $rules = $method->invoke($component);
+
+    $validator = validator([
+        'dockerRegistryImageTag' => '$API_VERSION',
+    ], [
+        'dockerRegistryImageTag' => $rules['dockerRegistryImageTag'],
+    ]);
+
+    expect($validator->passes())->toBeTrue();
+});

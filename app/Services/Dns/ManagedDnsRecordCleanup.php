@@ -150,6 +150,71 @@ class ManagedDnsRecordCleanup
     }
 
     /**
+     * Stops tracking the records of these resources without touching the provider. Used when another Coolify
+     * instance takes over the resources: their records still serve live traffic there. A record that another
+     * resource of this instance still uses keeps that resource's references.
+     *
+     * @param  iterable<int, Model>  $resources
+     */
+    public function forgetResources(iterable $resources): void
+    {
+        $keys = collect($resources)
+            ->flatMap(fn (Model $resource) => $this->resourceKeys($resource->getMorphClass(), $resource->getKey()))
+            ->all();
+        if ($keys === []) {
+            return;
+        }
+
+        $records = ManagedDnsRecord::query()
+            ->whereHas('references', fn (Builder $query) => $this->whereResourceKeys($query, $keys))
+            ->get();
+
+        foreach ($records as $record) {
+            $this->deleteReferences($record, $keys);
+            if (! $record->references()->exists()) {
+                $this->forget($record, 'The resource was transferred to another Coolify instance, which uses the record now.', 'info');
+            }
+        }
+    }
+
+    /**
+     * Keeps the records of resources that another Coolify instance manages now, for a later take back, but marks
+     * them not owned, so this instance never changes or deletes them at the provider. A record that another
+     * resource of this instance also uses only loses the references of these resources.
+     *
+     * @param  iterable<int, Model>  $resources
+     * @return list<int> ids of the records that were owned before
+     */
+    public function parkResources(iterable $resources): array
+    {
+        $keys = collect($resources)
+            ->flatMap(fn (Model $resource) => $this->resourceKeys($resource->getMorphClass(), $resource->getKey()))
+            ->all();
+        if ($keys === []) {
+            return [];
+        }
+
+        $parked = [];
+        $records = ManagedDnsRecord::query()
+            ->whereHas('references', fn (Builder $query) => $this->whereResourceKeys($query, $keys))
+            ->get();
+        foreach ($records as $record) {
+            $sharedWithOthers = $record->references()->whereNot(fn (Builder $query) => $this->whereResourceKeys($query, $keys))->exists();
+            if ($sharedWithOthers) {
+                $this->deleteReferences($record, $keys);
+
+                continue;
+            }
+            if ($record->owned) {
+                $record->update(['owned' => false]);
+                $parked[] = $record->id;
+            }
+        }
+
+        return $parked;
+    }
+
+    /**
      * Releases orphaned records: records whose references all point to deleted (or soft-deleted) resources, and
      * records without references that are older than the grace period. Records with a live reference are not touched.
      * Each orphan goes through release(), so a hostname that a live resource uses again keeps its record, and
@@ -269,7 +334,7 @@ class ManagedDnsRecordCleanup
         }
 
         if (! $record->owned || ! $deleteRecord) {
-            $record->delete();
+            $this->forget($record, $record->owned ? 'kept_by_user' : 'not_owned', 'info');
 
             return $record->owned ? null : ManagedDnsDeletionResult::NotOwned;
         }
@@ -400,13 +465,13 @@ class ManagedDnsRecordCleanup
     /**
      * Stops tracking the record without touching the provider.
      */
-    private function forget(ManagedDnsRecord $record, string $reason): void
+    private function forget(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
         $record->delete();
-        $this->auditSkipped($record, $reason);
+        $this->auditSkipped($record, $reason, $level);
     }
 
-    private function auditSkipped(ManagedDnsRecord $record, string $reason): void
+    private function auditSkipped(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
         $source = auth()->check() ? 'ui' : 'system';
         auditLog("{$source}.dns_record.delete_skipped", [
@@ -414,7 +479,7 @@ class ManagedDnsRecordCleanup
             'hostname' => $record->name,
             'provider' => 'cloudflare',
             'reason' => $reason,
-        ], 'warning');
+        ], $level);
     }
 
     /**

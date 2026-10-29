@@ -2,16 +2,15 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Actions\Database\StartDatabase;
-use App\Actions\Database\StopDatabase;
-use App\Actions\Service\StartService;
-use App\Actions\Service\StopService;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Actions\Shared\MigrateResourceToDestination;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -20,9 +19,11 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use RuntimeException;
 
 class ResourceOperations extends Component
 {
@@ -49,8 +50,9 @@ class ResourceOperations extends Component
         $parameters = get_route_parameters();
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
-        $this->projects = Project::ownedByCurrentTeamCached();
-        $servers = currentTeam()->servers()->get();
+        $teamId = $this->resourceTeamId();
+        $this->projects = Project::query()->where('team_id', $teamId)->orderByRaw('LOWER(name)')->get();
+        $servers = Server::query()->where('team_id', $teamId)->get();
         $this->servers = $servers->reject(fn ($server) => $server->isBuildServer());
         $this->buildServers = $servers->filter(fn ($server) => $server->isBuildServer());
     }
@@ -69,16 +71,19 @@ class ResourceOperations extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            if ($this->cloneVolumeData) {
+                $this->authorize(CloneVolumeDataWithSourceStopped::sourceAbility($this->resource), $this->resource);
+            }
 
             $new_environment = $this->resource->environment;
             if ($environment_id !== null) {
-                $new_environment = Environment::ownedByCurrentTeam()->find($environment_id);
+                $new_environment = $this->findResourceTeamEnvironment($environment_id);
                 if (! $new_environment) {
                     return $this->addError('environment_id', 'Environment not found.');
                 }
             }
 
-            $new_destination = find_resource_destination_for_current_team($destination_uuid);
+            $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
                 return $this->addError('destination_id', 'Destination not found.');
             }
@@ -127,7 +132,7 @@ class ResourceOperations extends Component
                     'updated_at',
                 ])->fill([
                     'uuid' => $uuid,
-                    'name' => $this->resource->name.'-clone-'.$uuid,
+                    'name' => clone_resource_name($this->resource->name, $uuid),
                     'status' => 'exited',
                     'started_at' => null,
                     'environment_id' => $new_environment->id,
@@ -142,6 +147,7 @@ class ResourceOperations extends Component
                 }
 
                 $new_resource->persistentStorages()->delete();
+                $pendingVolumeClones = [];
                 $persistentVolumes = $this->resource->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
                     $originalName = $volume->name;
@@ -185,21 +191,17 @@ class ResourceOperations extends Component
                     $newPersistentVolume->save();
 
                     if ($this->cloneVolumeData) {
-                        try {
-                            StopDatabase::dispatch($this->resource);
-                            $sourceVolume = $volume->name;
-                            $targetVolume = $newPersistentVolume->name;
-                            $sourceServer = $this->resource->destination->server;
-                            $targetServer = $new_resource->destination->server;
-
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                            StartDatabase::dispatch($this->resource);
-                        } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                        }
+                        $pendingVolumeClones[] = new VolumeCloneJob(
+                            $volume->name,
+                            $newPersistentVolume->name,
+                            $this->resource->destination->server,
+                            $new_resource->destination->server,
+                            $newPersistentVolume,
+                        );
                     }
                 }
+
+                CloneVolumeDataWithSourceStopped::run($this->resource, $pendingVolumeClones);
 
                 $fileStorages = $this->resource->fileStorages()->get();
                 foreach ($fileStorages as $storage) {
@@ -224,9 +226,10 @@ class ResourceOperations extends Component
                         'uuid' => $uuid,
                         'database_id' => $new_resource->id,
                         'database_type' => $new_resource->getMorphClass(),
-                        'team_id' => currentTeam()->id,
+                        'team_id' => $this->resourceTeamId(),
                     ]);
                     $newBackup->save();
+                    $backup->copyS3StoragesTo($newBackup);
                 }
 
                 $environmentVaribles = $this->resource->environment_variables()->get();
@@ -243,6 +246,8 @@ class ResourceOperations extends Component
                     $newEnvironmentVariable->save();
                 }
 
+                $this->resource->cloneSecretManagerLinkTo($new_resource);
+
                 $route = route('project.database.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
                     'environment_uuid' => $new_environment->uuid,
@@ -251,141 +256,9 @@ class ResourceOperations extends Component
 
                 return redirect()->to($route);
             } elseif ($this->resource->type() === 'service') {
-                $uuid = new_public_id();
-                $new_resource = $this->resource->replicate([
-                    'id',
-                    'created_at',
-                    'updated_at',
-                ])->fill([
-                    'uuid' => $uuid,
-                    'name' => $this->resource->name.'-clone-'.$uuid,
+                $new_resource = clone_service($this->resource, $new_destination, [
                     'environment_id' => $new_environment->id,
-                    'destination_id' => $new_destination->id,
-                    'destination_type' => $new_destination->getMorphClass(),
-                    'server_id' => $new_destination->server_id,
-                ]);
-
-                $new_resource->save();
-
-                $tags = $this->resource->tags;
-                foreach ($tags as $tag) {
-                    $new_resource->tags()->attach($tag->id);
-                }
-
-                $scheduledTasks = $this->resource->scheduled_tasks()->get();
-                foreach ($scheduledTasks as $task) {
-                    $newTask = $task->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'uuid' => new_public_id(),
-                        'service_id' => $new_resource->id,
-                        'team_id' => currentTeam()->id,
-                    ]);
-                    $newTask->save();
-                }
-
-                $environmentVariables = $this->resource->environment_variables()->get();
-                foreach ($environmentVariables as $environmentVariable) {
-                    $newEnvironmentVariable = $environmentVariable->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'resourceable_id' => $new_resource->id,
-                        'resourceable_type' => $new_resource->getMorphClass(),
-                    ]);
-                    $newEnvironmentVariable->save();
-                }
-
-                foreach ($new_resource->applications() as $application) {
-                    $application->fill([
-                        'status' => 'exited',
-                    ])->save();
-
-                    $persistentVolumes = $application->persistentStorages()->get();
-                    foreach ($persistentVolumes as $volume) {
-                        $newName = '';
-                        if (str_starts_with($volume->name, $volume->resource->uuid)) {
-                            $newName = str($volume->name)->replace($volume->resource->uuid, $application->uuid);
-                        } else {
-                            $newName = $application->uuid.'-'.str($volume->name)->afterLast('-');
-                        }
-
-                        $newPersistentVolume = $volume->replicate([
-                            'id',
-                            'created_at',
-                            'updated_at',
-                            'uuid',
-                        ])->fill([
-                            'name' => $newName,
-                            'resource_id' => $application->id,
-                        ]);
-                        $newPersistentVolume->save();
-
-                        if ($this->cloneVolumeData) {
-                            try {
-                                StopService::dispatch($application);
-                                $sourceVolume = $volume->name;
-                                $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $application->service->destination->server;
-                                $targetServer = $new_resource->destination->server;
-
-                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                                StartService::dispatch($application);
-                            } catch (\Exception $e) {
-                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                            }
-                        }
-                    }
-                }
-
-                foreach ($new_resource->databases() as $database) {
-                    $database->fill([
-                        'status' => 'exited',
-                    ])->save();
-
-                    $persistentVolumes = $database->persistentStorages()->get();
-                    foreach ($persistentVolumes as $volume) {
-                        $newName = '';
-                        if (str_starts_with($volume->name, $volume->resource->uuid)) {
-                            $newName = str($volume->name)->replace($volume->resource->uuid, $database->uuid);
-                        } else {
-                            $newName = $database->uuid.'-'.str($volume->name)->afterLast('-');
-                        }
-
-                        $newPersistentVolume = $volume->replicate([
-                            'id',
-                            'created_at',
-                            'updated_at',
-                            'uuid',
-                        ])->fill([
-                            'name' => $newName,
-                            'resource_id' => $database->id,
-                        ]);
-                        $newPersistentVolume->save();
-
-                        if ($this->cloneVolumeData) {
-                            try {
-                                StopService::dispatch($database->service);
-                                $sourceVolume = $volume->name;
-                                $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $database->service->destination->server;
-                                $targetServer = $new_resource->destination->server;
-
-                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                                StartService::dispatch($database->service);
-                            } catch (\Exception $e) {
-                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                            }
-                        }
-                    }
-                }
-
-                $new_resource->parse();
+                ], $this->cloneVolumeData);
 
                 $route = route('project.service.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
@@ -404,9 +277,12 @@ class ResourceOperations extends Component
     {
         try {
             $this->authorize('update', $this->resource);
-            $new_environment = Environment::ownedByCurrentTeam()->findOrFail($environment_id);
+            $new_environment = $this->findResourceTeamEnvironment($environment_id);
+            if (! $new_environment) {
+                return $this->addError('environment_id', 'Environment not found.');
+            }
             $this->resource->fill([
-                'environment_id' => $environment_id,
+                'environment_id' => $new_environment->id,
             ])->save();
             if ($this->resource->type() === 'application') {
                 $route = route('project.application.configuration', [
@@ -443,9 +319,9 @@ class ResourceOperations extends Component
         try {
             $this->authorize('update', $this->resource);
 
-            $new_destination = find_resource_destination_for_current_team($destination_uuid);
+            $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
-                return $this->addError('destination_id', 'Destination not found.');
+                return $this->dispatch('error', 'Destination not found.');
             }
 
             $result = MigrateResourceToDestination::run(
@@ -490,10 +366,36 @@ class ResourceOperations extends Component
         } catch (ValidationException $e) {
             $message = collect($e->errors())->flatten()->first() ?? $e->getMessage();
 
-            return $this->addError('destination_id', $message);
+            return $this->dispatch('error', $message);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function resourceTeamId(): int
+    {
+        return $this->resource->team()?->id ?? throw new RuntimeException('The resource has no team.');
+    }
+
+    /** Cloning and moving stay inside the resource team; the session team can differ after a team switch. */
+    private function findResourceTeamEnvironment(int|string|null $environmentId): ?Environment
+    {
+        return Environment::query()
+            ->whereRelation('project', 'team_id', $this->resourceTeamId())
+            ->find($environmentId);
+    }
+
+    private function findResourceTeamDestination(?string $uuid): StandaloneDocker|SwarmDocker|null
+    {
+        if (blank($uuid)) {
+            return null;
+        }
+
+        $teamId = $this->resourceTeamId();
+        $destination = StandaloneDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first()
+            ?? SwarmDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first();
+
+        return $destination?->server?->canHostResources() ? $destination : null;
     }
 
     public function render()

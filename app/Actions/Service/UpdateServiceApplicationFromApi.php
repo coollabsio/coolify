@@ -67,6 +67,16 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->setNoindexDomains($payload['noindex_domains'] ?? []);
         }
 
+        if (array_key_exists('redirect', $payload)) {
+            if (in_array($payload['redirect'], ['www', 'non-www'], true) && ! $this->hasWwwAndNonWwwDomains($serviceApplication->fqdn)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['redirect' => ['The www and non-www redirects need both a www and a non-www domain in url.']],
+                ], 422);
+            }
+            $serviceApplication->redirect = $payload['redirect'];
+        }
+
         if (array_key_exists('human_name', $payload)) {
             $serviceApplication->human_name = $payload['human_name'];
         }
@@ -87,12 +97,20 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->is_gzip_enabled = filter_var($payload['is_gzip_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('traefik_certificate_resolver', $payload)) {
+            $serviceApplication->traefik_certificate_resolver = filled($payload['traefik_certificate_resolver']) ? $payload['traefik_certificate_resolver'] : null;
+        }
+
         if (array_key_exists('is_stripprefix_enabled', $payload)) {
             $serviceApplication->is_stripprefix_enabled = filter_var($payload['is_stripprefix_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('is_force_https_enabled', $payload)) {
             $serviceApplication->is_force_https_enabled = filter_var($payload['is_force_https_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (array_key_exists('is_permanent_redirect_enabled', $payload)) {
+            $serviceApplication->is_permanent_redirect_enabled = filter_var($payload['is_permanent_redirect_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('max_restart_count', $payload)) {
@@ -121,5 +139,15 @@ class UpdateServiceApplicationFromApi
         updateCompose($serviceApplication);
 
         return null;
+    }
+
+    private function hasWwwAndNonWwwDomains(?string $fqdn): bool
+    {
+        $hosts = str($fqdn ?? '')->explode(',')
+            ->map(fn (string $url) => strtolower((string) parse_url(trim($url), PHP_URL_HOST)))
+            ->filter();
+
+        return $hosts->contains(fn (string $host) => str_starts_with($host, 'www.'))
+            && $hosts->contains(fn (string $host) => ! str_starts_with($host, 'www.'));
     }
 }

@@ -15,7 +15,7 @@
                         'lg:col-span-2' => !str_starts_with(strtolower($fqdn ?? ''), 'https://'),
                     ])>
                         <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
-                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-warning'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS."
+                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-brand-light'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS.<br><br>Passkeys are tied to this domain. If you change it, users must add their passkeys again."
                             placeholder="https://coolify.yourdomain.com" />
                     </div>
 
@@ -35,27 +35,33 @@
                     <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name"
                         placeholder="Coolify" helper="Custom name for this Coolify instance." />
 
-                    {{-- Use searchable-listbox so the label row (h-4) and control height match
+                    {{-- Use a searchable listbox so the label row (h-4) and control height match
                          sibling x-forms.input fields (Name). onChange auto-saves like before. --}}
-                    <x-forms.searchable-listbox id="instance_timezone" label="Instance timezone"
+                    <x-forms.listbox searchable id="instance_timezone" label="Instance timezone"
                         helper="Timezone used for update checks and the automatic update schedule."
-                        searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                        searchPlaceholder="Search timezones" searchEmptyText="No matching timezone"
                         onChange="submit" :options="collect($this->timezones)->map(fn ($timezone) => [
                             'value' => $timezone,
                             'label' => $timezone,
-                        ])->all()" :disabled="! auth()->user()->can('update', $settings)" />
+                        ])->all()" canGate="update" :canResource="$settings" />
                 </div>
             </x-application.settings-section>
 
             <x-application.settings-section title="Network addresses">
+                <x-slot:actions>
+                    <x-forms.button canGate="update" :canResource="$settings" type="button"
+                        wire:click="detectPublicIps">
+                        Detect
+                    </x-forms.button>
+                </x-slot:actions>
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password"
                         label="Instance public IPv4"
-                        helper="Set this when Coolify cannot detect the correct public IPv4 address."
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Detect looks it up again and saves it."
                         placeholder="1.2.3.4" autocomplete="new-password" />
                     <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password"
                         label="Instance public IPv6"
-                        helper="Set this when Coolify cannot detect the correct public IPv6 address."
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Detect looks it up again and saves it."
                         placeholder="2001:db8::1" autocomplete="new-password" />
                 </div>
             </x-application.settings-section>

@@ -10,20 +10,19 @@
     "mcp": true,
     "nightwatch_mcp": false,
     "packages": [
-        "spatie/laravel-ray",
         "lorisleiva/laravel-actions"
     ],
     "sail": false,
     "skills": [
+        "infer-conventions",
         "fortify-development",
         "laravel-best-practices",
+        "testing-best-practices",
         "configuring-horizon",
         "mcp-development",
         "socialite-development",
         "livewire-development",
-        "pest-testing",
         "tailwindcss-development",
-        "laravel-actions",
-        "debugging-output-and-previewing-html-using-ray"
+        "laravel-actions"
     ]
 }

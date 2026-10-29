@@ -8,23 +8,35 @@
         @if ($server->isFunctional())
             @if (isset($database) && isset($backup))
                 <form wire:submit="submit">
-                    <x-unsaved-bar action="submit" />
+                    {{-- Exclude is_backup_before_update_enabled (instantSave) so the bar does not flash. --}}
+                    <x-unsaved-bar action="submit" targets="description" />
 
                     <x-application.settings-section title="Instance database">
                         <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.input label="Name" readonly id="name" />
+                            <x-forms.input label="Name" readonly :value="$database->name" />
                             <x-forms.input label="Description" id="description" />
                             <div class="lg:col-span-2">
-                                <x-forms.input label="UUID" readonly id="uuid" />
+                                <x-forms.input label="UUID" readonly :value="$database->uuid" />
                             </div>
-                            <x-forms.input label="User" readonly id="postgres_user" />
-                            <x-forms.input type="password" label="Password" readonly id="postgres_password" />
+                            <x-forms.input label="User" readonly :value="$database->postgres_user" />
                         </div>
                     </x-application.settings-section>
                 </form>
 
                 <livewire:project.database.backup-edit :backup="$backup" :available-s3-storages="$s3s"
                     :status="data_get($database, 'status')" />
+
+                <x-application.settings-section title="Backup before update"
+                    description="Back up the Coolify database before an update is installed. If the backup fails, the update is not installed.">
+                    <div class="max-w-md">
+                        <x-forms.listbox id="is_backup_before_update_enabled" label="Database backup"
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]"
+                            helper="Runs this backup once before every manual or automatic update, in addition to the schedule." />
+                    </div>
+                </x-application.settings-section>
 
                 <livewire:project.database.backup-executions :backup="$backup" />
             @else

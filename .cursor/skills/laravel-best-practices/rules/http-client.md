@@ -1,86 +1,100 @@
 # HTTP Client Best Practices
 
-## Always Set Explicit Timeouts
+## Set Explicit Timeouts
 
-The default timeout is 30 seconds — too long for most API calls. Always set explicit `timeout` and `connectTimeout` to fail fast.
+Laravel's HTTP client has a 30-second response timeout by default. Choose response and connection timeouts that fit the service and the calling request or job. Remember that retries can multiply the total elapsed time.
 
-Incorrect:
+Less resilient:
+
 ```php
 $response = Http::get('https://api.example.com/users');
 ```
 
-Correct:
+Preferred:
+
 ```php
-$response = Http::timeout(5)
-    ->connectTimeout(3)
+$response = Http::connectTimeout(3)
+    ->timeout(5)
     ->get('https://api.example.com/users');
 ```
 
-For service-specific clients, define timeouts in a macro:
+Define shared settings in a macro or a dedicated client:
 
 ```php
 Http::macro('github', function () {
     return Http::baseUrl('https://api.github.com')
-        ->timeout(10)
         ->connectTimeout(3)
+        ->timeout(10)
         ->withToken(config('services.github.token'));
 });
 
 $response = Http::github()->get('/repos/laravel/framework');
 ```
 
-## Use Retry with Backoff for External APIs
+## Retry Only Safe Operations
 
-External APIs have transient failures. Use `retry()` with increasing delays.
+Retry transient connection failures, rate-limit responses, and server errors with an appropriate delay. Retry idempotent requests such as `GET` when the operation can safely run more than once. Retry a state-changing request only when the remote API supports an idempotency key or provides equivalent duplicate protection.
 
-Incorrect:
-```php
-$response = Http::post('https://api.stripe.com/v1/charges', $data);
+Unsafe without an idempotency guarantee:
 
-if ($response->failed()) {
-    throw new PaymentFailedException('Charge failed');
-}
-```
-
-Correct:
 ```php
 $response = Http::retry([100, 500, 1000])
-    ->timeout(10)
-    ->post('https://api.stripe.com/v1/charges', $data);
+    ->post('https://api.example.com/v1/charges', $data);
 ```
 
-Only retry on specific errors:
+Safe for an idempotent request:
 
 ```php
-$response = Http::retry(3, 100, function (Throwable $exception, PendingRequest $request) {
-    return $exception instanceof ConnectionException
-        || ($exception instanceof RequestException && $exception->response->serverError());
-})->post('https://api.example.com/data');
+$response = Http::connectTimeout(3)
+    ->timeout(10)
+    ->retry([100, 500, 1000], 0, function (Throwable $exception) {
+        return $exception instanceof ConnectionException
+            || ($exception instanceof RequestException
+                && ($exception->response->serverError() || $exception->response->status() === 429));
+    })
+    ->get('https://api.example.com/data');
+```
+
+For a supported state-changing API, send a stable idempotency key for every attempt:
+
+```php
+$response = Http::withHeaders(['Idempotency-Key' => $paymentAttempt->uuid])
+    ->connectTimeout(3)
+    ->timeout(10)
+    ->retry([100, 500, 1000], 0, function (Throwable $exception) {
+        return $exception instanceof ConnectionException
+            || ($exception instanceof RequestException
+                && ($exception->response->serverError() || $exception->response->status() === 429));
+    })
+    ->post('https://api.example.com/v1/charges', $data);
 ```
 
 ## Handle Errors Explicitly
 
-The HTTP Client does not throw on 4xx/5xx by default. Always check status or use `throw()`.
+The HTTP client returns responses for `4xx` and `5xx` status codes instead of throwing by default. Inspect the expected statuses or call `throw()` before consuming a success payload.
 
-Incorrect:
+Unsafe when a success payload is expected:
+
 ```php
-$response = Http::get('https://api.example.com/users/1');
-$user = $response->json(); // Could be an error body
+$user = Http::get('https://api.example.com/users/1')->json();
 ```
 
-Correct:
+Preferred:
+
 ```php
-$response = Http::timeout(5)
+$user = Http::connectTimeout(3)
+    ->timeout(5)
     ->get('https://api.example.com/users/1')
-    ->throw();
-
-$user = $response->json();
+    ->throw()
+    ->json();
 ```
 
-For graceful degradation:
+Handle expected alternatives explicitly when graceful degradation is required:
 
 ```php
-$response = Http::get('https://api.example.com/users/1');
+$response = Http::connectTimeout(3)
+    ->timeout(5)
+    ->get('https://api.example.com/users/1');
 
 if ($response->successful()) {
     return $response->json();
@@ -93,46 +107,30 @@ if ($response->notFound()) {
 $response->throw();
 ```
 
-## Use Request Pooling for Concurrent Requests
+## Pool Independent Requests
 
-When making multiple independent API calls, use `Http::pool()` instead of sequential calls.
+Use `Http::pool()` when several independent requests can run concurrently. Pooling changes execution time, not error handling; inspect or throw for each response as needed.
 
-Incorrect:
-```php
-$users = Http::get('https://api.example.com/users')->json();
-$posts = Http::get('https://api.example.com/posts')->json();
-$comments = Http::get('https://api.example.com/comments')->json();
-```
-
-Correct:
 ```php
 use Illuminate\Http\Client\Pool;
 
 $responses = Http::pool(fn (Pool $pool) => [
-    $pool->as('users')->get('https://api.example.com/users'),
-    $pool->as('posts')->get('https://api.example.com/posts'),
-    $pool->as('comments')->get('https://api.example.com/comments'),
+    $pool->as('users')->connectTimeout(3)->timeout(5)
+        ->get('https://api.example.com/users'),
+    $pool->as('posts')->connectTimeout(3)->timeout(5)
+        ->get('https://api.example.com/posts'),
 ]);
 
-$users = $responses['users']->json();
-$posts = $responses['posts']->json();
+$users = $responses['users']->throw()->json();
+$posts = $responses['posts']->throw()->json();
 ```
 
-## Fake HTTP Calls in Tests
+## Fake HTTP Requests in Tests
 
-Never make real HTTP requests in tests. Use `Http::fake()` and `preventStrayRequests()`.
+Use `Http::fake()` for external integrations, and use `Http::preventStrayRequests()` when an unexpected real request should fail the test. Also test timeouts, connection failures, and error responses that the application handles.
 
-Incorrect:
 ```php
-it('syncs user from API', function () {
-    $service = new UserSyncService;
-    $service->sync(1); // Hits the real API
-});
-```
-
-Correct:
-```php
-it('syncs user from API', function () {
+it('syncs a user from the API', function () {
     Http::preventStrayRequests();
 
     Http::fake([
@@ -142,16 +140,15 @@ it('syncs user from API', function () {
         ]),
     ]);
 
-    $service = new UserSyncService;
-    $service->sync(1);
+    (new UserSyncService)->sync(1);
 
-    Http::assertSent(function (Request $request) {
-        return $request->url() === 'https://api.example.com/users/1';
-    });
+    Http::assertSent(fn (Request $request) =>
+        $request->url() === 'https://api.example.com/users/1'
+    );
 });
 ```
 
-Test failure scenarios too:
+For example, fake a connection failure when testing the integration's failure path:
 
 ```php
 Http::fake([

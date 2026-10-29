@@ -1,8 +1,7 @@
-# ignore: true
 # documentation: https://forgejo.org/docs
 # slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
 # category: git
-# tags: version control, collaboration, code, hosting, lightweight, runner, postresql, actions, cicd, ci
+# tags: version control, collaboration, code, hosting, lightweight, runner, postgresql, actions, cicd, ci
 # logo: svgs/forgejo.svg
 # port: 3000
 
@@ -13,15 +12,22 @@ services:
       - SERVICE_URL_FORGEJO_3000
       - FORGEJO__server__ROOT_URL=${SERVICE_URL_FORGEJO}
       - FORGEJO__migrations__ALLOWED_DOMAINS=${FORGEJO__migrations__ALLOWED_DOMAINS}
-      - FORGEJO__migrations__ALLOW_LOCALNETWORKS=${FORGEJO__migrations__ALLOW_LOCALNETWORKS-false}
-      - USER_UID=1000
-      - USER_GID=1000
+      - FORGEJO__migrations__ALLOW_LOCALNETWORKS=${FORGEJO__migrations__ALLOW_LOCALNETWORKS:-false}
+      - FORGEJO__server__DOMAIN=${SERVICE_FQDN_FORGEJO}
+      - FORGEJO__server__SSH_DOMAIN=${SERVICE_FQDN_FORGEJO}
+      - FORGEJO__server__SSH_PORT=${FORGEJO_SSH_PORT:-22222}
       - FORGEJO__database__DB_TYPE=postgres
       - FORGEJO__database__HOST=postgresql
-      - FORGEJO__database__NAME=${POSTGRESQL_DATABASE-forgejo}
+      - FORGEJO__database__NAME=${POSTGRESQL_DATABASE:-forgejo}
       - FORGEJO__database__USER=$SERVICE_USER_POSTGRESQL
       - FORGEJO__database__PASSWD=$SERVICE_PASSWORD_POSTGRESQL
-      - RUNNER_SHARED_SECRET=${RUNNER_SHARED_SECRET-0000000000000000000000000000000000000000}
+      - USER_UID=1000
+      - USER_GID=1000
+      - RUNNER_SHARED_SECRET=${SERVICE_HEX_64_RUNNER}
+      - FORGEJO__security__INSTALL_LOCK=true
+      - FORGEJO_ADMIN_USER=${SERVICE_USER_ADMIN}
+      - FORGEJO_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - FORGEJO_ADMIN_EMAIL=${FORGEJO_ADMIN_EMAIL:-admin@example.com}
       - FORGEJO__repository__ENABLE_PUSH_CREATE_USER=true
       - FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE=false
       - FORGEJO__repository__DEFAULT_REPO_UNITS=repo.code,repo.actions
@@ -30,21 +36,23 @@ services:
       - forgejo-timezone:/etc/timezone:ro
       - forgejo-localtime:/etc/localtime:ro
     ports:
-      - 22222:22
+      - ${FORGEJO_SSH_PORT:-22222}:22
     depends_on:
       postgresql:
         condition: service_healthy
+    # Healthy only after the runner is registered, so the runner starts after it.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
-      interval: 2s
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:3000 > /dev/null && test -f /tmp/runner-registered"]
+      interval: 5s
       timeout: 10s
-      retries: 15
+      retries: 30
     command: >-
       bash -c '
-      /bin/s6-svscan /etc/s6 &
-      sleep 10 ;
-      su -c "forgejo forgejo-cli actions register --secret ${RUNNER_SHARED_SECRET}" git ;
-      sleep infinity
+      /usr/bin/s6-svscan /etc/s6 &
+      until su -c "forgejo forgejo-cli actions register --keep-labels --secret $${RUNNER_SHARED_SECRET:0:40}" git ; do sleep 5 ; done ;
+      su -c "forgejo admin user create --admin --username \"$$FORGEJO_ADMIN_USER\" --password \"$$FORGEJO_ADMIN_PASSWORD\" --email \"$$FORGEJO_ADMIN_EMAIL\" --must-change-password=false" git || true ;
+      touch /tmp/runner-registered ;
+      wait
       '
 
   postgresql:
@@ -54,7 +62,7 @@ services:
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRESQL_DATABASE}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-forgejo}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -66,56 +74,48 @@ services:
     hostname: docker
     privileged: true
     healthcheck:
-      test: ["CMD", "pgrep", "dockerd"]
+      test: ["CMD", "docker", "-H", "unix:///var/run/docker.sock", "info"]
       interval: 10s
       timeout: 30s
       retries: 10
     environment:
-      DOCKER_TLS_CERTDIR: /certs
-      DOCKER_HOST: docker-in-docker
+      - DOCKER_TLS_CERTDIR=/certs
+      - DOCKER_HOST=docker-in-docker
     volumes:
       - forgejo-did-certs:/certs
 
   runner-register:
-    image: code.forgejo.org/forgejo/runner:3.5.0
+    image: data.forgejo.org/forgejo/runner:13.2.0
     restart: 'no'
-    links:
-      - docker-in-docker
-      - forgejo
+    exclude_from_hc: true
     environment:
-      - DOCKER_HOST=tcp://docker-in-docker:2376
-      - RUNNER_SHARED_SECRET=${RUNNER_SHARED_SECRET}
+      - RUNNER_SHARED_SECRET=${SERVICE_HEX_64_RUNNER}
     volumes:
       - forgejo-runner-data:/data
-      - forgejo-timezone:/etc/timezone:ro
-      - forgejo-localtime:/etc/localtime:ro
-    healthcheck:
-      disable: true
     user: 0:0
     command: >-
       bash -ec '
-      while : ; do
-        forgejo-runner create-runner-file --connect --instance http://forgejo:3000 --name runner --secret ${RUNNER_SHARED_SECRET} && break ;
-        sleep 1 ;
-      done ;
-      sed -i -e "s|\"labels\": null|\"labels\": [\"docker:docker://node:20-bookworm\", \"ubuntu-22.04:docker://catthehacker/ubuntu:act-22.04\"]|" .runner ;
+      secret=$${RUNNER_SHARED_SECRET:0:40} ;
+      uuid=$$(printf %s "$${secret:0:16}" | od -An -tx1 | tr -d " \n" | sed -E "s/(.{8})(.{4})(.{4})(.{4})(.{12})/\1-\2-\3-\4-\5/") ;
       forgejo-runner generate-config > config.yml ;
+      sed -i -e "s|  labels: \[\]|  labels: [\"docker:docker://node:22-bookworm\", \"ubuntu-latest:docker://catthehacker/ubuntu:act-22.04\", \"ubuntu-22.04:docker://catthehacker/ubuntu:act-22.04\"]|" config.yml ;
       sed -i -e "s|network: .*|network: host|" config.yml ;
       sed -i -e "s|^  envs:$$|  envs:\n    DOCKER_HOST: tcp://docker:2376\n    DOCKER_TLS_VERIFY: 1\n    DOCKER_CERT_PATH: /certs/client|" config.yml ;
       sed -i -e "s|^  options:|  options: -v /certs/client:/certs/client|" config.yml ;
       sed -i -e "s|  valid_volumes: \[\]$$|  valid_volumes:\n    - /certs/client|" config.yml ;
-      chown -R 1000:1000 /data ;
-      exit 0
+      sed -i -e "s|  connections:|  connections:\n    default:\n      url: http://forgejo:3000\n      uuid: $$uuid\n      token: $$secret|" config.yml ;
+      chown -R 1000:1000 /data
       '
 
   runner:
-    image: code.forgejo.org/forgejo/runner:3.5.0
-    links:
-      - docker-in-docker
-      - forgejo
+    image: data.forgejo.org/forgejo/runner:13.2.0
     depends_on:
+      forgejo:
+        condition: service_healthy
       docker-in-docker:
-        condition: service_started
+        condition: service_healthy
+      runner-register:
+        condition: service_completed_successfully
     environment:
       - DOCKER_HOST=tcp://docker:2376
       - DOCKER_CERT_PATH=/certs/client
@@ -124,14 +124,9 @@ services:
     volumes:
       - forgejo-runner-data:/data
       - forgejo-did-certs:/certs
-      - forgejo-timezone:/etc/timezone:ro
-      - forgejo-localtime:/etc/localtime:ro
     healthcheck:
       test: ["CMD", "pgrep", "forgejo-runner"]
       interval: 10s
       timeout: 30s
       retries: 10
-    command: >-
-      bash -c '
-      while : ; do test -w .runner && forgejo-runner --config config.yml daemon ; sleep 1 ; done
-      '
+    command: forgejo-runner --config config.yml daemon

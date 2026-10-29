@@ -29,7 +29,7 @@ class ComplexStatusCheck
                     continue;
                 }
             }
-            $script = containerIdsByOwnerScript('application', $application->uuid, ['label=coolify.pullRequestId=0'], all: false, legacyId: (int) $application->id)
+            $script = containerIdsByOwnerScript('application', $application->uuid, ['label=coolify.pullRequestId=0'], all: false)
                 .'; [ -z "$container_ids" ] || docker container inspect $container_ids --format \'{{json .}}\'';
             $containers = instant_remote_process(['sh -c '.escapeshellarg($script)], $server, false);
             $containers = format_docker_command_output_to_json($containers);

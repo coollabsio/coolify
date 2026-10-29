@@ -122,7 +122,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     private function syncData(bool $toModel = false): void
@@ -143,12 +143,13 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->mongoConf = $this->database->mongo_conf;
+            $this->mongoConf = $canSeeCredentials ? $this->database->mongo_conf : null;
             $this->mongoInitdbRootUsername = $this->database->mongo_initdb_root_username;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->mongoInitdbRootPassword = $canSeeCredentials ? $this->database->mongo_initdb_root_password : '';
             $this->mongoInitdbDatabase = $this->database->mongo_initdb_database;
             $this->image = $this->database->image;
@@ -157,7 +158,7 @@ class General extends Component
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 
