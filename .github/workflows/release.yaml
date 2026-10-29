@@ -105,8 +105,11 @@ jobs:
           for index in "$RUNNER_TEMP"/images/*/index.json; do
             sources+=("oci-layout://${index%/index.json}@$(jq -r '.manifests[0].digest' "$index")")
           done
+          labels="$(docker buildx imagetools inspect "${sources[0]}" --format '{{ json .Image.Config.Labels }}' \
+            | jq -r 'to_entries[] | "--annotation=index:\(.key)=\(.value)"')"
+          mapfile -t annotations <<< "$labels"
           for repository in ghcr.io/coollabsio/coolify docker.io/coollabsio/coolify; do
-            docker buildx imagetools create --tag "$repository:${TAG#v}" "${sources[@]}"
+            docker buildx imagetools create "${annotations[@]}" --tag "$repository:${TAG#v}" "${sources[@]}"
           done
 
       - name: Create the GitHub release

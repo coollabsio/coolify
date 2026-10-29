@@ -81,7 +81,10 @@ jobs:
           for index in "$RUNNER_TEMP"/images/*/index.json; do
             sources+=("oci-layout://${index%/index.json}@$(jq -r '.manifests[0].digest' "$index")")
           done
-          docker buildx imagetools create --tag "ghcr.io/coollabsio/coolify:$TAG" "${sources[@]}"
+          labels="$(docker buildx imagetools inspect "${sources[0]}" --format '{{ json .Image.Config.Labels }}' \
+            | jq -r 'to_entries[] | "--annotation=index:\(.key)=\(.value)"')"
+          mapfile -t annotations <<< "$labels"
+          docker buildx imagetools create "${annotations[@]}" --tag "ghcr.io/coollabsio/coolify:$TAG" "${sources[@]}"
 
   size:
     name: Compare size with latest
