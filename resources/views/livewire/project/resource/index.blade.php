@@ -167,11 +167,11 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="environment-resource-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Resource</div>
-                    <div class="resource-type">Type</div>
-                    <div>Status</div>
-                    <div class="resource-domain">Domain</div>
-                    <div class="resource-server">Server</div>
+                    <x-table.sort-header label="Resource" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Type" asc="type-asc" desc="type-desc" then="page = 1" class="resource-type" />
+                    <x-table.sort-header label="Status" asc="status-asc" desc="status-desc" then="page = 1" />
+                    <x-table.sort-header label="Domain" asc="domain-asc" desc="domain-desc" then="page = 1" class="resource-domain" />
+                    <x-table.sort-header label="Server" asc="server-asc" desc="server-desc" then="page = 1" class="resource-server" />
                     <div class="resource-tags">Tags</div>
                 </div>
 
@@ -412,11 +412,11 @@
                     label: 'Name Z–A'
                 },
                 {
-                    value: 'type',
+                    value: 'type-asc',
                     label: 'Resource type'
                 },
                 {
-                    value: 'status',
+                    value: 'status-asc',
                     label: 'Status'
                 },
             ],
@@ -443,21 +443,20 @@
                         (!query || searchable.includes(query));
                 });
 
-                return items.sort((first, second) => {
-                    if (this.sortBy === 'name-desc') {
-                        return second.name.localeCompare(first.name);
-                    }
-                    if (this.sortBy === 'type') {
-                        return first.typeLabel.localeCompare(second.typeLabel) ||
-                            first.name.localeCompare(second.name);
-                    }
-                    if (this.sortBy === 'status') {
-                        return this.statusLabel(first).localeCompare(this.statusLabel(second)) ||
-                            first.name.localeCompare(second.name);
-                    }
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (item) => item.name,
+                    type: (item) => item.typeLabel,
+                    status: (item) => this.statusLabel(item),
+                    domain: (item) => this.displayDomain(item.fqdn) || '',
+                    server: (item) => item.destination?.server?.name || 'Unknown',
+                };
+                const sortValue = sortValues[column] || sortValues.name;
+                const order = direction === 'desc' ? -1 : 1;
 
-                    return first.name.localeCompare(second.name);
-                });
+                return items.sort((first, second) =>
+                    order * (sortValue(first).localeCompare(sortValue(second)) ||
+                        first.name.localeCompare(second.name)));
             },
             uniqueOptions(options) {
                 return [...new Map(options

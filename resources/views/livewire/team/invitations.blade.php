@@ -7,13 +7,16 @@
                     <div class="data-table min-w-[760px]">
                         <div
                             class="data-table-header grid-cols-[minmax(13rem,1.2fr)_7rem_7rem_minmax(15rem,1.5fr)_6rem]">
-                            <span>Email</span>
-                            <span>Method</span>
-                            <span>Role</span>
+                            <x-table.sort-header label="Email" asc="email-asc" desc="email-desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Method" asc="via-asc" desc="via-desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Role" asc="role-asc" desc="role-desc" first="desc"
+                                action="setSort" :current="$sort" />
                             <span>Invitation link</span>
                             <span class="text-right">Actions</span>
                         </div>
-                        @foreach ($invitations as $invite)
+                        @foreach ($sortedInvitations as $invite)
                             <div wire:key="team-invitation-{{ $invite->id }}"
                                 class="data-table-row grid-cols-[minmax(13rem,1.2fr)_7rem_7rem_minmax(15rem,1.5fr)_6rem] border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                                 <div class="truncate text-[12px] font-medium text-black dark:text-fg">

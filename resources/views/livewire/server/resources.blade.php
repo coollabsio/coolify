@@ -56,11 +56,11 @@
                 @if ($resources->total() > 0)
                     <div class="data-table">
                         <div class="data-table-header server-resources-managed-table-grid">
-                            <span>Name</span>
-                            <span>Project</span>
-                            <span>Environment</span>
-                            <span>Type</span>
-                            <span>Status</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Project" asc="project_asc" desc="project_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Environment" asc="environment_asc" desc="environment_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="setSort" :current="$sort" />
                         </div>
                         @foreach ($resources as $resource)
                             @php($resourceStatus = (string) data_get($resource, 'status', 'unknown'))
@@ -109,9 +109,9 @@
                 @if ($resources->total() > 0)
                     <div class="data-table">
                         <div class="data-table-header server-resources-unmanaged-table-grid">
-                            <span>Name</span>
-                            <span>Image</span>
-                            <span>Status</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Image" asc="image_asc" desc="image_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="setSort" :current="$sort" />
                             <span>Actions</span>
                         </div>
                         @foreach ($resources as $resource)

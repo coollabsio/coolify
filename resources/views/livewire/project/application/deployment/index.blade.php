@@ -202,7 +202,8 @@
                             <span>Source</span>
                             <span>Commit</span>
                             @unless ($embedded)
-                                <span>Started</span>
+                                <x-table.sort-header label="Started" asc="oldest" desc="newest" first="desc"
+                                    action="setDeploymentSort" :current="$deploymentSort" />
                             @endunless
                             <span>Duration</span>
                             <span>Server</span>

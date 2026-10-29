@@ -164,6 +164,23 @@ it('does not load deployment payload columns for the history list on any Livewir
     ($this->assertNoPayloadQueries)();
 });
 
+it('flips the deployment sort from the started column header', function () {
+    foreach (range(1, 3) as $number) {
+        ($this->createDeployment)("header-d{$number}", "2026-10-0{$number} 10:00:00");
+    }
+
+    Livewire::test(Index::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ])
+        ->assertSeeHtml('aria-label="Sort by started, sorted descending"')
+        ->assertSeeInOrder(['header-d3', 'header-d2', 'header-d1'])
+        ->call('setDeploymentSort', 'oldest')
+        ->assertSeeHtml('aria-label="Sort by started, sorted ascending"')
+        ->assertSeeInOrder(['header-d1', 'header-d2', 'header-d3']);
+});
+
 it('does not show the deployment history of another team', function () {
     $otherTeam = otherTeamDeployment();
     unset($otherTeam['deployment_uuid']);

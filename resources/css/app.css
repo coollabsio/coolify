@@ -3045,6 +3045,53 @@ input[type="search"]::-webkit-search-results-decoration {
     color: var(--color-fg-faint);
 }
 
+.table-sort-header {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    justify-self: start;
+    gap: 0.25rem;
+    border-radius: 4px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 150ms;
+}
+
+.table-sort-header:hover,
+.table-sort-header.is-sorted {
+    color: #000;
+}
+
+.dark .table-sort-header:hover,
+.dark .table-sort-header.is-sorted {
+    color: var(--color-fg);
+}
+
+.table-sort-header:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1px var(--color-accent, currentColor);
+}
+
+.table-sort-header-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 150ms, transform 150ms;
+}
+
+.table-sort-header:hover .table-sort-header-icon {
+    opacity: 0.5;
+}
+
+.table-sort-header-icon.is-visible {
+    opacity: 1;
+}
+
 .data-table > .env-table-item {
     border-bottom: 1px solid var(--coollabs-fill);
 }
@@ -3453,7 +3500,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 6rem;
     min-width: 50rem;
 }
 
