@@ -3,6 +3,8 @@
         <div class="flex flex-col gap-4" x-data="{
             showRecovery: false,
             submitting: false,
+            code: '',
+            codeFocused: false,
             handleSubmit(event) {
                 if (this.submitting) {
                     event.preventDefault();
@@ -12,6 +14,7 @@
             },
             submitAuthenticatorCode(event) {
                 event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
+                this.code = event.target.value;
 
                 if (event.target.value.length === 6) {
                     this.$nextTick(() => this.$refs.challengeForm.requestSubmit());
@@ -43,11 +46,23 @@
                 @csrf
 
                 <div x-show="!showRecovery" class="flex flex-col gap-3">
-                    <input x-ref="authenticatorCode" type="text" name="code" inputmode="numeric"
-                        pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" autofocus
-                        aria-label="Two-factor authentication code" :disabled="showRecovery"
-                        @input="submitAuthenticatorCode($event)"
-                        class="mx-auto h-14 w-64 rounded-md border border-neutral-300 bg-white px-4 text-center text-xl font-semibold tracking-[0.5em] text-neutral-900 transition-colors focus:border-warning focus:outline-none focus:ring-1 focus:ring-warning dark:border-white/10 dark:bg-coolgray-100 dark:text-white" />
+                    <div class="relative mx-auto flex gap-2">
+                        @for ($i = 0; $i < 6; $i++)
+                            <div aria-hidden="true" data-code-digit
+                                class="flex h-14 w-11 items-center justify-center rounded-md border bg-white text-xl font-semibold text-neutral-900 transition-colors dark:bg-coolgray-100 dark:text-white"
+                                :class="codeFocused && (code.length === {{ $i }} || (code.length === 6 && {{ $i }} === 5))
+                                    ? 'border-coollabs ring-1 ring-coollabs'
+                                    : 'border-neutral-300 dark:border-white/10'"
+                                x-text="code[{{ $i }}] ?? ''"></div>
+                        @endfor
+                        <input x-ref="authenticatorCode" type="text" name="code" inputmode="numeric"
+                            pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" autofocus
+                            aria-label="Two-factor authentication code" :disabled="showRecovery"
+                            x-init="codeFocused = document.activeElement === $el"
+                            @input="submitAuthenticatorCode($event)" @focus="codeFocused = true"
+                            @blur="codeFocused = false"
+                            class="absolute inset-0 h-full w-full cursor-text rounded-md border-0 bg-transparent text-transparent caret-transparent opacity-0 focus:outline-none focus:ring-0" />
+                    </div>
                     <button type="button" class="auth-text-link self-center"
                         x-on:click="showRecovery = true; $nextTick(() => $refs.recoveryCode.focus())">
                         Use a recovery code
