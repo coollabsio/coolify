@@ -224,7 +224,7 @@ test('new server provider pages render the selected creation flow', function (st
         ->assertDontSee('<h1>New Server</h1>', false)
         ->assertDontSee('Choose how to add your server');
 
-    $response->assertSeeInOrder(['New server', 'Change method', $heading]);
+    $response->assertSeeInOrder(['Add Docker server', 'Change method', $heading]);
 })->with([
     ['hetzner', 'Hetzner account'],
     ['vultr', 'Vultr account'],

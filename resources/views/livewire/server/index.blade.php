@@ -16,61 +16,45 @@
                 $canAddClusterServer = $clusterServersEnabled && auth()->user()->can('create', App\Models\Node::class);
             @endphp
             @if ($canAddClusterServer)
-                {{-- The shared split button (as Deploy on application pages). Both parts open the menu;
-                     each item opens its form through a hidden trigger. The New cluster form lives in node-cluster.index. --}}
-                <x-split-action id="server-index-add-actions">
-                    <x-slot:main x-on:click="open = !open">
-                        <x-reicon name="plus" class="size-3.5" />
-                        Add
-                    </x-slot:main>
-                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-                        x-on:click="open = false; document.getElementById('add-server-trigger')?.click()">
-                        <x-reicon name="servers" class="size-3.5 opacity-70" />
-                        Server
-                    </button>
+                {{-- One dropdown button with the server kinds and New cluster.
+                     The New cluster form lives in node-cluster.index. --}}
+                <x-table.dropdown panel-class="w-72!" role="menu">
+                    <x-slot:trigger>
+                        <button type="button" id="server-index-add-actions" class="button button-highlighted gap-1.5"
+                            aria-haspopup="menu" :aria-expanded="open">
+                            <x-reicon name="plus" class="size-3.5" />
+                            Add
+                            <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open && 'rotate-180'" />
+                        </button>
+                    </x-slot:trigger>
+                    <a href="{{ route('node.onboarding') }}" {{ wireNavigate() }} class="listbox-option items-start! justify-start! gap-2.5! py-2!" role="menuitem">
+                        <x-reicon name="cluster" class="mt-0.5 size-3.5 shrink-0 opacity-70" />
+                        <span class="flex min-w-0 flex-col text-left">
+                            <span>Cluster server</span>
+                            <span class="whitespace-normal text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">Podman host that joins a cluster and runs cluster applications.</span>
+                        </span>
+                    </a>
+                    @if ($canAddDockerServer)
+                        <a href="{{ route('server.create') }}" {{ wireNavigate() }} class="listbox-option items-start! justify-start! gap-2.5! py-2!" role="menuitem">
+                            <x-reicon name="servers" class="mt-0.5 size-3.5 shrink-0 opacity-70" />
+                            <span class="flex min-w-0 flex-col text-left">
+                                <span>Docker server</span>
+                                <span class="whitespace-normal text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">Docker host over SSH for applications, databases, and services.</span>
+                            </span>
+                        </a>
+                    @endif
                     @can('create', App\Models\NodeCluster::class)
-                        <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-                            x-on:click="open = false; document.getElementById('new-cluster-trigger')?.click()">
-                            <x-reicon name="cluster" class="size-3.5 opacity-70" />
-                            Cluster
+                        <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
+                        <button type="button" class="listbox-option items-start! justify-start! gap-2.5! py-2!" role="menuitem"
+                            x-on:click="close(); document.getElementById('new-cluster-trigger')?.click()">
+                            <x-reicon name="plus" class="mt-0.5 size-3.5 shrink-0 opacity-70" />
+                            <span class="flex min-w-0 flex-col text-left">
+                                <span>New cluster</span>
+                                <span class="whitespace-normal text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">A private network for cluster servers.</span>
+                            </span>
                         </button>
                     @endcan
-                </x-split-action>
-                <x-modal-input title="Add server" subtitle="Choose the kind of server to add." class="hidden">
-                    <x-slot:content>
-                        <button type="button" id="add-server-trigger" class="hidden" aria-hidden="true" tabindex="-1"></button>
-                    </x-slot:content>
-                    <div data-testid="add-server-choice" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <a href="{{ route('node.onboarding') }}" {{ wireNavigate() }}
-                            class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                            <span
-                                class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                <x-reicon name="cluster" class="size-4" />
-                            </span>
-                            <div class="pt-5">
-                                <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Cluster server</h3>
-                                <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
-                                    Podman host managed by Sentinel. Joins a cluster and runs cluster applications.
-                                </p>
-                            </div>
-                        </a>
-                        @if ($canAddDockerServer)
-                            <a href="{{ route('server.create') }}" {{ wireNavigate() }}
-                                class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                                <span
-                                    class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="servers" class="size-4" />
-                                </span>
-                                <div class="pt-5">
-                                    <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Docker server</h3>
-                                    <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
-                                        Docker host managed over SSH. Runs applications, databases, and services.
-                                    </p>
-                                </div>
-                            </a>
-                        @endif
-                    </div>
-                </x-modal-input>
+                </x-table.dropdown>
             @elseif ($canAddDockerServer)
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">

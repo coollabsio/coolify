@@ -1,34 +1,27 @@
 <div class="w-full">
     <x-slot:title>
-        New Server | Coolify
+        Add Docker server | Coolify
     </x-slot>
 
-    <div class="mb-5 flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">New server</h1>
-        <div class="flex flex-wrap items-center gap-2">
-            @if ($selectedType)
-                <a href="{{ route('server.create') }}" class="button" {{ wireNavigate() }}>
-                    Change method
-                </a>
-            @endif
-        </div>
-    </div>
+    {{-- Same header as the Add cluster server page (node/onboarding). --}}
+    <header class="mb-5">
+        <x-back-link :href="$selectedType ? route('server.create') : route('server.index')">
+            {{ $selectedType ? 'Change method' : 'Servers' }}
+        </x-back-link>
+        <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Add Docker server</h1>
+        <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Connect a Docker host over SSH, or provision one with a cloud provider.</p>
+    </header>
 
     @if (!$selectedType)
         <div class="application-settings-form flex flex-col gap-6">
-            <section class="application-settings-section">
-                <div class="application-settings-section-header">
-                    <h2 class="application-settings-section-title">Add a server</h2>
-                    <p class="application-settings-section-description">Connect a server you already manage.</p>
-                </div>
-                <div class="application-settings-section-body is-flush">
+            <x-application.settings-section title="Connect your server" helper="Connect a server you already manage." flush>
                     <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
                         <a href="{{ route('server.create.type', ['type' => 'manual']) }}"
                             class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}>
                             <div class="flex items-start">
                                 <span
-                                    class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    class="resource-glyph flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                                     <x-reicon name="servers" class="size-4" />
                                 </span>
                             </div>
@@ -40,16 +33,10 @@
                             </div>
                         </a>
                     </div>
-                </div>
-            </section>
+            </x-application.settings-section>
 
             @can('viewAny', App\Models\CloudProviderToken::class)
-                <section class="application-settings-section">
-                    <div class="application-settings-section-header">
-                        <h2 class="application-settings-section-title">Provision a server</h2>
-                        <p class="application-settings-section-description">Create a server with a cloud provider.</p>
-                    </div>
-                    <div class="application-settings-section-body is-flush">
+                <x-application.settings-section title="Provision a server" helper="Create a server with a cloud provider." flush>
                         <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
                             <a href="{{ route('server.create.type', ['type' => 'hetzner']) }}"
                                 class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
@@ -109,8 +96,7 @@
                             </a>
 
                         </div>
-                    </div>
-                </section>
+                </x-application.settings-section>
             @endcan
         </div>
     @else

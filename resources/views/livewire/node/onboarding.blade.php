@@ -1,10 +1,8 @@
-<div class="application-settings-form mx-auto w-full max-w-3xl">
+<div class="application-settings-form w-full">
     <x-slot:title>Add cluster server | Coolify</x-slot>
 
     <header class="mb-5">
-        <a href="{{ route('server.index') }}" {{ wireNavigate() }} class="mb-2 inline-flex items-center gap-1 text-[12px] text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
-            <x-reicon name="arrow-right" class="size-3.5 rotate-180" /> Servers
-        </a>
+        <x-back-link :href="route('server.index')">Servers</x-back-link>
         <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Add cluster server</h1>
         <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Connect a server. Coolify installs and configures the required components.</p>
     </header>

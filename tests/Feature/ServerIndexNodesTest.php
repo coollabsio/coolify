@@ -57,7 +57,7 @@ it('groups cluster servers by cluster above the Docker servers', function () {
 
     Livewire::test(ServerIndex::class)
         ->assertSeeLivewire(ClusterGroups::class)
-        ->assertSee('Add server')
+        ->assertSee('Cluster server')
         ->assertSeeInOrder(['Clusters', 'Docker servers', 'Docker host one'])
         ->assertDontSee('Node');
 
@@ -134,10 +134,9 @@ it('keeps the classic servers page when the cluster stack is disabled', function
         ->assertDontSee(route('node.onboarding'), escape: false);
 });
 
-it('asks whether to add a cluster server or a Docker server', function () {
+it('lists the server kinds and New cluster in the Add menu', function () {
     Livewire::test(ServerIndex::class)
-        ->assertSeeHtml('data-testid="add-server-choice"')
-        ->assertSeeInOrder(['Add server', 'Cluster server', 'Podman host managed by Sentinel', 'Docker server', 'Docker host managed over SSH'])
+        ->assertSeeInOrder(['Cluster server', 'joins a cluster', 'Docker server', 'Docker host over SSH', 'New cluster'])
         ->assertSee(route('node.onboarding'), escape: false)
         ->assertSee(route('server.create'), escape: false)
         ->assertDontSee('New server');

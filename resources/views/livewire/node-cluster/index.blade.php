@@ -61,7 +61,7 @@
                 <div class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.08]">
                     <div class="flex min-w-0 items-center gap-3">
                         <div
-                            class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
+                            class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
                             <x-reicon name="cluster" class="size-4" />
                         </div>
                         <div class="min-w-0">
