@@ -23,6 +23,7 @@ use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use App\Traits\ReleasesManagedDnsRecords;
+use App\Traits\ScopedByAccessGrants;
 use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -54,6 +55,7 @@ use Symfony\Component\Yaml\Yaml;
         'git_branch' => ['type' => 'string', 'description' => 'Git branch.'],
         'git_commit_sha' => ['type' => 'string', 'description' => 'Git commit SHA.'],
         'git_full_url' => ['type' => 'string', 'nullable' => true, 'description' => 'Git full URL.'],
+        'git_https_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTPS access to a private repository on a custom Git host. The password or token is never returned.'],
         'docker_registry_image_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image name.'],
         'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image tag.'],
         'build_pack' => ['type' => 'string', 'description' => 'Build pack.', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose']],
@@ -138,7 +140,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -160,6 +162,8 @@ class Application extends BaseModel
         'git_branch',
         'git_commit_sha',
         'git_full_url',
+        'git_https_username',
+        'git_https_password',
         'docker_registry_image_name',
         'docker_registry_image_tag',
         'build_pack',
@@ -281,6 +285,7 @@ class Application extends BaseModel
     protected $hidden = [
         ...self::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
         'http_basic_auth_password',
+        'git_https_password',
         'manual_webhook_secret_github',
         'manual_webhook_secret_gitlab',
         'manual_webhook_secret_bitbucket',
@@ -297,6 +302,7 @@ class Application extends BaseModel
     {
         return [
             'http_basic_auth_password' => 'encrypted',
+            'git_https_password' => 'encrypted',
             'http_basic_auth_hash_algorithm' => HttpBasicAuthHashAlgorithm::class,
             'manual_webhook_secret_github' => 'encrypted',
             'manual_webhook_secret_gitlab' => 'encrypted',
@@ -1816,6 +1822,10 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $escapedCustomRepository = escapeshellarg($customRepository);
+            $gitConfigOption = $this->gitHttpsCredentialConfigOption();
+            if ($gitConfigOption) {
+                $base_command = "git {$gitConfigOption} ls-remote";
+            }
             $base_command = "{$base_command} {$escapedCustomRepository}";
 
             if ($exec_in_docker) {
@@ -1830,6 +1840,53 @@ class Application extends BaseModel
                 'fullRepoUrl' => $fullRepoUrl,
             ];
         }
+    }
+
+    /**
+     * Tells if the application clones a private repository from a custom Git host over HTTP(S) with a username and a password or token.
+     */
+    public function usesGitHttpsCredential(): bool
+    {
+        return filled($this->git_https_password)
+            && $this->deploymentType() === 'other'
+            && $this->gitHttpsCredentialOrigin() !== null;
+    }
+
+    /**
+     * The value of the Basic auth header for the HTTPS credential, also used to redact it from logs.
+     */
+    public function gitHttpsCredentialBasicToken(): ?string
+    {
+        if (blank($this->git_https_password)) {
+            return null;
+        }
+
+        return base64_encode(($this->git_https_username ?? '').':'.$this->git_https_password);
+    }
+
+    /**
+     * A `git -c` option that sends the HTTPS credential as a Basic auth header, only to the host of the repository.
+     * Git does not save `-c` options in .git/config, and it passes them on to submodule and Git LFS commands.
+     */
+    public function gitHttpsCredentialConfigOption(): ?string
+    {
+        if (! $this->usesGitHttpsCredential()) {
+            return null;
+        }
+
+        return '-c '.escapeshellarg("http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}");
+    }
+
+    private function gitHttpsCredentialOrigin(): ?string
+    {
+        $url = parse_url((string) $this->git_repository);
+        $scheme = strtolower($url['scheme'] ?? '');
+        if (! in_array($scheme, ['http', 'https'], true) || blank($url['host'] ?? null)) {
+            return null;
+        }
+        $port = isset($url['port']) ? ":{$url['port']}" : '';
+
+        return "{$scheme}://{$url['host']}{$port}/";
     }
 
     private function gitCommand(string $command): array
@@ -2138,8 +2195,11 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $escapedCustomRepository = escapeshellarg($customRepository);
+            $gitConfigOption = $this->gitHttpsCredentialConfigOption();
+            $gitCommand = $gitConfigOption ? "git {$gitConfigOption}" : 'git';
+            $git_clone_command = str_replace('git clone', "{$gitCommand} clone", $git_clone_command);
             $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout);
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
             $otherSshCommand = gitSshCommand($customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
 
             if ($pull_request_id !== 0) {
@@ -2150,7 +2210,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2158,14 +2218,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" ".$this->buildGitCheckoutCommand($commit, $otherSshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" ".$this->buildGitCheckoutCommand($commit, $otherSshCommand, $gitConfigOption);
                 }
             }
 

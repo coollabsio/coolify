@@ -257,6 +257,25 @@ class SshMultiplexingHelper
     }
 
     /**
+     * Build an SSH command that runs the command batch given to the process as input (see sshBatchInput()).
+     * The batch is not part of any command line on the Coolify host, where `ps` would show its secrets
+     * (database passwords, registry passwords, tokens), and it is not limited to 128 KiB.
+     * Like the quoted heredoc of generateSshCommand(), the batch gets no local shell expansion.
+     */
+    public static function generateSshBatchCommand(Server $server, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
+    {
+        return self::generateSshStdinCommand($server, self::remoteShellCommand(), $disableMultiplexing, $commandTimeout);
+    }
+
+    /**
+     * The process input for generateSshBatchCommand(). A heredoc ends its content with a newline, so does this.
+     */
+    public static function sshBatchInput(string $command): string
+    {
+        return $command.PHP_EOL;
+    }
+
+    /**
      * Build an SSH command that runs one short remote command and leaves stdin free for data.
      * Large content must go through stdin: Linux limits one exec argument to 128 KiB, and
      * generateSshCommand() puts the whole script into one `sh -c` argument.

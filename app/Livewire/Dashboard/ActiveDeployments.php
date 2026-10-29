@@ -64,7 +64,8 @@ class ActiveDeployments extends Component
     {
         return ApplicationDeploymentQueue::query()
             ->with(['application.environment.project'])
-            ->ownedByTeam(currentTeam()->id);
+            ->ownedByTeam(currentTeam()->id)
+            ->visibleToCurrentActor();
     }
 
     public function render()

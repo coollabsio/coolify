@@ -157,11 +157,11 @@ describe('validate with install', function () {
 });
 
 describe('delete', function () {
-    test('write-only token cannot delete with force or delete_from_provider', function (string $query) {
+    test('token without the deploy permission cannot delete with force or delete_from_provider', function (string $query) {
         CloudProviderToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'hetzner']);
         $this->server->update(['hetzner_server_id' => 123]);
 
-        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write']))
+        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write', 'delete']))
             ->deleteJson("/api/v1/servers/{$this->server->uuid}?{$query}")
             ->assertForbidden()
             ->assertJsonPath('message', 'Missing required permissions: deploy. Deleting the resources or the cloud server needs a token with the deploy permission.');
@@ -169,16 +169,16 @@ describe('delete', function () {
         expect(Server::query()->whereKey($this->server->id)->exists())->toBeTrue();
     })->with(['force=true', 'delete_from_provider=true']);
 
-    test('write-only token can delete an empty server', function () {
-        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write']))
+    test('delete token can delete an empty server', function () {
+        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['delete']))
             ->deleteJson("/api/v1/servers/{$this->server->uuid}")
             ->assertOk();
 
         expect(Server::query()->whereKey($this->server->id)->exists())->toBeFalse();
     });
 
-    test('write and deploy token can delete with force', function () {
-        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
+    test('delete and deploy token can delete with force', function () {
+        $this->withHeaders(serverDeployAbilityHeaders($this->user, $this->team->id, ['delete', 'deploy']))
             ->deleteJson("/api/v1/servers/{$this->server->uuid}?force=true")
             ->assertOk();
 
