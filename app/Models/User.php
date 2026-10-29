@@ -216,19 +216,21 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
      */
     public function deleteIfNotVerifiedAndForcePasswordReset(): void
     {
-        if ($this->hasVerifiedEmail() || $this->force_password_reset !== true) {
-            return;
+        if ($this->isUnusedInvitedAccount()) {
+            $this->delete();
         }
+    }
 
-        if (TeamInvitation::whereEmail($this->email)->exists()) {
-            return;
-        }
-
-        if ($this->belongsToNonPersonalTeam()) {
-            return;
-        }
-
-        $this->delete();
+    /**
+     * Whether an invitation created this account and nobody uses it: the owner never set a password,
+     * it has no pending invitations, and it belongs to no team other than its own personal team.
+     */
+    public function isUnusedInvitedAccount(): bool
+    {
+        return ! $this->hasVerifiedEmail()
+            && $this->force_password_reset === true
+            && ! TeamInvitation::whereEmail($this->email)->exists()
+            && ! $this->belongsToNonPersonalTeam();
     }
 
     /**
