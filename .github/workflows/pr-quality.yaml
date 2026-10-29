@@ -13,7 +13,7 @@ jobs:
   pr-quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: peakoss/anti-slop@v0
+      - uses: peakoss/anti-slop@v0.3.0
         with:
           # General Settings
           max-failures: 4
