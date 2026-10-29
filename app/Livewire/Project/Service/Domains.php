@@ -10,6 +10,7 @@ use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
@@ -269,22 +270,10 @@ class Domains extends Component
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
 
-        $server = $this->service->server;
-        if ($server) {
-            if ($server->id === 0) {
-                $configured = data_get($settings, 'public_ipv4')
-                    ?: data_get($settings, 'public_ipv6')
-                    ?: $server->ip;
-            } else {
-                $configured = $server->ip;
-            }
-            $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
-            $this->serverIpConfigured = $resolved['configured'];
-            $this->serverIp = $resolved['ip'] ?? $resolved['configured'];
-        } else {
-            $this->serverIp = null;
-            $this->serverIpConfigured = null;
-        }
+        $addresses = ServerDnsAddresses::forServer($this->service->server);
+        $this->serverIpConfigured = $addresses->configured;
+        // Prefer the real IP so users know what DNS record to set when the server address is a hostname.
+        $this->serverIp = $addresses->address;
 
         $this->forceHttpsRedirects = $this->service->applications
             ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isForceHttpsEnabled()])

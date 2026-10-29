@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\ApplicationPreviewsController;
 use App\Http\Controllers\Api\ApplicationsController;
-use App\Http\Controllers\Api\ApplicationSecretManagerController;
 use App\Http\Controllers\Api\AuditEventsController;
 use App\Http\Controllers\Api\CloudInitScriptsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
@@ -10,6 +9,7 @@ use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\DigitalOceanController;
+use App\Http\Controllers\Api\DnsController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\S3StoragesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
+use App\Http\Controllers\Api\SecretManagerController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServerCloudflareTunnelController;
@@ -126,7 +127,13 @@ Route::group([
     Route::get('/security/keys/{uuid}', [SecurityController::class, 'key_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/security/keys/{uuid}', [SecurityController::class, 'update_key'])->middleware(['api.ability:write']);
     Route::delete('/security/keys/{uuid}', [SecurityController::class, 'delete_key'])->middleware(['api.ability:delete']);
+    Route::get('/security/integration-tokens', [IntegrationTokensController::class, 'index'])->middleware(['api.ability:read']);
     Route::post('/security/integration-tokens', [IntegrationTokensController::class, 'store'])->middleware(['api.ability:write']);
+    Route::get('/security/integration-tokens/{uuid}', [IntegrationTokensController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/security/integration-tokens/{uuid}', [IntegrationTokensController::class, 'update'])->middleware(['api.ability:write']);
+    Route::delete('/security/integration-tokens/{uuid}', [IntegrationTokensController::class, 'destroy'])->middleware(['api.ability:delete']);
+    Route::post('/security/integration-tokens/{uuid}/sync-zones', [IntegrationTokensController::class, 'syncZones'])->middleware(['api.ability:write']);
+    Route::get('/dns/zones', [DnsController::class, 'zones'])->middleware(['api.ability:read']);
 
     Route::get('/cloud-tokens', [CloudProviderTokensController::class, 'index'])->middleware(['api.ability:read']);
     Route::post('/cloud-tokens', [CloudProviderTokensController::class, 'store'])->middleware(['api.ability:write']);
@@ -255,7 +262,20 @@ Route::group([
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:delete']);
-    Route::patch('/applications/{uuid}/secret-manager', [ApplicationSecretManagerController::class, 'update'])->middleware(['api.ability:write']);
+
+    Route::whereIn('resource_type', ['applications', 'services', 'databases'])->group(function () {
+        Route::get('/{resource_type}/{uuid}/secret-manager', [SecretManagerController::class, 'show'])->middleware(['api.ability:read']);
+        Route::patch('/{resource_type}/{uuid}/secret-manager', [SecretManagerController::class, 'update'])->middleware(['api.ability:write']);
+        Route::delete('/{resource_type}/{uuid}/secret-manager', [SecretManagerController::class, 'destroy'])->middleware(['api.ability:delete']);
+        Route::get('/{resource_type}/{uuid}/secret-manager/keys', [SecretManagerController::class, 'keys'])->middleware(['api.ability:write']);
+        Route::post('/{resource_type}/{uuid}/secret-manager/references', [SecretManagerController::class, 'addReference'])->middleware(['api.ability:write']);
+        Route::post('/{resource_type}/{uuid}/secret-manager/import', [SecretManagerController::class, 'import'])->middleware(['api.ability:write']);
+    });
+
+    Route::get('/applications/{uuid}/dns', [DnsController::class, 'applicationStatus'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/dns', [DnsController::class, 'createApplicationRecord'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/dns/replace', [DnsController::class, 'replaceApplicationRecord'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/dns/{hostname}', [DnsController::class, 'releaseApplicationRecord'])->middleware(['api.ability:delete']);
 
     Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/envs', [ApplicationsController::class, 'create_env'])->middleware(['api.ability:write']);
@@ -394,6 +414,11 @@ Route::group([
     Route::delete('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'destroy'])
         ->defaults('resource_type', 'service')
         ->middleware(['api.ability:delete']);
+
+    Route::get('/services/{uuid}/dns', [DnsController::class, 'serviceStatus'])->middleware(['api.ability:read']);
+    Route::post('/services/{uuid}/dns', [DnsController::class, 'createServiceRecord'])->middleware(['api.ability:write']);
+    Route::post('/services/{uuid}/dns/replace', [DnsController::class, 'replaceServiceRecord'])->middleware(['api.ability:write']);
+    Route::delete('/services/{uuid}/dns/{hostname}', [DnsController::class, 'releaseServiceRecord'])->middleware(['api.ability:delete']);
 
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs'])->middleware(['api.ability:read']);
     Route::post('/services/{uuid}/envs', [ServicesController::class, 'create_env'])->middleware(['api.ability:write']);

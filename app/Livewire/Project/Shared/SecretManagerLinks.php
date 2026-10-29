@@ -4,9 +4,9 @@ namespace App\Livewire\Project\Shared;
 
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\IntegrationToken;
+use App\Services\SecretManagers\ResourceSecretManager;
 use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -45,10 +45,7 @@ class SecretManagerLinks extends Component
     private function loadData(): void
     {
         $this->link = $this->resource->secretManagerLink()->with('integrationToken')->first();
-        $this->availableTokens = $this->resourceTeamTokens()
-            ->get()
-            ->filter(fn (IntegrationToken $token) => in_array('secrets', $token->capabilities ?? [], true))
-            ->values();
+        $this->availableTokens = $this->secretManager()->availableTokens($this->resource);
 
         if ($this->link) {
             $this->integration_token_uuid = $this->link->integrationToken->uuid;
@@ -62,19 +59,12 @@ class SecretManagerLinks extends Component
             return null;
         }
 
-        return $this->resourceTeamTokens()->where('uuid', $this->integration_token_uuid)->get()
-            ->first(fn (IntegrationToken $token) => in_array('secrets', $token->capabilities ?? [], true));
+        return $this->secretManager()->findToken($this->resource, $this->integration_token_uuid);
     }
 
-    /**
-     * Secret manager tokens of the resource's team. The session team can differ: a user can
-     * switch teams in another tab while this component is still open.
-     */
-    private function resourceTeamTokens(): Builder
+    private function secretManager(): ResourceSecretManager
     {
-        return IntegrationToken::query()
-            ->where('team_id', $this->resource->team()?->id)
-            ->whereIn('provider', IntegrationToken::SECRET_MANAGER_PROVIDERS);
+        return app(ResourceSecretManager::class);
     }
 
     protected function rules(): array
@@ -83,24 +73,10 @@ class SecretManagerLinks extends Component
             'integration_token_uuid' => ['required', 'string'],
         ];
 
-        $rules += match ($this->selectedToken?->provider) {
-            'doppler' => $this->selectedToken->dopplerTokenType() === 'service_account'
-                ? [
-                    'settings.project' => ['required', 'string'],
-                    'settings.config' => ['required', 'string'],
-                ]
-                : [],
-            'infisical' => [
-                'settings.project_id' => ['required', 'string'],
-                'settings.environment' => ['required', 'string'],
-                'settings.secret_path' => ['nullable', 'string'],
-            ],
-            'vault' => [
-                'settings.mount' => ['required', 'string'],
-                'settings.path' => ['required', 'string'],
-            ],
-            default => [],
-        };
+        $token = $this->selectedToken;
+        if ($token !== null) {
+            $rules += $this->secretManager()->settingsRules($token);
+        }
 
         return $rules;
     }
@@ -126,16 +102,7 @@ class SecretManagerLinks extends Component
             }
 
             $validated = $this->validate($this->tokenChangeRules());
-            $settings = array_filter(data_get($validated, 'settings', []), fn ($value) => filled($value));
-
-            $this->resource->secretManagerLink()->updateOrCreate([], [
-                'integration_token_id' => $token->id,
-                'settings' => $settings ?: null,
-            ]);
-            $this->auditSecretManagerAction('source_updated', [
-                'integration_token_uuid' => $token->uuid,
-                'provider' => $token->provider,
-            ]);
+            $this->secretManager()->link($this->resource, $token, data_get($validated, 'settings', []), 'ui');
 
             $this->resetKeys();
             $this->loadData();
@@ -180,7 +147,7 @@ class SecretManagerLinks extends Component
             $settings = array_filter(data_get($validated, 'settings', []), fn ($value) => filled($value));
 
             $this->link->update(['settings' => $settings ?: null]);
-            $this->auditSecretManagerAction('settings_updated');
+            $this->secretManager()->audit('ui', $this->resource, 'settings_updated');
             $this->resetKeys();
             $this->loadData();
             $this->dispatch('success', 'Secret manager settings saved.');
@@ -193,12 +160,7 @@ class SecretManagerLinks extends Component
     {
         try {
             $this->authorize('update', $this->resource);
-            $token = $this->link?->integrationToken;
-            $this->resource->secretManagerLink()->delete();
-            $this->auditSecretManagerAction('source_removed', [
-                'integration_token_uuid' => $token?->uuid,
-                'provider' => $token?->provider,
-            ]);
+            $this->secretManager()->unlink($this->resource, 'ui');
             $this->link = null;
             $this->integration_token_uuid = '';
             $this->settings = [];
@@ -219,12 +181,8 @@ class SecretManagerLinks extends Component
                 return;
             }
 
-            // Values are fetched into memory, reduced to key names, and discarded.
-            $keys = array_keys($this->link->fetchSecrets());
-            sort($keys);
-            $this->keys = $keys;
+            $this->keys = $this->secretManager()->keyNames($this->resource, $this->link, 'ui');
             $this->keysLoaded = true;
-            $this->auditSecretManagerAction('keys_viewed', ['key_count' => count($keys)]);
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Could not fetch keys: '.$e->getMessage());
         }
@@ -239,23 +197,13 @@ class SecretManagerLinks extends Component
                 return;
             }
 
-            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
-                $this->dispatch('error', "{$key} is not a valid variable name.");
+            try {
+                $this->secretManager()->addReference($this->resource, $key, 'ui');
+            } catch (ValidationException $e) {
+                $this->dispatch('error', $e->validator->errors()->first('key'));
 
                 return;
             }
-
-            if ($this->resource->environment_variables()->where('key', $key)->exists()) {
-                $this->dispatch('error', "A variable with the key {$key} already exists.");
-
-                return;
-            }
-
-            $this->resource->environment_variables()->create([
-                'key' => $key,
-                'value' => '{{vault.'.$key.'}}',
-            ]);
-            $this->auditSecretManagerAction('reference_created', ['secret_key' => $key]);
 
             $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('success', "Added {$key} as {{vault.{$key}}}.");
@@ -273,12 +221,7 @@ class SecretManagerLinks extends Component
                 return;
             }
 
-            ['imported' => $imported, 'skipped' => $skipped] = $this->link->importMissingReferences();
-            $this->auditSecretManagerAction('references_imported', [
-                'key_count' => count($imported),
-                'secret_keys' => $imported,
-                'skipped_key_count' => count($skipped),
-            ]);
+            ['imported' => $imported, 'skipped' => $skipped] = $this->secretManager()->importAll($this->resource, $this->link, 'ui');
 
             $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('success', $this->importResultMessage($imported, $skipped));
@@ -319,18 +262,6 @@ class SecretManagerLinks extends Component
         $this->keys = [];
         $this->keysLoaded = false;
         $this->search = '';
-    }
-
-    /** @param array<string, mixed> $context */
-    private function auditSecretManagerAction(string $action, array $context = []): void
-    {
-        $resourceType = str(class_basename($this->resource))->snake()->value();
-
-        auditLog("ui.{$resourceType}.secret_manager.{$action}", array_merge([
-            'team_id' => $this->resource->team()?->id,
-            "{$resourceType}_uuid" => $this->resource->uuid,
-            "{$resourceType}_name" => $this->resource->name,
-        ], $context));
     }
 
     public function getFilteredKeysProperty(): array

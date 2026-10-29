@@ -400,10 +400,11 @@ class ManagedDnsRecordCleanup
     private function worseResult(?ManagedDnsDeletionResult $current, ?ManagedDnsDeletionResult $next): ?ManagedDnsDeletionResult
     {
         $rank = fn (?ManagedDnsDeletionResult $result): int => match ($result) {
-            ManagedDnsDeletionResult::Failed => 3,
-            ManagedDnsDeletionResult::Busy => 2,
-            ManagedDnsDeletionResult::ChangedExternally => 1,
-            default => 0,
+            ManagedDnsDeletionResult::Failed => 4,
+            ManagedDnsDeletionResult::Busy => 3,
+            ManagedDnsDeletionResult::ChangedExternally => 2,
+            null => 0,
+            default => 1,
         };
 
         return $rank($next) > $rank($current) ? $next : $current;
@@ -473,7 +474,11 @@ class ManagedDnsRecordCleanup
 
     private function auditSkipped(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
-        $source = auth()->check() ? 'ui' : 'system';
+        $source = match (true) {
+            auth()->user()?->currentAccessToken() !== null => 'api',
+            auth()->check() => 'ui',
+            default => 'system',
+        };
         auditLog("{$source}.dns_record.delete_skipped", [
             'team_id' => $record->team_id,
             'hostname' => $record->name,

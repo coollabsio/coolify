@@ -410,66 +410,6 @@
                 ]
             }
         },
-        "\/applications\/{uuid}\/secret-manager": {
-            "patch": {
-                "tags": [
-                    "Secret Managers"
-                ],
-                "summary": "Configure Application Secret Manager",
-                "description": "Configure the secret manager source used by an application.",
-                "operationId": "configure-application-secret-manager",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "required": [
-                                    "integration_token_uuid"
-                                ],
-                                "properties": {
-                                    "integration_token_uuid": {
-                                        "type": "string"
-                                    },
-                                    "settings": {
-                                        "type": "object"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Secret manager configured."
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "422": {
-                        "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "\/applications": {
             "get": {
                 "tags": [
@@ -11561,6 +11501,634 @@
                 ]
             }
         },
+        "\/dns\/zones": {
+            "get": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "List DNS Zones",
+                "description": "List the DNS zones that the Cloudflare tokens of the team can access. Requires admin or owner.",
+                "operationId": "list-dns-zones",
+                "responses": {
+                    "200": {
+                        "description": "DNS zones.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "zone": {
+                                                "type": "string"
+                                            },
+                                            "account_name": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "integration_token_uuid": {
+                                                "type": "string"
+                                            },
+                                            "integration_token_name": {
+                                                "type": "string"
+                                            },
+                                            "managed_records_count": {
+                                                "type": "integer"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/dns": {
+            "get": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Get Application DNS",
+                "description": "DNS providers and managed DNS records for the domains of an application.",
+                "operationId": "get-application-dns",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "DNS status.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceDnsStatus"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No access to the application."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Create Application DNS Record",
+                "description": "Create a DNS record at Cloudflare that points a domain of the application to its server. An existing record with the same address is adopted.",
+                "operationId": "create-application-dns-record",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/CreateDnsRecordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "DNS record created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "record": {
+                                            "$ref": "#\/components\/schemas\/ManagedDnsRecord"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cloudflare rejected the change."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the application."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Another record uses the hostname. Replace it with the replace endpoint.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/DnsRecordConflict"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "423": {
+                        "description": "Another DNS change for the hostname is in progress. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/dns": {
+            "get": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Get Service DNS",
+                "description": "DNS providers and managed DNS records for the domains of a service.",
+                "operationId": "get-service-dns",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "DNS status.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceDnsStatus"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No access to the service."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Create Service DNS Record",
+                "description": "Create a DNS record at Cloudflare that points a domain of the service to its server. An existing record with the same address is adopted.",
+                "operationId": "create-service-dns-record",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/CreateDnsRecordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "DNS record created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "record": {
+                                            "$ref": "#\/components\/schemas\/ManagedDnsRecord"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cloudflare rejected the change."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the service."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Another record uses the hostname. Replace it with the replace endpoint.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/DnsRecordConflict"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "423": {
+                        "description": "Another DNS change for the hostname is in progress. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/dns\/replace": {
+            "post": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Replace Application DNS Record",
+                "description": "Point the conflicting record from a 409 create response to the server of the application.",
+                "operationId": "replace-application-dns-record",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/ReplaceDnsRecordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "DNS record replaced.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "record": {
+                                            "$ref": "#\/components\/schemas\/ManagedDnsRecord"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cloudflare rejected the change, or the record changed since the conflict."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the application."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "423": {
+                        "description": "Another DNS change for the hostname is in progress. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/dns\/replace": {
+            "post": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Replace Service DNS Record",
+                "description": "Point the conflicting record from a 409 create response to the server of the service.",
+                "operationId": "replace-service-dns-record",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/ReplaceDnsRecordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "DNS record replaced.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "record": {
+                                            "$ref": "#\/components\/schemas\/ManagedDnsRecord"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cloudflare rejected the change, or the record changed since the conflict."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the service."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "423": {
+                        "description": "Another DNS change for the hostname is in progress. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/dns\/{hostname}": {
+            "delete": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Release Application DNS Record",
+                "description": "Release the managed DNS record of a hostname that the application no longer uses. Coolify deletes the record at Cloudflare only when it created the record, the record did not change, and no other resource uses the hostname. Removing a domain through the API already queues this release; use this endpoint to retry it or to keep the record.",
+                "operationId": "release-application-dns-record",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Application UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "hostname",
+                        "in": "path",
+                        "description": "Hostname of the record.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_record",
+                        "in": "query",
+                        "description": "Delete the record at Cloudflare. Default: true.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Record released.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "result": {
+                                            "type": "string",
+                                            "enum": [
+                                                "deleted",
+                                                "already_gone",
+                                                "not_owned",
+                                                "changed_externally",
+                                                "kept"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the application."
+                    },
+                    "404": {
+                        "description": "No managed record of the application for the hostname."
+                    },
+                    "422": {
+                        "description": "The application still uses the hostname."
+                    },
+                    "423": {
+                        "description": "Another DNS change for the hostname is in progress. Try again."
+                    },
+                    "502": {
+                        "description": "Cloudflare did not respond. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/dns\/{hostname}": {
+            "delete": {
+                "tags": [
+                    "DNS"
+                ],
+                "summary": "Release Service DNS Record",
+                "description": "Release the managed DNS record of a hostname that the service no longer uses. Coolify deletes the record at Cloudflare only when it created the record, the record did not change, and no other resource uses the hostname. Removing a domain through the API already queues this release; use this endpoint to retry it or to keep the record.",
+                "operationId": "release-service-dns-record",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "hostname",
+                        "in": "path",
+                        "description": "Hostname of the record.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_record",
+                        "in": "query",
+                        "description": "Delete the record at Cloudflare. Default: true.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Record released.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "result": {
+                                            "type": "string",
+                                            "enum": [
+                                                "deleted",
+                                                "already_gone",
+                                                "not_owned",
+                                                "changed_externally",
+                                                "kept"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the service."
+                    },
+                    "404": {
+                        "description": "No managed record of the service for the hostname."
+                    },
+                    "422": {
+                        "description": "The service still uses the hostname."
+                    },
+                    "423": {
+                        "description": "Another DNS change for the hostname is in progress. Try again."
+                    },
+                    "502": {
+                        "description": "Cloudflare did not respond. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/github-apps": {
             "get": {
                 "tags": [
@@ -13424,12 +13992,46 @@
             }
         },
         "\/security\/integration-tokens": {
+            "get": {
+                "tags": [
+                    "Integration Tokens"
+                ],
+                "summary": "List Integration Tokens",
+                "description": "List the integration tokens (Cloudflare, Doppler, Infisical, Vault) of the team. Requires admin or owner.",
+                "operationId": "list-integration-tokens",
+                "responses": {
+                    "200": {
+                        "description": "Integration tokens.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/IntegrationToken"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "post": {
                 "tags": [
-                    "Secret Managers"
+                    "Integration Tokens"
                 ],
-                "summary": "Create Secret Manager Token",
-                "description": "Create and validate a Doppler, Infisical, or Vault integration token.",
+                "summary": "Create Integration Token",
+                "description": "Create and validate a Cloudflare, Doppler, Infisical, or Vault integration token. A Cloudflare token also gets its DNS zones; it is not stored when the zones cannot be read. Requires admin or owner.",
                 "operationId": "create-secret-manager-integration-token",
                 "requestBody": {
                     "required": true,
@@ -13445,6 +14047,7 @@
                                     "provider": {
                                         "type": "string",
                                         "enum": [
+                                            "cloudflare",
                                             "doppler",
                                             "infisical",
                                             "vault"
@@ -13456,7 +14059,28 @@
                                     "token": {
                                         "type": "string"
                                     },
+                                    "capabilities": {
+                                        "description": "Cloudflare: dns, tunnel (tunnel needs dns). Default: dns. Secret managers: secrets.",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "enum": [
+                                                "dns",
+                                                "tunnel",
+                                                "secrets"
+                                            ]
+                                        }
+                                    },
+                                    "automatic_dns": {
+                                        "description": "Cloudflare only. Create DNS records when a domain is added. Default: true.",
+                                        "type": "boolean"
+                                    },
+                                    "proxied_dns": {
+                                        "description": "Cloudflare only. Create new records proxied (orange cloud). Default: false.",
+                                        "type": "boolean"
+                                    },
                                     "metadata": {
+                                        "description": "Secret managers only: base_url, client_id (Infisical), namespace (Vault), timeout.",
                                         "type": "object"
                                     }
                                 },
@@ -13467,16 +14091,282 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Integration token created."
+                        "description": "Integration token created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "400": {
-                        "$ref": "#\/components\/responses\/400"
+                        "description": "The provider rejected the token, or the Cloudflare zones could not be read."
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/security\/integration-tokens\/{uuid}": {
+            "get": {
+                "tags": [
+                    "Integration Tokens"
+                ],
+                "summary": "Get Integration Token",
+                "description": "Get an integration token of the team by UUID. Requires admin or owner.",
+                "operationId": "get-integration-token-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Integration token UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Integration token.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/IntegrationToken"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Integration Tokens"
+                ],
+                "summary": "Delete Integration Token",
+                "description": "Delete an integration token. A token that a resource uses as secret manager source, or that manages DNS records, cannot be deleted. Requires admin or owner.",
+                "operationId": "delete-integration-token-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Integration token UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Integration token deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "The token is still in use."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Integration Tokens"
+                ],
+                "summary": "Update Integration Token",
+                "description": "Rename an integration token, rotate its secret, or change its capabilities and settings. Omitted fields keep their value. The provider checks the token again when the secret, the capabilities, or the settings change. Requires admin or owner.",
+                "operationId": "update-integration-token-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Integration token UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "token": {
+                                        "description": "New secret. Required when base_url, client_id (Infisical), or namespace (Vault) changes.",
+                                        "type": "string"
+                                    },
+                                    "capabilities": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "enum": [
+                                                "dns",
+                                                "tunnel",
+                                                "secrets"
+                                            ]
+                                        }
+                                    },
+                                    "automatic_dns": {
+                                        "description": "Cloudflare only.",
+                                        "type": "boolean"
+                                    },
+                                    "proxied_dns": {
+                                        "description": "Cloudflare only.",
+                                        "type": "boolean"
+                                    },
+                                    "metadata": {
+                                        "description": "Secret managers only. Fields to change: base_url, client_id, namespace, timeout. An empty value removes a field.",
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Integration token updated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/IntegrationToken"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The provider rejected the token, or the Cloudflare zones could not be read."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/security\/integration-tokens\/{uuid}\/sync-zones": {
+            "post": {
+                "tags": [
+                    "Integration Tokens"
+                ],
+                "summary": "Sync Cloudflare Zones",
+                "description": "Read the DNS zones that a Cloudflare token can access again. Requires admin or owner.",
+                "operationId": "sync-integration-token-zones",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Integration token UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Zones synchronized.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "zones_count": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Cloudflare did not return the zones."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "The token is not a Cloudflare token."
                     }
                 },
                 "security": [
@@ -15988,6 +16878,424 @@
                     },
                     "403": {
                         "description": "The token needs the deploy ability."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/{resource_type}\/{uuid}\/secret-manager": {
+            "get": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Get Secret Manager Source",
+                "description": "The secret manager source of an application, service, or database, and the secret manager tokens of its team that can be linked.",
+                "operationId": "get-secret-manager-source",
+                "parameters": [
+                    {
+                        "name": "resource_type",
+                        "in": "path",
+                        "description": "Resource type.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "applications",
+                                "services",
+                                "databases"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Resource UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Secret manager source.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/SecretManagerSource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No access to the resource."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Remove Secret Manager Source",
+                "description": "Remove the secret manager source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.",
+                "operationId": "remove-secret-manager-source",
+                "parameters": [
+                    {
+                        "name": "resource_type",
+                        "in": "path",
+                        "description": "Resource type.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "applications",
+                                "services",
+                                "databases"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Resource UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Source removed."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the resource."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Set Secret Manager Source",
+                "description": "Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.",
+                "operationId": "configure-application-secret-manager",
+                "parameters": [
+                    {
+                        "name": "resource_type",
+                        "in": "path",
+                        "description": "Resource type.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "applications",
+                                "services",
+                                "databases"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Resource UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "integration_token_uuid"
+                                ],
+                                "properties": {
+                                    "integration_token_uuid": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "description": "Doppler service account: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.",
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Secret manager configured."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the resource."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/{resource_type}\/{uuid}\/secret-manager\/keys": {
+            "get": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "List Secret Manager Keys",
+                "description": "Key names of the secrets in the linked source. Values are never returned. Requires write access, like the resource page, because the stored secret is sent to the secret manager.",
+                "operationId": "list-secret-manager-keys",
+                "parameters": [
+                    {
+                        "name": "resource_type",
+                        "in": "path",
+                        "description": "Resource type.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "applications",
+                                "services",
+                                "databases"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Resource UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Key names.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "keys": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The secret manager did not return the keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the resource."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/{resource_type}\/{uuid}\/secret-manager\/references": {
+            "post": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Add Secret Manager Reference",
+                "description": "Add a {{vault.KEY}} environment variable for one key of the linked source.",
+                "operationId": "add-secret-manager-reference",
+                "parameters": [
+                    {
+                        "name": "resource_type",
+                        "in": "path",
+                        "description": "Resource type.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "applications",
+                                "services",
+                                "databases"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Resource UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "key"
+                                ],
+                                "properties": {
+                                    "key": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Variable added."
+                    },
+                    "400": {
+                        "description": "The secret manager did not return the keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the resource."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "Not a key of the source, not a valid variable name, or the variable exists."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/{resource_type}\/{uuid}\/secret-manager\/import": {
+            "post": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Import Secret Manager References",
+                "description": "Add a {{vault.KEY}} environment variable for every key of the linked source that has no variable yet. Keys that are not valid variable names are skipped.",
+                "operationId": "import-secret-manager-references",
+                "parameters": [
+                    {
+                        "name": "resource_type",
+                        "in": "path",
+                        "description": "Resource type.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "applications",
+                                "services",
+                                "databases"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Resource UUID.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Import result.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "imported": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "skipped": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The secret manager did not return the keys."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "No write access to the resource."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -24764,6 +26072,274 @@
                 },
                 "type": "object"
             },
+            "ManagedDnsRecord": {
+                "description": "DNS record that Coolify manages at a DNS provider.",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "hostname": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "A",
+                            "AAAA"
+                        ]
+                    },
+                    "address": {
+                        "description": "Server IP address that the record points to.",
+                        "type": "string"
+                    },
+                    "owned": {
+                        "description": "Coolify created the record, so it can delete it.",
+                        "type": "boolean"
+                    },
+                    "integration_token_uuid": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ResourceDnsStatus": {
+                "description": "DNS providers and managed records for the domains of a resource.",
+                "properties": {
+                    "default_address": {
+                        "description": "Address of a new record when none is given: the first public server address. Null when the server has no public address.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "public_addresses": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "hostnames": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "hostname": {
+                                    "type": "string"
+                                },
+                                "providers": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "integration_token_uuid": {
+                                                "type": "string"
+                                            },
+                                            "integration_token_name": {
+                                                "type": "string"
+                                            },
+                                            "zone": {
+                                                "type": "string"
+                                            },
+                                            "automatic_dns": {
+                                                "type": "boolean"
+                                            },
+                                            "proxied_dns": {
+                                                "type": "boolean"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "records": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ManagedDnsRecord"
+                                    }
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "CreateDnsRecordRequest": {
+                "required": [
+                    "hostname"
+                ],
+                "properties": {
+                    "hostname": {
+                        "description": "A saved domain of the resource.",
+                        "type": "string"
+                    },
+                    "integration_token_uuid": {
+                        "description": "Cloudflare token to use. Required when several tokens manage the zone of the hostname.",
+                        "type": "string"
+                    },
+                    "address": {
+                        "description": "A public address of the server. Default: default_address of the DNS status.",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ReplaceDnsRecordRequest": {
+                "required": [
+                    "hostname",
+                    "record_id",
+                    "current"
+                ],
+                "properties": {
+                    "hostname": {
+                        "description": "A saved domain of the resource.",
+                        "type": "string"
+                    },
+                    "integration_token_uuid": {
+                        "description": "Cloudflare token to use. Required when several tokens manage the zone of the hostname.",
+                        "type": "string"
+                    },
+                    "record_id": {
+                        "description": "conflict.record_id from the 409 response of the create request.",
+                        "type": "string"
+                    },
+                    "current": {
+                        "description": "conflict.current from the 409 response. The record is replaced only when it still has this value.",
+                        "type": "string"
+                    },
+                    "address": {
+                        "description": "A public address of the server. Default: default_address of the DNS status.",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "DnsRecordConflict": {
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    },
+                    "conflict": {
+                        "properties": {
+                            "record_id": {
+                                "type": "string"
+                            },
+                            "current": {
+                                "type": "string"
+                            },
+                            "proposed": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "IntegrationToken": {
+                "description": "Integration token. The secret is never returned.",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "provider": {
+                        "type": "string",
+                        "enum": [
+                            "cloudflare",
+                            "doppler",
+                            "infisical",
+                            "vault"
+                        ]
+                    },
+                    "capabilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "dns",
+                                "tunnel",
+                                "secrets"
+                            ]
+                        }
+                    },
+                    "automatic_dns": {
+                        "description": "Cloudflare only. Create DNS records when a domain is added.",
+                        "type": "boolean"
+                    },
+                    "proxied_dns": {
+                        "description": "Cloudflare only. Create new records proxied (orange cloud).",
+                        "type": "boolean"
+                    },
+                    "dns_zones_count": {
+                        "description": "Cloudflare only.",
+                        "type": "integer"
+                    },
+                    "zones_synced_at": {
+                        "description": "Cloudflare only.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "SecretManagerSource": {
+                "properties": {
+                    "linked": {
+                        "description": "The secret manager source of an application, service, or database. Routes start with the resource type\n(`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
+                        "type": "boolean"
+                    },
+                    "integration_token_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "provider": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "doppler",
+                            "infisical",
+                            "vault"
+                        ]
+                    },
+                    "settings": {
+                        "description": "Doppler: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "available_tokens": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "uuid": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "provider": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
             "VolumeBackupScheduleRequest": {
                 "required": [
                     "frequency"
@@ -26545,10 +28121,6 @@
             "description": "Applications"
         },
         {
-            "name": "Secret Managers",
-            "description": "Secret Managers"
-        },
-        {
             "name": "Audit Events",
             "description": "Audit Events"
         },
@@ -26577,6 +28149,10 @@
             "description": "DigitalOcean"
         },
         {
+            "name": "DNS",
+            "description": "DNS"
+        },
+        {
             "name": "GitHub Apps",
             "description": "GitHub Apps"
         },
@@ -26597,6 +28173,10 @@
             "description": "Settings"
         },
         {
+            "name": "Integration Tokens",
+            "description": "Integration Tokens"
+        },
+        {
             "name": "Notifications",
             "description": "Notifications"
         },
@@ -26615,6 +28195,10 @@
         {
             "name": "Scheduled Tasks",
             "description": "Scheduled Tasks"
+        },
+        {
+            "name": "Secret Managers",
+            "description": "Secret Managers"
         },
         {
             "name": "Private Keys",
