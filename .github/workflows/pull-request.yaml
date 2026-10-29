@@ -18,6 +18,7 @@ defaults:
 jobs:
   build:
     name: Build
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository || !(github.head_ref == 'main' || github.head_ref == 'next' || startsWith(github.head_ref, 'release/') || endsWith(github.head_ref, '.x')) }}
     permissions:
       contents: read
     uses: $/.github/workflows/build.yaml

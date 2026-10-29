@@ -3,6 +3,7 @@ set -euo pipefail
 
 OPTION="$*"
 BRANCH="${BRANCH:-}"
+PULL_REQUEST="${PULL_REQUEST:-}"
 PUBLISHED_VERSION="${PUBLISHED_VERSION:-}"
 PUBLISHED_REVISION="${PUBLISHED_REVISION:-}"
 VERSION_FILE=release.json
@@ -43,7 +44,7 @@ read_version() {
 	version="$(artifact_version "$channel")"
 	[ -n "$version" ] || die "$VERSION_FILE has no $channel version of $ARTIFACT"
 	if [ "$OPTION" = --build ]; then
-		echo "$version"
+		echo "$version${PULL_REQUEST:+-pr.$PULL_REQUEST}"
 		exit 0
 	fi
 }
