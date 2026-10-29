@@ -81,6 +81,7 @@ jobs:
         run: |
           {
             echo "epoch=$(git log -1 --format=%ct)"
+            echo "created=$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)"
             echo "sha=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
@@ -100,6 +101,7 @@ jobs:
           build-args: |
             COOLIFY_VERSION=${{ needs.plan.outputs.coolify }}
             SOURCE_DATE_EPOCH=${{ steps.args.outputs.epoch }}
+            CREATED=${{ steps.args.outputs.created }}
             GIT_SHA=${{ steps.args.outputs.sha }}
 
       - name: Upload the image
