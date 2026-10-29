@@ -103,6 +103,8 @@ jobs:
             SOURCE_DATE_EPOCH=${{ steps.args.outputs.epoch }}
             CREATED=${{ steps.args.outputs.created }}
             GIT_SHA=${{ steps.args.outputs.sha }}
+          provenance: mode=max
+          sbom: true
 
       - name: Upload the image
         uses: actions/upload-artifact@v7.0.2
