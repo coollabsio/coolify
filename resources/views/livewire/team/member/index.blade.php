@@ -1,7 +1,7 @@
 <div x-data="{
     search: '',
     roleFilter: 'all',
-    sortBy: 'name_asc',
+    sortBy: 'name-asc',
     page: 1,
     perPage: 10,
     members: @js($members->map(fn ($member) => [
@@ -9,6 +9,8 @@
         'name' => $member->name,
         'email' => $member->email,
         'role' => data_get($member, 'pivot.role'),
+        'roleRank' => \App\Enums\Role::tryFrom((string) data_get($member, 'pivot.role'))?->rank() ?? 0,
+        'twoFactor' => auth()->user()?->can('manageMembers', currentTeam()) ? filled($member->two_factor_confirmed_at) : null,
     ])->values()),
     get filteredMembers() {
         const query = this.search.trim().toLowerCase();
@@ -21,13 +23,17 @@
             return matchesSearch && matchesRole;
         });
 
-        return filtered.sort((left, right) => {
-            if (this.sortBy === 'name_desc') return right.name.localeCompare(left.name);
-            if (this.sortBy === 'email_asc') return left.email.localeCompare(right.email);
-            if (this.sortBy === 'role') return left.role.localeCompare(right.role);
+        const [column, direction] = this.sortBy.split('-');
+        const order = direction === 'desc' ? -1 : 1;
+        const byName = (left, right) => String(left.name || '').localeCompare(String(right.name || ''));
+        const compare = {
+            name: byName,
+            email: (left, right) => String(left.email || '').localeCompare(String(right.email || '')),
+            role: (left, right) => left.roleRank - right.roleRank,
+            twofa: (left, right) => Number(left.twoFactor) - Number(right.twoFactor),
+        }[column] || byName;
 
-            return left.name.localeCompare(right.name);
-        });
+        return filtered.sort((left, right) => order * compare(left, right) || byName(left, right));
     },
     get lastPage() {
         return Math.max(1, Math.ceil(this.filteredMembers.length / this.perPage));
@@ -85,11 +91,12 @@
                     </div>
                     <div class="w-full sm:w-40">
                         <x-forms.listbox id="member-sort" :wire="false" x-model="sortBy"
-                            x-effect="page = 1" :value="'name_asc'" :options="[
-                                ['value' => 'name_asc', 'label' => 'Name A–Z'],
-                                ['value' => 'name_desc', 'label' => 'Name Z–A'],
-                                ['value' => 'email_asc', 'label' => 'Email A–Z'],
-                                ['value' => 'role', 'label' => 'Role'],
+                            x-effect="page = 1" :value="'name-asc'" :options="[
+                                ['value' => 'name-asc', 'label' => 'Name A–Z'],
+                                ['value' => 'name-desc', 'label' => 'Name Z–A'],
+                                ['value' => 'email-asc', 'label' => 'Email A–Z'],
+                                ['value' => 'email-desc', 'label' => 'Email Z–A'],
+                                ['value' => 'role-desc', 'label' => 'Role'],
                             ]" />
                     </div>
                 </div>
@@ -111,11 +118,11 @@
                     'data-table-header team-members-table-grid',
                     'team-members-table-grid-2fa' => auth()->user()?->can('manageMembers', currentTeam()),
                 ])>
-                    <span>Name</span>
-                    <span>Email</span>
-                    <span>Role</span>
+                    <x-table.sort-header label="Name" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Email" asc="email-asc" desc="email-desc" then="page = 1" />
+                    <x-table.sort-header label="Role" asc="role-asc" desc="role-desc" first="desc" then="page = 1" />
                     @can('manageMembers', currentTeam())
-                        <span>2FA</span>
+                        <x-table.sort-header label="2FA" asc="twofa-asc" desc="twofa-desc" then="page = 1" />
                     @endcan
                     <span class="text-right">Actions</span>
                 </div>

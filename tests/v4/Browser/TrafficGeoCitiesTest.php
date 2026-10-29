@@ -17,6 +17,9 @@ class FakeBrowserCityTrafficClient extends SentinelTrafficClient
                 'latency' => ['p50' => 12.5, 'p95' => 45.2, 'p99' => 90.1],
                 'unique_visitors' => 320,
             ],
+            '/traffic/paths' => [
+                ['path' => '/', 'requests' => 900, 'bytes_out' => 20000],
+            ],
             '/traffic/breakdown/country' => [
                 ['value' => 'DE', 'requests' => 600, 'bytes_out' => 15000],
                 ['value' => 'FR', 'requests' => 400, 'bytes_out' => 10000],
@@ -64,4 +67,25 @@ it('switches the Locations card between countries and cities and remembers the s
         ->assertSee('BE, Germany')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'analytics-locations-cities');
+});
+
+// The lazy placeholder of this tab has the same sections as the loaded view. The Top paths
+// row makes the loaded view start Alpine components, which a morph of the skeleton broke.
+it('switches the Locations card between countries and cities on the application analytics tab', function () {
+    $application = createBrowserApplication($this->stack, ['uuid' => 'app-geo-cities', 'name' => 'Geo App']);
+    loginAndSkipBoarding();
+
+    $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $application);
+
+    $page = visit("{$url}/analytics");
+
+    $page->assertSee('Locations')
+        ->assertSee('Germany')
+        ->assertDontSee('BE, Germany')
+        ->click('button:visible:has-text("Cities")')
+        ->assertSee('BE, Germany')
+        ->assertSee('IDF, France')
+        ->assertScript("Boolean(document.getElementById('application-analytics-globe')._trafficGlobe)")
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-analytics-locations-cities');
 });

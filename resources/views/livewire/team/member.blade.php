@@ -27,10 +27,12 @@
     </div>
     <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $member->email }}</div>
     <div>
-        <span
-            class="inline-flex rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium capitalize text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+        <button type="button"
+            class="table-filter-value table-filter-badge inline-flex rounded-full border border-transparent bg-neutral-100 px-2 py-0.5 text-[10px] font-medium capitalize text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim"
+            title="Filter by {{ data_get($member, 'pivot.role') }}"
+            x-on:click="roleFilter = roleFilter === @js(data_get($member, 'pivot.role')) ? 'all' : @js(data_get($member, 'pivot.role')); page = 1">
             {{ data_get($member, 'pivot.role') }}
-        </span>
+        </button>
         @can('manageMembers', currentTeam())
             @if (data_get($member, 'pivot.role') === 'member')
                 <div class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-dim">

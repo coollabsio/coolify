@@ -167,11 +167,11 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="environment-resource-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Resource</div>
-                    <div class="resource-type">Type</div>
-                    <div>Status</div>
-                    <div class="resource-domain">Domain</div>
-                    <div class="resource-server">Server</div>
+                    <x-table.sort-header label="Resource" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Type" asc="type-asc" desc="type-desc" then="page = 1" class="resource-type" />
+                    <x-table.sort-header label="Status" asc="status-asc" desc="status-desc" then="page = 1" />
+                    <x-table.sort-header label="Domain" asc="domain-asc" desc="domain-desc" then="page = 1" class="resource-domain" />
+                    <x-table.sort-header label="Server" asc="server-asc" desc="server-desc" then="page = 1" class="resource-server" />
                     <div class="resource-tags">Tags</div>
                 </div>
 
@@ -206,11 +206,17 @@
                             </div>
                         </div>
 
-                        <div class="resource-type truncate text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="item.typeLabel"></div>
+                        <div class="resource-type min-w-0">
+                            <button type="button"
+                                class="table-filter-value truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                                x-on:click="toggleFilter('typeFilters', item.type)"
+                                x-bind:title="`Filter by ${item.typeLabel}`" x-text="item.typeLabel"></button>
+                        </div>
 
-                        <div>
-                            <x-status-badge dynamic x-bind:title="statusTitle(item)">
+                        <div class="min-w-0">
+                            <x-status-badge dynamic as="button" class="table-filter-value table-filter-badge"
+                                x-on:click="toggleFilter('statusFilters', statusState(item))"
+                                x-bind:title="`${statusTitle(item)} · Filter by ${statusLabel(item)}`">
                                 <span class="size-1.5 shrink-0 rounded-full"
                                     x-bind:class="statusDotClass(item)"></span>
                                 <span class="truncate" x-text="statusLabel(item)"></span>
@@ -226,8 +232,13 @@
                             <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
                         </div>
 
-                        <div class="resource-server truncate text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="item.destination?.server?.name || 'Unknown'"></div>
+                        <div class="resource-server min-w-0">
+                            <button type="button"
+                                class="table-filter-value truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                                x-on:click="toggleFilter('serverFilters', item.destination?.server?.name || 'Unknown')"
+                                x-bind:title="`Filter by ${item.destination?.server?.name || 'Unknown'}`"
+                                x-text="item.destination?.server?.name || 'Unknown'"></button>
+                        </div>
 
                         <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">
                             <template x-for="tag in item.tags.slice(0, 2)" :key="tag.id">
@@ -401,11 +412,11 @@
                     label: 'Name Z–A'
                 },
                 {
-                    value: 'type',
+                    value: 'type-asc',
                     label: 'Resource type'
                 },
                 {
-                    value: 'status',
+                    value: 'status-asc',
                     label: 'Status'
                 },
             ],
@@ -432,21 +443,20 @@
                         (!query || searchable.includes(query));
                 });
 
-                return items.sort((first, second) => {
-                    if (this.sortBy === 'name-desc') {
-                        return second.name.localeCompare(first.name);
-                    }
-                    if (this.sortBy === 'type') {
-                        return first.typeLabel.localeCompare(second.typeLabel) ||
-                            first.name.localeCompare(second.name);
-                    }
-                    if (this.sortBy === 'status') {
-                        return this.statusLabel(first).localeCompare(this.statusLabel(second)) ||
-                            first.name.localeCompare(second.name);
-                    }
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (item) => item.name,
+                    type: (item) => item.typeLabel,
+                    status: (item) => this.statusLabel(item),
+                    domain: (item) => this.displayDomain(item.fqdn) || '',
+                    server: (item) => item.destination?.server?.name || 'Unknown',
+                };
+                const sortValue = sortValues[column] || sortValues.name;
+                const order = direction === 'desc' ? -1 : 1;
 
-                    return first.name.localeCompare(second.name);
-                });
+                return items.sort((first, second) =>
+                    order * (sortValue(first).localeCompare(sortValue(second)) ||
+                        first.name.localeCompare(second.name)));
             },
             uniqueOptions(options) {
                 return [...new Map(options

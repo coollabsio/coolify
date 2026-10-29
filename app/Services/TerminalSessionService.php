@@ -109,7 +109,8 @@ class TerminalSessionService
     {
         return 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
-            'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
+            'if [ -n "$SHELL" ] && [ -x "$SHELL" ] && [ "${SHELL##*/}" != nologin ] && [ "${SHELL##*/}" != false ]; then exec $SHELL; '.
+            'elif command -v bash >/dev/null 2>&1; then exec bash; else sh; fi';
     }
 
     private function cacheKey(string $token): string

@@ -871,6 +871,15 @@ class General extends Component
 
             $this->syncData(toModel: true);
 
+            $otherApplication = $this->application->isDirty(['docker_registry_image_name', 'build_pack'])
+                ? $this->application->otherApplicationBuildingSameImage()
+                : null;
+            if ($otherApplication) {
+                $this->addError('dockerRegistryImageName', $this->application->sharedImageNameMessage($otherApplication));
+
+                return;
+            }
+
             if ($this->application->isDirty('redirect')) {
                 $this->setRedirect();
             }

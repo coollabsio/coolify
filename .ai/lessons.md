@@ -156,3 +156,9 @@
 
 ## Validate input safely
 - In PCRE, `$` also matches before a final `\n`. In validation regexes, use `\z` or reject control characters first, or a trailing newline passes.
+
+## Application queries carry hidden counts
+- `Application` has a global scope `withRelations` that adds two `withCount` subqueries and `applications.*`, also to `pluck('id')` and eager loads. For ID lookups and lean eager loads, call `withoutGlobalScope('withRelations')`.
+
+## Measure database reads end to end
+- On PostgreSQL 15, `EXPLAIN (ANALYZE, BUFFERS)` does not detoast or send the selected columns, so a wide `jsonb`/`json`/`text` column does not show in it. Time the full fetch (`psql \timing` with `-o /dev/null`, or PDO `fetchAll`) as well before you blame or rule out an index.

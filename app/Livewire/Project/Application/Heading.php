@@ -61,7 +61,7 @@ class Heading extends Component
             'environment_uuid' => $this->application->environment->uuid,
             'application_uuid' => $this->application->uuid,
         ];
-        $lastDeployment = $this->application->get_last_successful_deployment();
+        $lastDeployment = $this->application->get_last_successful_deployment(['commit', 'commit_message']);
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
         $this->loadComposeOnOpen = $this->activeRouteName === 'project.application.configuration'

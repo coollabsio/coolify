@@ -222,7 +222,8 @@
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
                                 wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
                             <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
-                            <span>Name</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc"
+                                action="setTableSort" :current="$tableSort" />
                             <span class="text-center">Managed</span>
                             @if ($showEnvironmentType)
                                 <span>Type</span>

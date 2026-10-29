@@ -9,12 +9,28 @@
         'name' => strtolower($backup->targetName()),
         'type' => strtolower($backup->targetType()),
         'frequency' => strtolower($backup->frequency),
+        'status' => match ($backup->latestExecution?->status) {
+            'running' => 'in progress',
+            'success' => 'success',
+            'failed' => 'failed',
+            default => $backup->enabled ? 'waiting' : 'disabled',
+        },
+        's3' => $backup->save_s3 ? ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId)->count() : -1,
+        'lastRunAt' => $backup->latestExecution?->finished_at?->timestamp ?? ($backup->latestExecution?->status === 'running' ? now()->timestamp : 0),
         'createdAt' => $backup->created_at?->timestamp ?? 0,
     ])->concat($databaseBackups->map(fn ($backup) => [
         'id' => 'database:'.$backup->id,
         'name' => strtolower($backup->database->human_name ?: $backup->database->name),
         'type' => 'database',
         'frequency' => strtolower($backup->frequency),
+        'status' => match ($backup->latest_log?->status) {
+            'running' => 'in progress',
+            'success' => 'success',
+            'failed' => 'failed',
+            default => $backup->enabled ? 'waiting' : 'disabled',
+        },
+        's3' => $backup->save_s3 ? ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId)->count() : -1,
+        'lastRunAt' => $backup->latest_log?->finished_at?->timestamp ?? ($backup->latest_log?->status === 'running' ? now()->timestamp : 0),
         'createdAt' => $backup->created_at?->timestamp ?? 0,
     ]))->values()),
     filterOptions: @js(collect([['value' => 'all', 'label' => 'All targets']])->merge(
@@ -36,11 +52,24 @@
             const matchesType = this.typeFilter === 'all' || backup.type === this.typeFilter;
             return matchesSearch && matchesType;
         });
+        const [column, direction] = this.sortBy.split('_');
+        const sortValues = {
+            target: (backup) => backup.name,
+            type: (backup) => backup.type,
+            schedule: (backup) => backup.frequency,
+            status: (backup) => backup.status,
+            s3: (backup) => backup.s3,
+            lastrun: (backup) => backup.lastRunAt,
+        };
+        const sortValue = sortValues[column] || sortValues.target;
+        const order = direction === 'desc' ? -1 : 1;
         return filtered.sort((left, right) => {
-            if (this.sortBy === 'target_desc') return right.name.localeCompare(left.name);
             if (this.sortBy === 'newest') return right.createdAt - left.createdAt;
             if (this.sortBy === 'oldest') return left.createdAt - right.createdAt;
-            return left.name.localeCompare(right.name);
+            const leftValue = sortValue(left);
+            const rightValue = sortValue(right);
+            return order * (typeof leftValue === 'number' ? leftValue - rightValue : leftValue.localeCompare(rightValue)) ||
+                left.name.localeCompare(right.name);
         });
     },
     isVisible(id) {
@@ -241,12 +270,12 @@
                 <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
                     <div class="flex min-w-[64rem] flex-col">
                     <div class="data-table-header backup-table-grid service-backup-table-grid">
-                        <span>Target</span>
-                        <span>Type</span>
-                        <span>Schedule</span>
-                        <span>Status</span>
-                        <span>S3</span>
-                        <span>Last run</span>
+                        <x-table.sort-header label="Target" asc="target_asc" desc="target_desc" />
+                        <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" />
+                        <x-table.sort-header label="Schedule" asc="schedule_asc" desc="schedule_desc" />
+                        <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" />
+                        <x-table.sort-header label="S3" asc="s3_asc" desc="s3_desc" />
+                        <x-table.sort-header label="Last run" asc="lastrun_asc" desc="lastrun_desc" first="desc" />
                         <span class="text-right">Actions</span>
                     </div>
 
@@ -279,7 +308,12 @@
                             <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg">
                                 {{ $databaseBackup->database->human_name ?: $databaseBackup->database->name }}
                             </span>
-                            <span>Database</span>
+                            <span class="min-w-0">
+                                <button type="button" class="table-filter-value"
+                                    title="Filter by Database"
+                                    x-on:click.stop="typeFilter = typeFilter === 'database' ? 'all' : 'database'"
+                                    x-on:keydown.enter.stop>Database</button>
+                            </span>
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
@@ -333,7 +367,12 @@
                                 title="{{ $backup->targetName() }}">
                                 {{ $backup->targetName() }}
                             </span>
-                            <span>{{ $backup->targetType() }}</span>
+                            <span class="min-w-0">
+                                <button type="button" class="table-filter-value"
+                                    title="Filter by {{ $backup->targetType() }}"
+                                    x-on:click.stop="typeFilter = typeFilter === @js(strtolower($backup->targetType())) ? 'all' : @js(strtolower($backup->targetType()))"
+                                    x-on:keydown.enter.stop>{{ $backup->targetType() }}</button>
+                            </span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>

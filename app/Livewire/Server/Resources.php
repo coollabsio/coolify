@@ -22,6 +22,8 @@ class Resources extends Component
 
     public string $search = '';
 
+    public string $sort = 'name_asc';
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -31,6 +33,38 @@ class Resources extends Component
     {
         $this->perPage = max(1, min(100, $this->perPage));
         $this->resetPage();
+    }
+
+    public function setSort(string $sort): void
+    {
+        if (! preg_match('/^(\w+)_(asc|desc)$/', $sort, $matches) || ! array_key_exists($matches[1], $this->sortColumns())) {
+            return;
+        }
+
+        $this->sort = $sort;
+        $this->resetPage();
+    }
+
+    /**
+     * @return array<string, \Closure(mixed): string>
+     */
+    private function sortColumns(): array
+    {
+        if ($this->activeTab === 'managed') {
+            return [
+                'name' => fn ($resource): string => (string) data_get($resource, 'name'),
+                'project' => fn ($resource): string => (string) data_get($resource->project(), 'name'),
+                'environment' => fn ($resource): string => (string) data_get($resource, 'environment.name'),
+                'type' => fn ($resource): string => (string) $resource->type(),
+                'status' => fn ($resource): string => (string) data_get($resource, 'status'),
+            ];
+        }
+
+        return [
+            'name' => fn ($container): string => (string) data_get($container, 'Names'),
+            'image' => fn ($container): string => (string) data_get($container, 'Image'),
+            'status' => fn ($container): string => (string) data_get($container, 'State'),
+        ];
     }
 
     public ?Server $server = null;
@@ -115,6 +149,7 @@ class Resources extends Component
         try {
             if ($this->activeTab !== 'managed') {
                 $this->search = '';
+                $this->sort = 'name_asc';
                 $this->resetPage();
             }
             $this->activeTab = 'managed';
@@ -128,6 +163,7 @@ class Resources extends Component
     {
         if ($this->activeTab !== 'unmanaged') {
             $this->search = '';
+            $this->sort = 'name_asc';
             $this->resetPage();
         }
         $this->activeTab = 'unmanaged';
@@ -156,9 +192,14 @@ class Resources extends Component
 
     public function render()
     {
-        $resources = $this->activeTab === 'managed'
-            ? $this->server->definedResources()->sortBy('name', SORT_NATURAL)
-            : collect($this->unmanagedContainers)->sortBy('Names', SORT_NATURAL);
+        $columns = $this->sortColumns();
+        [$column, $direction] = explode('_', $this->sort, 2) + [1 => 'asc'];
+        $sortValue = $columns[$column] ?? $columns['name'];
+        $resources = ($this->activeTab === 'managed'
+            ? $this->server->definedResources()
+            : collect($this->unmanagedContainers))
+            ->sortBy($columns['name'], SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy($sortValue, SORT_NATURAL | SORT_FLAG_CASE, $direction === 'desc');
         $search = trim($this->search);
         if ($search !== '') {
             $nameKey = $this->activeTab === 'managed' ? 'name' : 'Names';

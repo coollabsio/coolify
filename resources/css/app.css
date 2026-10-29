@@ -3045,6 +3045,53 @@ input[type="search"]::-webkit-search-results-decoration {
     color: var(--color-fg-faint);
 }
 
+.table-sort-header {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    justify-self: start;
+    gap: 0.25rem;
+    border-radius: 4px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 150ms;
+}
+
+.table-sort-header:hover,
+.table-sort-header.is-sorted {
+    color: #000;
+}
+
+.dark .table-sort-header:hover,
+.dark .table-sort-header.is-sorted {
+    color: var(--color-fg);
+}
+
+.table-sort-header:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1px var(--color-accent, currentColor);
+}
+
+.table-sort-header-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 150ms, transform 150ms;
+}
+
+.table-sort-header:hover .table-sort-header-icon {
+    opacity: 0.5;
+}
+
+.table-sort-header-icon.is-visible {
+    opacity: 1;
+}
+
 .data-table > .env-table-item {
     border-bottom: 1px solid var(--coollabs-fill);
 }
@@ -3068,6 +3115,38 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .dark .data-table-row:hover {
     background: rgba(255, 255, 255, 0.02);
+}
+
+/* A table cell value that filters the table by that value on click. */
+.table-filter-value {
+    position: relative;
+    z-index: 1;
+    max-width: 100%;
+    pointer-events: auto;
+    cursor: pointer;
+    text-align: left;
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+    transition: color 0.15s, border-color 0.15s, text-decoration-color 0.15s;
+}
+
+.table-filter-value:hover {
+    color: var(--color-black);
+    text-decoration-color: currentColor;
+}
+
+.dark .table-filter-value:hover {
+    color: var(--color-white);
+}
+
+.table-filter-value.table-filter-badge:hover {
+    text-decoration-color: transparent;
+    border-color: var(--color-neutral-400);
+}
+
+.dark .table-filter-value.table-filter-badge:hover {
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .env-table-grid {
@@ -3421,7 +3500,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 6rem;
     min-width: 50rem;
 }
 
@@ -4195,6 +4274,18 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     width: auto;
 }
 
+/* Mobile: search on its own row, cancel/force-start + menus below it */
+@media (max-width: 639.98px) {
+    .logs-viewer-end:not(.runtime-logs-viewer-end) {
+        flex-wrap: wrap;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-search {
+        order: -1;
+        flex: 1 1 100%;
+    }
+}
+
 .runtime-logs-viewer-end {
     align-items: stretch;
     flex-direction: column;
@@ -4316,7 +4407,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     /* Desktop: [actions + status] ... [cancel + search] */
     .logs-viewer-toolbar-controls {
         flex-direction: row;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         align-items: center;
         gap: 0.5rem 0.75rem;
     }

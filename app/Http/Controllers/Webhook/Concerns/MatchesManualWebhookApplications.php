@@ -35,7 +35,13 @@ trait MatchesManualWebhookApplications
      */
     protected function manualWebhookApplications(Builder $query, string $fullName): Collection
     {
-        return $query->get()
+        // Every repository form that manualWebhookRepositoryMatches() accepts
+        // contains the repository name, so the database discards unrelated
+        // applications that share the branch. The full match stays in PHP.
+        $pattern = '%'.str_replace('_', '\\_', mb_strtolower($fullName)).'%';
+
+        return $query->whereRaw("LOWER(git_repository) LIKE ? ESCAPE '\\'", [$pattern])
+            ->get()
             ->filter(fn (Application $application): bool => $this->manualWebhookRepositoryMatches($application->git_repository, $fullName))
             ->values();
     }

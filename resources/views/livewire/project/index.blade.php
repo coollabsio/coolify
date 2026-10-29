@@ -142,10 +142,11 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Project</div>
-                    <div>Contents</div>
-                    <div>Created</div>
-                    <div class="project-description">Description</div>
+                    <x-table.sort-header label="Project" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Contents" asc="resources-asc" desc="resources-desc" first="desc" then="page = 1" />
+                    <x-table.sort-header label="Created" asc="created-asc" desc="created-desc" first="desc" then="page = 1" />
+                    <x-table.sort-header label="Description" asc="description-asc" desc="description-desc" then="page = 1"
+                        class="project-description" />
                     <div></div>
                 </div>
 
@@ -233,11 +234,11 @@
                     label: 'Name Z–A'
                 },
                 {
-                    value: 'resources',
+                    value: 'resources-desc',
                     label: 'Most resources'
                 },
                 {
-                    value: 'environments',
+                    value: 'environments-desc',
                     label: 'Most environments'
                 },
             ],
@@ -252,21 +253,23 @@
                     return !query || searchable.includes(query);
                 });
 
-                return projects.sort((first, second) => {
-                    if (this.sortBy === 'name-desc') {
-                        return second.name.localeCompare(first.name);
-                    }
-                    if (this.sortBy === 'resources') {
-                        return second.resourceCount - first.resourceCount ||
-                            first.name.localeCompare(second.name);
-                    }
-                    if (this.sortBy === 'environments') {
-                        return second.environmentCount - first.environmentCount ||
-                            first.name.localeCompare(second.name);
-                    }
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (project) => project.name,
+                    resources: (project) => Number(project.resourceCount),
+                    environments: (project) => Number(project.environmentCount),
+                    created: (project) => Date.parse(project.createdAt) || 0,
+                    description: (project) => project.description || '',
+                };
+                const sortValue = sortValues[column] || sortValues.name;
+                const order = direction === 'desc' ? -1 : 1;
+                const compare = (first, second) => typeof first === 'number' ?
+                    first - second :
+                    first.localeCompare(second);
 
-                    return first.name.localeCompare(second.name);
-                });
+                return projects.sort((first, second) =>
+                    order * compare(sortValue(first), sortValue(second)) ||
+                    first.name.localeCompare(second.name));
             },
             get totalPages() {
                 return Math.max(1, Math.ceil(this.filteredProjects.length / this.pageSize));
