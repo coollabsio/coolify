@@ -65,3 +65,15 @@ it('keeps root user credentials that already parse unchanged', function (string 
 
     expect(repairRootUserEnvWithUpgradeScript($scriptPath, $initialEnv))->toBe($initialEnv);
 })->with($upgradeScripts);
+
+it('keeps root user credentials that only have whitespace around the value unchanged', function (string $scriptPath) {
+    $initialEnv = "ROOT_USER_EMAIL=admin@example.com\r\nROOT_USERNAME= Jane\r\nROOT_USER_PASSWORD=Secret1!  \r\nAPP_ENV=production\r\n";
+
+    expect(repairRootUserEnvWithUpgradeScript($scriptPath, $initialEnv))->toBe($initialEnv);
+})->with($upgradeScripts);
+
+it('quotes a root username with spaces in a file with CRLF line endings', function (string $scriptPath) {
+    $env = repairRootUserEnvWithUpgradeScript($scriptPath, "ROOT_USERNAME=Jane Doe\r\nAPP_ENV=production\r\n");
+
+    expect(Dotenv::parse($env))->toBe(['ROOT_USERNAME' => 'Jane Doe', 'APP_ENV' => 'production']);
+})->with($upgradeScripts);

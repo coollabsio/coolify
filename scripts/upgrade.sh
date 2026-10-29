@@ -228,6 +228,9 @@ quote_root_user_env_values() {
     local key value
     for key in ROOT_USERNAME ROOT_USER_EMAIL ROOT_USER_PASSWORD; do
         value=$(grep -m1 "^${key}=" "$ENV_FILE" | cut -d '=' -f2-) || continue
+        # phpdotenv ignores whitespace around an unquoted value (also the \r of CRLF line endings)
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
         case "$value" in
         \"* | \'* | *[[:space:]]\#*) continue ;;
         *[[:space:]]*) ;;
