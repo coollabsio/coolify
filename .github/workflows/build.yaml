@@ -97,7 +97,7 @@ jobs:
           file: docker/production/Dockerfile
           platforms: ${{ matrix.platform }}
           tags: coollabsio/coolify:test
-          outputs: type=oci,dest=${{ runner.temp }}/image,tar=false,rewrite-timestamp=true
+          outputs: type=oci,dest=${{ runner.temp }}/image,tar=false,rewrite-timestamp=true,compression=zstd,compression-level=11,force-compression=true
           build-args: |
             COOLIFY_VERSION=${{ needs.plan.outputs.coolify }}
             SOURCE_DATE_EPOCH=${{ steps.args.outputs.epoch }}
