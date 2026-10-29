@@ -144,3 +144,15 @@ it('names the preview text area in a directive error', function () {
         ->call('submit')
         ->assertDispatched('error', 'Preview deployments: Line 2: a "# coolify:" line must be directly above a KEY=value line.');
 });
+
+it('keeps the saved order of preview variables when alphabetical sorting is disabled', function () {
+    $component = ($this->devView)()
+        ->assertSet('showPreview', true)
+        ->assertSet('is_env_sorting_enabled', false)
+        ->set('variablesPreview', "ZEBRA=1\nALPHA=2\nMIDDLE=3")
+        ->call('submit')
+        ->assertNotDispatched('error');
+
+    expect($component->get('variablesPreview'))->toBe("ZEBRA=1\nALPHA=2\nMIDDLE=3")
+        ->and($component->instance()->environmentVariablesPreview->pluck('key')->all())->toBe(['ZEBRA', 'ALPHA', 'MIDDLE']);
+});
