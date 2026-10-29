@@ -4,14 +4,21 @@ on:
   schedule:
     - cron: '0 1 * * *'
 
-permissions:
-  issues: write
-  discussions: write
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: lock-threads
+  cancel-in-progress: false
 
 jobs:
   lock-threads:
-    runs-on: ubuntu-latest
+    name: Lock inactive threads
+    permissions:
+      issues: write # lock the inactive issues
+      discussions: write # lock the inactive discussions
+      pull-requests: write # lock the inactive pull requests
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
     steps:
       - name: Lock threads after 30 days of inactivity
         uses: dessant/lock-threads@v6.0.2

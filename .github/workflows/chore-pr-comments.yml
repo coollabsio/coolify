@@ -1,15 +1,29 @@
 name: Add comment based on label
+
 on:
+  # Comments on pull requests from forks too, it checks out and runs no code of the pull request
+  # jactionlint ignore=dangerous-triggers
   pull_request_target:
     types:
       - labeled
 
-permissions:
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: pr-comments-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   add-comment:
-    runs-on: ubuntu-latest
+    name: Ask for the docs of ${{ matrix.label }}
+    permissions:
+      pull-requests: write # comment on the pull request
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -41,9 +55,9 @@ jobs:
     steps:
       - name: Add comment
         if: >-
-          (github.event.label.name == matrix.label || github.event.label.name == '📑 Waiting for Docs PR')
+          ${{ (github.event.label.name == matrix.label || github.event.label.name == '📑 Waiting for Docs PR')
           && contains(github.event.pull_request.labels.*.name, matrix.label)
-          && contains(github.event.pull_request.labels.*.name, '📑 Waiting for Docs PR')
+          && contains(github.event.pull_request.labels.*.name, '📑 Waiting for Docs PR') }}
         run: gh pr comment "$NUMBER" --body "$BODY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -4,14 +4,14 @@ name: Manage PR Branch
 # PR Quality may close a PR that fails its checks, so we must wait for it to
 # complete before deciding whether to retarget the PR's base branch.
 on:
+  # Only reads the PR Quality run and the pull request through the API, it checks out and runs no code of the pull request
+  # jactionlint ignore=dangerous-triggers
   workflow_run:
     workflows: ["PR Quality"]
     types:
       - completed
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: manage-pr-branch-${{ github.event.workflow_run.head_sha }}
@@ -19,7 +19,12 @@ concurrency:
 
 jobs:
   manage-branch:
-    runs-on: ubuntu-latest
+    name: Retarget the pull request
+    permissions:
+      contents: read # read the branches of the repository
+      pull-requests: write # change the base branch of the pull request and comment on it
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
     steps:
       - name: Retarget PR base branch based on category
         uses: actions/github-script@v9.0.0

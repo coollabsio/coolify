@@ -4,13 +4,20 @@ on:
   schedule:
     - cron: '0 2 * * *'
 
-permissions:
-  issues: write
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: manage-stale
+  cancel-in-progress: false
 
 jobs:
   manage-stale:
-    runs-on: ubuntu-latest
+    name: Manage stale issues and PRs
+    permissions:
+      issues: write # label, comment on and close the stale issues
+      pull-requests: write # label, comment on and close the stale pull requests
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
     steps:
       - name: Manage stale issues and PRs
         uses: actions/stale@v11.0.0
