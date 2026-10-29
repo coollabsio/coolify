@@ -305,7 +305,7 @@ class ScanImage
             $this->progress($resource, 'sbom');
             [$sbom, $grype] = $this->sbomAndReport($commands, [$resource], $imageRef, $image);
 
-            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($sbom, $grype), $image, $databaseBuiltAt, $isBaseline, $baseImageRef);
+            return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($grype), $image, $databaseBuiltAt, $isBaseline, $baseImageRef);
         } catch (ScanFailed $e) {
             $errorContext = [...$context, ...$e->context];
 
@@ -347,7 +347,7 @@ class ScanImage
             }
             $this->progressAll($resources, 'sbom');
             [$sbom, $grype] = $this->sbomAndReport($commands, $resources, $imageId, $image);
-            $report = $this->report($sbom, $grype);
+            $report = $this->report($grype);
 
             return array_map(
                 fn (array $target, int $index) => $this->complete($server, $target[0], $target[1], null, $target[2], $sbom, $report, $image, $databaseBuiltAt, $isBaseline[$index]),
@@ -507,7 +507,7 @@ class ScanImage
      *
      * @param  list<Model>  $resources
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
-     * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}}
+     * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}}
      */
     private function sbomAndReport(ScannerCommands $commands, array $resources, string $imageRef, array $image): array
     {
@@ -518,7 +518,7 @@ class ScanImage
             $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
-                $this->assertSucceeded($grype['code'], $grype['killed_early']);
+                $this->assertSucceeded($grype, 'grype');
                 $sbom->forceFill(['last_used_at' => now()])->save();
 
                 return [$sbom, $grype];
@@ -530,7 +530,7 @@ class ScanImage
         $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
         $this->progressAll($resources, 'vulnerabilities');
         $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
-        $this->assertSucceeded($grype['code'], $grype['killed_early']);
+        $this->assertSucceeded($grype, 'grype');
 
         return [$sbom, $grype];
     }
@@ -543,11 +543,12 @@ class ScanImage
         self::checkDiskSpace($commands, $image['size']);
 
         $result = $this->runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
-        $this->assertSucceeded($result['code'], $result['killed_early']);
-        $this->assertSucceeded($result['exit_codes']['sbom'] ?? null, $result['killed_early']);
+        // `docker save` has no memory limit: its 137 is always a timeout kill.
+        $this->assertSucceeded($result, 'save');
+        $this->assertSucceeded($result, 'sbom');
 
         $packages = $this->runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_GRYPE);
-        $this->assertSucceeded($packages['code'], $packages['killed_early']);
+        $this->assertSucceeded($packages, 'packages');
         [$payload, $cut] = $this->readPayload($packages);
         $parsed = (new SyftPackageParser)->parse($payload);
 
@@ -567,22 +568,21 @@ class ScanImage
         return ImageSbom::query()->create([
             'server_id' => $commands->server->id,
             'image_id' => $image['id'],
-            'base_layer_ids' => [],
             ...$values,
         ]);
     }
 
     /**
-     * Findings of the Grype output, with their layer, sorted by risk.
+     * Findings of the Grype output, sorted by risk.
      *
-     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}  $grype
+     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}  $grype
      * @return array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}
      */
-    private function report(ImageSbom $sbom, array $grype): array
+    private function report(array $grype): array
     {
         [$payload, $cut] = $this->readPayload($grype);
         $report = (new GrypeReportParser)->parse($payload);
-        $findings = $this->withLayers($report['findings'], $sbom);
+        $findings = $report['findings'];
         usort($findings, fn (Finding $a, Finding $b) => ($b->risk ?? 0.0) <=> ($a->risk ?? 0.0));
 
         return ['findings' => $findings, 'eol' => $report['eol'], 'truncated' => $report['truncated'] || $cut];
@@ -798,29 +798,6 @@ class ScanImage
     }
 
     /**
-     * A finding is in a base layer when the layer of its package is one of the base image layers.
-     *
-     * @param  list<Finding>  $findings
-     * @return list<Finding>
-     */
-    private function withLayers(array $findings, ImageSbom $sbom): array
-    {
-        $layerByPackage = [];
-        foreach ((array) $sbom->packages as $package) {
-            if (is_array($package)) {
-                $layerByPackage[(string) ($package['id'] ?? '')] = (string) ($package['layerId'] ?? '');
-            }
-        }
-        $baseLayers = array_flip(array_filter(array_map('strval', (array) $sbom->base_layer_ids)));
-
-        return array_map(function (Finding $finding) use ($layerByPackage, $baseLayers) {
-            $layer = $layerByPackage[$finding->artifactId] ?? '';
-
-            return $finding->withLayer($layer !== '' && isset($baseLayers[$layer]) ? 'base' : 'app');
-        }, $findings);
-    }
-
-    /**
      * Whether the team builds the image: Coolify builds the images of Dockerfile, Nixpacks, Railpack, and static apps,
      * and the Compose images of a service with `build` (see composeBuildsImage). Docker images of the team are built by
      * the team unless it says otherwise; Docker Hub official images are not. Other images are pulled.
@@ -891,11 +868,10 @@ class ScanImage
      * Runs one command batch and reads the exit code of $step. No output or no marker means the batch did not run.
      *
      * @param  list<string>  $commands
-     * @return array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}
+     * @return array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}
      */
     private function runStep(Server $server, array $commands, string $step, int $timeout): array
     {
-        $startedAt = now();
         $output = instant_remote_process($commands, $server, throwError: false, timeout: $timeout);
         $parsed = ScannerCommands::parseOutput($output);
 
@@ -908,14 +884,20 @@ class ScanImage
             'size' => $parsed['sizes'][$step] ?? null,
             'payload' => $parsed['payload'],
             'exit_codes' => $parsed['exit_codes'],
-            // A tool killed (137) before the time limit of its step was killed by the memory limit, not by `timeout`.
-            'killed_early' => $startedAt->diffInSeconds(now()) < $timeout,
+            'oom' => $parsed['oom'],
         ];
     }
 
-    private function assertSucceeded(?int $code, bool $killedEarly = false): void
+    /**
+     * Throws for a failed $step of the batch. Only Docker's own `OOMKilled` (the `coolify-scan-oom` line of the
+     * memory-limited Syft and Grype containers) means out of memory; a 137 without it was killed by `timeout`.
+     *
+     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}  $result
+     */
+    private function assertSucceeded(array $result, string $step): void
     {
-        if ($code === 137 && $killedEarly) {
+        $code = $result['exit_codes'][$step] ?? null;
+        if ($code !== 0 && $step !== 'save' && in_array($step, $result['oom'], true)) {
             throw new ScanFailed(ImageScanErrorCode::OutOfMemory);
         }
         if (in_array($code, self::EXIT_TIMEOUT, true)) {
@@ -929,7 +911,7 @@ class ScanImage
     /**
      * Output over the limit was cut by `head -c`: keep only the complete lines that were read.
      *
-     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}  $result
+     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}  $result
      * @return array{0: string, 1: bool}
      */
     private function readPayload(array $result): array

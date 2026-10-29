@@ -2073,6 +2073,40 @@ test('scan rules and ignores of the server and its applications move, linked by 
         ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(3);
 });
 
+test('team scan rules that the server inherits move as rules of the server, so the gate is not weaker on the target', function () {
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'on', 'on_scan_error' => null]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict', 'on_scan_error' => 'block']);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect(collect($bundle['image_scan_policies'])->firstWhere('scope_kind', 'server'))
+        ->toMatchArray(['scope_uuid' => $this->server->uuid, 'gate_mode' => 'on', 'on_scan_error' => 'block']);
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    expect($serverPolicy->gate_mode->value)->toBe('on')
+        ->and($serverPolicy->on_scan_error->value)->toBe('block');
+});
+
+test('team scan rules move as rules of the server also when the server has none of its own', function () {
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict', 'on_scan_error' => null]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['image_scan_policies'])->toBe([
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'gate_mode' => 'strict', 'on_scan_error' => null],
+    ]);
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    expect($serverPolicy->gate_mode->value)->toBe('strict')
+        ->and($serverPolicy->on_scan_error)->toBeNull();
+});
+
 test('scan rules of a bundle from an older version map Block deploys on to strict and drop the alert level', function () {
     $bundle = $this->exporter->export($this->server->fresh());
     $appUuid = $this->application->uuid;

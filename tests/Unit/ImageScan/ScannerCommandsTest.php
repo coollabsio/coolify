@@ -87,6 +87,36 @@ it('runs syft with one worker and without file metadata, so a large image fits i
         ->and($syft)->toContain('--memory 1g --memory-swap 1g');
 });
 
+it('asks Docker whether the memory limit stopped a scanner, then removes its container in the same script', function () {
+    $name = 'coolify-scan-'.SCANNER_TEST_RUN_ID;
+    $check = "if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' {$name} 2>/dev/null)\" = true ]; then echo 'coolify-scan-oom %s'; fi; docker rm -f {$name} >/dev/null 2>&1";
+    $runs = [
+        'sbom' => $this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX),
+        'grype' => $this->commands->grype(SCANNER_TEST_HEX),
+        'packages' => $this->commands->packages(SCANNER_TEST_HEX),
+    ];
+
+    foreach ($runs as $step => $commands) {
+        $script = collect(scannerUnwrapped($commands))->first(fn (string $line) => str_contains($line, 'docker run'));
+
+        expect($script)->toContain(sprintf($check, $step))
+            ->and(strpos($script, 'docker run'))->toBeLessThan(strpos($script, 'docker inspect'))
+            ->and(strpos($script, 'docker inspect'))->toBeLessThan(strpos($script, 'echo "coolify-scan-exit'));
+    }
+
+    $registry = collect(scannerUnwrapped($this->commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/amd64', 'cand-1', null)))->first(fn (string $line) => str_contains($line, 'docker run'));
+    expect($registry)->toContain(sprintf($check, 'sbom'))
+        ->and(collect($this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'docker save')))->not->toContain('OOMKilled');
+});
+
+it('reads the out of memory line only before the payload', function () {
+    $parsed = ScannerCommands::parseOutput("coolify-scan-oom grype\ncoolify-scan-exit grype 137 0\ncoolify-scan-payload\ncoolify-scan-oom packages");
+
+    expect($parsed['oom'])->toBe(['grype'])
+        ->and($parsed['exit_codes'])->toBe(['grype' => 137])
+        ->and(ScannerCommands::parseOutput("coolify-scan-exit grype 137 0\ncoolify-scan-payload\n")['oom'])->toBe([]);
+});
+
 it('starts every command list by removing a leftover scan container', function () {
     foreach (scannerCommandLists($this->commands) as $name => $commands) {
         expect($commands[0])->toBe('docker rm -f coolify-scan-'.SCANNER_TEST_RUN_ID.' >/dev/null 2>&1 || true', $name);
@@ -94,7 +124,7 @@ it('starts every command list by removing a leftover scan container', function (
 });
 
 it('runs every scanner container with each hardening flag exactly once', function () {
-    $flags = ['--rm ', '--name coolify-scan-'.SCANNER_TEST_RUN_ID.' ', '--cap-drop ALL ', '--security-opt no-new-privileges ', '--read-only ',
+    $flags = ['--name coolify-scan-'.SCANNER_TEST_RUN_ID.' ', '--cap-drop ALL ', '--security-opt no-new-privileges ', '--read-only ',
         '--pids-limit 256 ', '--user 65534:65534 ', '--cpus 1 ', '--memory 1g ', '--memory-swap 1g ',
         "-e 'SYFT_CHECK_FOR_APP_UPDATE=false' ", "-e 'GRYPE_CHECK_FOR_APP_UPDATE=false' ", "-e 'XDG_CACHE_HOME=/scratch/cache' "];
     $runs = 0;
@@ -102,7 +132,8 @@ it('runs every scanner container with each hardening flag exactly once', functio
     foreach (scannerCommandLists($this->commands) as $name => $commands) {
         foreach (scannerDockerRuns($commands) as $line) {
             $runs++;
-            expect($line)->toMatch('/timeout -k 10 \d+ docker run /');
+            expect($line)->toMatch('/timeout -k 10 \d+ docker run /')
+                ->not->toContain('--rm ');
             foreach ($flags as $flag) {
                 expect(substr_count($line, $flag))->toBe(1, "{$name}: {$flag}");
             }
@@ -200,7 +231,8 @@ it('writes the SBOM to a temp file and moves it into place after Syft succeeds',
     $final = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json';
 
     expect($commands[$index])->toStartWith("sh -c 'ulimit -f 2097152; ")
-        ->and($syft)->toContain("> '{$tmp}' 2>/dev/null && chown 65534:65534 '{$tmp}' && chmod 600 '{$tmp}' && mv -f '{$tmp}' '{$final}'; rc=\$?")
+        ->and($syft)->toContain("> '{$tmp}' 2>/dev/null; rc=\$?; ")
+        ->and($syft)->toContain("if [ \$rc -eq 0 ]; then chown 65534:65534 '{$tmp}' && chmod 600 '{$tmp}' && mv -f '{$tmp}' '{$final}'; rc=\$?; fi; echo \"coolify-scan-exit sbom \$rc\"")
         ->and($commands)->toContain("rm -f '{$tmp}' || true");
 });
 
@@ -217,7 +249,7 @@ it('reads tool output through a size cap and prints an exit marker', function ()
 
         expect($all)->toContain("head -c 10485761 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || true")
             ->toContain('ulimit -f 40960; timeout ')
-            ->toContain("rc=\$?; size=\$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge 20971520 ]; then rc=0; fi; echo \"coolify-scan-exit {$step} \$rc \$size\"")
+            ->toContain("rc=\$?; if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' coolify-scan-".SCANNER_TEST_RUN_ID." 2>/dev/null)\" = true ]; then echo 'coolify-scan-oom {$step}'; fi; docker rm -f coolify-scan-".SCANNER_TEST_RUN_ID." >/dev/null 2>&1; size=\$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge 20971520 ]; then rc=0; fi; echo \"coolify-scan-exit {$step} \$rc \$size\"")
             ->and(array_search('echo coolify-scan-payload', $commands, true))->toBeLessThan(collect($commands)->search(fn (string $line) => str_starts_with($line, 'head -c')))
             ->and(end($commands))->toBe("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true");
     }
@@ -380,10 +412,11 @@ it('parses exit markers before the payload separator', function () {
     expect(ScannerCommands::parseOutput($output))->toBe([
         'exit_codes' => ['save' => 0, 'sbom' => 0, 'grype' => 0],
         'sizes' => ['grype' => 12],
+        'oom' => [],
         'payload' => "{\"a\":1}\ncoolify-scan-payload\n{\"b\":2}",
     ])->and(ScannerCommands::parseOutput("coolify-scan-exit save 0\ncoolify-scan-exit sbom 1"))->toBe([
-        'exit_codes' => ['save' => 0, 'sbom' => 1], 'sizes' => [], 'payload' => '',
-    ])->and(ScannerCommands::parseOutput(null))->toBe(['exit_codes' => [], 'sizes' => [], 'payload' => '']);
+        'exit_codes' => ['save' => 0, 'sbom' => 1], 'sizes' => [], 'oom' => [], 'payload' => '',
+    ])->and(ScannerCommands::parseOutput(null))->toBe(['exit_codes' => [], 'sizes' => [], 'oom' => [], 'payload' => '']);
 });
 
 it('ignores payload lines that look like exit markers', function () {
@@ -392,6 +425,7 @@ it('ignores payload lines that look like exit markers', function () {
     expect(ScannerCommands::parseOutput($output))->toBe([
         'exit_codes' => ['grype' => 2],
         'sizes' => ['grype' => 9],
+        'oom' => [],
         'payload' => "coolify-scan-exit grype 0 9\n{}",
     ]);
 });

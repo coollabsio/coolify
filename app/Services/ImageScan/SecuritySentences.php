@@ -6,6 +6,7 @@ use App\Enums\SecurityActionType;
 use App\Enums\SecurityStatusType;
 use App\Models\ImageScan;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 use Throwable;
 
@@ -132,25 +133,144 @@ final class SecuritySentences
     }
 
     /**
-     * The sentence of one image row (spec 15.11): it starts with the image ref.
+     * The sentence of one image row (spec 15.11): it starts with the image ref, or with "This app" for an image that
+     * Coolify builds (its ref is a long commit tag, shown in the row footer). With the scan, a no_fix sentence says
+     * what the stored findings and version check know about a fix.
      */
-    public static function imageSentence(ResourceSecurity $security, string $imageRef): string
+    public static function imageSentence(ResourceSecurity $security, string $imageRef, ?ImageScan $scan = null): string
     {
+        $subject = self::builtByCoolify($scan) ? 'This app' : $imageRef;
+
         return match ($security->status) {
-            SecurityStatusType::UpdateNow => self::updateNow($security, $imageRef, 'A newer build'),
-            SecurityStatusType::UpdateAvailable => self::imageUpdateAvailable($security, $imageRef),
+            SecurityStatusType::UpdateNow => self::updateNow($security, $subject, 'A newer build'),
+            SecurityStatusType::UpdateAvailable => self::imageUpdateAvailable($security, $subject),
             SecurityStatusType::NoFix => $security->builderImage
-                ? self::noFix($security, $imageRef)
-                : "{$imageRef} has ".self::problems($security->problemCount).' that attackers '.($security->anyExploited ? 'are using' : 'are likely to use')
-                    .'. No fixed version exists yet, and Coolify checks every day.',
-            SecurityStatusType::Ok => "{$imageRef} needs no action.",
-            SecurityStatusType::CheckNeeded => "{$imageRef} needs another check: ".(in_array($security->checkReason, self::CHECK_REASONS, true)
+                ? self::noFix($security, $subject)
+                : "{$subject} has ".self::problems($security->problemCount).' that attackers '.($security->anyExploited ? 'are using' : 'are likely to use')
+                    .'. '.self::noFixState($scan, $security),
+            SecurityStatusType::Ok => "{$subject} needs no action.",
+            SecurityStatusType::CheckNeeded => "{$subject} needs another check: ".(in_array($security->checkReason, self::CHECK_REASONS, true)
                 ? self::checkReason((string) $security->checkReason, self::checkContext($security))
                 : 'the last check is incomplete').'.',
             SecurityStatusType::NotChecked => in_array($security->checkReason, [null, SecurityStatus::NOT_SCANNED], true)
-                ? "{$imageRef} has not been checked yet."
+                ? "{$subject} has not been checked yet."
                 : self::checkReason((string) $security->checkReason, $security->checkContext),
         };
+    }
+
+    /**
+     * The short action text of a no_fix status for the team page. Null for other statuses.
+     */
+    public static function noFixAction(ResourceSecurity $security): ?string
+    {
+        if ($security->status !== SecurityStatusType::NoFix) {
+            return null;
+        }
+
+        return $security->builderImage ? 'Needs a builder update in a Coolify release.' : 'No fix released yet. Coolify checks daily.';
+    }
+
+    /**
+     * Coolify builds the image (Dockerfile, Nixpacks, Railpack, static, Compose build), so its ref is a commit tag.
+     */
+    private static function builtByCoolify(?ImageScan $scan): bool
+    {
+        if ($scan === null || ! (bool) $scan->builds_image) {
+            return false;
+        }
+        $owner = $scan->resource;
+
+        return $owner instanceof Model && in_array(SecurityActions::imageKind($scan, $owner), ['dockerfile', 'compose', 'builder'], true);
+    }
+
+    /**
+     * What a no_fix image row says about a fix, in line with `noFixPackages()` of the provenance. When every listed
+     * problem has a fixed package version upstream and the version check covered the newest image of the line without
+     * finding it there: "The fix is not in the newest mysql 8.x image yet." Without that check, only that a fix exists.
+     */
+    private static function noFixState(?ImageScan $scan, ResourceSecurity $security): string
+    {
+        $none = 'No fixed version exists yet, and Coolify checks every day.';
+        $findings = $scan === null ? [] : self::whyFindings($scan, $security);
+        $withFix = count(array_filter($findings, fn (Finding $finding): bool => self::hasPackageFix($finding)));
+        if ($findings === [] || $withFix === 0) {
+            return $none;
+        }
+
+        $many = $security->problemCount > 1;
+        if ($withFix < count($findings)) {
+            return 'Some of them have a fix that the image does not include yet. Coolify checks every day.';
+        }
+
+        $newest = self::newestImageWithout($scan, $findings);
+
+        return match (true) {
+            $newest !== null => ($many ? 'The fixes are' : 'The fix is')." not in the newest {$newest} image yet. Coolify checks every day.",
+            $many => 'A fix exists for each, but the image does not include them yet. Coolify checks every day.',
+            default => 'A fix exists, but the image does not include it yet. Coolify checks every day.',
+        };
+    }
+
+    /**
+     * "mysql 8.x" when the stored version check (ok or no_better) found no newer build or tag of the line that has a
+     * fix of the findings, so the newest image of the line does not have it. Null when the check did not cover it or
+     * the tag is not a version.
+     *
+     * @param  list<Finding>  $findings
+     */
+    private static function newestImageWithout(ImageScan $scan, array $findings): ?string
+    {
+        if (! in_array($scan->candidateStatus(), ['ok', 'no_better'], true)) {
+            return null;
+        }
+
+        try {
+            $image = ImageRef::parse((string) $scan->image_ref);
+            $name = (string) ImageRef::parse($image->qualifiedName());
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+        $line = self::releaseLine($image->tag, $image->tag);
+        if ($line === null) {
+            return null;
+        }
+
+        $ids = [];
+        foreach ($findings as $finding) {
+            foreach ([$finding->id, ...$finding->aliases] as $id) {
+                $ids[mb_strtolower((string) $id)] = true;
+            }
+        }
+        foreach ($scan->candidateEntries() as $entry) {
+            if (! in_array($entry['kind'] ?? null, ['same_tag', 'line'], true)) {
+                continue;
+            }
+            foreach ((array) ($entry['fixed_ids'] ?? []) as $id) {
+                if (isset($ids[mb_strtolower((string) $id)])) {
+                    return null;
+                }
+            }
+        }
+
+        return "{$name} {$line}";
+    }
+
+    /**
+     * The stored findings of the why-list (by ID, display ID, or alias).
+     *
+     * @return list<Finding>
+     */
+    private static function whyFindings(ImageScan $scan, ResourceSecurity $security): array
+    {
+        $whyIds = array_flip(array_map(fn (array $why): string => mb_strtolower((string) $why['display_id']), $security->why));
+
+        return array_values(array_filter(ResourceScans::findings($scan), fn (Finding $finding): bool => array_intersect_key(
+            array_flip(array_map('mb_strtolower', [$finding->id, $finding->displayId, ...$finding->aliases])), $whyIds) !== []));
+    }
+
+    private static function hasPackageFix(Finding $finding): bool
+    {
+        return $finding->fixState === 'fixed' && filled($finding->fixedIn);
     }
 
     /**
@@ -312,7 +432,7 @@ final class SecuritySentences
         $line = self::releaseLine($tag, $tag);
         $sentences = [$newer === []
             ? "{$checked}: you already run the newest ".($line === null ? "build of {$tag}" : "{$line} version").'.'
-            : "{$checked}: ".self::andList($newer).(count($newer) > 1 ? ' are' : ' is').' newer, but not safer.'];
+            : "{$checked}: ".self::andList($newer).(count($newer) > 1 ? ' are' : ' is').' newer, but not better.'];
 
         $sentences[] = self::noFixPackages($scan, $security, $one);
 
@@ -325,7 +445,7 @@ final class SecuritySentences
             $sentences[] = ($major['fixes_problems'] ?? false) === true && $fixedWhy > 0
                 ? "{$ref}, a new major version, fixes ".($fixedWhy < count($whyIds) ? 'some of them' : ($one ? 'it' : 'them'))
                     .'. Coolify does not change major versions for you, because they can need a data migration or code changes: read its upgrade notes first.'
-                : "The newest major version, {$ref}, is not safer either.";
+                : "The newest major version, {$ref}, is not better either.";
         }
 
         return implode(' ', array_filter($sentences));
@@ -342,14 +462,14 @@ final class SecuritySentences
             return null;
         }
 
-        $whyIds = array_flip(array_map(fn (array $why): string => mb_strtolower((string) $why['display_id']), $security->why));
-        $findings = array_filter(ResourceScans::findings($scan), fn (Finding $finding): bool => array_intersect_key(
-            array_flip(array_map('mb_strtolower', [$finding->id, $finding->displayId, ...$finding->aliases])), $whyIds) !== []);
-        $withFix = count(array_filter($findings, fn (Finding $finding): bool => $finding->fixState === 'fixed' && filled($finding->fixedIn)));
+        $findings = self::whyFindings($scan, $security);
+        $withFix = count(array_filter($findings, fn (Finding $finding): bool => self::hasPackageFix($finding)));
         $names = self::andList($packages);
         $where = ($security->problemCount > count($security->why) ? 'The listed problems are' : ($one ? 'The problem is' : 'The problems are'))." in {$names}";
 
         return match (true) {
+            // No stored finding of the why-list: nothing is known about a fix.
+            $findings === [] => "{$where}.",
             $withFix === 0 => "{$where}, and no fixed version of ".(count($packages) > 1 ? 'them' : 'it').' exists yet.',
             $withFix === count($findings) => "{$where}. Fixed versions exist, but the image does not include them yet.",
             default => "{$where}. Some of them have a fixed version that the image does not include yet.",
@@ -554,11 +674,16 @@ final class SecuritySentences
     }
 
     /**
-     * The "pull it" half of a pull_latest sentence: "Pull it and restart." or "Redeploy this app to pull it.".
+     * The "pull it" half of a pull_latest sentence: "Pull it and restart.", "Pull it and redeploy." (Compose), or
+     * "Redeploy this app to pull it.".
      */
     private static function pullInstruction(string $sentence): string
     {
-        return str_contains($sentence, 'Redeploy this app to pull it.') ? 'Redeploy this app to pull it.' : 'Pull it and restart.';
+        return match (true) {
+            str_contains($sentence, 'Redeploy this app to pull it.') => 'Redeploy this app to pull it.',
+            str_ends_with($sentence, ' and redeploy.') => 'Pull it and redeploy.',
+            default => 'Pull it and restart.',
+        };
     }
 
     /**

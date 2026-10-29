@@ -182,8 +182,8 @@ final class SecurityActions
             SecurityActionType::PullLatest => match (true) {
                 $context['coolify'] => self::COOLIFY_TEXT,
                 $context['compose'] && $context['switchBlocked'] => 'A newer build of this image fixes it. Redeploy this app to pull it.',
-                $context['compose'] => 'A newer build of this image fixes it. Pull it and redeploy.',
-                default => 'A newer build of this image fixes it. Pull it and restart.',
+                $context['compose'] => 'Pull the newer build of '.($ref ?? $context['image'] ?? 'this image').' and redeploy.',
+                default => 'Pull the newer build of '.($ref ?? $context['image'] ?? 'this image').' and restart.',
             },
             SecurityActionType::ChangeBase => "Change the base image to {$newBase} in your Dockerfile, then redeploy.",
             SecurityActionType::Rebuild => 'Rebuild without cache to get the fixed system packages.',

@@ -18,7 +18,10 @@ use InvalidArgumentException;
  * - Every tool run prints one marker line `coolify-scan-exit {step} {code}`; steps that produce output add
  *   the full output size in bytes: `coolify-scan-exit {step} {code} {bytes}`. `{code}` is the exit code of
  *   the run: 0 success, 124 timeout, 137 killed (timeout kill or memory limit), 125 `docker run` failed
- *   (for example the image could not be pulled), any other value is an error of the tool. Steps: `pull-syft`,
+ *   (for example the image could not be pulled), any other value is an error of the tool. A tool whose output is
+ *   captured (Syft, Grype, regctl) runs without `--rm`: after it stops, Docker's `State.OOMKilled` decides whether the
+ *   memory limit stopped it (line `coolify-scan-oom {step}`, before the exit marker), and the container is removed in
+ *   the same script. Only that line means "out of memory"; a 137 without it was a `timeout` kill. Steps: `pull-syft`,
  *   `pull-grype`, `pull-regctl` (prepare), `db-update`, `db-status`, `disk-db` and `disk-sboms` (diskUsage, size = bytes), `inspect`, `save` and `sbom`
  *   (sbomFromLocal), `sbom` (sbomFromRegistry), `grype`, `packages`, `tags`, `digest`.
  * - A failed run does not stop the batch, and the container and the work directory are still removed.
@@ -57,6 +60,8 @@ class ScannerCommands
     public const MARKER = 'coolify-scan-exit';
 
     public const PAYLOAD_SEPARATOR = 'coolify-scan-payload';
+
+    public const OOM_MARKER = 'coolify-scan-oom';
 
     private const SCANNER_USER = '65534:65534';
 
@@ -364,9 +369,10 @@ class ScannerCommands
     }
 
     /**
-     * Splits batch output into the marker lines before `coolify-scan-payload` and the payload after it.
+     * Splits batch output into the marker lines before `coolify-scan-payload` and the payload after it. `oom` lists
+     * the steps whose container Docker stopped at the memory limit.
      *
-     * @return array{exit_codes: array<string, int>, sizes: array<string, int>, payload: string}
+     * @return array{exit_codes: array<string, int>, sizes: array<string, int>, oom: list<string>, payload: string}
      */
     public static function parseOutput(?string $output): array
     {
@@ -374,8 +380,14 @@ class ScannerCommands
         $separator = array_search(self::PAYLOAD_SEPARATOR, $lines, true);
         $exitCodes = [];
         $sizes = [];
+        $oom = [];
 
         foreach ($separator === false ? $lines : array_slice($lines, 0, $separator) as $line) {
+            if (preg_match('/\A'.self::OOM_MARKER.' ([a-z-]+)\z/', $line, $matches) === 1) {
+                $oom[] = $matches[1];
+
+                continue;
+            }
             if (preg_match('/\A'.self::MARKER.' ([a-z-]+) (\d+)(?: +(\d+))?\z/', $line, $matches) !== 1) {
                 continue;
             }
@@ -388,6 +400,7 @@ class ScannerCommands
         return [
             'exit_codes' => $exitCodes,
             'sizes' => $sizes,
+            'oom' => array_values(array_unique($oom)),
             'payload' => $separator === false ? '' : implode("\n", array_slice($lines, $separator + 1)),
         ];
     }
@@ -420,6 +433,17 @@ class ScannerCommands
         return 'docker rm -f '.$this->containerName().' >/dev/null 2>&1 || true';
     }
 
+    /**
+     * Shell script part that runs right after a `dockerRun()` (no `--rm`): prints `coolify-scan-oom {step}` when Docker
+     * stopped the container at the memory limit, then removes the container. Keeps `$?` of the run in `rc`.
+     */
+    private function oomCheck(string $step): string
+    {
+        $name = $this->containerName();
+
+        return "if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' {$name} 2>/dev/null)\" = true ]; then echo '".self::OOM_MARKER." {$step}'; fi; docker rm -f {$name} >/dev/null 2>&1";
+    }
+
     private function image(string $tool): string
     {
         $repo = config("constants.image_scan.images.{$tool}.repo");
@@ -442,6 +466,7 @@ class ScannerCommands
 
     /**
      * A `timeout`-wrapped `docker run` with the hardening flags. Values are escaped; mounts use `--mount`, which fails on a missing source.
+     * Without `--rm`, so `oomCheck()` can read why the container stopped; every list removes the container afterwards.
      *
      * @param  array<string, string>  $env
      * @param  list<string>  $mounts
@@ -464,7 +489,7 @@ class ScannerCommands
 
         $parts = [
             "timeout -k 10 {$timeout} docker run",
-            '--rm --name '.$this->containerName(),
+            '--name '.$this->containerName(),
             '--cap-drop ALL --security-opt no-new-privileges --read-only --pids-limit 256',
             '--user '.self::SCANNER_USER.' --cpus 1 --memory 1g --memory-swap 1g --log-driver none',
         ];
@@ -506,7 +531,7 @@ class ScannerCommands
         return [
             ...$commands,
             ...$this->ownWorkDir($auth !== null),
-            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$out} 2>/dev/null; rc=\$?; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
+            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$out} 2>/dev/null; rc=\$?; {$this->oomCheck($step)}; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
             ...$this->finish(['echo '.self::PAYLOAD_SEPARATOR, 'head -c '.(self::OUTPUT_LIMIT + 1)." {$out} 2>/dev/null || true"]),
         ];
     }
@@ -519,7 +544,7 @@ class ScannerCommands
         $tmp = escapeshellarg($this->sbomTmpPath($name));
         $final = escapeshellarg($this->sbomPath($name));
 
-        return $this->shell('ulimit -f '.self::SBOM_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$tmp} 2>/dev/null && chown ".self::SCANNER_USER." {$tmp} && chmod 600 {$tmp} && mv -f {$tmp} {$final}; rc=\$?; echo \"".self::MARKER.' sbom $rc"');
+        return $this->shell('ulimit -f '.self::SBOM_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$tmp} 2>/dev/null; rc=\$?; {$this->oomCheck('sbom')}; if [ \$rc -eq 0 ]; then chown ".self::SCANNER_USER." {$tmp} && chmod 600 {$tmp} && mv -f {$tmp} {$final}; rc=\$?; fi; echo \"".self::MARKER.' sbom $rc"');
     }
 
     private function usageMarker(string $step, string $path): string

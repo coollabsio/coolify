@@ -152,29 +152,12 @@ it('stores the findings, the summary, and the package list of a completed scan',
         ->and(collect($scan->findings)->pluck('layer')->unique()->values()->all())->toBe(['app']);
 });
 
-it('marks findings in base layers as base', function () {
-    scanImageTestFake();
-    ImageSbom::factory()->create([
-        'server_id' => $this->server->id,
-        'image_id' => 'sha256:'.SCAN_TEST_IMAGE_HEX,
-        'packages' => [['id' => '0bbf5c9dd36d4a50', 'name' => 'postgresql', 'layerId' => 'sha256:base']],
-        'base_layer_ids' => ['sha256:base'],
-    ]);
-
-    $scan = scanImageTestRun();
-
-    $layers = collect($scan->findings)->groupBy('layer')->map->count();
-    expect($layers['base'] ?? 0)->toBeGreaterThan(0)
-        ->and(collect($scan->findings)->where('artifactId', '0bbf5c9dd36d4a50')->pluck('layer')->unique()->all())->toBe(['base']);
-});
-
 it('stores the base image of a Dockerfile build on the scan', function (string $baseImageRef, ?string $stored) {
     scanImageTestFake();
 
     $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', null, 0, $baseImageRef);
 
-    expect($scan->base_image_ref)->toBe($stored)
-        ->and(ImageSbom::query()->sole()->base_layer_ids)->toBe([]);
+    expect($scan->base_image_ref)->toBe($stored);
 })->with([
     'valid' => ['node:20.11-alpine', 'node:20.11-alpine'],
     'invalid' => ['Node:20!', null],
@@ -492,19 +475,23 @@ it('fails with a timeout when grype is stopped by the server timeout, and still 
     Process::assertRan(fn ($process) => str_contains($process->command, "-name 'tmp-*' -mmin +60"));
 });
 
-it('fails with a timeout when the server timeout kills grype', function () {
-    scanImageTestFake(['grype' => function () {
-        $this->travel(361)->seconds();
-
-        return scanImageTestPayload('grype', '', 0, 137);
-    }]);
+it('fails with a timeout when `timeout` kills a scanner after its grace period', function (string $step, string $output) {
+    // A kill by `timeout` exits with 137 right away, long before the SSH budget of the step, and Docker reports no OOM.
+    scanImageTestFake([$step => $output]);
 
     $scan = scanImageTestRun();
 
-    expect($scan->error_code)->toBe(ImageScanErrorCode::Timeout);
-});
+    expect($scan->status)->toBe(ImageScanStatus::Failed)
+        ->and($scan->error_code)->toBe(ImageScanErrorCode::Timeout);
+})->with([
+    'docker save' => ['sbom', "coolify-scan-exit save 137\ncoolify-scan-exit sbom 1"],
+    'docker save, even with an OOM line of another step' => ['sbom', "coolify-scan-exit save 137\ncoolify-scan-oom save\ncoolify-scan-exit sbom 1"],
+    'syft' => ['sbom', "coolify-scan-exit save 0\ncoolify-scan-exit sbom 137"],
+    'packages' => ['packages', scanImageTestPayload('packages', '', 0, 137)],
+    'grype' => ['grype', scanImageTestPayload('grype', '', 0, 137)],
+]);
 
-it('says that the scanner ran out of memory when it is killed before the time limit', function (string $step, string $output) {
+it('says that the scanner ran out of memory only when Docker reports that the memory limit stopped it', function (string $step, string $output) {
     scanImageTestFake([$step => $output]);
 
     $scan = scanImageTestRun();
@@ -513,8 +500,9 @@ it('says that the scanner ran out of memory when it is killed before the time li
         ->and($scan->error_code)->toBe(ImageScanErrorCode::OutOfMemory)
         ->and(ImageScanErrorCode::OutOfMemory->message())->toBe('The scanner needed more than 1 GB of memory for this image and was stopped.');
 })->with([
-    'syft' => ['sbom', "coolify-scan-exit save 0\ncoolify-scan-exit sbom 137"],
-    'grype' => ['grype', scanImageTestPayload('grype', '', 0, 137)],
+    'syft' => ['sbom', "coolify-scan-exit save 0\ncoolify-scan-oom sbom\ncoolify-scan-exit sbom 137"],
+    'packages' => ['packages', "coolify-scan-oom packages\n".scanImageTestPayload('packages', '', 0, 137)],
+    'grype' => ['grype', "coolify-scan-oom grype\n".scanImageTestPayload('grype', '', 0, 137)],
 ]);
 
 it('keeps a completed scan when a rescan of the same image fails', function () {

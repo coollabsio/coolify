@@ -34,8 +34,9 @@ use Throwable;
 /**
  * Finds newer versions of a scanned image that fix vulnerabilities (spec 7.2 and the candidate rules of spec 15.4):
  * the same tag with a newer build, the newest tag of the same line, and the next major for information.
- * Candidates are scanned from the registry on the server, at most 2 per image and 20 per server and day; the SBOM of
- * a candidate digest is kept per server and reused.
+ * Candidates are scanned from the registry on the server: the newer build of the same tag, plus at most
+ * MAX_CANDIDATE_SCANS other tags per image, and DAILY_CANDIDATE_SCANS per server and day; the SBOM of a candidate
+ * digest is kept per server and reused.
  *
  * Writes `image_scans.candidates` as `{status, checked_at, error, tags_truncated, entries}`, with status `skipped` when
  * only the base image was checked. The base image of a Dockerfile build (spec 7.4) is scanned from the registry with the
@@ -49,9 +50,13 @@ class RefreshCandidates
 {
     use AsAction;
 
+    /** Scans of other tags per check (the patch and the line tag, or the major); the same-tag build is extra. */
     public const MAX_CANDIDATE_SCANS = 2;
 
     public const DAILY_CANDIDATE_SCANS = 20;
+
+    /** The information-only scan of the newest major leaves this many daily scans for the checks that can fix. */
+    public const MAJOR_SCAN_DAILY_RESERVE = 5;
 
     /** A check newer than this is not repeated after a scan. The daily rescan is always older. */
     public const FRESH_HOURS = 20;
@@ -317,9 +322,11 @@ class RefreshCandidates
         }
 
         // The smallest change first: a newer build of the same tag, the newest patch of the same minor, then the newest
-        // tag of the major. A safer patch ends the search of the line. At most MAX_CANDIDATE_SCANS scans per check.
+        // tag of the major. A safer patch ends the search of the line. The same-tag build does not take one of the
+        // MAX_CANDIDATE_SCANS slots, so the patch and the line tag always fit.
         $entries = [];
         $scannedDigests = [];
+        $tagScans = 0;
         if ($scan->repo_digest !== null) {
             $digest = $this->digest($tag);
             if ($digest === null && ($this->authRequired || ! $isVersion)) {
@@ -332,9 +339,6 @@ class RefreshCandidates
         }
 
         foreach (array_filter([$selected['patch'], $selected['line']], fn (?string $lineTag): bool => $lineTag !== null && $lineTag !== $tag) as $lineTag) {
-            if (count($scannedDigests) >= self::MAX_CANDIDATE_SCANS) {
-                break;
-            }
             $digest = $this->digest($lineTag);
             if ($digest === null) {
                 $this->error ??= 'registry';
@@ -345,6 +349,7 @@ class RefreshCandidates
                 continue;
             }
             $scannedDigests[] = $digest;
+            $tagScans++;
             $lineEntries = $this->evaluate($scan, $resource, [['kind' => 'line', 'tag' => $lineTag, 'digest' => $digest]], $platform, $lockWaitSeconds);
             $entries = [...$entries, ...$lineEntries];
             if (($lineEntries[0]['better'] ?? false) === true) {
@@ -354,7 +359,7 @@ class RefreshCandidates
 
         if ($selected['major'] !== null) {
             $entries[] = $this->majorEntry($scan, $resource, $selected['major'], $platform, $lockWaitSeconds,
-                withScan: ! in_array(true, array_column($entries, 'better'), true) && count($scannedDigests) < self::MAX_CANDIDATE_SCANS);
+                withScan: ! in_array(true, array_column($entries, 'better'), true) && $tagScans < self::MAX_CANDIDATE_SCANS);
         }
 
         $scanned = array_filter($entries, fn (array $entry) => $entry['kind'] !== 'major');
@@ -374,9 +379,10 @@ class RefreshCandidates
 
     /**
      * The newest tag of a higher major. It is never offered as an update: a major version can need a data migration or
-     * code changes. When nothing of the same major is safer and the check has a scan left, Coolify scans it, so the
-     * page can say whether it would fix the problems (`fixes_problems`, the "better" rule). Its registry and scan
-     * problems never change the status of the check.
+     * code changes. When nothing of the same major is safer, the check has a scan left, and the server has at least
+     * MAJOR_SCAN_DAILY_RESERVE daily scans left, Coolify scans it, so the page can say whether it would fix the problems
+     * (`fixes_problems`, the "better" rule). Its registry and scan problems, also a busy lock, never change the status
+     * of the check.
      *
      * @return array<string, mixed>
      */
@@ -394,13 +400,17 @@ class RefreshCandidates
             'eol' => null,
             'scanned_at' => null,
         ];
-        if (! $withScan) {
+        if (! $withScan || self::dailyScansLeft($this->commands->server) < self::MAJOR_SCAN_DAILY_RESERVE) {
             return $entry;
         }
 
         [$error, $authRequired] = [$this->error, $this->authRequired];
-        $digest = $this->digest($majorTag);
-        $scanned = $digest === null ? [] : $this->evaluate($scan, $resource, [['kind' => 'major', 'tag' => $majorTag, 'digest' => $digest]], $platform, $lockWaitSeconds);
+        try {
+            $digest = $this->digest($majorTag);
+            $scanned = $digest === null ? [] : $this->evaluate($scan, $resource, [['kind' => 'major', 'tag' => $majorTag, 'digest' => $digest]], $platform, $lockWaitSeconds);
+        } catch (ScanLockBusy) {
+            $scanned = [];
+        }
         [$this->error, $this->authRequired] = [$error, $authRequired];
 
         if ($scanned === []) {
@@ -628,7 +638,7 @@ class RefreshCandidates
             }
 
             $parsed = (new SyftPackageParser)->parse($this->payload($packages)[0]);
-            ($sbom ?? new ImageSbom(['server_id' => $server->id, 'image_id' => $digest, 'base_layer_ids' => []]))->forceFill([
+            ($sbom ?? new ImageSbom(['server_id' => $server->id, 'image_id' => $digest]))->forceFill([
                 'platform' => $platform,
                 'packages' => array_map(fn ($package) => $package->toArray(), $parsed['packages']),
                 'packages_truncated' => $parsed['truncated'] || $this->payload($packages)[1],
@@ -672,6 +682,20 @@ class RefreshCandidates
         }
 
         return true;
+    }
+
+    /**
+     * The registry scans the server has left today.
+     */
+    private static function dailyScansLeft(Server $server): int
+    {
+        $settings = ServerSetting::query()->where('server_id', $server->id)->first(['image_candidate_scans_today', 'image_candidate_scans_date']);
+        $date = $settings?->image_candidate_scans_date;
+        if ($date === null || ! today()->isSameDay($date)) {
+            return self::DAILY_CANDIDATE_SCANS;
+        }
+
+        return max(0, self::DAILY_CANDIDATE_SCANS - (int) $settings->image_candidate_scans_today);
     }
 
     /**

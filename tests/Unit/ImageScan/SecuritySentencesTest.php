@@ -2,6 +2,7 @@
 
 use App\Enums\SecurityActionType;
 use App\Enums\SecurityStatusType;
+use App\Models\Application;
 use App\Models\ImageScan;
 use App\Services\ImageScan\ResourceSecurity;
 use App\Services\ImageScan\SecurityAction;
@@ -190,6 +191,18 @@ it('says what a pull_latest action fixes in update_now', function () {
         ->toBe('This image has 3 security problems that attackers are using. A newer build of this image fixes them. Pull it and restart.')
         ->and(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$pull], 'problemCount' => 3, 'fixedByPrimary' => 2])))
         ->toEndWith('A newer build of this image fixes 2 of them. Pull it and restart.');
+});
+
+it('keeps the pull instruction of the new pull_latest action copy', function () {
+    $restart = sentenceAction(SecurityActionType::PullLatest, 'Pull the newer build of postgres:16-alpine and restart.', '16-alpine');
+    $redeploy = sentenceAction(SecurityActionType::PullLatest, 'Pull the newer build of postgres:16-alpine and redeploy.', '16-alpine');
+
+    expect(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$restart]])))
+        ->toBe('This image has a security problem that attackers are using. A newer build of this image fixes it. Pull it and restart.')
+        ->and(SecuritySentences::headline(sentenceUpdateNow(['actions' => [$redeploy]])))
+        ->toBe('This image has a security problem that attackers are using. A newer build of this image fixes it. Pull it and redeploy.')
+        ->and(SecuritySentences::imageSentence(sentenceUpdateNow(['actions' => [$restart]]), 'postgres:16-alpine'))
+        ->toBe('postgres:16-alpine has a security problem that attackers are using. A newer build fixes it. Pull it and restart.');
 });
 
 it('says a newer build is available for a pull_latest action in update_available', function () {
@@ -420,6 +433,75 @@ describe('image rows', function () {
             ->and(SecuritySentences::noFixAdvice($security))->toBeNull();
     });
 
+    it('starts the sentence of an image that Coolify builds with "This app" instead of its long ref', function (string $buildPack, bool $buildsImage, string $start) {
+        $scan = sentenceScan(['image_ref' => 'k8s0w4c:3f2a1c9e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39', 'builds_image' => $buildsImage]);
+        $scan->setRelation('resource', new Application(['build_pack' => $buildPack]));
+        $ref = (string) $scan->image_ref;
+
+        expect(SecuritySentences::imageSentence(sentenceUpdateNow(), $ref, $scan))->toStartWith($start.' has a security problem that attackers are using.')
+            ->and(SecuritySentences::imageSentence(sentenceSecurity(SecurityStatusType::Ok), $ref, $scan))->toBe("{$start} needs no action.")
+            ->and(SecuritySentences::imageSentence(sentenceSecurity(SecurityStatusType::NotChecked), $ref, $scan))->toBe("{$start} has not been checked yet.")
+            ->and(SecuritySentences::imageSentence(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true, 'builderImage' => true]), $ref, $scan))
+            ->toBe("{$start} has a security problem that attackers are using. ".SecurityActions::BUILDER_TEXT);
+    })->with([
+        'dockerfile' => ['dockerfile', true, 'This app'],
+        'nixpacks' => ['nixpacks', true, 'This app'],
+        'compose build' => ['dockercompose', true, 'This app'],
+        'docker image built in CI' => ['dockerimage', true, 'k8s0w4c:3f2a1c9e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39'],
+        'pulled image' => ['dockercompose', false, 'k8s0w4c:3f2a1c9e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39'],
+    ]);
+
+    it('says that the fix is not in the newest image of the line when only the package has a fix, like the provenance', function (array $entries, string $tail) {
+        $finding = ['id' => 'CVE-2024-6119', 'aliases' => [], 'severity' => 'high', 'package' => 'openssl', 'version' => '3.5.8', 'type' => 'rpm',
+            'artifactId' => 'a', 'fixedIn' => '3.5.9', 'fixState' => 'fixed', 'kev' => false, 'epss' => 0.5, 'risk' => 1.0, 'summary' => '', 'displayId' => 'CVE-2024-6119'];
+        $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'high', 'signal' => 'likely', 'package' => 'openssl', 'version' => '3.5.8']];
+        $scan = sentenceScan(['image_ref' => 'mysql:8.0', 'findings' => [$finding], 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => $entries]]);
+        $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'why' => $why]);
+
+        expect(SecuritySentences::imageSentence($security, 'mysql:8.0', $scan))->toBe('mysql:8.0 has a security problem that attackers are likely to use. '.$tail)
+            ->and(SecuritySentences::provenance($scan, null, $security))->toContain('Fixed versions exist, but the image does not include them yet.')
+            ->and(SecuritySentences::provenance($scan, null, $security))->not->toContain('no fixed version');
+    })->with([
+        'runs the newest' => [[], 'The fix is not in the newest mysql 8.x image yet. Coolify checks every day.'],
+        'newer tag without the fix' => [[[...sentenceCandidate('mysql:8.4', 'line'), 'better' => false, 'fixed_ids' => []]], 'The fix is not in the newest mysql 8.x image yet. Coolify checks every day.'],
+        'newer tag with the fix, but not better' => [[[...sentenceCandidate('mysql:8.4', 'line'), 'better' => false, 'fixed_ids' => ['CVE-2024-6119']]], 'A fix exists, but the image does not include it yet. Coolify checks every day.'],
+    ]);
+
+    it('speaks of one fix when one problem is found in two packages', function () {
+        $finding = ['id' => 'CVE-2024-6119', 'aliases' => [], 'severity' => 'high', 'package' => 'openssl', 'version' => '3.5.8', 'type' => 'rpm',
+            'artifactId' => 'a', 'fixedIn' => '3.5.9', 'fixState' => 'fixed', 'kev' => false, 'epss' => 0.5, 'risk' => 1.0, 'summary' => '', 'displayId' => 'CVE-2024-6119'];
+        $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'high', 'signal' => 'likely', 'package' => 'openssl', 'version' => '3.5.8']];
+        $scan = sentenceScan(['image_ref' => 'mysql:8.0', 'findings' => [$finding, [...$finding, 'package' => 'openssl-libs', 'artifactId' => 'b']],
+            'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]);
+        $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'why' => $why]);
+
+        expect(SecuritySentences::imageSentence($security, 'mysql:8.0', $scan))
+            ->toBe('mysql:8.0 has a security problem that attackers are likely to use. The fix is not in the newest mysql 8.x image yet. Coolify checks every day.');
+    });
+
+    it('says that a fix exists without naming a line when the version check did not cover it', function () {
+        $finding = ['id' => 'CVE-2024-6119', 'aliases' => [], 'severity' => 'high', 'package' => 'openssl', 'version' => '3.5.8', 'type' => 'rpm',
+            'artifactId' => 'a', 'fixedIn' => '3.5.9', 'fixState' => 'fixed', 'kev' => true, 'epss' => 0.5, 'risk' => 1.0, 'summary' => '', 'displayId' => 'CVE-2024-6119'];
+        $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'high', 'signal' => 'exploited', 'package' => 'openssl', 'version' => '3.5.8']];
+        $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2, 'anyExploited' => true, 'why' => [...$why, [...$why[0], 'display_id' => 'CVE-2024-0001']]]);
+        $failed = sentenceScan(['image_ref' => 'mysql:8.0', 'findings' => [$finding, [...$finding, 'id' => 'CVE-2024-0001', 'displayId' => 'CVE-2024-0001']], 'candidates' => ['status' => 'failed', 'entries' => []]]);
+        $mixed = sentenceScan(['image_ref' => 'mysql:8.0', 'findings' => [$finding, [...$finding, 'id' => 'CVE-2024-0001', 'displayId' => 'CVE-2024-0001', 'fixState' => 'not-fixed', 'fixedIn' => null]], 'candidates' => ['status' => 'failed', 'entries' => []]]);
+
+        expect(SecuritySentences::imageSentence($security, 'mysql:8.0', $failed))
+            ->toBe('mysql:8.0 has 2 security problems that attackers are using. A fix exists for each, but the image does not include them yet. Coolify checks every day.')
+            ->and(SecuritySentences::imageSentence($security, 'mysql:8.0', $mixed))
+            ->toBe('mysql:8.0 has 2 security problems that attackers are using. Some of them have a fix that the image does not include yet. Coolify checks every day.')
+            ->and(SecuritySentences::imageSentence($security, 'mysql:8.0'))
+            ->toBe('mysql:8.0 has 2 security problems that attackers are using. No fixed version exists yet, and Coolify checks every day.');
+    });
+
+    it('gives a no_fix image a short action text for the team page', function () {
+        expect(SecuritySentences::noFixAction(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1])))->toBe('No fix released yet. Coolify checks daily.')
+            ->and(SecuritySentences::noFixAction(sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'builderImage' => true])))->toBe('Needs a builder update in a Coolify release.')
+            ->and(SecuritySentences::noFixAction(sentenceUpdateNow()))->toBeNull()
+            ->and(SecuritySentences::noFixAction(sentenceSecurity(SecurityStatusType::Ok)))->toBeNull();
+    });
+
     it('counts the known issues of an image', function () {
         expect(SecuritySentences::knownIssues(12))->toBe('12 known issues')
             ->and(SecuritySentences::knownIssues(1))->toBe('1 known issue')
@@ -501,7 +583,7 @@ describe('provenance', function () {
                 [...sentenceCandidate('quay.io/keycloak/keycloak:26.0', 'same_tag'), 'better' => false],
                 [...sentenceCandidate('quay.io/keycloak/keycloak:26.4', 'line'), 'better' => false],
             ]]]), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2])))
-            ->toBe('Coolify checked Quay 3 hours ago: a newer build of 26.0 and 26.4 are newer, but not safer.')
+            ->toBe('Coolify checked Quay 3 hours ago: a newer build of 26.0 and 26.4 are newer, but not better.')
             ->and(SecuritySentences::provenance(sentenceScan(['candidates' => ['status' => 'failed', 'entries' => []]]), null, $noFix))->toBeNull()
             ->and(SecuritySentences::provenance(sentenceScan(), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'builderImage' => true])))->toBeNull();
     });
@@ -519,6 +601,14 @@ describe('provenance', function () {
         'a fixed package the image does not include' => ['fixed', '3.5.9', 'The problem is in openssl. Fixed versions exist, but the image does not include them yet.'],
     ]);
 
+    it('names only the package of a no-fix problem when no stored finding matches it', function () {
+        $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'medium', 'signal' => 'likely', 'package' => 'openssl', 'version' => '3.5.8']];
+        $scan = sentenceScan(['image_ref' => 'mysql:8', 'findings' => [], 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]);
+
+        expect(SecuritySentences::provenance($scan, null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'why' => $why])))
+            ->toBe('Coolify checked Docker Hub 3 hours ago: you already run the newest 8.x version. The problem is in openssl.');
+    });
+
     it('says whether the newest major version would fix the problems, without offering it', function (bool $fixes, array $fixedIds, string $text) {
         $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'medium', 'signal' => 'likely', 'package' => '', 'version' => '']];
         $major = [...sentenceCandidate('mysql:26', 'major'), 'better' => false, 'fixes_problems' => $fixes, 'fixed_ids' => $fixedIds];
@@ -528,8 +618,8 @@ describe('provenance', function () {
             ->toBe('Coolify checked Docker Hub 3 hours ago: you already run the newest 8.x version. '.$text);
     })->with([
         'fixes it' => [true, ['CVE-2024-6119'], 'mysql:26, a new major version, fixes it. Coolify does not change major versions for you, because they can need a data migration or code changes: read its upgrade notes first.'],
-        'not safer' => [false, ['CVE-2024-6119'], 'The newest major version, mysql:26, is not safer either.'],
-        'safer, but not for these problems' => [true, [], 'The newest major version, mysql:26, is not safer either.'],
+        'not safer' => [false, ['CVE-2024-6119'], 'The newest major version, mysql:26, is not better either.'],
+        'safer, but not for these problems' => [true, [], 'The newest major version, mysql:26, is not better either.'],
     ]);
 
     it('names the patch line of an exact tag', function () {

@@ -31,6 +31,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ProjectIconStorageService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -1635,13 +1636,20 @@ class ServerTransferExporter
     }
 
     /**
-     * Scan rules of the server and of its applications. Team and instance rules stay on the source.
+     * Scan rules of the server and of its applications. Team and instance rules stay on the source, but a rule the
+     * server inherits from its team is exported as a rule of the server (where the server has no value of its own),
+     * so the gate is not weaker on the target. Instance defaults are not copied: the target has its own.
      *
      * @param  Collection<int, Application>  $applications
      * @return list<array<string, mixed>>
      */
     private function exportImageScanPolicies(Server $server, Collection $applications): array
     {
+        $fromTeam = collect(ImageScanPolicyResolver::inheritedFor($server))
+            ->filter(fn (array $field): bool => $field['source'] === 'team')
+            ->map(fn (array $field): string => $field['value']->value)
+            ->all();
+        $serverExported = false;
         $out = [];
         $policies = ImageScanPolicy::query()
             ->where(fn ($query) => $query
@@ -1658,9 +1666,19 @@ class ServerTransferExporter
             $out[] = [
                 'scope_kind' => $isServer ? 'server' : 'application',
                 'scope_uuid' => $scope->uuid,
-                'gate_mode' => $policy->gate_mode?->value,
-                'on_scan_error' => $policy->on_scan_error?->value,
+                'gate_mode' => $policy->gate_mode?->value ?? ($isServer ? ($fromTeam['gate_mode'] ?? null) : null),
+                'on_scan_error' => $policy->on_scan_error?->value ?? ($isServer ? ($fromTeam['on_scan_error'] ?? null) : null),
             ];
+            $serverExported = $serverExported || $isServer;
+        }
+
+        if (! $serverExported && $fromTeam !== []) {
+            array_unshift($out, [
+                'scope_kind' => 'server',
+                'scope_uuid' => $server->uuid,
+                'gate_mode' => $fromTeam['gate_mode'] ?? null,
+                'on_scan_error' => $fromTeam['on_scan_error'] ?? null,
+            ]);
         }
 
         return $out;

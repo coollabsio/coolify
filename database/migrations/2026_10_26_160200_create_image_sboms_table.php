@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('image_id', 80);
             $table->string('platform', 32);
             $table->jsonb('packages');
-            $table->jsonb('base_layer_ids');
             $table->boolean('packages_truncated')->default(false);
             $table->timestamp('last_used_at');
 

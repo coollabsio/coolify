@@ -35,6 +35,12 @@ final class ResourceScans
     /** @var WeakMap<ImageScan, list<Finding>>|null */
     private static ?WeakMap $findings = null;
 
+    /** Parsed Compose images by a hash of the Compose file, so a list render parses each file once. */
+    private const COMPOSE_IMAGES_CACHE_SIZE = 200;
+
+    /** @var array<string, array<string, string>> */
+    private static array $composeImages = [];
+
     /**
      * Finds a resource page's resource by type and uuid, only in the given teams.
      *
@@ -277,17 +283,28 @@ final class ResourceScans
      */
     private static function composeImages(Application $application): array
     {
-        try {
-            $compose = Yaml::parse((string) ($application->docker_compose ?: $application->docker_compose_raw));
-        } catch (ParseException) {
-            return [];
+        $yaml = (string) ($application->docker_compose ?: $application->docker_compose_raw);
+        $key = hash('xxh128', $yaml);
+        if (array_key_exists($key, self::$composeImages)) {
+            return self::$composeImages[$key];
         }
 
-        return collect((array) data_get($compose, 'services', []))
-            ->map(fn ($service) => data_get($service, 'image'))
-            ->filter(fn ($image): bool => is_string($image) && trim($image) !== '' && ! str_contains($image, '$'))
-            ->mapWithKeys(fn (string $image, $service): array => [(string) $service => trim($image)])
-            ->all();
+        try {
+            $compose = Yaml::parse($yaml);
+            $images = collect((array) data_get($compose, 'services', []))
+                ->map(fn ($service) => data_get($service, 'image'))
+                ->filter(fn ($image): bool => is_string($image) && trim($image) !== '' && ! str_contains($image, '$'))
+                ->mapWithKeys(fn (string $image, $service): array => [(string) $service => trim($image)])
+                ->all();
+        } catch (ParseException) {
+            $images = [];
+        }
+
+        if (count(self::$composeImages) >= self::COMPOSE_IMAGES_CACHE_SIZE) {
+            self::$composeImages = [];
+        }
+
+        return self::$composeImages[$key] = $images;
     }
 
     /**

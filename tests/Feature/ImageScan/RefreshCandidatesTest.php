@@ -71,6 +71,7 @@ beforeEach(function () {
     $this->diskFree = '50000000000 50000000000';
     $this->grypeCut = false;
     $this->grypeEdit = null;
+    $this->beforeDigest = null;
 });
 
 function candidatesServer(Team $team): Server
@@ -161,6 +162,7 @@ function candidatesFake(): void
             str_contains($command, 'df -P') => test()->diskFree,
             str_contains($command, 'docker image inspect') => "coolify-scan-exit inspect 0\ncoolify-scan-payload\nsha256:".CANDIDATES_CURRENT_HEX.'|postgres@'.CANDIDATES_REPO_DIGEST.'|linux/amd64|2000000000',
             str_contains($command, 'coolify-scan-exit tags') => candidatesPayload('tags', implode("\n", test()->tags)),
+            str_contains($command, 'coolify-scan-exit digest') && test()->beforeDigest !== null && (test()->beforeDigest)($command) => candidatesPayload('digest', '', 1),
             str_contains($command, 'coolify-scan-exit digest') => preg_match("/'digest' '[^']*:([A-Za-z0-9_.-]+)'/", $command, $tag) === 1 && isset(test()->digests[$tag[1]])
                 ? candidatesPayload('digest', test()->digests[$tag[1]])
                 : candidatesPayload('digest', '', 1),
@@ -301,6 +303,72 @@ it('keeps the status of the check when the scan of the newest major fails', func
         ->and($scan->candidates['error'])->toBeNull()
         ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->toMatchArray(['ref' => 'postgres:16.4-alpine', 'scanned_at' => null])
         ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->not->toHaveKey('fixes_problems');
+});
+
+it('checks the newest tag of the line also after a newer build of the same tag and a newer patch', function () {
+    candidatesFake();
+    $patch = 'sha256:'.str_repeat('5', 64);
+    $this->tags = ['15.0.1-alpine', '15.0.4-alpine', '15.2.0-alpine'];
+    $this->digests = ['15.0.1-alpine' => CANDIDATES_NEW_BUILD, '15.0.4-alpine' => $patch, '15.2.0-alpine' => CANDIDATES_LINE];
+    $this->grype = [
+        substr(CANDIDATES_NEW_BUILD, 7) => 'grype-candidate-15.11',
+        substr($patch, 7) => 'grype-candidate-15.11',
+        substr(CANDIDATES_LINE, 7) => 'grype-candidate-15-alpine',
+    ];
+    $scan = candidatesScan('postgres:15.0.1-alpine');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect(collect($scan->candidateEntries())->map(fn (array $entry) => [$entry['kind'], $entry['ref'], $entry['better']])->all())->toBe([
+        ['same_tag', 'postgres:15.0.1-alpine', false],
+        ['line', 'postgres:15.0.4-alpine', false],
+        ['line', 'postgres:15.2.0-alpine', true],
+    ])
+        ->and($scan->candidateStatus())->toBe('ok')
+        ->and(candidatesRan("'registry:"))->toBe(3)
+        ->and(candidatesScansToday())->toBe(3);
+});
+
+it('does not scan the newest major for information when fewer than 5 scans are left on the server today', function () {
+    candidatesFake();
+    $this->server->settings->forceFill(['image_candidate_scans_today' => 15, 'image_candidate_scans_date' => today()])->saveQuietly();
+    $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype-candidate-15.11';
+    $this->digests['16.4-alpine'] = CANDIDATES_NEW_BUILD;
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidateStatus())->toBe('no_better')
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->toMatchArray(['ref' => 'postgres:16.4-alpine', 'scanned_at' => null])
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->not->toHaveKey('fixes_problems')
+        ->and(candidatesRan("'registry:"))->toBe(1)
+        ->and(candidatesScansToday())->toBe(16);
+});
+
+it('keeps the result of the check when the server lock is busy for the scan of the newest major', function () {
+    candidatesFake();
+    $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype-candidate-15.11';
+    $this->digests['16.4-alpine'] = CANDIDATES_NEW_BUILD;
+    $this->grype[substr(CANDIDATES_NEW_BUILD, 7)] = 'grype-candidate-15-alpine';
+    // A deploy gate starts to wait for the lock while Coolify asks for the digest of the major.
+    $this->beforeDigest = function (string $command): bool {
+        if (str_contains($command, ":16.4-alpine'")) {
+            Cache::put(ScanImage::gateWaitingCacheKey($this->server), true, 120);
+        }
+
+        return false;
+    };
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan, 0, retryWhenBusy: true);
+
+    $scan->refresh();
+    expect($scan->candidateStatus())->toBe('no_better')
+        ->and($scan->candidates['error'])->toBeNull()
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->not->toHaveKey('fixes_problems')
+        ->and(candidatesRan("'registry:"))->toBe(1);
 });
 
 it('checks the same tag for a newer build and scans at most 2 candidates', function () {

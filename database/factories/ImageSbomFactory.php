@@ -18,7 +18,6 @@ class ImageSbomFactory extends Factory
             'image_id' => 'sha256:'.fake()->sha256(),
             'platform' => 'linux/amd64',
             'packages' => [],
-            'base_layer_ids' => [],
             'packages_truncated' => false,
             'last_used_at' => now(),
         ];

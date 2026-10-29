@@ -21,7 +21,6 @@ class ImageSbom extends Model
         'image_id',
         'platform',
         'packages',
-        'base_layer_ids',
         'packages_truncated',
         'last_used_at',
     ];
@@ -30,7 +29,6 @@ class ImageSbom extends Model
     {
         return [
             'packages' => 'array',
-            'base_layer_ids' => 'array',
             'packages_truncated' => 'boolean',
             'last_used_at' => 'datetime',
         ];
