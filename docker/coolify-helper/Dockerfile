@@ -35,7 +35,7 @@ USER root
 WORKDIR /artifacts
 ENV RAILPACK_VERSION=${RAILPACK_VERSION}
 RUN apk upgrade --no-cache && \
-    apk add --no-cache bash curl git git-lfs openssh-client pigz tar tini
+    apk add --no-cache age bash curl git git-lfs openssh-client pigz tar tini
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # SHA256 of every download, per architecture. After you change a version above, run scripts/helper-checksums to update them.

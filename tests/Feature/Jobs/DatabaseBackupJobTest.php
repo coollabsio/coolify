@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\DatabaseBackupJob;
+use App\Models\AgeKey;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -336,9 +337,11 @@ test('database dump compression uses the helper image and shared CPU setting', f
     ]));
     $job->server = $server;
 
+    $job->backup_location = '/backups/pg-dump-all.gz';
+
     $command = (new ReflectionClass($job))
-        ->getMethod('buildCompressedDumpCommand')
-        ->invoke($job, 'docker exec database pg_dumpall', "'/backups/pg-dump-all.gz'");
+        ->getMethod('writeDumpCommand')
+        ->invoke($job, 'docker exec database pg_dumpall', true);
 
     expect($command)
         ->toStartWith('status=$( { { docker exec database pg_dumpall; echo $? >&3; } | docker run --rm -i')
@@ -352,6 +355,69 @@ test('database dump compression uses the helper image and shared CPU setting', f
     'low' => 25,
     'high' => 75,
 ]);
+
+function encryptingBackupJob(?ScheduledDatabaseBackup $backup = null): DatabaseBackupJob
+{
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $job = new DatabaseBackupJob($backup ?? new ScheduledDatabaseBackup(['timeout' => 3600]));
+    $server = new Server;
+    $server->setRelation('settings', new ServerSetting(['backup_compression_cpu_percentage' => 25]));
+    $job->server = $server;
+    $job->backup_location = '/backups/pg-dump.dmp.age';
+    $job->age_public_key = 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+
+    return $job;
+}
+
+test('an unencrypted, uncompressed dump writes straight to the backup file', function () {
+    $job = new DatabaseBackupJob(new ScheduledDatabaseBackup(['timeout' => 3600]));
+    $job->backup_location = '/backups/pg-dump.dmp';
+
+    $command = (new ReflectionClass($job))
+        ->getMethod('writeDumpCommand')
+        ->invoke($job, 'docker exec database pg_dump mydb', false);
+
+    expect($command)->toBe("docker exec database pg_dump mydb > '/backups/pg-dump.dmp'");
+});
+
+test('an encrypted dump goes through age in the helper image and keeps the dump exit status', function () {
+    $job = encryptingBackupJob();
+
+    $command = (new ReflectionClass($job))
+        ->getMethod('writeDumpCommand')
+        ->invoke($job, 'docker exec database pg_dump mydb', false);
+
+    expect($command)
+        ->toStartWith('status=$( { { docker exec database pg_dump mydb; echo $? >&3; } | docker run --rm -i -e \'AGE_RECIPIENT=age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\'')
+        ->toContain('coolify-helper')
+        ->toContain(escapeshellarg('exec age --encrypt --recipient "$AGE_RECIPIENT"'))
+        ->toContain("> '/backups/pg-dump.dmp.age'; } 3>&1 ) && [ \"\$status\" -eq 0 ]")
+        ->not->toContain('pigz');
+});
+
+test('a compressed and encrypted dump compresses before it encrypts', function () {
+    $job = encryptingBackupJob();
+
+    $command = (new ReflectionClass($job))
+        ->getMethod('writeDumpCommand')
+        ->invoke($job, 'docker exec database pg_dumpall', true);
+
+    expect($command)
+        ->toContain('set -o pipefail; compressor=$(')
+        ->toContain('$compressor | age --encrypt --recipient "$AGE_RECIPIENT"');
+});
+
+test('a backup encrypts only with an age key of its own team', function () {
+    $team = Team::factory()->create();
+    $otherTeam = Team::factory()->create();
+    $publicKey = 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+    $ownKey = AgeKey::create(['name' => 'own', 'public_key' => $publicKey, 'team_id' => $team->id]);
+    $foreignKey = AgeKey::create(['name' => 'foreign', 'public_key' => $publicKey, 'team_id' => $otherTeam->id]);
+
+    expect((new ScheduledDatabaseBackup(['team_id' => $team->id, 'age_key_id' => $ownKey->id]))->encryptionRecipient())->toBe($publicKey)
+        ->and((new ScheduledDatabaseBackup(['team_id' => $team->id, 'age_key_id' => $foreignKey->id]))->encryptionRecipient())->toBeNull()
+        ->and((new ScheduledDatabaseBackup(['team_id' => $team->id]))->encryptionRecipient())->toBeNull();
+});
 
 test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {
     $backup = new ScheduledDatabaseBackup([

@@ -59,6 +59,7 @@ RUN apk upgrade --no-cache && \
 # Install system dependencies
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
+    age \
     nodejs \
     npm \
     make \

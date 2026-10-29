@@ -47,6 +47,7 @@ class ServerTransferBundle
         'gitlab_apps' => 1000,
         'gitea_apps' => 1000,
         's3_storages' => 1000,
+        'age_keys' => 1000,
         'cloud_provider_tokens' => 1000,
         'integration_tokens' => 1000,
         'dns_zones' => 1000,

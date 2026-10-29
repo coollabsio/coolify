@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -171,6 +172,7 @@ class ServerTransferExporter
             'gitlab_apps' => $dependencies['gitlab_apps']->map(fn (GitlabApp $app) => $this->exportGitlabApp($app))->values()->all(),
             'gitea_apps' => $dependencies['gitea_apps']->map(fn (GiteaApp $app) => $this->exportGiteaApp($app))->values()->all(),
             's3_storages' => $dependencies['s3_storages']->map(fn (S3Storage $storage) => $this->exportS3Storage($storage))->values()->all(),
+            'age_keys' => $dependencies['age_keys']->map(fn (AgeKey $key) => $this->exportAgeKey($key))->values()->all(),
             'cloud_provider_tokens' => $dependencies['cloud_provider_tokens']->map(fn (CloudProviderToken $token) => $this->exportCloudProviderToken($token))->values()->all(),
             'integration_tokens' => $integrationTokens->map(fn (IntegrationToken $token) => $this->exportIntegrationToken($token))->values()->all(),
             'dns_zones' => $managedDns['records']->pluck('zone')->unique('id')->map(fn (DnsProviderZone $zone) => $this->exportDnsZone($zone))->values()->all(),
@@ -200,6 +202,7 @@ class ServerTransferExporter
      *     gitlab_apps: Collection<int, GitlabApp>,
      *     gitea_apps: Collection<int, GiteaApp>,
      *     s3_storages: Collection<int, S3Storage>,
+     *     age_keys: Collection<int, AgeKey>,
      *     cloud_provider_tokens: Collection<int, CloudProviderToken>
      * }
      */
@@ -211,6 +214,7 @@ class ServerTransferExporter
         $gitlabApps = collect();
         $giteaApps = collect();
         $s3Ids = collect();
+        $ageKeyIds = collect();
 
         // System-wide GitHub Apps are instance-owned; do not copy them. The application source and the runner
         // config still record the App uuid, so the import can re-link to a system-wide App of the target.
@@ -260,8 +264,11 @@ class ServerTransferExporter
             }
         }
 
-        $collectBackupS3 = function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup) use (&$s3Ids): void {
+        $collectBackupS3 = function (ScheduledDatabaseBackup|ScheduledVolumeBackup $backup) use (&$s3Ids, &$ageKeyIds): void {
             $s3Ids->push($backup->s3_storage_id, ...$backup->s3Storages()->pluck('s3_storages.id')->all());
+            if ($backup instanceof ScheduledDatabaseBackup) {
+                $ageKeyIds->push($backup->age_key_id);
+            }
         };
 
         $collectVolumeS3 = function ($resource) use ($collectBackupS3): void {
@@ -330,6 +337,7 @@ class ServerTransferExporter
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
             'gitea_apps' => $giteaApps->unique('id')->values(),
             's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
+            'age_keys' => $ageKeyIds->unique()->filter()->map(fn (int|string $id) => $this->findTeamRecord(AgeKey::class, $id, $teamId, 'backup encryption key'))->values(),
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
     }
@@ -1376,6 +1384,8 @@ class ServerTransferExporter
                 's3_storage_uuid' => $backup->s3?->uuid,
                 's3_storage_uuids' => $backup->selectedS3Storages()->pluck('uuid')->values()->all(),
                 'had_s3_storage' => filled($backup->s3_storage_id),
+                'encryption_enabled' => (bool) $backup->encryption_enabled,
+                'age_key_uuid' => $backup->ageKey?->uuid,
             ];
         }
 
@@ -1491,6 +1501,19 @@ class ServerTransferExporter
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'is_usable' => (bool) $storage->is_usable,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exportAgeKey(AgeKey $key): array
+    {
+        return [
+            'uuid' => $key->uuid,
+            'name' => $key->name,
+            'description' => $key->description,
+            'public_key' => $key->public_key,
         ];
     }
 

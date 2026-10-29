@@ -152,6 +152,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         foreach (S3Storage::query()->where('team_id', $this->id)->get() as $s3) {
             $s3->delete();
         }
+
+        $this->ageKeys()->delete();
     }
 
     public static function serverLimitReached(?Team $team = null)
@@ -418,6 +420,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function privateKeys()
     {
         return $this->hasMany(PrivateKey::class);
+    }
+
+    public function ageKeys()
+    {
+        return $this->hasMany(AgeKey::class);
     }
 
     public function cloudProviderTokens()

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasS3Destinations;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -16,6 +17,7 @@ class ScheduledDatabaseBackup extends BaseModel
     {
         return [
             'dump_all' => 'boolean',
+            'encryption_enabled' => 'boolean',
             'database_backup_retention_max_storage_locally' => 'float',
             'database_backup_retention_max_storage_s3' => 'float',
             'missing_backup_notification_days' => 'integer',
@@ -44,6 +46,8 @@ class ScheduledDatabaseBackup extends BaseModel
         'timeout',
         'disable_local_backup',
         'missing_backup_notification_days',
+        'encryption_enabled',
+        'age_key_id',
     ];
 
     public static function ownedByCurrentTeam()
@@ -85,6 +89,21 @@ class ScheduledDatabaseBackup extends BaseModel
     public function s3Storages(): BelongsToMany
     {
         return $this->belongsToMany(S3Storage::class, 'scheduled_database_backup_s3_storage')->withTimestamps();
+    }
+
+    public function ageKey(): BelongsTo
+    {
+        return $this->belongsTo(AgeKey::class);
+    }
+
+    /**
+     * The age public key that encrypts this schedule's backups. Only a key of the schedule's team counts.
+     */
+    public function encryptionRecipient(): ?string
+    {
+        $ageKey = $this->ageKey;
+
+        return $ageKey && $ageKey->team_id === $this->team_id ? $ageKey->public_key : null;
     }
 
     public function get_last_days_backup_status($days = 7)

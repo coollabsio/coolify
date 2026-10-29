@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -112,6 +113,7 @@ final class ServerTransferCoverage
         GitlabApp::class => ['gitlab_apps.*'],
         GiteaApp::class => ['gitea_apps.*'],
         S3Storage::class => ['s3_storages.*'],
+        AgeKey::class => ['age_keys.*'],
         Project::class => ['projects.*'],
         Environment::class => ['projects.*.environments.*'],
         ResourceLink::class => ['projects.*.environments.*.resource_links.*'],
@@ -217,6 +219,7 @@ final class ServerTransferCoverage
         GitlabApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         GiteaApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         S3Storage::class => ['team_id' => self::TEAM, 'unusable_email_sent' => self::RUNTIME],
+        AgeKey::class => ['team_id' => self::TEAM],
         Project::class => [
             'team_id' => self::TEAM,
             'icon_path' => 'The icon file is exported as `icon` (base64 content). The target stores it in its own icon storage and sets the path.',
@@ -258,6 +261,7 @@ final class ServerTransferCoverage
         Tag::class => ['team_id' => self::TEAM],
         ScheduledDatabaseBackup::class => [
             'team_id' => self::TEAM, 'database_type' => self::LINKED, 'database_id' => self::LINKED, 's3_storage_id' => self::LINKED,
+            'age_key_id' => 'Exported as age_key_uuid. '.self::LINKED,
             'last_execution_at' => 'Execution history of the source.',
         ],
         ScheduledVolumeBackup::class => [

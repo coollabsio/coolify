@@ -139,6 +139,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
+    age \
     libstdc++ \
     openssh-client \
     git \

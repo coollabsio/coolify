@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ValidateAndInstallServerJob;
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -168,7 +169,8 @@ beforeEach(function () {
     transferCoverageRecord(ScheduledVolumeBackup::class, [...$teamId, 'backupable_type' => $volume->getMorphClass(), 'backupable_id' => $volume->id, 's3_storage_id' => $s3->id]);
     transferCoverageRecord(ScheduledTask::class, [...$teamId, 'application_id' => $application->id]);
     transferCoverageRecord(ScheduledTask::class, [...$teamId, 'service_id' => $service->id]);
-    transferCoverageRecord(ScheduledDatabaseBackup::class, [...$teamId, 'database_type' => $databases->first()->getMorphClass(), 'database_id' => $databases->first()->id, 's3_storage_id' => $s3->id]);
+    $ageKey = transferCoverageRecord(AgeKey::class, [...$teamId, 'public_key' => 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq']);
+    transferCoverageRecord(ScheduledDatabaseBackup::class, [...$teamId, 'database_type' => $databases->first()->getMorphClass(), 'database_id' => $databases->first()->id, 's3_storage_id' => $s3->id, 'encryption_enabled' => true, 'age_key_id' => $ageKey->id]);
 
     $tag = transferCoverageRecord(Tag::class, $teamId);
     foreach ([$application, $databases->first(), $service] as $tagged) {
@@ -246,6 +248,7 @@ test('every exported value arrives unchanged on the target', function () {
         GiteaApp::class => ['html_url' => 'https://gitea.fuzz.example.test', 'api_url' => 'https://gitea.fuzz.example.test/api/v1'],
         ScheduledTask::class => ['frequency' => '*/7 * * * *'],
         ScheduledDatabaseBackup::class => ['frequency' => '0 3 * * *'],
+        AgeKey::class => ['public_key' => 'age1pppppppppppppppppppppppppppppppppppppppppppppppppppppppppp'],
         ScheduledVolumeBackup::class => ['frequency' => '0 4 * * *'],
         StandalonePostgresql::class => ['postgres_user' => 'fuzz_user', 'postgres_db' => 'fuzz_db', 'ports_mappings' => '15432:5432', 'public_port' => 15432],
         StandaloneMongodb::class => ['mongo_initdb_root_username' => 'fuzz_user', 'mongo_initdb_database' => 'fuzz_db', 'ports_mappings' => '17017:27017', 'public_port' => 17017],

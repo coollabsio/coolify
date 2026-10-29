@@ -24,6 +24,7 @@ use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
+use App\Support\BackupEncryption;
 use App\Support\ClickhouseBackupCommand;
 use App\Support\DatabaseOperationReservation;
 use App\Support\PostgresUser;
@@ -87,6 +88,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $mongo_root_password = null;
 
+    public ?string $age_public_key = null;
+
     public $timeout = 3600 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?string $backup_log_uuid = null;
@@ -140,6 +143,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (is_null($this->database)) {
                 throw new \Exception('Database not found?!');
+            }
+            if ($this->backup->encryption_enabled) {
+                if ($this->database instanceof StandaloneClickhouse) {
+                    throw new \Exception('Backup encryption is not supported for Clickhouse backups.');
+                }
+                $this->age_public_key = $this->backup->encryptionRecipient();
+                if (blank($this->age_public_key)) {
+                    throw new \Exception('Backup encryption is enabled, but the age key of this backup schedule is missing or does not belong to its team.');
+                }
             }
 
             $this->markStaleExecutionsAsFailed();
@@ -357,6 +369,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         if ($this->backup->dump_all) {
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz";
                         }
+                        $this->backup_file .= $this->encryptedSuffix();
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
@@ -379,7 +392,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             }
                         }
                         $fileDatabaseName = $this->backupFilenamePart($databaseName);
-                        $this->backup_file = "/mongo-dump-$fileDatabaseName-".Carbon::now()->timestamp."-{$this->backup_log_uuid}.tar.gz";
+                        $this->backup_file = "/mongo-dump-$fileDatabaseName-".Carbon::now()->timestamp."-{$this->backup_log_uuid}.tar.gz".$this->encryptedSuffix();
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
@@ -396,6 +409,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         if ($this->backup->dump_all) {
                             $this->backup_file = '/mysql-dump-all-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz";
                         }
+                        $this->backup_file .= $this->encryptedSuffix();
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
@@ -412,6 +426,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         if ($this->backup->dump_all) {
                             $this->backup_file = '/mariadb-dump-all-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz";
                         }
+                        $this->backup_file .= $this->encryptedSuffix();
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
@@ -435,7 +450,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_clickhouse($database);
                     } elseif ($this->database instanceof StandaloneSqlite) {
-                        $this->backup_file = "/sqlite-backup-$database-".Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz";
+                        $this->backup_file = "/sqlite-backup-$database-".Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz".$this->encryptedSuffix();
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
@@ -607,14 +622,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
             $escapedUrl = escapeshellarg($url);
             $escapedContainerName = escapeshellarg($this->container_name);
-            $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($databaseWithCollections === 'all') {
                 $commands = $this->backupDirectoryCommands();
                 if (str($this->database->image)->startsWith('mongo:4')) {
-                    $commands[] = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --archive > {$escapedBackupLocation}";
+                    $dumpCommand = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --archive";
                 } else {
-                    $commands[] = "docker exec {$escapedContainerName} mongodump --authenticationDatabase=admin --uri=$escapedUrl --gzip --archive > {$escapedBackupLocation}";
+                    $dumpCommand = "docker exec {$escapedContainerName} mongodump --authenticationDatabase=admin --uri=$escapedUrl --gzip --archive";
                 }
+                $commands[] = $this->writeDumpCommand($dumpCommand, compress: false);
             } else {
                 if (str($databaseWithCollections)->contains(':')) {
                     $databaseName = str($databaseWithCollections)->before(':');
@@ -631,10 +646,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 if ($collectionsToExclude->count() === 0) {
                     if (str($this->database->image)->startsWith('mongo:4')) {
-                        $commands[] = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --archive > {$escapedBackupLocation}";
+                        $dumpCommand = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --archive";
                     } else {
-                        $commands[] = "docker exec {$escapedContainerName} mongodump --authenticationDatabase=admin --uri=$escapedUrl --db $escapedDatabaseName --gzip --archive > {$escapedBackupLocation}";
+                        $dumpCommand = "docker exec {$escapedContainerName} mongodump --authenticationDatabase=admin --uri=$escapedUrl --db $escapedDatabaseName --gzip --archive";
                     }
+                    $commands[] = $this->writeDumpCommand($dumpCommand, compress: false);
                 } else {
                     // Validate and escape each collection name
                     $escapedCollections = $collectionsToExclude->map(function ($collection) {
@@ -645,10 +661,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     });
 
                     if (str($this->database->image)->startsWith('mongo:4')) {
-                        $commands[] = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --excludeCollection ".$escapedCollections->implode(' --excludeCollection ')." --archive > {$escapedBackupLocation}";
+                        $dumpCommand = "docker exec {$escapedContainerName} mongodump --uri=$escapedUrl --gzip --excludeCollection ".$escapedCollections->implode(' --excludeCollection ').' --archive';
                     } else {
-                        $commands[] = "docker exec {$escapedContainerName} mongodump --authenticationDatabase=admin --uri=$escapedUrl --db $escapedDatabaseName --gzip --excludeCollection ".$escapedCollections->implode(' --excludeCollection ')." --archive > {$escapedBackupLocation}";
+                        $dumpCommand = "docker exec {$escapedContainerName} mongodump --authenticationDatabase=admin --uri=$escapedUrl --db $escapedDatabaseName --gzip --excludeCollection ".$escapedCollections->implode(' --excludeCollection ').' --archive';
                     }
+                    $commands[] = $this->writeDumpCommand($dumpCommand, compress: false);
                 }
             }
             $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
@@ -696,17 +713,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             $escapedUsername = escapeshellarg($this->database->postgres_user);
             $escapedContainerName = escapeshellarg($this->container_name);
-            $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
                 $backupCommand .= " {$escapedContainerName} pg_dumpall --username $escapedUsername";
-                $backupCommand = $this->buildCompressedDumpCommand($backupCommand, $escapedBackupLocation);
+                $backupCommand = $this->writeDumpCommand($backupCommand, compress: true);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
                 // Keep owners and privileges in the archive: services such as Supabase need them,
                 // and the restore skips them unless "Keep owners and privileges" is selected.
-                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
+                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --username $escapedUsername $escapedDatabase";
+                $backupCommand = $this->writeDumpCommand($backupCommand, compress: false);
             }
 
             $commands[] = $backupCommand;
@@ -727,15 +744,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands = $this->backupDirectoryCommands();
             $escapedPassword = escapeshellarg($this->database->mysql_root_password);
             $escapedContainerName = escapeshellarg($this->container_name);
-            $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
                 $dumpCommand = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
-                $commands[] = $this->buildCompressedDumpCommand($dumpCommand, $escapedBackupLocation);
+                $commands[] = $this->writeDumpCommand($dumpCommand, compress: true);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $commands[] = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
+                $dumpCommand = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase";
+                $commands[] = $this->writeDumpCommand($dumpCommand, compress: false);
             }
             $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
@@ -754,15 +771,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands = $this->backupDirectoryCommands();
             $escapedPassword = escapeshellarg($this->database->mariadb_root_password);
             $escapedContainerName = escapeshellarg($this->container_name);
-            $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
                 $dumpCommand = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
-                $commands[] = $this->buildCompressedDumpCommand($dumpCommand, $escapedBackupLocation);
+                $commands[] = $this->writeDumpCommand($dumpCommand, compress: true);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $commands[] = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
+                $dumpCommand = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase";
+                $commands[] = $this->writeDumpCommand($dumpCommand, compress: false);
             }
             $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
@@ -810,7 +827,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands = $this->backupDirectoryCommands();
             $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' \'.timeout 10000\' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
             $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
-            $commands[] = $this->buildCompressedDumpCommand($dumpCommand, escapeshellarg($this->backup_location));
+            $commands[] = $this->writeDumpCommand($dumpCommand, compress: true);
             $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
@@ -1033,13 +1050,35 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         );
     }
 
-    private function buildCompressedDumpCommand(string $dumpCommand, string $escapedBackupLocation): string
+    /**
+     * Writes the dump to the backup file. A compressed or encrypted dump goes through the helper image,
+     * which compresses it and then encrypts it with age for the configured recipient.
+     */
+    private function writeDumpCommand(string $dumpCommand, bool $compress): string
     {
-        $cpuPercentage = BackupCompression::cpuPercentage($this->server->settings->backup_compression_cpu_percentage);
-        $compressorCommand = BackupCompression::compressorCommand($cpuPercentage);
-        $script = "compressor=\$({$compressorCommand}); exec \$compressor";
+        $escapedBackupLocation = escapeshellarg($this->backup_location);
+        $encrypt = filled($this->age_public_key);
+        if (! $compress && ! $encrypt) {
+            return "{$dumpCommand} > {$escapedBackupLocation}";
+        }
 
-        return pipeToFileKeepingExitStatus($dumpCommand, 'docker run --rm -i '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script), $escapedBackupLocation);
+        $cpuPercentage = BackupCompression::cpuPercentage($this->server->settings->backup_compression_cpu_percentage);
+        $compressor = 'compressor=$('.BackupCompression::compressorCommand($cpuPercentage).');';
+        $encryptor = 'age --encrypt --recipient "$AGE_RECIPIENT"';
+        $script = match (true) {
+            $compress && $encrypt => "set -o pipefail; {$compressor} \$compressor | {$encryptor}",
+            $compress => "{$compressor} exec \$compressor",
+            default => "exec {$encryptor}",
+        };
+        $environment = $encrypt ? ' -e '.escapeshellarg('AGE_RECIPIENT='.$this->age_public_key) : '';
+        $sink = 'docker run --rm -i'.$environment.' '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script);
+
+        return pipeToFileKeepingExitStatus($dumpCommand, $sink, $escapedBackupLocation);
+    }
+
+    private function encryptedSuffix(): string
+    {
+        return filled($this->age_public_key) ? BackupEncryption::FILE_EXTENSION : '';
     }
 
     /**

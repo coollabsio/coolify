@@ -4,9 +4,11 @@ namespace App\Livewire\Project\Database;
 
 use App\Livewire\Concerns\ManagesDatabaseBackup;
 use App\Livewire\Project\Database\Backup\Execution;
+use App\Models\AgeKey;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandalonePostgresql;
 use App\Traits\ListensToTeamChannel;
 use Exception;
@@ -33,6 +35,9 @@ class BackupEdit extends Component
 
     #[Locked]
     public $availableS3Storages;
+
+    #[Locked]
+    public $availableAgeKeys;
 
     #[Locked]
     public $parameters;
@@ -92,6 +97,12 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $encryptionEnabled = false;
+
+    #[Validate(['nullable', 'integer'])]
+    public ?int $ageKeyId = null;
+
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int|string $timeout = 3600;
 
@@ -130,6 +141,10 @@ class BackupEdit extends Component
                 ->whereKey($this->availableS3StorageIds()->all())
                 ->orderBy('name')
                 ->get();
+            $this->availableAgeKeys = AgeKey::query()
+                ->whereKey($this->availableAgeKeyIds()->all())
+                ->orderBy('name')
+                ->get(['id', 'name']);
             $this->parameters = get_route_parameters();
             $this->syncData();
             $this->refreshStatus();
@@ -185,6 +200,8 @@ class BackupEdit extends Component
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
             $this->backup->missing_backup_notification_days = $this->missingBackupNotificationDays;
+            $this->backup->encryption_enabled = $this->encryptionEnabled;
+            $this->backup->age_key_id = $this->ageKeyId;
             $storageIds = $this->customValidate();
             $changedFields = auditChangedFields($this->backup);
             $this->backup->save();
@@ -214,6 +231,8 @@ class BackupEdit extends Component
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
             $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
+            $this->encryptionEnabled = $this->backup->encryption_enabled ?? false;
+            $this->ageKeyId = $this->backup->age_key_id;
         }
 
         return [];
@@ -341,6 +360,23 @@ class BackupEdit extends Component
         $this->instantSave();
     }
 
+    public function updatedAgeKeyId(): void
+    {
+        $this->instantSave();
+    }
+
+    public function toggleEncryption(): void
+    {
+        if (! $this->encryptionEnabled && $this->availableAgeKeyIds()->isEmpty()) {
+            $this->dispatch('error', 'Add an age key before enabling backup encryption.');
+
+            return;
+        }
+
+        $this->encryptionEnabled = ! $this->encryptionEnabled;
+        $this->instantSave();
+    }
+
     /**
      * @return Collection<int, int> The usable S3 storage IDs to keep as destinations.
      */
@@ -363,6 +399,17 @@ class BackupEdit extends Component
         if ($this->backup->disable_local_backup && ! $this->backup->save_s3) {
             $this->backup->disable_local_backup = $this->disableLocalBackup = false;
         }
+
+        // Only an age key of the database's team can encrypt; without one, encryption stays off.
+        $ageKeyIds = $this->availableAgeKeyIds();
+        if (! $ageKeyIds->contains($this->backup->age_key_id)) {
+            $this->backup->age_key_id = $this->backup->encryption_enabled ? $ageKeyIds->first() : null;
+        }
+        if ($this->backup->age_key_id === null) {
+            $this->backup->encryption_enabled = false;
+        }
+        $this->ageKeyId = $this->backup->age_key_id;
+        $this->encryptionEnabled = $this->backup->encryption_enabled;
 
         $isValid = validate_cron_expression($this->backup->frequency);
         if (! $isValid) {
@@ -406,12 +453,30 @@ class BackupEdit extends Component
             ->values();
     }
 
-    private function availableS3StorageIds(): Collection
+    private function databaseTeamId(): ?int
     {
         $database = $this->backup->database;
-        // The instance database (id 0) has no project and belongs to the root team.
-        $teamId = $database instanceof StandalonePostgresql && $database->id === 0 ? 0 : $database?->team()?->id;
 
+        // The instance database (id 0) has no project and belongs to the root team.
+        return $database instanceof StandalonePostgresql && $database->id === 0 ? 0 : $database?->team()?->id;
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function availableAgeKeyIds(): Collection
+    {
+        $teamId = $this->databaseTeamId();
+        if ($teamId === null || $this->backup->database_type === StandaloneClickhouse::class) {
+            return collect();
+        }
+
+        return AgeKey::query()->where('team_id', $teamId)->pluck('id');
+    }
+
+    private function availableS3StorageIds(): Collection
+    {
+        $teamId = $this->databaseTeamId();
         if ($teamId === null) {
             return collect();
         }

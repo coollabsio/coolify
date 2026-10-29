@@ -29,6 +29,7 @@ final class ServerTransferSnapshot
         'dns_provider_zone_id' => 'dns_provider_zones', 'github_app_id' => 'github_apps', 'cloud_provider_token_id' => 'cloud_provider_tokens',
         'managed_dns_record_id' => 'managed_dns_records', 'standalone_sqlite_id' => 'standalone_sqlites', 'icon_s3_storage_id' => 's3_storages',
         'scheduled_database_backup_id' => 'scheduled_database_backups', 'scheduled_volume_backup_id' => 'scheduled_volume_backups',
+        'age_key_id' => 'age_keys',
     ];
 
     /** Polymorphic relations: `<name>_type` + `<name>_id`. */
@@ -44,7 +45,7 @@ final class ServerTransferSnapshot
 
     /** Records that a moved record needs. Their own children are not collected. */
     private const DEPENDENCY_TABLES = ['private_keys', 's3_storages', 'integration_tokens', 'dns_provider_zones', 'github_apps', 'gitlab_apps',
-        'gitea_apps', 'cloud_provider_tokens', 'environments', 'projects', 'managed_dns_records'];
+        'gitea_apps', 'cloud_provider_tokens', 'environments', 'projects', 'managed_dns_records', 'age_keys'];
 
     /** Values that the live instances change while they manage the resources, not the transfer. */
     public const LIVE_RUNTIME_COLUMNS = ['last_online_at', 'status', 'docker_version_checked_at', 'compose_version_checked_at', 'started_at', 'config_hash', 'container_present'];

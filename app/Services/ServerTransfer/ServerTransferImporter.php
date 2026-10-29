@@ -5,6 +5,7 @@ namespace App\Services\ServerTransfer;
 use App\Enums\GithubRunnerDockerMode;
 use App\Enums\ServerRole;
 use App\Jobs\ValidateAndInstallServerJob;
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -93,6 +94,9 @@ class ServerTransferImporter
 
     /** @var array<string, S3Storage> */
     private array $s3StorageMap = [];
+
+    /** @var array<string, AgeKey> */
+    private array $ageKeyMap = [];
 
     /** @var array<string, CloudProviderToken> */
     private array $cloudTokenMap = [];
@@ -232,6 +236,7 @@ class ServerTransferImporter
             'gitlab_apps' => 0,
             'gitea_apps' => 0,
             's3_storages' => 0,
+            'age_keys' => 0,
             'cloud_provider_tokens' => 0,
             'integration_tokens' => 0,
             'managed_dns_records' => 0,
@@ -262,6 +267,7 @@ class ServerTransferImporter
             $created['gitlab_apps'] = count(data_get($bundle, 'gitlab_apps', []));
             $created['gitea_apps'] = count(data_get($bundle, 'gitea_apps', []));
             $created['s3_storages'] = count(data_get($bundle, 's3_storages', []));
+            $created['age_keys'] = count(data_get($bundle, 'age_keys', []));
             $created['cloud_provider_tokens'] = count(data_get($bundle, 'cloud_provider_tokens', []));
             $created['integration_tokens'] = count(data_get($bundle, 'integration_tokens', []));
             $created['managed_dns_records'] = count(data_get($bundle, 'managed_dns_records', []));
@@ -359,6 +365,13 @@ class ServerTransferImporter
                 $this->s3StorageMap[(string) data_get($s3Payload, 'uuid', $s3->uuid)] = $s3;
                 $this->s3StorageMap[$s3->uuid] = $s3;
                 $created['s3_storages']++;
+            }
+
+            foreach (data_get($bundle, 'age_keys', []) as $ageKeyPayload) {
+                $ageKey = $this->importAgeKey($ageKeyPayload, $teamId, $preserveUuids);
+                $this->ageKeyMap[(string) data_get($ageKeyPayload, 'uuid', $ageKey->uuid)] = $ageKey;
+                $this->ageKeyMap[$ageKey->uuid] = $ageKey;
+                $created['age_keys']++;
             }
 
             foreach (data_get($bundle, 'cloud_provider_tokens', []) as $tokenPayload) {
@@ -1755,6 +1768,11 @@ class ServerTransferImporter
             $s3Ids = $this->importedBackupS3StorageIds($backup);
             $s3Id = $s3Ids[0] ?? null;
             $this->warnAboutMissingS3Storage($backup, $s3Id, "database {$database->name}");
+            $ageKeyId = $this->ageKeyMap[(string) data_get($backup, 'age_key_uuid')]->id ?? null;
+            $encryptionEnabled = (bool) data_get($backup, 'encryption_enabled', false);
+            if ($encryptionEnabled && $ageKeyId === null) {
+                $this->importWarnings[] = "Backup of database {$database->name}: encryption was turned off because its age key was not found.";
+            }
 
             $importedBackup = ScheduledDatabaseBackup::create([
                 'uuid' => $uuid,
@@ -1775,6 +1793,8 @@ class ServerTransferImporter
                 'disable_local_backup' => (bool) data_get($backup, 'disable_local_backup', false),
                 'missing_backup_notification_days' => (int) data_get($backup, 'missing_backup_notification_days', 0),
                 's3_storage_id' => $s3Id,
+                'encryption_enabled' => $encryptionEnabled && $ageKeyId !== null,
+                'age_key_id' => $ageKeyId,
                 'database_type' => $database->getMorphClass(),
                 'database_id' => $database->id,
             ]);
@@ -2014,6 +2034,40 @@ class ServerTransferImporter
         $storage->save();
 
         return $storage;
+    }
+
+    /**
+     * Age keys hold only a public key, so a key of the team with the same public key is reused.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function importAgeKey(array $payload, int $teamId, bool $preserveUuids): AgeKey
+    {
+        $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
+            ? (string) data_get($payload, 'uuid')
+            : new_public_id();
+
+        $existing = AgeKey::query()->where('team_id', $teamId)
+            ->where(fn ($query) => $query->where('uuid', $uuid)->orWhere('public_key', trim((string) data_get($payload, 'public_key'))))
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+        if (AgeKey::where('uuid', $uuid)->exists()) {
+            $uuid = new_public_id();
+        }
+
+        $key = new AgeKey;
+        $key->forceFill([
+            'team_id' => $teamId,
+            'name' => data_get($payload, 'name') ?: 'Imported age key',
+            'description' => data_get($payload, 'description'),
+            'public_key' => (string) data_get($payload, 'public_key'),
+        ]);
+        $key->uuid = $uuid;
+        $key->save();
+
+        return $key;
     }
 
     /**

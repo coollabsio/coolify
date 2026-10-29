@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ValidateAndInstallServerJob;
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
@@ -1640,6 +1641,46 @@ test('import warns when the git source, private key or S3 storage of a resource 
     expect($result['warnings'])->toContain('Application my-app: its GitHub App was not found on this instance; set the source again.')
         ->and($result['warnings'])->toContain('Application my-app: its private key was not found on this instance; select the private key again.')
         ->and($result['warnings'])->toContain('Backup of database app-db: S3 upload was turned off because its S3 storage was not found.');
+});
+
+test('encrypted database backups keep their age key on the target', function () {
+    $ageKey = AgeKey::create([
+        'name' => 'Backup key',
+        'public_key' => 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq',
+        'team_id' => $this->team->id,
+    ]);
+    $this->backup->update(['encryption_enabled' => true, 'age_key_id' => $ageKey->id]);
+    $bundle = $this->exporter->export($this->server);
+    removeTransferSourceResources($this);
+    $targetTeam = Team::factory()->create();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $importedBackup = ScheduledDatabaseBackup::query()->where('team_id', $targetTeam->id)->sole();
+    expect($importedBackup->encryption_enabled)->toBeTrue()
+        ->and($importedBackup->ageKey->team_id)->toBe($targetTeam->id)
+        ->and($importedBackup->ageKey->public_key)->toBe($ageKey->public_key)
+        ->and($result['warnings'])->not->toContain('Backup of database app-db: encryption was turned off because its age key was not found.');
+});
+
+test('import turns off backup encryption with a warning when the age key is missing', function () {
+    $ageKey = AgeKey::create([
+        'name' => 'Backup key',
+        'public_key' => 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq',
+        'team_id' => $this->team->id,
+    ]);
+    $this->backup->update(['encryption_enabled' => true, 'age_key_id' => $ageKey->id]);
+    $bundle = $this->exporter->export($this->server);
+    $bundle['age_keys'] = [];
+    removeTransferSourceResources($this);
+    $targetTeam = Team::factory()->create();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $importedBackup = ScheduledDatabaseBackup::query()->where('team_id', $targetTeam->id)->sole();
+    expect($importedBackup->encryption_enabled)->toBeFalse()
+        ->and($importedBackup->age_key_id)->toBeNull()
+        ->and($result['warnings'])->toContain('Backup of database app-db: encryption was turned off because its age key was not found.');
 });
 
 test('export warns about DNS records of another team', function () {
