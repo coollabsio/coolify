@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Manage stale issues and PRs
-        uses: actions/stale@v9
+        uses: actions/stale@v11.0.0
         id: stale
         with:
           stale-issue-message: 'This issue will be automatically closed in a few days if no response is received. Please provide an update with the requested information.'
