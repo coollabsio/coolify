@@ -78,7 +78,7 @@ read_versions() {
 
 read_changes() {
 	local tag range hash subject
-	tag="$(git describe --tags --abbrev=0 --match "*v$stable" 2> /dev/null)" || true
+	tag="$(git describe --tags --abbrev=0 --match "v${UPSTREAM:+*-v}$stable" 2> /dev/null)" || true
 	range="${tag:+$tag..}HEAD"
 	required="patch"
 	if [ -n "$(git log -E --grep="$BREAKING_CHANGE" --format=%h "$range")" ]; then
@@ -195,7 +195,7 @@ artifact_version() {
 }
 
 release_tags() {
-	git tag --list "$@" | grep -E "^${UPSTREAM:+[^-]+-}v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$" || true
+	git tag --list "$@" | grep -E "^v${UPSTREAM:+[^-]+-v}[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$" || true
 }
 
 tag_versions() {
