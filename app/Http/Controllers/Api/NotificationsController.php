@@ -59,6 +59,7 @@ class NotificationsController extends Controller
                     'server_unreachable_email_notifications' => 'sometimes|boolean',
                     'server_patch_email_notifications' => 'sometimes|boolean',
                     'traefik_outdated_email_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_email_notifications' => 'sometimes|boolean',
                 ],
             ],
             'discord' => [
@@ -81,6 +82,7 @@ class NotificationsController extends Controller
                     'server_unreachable_discord_notifications' => 'sometimes|boolean',
                     'server_patch_discord_notifications' => 'sometimes|boolean',
                     'traefik_outdated_discord_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_discord_notifications' => 'sometimes|boolean',
                     'discord_ping_enabled' => 'sometimes|boolean',
                 ],
             ],
@@ -104,6 +106,7 @@ class NotificationsController extends Controller
                     'server_unreachable_slack_notifications' => 'sometimes|boolean',
                     'server_patch_slack_notifications' => 'sometimes|boolean',
                     'traefik_outdated_slack_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_slack_notifications' => 'sometimes|boolean',
                 ],
             ],
             'telegram' => [
@@ -127,6 +130,7 @@ class NotificationsController extends Controller
                     'server_unreachable_telegram_notifications' => 'sometimes|boolean',
                     'server_patch_telegram_notifications' => 'sometimes|boolean',
                     'traefik_outdated_telegram_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_telegram_notifications' => 'sometimes|boolean',
                     'telegram_notifications_deployment_success_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_deployment_failure_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_status_change_thread_id' => 'sometimes|nullable|string|max:255',
@@ -142,6 +146,7 @@ class NotificationsController extends Controller
                     'telegram_notifications_server_unreachable_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_server_patch_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_traefik_outdated_thread_id' => 'sometimes|nullable|string|max:255',
+                    'telegram_notifications_image_vulnerabilities_thread_id' => 'sometimes|nullable|string|max:255',
                 ],
             ],
             'pushover' => [
@@ -165,6 +170,7 @@ class NotificationsController extends Controller
                     'server_unreachable_pushover_notifications' => 'sometimes|boolean',
                     'server_patch_pushover_notifications' => 'sometimes|boolean',
                     'traefik_outdated_pushover_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_pushover_notifications' => 'sometimes|boolean',
                 ],
             ],
             'webhook' => [
@@ -187,6 +193,7 @@ class NotificationsController extends Controller
                     'server_unreachable_webhook_notifications' => 'sometimes|boolean',
                     'server_patch_webhook_notifications' => 'sometimes|boolean',
                     'traefik_outdated_webhook_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_webhook_notifications' => 'sometimes|boolean',
                 ],
             ],
             default => throw new \InvalidArgumentException("Unknown notification channel [{$channel}]."),

@@ -9,6 +9,7 @@ use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use App\Notifications\ImageScan\NotificationText;
 use App\Traits\IncludesDeploymentCommitDetails;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -34,6 +35,12 @@ class DeploymentFailed extends CustomEmailNotification
 
     public ?string $fqdn = null;
 
+    /** The gate headline ("Deploy blocked: this image has 2 security problems that attackers are using") when the image scan gate stopped the deployment, for email. Never IDs. */
+    public ?string $blockedTitle = null;
+
+    /** The same headline without counts, for chat and webhook channels. */
+    public ?string $blockedChatTitle = null;
+
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null, ?ApplicationDeploymentQueue $deployment = null)
     {
         $this->onQueue('high');
@@ -50,6 +57,26 @@ class DeploymentFailed extends CustomEmailNotification
         }
         $this->deployment_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
         $this->resolveDeploymentCommitDetails($application, $deployment, $preview);
+        $gate = $deployment?->deployment_uuid === $deployment_uuid
+            ? $deployment->scan_gate_result
+            : ApplicationDeploymentQueue::query()->where('deployment_uuid', $deployment_uuid)->value('scan_gate_result');
+        if (is_array($gate) && ($gate['blocked'] ?? false)) {
+            $this->blockedTitle = self::blockedTitle((string) ($gate['headline'] ?? ''));
+            // A result stored before the plain headline existed may count problems: chat gets the generic title then.
+            $this->blockedChatTitle = isset($gate['headline_plain'])
+                ? self::blockedTitle((string) $gate['headline_plain'])
+                : (preg_match('/\d/', (string) ($gate['headline'] ?? '')) === 1 ? self::blockedTitle('') : $this->blockedTitle);
+        }
+    }
+
+    private static function blockedTitle(string $headline): string
+    {
+        $headline = rtrim(NotificationText::plain(mb_substr($headline, 0, 300)), '.');
+        if ($headline === '') {
+            return 'Deploy blocked by the image scan';
+        }
+
+        return str_starts_with($headline, 'Deploy blocked') ? $headline : "Deploy blocked: {$headline}";
     }
 
     public function via(object $notifiable): array
@@ -62,7 +89,9 @@ class DeploymentFailed extends CustomEmailNotification
         $mail = new MailMessage;
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
         $fqdn = $this->fqdn;
-        if ($pull_request_id === 0) {
+        if ($this->blockedTitle !== null) {
+            $mail->subject('Coolify: '.$this->blockedTitle.' ('.$this->application_name.').');
+        } elseif ($pull_request_id === 0) {
             $mail->subject('Coolify: Deployment failed of '.$this->application_name.'.');
         } else {
             $fqdn = $this->preview->fqdn;
@@ -74,6 +103,7 @@ class DeploymentFailed extends CustomEmailNotification
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,
             'pull_request_id' => data_get($this->preview, 'pull_request_id', 0),
+            'blocked' => $this->blockedTitle === null ? null : NotificationText::mailMarkdown($this->blockedTitle),
         ]);
 
         return $mail;
@@ -83,7 +113,7 @@ class DeploymentFailed extends CustomEmailNotification
     {
         if ($this->preview) {
             $message = new DiscordMessage(
-                title: ':cross_mark: Deployment failed',
+                title: $this->blockedChatTitle ?? ':cross_mark: Deployment failed',
                 description: 'Pull request: '.$this->preview->pull_request_id,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
@@ -104,7 +134,7 @@ class DeploymentFailed extends CustomEmailNotification
                 $description = '';
             }
             $message = new DiscordMessage(
-                title: ':cross_mark: Deployment failed',
+                title: $this->blockedChatTitle ?? ':cross_mark: Deployment failed',
                 description: $description,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
@@ -122,7 +152,9 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        if ($this->preview) {
+        if ($this->blockedChatTitle !== null) {
+            $message = 'Coolify: '.$this->blockedChatTitle.' ('.$this->application_name.'): ';
+        } elseif ($this->preview) {
             $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
         } else {
             $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
@@ -142,7 +174,10 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        if ($this->preview) {
+        if ($this->blockedChatTitle !== null) {
+            $title = $this->blockedChatTitle;
+            $message = 'The image scan blocked the deployment of '.NotificationText::html($this->application_name).'.';
+        } elseif ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
             $message = "Pull request deployment failed for {$this->application_name}";
         } else {
@@ -181,6 +216,11 @@ class DeploymentFailed extends CustomEmailNotification
             }
         }
 
+        if ($this->blockedChatTitle !== null) {
+            $title = $this->blockedChatTitle;
+            $description = 'The image scan blocked the deployment of '.NotificationText::slack($this->application_name).'.';
+        }
+
         $description .= "\n\n*Project:* ".data_get($this->application, 'environment.project.name');
         $description .= "\n*Environment:* {$this->environment_name}";
         $description .= "\n*<{$this->deployment_url}|Deployment Logs>*";
@@ -196,7 +236,7 @@ class DeploymentFailed extends CustomEmailNotification
     {
         $data = [
             'success' => false,
-            'message' => 'Deployment failed',
+            'message' => $this->blockedChatTitle ?? 'Deployment failed',
             'event' => 'deployment_failed',
             'application_name' => $this->application_name,
             'application_uuid' => $this->application->uuid,
@@ -213,6 +253,10 @@ class DeploymentFailed extends CustomEmailNotification
 
         if ($this->fqdn) {
             $data['fqdn'] = $this->fqdn;
+        }
+
+        if ($this->blockedChatTitle !== null) {
+            $data['blocked'] = true;
         }
 
         return $data;

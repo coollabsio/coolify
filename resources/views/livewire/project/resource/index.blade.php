@@ -192,6 +192,7 @@
                                         {{ wireNavigate() }}
                                         class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
+                                    <x-image-scan.marker bind="item.security" class="relative" />
                                 </div>
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-show="item.description?.trim()"
@@ -277,6 +278,7 @@
                                         <h2
                                             class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                             x-text="item.name"></h2>
+                                        <x-image-scan.marker bind="item.security" class="relative" />
                                     </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>

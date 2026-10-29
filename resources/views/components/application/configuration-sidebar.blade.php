@@ -7,6 +7,8 @@
             'application_uuid' => $application->uuid,
         ];
 
+        $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
+
         $configurationMenuItems = [
             [
                 'label' => 'General',
@@ -127,6 +129,13 @@
                 'active' => $currentRoute === 'project.application.analytics',
             ],
             [
+                'label' => 'Security',
+                'route' => 'project.application.vulnerabilities',
+                'active' => $currentRoute === 'project.application.vulnerabilities',
+                'visible' => $imageScanningAllowed,
+                'security' => $imageScanningAllowed ? \App\Services\ImageScan\SecurityStatus::stored($application)->status->value : null,
+            ],
+            [
                 'label' => 'Tags',
                 'route' => 'project.application.tags',
                 'active' => $currentRoute === 'project.application.tags',
@@ -167,6 +176,7 @@
             'Resource Operations' => 'server-update',
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
+            'Security' => 'shield-alert',
             'Tags' => 'tags',
             'Danger Zone' => 'danger',
         ];
@@ -174,7 +184,7 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
@@ -266,6 +276,7 @@
                                     @if ($menuItem['label'] === 'Files')
                                         <x-beta-badge class="ml-auto shrink-0" />
                                     @endif
+                                    <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
                                             <livewire:project.application.server-status-badge :application="$application"

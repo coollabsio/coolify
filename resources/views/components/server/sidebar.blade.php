@@ -195,6 +195,7 @@
             'disabled' => ! $server->isFunctional(),
             'children' => [
                 ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage', 'beta' => true],
+                ['label' => 'Image Scanning', 'route' => 'server.security.image-scanning', 'active' => $activeSubMenu === 'image-scanning', 'icon' => 'shield-alert'],
                 ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
             ],
         ],

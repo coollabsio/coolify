@@ -24,6 +24,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Services\ImageScan\DeploymentImageScan;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -43,6 +44,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use JsonException;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -230,6 +232,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private bool $skip_build = false;
 
     private Collection|string $build_secrets;
+
+    private ?DeploymentImageScan $imageScan = null;
 
     public function tags()
     {
@@ -622,6 +626,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Mark deployment as complete FIRST, before any other operations
         // This ensures the deployment status is FINISHED even if subsequent operations fail
         $this->completeDeployment();
+        $this->imageScan()->linkReusedScans();
 
         // Then handle side effects - these should not fail the deployment
         try {
@@ -655,6 +660,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        $this->imageScan()->dispatchScanAfterStart();
+        $this->imageScan()->refreshSecurity();
     }
 
     private function deploy_simple_dockerfile()
@@ -686,6 +693,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+        $this->imageScan()->rememberDockerfileBaseImage();
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
@@ -830,6 +838,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
 
         $this->loadComposeFileForDeployment();
+        $this->imageScan()->forgetStaleComposeImageOverrides();
         $buildEnvironment = null;
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
@@ -883,6 +892,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->save_runtime_environment_variables();
 
         $this->pull_docker_compose_images();
+        $this->imageScan()->applyComposeStartPins();
+
+        $this->imageScan()->checkComposeGate();
 
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
@@ -1269,6 +1281,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+        $this->imageScan()->rememberDockerfileBaseImage();
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
@@ -1597,6 +1610,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->should_skip_build();
         $this->completeDeployment();
+        $this->imageScan()->linkReusedScans();
     }
 
     private function should_skip_build()
@@ -2523,11 +2537,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         try {
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
-                throw new \InvalidArgumentException('Invalid build-time environment variable key.');
+                throw new InvalidArgumentException('Invalid build-time environment variable key.');
             }
 
             return $key;
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             $this->logInvalidBuildtimeEnvironmentVariableKey($key, $origin);
 
             // The log already explains the problem and how to fix it.
@@ -2890,6 +2904,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function rolling_update()
     {
+        $this->imageScan()->applyStartPin();
+        $this->imageScan()->checkGate($this->production_image_name);
+
         try {
             $this->checkForCancellation();
             $this->write_compose_file_to_workdir();
@@ -2939,6 +2956,31 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * The image scan steps of this deployment (gate, start pins, scan after the start), created on first use. It reads
+     * job properties when a step needs them, because the job changes servers and the Compose file during the deploy.
+     */
+    private function imageScan(): DeploymentImageScan
+    {
+        return $this->imageScan ??= new DeploymentImageScan(
+            $this->application,
+            $this->application_deployment_queue,
+            read: fn (string $property): mixed => match ($property) {
+                'server', 'mainServer', 'use_build_server', 'deployment_uuid', 'pull_request_id', 'commit', 'rollback',
+                'skip_build', 'is_this_additional_server', 'container_name', 'docker_compose', 'generated_docker_compose',
+                'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'workdir',
+                'docker_compose_location', 'saved_outputs' => $this->{$property},
+                // Not set before the build server is chosen or the image is named.
+                'build_server', 'production_image_name' => $this->{$property} ?? null,
+            },
+            write: fn (string $property, string $value): string => match ($property) {
+                'docker_compose', 'generated_docker_compose' => $this->{$property} = $value,
+            },
+            run: fn (array ...$commands) => $this->execute_remote_command(...$commands),
+            checkForCancellation: fn () => $this->checkForCancellation(),
+        );
     }
 
     /**
@@ -3132,6 +3174,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_pull_request_image();
+        $this->imageScan()->rememberDockerfileBaseImage();
 
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
@@ -5353,15 +5396,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             );
 
             if ($this->application->build_pack === 'dockerimage') {
-                $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} pull"), 'hidden' => true],
-                    [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} up --build -d"), 'hidden' => true],
-                );
+                $up = [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} up --build -d"), 'hidden' => true];
+                if ($this->imageScan()->pinnedImage() !== null || $this->imageScan()->startPinned()) {
+                    // The gate pulled and scanned the pinned image.
+                    $this->execute_remote_command($up);
+                } else {
+                    $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
+                    $this->execute_remote_command(
+                        [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} pull"), 'hidden' => true],
+                        $up,
+                    );
+                }
             } else {
                 if ($this->use_build_server) {
+                    // A pinned digest cannot change in the registry, so Compose pulls it only when it is missing.
+                    $pull = $this->imageScan()->pinnedImage() !== null ? '' : '--pull always ';
                     $this->execute_remote_command(
-                        [serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --pull always --build -d", 'hidden' => true],
+                        [serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up {$pull}--build -d", 'hidden' => true],
                     );
                 } else {
                     $this->execute_remote_command(

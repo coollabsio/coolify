@@ -152,6 +152,8 @@ services:
       - postgres_data:/data/coolify/_volumes/database
       - redis_data:/data/coolify/_volumes/redis
       - minio_data:/data/coolify/_volumes/minio
+      # Image scanner files: the scanner containers bind-mount these paths through the host daemon.
+      - /data/coolify/image-scans:/data/coolify/image-scans
     networks:
       coolify:
         # Seeders use this hostname for the localhost server.

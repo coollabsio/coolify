@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\SharedVariableCanvasController;
 use App\Http\Controllers\Api\TagCanvasController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FileBrowserDownloadController;
+use App\Http\Controllers\ImageScanSbomController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
@@ -34,6 +35,10 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\ImageScan\FleetVulnerabilities;
+use App\Livewire\ImageScan\InstanceImageScanning;
+use App\Livewire\ImageScan\ServerImageScanning;
+use App\Livewire\ImageScan\TeamImageScanning;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
@@ -208,6 +213,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('two-factor.required.switch-team');
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    // Members limited to some projects see the resources they have access to.
+    Route::get('/vulnerabilities', FleetVulnerabilities::class)->name('vulnerabilities');
     Route::middleware('access.team-wide')->group(function () {
         Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
         Route::get('/analytics', Analytics::class)->name('analytics');
@@ -282,6 +289,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', SettingsIndex::class)->name('settings.index');
         Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
         Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+        Route::get('/settings/image-scanning', InstanceImageScanning::class)->name('settings.image-scanning');
 
         Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
         Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
@@ -337,6 +345,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index')->middleware('access.team-wide');
         Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
         Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log')->middleware('access.team-wide');
+        Route::get('/image-scanning', TeamImageScanning::class)->name('team.image-scanning')->middleware('access.team-wide');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view')->middleware('access.team-wide');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone')->middleware('access.team-wide');
     });
@@ -429,6 +438,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
+        Route::get('/vulnerabilities', ApplicationConfiguration::class)->name('project.application.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.application.vulnerabilities.sbom');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -451,6 +462,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
         Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
         Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/vulnerabilities', DatabaseConfiguration::class)->name('project.database.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.database.vulnerabilities.sbom');
         Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
@@ -470,6 +483,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
+        Route::get('/vulnerabilities', ServiceConfiguration::class)->name('project.service.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.service.vulnerabilities.sbom');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
         Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
@@ -538,6 +553,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
             Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
             Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
+            Route::get('/security/image-scanning', ServerImageScanning::class)->name('server.security.image-scanning')->middleware('can.update.resource');
             Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
         });
         Route::get('/destinations', DestinationIndex::class)->name('destination.index');

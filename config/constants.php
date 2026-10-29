@@ -82,6 +82,16 @@ return [
         'stop_timeout_flag_since' => '28.0.0',
     ],
 
+    // Scanner images run on managed servers, pinned by digest. Change them only with a Coolify release.
+    'image_scan' => [
+        'images' => [
+            'syft' => ['repo' => 'anchore/syft', 'version' => '1.55.0', 'digest' => 'sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a'],
+            'grype' => ['repo' => 'anchore/grype', 'version' => '0.121.0', 'digest' => 'sha256:621d56d1d68106b787022c81546f7e0a36202a25d1239f0c20195fab8c16f7ea'],
+            'regctl' => ['repo' => 'regclient/regctl', 'version' => '0.11.7', 'digest' => 'sha256:45b57933c2b67bb1e280b4baaa220ef1ab212c81268ab19589fa1e83719c7c82'],
+            'init' => ['repo' => 'alpine', 'version' => '3.22.7', 'digest' => 'sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f'],
+        ],
+    ],
+
     'ssh' => [
         'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),

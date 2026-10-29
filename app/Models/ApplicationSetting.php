@@ -66,6 +66,10 @@ class ApplicationSetting extends Model
 
     public const GPU_COUNT_PATTERN = '/^(all|\d+)$/';
 
+    protected $attributes = [
+        'is_image_scan_enabled' => true,
+    ];
+
     protected $casts = [
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
@@ -101,10 +105,14 @@ class ApplicationSetting extends Model
         'include_coolify_default_variables' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'disable_build_cache' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
+        'image_builds_by_team' => 'boolean',
     ];
 
     protected $fillable = [
         'application_id',
+        'is_image_scan_enabled',
+        'image_builds_by_team',
         'is_static',
         'is_git_submodules_enabled',
         'is_git_lfs_enabled',

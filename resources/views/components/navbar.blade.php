@@ -109,14 +109,17 @@
             @php
                 // Members limited to some projects only see project pages; team-level pages return 403 for them.
                 $teamWide = app(App\Services\Access\AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
+                $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
                 // An entry with children opens a submenu in place of the main menu (back button + its pages).
                 $navSections = collect([
                     'Workspace' => [
                         ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'canvas')],
                         ['label' => 'Projects', 'icon' => 'projects', 'href' => route('project.index'), 'active' => request()->is('projects', 'projects/*', 'project/*')],
-                        ['label' => 'Monitoring', 'icon' => 'graph', 'visible' => $teamWide, 'children' => [
-                            ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics')],
-                            ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics')],
+                        ['label' => 'Monitoring', 'icon' => 'graph', 'visible' => $teamWide || $imageScanningAllowed, 'children' => [
+                            ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics'), 'visible' => $teamWide],
+                            ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics'), 'visible' => $teamWide],
+                            // Members limited to some projects see the resources they have access to.
+                            ['label' => 'Security', 'icon' => 'shield-alert', 'href' => route('vulnerabilities'), 'active' => request()->is('vulnerabilities'), 'visible' => $imageScanningAllowed],
                         ]],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
@@ -141,6 +144,7 @@
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('team.index'), 'active' => request()->is('team')],
                             ['label' => 'Members', 'icon' => 'teams', 'href' => route('team.member.index'), 'active' => request()->is('team/members*')],
                             ['label' => 'Audit log', 'icon' => 'time-back', 'href' => route('team.audit-log'), 'active' => request()->is('team/audit-log'), 'visible' => auth()->user()?->isAdminOfTeam(currentTeam()->id)],
+                            ['label' => 'Image Scanning', 'icon' => 'shield-alert', 'href' => route('team.image-scanning'), 'active' => request()->is('team/image-scanning'), 'visible' => $imageScanningAllowed],
                             ['label' => 'Admin View', 'icon' => 'admin', 'href' => route('team.admin-view'), 'active' => request()->is('team/admin'), 'visible' => isInstanceAdmin()],
                             ['label' => 'Danger Zone', 'icon' => 'danger', 'href' => route('team.danger-zone'), 'active' => request()->is('team/danger'), 'visible' => auth()->user()?->can('delete', currentTeam()), 'sectionStart' => true],
                         ]],
@@ -165,6 +169,7 @@
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->is('settings')],
                             ['label' => 'Advanced', 'icon' => 'grid', 'href' => route('settings.advanced'), 'active' => request()->is('settings/advanced')],
                             ['label' => 'Updates', 'icon' => 'refresh3', 'href' => route('settings.updates'), 'active' => request()->is('settings/updates')],
+                            ['label' => 'Image Scanning', 'icon' => 'shield-alert', 'href' => route('settings.image-scanning'), 'active' => request()->is('settings/image-scanning')],
                             ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*'), 'sectionStart' => true],
                             ['label' => 'Email', 'icon' => 'mail', 'href' => route('settings.email'), 'active' => request()->is('settings/email')],
                             ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup')],

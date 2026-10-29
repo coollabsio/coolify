@@ -51,6 +51,7 @@ it('lists every instance settings page for the root team', function () {
         route('settings.backup'),
         route('settings.email'),
         route('settings.oauth'),
+        route('settings.image-scanning'),
     );
 });
 
@@ -74,6 +75,7 @@ it('lists team, security, notification and profile pages for a team owner', func
         route('notifications.pushover'),
         route('notifications.webhook'),
         route('profile.appearance'),
+        route('team.image-scanning'),
         ...adminOnlyNavigationLinks(),
     );
 });

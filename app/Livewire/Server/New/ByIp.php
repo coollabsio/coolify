@@ -4,6 +4,7 @@ namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -17,6 +18,7 @@ use Livewire\Component;
 class ByIp extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     #[Locked]
     public $private_keys;
@@ -174,6 +176,7 @@ class ByIp extends Component
             $server->settings->server_role = ServerRole::from($this->server_role);
             $server->settings->is_build_server = $this->server_role === ServerRole::BUILD->value;
             $server->settings->save();
+            $this->applyImageScanning($server);
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {

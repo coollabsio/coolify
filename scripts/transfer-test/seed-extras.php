@@ -10,6 +10,8 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
 use App\Models\ResourceLink;
@@ -78,6 +80,14 @@ $environment->forceFill(['canvas_positions' => [$app->uuid => ['x' => 111, 'y' =
 SharedEnvironmentVariable::create(['type' => 'team', 'team_id' => $teamId, 'key' => 'FAKE_TEAM_VAR', 'value' => 'team-value']);
 EnvironmentVariable::create(['key' => 'USES_TEAM', 'value' => '{{team.FAKE_TEAM_VAR}}', 'resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id]);
 $app->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>fake maintenance</h1>'])->saveQuietly();
+
+// Image scan: server opt-in, server and app rules, and an ignore of the app
+$server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+$quiet(ImageScanPolicy::class, ['scope_type' => $server->getMorphClass(), 'scope_id' => $server->id, 'gate_mode' => 'strict']);
+$quiet(ImageScanPolicy::class, ['scope_type' => $app->getMorphClass(), 'scope_id' => $app->id, 'on_scan_error' => 'block']);
+$quiet(ImageScanIgnore::class, ['team_id' => $teamId, 'resource_type' => $app->getMorphClass(), 'resource_id' => $app->id, 'vulnerability_id' => 'CVE-2024-0001', 'reason' => 'fake ignore']);
+$quiet(ImageScanIgnore::class, ['team_id' => $teamId, 'vulnerability_id' => 'CVE-2024-0002', 'reason' => 'fake team-wide ignore']);
+$app->settings->forceFill(['is_image_scan_enabled' => false, 'image_builds_by_team' => true])->saveQuietly();
 
 // A git application that uses a system-wide GitHub App, which the transfer does not move
 $systemApp = $quiet(GithubApp::class, ['name' => 'fake-system-wide-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 0, 'is_system_wide' => true, 'is_public' => false]);

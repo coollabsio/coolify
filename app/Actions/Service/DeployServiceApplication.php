@@ -4,8 +4,10 @@ namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Events\ServiceStartFinished;
+use App\Jobs\ScanResourceImagesJob;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\ImageScan\ImageStartPin;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -44,6 +46,9 @@ class DeployServiceApplication
             $commands->push(serverDockerConfigPrefix($service->server)."docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName} < /dev/null");
         }
 
+        // After the pull: the scanned build of a "Pull latest" security update keeps the tag of the compose file.
+        $commands->push(...ImageStartPin::commands(ImageStartPin::take($service), serverDockerConfigPrefix($service->server)));
+
         if ($service->networks()->count() > 0) {
             $commands->push('echo Creating Docker network.');
             $commands->push("docker network inspect {$safeProjectName} >/dev/null 2>&1 || docker network create --attachable {$safeProjectName}");
@@ -73,6 +78,9 @@ class DeployServiceApplication
 
         $commands->push("docker network connect {$safeProjectName} coolify-proxy >/dev/null 2>&1 || true");
 
-        return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: ServiceStartFinished::dataFor($service), queue: deployment_queue());
+        $activity = remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: ServiceStartFinished::dataFor($service), queue: deployment_queue());
+        ScanResourceImagesJob::dispatchAfterStart($service);
+
+        return $activity;
     }
 }

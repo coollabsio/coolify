@@ -154,6 +154,7 @@
                         :events="[
                             ['property' => 'statusChangeEmailNotifications', 'label' => 'Resource status changes', 'enabled' => $statusChangeEmailNotifications],
                             ['property' => 'restartLimitReachedEmailNotifications', 'label' => 'Restart limit reached', 'enabled' => $restartLimitReachedEmailNotifications],
+                            ['property' => 'imageVulnerabilitiesEmailNotifications', 'label' => 'Image vulnerabilities', 'enabled' => $imageVulnerabilitiesEmailNotifications],
                         ]" />
                     <x-notification.event-multiselect :settings="$settings" id="backup-email-events" label="Backups"
                         :events="[

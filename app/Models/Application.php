@@ -17,6 +17,7 @@ use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasConfiguration;
+use App\Traits\HasImageScans;
 use App\Traits\HasMaintenancePage;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
@@ -140,7 +141,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -215,6 +216,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'docker_compose_domains',
+        'docker_compose_image_overrides',
         'domain_dns_statuses',
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
@@ -311,6 +313,7 @@ class Application extends BaseModel
             'noindex_domains' => 'array',
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
+            'docker_compose_image_overrides' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'restart_limit_reached' => 'boolean',
@@ -2324,6 +2327,75 @@ class Application extends BaseModel
         return is_array($services) ? $services : [];
     }
 
+    /**
+     * The image that a security update set for a Compose service, while the compose file still names the image it
+     * replaced. When the user changes that image in the compose file (in Git), the compose file wins again.
+     */
+    public function composeImageOverride(string $serviceName, ?string $composeImage): ?string
+    {
+        $override = data_get($this->docker_compose_image_overrides, $serviceName);
+        if (! is_array($override) || ! is_string($override['from'] ?? null) || ! is_string($override['to'] ?? null)) {
+            return null;
+        }
+
+        return $composeImage !== null && trim($composeImage) === trim($override['from']) ? $override['to'] : null;
+    }
+
+    /**
+     * The overrides that still apply to the compose file, keyed by the service name.
+     *
+     * @return array<string, array{from: string, to: string}>
+     */
+    public function activeComposeImageOverrides(): array
+    {
+        try {
+            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services', []);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $active = [];
+        foreach ((array) $this->docker_compose_image_overrides as $serviceName => $override) {
+            $image = is_array($services) ? ($services[$serviceName]['image'] ?? null) : null;
+            if ($this->composeImageOverride((string) $serviceName, is_string($image) ? $image : null) !== null) {
+                $active[(string) $serviceName] = ['from' => (string) $override['from'], 'to' => (string) $override['to']];
+            }
+        }
+
+        return $active;
+    }
+
+    /**
+     * Removes the overrides whose image the compose file no longer names, so a later compose file that names that
+     * image again does not turn them on. Keeps them all when the compose file cannot be read.
+     */
+    public function forgetStaleComposeImageOverrides(): void
+    {
+        $stored = (array) $this->docker_compose_image_overrides;
+        if ($stored === []) {
+            return;
+        }
+
+        try {
+            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services');
+        } catch (\Throwable) {
+            return;
+        }
+        if (! is_array($services)) {
+            return;
+        }
+
+        $active = $this->activeComposeImageOverrides();
+        if (count($active) === count($stored)) {
+            return;
+        }
+
+        $value = $active === [] ? null : $active;
+        static::query()->whereKey($this->getKey())->update(['docker_compose_image_overrides' => $value === null ? null : json_encode($value)]);
+        $this->docker_compose_image_overrides = $value;
+        $this->syncOriginalAttribute('docker_compose_image_overrides');
+    }
+
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
@@ -2937,5 +3009,16 @@ class Application extends BaseModel
         } catch (\Exception $e) {
             throw new \Exception('Failed to update application settings');
         }
+    }
+
+    /**
+     * The server of a deployment when it is the destination server or an additional server of the application.
+     */
+    public function deploymentServer(ApplicationDeploymentQueue $deployment): ?Server
+    {
+        return collect([$this->destination?->server])
+            ->concat($this->additional_servers()->get())
+            ->filter(fn ($server): bool => $server instanceof Server)
+            ->first(fn (Server $server): bool => (int) $server->id === (int) $deployment->server_id);
     }
 }

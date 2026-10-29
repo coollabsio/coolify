@@ -9,6 +9,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
@@ -360,6 +362,18 @@ test('an imported application and service keep their compose parser version and 
     expect($application->compose_parsing_version)->toBe('3')
         ->and(Service::where('uuid', $serviceUuid)->value('compose_parsing_version'))->toBe('3')
         ->and($application->environment_variables()->where('key', 'NIXPACKS_NODE_VERSION')->pluck('value')->all())->toBe(['18']);
+});
+
+test('an imported Compose app keeps the image overrides of its security updates', function () {
+    $overrides = ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']];
+    $this->application->forceFill(['build_pack' => 'dockercompose', 'docker_compose_image_overrides' => $overrides])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Application::where('uuid', $applicationUuid)->firstOrFail()->docker_compose_image_overrides)->toBe($overrides);
 });
 
 test('a static application keeps the port that the user set after turning on static', function () {
@@ -1983,4 +1997,193 @@ test('an application with a system-wide GitHub App that the target lacks is list
     expect(data_get($bundle, 'projects.0.environments.0.applications.0.source.system_wide'))->toBeTrue()
         ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
+});
+
+/**
+ * Moves the beforeEach server to a new team after the source forgot its scan rules.
+ *
+ * @param  array<string, mixed>  $bundle
+ * @return array{result: array<string, mixed>, team: Team}
+ */
+function importScanRulesBundle(object $test, array $bundle): array
+{
+    // The source instance no longer manages the rules of the moved server and applications.
+    ImageScanPolicy::query()->whereIn('scope_type', [$test->server->getMorphClass(), $test->application->getMorphClass()])->delete();
+    ImageScanIgnore::query()->delete();
+    $test->service->forceDelete();
+    $test->application->forceDelete();
+    $test->database->forceDelete();
+    $test->server->forceDelete();
+
+    $team = Team::factory()->create();
+
+    return ['result' => $test->importer->import($bundle, teamId: $team->id), 'team' => $team];
+}
+
+test('scan rules and ignores of the server and its applications move, linked by uuid, and the opt-ins move', function () {
+    $user = User::factory()->create();
+    $this->server->settings->forceFill(['is_image_scan_enabled' => true, 'image_candidate_scans_today' => 7, 'image_candidate_scans_date' => '2031-02-03'])->saveQuietly();
+    $this->application->settings->forceFill(['is_image_scan_enabled' => false, 'image_builds_by_team' => true])->saveQuietly();
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'on']);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->application->getMorphClass(), 'scope_id' => $this->application->id, 'on_scan_error' => 'block']);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict']);
+    ImageScanIgnore::factory()->create([
+        'team_id' => $this->team->id, 'resource_type' => $this->application->getMorphClass(), 'resource_id' => $this->application->id,
+        'vulnerability_id' => 'CVE-2024-12345', 'package' => 'openssl', 'reason' => 'Not reachable', 'expires_at' => '2031-06-01 00:00:00', 'created_by' => $user->id,
+    ]);
+    ImageScanIgnore::factory()->create([
+        'team_id' => $this->team->id, 'resource_type' => $this->database->getMorphClass(), 'resource_id' => $this->database->id, 'vulnerability_id' => null, 'package' => 'libpq',
+    ]);
+    $teamWide = ImageScanIgnore::factory()->create(['team_id' => $this->team->id]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['warnings'])->toContain('Team-wide vulnerability ignores stay on this instance.')
+        ->and(data_get($bundle, 'server.settings.is_image_scan_enabled'))->toBeTrue()
+        ->and(data_get($bundle, 'server.settings'))->not->toHaveKeys(['image_candidate_scans_today', 'image_candidate_scans_date'])
+        ->and($bundle['image_scan_policies'])->toHaveCount(2)
+        ->and($bundle['image_scan_ignores'])->toHaveCount(2)
+        ->and(json_encode($bundle['image_scan_ignores']))->not->toContain($teamWide->vulnerability_id);
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $app = Application::query()->where('name', 'my-app')->firstOrFail();
+    $database = StandalonePostgresql::query()->where('name', 'app-db')->firstOrFail();
+
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    $appPolicy = ImageScanPolicy::query()->where('scope_type', $app->getMorphClass())->where('scope_id', $app->id)->firstOrFail();
+    $ignore = ImageScanIgnore::query()->where('resource_type', $app->getMorphClass())->where('resource_id', $app->id)->firstOrFail();
+
+    expect($server->settings->is_image_scan_enabled)->toBeTrue()
+        ->and($server->settings->image_candidate_scans_today)->toBe(0)
+        ->and($server->settings->image_candidate_scans_date)->toBeNull()
+        ->and($app->settings->is_image_scan_enabled)->toBeFalse()
+        ->and($app->settings->image_builds_by_team)->toBeTrue()
+        ->and($serverPolicy->gate_mode->value)->toBe('on')
+        ->and($serverPolicy->on_scan_error)->toBeNull()
+        ->and($appPolicy->on_scan_error->value)->toBe('block')
+        ->and($appPolicy->gate_mode)->toBeNull()
+        ->and($ignore->team_id)->toBe($team->id)
+        ->and($ignore->created_by)->toBeNull()
+        ->and($ignore->vulnerability_id)->toBe('CVE-2024-12345')
+        ->and($ignore->package)->toBe('openssl')
+        ->and($ignore->reason)->toBe('Not reachable')
+        ->and($ignore->expires_at->format('Y-m-d'))->toBe('2031-06-01')
+        ->and(ImageScanIgnore::query()->where('resource_type', $database->getMorphClass())->where('resource_id', $database->id)->where('package', 'libpq')->exists())->toBeTrue()
+        ->and(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
+        ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(3);
+});
+
+test('team scan rules that the server inherits move as rules of the server, so the gate is not weaker on the target', function () {
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'on', 'on_scan_error' => null]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict', 'on_scan_error' => 'block']);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect(collect($bundle['image_scan_policies'])->firstWhere('scope_kind', 'server'))
+        ->toMatchArray(['scope_uuid' => $this->server->uuid, 'gate_mode' => 'on', 'on_scan_error' => 'block']);
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    expect($serverPolicy->gate_mode->value)->toBe('on')
+        ->and($serverPolicy->on_scan_error->value)->toBe('block');
+});
+
+test('team scan rules move as rules of the server also when the server has none of its own', function () {
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict', 'on_scan_error' => null]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['image_scan_policies'])->toBe([
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'gate_mode' => 'strict', 'on_scan_error' => null],
+    ]);
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    expect($serverPolicy->gate_mode->value)->toBe('strict')
+        ->and($serverPolicy->on_scan_error)->toBeNull();
+});
+
+test('scan rules of a bundle from an older version map Block deploys on to strict and drop the alert level', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $appUuid = $this->application->uuid;
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'high', 'gate_enabled' => true, 'on_scan_error' => 'block'],
+        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'alert_level' => 'medium', 'gate_enabled' => false, 'on_scan_error' => null],
+    ];
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $app = Application::query()->where('name', 'my-app')->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    $appPolicy = ImageScanPolicy::query()->where('scope_type', $app->getMorphClass())->where('scope_id', $app->id)->firstOrFail();
+
+    expect($serverPolicy->gate_mode->value)->toBe('strict')
+        ->and($serverPolicy->on_scan_error->value)->toBe('block')
+        ->and($appPolicy->gate_mode->value)->toBe('off')
+        ->and($appPolicy->getAttributes())->not->toHaveKeys(['alert_level', 'gate_enabled'])
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(0);
+});
+
+test('scan rules of an older bundle with a Block deploys value that is not a boolean are dropped with a warning', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'high', 'gate_enabled' => 'yes', 'on_scan_error' => 'block'],
+    ];
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(0)
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules of the server were not imported')))->toHaveCount(1);
+});
+
+test('no team-wide ignore warning is exported when the team has none', function () {
+    ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => $this->application->getMorphClass(), 'resource_id' => $this->application->id]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['warnings'])->not->toContain('Team-wide vulnerability ignores stay on this instance.');
+});
+
+test('scan rules that fail the validation of the UI or point to nothing in the bundle are dropped with a warning', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $appUuid = $this->application->uuid;
+    $ignore = fn (array $fields): array => ['resource_kind' => 'application', 'resource_uuid' => $appUuid, 'vulnerability_id' => 'CVE-2024-1', 'package' => null, 'reason' => 'ok', 'expires_at' => null, ...$fields];
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'gate_mode' => 'always', 'on_scan_error' => null],
+        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'gate_mode' => 'strict', 'on_scan_error' => 'deploy'],
+        ['scope_kind' => 'application', 'scope_uuid' => 'missing-app', 'gate_mode' => 'on', 'on_scan_error' => null],
+    ];
+    $bundle['image_scan_ignores'] = [
+        $ignore(['vulnerability_id' => 'bad id; rm -rf /']),
+        $ignore(['vulnerability_id' => null, 'package' => null]),
+        $ignore(['reason' => str_repeat('a', 501)]),
+        $ignore(['reason' => '']),
+        $ignore(['resource_uuid' => 'missing-app']),
+        $ignore(['vulnerability_id' => 'GHSA-abcd-1234']),
+    ];
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanIgnore::query()->where('team_id', $team->id)->pluck('vulnerability_id')->all())->toBe(['GHSA-abcd-1234'])
+        ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->pluck('gate_mode')->map(fn ($mode) => $mode?->value)->all())->toBe(['strict'])
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'vulnerability ignore')))->toHaveCount(5)
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(2);
+});
+
+test('an ignore that the import created before is not created again', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $entry = ['resource_kind' => 'application', 'resource_uuid' => $this->application->uuid, 'vulnerability_id' => 'CVE-2024-7', 'package' => null, 'reason' => 'Not reachable', 'expires_at' => null];
+    $bundle['image_scan_ignores'] = [$entry, $entry, [...$entry, 'vulnerability_id' => null, 'package' => 'openssl'], [...$entry, 'vulnerability_id' => null, 'package' => 'openssl']];
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
+        ->and($result['created']['image_scan_ignores'])->toBe(2);
 });

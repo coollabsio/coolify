@@ -36,6 +36,13 @@
     --color-warning-900: oklch(42.1% 0.0897 57.71);
     --color-success: oklch(72.27% 0.192 149.58);
     --color-error: oklch(57.71% 0.2152 27.33);
+    /* Vulnerability severity. Critical uses --color-error; low and unknown are
+       neutral. These two never follow the accent or --color-warning (the custom
+       theme recolors both): high is orange, medium is sky blue, so neither reads
+       as the yellow warning or the purple accent. Light values here, dark
+       values in .dark. */
+    --color-severity-high: oklch(56% 0.135 50);
+    --color-severity-medium: oklch(55% 0.1 235);
     --color-coollabs-50: oklch(96.33% 0.0206 301.15);
     --color-coollabs: oklch(49.65% 0.2709 289.33);
     --color-coollabs-100: oklch(52.34% 0.287 289.16);
@@ -1408,6 +1415,8 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
        (4.10/3.75/3.53). Brightened for dark mode so text-error clears AA on the
        card ladder while staying unmistakably red. */
     --color-error: oklch(66% 0.2 27.33);
+    --color-severity-high: oklch(74% 0.15 55);
+    --color-severity-medium: oklch(76% 0.11 230);
 }
 
 /* Light-mode semantic text.
@@ -2071,6 +2080,30 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 
 .application-settings-section > :is(header, .application-settings-section-header) :is(h2, h3) .info-helper {
     color: inherit;
+}
+
+/* Collapsible layer card: the title is the toggle; closed, only the title row shows. */
+.application-settings-section > header.is-collapsed {
+    padding-bottom: 0.25rem;
+}
+
+.application-settings-section .settings-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    color: inherit;
+    font: inherit;
+    transition: color 150ms ease;
+}
+
+.application-settings-section .settings-section-toggle:hover {
+    color: var(--card-fg);
+}
+
+.application-settings-section .settings-section-toggle:focus-visible {
+    outline: 2px solid var(--color-coollabs);
+    outline-offset: 2px;
 }
 
 .application-settings-section > .application-settings-section-header p {
@@ -3690,6 +3723,105 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
 }
 
+.image-scan-ignores-table-grid {
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(12rem, 2fr) 6.5rem 9rem 5rem;
+}
+
+.image-scan-packages-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 2.5rem;
+}
+
+.image-scan-packages-grid.has-image {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 2.5rem;
+    min-width: 52rem;
+}
+
+.image-scan-findings-grid {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+}
+
+.image-scan-findings-grid.has-image {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+    min-width: 52rem;
+}
+
+.image-scan-findings-grid.is-nested {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+    padding-left: 2.75rem;
+}
+
+.image-scan-sbom-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) 6rem minmax(8rem, 1fr);
+}
+
+.image-scan-sbom-grid.has-image {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) 6rem minmax(8rem, 1fr) minmax(8rem, 1fr);
+    min-width: 46rem;
+}
+
+.image-scan-fleet-grid {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 0.9fr) minmax(12rem, 1.8fr) minmax(7rem, 0.8fr) 6.5rem;
+}
+
+@media (max-width: 1279px) {
+    .image-scan-fleet-grid {
+        grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 0.9fr) minmax(10rem, 1.6fr) minmax(7rem, 0.8fr);
+    }
+
+    .image-scan-fleet-grid > .image-scan-fleet-tertiary {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .image-scan-packages-grid,
+    .image-scan-packages-grid.has-image,
+    .image-scan-findings-grid,
+    .image-scan-findings-grid.has-image,
+    .image-scan-findings-grid.is-nested {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 0.375rem;
+        min-width: 0;
+    }
+
+    .image-scan-severity-cell {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .data-table-header > .image-scan-severity-cell {
+        display: none;
+    }
+
+    .image-scan-findings-grid.is-nested {
+        padding-left: 1rem;
+    }
+
+    .image-scan-sbom-grid,
+    .image-scan-sbom-grid.has-image {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+        min-width: 0;
+    }
+
+    .image-scan-fleet-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 0.375rem;
+    }
+
+    .image-scan-fleet-action {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .data-table-header > .image-scan-fleet-action {
+        display: none;
+    }
+
+    .image-scan-secondary {
+        display: none;
+    }
+}
+
 .fleet-servers-table-grid {
     grid-template-columns: minmax(9rem, 1.4fr) 8rem 8rem 8rem 5rem 8rem 5.5rem;
 }
@@ -3787,6 +3919,15 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .api-tokens-table-grid > :nth-child(3),
     .api-tokens-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .image-scan-ignores-table-grid {
+        grid-template-columns: minmax(0, 1fr) 6.5rem 5rem;
+    }
+
+    .image-scan-ignores-table-grid > :nth-child(2),
+    .image-scan-ignores-table-grid > :nth-child(4) {
         display: none;
     }
 

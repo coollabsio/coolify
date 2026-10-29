@@ -17,6 +17,7 @@
     scope: 'global',
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
     developerCommandsEnabled: @js(app()->environment('local')),
+    vulnerabilitiesUrl: @js(instanceSettings()->is_image_scanning_allowed ? route('vulnerabilities') : null),
 
     get showServerTimingCommand() {
         if (!this.developerCommandsEnabled) return false;
@@ -99,6 +100,12 @@
             if (!item.search_text) return false;
             return item.search_text.toLowerCase().includes(query);
         }).slice(0, 20);
+
+        // A vulnerability ID opens the Security page with that search (resources/js/vulnerability-search.js).
+        const vulnerability = window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl);
+        if (vulnerability) {
+            return [vulnerability, ...results].slice(0, 20);
+        }
 
         return results;
     },

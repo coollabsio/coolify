@@ -926,6 +926,15 @@ The shared workspace grid is:
 
 Instance Settings uses `x-settings.layout` with the same full-width workspace.
 
+The Security item of the resource sidebars shows a status dot at its end
+(`<x-image-scan.security-dot :status="..." />`, set `'security'` on the item to
+the stored status): a red `bg-error` dot for update_now and a yellow
+`bg-warning` dot for update_available, each with an `aria-label`
+("Security: update now", "Security: security update") that is also the tooltip.
+Other statuses show nothing, and the item never shows a count. Status that needs
+live updates keeps its own component (the application Servers item uses the
+`badge` server status badge).
+
 **Page titles (global):** `x-dashboard.navbar` H1s (`titleOnDesktop="false"`,
 the default) hide at **lg+** only when the page renders a fixed tab strip or
 actions; otherwise they stay visible. Collection indexes (Servers, Projects, …)
@@ -996,6 +1005,13 @@ Anatomy:
 
 The title row has `4px 8px 10px` padding inside the 6px outer padding, so
 header actions sit 10px from the top and 14px from the right edge.
+
+A card that most users do not need open can be collapsible: pass
+`collapsible` (and `:open="true"` to start open). The title becomes a button
+with a chevron (`aria-expanded`, `aria-controls` the well), the well is hidden
+until it is opened, and the closed title row has a 4px bottom padding. Header
+actions stay visible while it is closed. The Security page uses it for "All
+findings ({n})", "Packages and SBOM", and "Settings".
 
 The card keeps `overflow: visible` so listbox panels and tooltips can escape
 it. Do not add `overflow: hidden` to the card or the well.
@@ -1171,6 +1187,30 @@ history filter in
 Do not represent the empty state as a selectable `All` option. The footer reset
 action is the single way to return the multi-select to its unfiltered state.
 
+#### Inherited listbox option
+
+A setting that inherits through levels (for example instance → team → server
+→ app for image scan rules) uses `x-forms.inherited-listbox`. It wraps
+`x-forms.listbox` and prepends one option with the value `''`:
+
+```blade
+<x-forms.inherited-listbox id="gateMode" label="Block deploys"
+    inheritLabel="Use team default (Off)" :options="$options" />
+```
+
+- the label is `Use {level} default ({value})`: `{level}` is the level the
+  inherited value comes from (`Coolify` for the instance level, then `team`,
+  `server`), and `{value}` is that value's option label;
+- choosing it stores `null`, so the field follows later changes of the level
+  above. Do not copy the inherited value into the row;
+- the top level has concrete values and no inherit option (pass no
+  `inheritLabel`), and the server rejects an empty value for it;
+- it saves instantly (`onChange`), like the other instant-save listboxes;
+- a related choice that is not inheritance, such as "Detect automatically",
+  uses a plain listbox with its own first option instead.
+
+The reference is `resources/views/livewire/image-scan/partials/scan-rules.blade.php`.
+
 ### Standard table controls
 
 Dense tables use the shared `x-table.*` components so search, filters, sorting,
@@ -1189,6 +1229,32 @@ Tables continue to own their filter options, sort choices, headers, rows,
 queries, permissions, and empty states. Backend-filtered or paginated tables
 must use `x-table.loading`; frontend-only Alpine tables reuse the same toolbar
 and control anatomy but do not show an artificial loading state.
+
+### Fix-state switch
+
+The "All findings ({n})" card of the Security page splits findings into "Fixed
+by an update" (a fixed version exists, or an action of the main card fixes it)
+and "No fix yet". This is a view switch, not a filter, so it is not in the
+`x-table.filter` menu and "Reset filters" keeps its meaning:
+
+- a segmented control in the table toolbar, after the search: a 4px-padded
+  neutral track (`bg-neutral-100`, dark `white/4%`) with 28px, 6px-radius
+  buttons; the current one is the raised white pill (dark `white/9%`) with a
+  hairline ring;
+- `role="group"` with an `aria-label`, and `aria-pressed` on each button;
+- each label has its count in parentheses: `Fixed by an update (5)`. The counts
+  follow the search and the filters, so a switch never hides results without
+  saying how many;
+- "Fixed by an update" is the default. When it is empty, the empty state says
+  "No finding has a fixed version." and links to "No fix yet ({n})";
+- the same segmented anatomy is used for the "By package / By CVE" grouping
+  toggle on the right of the toolbar;
+- ignored findings are not a third state. The table footer has an "{n} ignored"
+  link that opens the ignored list;
+- a finding of a Dockerfile build that the base image has too says "Comes from
+  {base}." in its details.
+
+The reference is `resources/views/livewire/image-scan/vulnerabilities.blade.php`.
 
 ### Buttons
 
@@ -1263,6 +1329,270 @@ Relevant classes:
 
 Create a page-specific grid class when columns differ. Add responsive rules
 that hide secondary columns before allowing horizontal overflow.
+
+### Severity badge, security marker, gate status, and the Security main card
+
+Image scan findings use shared pieces in
+`resources/views/components/image-scan/`. They keep the status badge rule:
+the surface stays neutral and only a small mark carries the color, and the
+severity word is always in the text, so color is never the only signal.
+
+Severity tokens live in `app.css`, with a light value in `@theme` and a dark
+value in `.dark`. They are OKLCH only and never follow the accent or
+`--color-warning`, because the custom theme recolors both.
+
+| Severity | Dot color | Why |
+|---|---|---|
+| critical | `--color-error` (`bg-error`) | the existing error red |
+| high | `--color-severity-high` (orange) | between error red and warning yellow |
+| medium | `--color-severity-medium` (sky blue) | not yellow like warnings, not purple like the accent |
+| low, unknown | neutral | no urgency |
+
+- Every severity dot clears 3:1 (non-text contrast) on the badge background in
+  both themes, and medium is more than 10 ΔE (OKLab ×100) from the accent and
+  the warning color. `tests/Unit/ImageScan/SeverityTokenContrastTest.php`
+  enforces both. Change a token and run it.
+- `<x-image-scan.severity-badge severity="critical" :count="2" />` renders
+  `x-status-badge` with the types `severity-critical`, `severity-high`,
+  `severity-medium`, or `severity-low` (unknown is neutral). The label is
+  `2 critical`, or `Critical` (sentence case) when `count` is null.
+- `<x-image-scan.marker status="update_now" text="Update now" label="…" tooltip="Update to 15.15." />`
+  is the security marker for lists: a `shield-alert` icon with visible text,
+  never a tooltip-only count, so it works on touch screens.
+  - Only two statuses get one: update_now ("Update now", the icon in
+    `text-error`) and no_fix ("No fix yet", a neutral icon). The color is on
+    the icon only; the text keeps the normal foreground. Every other status
+    renders nothing.
+  - `tooltip` (`data-tooltip`) is the sentence of the primary action, when
+    update_now has one. `label` (`aria-label`) names the status and that
+    action: "Security: update now. Update to 15.15." The marker sets
+    `data-tooltip-wrap`, so a long action sentence wraps at `max-w-xs`
+    instead of running off the screen. Short labels keep the default
+    one-line tooltip; add `data-tooltip-wrap` only to sentence tooltips.
+  - It sits right after the resource name: the environment list (table and
+    cards), the server Resources tab, and the canvas cards (in the chip row,
+    before the extra servers chip; `Card.svelte` draws the same anatomy from
+    the node's `security` value).
+  - Lists rendered by Alpine pass an expression instead of values:
+    `<x-image-scan.marker bind="item.security" class="relative" />`. Add
+    `relative` when the row has a full-row link overlay, so the tooltip still
+    opens.
+  - Compute the markers of a whole list at once with
+    `VulnerabilityMarkers::for($resources)`. It reads the stored statuses
+    (`SecurityStatus::storedMany()`) with a fixed number of queries, never one
+    per row, and never reads findings. A resource that is not scanned now
+    (instance does not allow scanning, its server has scanning off, or an app
+    turned its scan off; one rule in `ImageScanPolicyResolver::offState()`) is
+    not_checked: no marker, no sidebar dot, and no dashboard count.
+- The team Security page (Monitoring > Security,
+  `livewire/image-scan/fleet-vulnerabilities.blade.php`) is a top-level
+  destination: title and summary, one dense table with every resource the
+  user can see.
+  - Columns: Resource (with project / environment under the name), Status,
+    Action, Server, Checked.
+  - Status: the badge of the main card ("Update now" error, "Security update"
+    warning, "No fix yet" and "Check needed" neutral), or muted text "No action
+    needed" (ok) and "Not checked". A resource with several images that needs
+    an update adds "{k} of {n} images" under the badge (11px muted,
+    `TeamVulnerabilities::imagesLine()`). One row per resource; images are never
+    nested rows.
+  - Action: the sentence of the primary action (update_now and
+    update_available), as a link to the resource's Security card
+    (`#security-section`) in the text link style (`underline
+    decoration-neutral-400/40 underline-offset-4`); muted "Check again:
+    {reason}." as the same link for check_needed; muted, unlinked "No fix
+    released yet. Coolify checks daily." for no_fix; muted, unlinked "why not
+    checked" text for not_checked. No buttons and no bulk actions.
+  - Sort: update_now, update_available, no_fix, check_needed, ok,
+    not_checked, then the resource name. Filters: Status (with a count per
+    status, "Update now (3)", and in the URL as `statuses[]`), Server, and
+    Project in one `x-table.filter`. 25 rows per page by default.
+  - A search by CVE, GHSA, or package lists the resources with a matching
+    finding and switches the Status and Action columns to the match and its
+    state ("Fix available upstream", "No fix yet", "Ignored", the words of
+    All findings). A small status badge stays next to the resource name.
+    Only the search decodes findings.
+  - Resources that were not scanned are hidden by default (no status filter),
+    so they do not bury the ones that need an action, but never silently: a
+    muted line under the table says "{n} resources on {m} servers were not
+    scanned, so Coolify cannot tell." with the link "Show them" / "Hide them"
+    (`showNotChecked`, in the URL). The Status filter "Not checked" shows them
+    too.
+  - A scan event reloads the page at most once per 10 seconds
+    (`FleetVulnerabilities::RELOAD_INTERVAL`); a server scan sends one event
+    per image.
+- Fleet callouts:
+  - The dashboard shows one callout, only for update_now: "{n} {resource
+    needs/resources need} a security update now." + Review (danger), which
+    opens the Security page filtered to update_now. After a dismiss it shows
+    again only when a resource that was not dismissed needs an update now:
+    `resources/js/security-callout.js` keeps the dismissed resource UUIDs in
+    `localStorage` and clears them when no resource needs an update now.
+    Nothing else about security goes on the dashboard.
+  - The Security page shows admins "{n} servers do not scan images." Its
+    `localStorage` key holds the number, so a new number shows it again.
+  - Callout keys are per team (`….dismissed.{teamId}`): a dismiss in one team
+    never hides the callout of another.
+- `<x-image-scan.gate-status :result="$deployment->scan_gate_result" />` is the
+  deploy gate state: a `x-status-badge` button ("Blocked" error, or "Not
+  scanned" warning when the scan could not run) that opens a popover with the
+  same anatomy as `x-configuration-warning` (icon tile, headline, links). The
+  popover is `position: fixed` and placed from the trigger, so it escapes the
+  `overflow: hidden` log viewer. It replaces the status dot in the deployment
+  log toolbar when blocked (no card above the log). The application heading
+  teleports it into `#configuration-warning-hud-slot` from `xl` and repeats it
+  in the in-flow heading below `xl`, for the latest non-preview deployment
+  only. A blocked popover shows the sentence of the primary action for the
+  blocked image (`:action`, from `SecurityCard::gateAction()`) and an "Open
+  Security" link; it never runs an update itself. "Deploy anyway" shows only
+  where the page can run it and the user has Write access; otherwise "Ask
+  someone with write access to deploy anyway."
+- The Security main card (`livewire/image-scan/vulnerabilities.blade.php`, data
+  from `SecurityCard::for()`) is the first layer card of a resource's Security
+  page, for people who are not security experts. It answers "Is this OK, and
+  what do I click?" first: status, sentence, and one action, then the why-list
+  (spec 15.11). It is one component for every resource: a list of the images
+  the status counts. No summary tiles, no severity counts, no separate
+  problems table, and no row menus: a count that the status does not use
+  (upstream package fixes, CPE-only matches, findings that are not relevant)
+  contradicts the sentence.
+  - Card header: title "Security" with the status badge of the resource in the
+    badges slot ("Update now" error, "Security update" warning, "No fix yet"
+    and "Check needed" neutral, none for ok and not checked), and "Checked
+    {time}" (absolute time in the tooltip) and Scan now in the header actions
+    (not for check_needed, where Scan now is the primary action in the body).
+  - Vocabulary: the plain layer (the card) says "problems"; the expert layer
+    (All findings, Packages and SBOM, the row footer, ignores) says
+    "findings". Never "issues" or "vulnerabilities" in the UI.
+  - Not scanned yet: apps say "Not scanned yet. The next deploy scans the
+    image."; databases and services say "Not scanned yet." with a highlighted
+    Scan now (only for users who may update the resource).
+  - One image (a database, a Docker image app, a Dockerfile app): the row is
+    open and has no list frame, no row header, no chevron, and no second status
+    badge; the card badge is the status. The image ref is shown in the
+    sentence only when the sentence starts with it; an own-built app ("This app
+    has…") shows the ref only in the footer.
+  - Rows: every image the status counts. That includes a scanned service
+    application or database without a result and every image of a Compose
+    app without a result in its current deployment (keyed
+    `compose-{md5(service)}`). These rows show "Not checked" and "{ref} has
+    not been checked yet.", and Scan now stays in the card header.
+  - Several images (a service, a Compose app): a 15px medium line "{k} of {n}
+    images need an update" only when k > 0 (k = rows with update_now or
+    update_available). For k = 0 there is no header line: the card badge
+    already says the status, and "All images are up to date" is never used.
+    Then one bordered list (`aria-label="Images"`, rows split by dividers).
+    Rows are worst first (update_now, update_available, no_fix, check_needed,
+    ok, not_checked, then the name). The first row with a problem is open; the
+    others, and every "No action needed" row, are closed.
+  - Row header (several images): a real `<button>` with `aria-expanded` and
+    `aria-controls` that holds the chevron, the name (13px medium; the service
+    application or database, or the Compose service) and the image ref (mono,
+    11px muted under a name, else 12px); then the status badge (muted text "No
+    action needed" or "Not checked" without one) and the primary action
+    (highlighted on the first row, else neutral) or copy chip. A merged
+    service update (spec 15.5) has its button on the first row of the group
+    only; the other rows show muted "Updated with {first name}".
+  - Open row content, from `partials/security-image.blade.php`, in this order:
+    - The sentence of `SecuritySentences::imageSentence()` in 15px medium
+      (starts with the image ref in mono when the sentence does).
+    - One image only: the primary action right under the sentence, on its own
+      line (highlighted button, or the copy chip at full width), or the
+      highlighted Scan now for check_needed. It is the first control of the
+      card in tab order.
+    - The attack note of `attackNote()` (update_available only), the no_fix
+      advice (`noFixAdvice()`), the extra lines, and the version check notes,
+      13px dim.
+    - A Compose app image that a security update replaced: a 12px faint line
+      "Coolify deploys {to} instead of {from} from your compose file." with the
+      text button "Use the compose file" (`removeImageOverride()`), which drops
+      the override for the next deploy.
+    - Why-list "Fixed by this update" ("Not fixed yet" for no_fix): up to 3
+      rows in one bordered list, inside the open row of its image, so the
+      image is always clear. Line 1: the title (13px) and, on the right, the
+      severity badge with the CVSS score next to it. The score shows only when
+      its CVSS range has the same severity (9.0 critical, 7.0 high, 4.0
+      medium); otherwise the badge alone, with "CVSS 7.5" in the tooltip, so a
+      row never reads "Medium 7.5". Line 2, 11px muted: "{package} {version} ·
+      {display ID} · {signal}"; the ID links to NVD or GitHub, and "Used by
+      attackers" is in `text-error`. Then the link "{n} more problems this
+      update fixes →", which opens All findings (filtered to the image when
+      the resource has several).
+    - Provenance: one 12px muted line with the 12px medium label "How Coolify
+      knows:" and the sentence of `SecuritySentences::provenance()`.
+    - Other fixes: a `<details>` "{n} other fixes" whose `chevron-down` points
+      right when closed and turns 90° when open (180ms,
+      `cubic-bezier(0.23,1,0.32,1)`, `motion-reduce:transition-none`). The open
+      list spans the full row width: each action with its sentence and a
+      neutral button or copy chip, then "and {n} more".
+    - Footer, above a divider: "Running {ref} {short digest}" (the first 12
+      characters after `sha256:` of the repo digest, else of the image ID, with
+      `x-copy-button` for the full value) · "{n} findings" · "Packages and
+      SBOM" · "Settings". The links use the text link style (`underline
+      decoration-neutral-400/40 underline-offset-4`, full decoration on
+      hover). "{n} findings" opens All findings, "Packages and SBOM" and
+      "Settings" open their cards: each dispatches `open-settings-section`
+      with the section id (`x-application.settings-section` opens itself and
+      scrolls into view). For several images they also filter the section to
+      that image (`showImageFindings()` and the Packages
+      `security-show-image-packages` event). A "·" separator stays with the
+      part after it, so no line ends with one.
+  - Provenance never states a count of its own, so it cannot contradict the
+    sentence; the "better" rule guarantees that an offered update adds no
+    problem with an exploit signal. When the stored entry has `added` > 0 it
+    adds "It has {m} other problems that attackers are not known to use."
+    Without a stored candidate there is no line, so it never claims a scan.
+  - Fix button for every deployment type (`UpdateResourceImage`): a new tag
+    changes the stored configuration (the tag of a Docker image app, `image`
+    of a database, the compose file and images of a service, the Coolify
+    variable when `${IMAGE}` or `repo:${TAG}` sets the image, or the image
+    override of a Compose app from Git), so it stays after later deploys. A
+    newer build of the same tag changes nothing: the next start pulls the
+    scanned digest and tags it (`ImageStartPin`). Raw Compose deployments and
+    other variable forms keep the "Change the version in the compose file"
+    sentence without a button.
+  - Confirmation (`x-modal-confirmation`): one line per image "{ref} {short
+    digest} → {new ref}" (with the name for a service), what restarts (a
+    service names every application and database it restarts), and the
+    warning: the patch release sentence for a database, the template warning
+    for a service. Buttons show only to users who may run them (Write for
+    updates, Deploy for Rebuild) and never for `id = 0` or a transferred-away
+    server. Scan now on a transferred-away server says "Another Coolify
+    instance manages this server now." and starts nothing.
+  - Motion: a row opens and closes by animating height and opacity together
+    (`grid-rows-[0fr]` → `grid-rows-[1fr]` with `opacity`, 180ms,
+    `cubic-bezier(0.23,1,0.32,1)`); the chevron turns 90° with the same
+    timing. The server renders the open state, so nothing animates on page
+    load, and `motion-reduce:transition-none` makes it instant. A closed body
+    is `inert`. Row keys are the scan UUID (or the owner UUID for an image
+    without a scan), never a position.
+  - Titles: `ScannerText::tidyTitle()` cleans parsed and stored titles. It
+    removes advisory labels ("Issue summary:"), leading changelog tokens
+    ("[1.0.9-10.0.1] - "), "[Orabug: …]" groups, and trailing "[CVE-…]"
+    references, and keeps only the first entry of a changelog. The parser
+    takes the related description when the finding's own description is a
+    changelog. A stored title that still looks like a changelog entry shows
+    the fallback "{package} {version}: {severity} vulnerability" until a
+    rescan (`ScannerText::storedTitle()`).
+  - No totals and no severity bar: the only total finding count of the page is
+    in the "All findings ({n})" header, and the row footer has the count of its
+    image. Every count uses `number_format()` ("1,362"). The collapsed "All
+    findings", "Packages and SBOM", and "Settings" cards follow, with the same
+    `gap-6` between every card. Settings holds the rules and ignored findings
+    of an app; on a database or service it lists the ignored findings only (a
+    service with the ignores of its applications and databases, "Set for"
+    names the image). Hidden helpers in the stack (the teleported ignore
+    modal) stay `hidden`, so they add no second gap.
+  - All findings: the fix-state switch "Fix available upstream ({n})" / "No
+    fix yet ({n})" (a fixed package version exists, which is not the same as
+    the card's update), and the column "Findings" in the By package view.
+  - Image picker (`x-image-scan.image-select`): the "All findings" and
+    "Packages and SBOM" toolbars show a single-select "All images" button
+    (`layers` icon, highlighted when one image is picked) left of Filter, only
+    when the resource has more than one image. The image is not in the Filter
+    menu, and "Reset filters" does not clear it.
+  - Row actions in the findings tables are icon buttons (`eye-off2`, tooltip
+    "Ignore" or "Ignore package"), not labelled buttons on every row.
 
 ---
 
@@ -1428,6 +1758,9 @@ Use these as implementation references:
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
 | Empty state | `resources/views/components/empty.blade.php` |
 | Status pill | `resources/views/components/status-badge.blade.php` |
+| Severity badge, security marker, gate status, security dot | `resources/views/components/image-scan/` |
+| Team Security page | `resources/views/livewire/image-scan/fleet-vulnerabilities.blade.php` |
+| Security main card | `resources/views/livewire/image-scan/vulnerabilities.blade.php` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
 | Command palette / global search | `resources/views/livewire/global-search.blade.php` |

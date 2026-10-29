@@ -15,6 +15,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -134,6 +136,9 @@ class ServerTransferImporter
     /** @var array<string, ServiceApplication> */
     private array $serviceApplicationMap = [];
 
+    /** @var array<string, ServiceDatabase> */
+    private array $serviceDatabaseMap = [];
+
     /** @var array<string, Model> */
     private array $databaseMap = [];
 
@@ -236,6 +241,8 @@ class ServerTransferImporter
             'integration_tokens' => 0,
             'managed_dns_records' => 0,
             'ssl_certificates' => 0,
+            'image_scan_policies' => 0,
+            'image_scan_ignores' => 0,
             'volume_backups' => 0,
             'previews' => 0,
         ];
@@ -266,6 +273,8 @@ class ServerTransferImporter
             $created['integration_tokens'] = count(data_get($bundle, 'integration_tokens', []));
             $created['managed_dns_records'] = count(data_get($bundle, 'managed_dns_records', []));
             $created['ssl_certificates'] = count(data_get($bundle, 'ssl_certificates', []));
+            $created['image_scan_policies'] = count(data_get($bundle, 'image_scan_policies', []));
+            $created['image_scan_ignores'] = count(data_get($bundle, 'image_scan_ignores', []));
             $created['volume_backups'] = count(data_get($bundle, 'volume_backups', []));
 
             return [
@@ -304,6 +313,7 @@ class ServerTransferImporter
             $this->previewMap = [];
             $this->serviceMap = [];
             $this->serviceApplicationMap = [];
+            $this->serviceDatabaseMap = [];
             $this->databaseMap = [];
             $this->pendingSqliteLinks = [];
             $this->importWarnings = [];
@@ -424,6 +434,8 @@ class ServerTransferImporter
             $created['managed_dns_records'] = $this->importManagedDnsRecords(data_get($bundle, 'managed_dns_records', []), $server, $teamId, $preserveUuids);
 
             $created['ssl_certificates'] = $this->importSslCertificates(data_get($bundle, 'ssl_certificates', []), $server);
+            $created['image_scan_policies'] = $this->importImageScanPolicies(data_get($bundle, 'image_scan_policies', []), $server);
+            $created['image_scan_ignores'] = $this->importImageScanIgnores(data_get($bundle, 'image_scan_ignores', []), $teamId);
             $created['volume_backups'] = $this->importVolumeBackups(data_get($bundle, 'volume_backups', []), $teamId);
             $warnings = array_merge($warnings, $this->importWarnings);
 
@@ -722,6 +734,7 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'image_candidate_scans_today', 'image_candidate_scans_date',
                 ])
                 ->all();
             $server->settings->fill($safe);
@@ -1432,7 +1445,8 @@ class ServerTransferImporter
         }
 
         foreach (data_get($payload, 'databases', []) as $dbPayload) {
-            $this->importServiceDatabase($dbPayload, $service, $preserveUuids, $adoptMode, $teamId);
+            $serviceDatabase = $this->importServiceDatabase($dbPayload, $service, $preserveUuids, $adoptMode, $teamId);
+            $this->serviceDatabaseMap[(string) data_get($dbPayload, 'uuid', $serviceDatabase->uuid)] = $serviceDatabase;
         }
 
         return $service;
@@ -2408,6 +2422,104 @@ class ServerTransferImporter
                 'resource_id' => $resourceId,
             ]);
             $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Scan rules of the server and of its applications. A rule that fails the validation of the UI, or whose scope is not in the bundle, is dropped.
+     * A bundle of an older version has `gate_enabled` (on: strict, off: off) and `alert_level` (no longer used).
+     *
+     * @param  list<array<string, mixed>>  $policies
+     */
+    private function importImageScanPolicies(array $policies, Server $server): int
+    {
+        $count = 0;
+        foreach ($policies as $policyPayload) {
+            $scope = match (data_get($policyPayload, 'scope_kind')) {
+                'server' => $server,
+                'application' => $this->applicationMap[(string) data_get($policyPayload, 'scope_uuid')] ?? null,
+                default => null,
+            };
+            $gateMode = array_key_exists('gate_mode', (array) $policyPayload)
+                ? data_get($policyPayload, 'gate_mode')
+                : match ($gateEnabled = data_get($policyPayload, 'gate_enabled')) {
+                    true => 'strict',
+                    false => 'off',
+                    // Anything else is not a value of an old bundle: the validation rejects it.
+                    default => $gateEnabled,
+                };
+            $fields = [
+                'gate_mode' => $gateMode,
+                'on_scan_error' => data_get($policyPayload, 'on_scan_error'),
+            ];
+            if ($scope === null) {
+                $this->importWarnings[] = 'Vulnerability scan rules were not imported, because their server or application is not in the bundle. Set the scan rules again.';
+
+                continue;
+            }
+            $validator = Validator::make($fields, ImageScanPolicy::validationRules());
+            if ($validator->fails()) {
+                $this->importWarnings[] = 'The vulnerability scan rules of '.($scope instanceof Server ? 'the server' : "application {$scope->name}").' were not imported, because they are not valid: '.$validator->errors()->first().' Set the scan rules again.';
+
+                continue;
+            }
+
+            ImageScanPolicy::query()->updateOrCreate(
+                ['scope_type' => $scope->getMorphClass(), 'scope_id' => $scope->id],
+                $validator->validated(),
+            );
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Ignores of the transferred resources, owned by the target team. A row that fails the validation of the UI is dropped.
+     *
+     * @param  list<array<string, mixed>>  $ignores
+     */
+    private function importImageScanIgnores(array $ignores, int $teamId): int
+    {
+        $count = 0;
+        foreach ($ignores as $ignorePayload) {
+            $uuid = (string) data_get($ignorePayload, 'resource_uuid');
+            $resource = match (data_get($ignorePayload, 'resource_kind')) {
+                'application' => $this->applicationMap[$uuid] ?? null,
+                'database' => $this->databaseMap[$uuid] ?? null,
+                'service_application' => $this->serviceApplicationMap[$uuid] ?? null,
+                'service_database' => $this->serviceDatabaseMap[$uuid] ?? null,
+                default => null,
+            };
+            $fields = [
+                'vulnerability_id' => data_get($ignorePayload, 'vulnerability_id'),
+                'package' => data_get($ignorePayload, 'package'),
+                'reason' => data_get($ignorePayload, 'reason'),
+                'expires_at' => data_get($ignorePayload, 'expires_at'),
+            ];
+            $validator = Validator::make($fields, ImageScanIgnore::validationRules());
+            if ($resource === null || $validator->fails()) {
+                $label = filled($fields['vulnerability_id']) ? $fields['vulnerability_id'] : (filled($fields['package']) ? 'package '.$fields['package'] : 'an unknown entry');
+                $this->importWarnings[] = "The vulnerability ignore for {$label} was not imported, because ".($resource === null ? 'its resource is not in the bundle' : 'it is not valid: '.$validator->errors()->first()).'.';
+
+                continue;
+            }
+
+            // A retried import (adopt mode) finds the ignore it created before.
+            $ignore = ImageScanIgnore::query()->firstOrCreate([
+                'team_id' => $teamId,
+                'resource_type' => $resource->getMorphClass(),
+                'resource_id' => $resource->id,
+                'vulnerability_id' => filled($fields['vulnerability_id']) ? $fields['vulnerability_id'] : null,
+                'package' => filled($fields['package']) ? $fields['package'] : null,
+            ], [
+                'reason' => $fields['reason'],
+                'expires_at' => $fields['expires_at'],
+                'created_by' => null,
+            ]);
+            $count += $ignore->wasRecentlyCreated ? 1 : 0;
         }
 
         return $count;

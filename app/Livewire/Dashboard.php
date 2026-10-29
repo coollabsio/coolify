@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\TeamInvitation;
 use App\Services\Access\AccessResolver;
+use App\Services\ImageScan\TeamVulnerabilities;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -28,6 +29,14 @@ class Dashboard extends Component
     #[Locked]
     public bool $showsTeamSections = true;
 
+    /**
+     * UUIDs of the resources the user can see that need a security update now (update_now).
+     *
+     * @var list<string>
+     */
+    #[Locked]
+    public array $securityUpdateNow = [];
+
     public function mount()
     {
         $this->showsTeamSections = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
@@ -38,6 +47,7 @@ class Dashboard extends Component
             return;
         }
 
+        $this->securityUpdateNow = TeamVulnerabilities::updateNowResources(currentTeam()->id);
         $this->privateKeys = $this->showsTeamSections ? PrivateKey::ownedByCurrentTeamCached() : collect();
         $this->servers = $this->showsTeamSections ? Server::ownedByCurrentTeamCached() : collect();
         $this->projects = Project::ownedByCurrentTeam()
@@ -63,6 +73,16 @@ class Dashboard extends Component
         return view('livewire.dashboard', [
             'pendingInvitations' => $this->pendingInvitations(),
         ]);
+    }
+
+    /**
+     * "1 resource needs a security update now." / "3 resources need a security update now."
+     */
+    public static function securityCalloutTitle(int $count): string
+    {
+        return $count === 1
+            ? '1 resource needs a security update now.'
+            : "{$count} resources need a security update now.";
     }
 
     /**

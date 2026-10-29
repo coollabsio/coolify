@@ -1,7 +1,7 @@
 @props([
     'label' => null,
     'status' => null,
-    'type' => 'neutral',
+    'type' => 'neutral', // neutral|success|warning|error|severity-critical|severity-high|severity-medium|severity-low
     'as' => 'span',
     'dynamic' => false,
     'pulse' => false, // ping the dot for a state that is still in progress
@@ -13,6 +13,10 @@
         'success' => 'bg-emerald-500',
         'warning' => 'bg-warning',
         'error' => 'bg-red-500',
+        'severity-critical' => 'bg-error',
+        'severity-high' => 'bg-severity-high',
+        'severity-medium' => 'bg-severity-medium',
+        'severity-low' => 'bg-neutral-400 dark:bg-neutral-500',
     ];
 
     $baseClasses = 'inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white';

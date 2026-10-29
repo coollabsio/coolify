@@ -4,6 +4,7 @@ namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
 use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -18,6 +19,7 @@ use Livewire\Component;
 class ByHostinger extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     public int $current_step = 1;
 
@@ -361,6 +363,7 @@ class ByHostinger extends Component
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
+            $this->applyImageScanning($server);
 
             try {
                 if ($this->selected_public_key_ids) {

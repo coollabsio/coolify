@@ -17,6 +17,9 @@ class DockerRegistryLogins
 {
     public const DOCKER_HUB = 'docker.io';
 
+    /** Credentials stay in the output, which instant_remote_process neither logs nor stores. */
+    private const READ_CONFIG = 'cat "$HOME/.docker/config.json" 2>/dev/null || true';
+
     /**
      * A registry host with an optional port. An IPv6 host is bracketed ([2a01:4f8::1]:5000) and holds only
      * hex digits, ':' and '.', so the value stays safe in shell commands.
@@ -32,9 +35,57 @@ class DockerRegistryLogins
      */
     public static function forServer(Server $server): array
     {
-        $config = instant_remote_process(['cat "$HOME/.docker/config.json" 2>/dev/null || true'], $server);
+        $config = instant_remote_process([self::READ_CONFIG], $server);
 
         return self::parseConfig($config);
+    }
+
+    /**
+     * The `auths` login of one registry from the server's Docker config, as a base64 Docker config that holds only
+     * that registry, for the scanner commands. The config is read over SSH without logging; the result is never
+     * stored or logged. Credential helpers and stores cannot be read and take precedence over `auths`, like in Docker:
+     * they return the status `helper`.
+     *
+     * @return array{status: 'ok'|'helper'|'none', config: ?string}
+     */
+    public static function registryAuthConfig(Server $server, string $registry): array
+    {
+        $config = instant_remote_process([self::READ_CONFIG], $server, throwError: false);
+
+        return self::singleRegistryConfig($config, $registry);
+    }
+
+    /**
+     * @return array{status: 'ok'|'helper'|'none', config: ?string}
+     */
+    public static function singleRegistryConfig(?string $config, string $registry): array
+    {
+        $registry = self::normalizeRegistry($registry);
+        $decoded = json_decode((string) $config, true);
+        if (! is_array($decoded)) {
+            return ['status' => 'none', 'config' => null];
+        }
+
+        // Docker reads a credential helper or store before `auths`, so an `auths` entry next to one may be stale.
+        $helpers = is_array($decoded['credHelpers'] ?? null) ? array_map(fn ($key) => self::normalizeRegistry((string) $key), array_keys($decoded['credHelpers'])) : [];
+        $store = is_string($decoded['credsStore'] ?? null) && $decoded['credsStore'] !== '';
+        if ($store || in_array($registry, $helpers, true)) {
+            return ['status' => 'helper', 'config' => null];
+        }
+
+        foreach (is_array($decoded['auths'] ?? null) ? $decoded['auths'] : [] as $key => $entry) {
+            $auth = is_array($entry) && self::normalizeRegistry((string) $key) === $registry ? self::basicAuth($entry) : null;
+            if ($auth !== null) {
+                $configKey = $registry === self::DOCKER_HUB ? 'https://index.docker.io/v1/' : $registry;
+
+                return [
+                    'status' => 'ok',
+                    'config' => base64_encode(json_encode(['auths' => [$configKey => ['auth' => $auth]]], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)),
+                ];
+            }
+        }
+
+        return ['status' => 'none', 'config' => null];
     }
 
     /**
@@ -159,6 +210,28 @@ class DockerRegistryLogins
                 return $mustBuildElsewhere || (bool) data_get($application, 'settings.is_build_server_enabled');
             })
             ->values();
+    }
+
+    /**
+     * The base64 "username:password" of an `auths` entry, from "auth" or from "username" and "password".
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private static function basicAuth(array $entry): ?string
+    {
+        $auth = is_string($entry['auth'] ?? null) ? $entry['auth'] : '';
+        $decoded = preg_match('/\A[A-Za-z0-9+\/]+={0,2}\z/', $auth) === 1 ? base64_decode($auth, true) : false;
+        if (is_string($decoded) && str_contains($decoded, ':')) {
+            return $auth;
+        }
+
+        $username = $entry['username'] ?? null;
+        $password = $entry['password'] ?? null;
+        if (is_string($username) && $username !== '' && ! str_contains($username, ':') && is_string($password) && $password !== '') {
+            return base64_encode($username.':'.$password);
+        }
+
+        return null;
     }
 
     /**

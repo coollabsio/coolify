@@ -100,6 +100,8 @@ services:
       - dev_postgres_data:/data/coolify/_volumes/database
       - dev_redis_data:/data/coolify/_volumes/redis
       - dev_minio_data:/data/coolify/_volumes/minio
+      # Image scanner files: the scanner containers bind-mount these paths through the host daemon.
+      - /data/coolify/image-scans:/data/coolify/image-scans
     networks:
       - coolify
   mailpit:
