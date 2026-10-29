@@ -4,7 +4,8 @@
             <x-application.settings-section title="Pending invitations"
                 description="Invitation links that have not been accepted yet." flush>
                 <div class="overflow-x-auto">
-                    <div class="data-table min-w-[760px]">
+                    <div class="data-table min-w-[760px] transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                        wire:target="setSort">
                         <div
                             class="data-table-header grid-cols-[minmax(13rem,1.2fr)_7rem_7rem_minmax(15rem,1.5fr)_6rem]">
                             <x-table.sort-header label="Email" asc="email-asc" desc="email-desc" action="setSort"

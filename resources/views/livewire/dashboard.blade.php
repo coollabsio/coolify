@@ -160,7 +160,8 @@
                     @endforeach
                 </div>
 
-                <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
+                <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setProjectSort">
                     <div class="grid grid-cols-[minmax(0,1fr)_7rem_4rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4rem] {{ $tableHead }}">
                         <x-table.sort-header label="Project" asc="name-asc" desc="name-desc"
                             action="setProjectSort" :current="$projectSort" />
@@ -344,7 +345,8 @@
                         ? 'grid-cols-[minmax(0,1fr)_9.5rem] @xl:grid-cols-[minmax(0,1fr)_9rem_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9rem_9.5rem]'
                         : 'grid-cols-[minmax(0,1fr)_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem]';
                 @endphp
-                <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
+                <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setServerSort">
                     <div class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] {{ $tableHead }}">
                         <x-table.sort-header label="Server" asc="name-asc" desc="name-desc"
                             action="setServerSort" :current="$serverSort" />

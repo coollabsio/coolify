@@ -54,7 +54,7 @@
                 wire:loading.attr="inert" wire:target="search">
             @if ($activeTab === 'managed')
                 @if ($resources->total() > 0)
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-resources-managed-table-grid">
                             <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
                             <x-table.sort-header label="Project" asc="project_asc" desc="project_desc" action="setSort" :current="$sort" />
@@ -107,7 +107,7 @@
                 @endif
             @else
                 @if ($resources->total() > 0)
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-resources-unmanaged-table-grid">
                             <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
                             <x-table.sort-header label="Image" asc="image_asc" desc="image_desc" action="setSort" :current="$sort" />

@@ -48,7 +48,7 @@
                             : 'Images pulled or built on this server will appear here.'" icon-name="layers" />
                     </div>
                 @else
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-images-table-grid">
                             <x-table.sort-header label="Repository" asc="repository_asc" desc="repository_desc"
                                 action="setSort" :current="$sort" />

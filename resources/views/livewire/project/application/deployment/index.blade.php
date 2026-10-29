@@ -183,7 +183,7 @@
             @if ($deployments->isNotEmpty())
                 <div class="data-table relative w-full transition-opacity"
                     wire:loading.class="opacity-50 pointer-events-none"
-                    wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter">
+                    wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter,setDeploymentSort">
                     <x-table.loading id="deployment-table-filter-loading"
                         target="toggleDeploymentFilter,clearFilter,setPullRequestFilter"
                         text="Filtering deployments..." class="rounded-lg" />

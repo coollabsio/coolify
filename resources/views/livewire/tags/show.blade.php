@@ -418,7 +418,8 @@
                     @endif
                 </x-slot:actions>
 
-                <div wire:poll="getDeployments" class="overflow-x-auto">
+                <div wire:poll="getDeployments" class="overflow-x-auto transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setDeploymentSort">
                     @if (count($deploymentsPerTagPerServer ?? []) === 0)
                         <div class="p-3">
                             <x-empty title="No active deployments"

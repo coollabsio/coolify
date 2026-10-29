@@ -5,7 +5,8 @@
     Alpine tables set `model` (the sort variable in the enclosing x-data scope) and an
     optional `then` expression that runs after the change (for example `page = 1`).
     Livewire tables set `action` (a component method that takes the sort value) and
-    `current` (the current server-side sort value).
+    `current` (the current server-side sort value). While that request runs, the
+    clicked header shows a spinner.
 
     @param string  $label
     @param string  $asc     sort value for ascending order
@@ -37,14 +38,21 @@
             default => null,
         };
         $nextValue = $current === $firstValue ? $otherValue : $firstValue;
+        $call = $action.'('.\Illuminate\Support\Js::from($nextValue).')';
     @endphp
-    <button type="button" wire:click="{{ $action }}(@js($nextValue))"
+    <button type="button" wire:click="{{ $call }}" wire:loading.attr="aria-busy" wire:target="{{ $call }}"
         aria-label="{{ $ariaBase }}{{ $direction ? ', sorted '.($direction === 'asc' ? 'ascending' : 'descending') : '' }}"
         {{ $attributes->class(['table-sort-header group', 'is-sorted' => $direction]) }}>
         <span class="truncate">{{ $label }}</span>
         <svg @class(['table-sort-header-icon', 'rotate-180' => $direction === 'desc', 'is-visible' => $direction]) viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"
+            wire:loading.remove wire:target="{{ $call }}">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6" />
+        </svg>
+        <svg class="size-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+            wire:loading wire:target="{{ $call }}">
+            <circle class="opacity-20" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" />
+            <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
         </svg>
     </button>
 @else
