@@ -23,6 +23,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ImageScan\ImageStartPin;
 use App\Services\ImageScan\ResourceScans;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1328,4 +1329,55 @@ it('links the reused scans when a restart finishes', function () {
 
     expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value)
         ->and($scan->fresh()->deployment_queue_id)->toBe(test()->queue->id);
+});
+
+describe('scanned build of a security update', function () {
+    it('starts the scanned build of a Docker image without a pull of the tag', function () {
+        ScanImage::shouldRun()->never();
+        $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => '1.27']);
+        ImageStartPin::put($this->application->fresh(), 'nginx:1.27', GATE_REPO_DIGEST);
+        $job = deployGateJob(['production_image_name' => 'nginx:1.27']);
+
+        expect(deployGateReachesStart($job))->toBeTrue();
+
+        $commands = collect($job->commands);
+        expect($commands->contains(fn (string $command) => str_contains($command, "docker pull 'docker.io/library/nginx@".GATE_REPO_DIGEST."' && ")
+            && str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'")))->toBeTrue()
+            ->and($commands->contains(fn (string $command) => preg_match('/docker compose .* pull/', $command) === 1))->toBeFalse()
+            ->and(ImageStartPin::take($this->application))->toBe([]);
+    });
+
+    it('lets the gate scan the scanned build instead of pulling the tag again', function () {
+        deployGatePolicy();
+        ScanImage::shouldRun()->once()->withArgs(fn ($server, $resource, $ref) => $ref === 'nginx:1.27')->andReturn(deployGateReturnedScan([]));
+        $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => '1.27']);
+        ImageStartPin::put($this->application->fresh(), 'nginx:1.27', GATE_REPO_DIGEST);
+        $job = deployGateJob(['production_image_name' => 'nginx:1.27']);
+        $job->outputs = ['docker image inspect' => GATE_IMAGE_ID.' nginx@'.GATE_REPO_DIGEST.' '];
+
+        expect(deployGateReachesStart($job))->toBeTrue()
+            ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker pull 'nginx:1.27'")))->toBeFalse();
+    });
+
+    it('does not use the scanned build for a rollback, and keeps it for the next deploy', function () {
+        ScanImage::shouldRun()->never();
+        $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => '1.27']);
+        ImageStartPin::put($this->application->fresh(), 'nginx:1.27', GATE_REPO_DIGEST);
+        $job = deployGateJob(['production_image_name' => 'nginx:1.27', 'rollback' => true]);
+
+        expect(deployGateReachesStart($job))->toBeTrue()
+            ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, 'docker tag')))->toBeFalse()
+            ->and(ImageStartPin::take($this->application))->not->toBe([]);
+    });
+
+    it('gives the scanned builds of a Compose app their tags after the pull', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        ImageStartPin::put($this->application->fresh(), 'nginx:1.27', GATE_REPO_DIGEST);
+        $job = deployGateJob(['production_image_name' => 'nginx:1.27']);
+
+        deployGateCall($job, 'applyComposeImageStartPins');
+
+        expect(collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'")))->toBeTrue()
+            ->and(ImageStartPin::take($this->application))->toBe([]);
+    });
 });

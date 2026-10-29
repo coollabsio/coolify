@@ -533,7 +533,25 @@ final class ResourceScans
             };
         }
 
-        return ! self::sameImage(trim((string) $owner->getAttribute('image')), (string) $scan->image_ref);
+        return ! self::sameImage(self::configuredImage($owner), (string) $scan->image_ref);
+    }
+
+    /**
+     * The image of a database or a service application or database, with the Coolify variable of the service resolved
+     * when one sets it (`${N8N_IMAGE}`, `n8nio/n8n:${N8N_VERSION}`).
+     */
+    public static function configuredImage(Model $owner): string
+    {
+        $image = trim((string) $owner->getAttribute('image'));
+        $variable = ComposeImageVariable::parse($image);
+        $service = $owner instanceof ServiceApplication || $owner instanceof ServiceDatabase ? $owner->service : null;
+        if ($variable === null || ! $service instanceof Service) {
+            return $image;
+        }
+
+        $value = $service->environment_variables()->where('key', $variable->key)->where('is_preview', false)->value('value');
+
+        return $variable->resolve(is_string($value) ? $value : null) ?? $image;
     }
 
     /**

@@ -91,6 +91,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | Nixpacks app, public GitHub repo | Expected: checklist step for manual webhooks |
 | ✅ | Static app (`is_static`, `is_spa`) | |
 | ➕ | Docker Compose app | raw compose on, one variable with an empty value (`preserve_compose_null`) |
+| ➕ | Docker Compose app with a security update | an image override from the Security page (`docker_compose_image_overrides`); the target deploys the new image |
 | ➕ | App with GitHub App source, app with GitLab App source, app with deploy key | |
 | ✅ | Domains | 2 domains, noindex domains, domain port overrides, preview URL template |
 | ✅ | Health check | custom path, port, method, return code, interval, retries, start period |

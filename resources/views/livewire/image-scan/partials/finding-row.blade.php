@@ -55,13 +55,16 @@
                     Ignored{{ $ignore->expires_at ? ' until '.$ignore->expires_at->toFormattedDateString() : '' }}
                 </span>
             @elseif ($canUpdate)
-                <button type="button" class="button normal-case!"
+                <button type="button" class="icon-button" data-tooltip="Ignore"
+                    aria-label="Ignore {{ $finding->id }}"
                     x-on:click="$dispatch('open-ignore-modal', {
                         target: {{ \Illuminate\Support\Js::from($finding->id) }},
                         kind: 'vulnerability',
                         owner: {{ \Illuminate\Support\Js::from($row['owner']) }},
                         neverAllowed: {{ \Illuminate\Support\Js::from($row['never_allowed'] ?? true) }},
-                    })">Ignore</button>
+                    })">
+                    <x-reicon name="eye-off2" class="size-3.5" />
+                </button>
             @endif
         </span>
     </div>

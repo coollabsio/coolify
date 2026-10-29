@@ -4,6 +4,7 @@ use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityActionType;
 use App\Models\Application;
+use App\Models\ApplicationSetting;
 use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\Service;
@@ -119,10 +120,12 @@ function dockerfileScan(array $findings, ?array $base = [], array $attributes = 
     ]);
 }
 
-function composeApp(): Application
+function composeApp(bool $raw = false): Application
 {
     $app = actionApp('dockercompose');
     $app->uuid = 'k8w2c9';
+    $app->compose_parsing_version = '5';
+    $app->setRelation('settings', new ApplicationSetting(['is_raw_compose_deployment_enabled' => $raw]));
     $app->docker_compose = "services:\n  web:\n    build: .\n    image: 'k8w2c9_web:4f1c2d3'\n  worker:\n    build:\n      context: ./worker\n    image: 'ghcr.io/acme/worker:2.0'\n  db:\n    image: 'postgres:16'\n";
     $app->syncOriginal();
 
@@ -252,9 +255,9 @@ describe('buttons', function () {
         expect(actionsFor($scan)['byFinding']['CVE-1']->button)->toBeFalse();
     });
 
-    it('gives no button when the compose file sets the image with a variable', function () {
+    it('gives no button when the compose file sets the image in a way Coolify cannot change', function () {
         $service = actionOwner(new Service, 9);
-        $application = actionOwner(new ServiceApplication(['image' => 'postgres:${PG_VERSION}']), 3);
+        $application = actionOwner(new ServiceApplication(['image' => '${PG_REPO}:${PG_VERSION}']), 3);
         $application->setRelation('service', $service);
         $scan = actionScan($application, [actionFinding('CVE-1')], [
             'candidates' => actionCandidates([actionEntry('postgres:15.15-alpine', 'line', ['CVE-1'])]),
@@ -451,7 +454,7 @@ describe('compose builds and builder images', function () {
             ->and($result['byFinding']['CVE-2']->type)->toBe(SecurityActionType::UpgradePackage);
     });
 
-    it('treats a pulled image of a compose app as third-party, without a button', function () {
+    it('treats a pulled image of a compose app as third-party, with a button that keeps the new image', function () {
         $app = composeApp();
         $scan = actionScan($app, [
             actionFinding('CVE-1'),
@@ -466,12 +469,25 @@ describe('compose builds and builder images', function () {
         expect($scan->builds_image)->toBeFalse()
             ->and(array_keys($result['byFinding']))->toBe(['CVE-1'])
             ->and($result['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpdateImage)
-            ->and($result['byFinding']['CVE-1']->sentence)->toBe('Change the version to 16.4 in the compose file of this app, then redeploy.')
+            ->and($result['byFinding']['CVE-1']->sentence)->toBe('Update to 16.4.')
             ->and($result['byFinding']['CVE-1']->target)->toBe('16.4')
-            ->and($result['byFinding']['CVE-1']->button)->toBeFalse();
+            ->and($result['byFinding']['CVE-1']->button)->toBeTrue();
     });
 
-    it('tells a compose app to redeploy for a newer build of a pulled image', function () {
+    it('tells a compose app that deploys its file as written to change the version in the file', function () {
+        $app = composeApp(raw: true);
+        $scan = actionScan($app, [actionFinding('CVE-1')], [
+            'image_ref' => 'postgres:16', 'builds_image' => ScanImage::buildsImage($app, 'postgres:16'),
+            'candidates' => actionCandidates([actionEntry('postgres:16.4', 'line', ['CVE-1'])]),
+        ]);
+
+        $action = actionsFor($scan)['byFinding']['CVE-1'];
+
+        expect($action->sentence)->toBe('Change the version to 16.4 in the compose file of this app, then redeploy.')
+            ->and($action->button)->toBeFalse();
+    });
+
+    it('pulls the scanned build and redeploys a compose app for a newer build of a pulled image', function () {
         $app = composeApp();
         $scan = actionScan($app, [actionFinding('CVE-1')], [
             'image_ref' => 'postgres:16', 'builds_image' => ScanImage::buildsImage($app, 'postgres:16'),
@@ -481,9 +497,9 @@ describe('compose builds and builder images', function () {
         $action = actionsFor($scan)['byFinding']['CVE-1'];
 
         expect($action->type)->toBe(SecurityActionType::PullLatest)
-            ->and($action->sentence)->toBe('A newer build of this image fixes it. Redeploy this app to pull it.')
+            ->and($action->sentence)->toBe('A newer build of this image fixes it. Pull it and redeploy.')
             ->and($action->target)->toBe('16')
-            ->and($action->button)->toBeFalse();
+            ->and($action->button)->toBeTrue();
     });
 
     it('decides which compose images Coolify builds', function (string $imageRef, bool $builds) {

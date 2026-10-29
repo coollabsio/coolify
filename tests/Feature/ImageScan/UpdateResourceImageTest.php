@@ -21,6 +21,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ImageScan\BaseImageCheck;
+use App\Services\ImageScan\ImageStartPin;
 use App\Services\ImageScan\ImageUpdateRefused;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -90,6 +91,32 @@ function updateImageApplication(): Application
         'docker_registry_image_tag' => '1.27',
     ]);
 }
+
+/**
+ * A Compose app from Git with the given images per service.
+ *
+ * @param  array<string, string>  $images
+ */
+function updateImageComposeApplication(array $images): Application
+{
+    $compose = ['services' => []];
+    foreach ($images as $name => $image) {
+        $compose['services'][$name] = ['image' => $image];
+    }
+
+    $application = Application::factory()->create([
+        'environment_id' => test()->environment->id,
+        'destination_id' => test()->destination->id,
+        'destination_type' => test()->destination->getMorphClass(),
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => Yaml::dump($compose, 10, 2),
+        'compose_parsing_version' => '5',
+    ]);
+
+    return $application->fresh();
+}
+
+const UPDATE_IMAGE_NEW_BUILD = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 /**
  * @param  array<string, mixed>  $overrides
@@ -205,13 +232,25 @@ describe('standalone database', function () {
         expect($this->database->fresh()->image)->toBe('postgres:15.0-alpine');
     });
 
-    it('pulls the newest build of the same tag and restarts', function () {
+    it('waits the scanned build of the same tag for the restart, and keeps the image', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.0-alpine', 'same_tag')]);
         RestartDatabase::shouldRun()->once()->andReturn(new Activity);
 
         UpdateResourceImage::run($this->database, 'postgres:15.0-alpine', $this->admin);
 
-        expect($this->database->fresh()->image)->toBe('postgres:15.0-alpine');
+        expect($this->database->fresh()->image)->toBe('postgres:15.0-alpine')
+            ->and(ImageStartPin::take($this->database))->toBe(['docker.io/library/postgres:15.0-alpine' => [
+                'ref' => 'postgres:15.0-alpine', 'pull' => 'docker.io/library/postgres@'.UPDATE_IMAGE_NEW_BUILD,
+            ]]);
+    });
+
+    it('drops the waiting build when the restart cannot start', function () {
+        updateImageScan($this->database, 'postgres:15.0-alpine', [updateImageEntry('postgres:15.0-alpine', 'same_tag')]);
+        RestartDatabase::shouldRun()->once()->andReturn('Server is not functional');
+
+        expect(fn () => UpdateResourceImage::run($this->database, 'postgres:15.0-alpine', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'Server is not functional');
+        expect(ImageStartPin::take($this->database))->toBe([]);
     });
 
     it('records the update with the team of the database', function () {
@@ -361,14 +400,15 @@ describe('docker image app', function () {
         expect($application->fresh()->docker_registry_image_tag)->toBe('1.27');
     });
 
-    it('redeploys without a change for a newer build of the same tag', function () {
+    it('redeploys the scanned build of the same tag without a change', function () {
         $application = updateImageApplication();
         updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.27', 'same_tag')]);
 
         UpdateResourceImage::run($application, 'nginx:1.27', $this->admin);
 
         expect($application->fresh()->docker_registry_image_tag)->toBe('1.27')
-            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1);
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1)
+            ->and(array_column(ImageStartPin::take($application), 'pull'))->toBe(['docker.io/library/nginx@'.UPDATE_IMAGE_NEW_BUILD]);
     });
 });
 
@@ -395,19 +435,76 @@ describe('service', function () {
             ->and(data_get($compose, 'services.db.image'))->toBe('postgres:16');
     });
 
-    it('refuses an image that the compose file sets with a variable', function () {
+    it('changes the variable that sets the tag of the image, and keeps the compose file', function () {
+        $service = updateImageService(['web' => 'nginx:${NGINX_VERSION:-1.27}']);
+        $raw = $service->docker_compose_raw;
+        $web = updateImageSubResource($service, 'web', 'nginx:${NGINX_VERSION:-1.27}');
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->once()->andReturn(new Activity);
+
+        updateImagePage($this->admin, $service, 'service')->assertSeeHtml('updateImage(');
+        UpdateResourceImage::run($web, 'nginx:1.29', $this->admin);
+
+        expect($service->environment_variables()->where('key', 'NGINX_VERSION')->value('value'))->toBe('1.29')
+            ->and($service->fresh()->docker_compose_raw)->toBe($raw)
+            ->and($web->fresh()->image)->toBe('nginx:${NGINX_VERSION:-1.27}');
+    });
+
+    it('changes the variable that sets the whole image', function () {
+        $service = updateImageService(['web' => '${WEB_IMAGE}']);
+        $web = updateImageSubResource($service, 'web', '${WEB_IMAGE}');
+        $service->environment_variables()->create(['key' => 'WEB_IMAGE', 'value' => 'docker.io/library/nginx:1.27', 'is_preview' => false]);
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->once()->andReturn(new Activity);
+
+        UpdateResourceImage::run($web, 'nginx:1.29', $this->admin);
+
+        expect($service->environment_variables()->where('key', 'WEB_IMAGE')->value('value'))->toBe('docker.io/library/nginx:1.29');
+    });
+
+    it('puts the variable back when the restart fails', function () {
         $service = updateImageService(['web' => 'nginx:${NGINX_VERSION:-1.27}']);
         $web = updateImageSubResource($service, 'web', 'nginx:${NGINX_VERSION:-1.27}');
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->once()->andThrow(new RuntimeException('ssh: connect to host failed'));
+
+        expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The restart failed. Coolify kept the old image.');
+        expect($service->environment_variables()->where('key', 'NGINX_VERSION')->exists())->toBeFalse();
+    });
+
+    it('refuses a variable that also sets the image of another application', function () {
+        $service = updateImageService(['web' => 'nginx:${VERSION:-1.27}', 'proxy' => 'acme/proxy:${VERSION:-1.27}']);
+        $web = updateImageSubResource($service, 'web', 'nginx:${VERSION:-1.27}');
+        updateImageSubResource($service, 'proxy', 'acme/proxy:${VERSION:-1.27}');
         updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
         RestartService::shouldRun()->never();
 
         expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
-            ->toThrow(ImageUpdateRefused::class, 'The compose file sets this image with a variable. Change the version in the compose file.');
-        expect($web->fresh()->image)->toBe('nginx:${NGINX_VERSION:-1.27}');
+            ->toThrow(ImageUpdateRefused::class, 'The variable VERSION also sets the image of proxy.');
+        expect($service->environment_variables()->where('key', 'VERSION')->exists())->toBeFalse();
+    });
 
-        updateImagePage($this->admin, $service, 'service')
-            ->assertSeeText('nginx:1.27 needs another check: the running image is not the checked image.')
-            ->assertDontSeeHtml('updateImage(');
+    it('refuses a variable that refers to a shared variable', function () {
+        $service = updateImageService(['web' => 'nginx:${NGINX_VERSION}']);
+        $web = updateImageSubResource($service, 'web', 'nginx:${NGINX_VERSION}');
+        $service->environment_variables()->create(['key' => 'NGINX_VERSION', 'value' => '{{team.NGINX_VERSION}}', 'is_preview' => false]);
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->never();
+
+        expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))->toThrow(ImageUpdateRefused::class);
+        expect($service->environment_variables()->where('key', 'NGINX_VERSION')->value('value'))->toBe('{{team.NGINX_VERSION}}');
+    });
+
+    it('offers no update for an image that the compose file sets in a way Coolify cannot change', function () {
+        $service = updateImageService(['web' => '${REPO}:${VERSION}']);
+        $web = updateImageSubResource($service, 'web', '${REPO}:${VERSION}');
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->never();
+
+        expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The compose file sets this image in a way Coolify cannot change. Change the version in the compose file.');
+        updateImagePage($this->admin, $service, 'service')->assertDontSeeHtml('updateImage(');
     });
 
     it('refuses when the compose file names another image than the application', function () {
@@ -436,7 +533,7 @@ describe('service', function () {
             ->and(AuditEvent::query()->where('event', 'ui.image_scan.image_updated')->exists())->toBeFalse();
     });
 
-    it('pulls and restarts the service for a newer build of the same tag', function () {
+    it('pulls and restarts the service with the scanned build of the same tag', function () {
         $service = updateImageService(['web' => 'nginx:1.27']);
         $web = updateImageSubResource($service, 'web', 'nginx:1.27');
         updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.27', 'same_tag')]);
@@ -444,7 +541,8 @@ describe('service', function () {
 
         UpdateResourceImage::run($web, 'nginx:1.27', $this->admin);
 
-        expect($web->fresh()->image)->toBe('nginx:1.27');
+        expect($web->fresh()->image)->toBe('nginx:1.27')
+            ->and(array_column(ImageStartPin::take($service), 'ref'))->toBe(['nginx:1.27']);
     });
 
     it('authorizes against the service', function () {
@@ -457,6 +555,109 @@ describe('service', function () {
         RestartService::shouldRun()->never();
 
         expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $reader))->toThrow(AuthorizationException::class);
+    });
+});
+
+describe('compose app', function () {
+    it('keeps the new image as an override of the compose file from Git and deploys', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27', 'db' => 'postgres:16']);
+        $raw = $application->docker_compose_raw;
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+
+        UpdateResourceImage::run($application, 'nginx:1.29', $this->admin);
+
+        $application->refresh();
+        expect($application->docker_compose_image_overrides)->toBe(['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']])
+            ->and($application->docker_compose_raw)->toBe($raw)
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1)
+            ->and(data_get($application->parse(), 'services.web.image'))->toBe('nginx:1.29')
+            ->and(data_get($application->parse(), 'services.db.image'))->toBe('postgres:16');
+    });
+
+    it('stops the override when the compose file in Git names another image', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->forceFill(['docker_compose_image_overrides' => ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']]])->save();
+        $application->forceFill(['docker_compose_raw' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:1.30']]], 10, 2)])->save();
+
+        expect(data_get($application->fresh()->parse(), 'services.web.image'))->toBe('nginx:1.30')
+            ->and($application->fresh()->activeComposeImageOverrides())->toBe([]);
+    });
+
+    it('updates an image that an override already replaced', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->forceFill(['docker_compose_image_overrides' => ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']]])->save();
+        updateImageScan($application, 'nginx:1.29', [updateImageEntry('nginx:1.31')]);
+
+        UpdateResourceImage::run($application, 'nginx:1.31', $this->admin);
+
+        expect($application->fresh()->docker_compose_image_overrides)->toBe(['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.31']]);
+    });
+
+    it('changes the variable that sets the image of a compose service', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:${NGINX_VERSION:-1.27}']);
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+
+        UpdateResourceImage::run($application, 'nginx:1.29', $this->admin);
+
+        expect($application->environment_variables()->where('key', 'NGINX_VERSION')->value('value'))->toBe('1.29')
+            ->and($application->fresh()->docker_compose_image_overrides)->toBeNull();
+    });
+
+    it('deploys the scanned build of the same tag without an override', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.27', 'same_tag')]);
+
+        UpdateResourceImage::run($application, 'nginx:1.27', $this->admin);
+
+        expect($application->fresh()->docker_compose_image_overrides)->toBeNull()
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1)
+            ->and(array_column(ImageStartPin::take($application), 'ref'))->toBe(['nginx:1.27']);
+    });
+
+    it('puts the overrides back when the deploy cannot be queued', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        $this->server->settings->forceFill(['deployment_queue_limit' => 0])->saveQuietly();
+
+        expect(fn () => UpdateResourceImage::run($application, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'Deployment queue is full.');
+        expect($application->fresh()->docker_compose_image_overrides)->toBeNull();
+    });
+
+    it('refuses a compose app that deploys its compose file as written', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->settings->forceFill(['is_raw_compose_deployment_enabled' => true])->save();
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+
+        expect(fn () => UpdateResourceImage::run($application->fresh(), 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'This app deploys its compose file as written.');
+        expect($application->fresh()->docker_compose_image_overrides)->toBeNull();
+    });
+
+    it('shows the override on the Security card and removes it', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->forceFill(['docker_compose_image_overrides' => ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']]])->save();
+        $application->forceFill(['docker_compose' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:1.29']]], 10, 2)])->save();
+        updateImageScan($application, 'nginx:1.29', [updateImageEntry('nginx:1.31')]);
+
+        updateImagePage($this->admin, $application, 'application')
+            ->assertSee('instead of')
+            ->assertSee('Use the compose file')
+            ->call('removeImageOverride', 'web')
+            ->assertDispatched('success');
+
+        expect($application->fresh()->docker_compose_image_overrides)->toBeNull();
+    });
+
+    it('forbids a read-only member to remove an override', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->forceFill(['docker_compose_image_overrides' => ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']]])->save();
+        updateImageScan($application, 'nginx:1.29', [updateImageEntry('nginx:1.31')]);
+        $reader = updateImageMember($this->team, 'member', [['scope' => 'resource', 'uuid' => $application->uuid, 'levels' => ['read']]]);
+
+        updateImagePage($reader, $application, 'application')->call('removeImageOverride', 'web')->assertForbidden();
+
+        expect($application->fresh()->docker_compose_image_overrides)->toBe(['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']]);
     });
 });
 
@@ -478,7 +679,7 @@ describe('main card actions', function () {
         updateImagePage($this->admin, $this->database, 'database')
             ->assertSeeText('postgres:15.0-alpine has a security problem that attackers are likely to use. A newer build fixes it. Pull it and restart.')
             ->assertSee('Pull latest and restart')
-            ->assertSee('Coolify pulls the newest build of postgres:15.0-alpine and restarts.');
+            ->assertSee('Coolify pulls exactly the build that it scanned, not a build pushed after the check. The settings keep postgres:15.0-alpine, so later restarts pull its newest build as usual.');
     });
 
     it('never offers a newer major version', function () {

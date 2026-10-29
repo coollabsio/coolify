@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Jobs\ScanResourceImagesJob;
 use App\Services\DatabaseStartCommandExecutor;
+use App\Services\ImageScan\ImageStartPin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
@@ -20,6 +21,22 @@ trait ExecutesDatabaseStartCommands
         ScanResourceImagesJob::dispatchAfterStart($database);
 
         return $activity;
+    }
+
+    /**
+     * The image pull of the start: the scanned build of a "Pull latest" security update when one waits for this
+     * database (the compose file keeps the tag), else a pull of the configured image.
+     *
+     * @return list<string>
+     */
+    private function pullImageCommands(string $composeFile): array
+    {
+        $prefix = serverDockerConfigPrefix($this->database->destination->server);
+        $pins = ImageStartPin::for(ImageStartPin::take($this->database), [(string) $this->database->image]);
+
+        return $pins === []
+            ? [$prefix."docker compose -f {$composeFile} pull"]
+            : ImageStartPin::commands($pins, $prefix);
     }
 
     /**

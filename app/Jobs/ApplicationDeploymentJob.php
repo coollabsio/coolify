@@ -36,6 +36,7 @@ use App\Services\ImageScan\DockerfileBaseImage;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\ImageStartPin;
 use App\Services\ImageScan\ResolvedImageScanPolicy;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\SecurityCard;
@@ -264,6 +265,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /** Repo digest reference that replaces the image tag in the compose file. */
     private ?string $imageScanPinnedImage = null;
+
+    /** Whether the scanned build of a "Pull latest" security update has the image tag now, so no pull may replace it. */
+    private bool $imageStartPinned = false;
 
     /** The base image of the final stage of a Dockerfile build (spec 7.4). */
     private ?string $imageScanBaseImageRef = null;
@@ -953,6 +957,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->save_runtime_environment_variables();
 
         $this->pull_docker_compose_images();
+        $this->applyComposeImageStartPins();
 
         $this->checkComposeImageScanGate();
 
@@ -2904,6 +2909,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function rolling_update()
     {
+        $this->applyImageStartPin();
         $this->checkImageScanGate($this->production_image_name);
 
         try {
@@ -2975,7 +2981,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if ($this->application->build_pack === 'dockerimage') {
+        if ($this->application->build_pack === 'dockerimage' && ! $this->imageStartPinned) {
             $this->application_deployment_queue->addLogEntry("Pulling image ({$imageRef}) to scan it before the start.");
             $this->execute_remote_command([
                 serverDockerConfigPrefix($this->server).'docker pull '.escapeshellarg($imageRef),
@@ -3133,6 +3139,47 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Throwable $e) {
             report($e);
         }
+    }
+
+    /**
+     * A "Pull latest" security update of a Docker image app: pulls the build that Coolify scanned and gives it the
+     * configured tag, so the gate and the start use it and do not pull the tag again.
+     */
+    private function applyImageStartPin(): void
+    {
+        if ($this->application->build_pack !== 'dockerimage' || $this->pull_request_id !== 0 || $this->rollback) {
+            return;
+        }
+
+        $pins = ImageStartPin::for(ImageStartPin::take($this->application), [$this->production_image_name]);
+        if ($pins === []) {
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry("Pulling the scanned build of {$this->production_image_name}.");
+        $this->execute_remote_command(...array_map(fn (string $command): array => [$command, 'hidden' => true],
+            ImageStartPin::commands($pins, serverDockerConfigPrefix($this->server))));
+        $this->imageStartPinned = true;
+    }
+
+    /**
+     * A "Pull latest" security update of a Compose app: after the pull of the registry images, gives the scanned builds
+     * their tags again. `up` uses local images, so the containers run the scanned builds.
+     */
+    private function applyComposeImageStartPins(): void
+    {
+        if ($this->pull_request_id !== 0 || $this->docker_compose_custom_build_command) {
+            return;
+        }
+
+        $pins = ImageStartPin::take($this->application);
+        if ($pins === []) {
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry('Pulling the scanned builds of the security update.');
+        $this->execute_remote_command(...array_map(fn (string $command): array => [$command, 'hidden' => true],
+            ImageStartPin::commands($pins, serverDockerConfigPrefix($this->server))));
     }
 
     /**
@@ -5991,7 +6038,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             if ($this->application->build_pack === 'dockerimage') {
                 $up = [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} up --build -d"), 'hidden' => true];
-                if ($this->imageScanPinnedImage !== null) {
+                if ($this->imageScanPinnedImage !== null || $this->imageStartPinned) {
                     // The gate pulled and scanned the pinned image.
                     $this->execute_remote_command($up);
                 } else {

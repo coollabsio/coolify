@@ -172,13 +172,42 @@ class Vulnerabilities extends Component
     public function resetFilters(): void
     {
         $this->severities = [];
-        $this->images = [];
         $this->resetPage();
     }
 
     /**
      * The "All findings" link of an image row: the findings of that image only. The browser opens the section.
      */
+    /**
+     * Opens the findings of one severity, from a tile of the Security card.
+     */
+    public function showSeverityFindings(string $severity): void
+    {
+        if (! in_array($severity, self::SEVERITIES, true)) {
+            return;
+        }
+
+        $this->severities = [$severity];
+        $this->images = [];
+        $this->showIgnored = false;
+        $this->resetPage();
+    }
+
+    /**
+     * The image picker of the findings toolbar: one image, or every image for ''.
+     */
+    public function selectImage(string $image): void
+    {
+        if ($image === '') {
+            $this->images = [];
+            $this->resetPage();
+
+            return;
+        }
+
+        $this->showImageFindings($image);
+    }
+
     public function showImageFindings(string $image): void
     {
         $refs = $this->currentScans()->pluck('image_ref')->map(fn ($ref): string => (string) $ref)->unique();
@@ -246,6 +275,33 @@ class Vulnerabilities extends Component
      *
      * @param  string|null  $ownerUuid  On a service page: the application or database whose scan offers the candidate.
      */
+    /**
+     * Stops replacing the image of a Compose service: the next deploy uses the image of the compose file again.
+     */
+    public function removeImageOverride(string $service): void
+    {
+        $resource = $this->resource();
+        $this->authorize('update', $resource);
+        abort_unless($resource instanceof Application && $resource->build_pack === 'dockercompose', 404);
+
+        $overrides = (array) $resource->docker_compose_image_overrides;
+        if (! isset($overrides[$service])) {
+            return;
+        }
+        unset($overrides[$service]);
+        $resource->docker_compose_image_overrides = $overrides === [] ? null : $overrides;
+        $resource->save();
+
+        auditLog('ui.image_scan.image_override_removed', [
+            'team_id' => $resource->team()?->id,
+            'resource_type' => $resource->getMorphClass(),
+            'resource_uuid' => (string) $resource->uuid,
+            'service' => $service,
+            'user_id' => auth()->id(),
+        ]);
+        $this->dispatch('success', 'The next deploy uses the image of the compose file.');
+    }
+
     public function updateImage(string $candidateRef, ?string $ownerUuid = null): bool
     {
         $resource = $this->resource();
@@ -750,6 +806,27 @@ class Vulnerabilities extends Component
     }
 
     /**
+     * The counts of the summary tiles: the findings that are not ignored, of every image, before any filter. They come
+     * from the same rows as the findings table, so a tile and the table never disagree.
+     *
+     * @param  list<array{finding: Finding, state: string}>  $activeRows
+     * @return array{critical: int, high: int, fixed: int, no_fix: int}
+     */
+    private function summary(array $activeRows): array
+    {
+        $summary = ['critical' => 0, 'high' => 0, 'fixed' => 0, 'no_fix' => 0];
+        foreach ($activeRows as $row) {
+            $severity = strtolower($row['finding']->severity);
+            if (isset($summary[$severity])) {
+                $summary[$severity]++;
+            }
+            $summary[$row['state']]++;
+        }
+
+        return $summary;
+    }
+
+    /**
      * The findings that are not ignored, per scan.
      *
      * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $activeRows
@@ -974,6 +1051,7 @@ class Vulnerabilities extends Component
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
+            'summary' => $this->summary($activeRows),
             'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows), $imageStatuses, fn (Model $owner): IgnoreMatcher => $this->matcherFor($owner)),
             'hasSettings' => $resource instanceof Application,
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),

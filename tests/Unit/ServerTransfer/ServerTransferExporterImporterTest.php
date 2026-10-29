@@ -364,6 +364,18 @@ test('an imported application and service keep their compose parser version and 
         ->and($application->environment_variables()->where('key', 'NIXPACKS_NODE_VERSION')->pluck('value')->all())->toBe(['18']);
 });
 
+test('an imported Compose app keeps the image overrides of its security updates', function () {
+    $overrides = ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']];
+    $this->application->forceFill(['build_pack' => 'dockercompose', 'docker_compose_image_overrides' => $overrides])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Application::where('uuid', $applicationUuid)->firstOrFail()->docker_compose_image_overrides)->toBe($overrides);
+});
+
 test('a static application keeps the port that the user set after turning on static', function () {
     $this->application->settings->forceFill(['is_static' => true])->save();
     $this->application->refresh()->forceFill(['ports_exposes' => '8080'])->saveQuietly();

@@ -138,7 +138,7 @@ final class SecurityActions
         $context = [
             'image' => $scan->image_ref === null ? null : (string) $scan->image_ref,
             'coolify' => self::isCoolifyResource($owner),
-            // A Compose app sets the images of its file; Coolify does not change them.
+            // A Compose app: Coolify keeps the new image as an override of its compose file and redeploys.
             'compose' => $owner instanceof Application && $owner->build_pack === 'dockercompose',
             'buttons' => ! self::isCoolifyResource($owner) && ! (bool) $scan->server?->isTransferredAway(),
             'switchBlocked' => $line !== null || $sameTag !== null ? UpdateResourceImage::blockedReason($scan, $owner) !== null : false,
@@ -176,12 +176,13 @@ final class SecurityActions
         $sentence = match ($type) {
             SecurityActionType::UpdateImage => match (true) {
                 $context['coolify'] => self::COOLIFY_TEXT,
-                $context['compose'] => "Change the version to {$tag} in the compose file of this app, then redeploy.",
+                $context['compose'] && $context['switchBlocked'] => "Change the version to {$tag} in the compose file of this app, then redeploy.",
                 default => "Update to {$tag}.",
             },
             SecurityActionType::PullLatest => match (true) {
                 $context['coolify'] => self::COOLIFY_TEXT,
-                $context['compose'] => 'A newer build of this image fixes it. Redeploy this app to pull it.',
+                $context['compose'] && $context['switchBlocked'] => 'A newer build of this image fixes it. Redeploy this app to pull it.',
+                $context['compose'] => 'A newer build of this image fixes it. Pull it and redeploy.',
                 default => 'A newer build of this image fixes it. Pull it and restart.',
             },
             SecurityActionType::ChangeBase => "Change the base image to {$newBase} in your Dockerfile, then redeploy.",
@@ -208,7 +209,7 @@ final class SecurityActions
             },
             fixedIds: $plan['ids'],
             button: in_array($type, self::BUTTON_TYPES, true) && $context['buttons']
-                && ($type === SecurityActionType::Rebuild || (! $context['switchBlocked'] && ! $context['compose'])),
+                && ($type === SecurityActionType::Rebuild || ! $context['switchBlocked']),
             image: $context['image'],
             ref: $ref,
         );

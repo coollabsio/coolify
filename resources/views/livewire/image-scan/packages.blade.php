@@ -32,8 +32,9 @@
                     <x-table.search placeholder="Search packages" loading-target="search"
                         wire:model.live.debounce.300ms="search" />
                 </x-slot:search>
-                @if (count($typeOptions) > 0 || $imageOptions !== [])
-                    <x-table.filter :active-count="count($types) + count($images)" reset-action="resetFilters">
+                <x-image-scan.image-select :options="$imageOptions" :selected="$images" action="showImage" />
+                @if (count($typeOptions) > 0)
+                    <x-table.filter :active-count="count($types)" reset-action="resetFilters">
                         @if (count($typeOptions) > 0)
                             <span class="{{ $groupLabel }}">Type</span>
                             @foreach ($typeOptions as $option)
@@ -42,25 +43,6 @@
                                     aria-selected="{{ $selected ? 'true' : 'false' }}"
                                     wire:click="toggleType({{ \Illuminate\Support\Js::from($option) }})">
                                     <span class="truncate">{{ $option }}</span>
-                                    <span class="{{ $checkbox($selected) }}">
-                                        @if ($selected)
-                                            <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                                <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor" stroke-width="1.8"
-                                                    stroke-linecap="round" stroke-linejoin="round" />
-                                            </svg>
-                                        @endif
-                                    </span>
-                                </button>
-                            @endforeach
-                        @endif
-                        @if ($imageOptions !== [])
-                            <span class="{{ $groupLabel }}">Image</span>
-                            @foreach ($imageOptions as $option)
-                                @php $selected = in_array($option, $images, true); @endphp
-                                <button type="button" class="listbox-option" role="option"
-                                    aria-selected="{{ $selected ? 'true' : 'false' }}"
-                                    wire:click="toggleImage({{ \Illuminate\Support\Js::from($option) }})">
-                                    <span class="truncate" title="{{ $option }}">{{ $option }}</span>
                                     <span class="{{ $checkbox($selected) }}">
                                         @if ($selected)
                                             <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">

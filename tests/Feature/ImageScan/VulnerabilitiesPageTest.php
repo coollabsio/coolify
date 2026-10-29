@@ -686,6 +686,7 @@ describe('packages of one image', function () {
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Packages::class, ['resourceType' => 'service', 'resourceUuid' => $service->uuid])
+            ->assertSee('All images')
             ->assertSee('openssl')
             ->assertSee('libpq')
             ->call('toggleImage', 'postgres:16')

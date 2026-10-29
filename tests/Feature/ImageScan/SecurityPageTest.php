@@ -242,6 +242,26 @@ function securityPage(User $user, Model $resource, string $type, ?Team $sessionT
 }
 
 describe('main card', function () {
+    it('counts the summary tiles from the findings that are not ignored, and opens a severity from its tile', function () {
+        $database = securityPageDatabase();
+        securityPageScan($database, 'postgres:15.0', [
+            securityPageFinding('CVE-2026-0001', ['severity' => 'critical']),
+            securityPageFinding('CVE-2026-0002', ['severity' => 'high', 'fixedIn' => null, 'fixState' => 'not-fixed']),
+            securityPageFinding('CVE-2026-0003', ['severity' => 'medium', 'kev' => false]),
+        ]);
+
+        $page = securityPage($this->admin, $database, 'database');
+
+        expect($page->viewData('summary'))->toBe(['critical' => 1, 'high' => 1, 'fixed' => 2, 'no_fix' => 1]);
+
+        $page->set('images', ['postgres:15.0'])
+            ->call('showSeverityFindings', 'critical')
+            ->assertSet('severities', ['critical'])
+            ->assertSet('images', [])
+            ->call('showSeverityFindings', 'not-a-severity')
+            ->assertSet('severities', ['critical']);
+    });
+
     it('tells a postgres 15.0 database to update now and why', function () {
         $database = securityPageDatabase();
         securityPageScan($database, 'postgres:15.0', [
@@ -253,7 +273,7 @@ describe('main card', function () {
             ->assertSeeText('postgres:15.0 has a security problem that attackers are using. Update to 15.13 to fix it.')
             ->assertSee('SQL injection in psql quoting')
             ->assertSee('CVE-2025-1094')
-            ->assertSee('8.1 High')
+            ->assertSeeInOrder(['Top problems', 'SQL injection in psql quoting', 'High', '8.1'])
             ->assertSee('Used by attackers')
             ->assertSee('Update to 15.13')
             ->assertSee('postgres:15.0 '.substr(ResourceScans::current($database)->first()->image_id, 7, 12).' → postgres:15.13')
@@ -270,7 +290,7 @@ describe('main card', function () {
         securityPage($this->admin, $application, 'application')
             ->assertSeeText('nginx:1.27 has a security problem that attackers are using. A newer build fixes it. Pull it and restart.')
             ->assertSee('Pull latest and restart')
-            ->assertSee('Pull the newest build of nginx:1.27.')
+            ->assertSee('Pull the build of nginx:1.27 that Coolify scanned.')
             ->assertSeeHtml('updateImage(\\u0027nginx:1.27\\u0027');
     });
 
@@ -739,7 +759,7 @@ describe('image list', function () {
         return [$service->fresh(), $main, $runners, $postgres];
     }
 
-    it('shows one open image with its sentence, attack note, provenance, and running digest, without a list', function () {
+    it('shows one image as a table row with its sentence, attack note, provenance, and running digest', function () {
         $database = securityPageDatabase();
         $database->forceFill(['image' => 'postgres:16-alpine'])->save();
         $ids = ['CVE-2026-0001', 'CVE-2026-0002'];
@@ -768,10 +788,10 @@ describe('image list', function () {
             ->assertSee('3 known issues')
             ->assertDontSee('have no fix')
             ->assertDontSee('images need an update')
-            ->assertDontSeeHtml('aria-label="Images"');
+            ->assertSeeHtml('aria-label="Images"');
     });
 
-    it('lists the images of a service worst first, opens the first problem, and puts a merged update on its first row', function () {
+    it('lists the images of a service worst first, shows every problem image open, and puts a merged update on its first row', function () {
         [$service, $main, $runners, $postgres] = securityPageThreeImageService();
         $this->actingAs($this->admin);
 
@@ -779,7 +799,7 @@ describe('image list', function () {
 
         expect($card['header'])->toBe('2 of 3 images need an update')
             ->and(array_column($card['rows'], 'name'))->toBe(['n8n', 'n8n runners', 'postgres'])
-            ->and(array_column($card['rows'], 'open'))->toBe([true, false, false])
+            ->and(array_column($card['rows'], 'attention'))->toBe([true, true, false])
             ->and($card['rows'][0]['primary']['button']['submit'])->toStartWith('updateImages(')
             ->and($card['rows'][0]['mergedWith'])->toBeNull()
             ->and($card['rows'][1]['primary'])->toBeNull()
@@ -817,7 +837,6 @@ describe('image list', function () {
             ->assertSee('Check needed')
             ->assertSee('1 of 2 images needs an update')
             ->assertSeeText('redis:7 has not been checked yet.')
-            ->assertSee('Not checked')
             ->assertSee('Scan now');
     });
 
@@ -862,6 +881,23 @@ describe('image list', function () {
         $page->call('showImageFindings', 'not-an-image:1.0')->assertSet('images', ['n8nio/runners:1.0']);
     });
 
+    it('picks one image or every image for the findings, and keeps the image when the other filters reset', function () {
+        [$service] = securityPageThreeImageService();
+
+        securityPage($this->admin, $service, 'service')
+            ->assertSee('All images')
+            ->call('selectImage', 'n8nio/runners:1.0')
+            ->assertSet('images', ['n8nio/runners:1.0'])
+            ->call('toggleSeverity', 'high')
+            ->call('resetFilters')
+            ->assertSet('severities', [])
+            ->assertSet('images', ['n8nio/runners:1.0'])
+            ->call('selectImage', 'not-an-image:1.0')
+            ->assertSet('images', ['n8nio/runners:1.0'])
+            ->call('selectImage', '')
+            ->assertSet('images', []);
+    });
+
     it('cleans old stored titles, and shows the fallback title for a stored changelog entry', function () {
         $database = securityPageDatabase();
         securityPageScan($database, 'postgres:15.0', [
@@ -887,7 +923,7 @@ describe('image list', function () {
             ->assertSee('No fix yet')
             ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. No fixed version exists yet, and Coolify checks every day.')
             ->assertSee('Until then, limit who can reach this service, or ignore the problem if the affected part is not used.')
-            ->assertSee('Not fixed yet')
+            ->assertSeeInOrder(['Top problems', 'No fix yet'])
             ->assertDontSee('images need an update')
             ->assertDontSee('Attackers are using this.');
     });

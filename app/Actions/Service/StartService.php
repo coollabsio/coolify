@@ -8,6 +8,7 @@ use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\ImageScan\ImageStartPin;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -53,6 +54,8 @@ class StartService
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "{$compose} pull < /dev/null";
         }
+        // After the pull: the scanned build of a "Pull latest" security update keeps the tag of the compose file.
+        $commands = array_merge($commands, ImageStartPin::commands(ImageStartPin::take($service), serverDockerConfigPrefix($service->server)));
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";

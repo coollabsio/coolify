@@ -29,8 +29,8 @@ use InvalidArgumentException;
  *
  * @phpstan-type ButtonData array{label: string, title: string, submit: string, actions: list<string>, warning: string}
  * @phpstan-type ActionData array{key: string, type: string, sentence: string, copy: ?string, button: ?ButtonData}
- * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, signal: ?string, package: string, version: string}
- * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, filter: ?string}
+ * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, cvss: ?string, severity: string, signal: ?string, exploited: bool, package: string, version: string}
+ * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, attention: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, issues: ?int, filter: ?string, override: ?array{service: string, from: string, to: string}}
  */
 final class SecurityCard
 {
@@ -147,7 +147,7 @@ final class SecurityCard
             $resource instanceof Service => 'this service',
             default => 'this database',
         };
-        $opened = false;
+        $composeOverrides = $resource instanceof Application && $resource->build_pack === 'dockercompose' ? $resource->activeComposeImageOverrides() : [];
         $rows = [];
         foreach ($entries as $entry) {
             /** @var ResourceSecurity $imageSecurity */
@@ -182,9 +182,6 @@ final class SecurityCard
                 }
             }
 
-            $isProblem = in_array($status->value, self::PROBLEM_STATUSES, true);
-            $open = $single || ($isProblem && ! $opened);
-            $opened = $opened || $open;
             $others = array_slice($actions, 1);
             $counts = $scan === null ? null : ($findingCounts[(string) $scan->uuid] ?? null);
             $digestFull = $scan === null ? null : ($scan->repo_digest ?: $scan->image_id);
@@ -196,7 +193,7 @@ final class SecurityCard
                 'status' => $status->value,
                 'badge' => SecuritySentences::badge($status),
                 'badgeType' => self::badgeType($status),
-                'open' => $open,
+                'attention' => in_array($status->value, self::PROBLEM_STATUSES, true),
                 'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref),
                 'attackNote' => SecuritySentences::attackNote($imageSecurity),
                 'advice' => SecuritySentences::noFixAdvice($imageSecurity, $noun),
@@ -216,7 +213,9 @@ final class SecurityCard
                 'digest' => SecuritySentences::shortDigest($digestFull),
                 'digestFull' => $digestFull,
                 'known' => $counts === null ? '' : SecuritySentences::knownIssues($counts),
+                'issues' => $counts,
                 'filter' => $single ? null : $ref,
+                'override' => $name !== null && isset($composeOverrides[$name]) ? ['service' => $name, ...$composeOverrides[$name]] : null,
             ];
         }
 
@@ -243,11 +242,14 @@ final class SecurityCard
             'display_id' => (string) $why['display_id'],
             'link' => $why['link'],
             'score' => $why['score'] === null ? 'No score' : number_format((float) $why['score'], 1).' '.ucfirst((string) $why['severity']),
+            'cvss' => $why['score'] === null ? null : number_format((float) $why['score'], 1),
+            'severity' => strtolower((string) ($why['severity'] ?? 'unknown')),
             'signal' => match ($why['signal']) {
                 SecurityRules::EXPLOITED => 'Used by attackers',
                 SecurityRules::LIKELY => 'Likely to be exploited',
                 default => null,
             },
+            'exploited' => $why['signal'] === SecurityRules::EXPLOITED,
             'package' => (string) ($why['package'] ?? ''),
             'version' => (string) ($why['version'] ?? ''),
         ];
@@ -559,8 +561,8 @@ final class SecurityCard
                 'label' => 'Pull latest and restart',
                 'title' => "Pull the newest build of {$image}?",
                 'submit' => $submit,
-                'actions' => ["Pull the newest build of {$image}.", $restart],
-                'warning' => "Coolify pulls the newest build of {$image} and restarts.",
+                'actions' => ["Pull the build of {$image} that Coolify scanned.", $restart],
+                'warning' => "Coolify pulls exactly the build that it scanned, not a build pushed after the check. The settings keep {$image}, so later restarts pull its newest build as usual.",
             ];
         }
 
@@ -623,6 +625,9 @@ final class SecurityCard
     {
         if ($resource instanceof Service) {
             return 'One-click services pin versions that work together. Check the service template before you update.';
+        }
+        if ($resource instanceof Application && $resource->build_pack === 'dockercompose') {
+            return 'Coolify redeploys the app with the new image. Your compose file in Git does not change: Coolify keeps using the new image until the file names another one.';
         }
         if ($resource instanceof Application) {
             return 'Coolify redeploys the app with the new image.';

@@ -110,7 +110,6 @@ class Packages extends Component
     public function resetFilters(): void
     {
         $this->types = [];
-        $this->images = [];
         $this->resetPage(self::PAGE_NAME);
     }
 

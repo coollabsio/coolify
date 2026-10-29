@@ -3728,11 +3728,11 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .image-scan-packages-grid {
-    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 8rem;
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 2.5rem;
 }
 
 .image-scan-packages-grid.has-image {
-    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 8rem;
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 2.5rem;
     min-width: 52rem;
 }
 
@@ -3748,6 +3748,23 @@ input[type="search"]::-webkit-search-results-decoration {
 .image-scan-findings-grid.is-nested {
     grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
     padding-left: 2.75rem;
+}
+
+.image-scan-images-grid {
+    grid-template-columns: minmax(10rem, 0.9fr) 8.5rem minmax(16rem, 2.6fr) 4.5rem 2.25rem;
+}
+
+.image-scan-images-grid.data-table-row {
+    padding-top: 0.875rem;
+    padding-bottom: 0.875rem;
+}
+
+.image-scan-problems-grid {
+    grid-template-columns: minmax(14rem, 2.4fr) minmax(9rem, 1.1fr) 9rem minmax(7rem, 0.8fr);
+}
+
+.image-scan-problems-grid.has-image {
+    grid-template-columns: minmax(14rem, 2.2fr) minmax(9rem, 1fr) minmax(7rem, 0.8fr) 9rem minmax(7rem, 0.8fr);
 }
 
 .image-scan-sbom-grid {
@@ -3773,7 +3790,31 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+@media (max-width: 767px) {
+    .image-scan-images-grid {
+        grid-template-columns: minmax(0, 1fr) auto 2.25rem;
+        row-gap: 0.625rem;
+    }
+
+    .image-scan-images-grid > .image-scan-summary-cell {
+        display: flex;
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .data-table-header.image-scan-images-grid > :nth-child(3),
+    .image-scan-images-grid > :nth-child(4) {
+        display: none;
+    }
+}
+
 @media (max-width: 600px) {
+    .image-scan-problems-grid,
+    .image-scan-problems-grid.has-image {
+        grid-template-columns: minmax(0, 1fr) auto;
+        min-width: 0;
+    }
+
     .image-scan-packages-grid,
     .image-scan-packages-grid.has-image,
     .image-scan-findings-grid,
