@@ -148,9 +148,11 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="environments-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Environment</div>
-                    <div class="environment-resource-count">Resources</div>
-                    <div class="environment-description">Description</div>
+                    <x-table.sort-header label="Environment" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Resources" asc="resources-asc" desc="resources-desc" first="desc" then="page = 1"
+                        class="environment-resource-count" />
+                    <x-table.sort-header label="Description" asc="description-asc" desc="description-desc" then="page = 1"
+                        class="environment-description" />
                     <div></div>
                 </div>
 
@@ -230,7 +232,7 @@
                     label: 'Name Z–A'
                 },
                 {
-                    value: 'resources',
+                    value: 'resources-desc',
                     label: 'Most resources'
                 },
             ],
@@ -245,21 +247,27 @@
                     return !query || searchable.includes(query);
                 });
 
-                return environments.sort((first, second) => {
-                    if (this.sortBy === 'name-desc') {
-                        return second.name.localeCompare(first.name);
-                    }
-                    if (this.sortBy === 'resources') {
-                        return second.resourceCount - first.resourceCount ||
-                            first.name.localeCompare(second.name);
-                    }
-                    if (this.sortBy === 'name-asc') {
-                        return first.name.localeCompare(second.name);
-                    }
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (environment) => environment.name,
+                    resources: (environment) => Number(environment.resourceCount),
+                    description: (environment) => environment.description || '',
+                };
+                const sortValue = sortValues[column];
 
-                    // Default: the server order (production, staging, development, then by name).
-                    return 0;
-                });
+                // Default: the server order (production, staging, development, then by name).
+                if (!sortValue) {
+                    return environments;
+                }
+
+                const order = direction === 'desc' ? -1 : 1;
+                const compare = (first, second) => typeof first === 'number' ?
+                    first - second :
+                    first.localeCompare(second);
+
+                return environments.sort((first, second) =>
+                    order * compare(sortValue(first), sortValue(second)) ||
+                    first.name.localeCompare(second.name));
             },
             get totalPages() {
                 return Math.max(1, Math.ceil(this.filteredEnvironments.length / this.pageSize));

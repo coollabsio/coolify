@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -230,6 +232,9 @@ class ServerSetting extends Model
         'logdrain_custom_config_parser',
         'geoip_maxmind_license_key',
     ];
+
+    /** @var list<string>|null */
+    private static ?array $columnsWithoutPatchCheckResult = null;
 
     protected static function booted()
     {
@@ -463,6 +468,17 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    /**
+     * Selects every column except patch_check_result, which holds the full update list of the last patch
+     * check (often tens of kilobytes). Use it for instance-wide server loops that do not read the result.
+     */
+    public function scopeWithoutPatchCheckResult(Builder $query): Builder
+    {
+        self::$columnsWithoutPatchCheckResult ??= array_values(array_diff(Schema::getColumnListing($this->getTable()), ['patch_check_result']));
+
+        return $query->select(self::$columnsWithoutPatchCheckResult);
     }
 
     /**

@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -42,6 +43,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public ?DockerCleanupExecution $execution_log = null;
 
     public const INTERRUPTED_MESSAGE = 'Docker cleanup was interrupted: its worker stopped before the cleanup finished.';
+
+    public const INTERRUPTED_EXECUTIONS_CHUNK_SIZE = 100;
 
     /**
      * Shares the per-server lock with queued CleanupDocker runs, so two cleanups never run on
@@ -254,31 +257,32 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
      */
     public static function failInterruptedExecutions(): void
     {
-        $executions = DockerCleanupExecution::query()
+        DockerCleanupExecution::query()
+            ->select(['id', 'server_id'])
             ->with('server.team')
             ->where('status', 'running')
             ->whereNull('finished_at')
             ->where('created_at', '<', now()->subSeconds(CleanupDocker::overlapLockExpiresAfter()))
-            ->get();
+            ->chunkById(self::INTERRUPTED_EXECUTIONS_CHUNK_SIZE, function (Collection $executions): void {
+                foreach ($executions as $execution) {
+                    $updated = DockerCleanupExecution::query()
+                        ->whereKey($execution->id)
+                        ->where('status', 'running')
+                        ->whereNull('finished_at')
+                        ->update([
+                            'status' => 'failed',
+                            'message' => self::INTERRUPTED_MESSAGE,
+                            'finished_at' => Carbon::now()->toImmutable(),
+                        ]);
 
-        foreach ($executions as $execution) {
-            $updated = DockerCleanupExecution::query()
-                ->whereKey($execution->id)
-                ->where('status', 'running')
-                ->whereNull('finished_at')
-                ->update([
-                    'status' => 'failed',
-                    'message' => self::INTERRUPTED_MESSAGE,
-                    'finished_at' => Carbon::now()->toImmutable(),
-                ]);
+                    if ($updated === 0) {
+                        continue;
+                    }
 
-            if ($updated === 0) {
-                continue;
-            }
-
-            event(new DockerCleanupDone($execution->refresh()));
-            $execution->server?->team?->notify(new DockerCleanupFailed($execution->server, 'Docker cleanup job failed with the following error: '.self::INTERRUPTED_MESSAGE));
-        }
+                    event(new DockerCleanupDone($execution->refresh()));
+                    $execution->server?->team?->notify(new DockerCleanupFailed($execution->server, 'Docker cleanup job failed with the following error: '.self::INTERRUPTED_MESSAGE));
+                }
+            });
     }
 
     public function failed(?\Throwable $exception): void

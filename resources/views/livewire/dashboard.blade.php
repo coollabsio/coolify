@@ -8,36 +8,8 @@
     @endif
 
     @php
-        $dashboardItemLimit = 8;
-        $dashboardProjects = $projects->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
-        $dashboardServers = $servers->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
+        $dashboardItemLimit = \App\Livewire\Dashboard::ITEM_LIMIT;
         $hasTrafficAnalytics = $servers->contains(fn ($server) => $server->isTrafficAnalyticsEnabled());
-        $projectResourceCounts = $dashboardProjects->mapWithKeys(fn ($project) => [$project->id => collect([
-            $project->applications_count,
-            $project->services_count,
-            $project->postgresqls_count,
-            $project->redis_count,
-            $project->keydbs_count,
-            $project->dragonflies_count,
-            $project->clickhouses_count,
-            $project->mongodbs_count,
-            $project->mysqls_count,
-            $project->mariadbs_count,
-            $project->sqlites_count,
-        ])->sum()]);
-        $serverStatuses = $dashboardServers->mapWithKeys(function ($server) {
-            $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-            $sentinelNeedsAttention = $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
-
-            return [$server->id => match (true) {
-                $server->settings->force_disabled => ['Disabled', 'error'],
-                ! $server->settings->is_reachable && ! $server->settings->is_usable => ['Unavailable', 'error'],
-                ! $server->settings->is_reachable => ['Unreachable', 'error'],
-                ! $server->settings->is_usable => ['Not ready', 'warning'],
-                $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-                default => ['Ready', 'success'],
-            }];
-        });
         $iconButton = 'card-icon-button flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black';
         // Same look as $iconButton, sized to the 20px section title it sits next to.
         $titleIconButton = 'flex size-5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
@@ -188,11 +160,17 @@
                     @endforeach
                 </div>
 
-                <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
+                <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setProjectSort">
                     <div class="grid grid-cols-[minmax(0,1fr)_7rem_4rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4rem] {{ $tableHead }}">
-                        <div>Project</div>
-                        <div>Contents</div>
-                        <div class="hidden @2xl:block">Description</div>
+                        <x-table.sort-header label="Project" asc="name-asc" desc="name-desc"
+                            action="setProjectSort" :current="$projectSort" />
+                        <x-table.sort-header label="Contents" asc="resources-asc" desc="resources-desc" first="desc"
+                            action="setProjectSort" :current="$projectSort" title="Sort by resource count" />
+                        <div class="hidden @2xl:block">
+                            <x-table.sort-header label="Description" asc="description-asc" desc="description-desc"
+                                action="setProjectSort" :current="$projectSort" />
+                        </div>
                         <div></div>
                     </div>
                     @foreach ($dashboardProjects as $project)
@@ -388,14 +366,20 @@
                         ? 'grid-cols-[minmax(0,1fr)_9.5rem] @xl:grid-cols-[minmax(0,1fr)_9rem_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9rem_9.5rem]'
                         : 'grid-cols-[minmax(0,1fr)_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem]';
                 @endphp
-                <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
+                <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setServerSort">
                     <div class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] {{ $tableHead }}">
-                        <div>Server</div>
-                        <div class="hidden @2xl:block">Description</div>
+                        <x-table.sort-header label="Server" asc="name-asc" desc="name-desc"
+                            action="setServerSort" :current="$serverSort" />
+                        <div class="hidden @2xl:block">
+                            <x-table.sort-header label="Description" asc="description-asc" desc="description-desc"
+                                action="setServerSort" :current="$serverSort" />
+                        </div>
                         @if ($showServerUsage)
                             <div class="hidden @xl:block">Usage</div>
                         @endif
-                        <div>Status</div>
+                        <x-table.sort-header label="Status" asc="status-asc" desc="status-desc"
+                            action="setServerSort" :current="$serverSort" />
                     </div>
                     @foreach ($dashboardServers as $server)
                         @php

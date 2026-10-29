@@ -712,13 +712,13 @@ class Application extends BaseModel
         return false;
     }
 
-    public function is_github_based(): bool
+    /**
+     * Watch paths filter Git webhook deployments. Deploy-key applications have no
+     * source but receive manual webhooks, so a source is not required.
+     */
+    public function supportsWatchPaths(): bool
     {
-        if (data_get($this, 'source')) {
-            return true;
-        }
-
-        return false;
+        return $this->git_based() && ! $this->is_public_repository();
     }
 
     public function isGithubAppSource(): bool
@@ -1113,6 +1113,30 @@ class Application extends BaseModel
         return data_get($this, 'environment.project.team');
     }
 
+    /**
+     * Another application of the team that builds and pushes an image with the same Docker image name.
+     * Both push the same tags (the commit SHA, `latest`, `pr-<id>`), so one application can run the image of the other.
+     */
+    public function otherApplicationBuildingSameImage(): ?Application
+    {
+        $buildPacksWithoutPushedImage = ['dockerimage', 'dockercompose'];
+        if (blank($this->docker_registry_image_name) || in_array($this->build_pack, $buildPacksWithoutPushedImage, true)) {
+            return null;
+        }
+
+        return Application::query()
+            ->whereRelation('environment.project.team', 'id', $this->team()->id)
+            ->when($this->exists, fn ($query) => $query->whereKeyNot($this->id))
+            ->where('docker_registry_image_name', $this->docker_registry_image_name)
+            ->whereNotIn('build_pack', $buildPacksWithoutPushedImage)
+            ->first();
+    }
+
+    public function sharedImageNameMessage(Application $otherApplication): string
+    {
+        return "The application {$otherApplication->name} also builds the Docker image {$this->docker_registry_image_name}. Both push the same image tags, so one application can run the image of the other. Set a different Docker image name for each application in the General settings.";
+    }
+
     public function serviceType()
     {
         $found = str(collect(SPECIFIC_SERVICES)->filter(function ($service) {
@@ -1222,15 +1246,7 @@ class Application extends BaseModel
     public function environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', true)
-            ->orderByRaw("
-                CASE
-                    WHEN is_required = true THEN 1
-                    WHEN LOWER(key) LIKE 'service_%' THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+            ->where('is_preview', true);
     }
 
     public function runtime_environment_variables_preview()
@@ -1299,9 +1315,9 @@ class Application extends BaseModel
         return false;
     }
 
-    public function get_last_successful_deployment()
+    public function get_last_successful_deployment(array $columns = ['*'])
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first($columns);
     }
 
     public function get_last_days_deployments()

@@ -28,7 +28,7 @@ class TeamAvatarStorageService extends AvatarStorageService
             'avatar_path' => $path,
             'avatar_storage_type' => $storageType,
             'avatar_s3_storage_id' => $s3StorageId,
-        ])->save();
+        ])->touch();
 
         if ($oldPath && ($oldStorageType !== $storageType || $oldS3StorageId !== $s3StorageId)) {
             $this->disk($oldStorageType ?? 'local', $oldS3StorageId)->delete($oldPath);

@@ -4,10 +4,10 @@ namespace App\Jobs;
 
 use App\Models\InstanceSettings;
 use App\Models\Server;
-use App\Models\Team;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -38,6 +38,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private const CLOUD_PROVIDER_STATUS_CHECK_CRON = '*/5 * * * *';
 
     /**
+     * Number of servers loaded and processed at a time.
+     */
+    public const SERVER_BATCH_SIZE = 500;
+
+    /**
      * Create a new job instance.
      */
     public function __construct()
@@ -59,43 +64,55 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             $this->instanceTimezone = config('app.timezone');
         }
 
-        // Get all servers to process
-        $servers = $this->getServers();
+        // Decide once per run: these cron keys are global, so a second call in the same run returns false.
+        $runCloudProviderStatusChecks = shouldRunCronNow(self::CLOUD_PROVIDER_STATUS_CHECK_CRON, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime);
+        $runConnectionChecks = shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime);
 
-        // Provider state checks run independently so slow APIs cannot block SSH checks.
-        $this->dispatchCloudProviderStatusChecks($servers);
+        $relations = ['settings' => fn (HasOne $query) => $query->withoutPatchCheckResult(), 'cloudProviderToken'];
 
-        $servers = $servers
-            ->reject(fn (Server $server) => $server->hasPlaceholderIp())
-            ->values();
+        foreach ($this->getServerIds()->chunk(self::SERVER_BATCH_SIZE) as $serverIds) {
+            $servers = Server::with($relations)->whereKey($serverIds)->orderBy('id')->get();
 
-        // Dispatch ServerConnectionCheck for all servers efficiently
-        $this->dispatchConnectionChecks($servers);
+            // Provider state checks run independently so slow APIs cannot block SSH checks.
+            if ($runCloudProviderStatusChecks) {
+                $this->dispatchCloudProviderStatusChecks($servers);
+            }
 
-        // Process server-specific scheduled tasks
-        $this->processScheduledTasks($servers);
+            $servers = $servers
+                ->reject(fn (Server $server) => $server->hasPlaceholderIp())
+                ->values();
+
+            if ($runConnectionChecks) {
+                $this->dispatchConnectionChecks($servers);
+            }
+
+            // Process server-specific scheduled tasks
+            $this->processScheduledTasks($servers);
+        }
     }
 
-    private function getServers(): Collection
+    /**
+     * Selects only the IDs, so the paid-subscription filter runs once and the full server rows are loaded
+     * in batches by primary key. Loading every server in one query kept all of them in worker memory.
+     * toBase() skips model hydration, which an Eloquent pluck of the cast id column would do for every row.
+     *
+     * @return Collection<int, int>
+     */
+    private function getServerIds(): Collection
     {
-        $allServers = Server::with(['settings', 'cloudProviderToken']);
-
-        if (isCloud()) {
-            $servers = $allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
-            $own = Team::find(0)->servers()->with(['settings', 'cloudProviderToken'])->get();
-
-            return $servers->merge($own)->unique('id')->values();
-        } else {
-            return $allServers->get();
+        if (! isCloud()) {
+            return Server::query()->orderBy('id')->toBase()->pluck('id');
         }
+
+        return Server::query()->whereRelation('team.subscription', 'stripe_invoice_paid', true)->toBase()->pluck('id')
+            ->merge(Server::query()->where('team_id', 0)->toBase()->pluck('id'))
+            ->unique()
+            ->sort()
+            ->values();
     }
 
     private function dispatchCloudProviderStatusChecks(Collection $servers): void
     {
-        if (! shouldRunCronNow(self::CLOUD_PROVIDER_STATUS_CHECK_CRON, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
-            return;
-        }
-
         $servers->each(function (Server $server) {
             $hasCloudResource = $server->hetzner_server_id
                 || $server->vultr_instance_id
@@ -110,34 +127,31 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function dispatchConnectionChecks(Collection $servers): void
     {
-
-        if (shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime)) {
-            $servers->each(function (Server $server) {
-                try {
-                    if ($server->hasPlaceholderIp()) {
-                        return;
-                    }
-
-                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity.
-                    // Never skip while the server is marked unreachable or unusable: the heartbeat does not
-                    // restore these flags, so deployments would fail with "Server is not functional" forever.
-                    if ($server->isSentinelEnabled() && $server->isSentinelLive()
-                        && $server->settings->is_reachable && $server->settings->is_usable) {
-                        return;
-                    }
-                    if ($this->shouldSkipDueToBackoff($server)) {
-                        return;
-                    }
-                    ServerConnectionCheckJob::dispatch($server);
-                } catch (\Exception $e) {
-                    Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
-                        'server_id' => $server->id,
-                        'server_name' => $server->name,
-                        'error' => get_class($e).': '.$e->getMessage(),
-                    ]);
+        $servers->each(function (Server $server) {
+            try {
+                if ($server->hasPlaceholderIp()) {
+                    return;
                 }
-            });
-        }
+
+                // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity.
+                // Never skip while the server is marked unreachable or unusable: the heartbeat does not
+                // restore these flags, so deployments would fail with "Server is not functional" forever.
+                if ($server->isSentinelEnabled() && $server->isSentinelLive()
+                    && $server->settings->is_reachable && $server->settings->is_usable) {
+                    return;
+                }
+                if ($this->shouldSkipDueToBackoff($server)) {
+                    return;
+                }
+                ServerConnectionCheckJob::dispatch($server);
+            } catch (\Exception $e) {
+                Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
+                    'server_id' => $server->id,
+                    'server_name' => $server->name,
+                    'error' => get_class($e).': '.$e->getMessage(),
+                ]);
+            }
+        });
     }
 
     private function processScheduledTasks(Collection $servers): void
