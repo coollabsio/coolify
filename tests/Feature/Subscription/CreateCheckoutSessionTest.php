@@ -77,7 +77,8 @@ test('checkout session expiration includes a buffer above Stripe\'s 30-minute mi
     $this->checkoutSessions->shouldReceive('create')->once()
         ->withArgs(function (array $payload): bool {
             expect($payload['expires_at'])->toBeGreaterThanOrEqual(now()->addMinutes(35)->timestamp)
-                ->and($payload['expires_at'])->toBeLessThanOrEqual(now()->addHours(24)->timestamp);
+                ->and($payload['expires_at'])->toBeLessThanOrEqual(now()->addHours(24)->timestamp)
+                ->and($payload['after_expiration'])->toBe(['recovery' => ['enabled' => true, 'allow_promotion_codes' => false]]);
 
             return $payload['customer'] === 'cus_existing';
         })
