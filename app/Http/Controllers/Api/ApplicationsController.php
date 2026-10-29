@@ -388,6 +388,8 @@ class ApplicationsController extends Controller
                             'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
+                            'git_https_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTPS access to a private repository on a custom Git host (not github.com).'],
+                            'git_https_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password or access token for HTTPS access to a private repository on a custom Git host (not github.com). It is stored encrypted and never returned.'],
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
@@ -1355,8 +1357,6 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
 
-        $this->authorize('create', Application::class);
-
         // removeUnnecessaryFieldsFromRequest() strips force_domain_override before the docker_compose_domains checks run.
         $forceDomainOverride = $request->boolean('force_domain_override');
 
@@ -1368,7 +1368,7 @@ class ApplicationsController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -1400,6 +1400,13 @@ class ApplicationsController extends Controller
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $errors,
+            ], 422);
+        }
+
+        if ($type !== 'public' && $request->hasAny(['git_https_username', 'git_https_password'])) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['git_https_password' => 'HTTPS credentials can only be used with a public or custom Git host repository (POST /applications/public).'],
             ], 422);
         }
 
@@ -1501,6 +1508,7 @@ class ApplicationsController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
+        $this->authorize('create', [Application::class, $environment]);
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
@@ -1669,6 +1677,20 @@ class ApplicationsController extends Controller
             }
             $repository_url_parsed = Url::fromString($gitRepository);
             $git_host = $repository_url_parsed->getHost();
+            if ($request->filled('git_https_password')) {
+                if ($git_host === 'github.com') {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['git_https_password' => 'HTTPS credentials are not used for github.com. Use a GitHub App (POST /applications/private-github-app) for a private GitHub repository.'],
+                    ], 422);
+                }
+                $application->git_https_password = $request->input('git_https_password');
+            } elseif ($request->filled('git_https_username')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['git_https_password' => 'The git_https_password is required with git_https_username.'],
+                ], 422);
+            }
             if ($git_host === 'github.com') {
                 $application->source_type = GithubApp::class;
                 $application->source_id = GithubApp::find(0)->id;
@@ -3195,6 +3217,8 @@ class ApplicationsController extends Controller
                             'github_app_uuid' => ['type' => 'string', 'description' => 'The Github App UUID.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
+                            'git_https_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTPS access to a private repository on a custom Git host. Send null to remove it.'],
+                            'git_https_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password or access token for HTTPS access to a private repository on a custom Git host. It is stored encrypted and never returned. Send null or an empty string to remove the credentials.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
@@ -3405,7 +3429,7 @@ class ApplicationsController extends Controller
         $dnsCleanup = app(ManagedDnsRecordCleanup::class);
         $previousDnsHostnames = $dnsCleanup->hostnamesOf($application);
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'github_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'github_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -3543,6 +3567,21 @@ class ApplicationsController extends Controller
                 ->first();
             if (! $githubApp?->isConnected()) {
                 return response()->json(['message' => 'Github App not found.'], 404);
+            }
+        }
+
+        if ($request->hasAny(['git_https_username', 'git_https_password'])) {
+            if ($application->deploymentType() !== 'other') {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['git_https_password' => 'HTTPS credentials can only be used by applications that clone a repository without a Git source or deploy key.'],
+                ], 422);
+            }
+            if ($request->filled('git_https_username') && ! $request->filled('git_https_password') && blank($application->git_https_password)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['git_https_password' => 'The git_https_password is required with git_https_username.'],
+                ], 422);
             }
         }
 
@@ -3809,6 +3848,12 @@ class ApplicationsController extends Controller
         $requestHasNoindexDomains = $request->has('noindex_domains');
         data_forget($data, 'noindex_domains');
         $application->fill($data);
+        if ($request->exists('git_https_password')) {
+            $application->git_https_password = $request->filled('git_https_password') ? $request->input('git_https_password') : null;
+            if (blank($application->git_https_password)) {
+                $application->git_https_username = null;
+            }
+        }
         if ($githubApp && ($application->source_id !== $githubApp->id || $application->source_type !== $githubApp->getMorphClass())) {
             $application->source_id = $githubApp->id;
             $application->source_type = $githubApp->getMorphClass();
@@ -6060,6 +6105,7 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+        $this->authorize('create', [Application::class, $application->environment]);
 
         if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
             return $response;

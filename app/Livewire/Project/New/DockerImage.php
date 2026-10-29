@@ -83,8 +83,6 @@ class DockerImage extends Component
 
     public function submit()
     {
-        $this->authorize('create', Application::class);
-
         $this->validate([
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),
@@ -123,6 +121,7 @@ class DockerImage extends Component
 
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         // Append @sha256 to image name if using digest and not already present
         $imageName = $parser->getFullImageNameWithoutTag();

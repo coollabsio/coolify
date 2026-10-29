@@ -35,7 +35,7 @@ class ManageEnv extends RestActionTool
                 'application' => 'applications/{uuid}/envs/{env_uuid}',
                 'database' => 'databases/{uuid}/envs/{env_uuid}',
                 'service' => 'services/{uuid}/envs/{env_uuid}',
-            ], 'ability' => 'write', 'confirm' => true, 'description' => 'delete a variable by UUID'],
+            ], 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a variable by UUID'],
         ];
     }
 

@@ -353,6 +353,14 @@ paths:
                 git_branch:
                   type: string
                   description: 'The git branch.'
+                git_https_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTPS access to a private repository on a custom Git host (not github.com).'
+                git_https_password:
+                  type: string
+                  nullable: true
+                  description: 'Password or access token for HTTPS access to a private repository on a custom Git host (not github.com). It is stored encrypted and never returned.'
                 build_pack:
                   type: string
                   enum: [nixpacks, railpack, static, dockerfile, dockercompose]
@@ -2474,6 +2482,14 @@ paths:
                 git_branch:
                   type: string
                   description: 'The git branch.'
+                git_https_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTPS access to a private repository on a custom Git host. Send null to remove it.'
+                git_https_password:
+                  type: string
+                  nullable: true
+                  description: 'Password or access token for HTTPS access to a private repository on a custom Git host. It is stored encrypted and never returned. Send null or an empty string to remove the credentials.'
                 ports_exposes:
                   type: string
                   description: 'The ports to expose.'
@@ -15894,6 +15910,10 @@ components:
           type: string
           nullable: true
           description: 'Git full URL.'
+        git_https_username:
+          type: string
+          nullable: true
+          description: 'Username for HTTPS access to a private repository on a custom Git host. The password or token is never returned.'
         docker_registry_image_name:
           type: string
           nullable: true

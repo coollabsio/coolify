@@ -143,6 +143,10 @@
                 next-disabled="page >= lastPage" />
         </x-application.settings-section>
 
+        @can('manageMembers', currentTeam())
+            <livewire:team.member.access />
+        @endcan
+
         @can('manageInvitations', currentTeam())
             <livewire:team.invite-link />
             <livewire:team.invitations :invitations="$invitations" />

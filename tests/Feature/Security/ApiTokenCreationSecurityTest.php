@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Middleware\ApiAbility;
+use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Livewire\Security\ApiTokens;
 use App\Models\InstanceSettings;
 use App\Models\Team;
@@ -157,7 +157,7 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
     });
 });
 
-describe('ApiAbility middleware — member with elevated token blocked', function () {
+describe('API middleware — member with elevated token blocked', function () {
     test('existing member wildcard token is blocked', function () {
         session(['currentTeam' => $this->team]);
         $token = $this->member->createToken('legacy-wildcard-token', ['*']);
@@ -203,7 +203,7 @@ describe('ApiAbility middleware — member with elevated token blocked', functio
             ->assertStatus(403);
     });
 
-    test('ApiAbility evaluates member token abilities through the token', function () {
+    test('the token team middleware evaluates member token abilities through the token', function () {
         session(['currentTeam' => $this->team]);
         $token = $this->member->createToken('token', ['*']);
         $this->member->withAccessToken($token->accessToken);
@@ -211,7 +211,7 @@ describe('ApiAbility middleware — member with elevated token blocked', functio
         $request = Request::create('/api/v1/projects');
         $request->setUserResolver(fn () => $this->member);
 
-        $response = (new ApiAbility)->handle($request, fn () => response('ok'), 'read');
+        $response = (new EnsureTokenBelongsToCurrentTeamMember)->handle($request, fn () => response('ok'));
 
         expect($response->getStatusCode())->toBe(403);
     });
