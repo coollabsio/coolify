@@ -4274,6 +4274,18 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     width: auto;
 }
 
+/* Mobile: search on its own row, cancel/force-start + menus below it */
+@media (max-width: 639.98px) {
+    .logs-viewer-end:not(.runtime-logs-viewer-end) {
+        flex-wrap: wrap;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-search {
+        order: -1;
+        flex: 1 1 100%;
+    }
+}
+
 .runtime-logs-viewer-end {
     align-items: stretch;
     flex-direction: column;
@@ -4395,7 +4407,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     /* Desktop: [actions + status] ... [cancel + search] */
     .logs-viewer-toolbar-controls {
         flex-direction: row;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         align-items: center;
         gap: 0.5rem 0.75rem;
     }
