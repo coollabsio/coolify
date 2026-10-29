@@ -3,13 +3,8 @@
 namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
-use App\Actions\ImageScan\RefreshCandidates;
-use App\Actions\ImageScan\ScanImage;
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Enums\ApplicationDeploymentStatus;
-use App\Enums\ImageScanErrorCode;
-use App\Enums\ImageScanGateMode;
-use App\Enums\ImageScanStatus;
 use App\Enums\ProcessStatus;
 use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
@@ -23,23 +18,13 @@ use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use App\Models\User;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
-use App\Services\ImageScan\DockerfileBaseImage;
-use App\Services\ImageScan\IgnoreMatcher;
-use App\Services\ImageScan\ImageRef;
-use App\Services\ImageScan\ImageScanPolicyResolver;
-use App\Services\ImageScan\ImageStartPin;
-use App\Services\ImageScan\ResolvedImageScanPolicy;
-use App\Services\ImageScan\ResourceScans;
-use App\Services\ImageScan\SecurityCard;
-use App\Services\ImageScan\SecurityGate;
+use App\Services\ImageScan\DeploymentImageScan;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -248,38 +233,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Collection|string $build_secrets;
 
-    private ?ResolvedImageScanPolicy $imageScanPolicy = null;
-
-    private ?int $imageScanPolicyServerId = null;
-
-    private ?bool $imageScanRollbackRanBefore = null;
-
-    /** @var array<string, mixed>|null The worst gate result of this deployment (blocked, then error, then pass). */
-    private ?array $imageScanGateResult = null;
-
-    /** The gate decided for the whole deployment (bypass, rollback, or a scan that cannot run). */
-    private bool $imageScanGateSettled = false;
-
-    /** @var array<string, true> Images whose scan ran or was reused before the start, so they need no scan after it. */
-    private array $imageScanScannedImages = [];
-
-    /** Repo digest reference that replaces the image tag in the compose file. */
-    private ?string $imageScanPinnedImage = null;
-
-    /** Whether the scanned build of a "Pull latest" security update has the image tag now, so no pull may replace it. */
-    private bool $imageStartPinned = false;
-
-    /** The base image of the final stage of a Dockerfile build (spec 7.4). */
-    private ?string $imageScanBaseImageRef = null;
-
-    /** @var array<string, true> Compose images that the gate checked on the server. */
-    private array $imageScanCheckedImages = [];
-
-    /** @var array<int, true> IDs of stored scans that the gate reused; they join this deployment when it finishes. */
-    private array $imageScanReusedScans = [];
-
-    /** @var list<string>|null Image IDs that the gate blocked in earlier deployments, read once per job. */
-    private ?array $imageScanBlockedImageIds = null;
+    private ?DeploymentImageScan $imageScan = null;
 
     public function tags()
     {
@@ -672,7 +626,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Mark deployment as complete FIRST, before any other operations
         // This ensures the deployment status is FINISHED even if subsequent operations fail
         $this->completeDeployment();
-        $this->linkReusedImageScans();
+        $this->imageScan()->linkReusedScans();
 
         // Then handle side effects - these should not fail the deployment
         try {
@@ -706,25 +660,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        $this->dispatchImageScanAfterStart();
-        $this->refreshImageScanSecurity();
-    }
-
-    /**
-     * The gate scanned the new image while the deployment was in progress, so its stored security status compared it
-     * with the image of the previous deployment. Now that this deployment finished, the status is stored again.
-     */
-    private function refreshImageScanSecurity(): void
-    {
-        if ($this->pull_request_id !== 0 || ! ImageScanPolicyResolver::isScanOn($this->application)) {
-            return;
-        }
-
-        try {
-            ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
-        } catch (Throwable $e) {
-            report($e);
-        }
+        $this->imageScan()->dispatchScanAfterStart();
+        $this->imageScan()->refreshSecurity();
     }
 
     private function deploy_simple_dockerfile()
@@ -756,7 +693,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->rememberDockerfileBaseImage();
+        $this->imageScan()->rememberDockerfileBaseImage();
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
@@ -901,7 +838,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
 
         $this->loadComposeFileForDeployment();
-        $this->forgetStaleComposeImageOverrides();
+        $this->imageScan()->forgetStaleComposeImageOverrides();
         $buildEnvironment = null;
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
@@ -955,9 +892,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->save_runtime_environment_variables();
 
         $this->pull_docker_compose_images();
-        $this->applyComposeImageStartPins();
+        $this->imageScan()->applyComposeStartPins();
 
-        $this->checkComposeImageScanGate();
+        $this->imageScan()->checkComposeGate();
 
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
@@ -982,21 +919,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->start_docker_compose_services();
 
         $this->application_deployment_queue->addLogEntry('New container started.');
-    }
-
-    /**
-     * Writes the Compose file again after the gate changed it, with the same commands as the first write.
-     */
-    private function write_docker_compose_file_to_workdir(string $yaml): void
-    {
-        $this->execute_remote_command([
-            "docker exec {$this->deployment_uuid} rm -f {$this->workdir}{$this->docker_compose_location}",
-            'hidden' => true,
-        ], [
-            "docker exec -i {$this->deployment_uuid} tee {$this->workdir}{$this->docker_compose_location} > /dev/null",
-            'input' => $yaml,
-            'hidden' => true,
-        ]);
     }
 
     /**
@@ -1359,7 +1281,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->rememberDockerfileBaseImage();
+        $this->imageScan()->rememberDockerfileBaseImage();
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
@@ -1688,7 +1610,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->should_skip_build();
         $this->completeDeployment();
-        $this->linkReusedImageScans();
+        $this->imageScan()->linkReusedScans();
     }
 
     private function should_skip_build()
@@ -1922,23 +1844,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry($message, 'stderr');
 
             throw DeploymentException::alreadyLogged($message, previous: $e);
-        }
-    }
-
-    /**
-     * The compose file from Git decides which image overrides of security updates still apply. A preview deploys
-     * the compose file of its branch, so it keeps them.
-     */
-    private function forgetStaleComposeImageOverrides(): void
-    {
-        if ($this->pull_request_id !== 0) {
-            return;
-        }
-
-        try {
-            $this->application->forgetStaleComposeImageOverrides();
-        } catch (Throwable $e) {
-            report($e);
         }
     }
 
@@ -2999,8 +2904,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function rolling_update()
     {
-        $this->applyImageStartPin();
-        $this->checkImageScanGate($this->production_image_name);
+        $this->imageScan()->applyStartPin();
+        $this->imageScan()->checkGate($this->production_image_name);
 
         try {
             $this->checkForCancellation();
@@ -3054,701 +2959,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * The deploy gate (spec 15.8): stops the start of an image with security problems, by the "Block deploys" mode.
-     * Does nothing, and runs no remote command, unless the gate applies to this application.
+     * The image scan steps of this deployment (gate, start pins, scan after the start), created on first use. It reads
+     * job properties when a step needs them, because the job changes servers and the Compose file during the deploy.
      */
-    private function checkImageScanGate(string $imageRef): void
+    private function imageScan(): DeploymentImageScan
     {
-        if ($this->imageScanGateSettled || ! $this->imageScanGateApplies()) {
-            return;
-        }
-
-        $this->checkForCancellation();
-
-        if ($this->settleImageScanGateForDeployment()) {
-            $this->pinBypassedImage();
-
-            return;
-        }
-
-        if ($this->application->build_pack === 'dockerimage' && ! $this->imageStartPinned) {
-            $this->application_deployment_queue->addLogEntry("Pulling image ({$imageRef}) to scan it before the start.");
-            $this->execute_remote_command([
-                serverDockerConfigPrefix($this->server).'docker pull '.escapeshellarg($imageRef),
-                'hidden' => true,
-            ]);
-        }
-
-        $image = $this->inspectImageForScan($imageRef);
-
-        if ($image !== null && $this->rollback && $this->imageRanBefore($image['id'])) {
-            $this->application_deployment_queue->addLogEntry('Rollback to an image that ran before. The image scan does not block it.');
-
-            return;
-        }
-
-        if ($image !== null) {
-            $this->imageScanCheckedImages[$imageRef] = true;
-            $this->pinScannedImage($image['repo_digest']);
-        }
-
-        $error = $this->imageScanErrorBeforeScan();
-        if ($error !== null) {
-            $this->imageScanGateSettled = true;
-            $this->applyImageScanGate(null, ...$error);
-
-            return;
-        }
-
-        // Read before the scan: a scan of the same image takes over the row of the running image.
-        $running = $this->runningImageScan($imageRef);
-        $baselineMissing = false;
-        if ($running === null && $this->hasEarlierFinishedDeployment()) {
-            $running = $this->latestEarlierImageScan($imageRef, $image['id'] ?? null);
-            // An image the gate blocked before is never its own baseline.
-            $baselineMissing = $running === null && ! ($image !== null && in_array($image['id'], $this->blockedImageIds(), true));
-        }
-        $reused = $image !== null ? $this->completedImageScan($image['id']) : null;
-        $scan = $reused ?? ScanImage::run($this->server, $this->application, $imageRef, $this->application_deployment_queue, lockWaitSeconds: ScanImage::GATE_LOCK_WAIT_SECONDS, baseImageRef: $this->imageScanBaseImageRef, queueCandidateCheck: false);
-        $this->queueImageScanCandidates($scan);
-
-        $this->applyImageScanGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, running: $running, baselineMissing: $baselineMissing, imageId: $image['id'] ?? $scan->image_id);
-
-        if ($reused !== null) {
-            $this->imageScanReusedScans[(int) $reused->id] = true;
-        }
-    }
-
-    /**
-     * Queues the check of newer versions and of the base image for the scanned image. The gate does not wait for it:
-     * it reads only the findings.
-     */
-    private function queueImageScanCandidates(ImageScan $scan): void
-    {
-        try {
-            $scan->setRelation('resource', $this->application);
-            if ($scan->exists && RefreshCandidates::shouldRefresh($scan)) {
-                RefreshCandidatesJob::dispatch($scan);
-            }
-        } catch (Throwable $e) {
-            report($e);
-        }
-    }
-
-    /**
-     * The scan of the image the application ran before this deployment: a completed scan of the latest finished
-     * deployment that is not a preview. The deployment decides, not the scan time: a redeploy of an older image links
-     * its older scan to the newer deployment. A Compose application matches the image by name. Null before the first
-     * deploy, so every finding of the new image counts as new.
-     */
-    private function runningImageScan(string $imageRef): ?ImageScan
-    {
-        $query = fn () => $this->application->imageScans()
-            ->where('status', ImageScanStatus::Completed)
-            ->whereHas('deploymentQueue', fn ($query) => $query
-                ->where('pull_request_id', 0)
-                ->where('status', ApplicationDeploymentStatus::FINISHED->value))
-            ->orderByDesc('deployment_queue_id')
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id');
-
-        if ($this->application->build_pack !== 'dockercompose') {
-            return $query()->first();
-        }
-
-        $name = ScanImage::imageName($imageRef);
-        $id = $query()->get(['id', 'image_ref'])
-            ->first(fn (ImageScan $scan): bool => ScanImage::imageName((string) $scan->image_ref) === $name)?->id;
-
-        return $id === null ? null : ImageScan::query()->find($id);
-    }
-
-    /**
-     * A finished deployment of this application that is not a preview ran before this one, so this is not the first
-     * deploy.
-     */
-    private function hasEarlierFinishedDeployment(): bool
-    {
-        return ApplicationDeploymentQueue::query()
-            ->where('application_id', (string) $this->application->id)
-            ->where('pull_request_id', 0)
-            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
-            ->whereKeyNot($this->application_deployment_queue->id)
-            ->exists();
-    }
-
-    /**
-     * The gate's baseline when no scan of the running image exists although the app was deployed before (for
-     * example, scanning was turned on after the deploy): the newest completed scan that is not a preview. The scan of
-     * an image the gate blocked never counts, and neither does the image of this deploy, so trying a blocked image
-     * again cannot pass.
-     */
-    private function latestEarlierImageScan(string $imageRef, ?string $imageId): ?ImageScan
-    {
-        $name = $this->application->build_pack === 'dockercompose' ? ScanImage::imageName($imageRef) : null;
-        $excluded = array_values(array_unique(array_filter([...$this->blockedImageIds(), $imageId])));
-
-        return $this->application->imageScans()
-            ->where('status', ImageScanStatus::Completed)
-            ->where(fn ($query) => $query
-                ->whereNull('deployment_queue_id')
-                ->orWhereHas('deploymentQueue', fn ($deployment) => $deployment
-                    ->where('pull_request_id', 0)
-                    ->whereKeyNot($this->application_deployment_queue->id)))
-            ->whereDoesntHave('deploymentQueue', fn ($deployment) => $deployment->where('scan_gate_result->blocked', true))
-            ->when($excluded !== [], fn ($query) => $query->whereNotIn('image_id', $excluded))
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->limit(50)
-            ->get()
-            ->first(fn (ImageScan $scan): bool => $name === null || ScanImage::imageName((string) $scan->image_ref) === $name);
-    }
-
-    /**
-     * The images that the gate blocked in an earlier deployment of this application that is not a preview: the image
-     * ID stored with the result, or a scan linked to the blocked deployment. The stored ID keeps the block when the
-     * scan was removed.
-     *
-     * @return list<string>
-     */
-    private function blockedImageIds(): array
-    {
-        if ($this->imageScanBlockedImageIds !== null) {
-            return $this->imageScanBlockedImageIds;
-        }
-
-        $blocked = fn ($query) => $query
-            ->where('pull_request_id', 0)
-            ->whereKeyNot($this->application_deployment_queue->id)
-            ->where('scan_gate_result->blocked', true);
-
-        $stored = $blocked(ApplicationDeploymentQueue::query()->where('application_id', (string) $this->application->id))
-            ->get(['id', 'scan_gate_result'])
-            ->map(fn (ApplicationDeploymentQueue $deployment) => data_get($deployment->scan_gate_result, 'image_id'));
-        $scanned = $this->application->imageScans()
-            ->whereNotNull('image_id')
-            ->whereHas('deploymentQueue', $blocked)
-            ->pluck('image_id');
-
-        return $this->imageScanBlockedImageIds = $stored->merge($scanned)
-            ->filter(fn ($id): bool => is_string($id) && $id !== '')
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * The stored scans that the gate reused belong to this deployment once it finished, so the current scans of the
-     * application (all images of a Compose deployment) include them. Until then they stay with the deployment that
-     * ran them: a deployment that is running or failed never takes them over. Preview deployments keep the link of
-     * the application. Called right after the deployment is marked finished (`post_deployment()`, `just_restart()`).
-     */
-    private function linkReusedImageScans(): void
-    {
-        if ($this->pull_request_id !== 0 || $this->imageScanReusedScans === []) {
-            return;
-        }
-
-        // completeDeployment() does nothing when the deployment was cancelled or failed meanwhile.
-        if (ApplicationDeploymentQueue::query()->whereKey($this->application_deployment_queue->id)->value('status') !== ApplicationDeploymentStatus::FINISHED->value) {
-            return;
-        }
-
-        try {
-            $this->application->imageScans()
-                ->whereKey(array_keys($this->imageScanReusedScans))
-                ->where(fn ($query) => $query
-                    ->whereNull('deployment_queue_id')
-                    ->orWhere('deployment_queue_id', '!=', $this->application_deployment_queue->id))
-                ->update(['deployment_queue_id' => $this->application_deployment_queue->id]);
-            $this->imageScanReusedScans = [];
-        } catch (Throwable $e) {
-            report($e);
-        }
-    }
-
-    /**
-     * A "Pull latest" security update of a Docker image app: pulls the build that Coolify scanned and gives it the
-     * configured tag, so the gate and the start use it and do not pull the tag again.
-     */
-    private function applyImageStartPin(): void
-    {
-        if ($this->application->build_pack !== 'dockerimage' || $this->pull_request_id !== 0 || $this->rollback) {
-            return;
-        }
-
-        $pins = ImageStartPin::for(ImageStartPin::take($this->application, $this->server->id), [$this->production_image_name]);
-        if ($pins === []) {
-            return;
-        }
-
-        $this->application_deployment_queue->addLogEntry("Pulling the scanned build of {$this->production_image_name}.");
-        $this->execute_remote_command(...array_map(fn (string $command): array => [$command, 'hidden' => true],
-            ImageStartPin::commands($pins, serverDockerConfigPrefix($this->server))));
-        $this->imageStartPinned = true;
-    }
-
-    /**
-     * A "Pull latest" security update of a Compose app: after the pull of the registry images, gives the scanned builds
-     * their tags again. `up` uses local images, so the containers run the scanned builds.
-     */
-    private function applyComposeImageStartPins(): void
-    {
-        if ($this->pull_request_id !== 0 || $this->docker_compose_custom_build_command) {
-            return;
-        }
-
-        $pins = ImageStartPin::take($this->application, $this->server->id);
-        if ($pins === []) {
-            return;
-        }
-
-        $this->application_deployment_queue->addLogEntry('Pulling the scanned builds of the security update.');
-        $this->execute_remote_command(...array_map(fn (string $command): array => [$command, 'hidden' => true],
-            ImageStartPin::commands($pins, serverDockerConfigPrefix($this->server))));
-    }
-
-    /**
-     * "Deploy anyway" of a Docker image starts the image that was blocked, not a newer image behind the same tag.
-     */
-    private function pinBypassedImage(): void
-    {
-        if ($this->application->build_pack !== 'dockerimage' || $this->imageScanGateBypassedBy() === null) {
-            return;
-        }
-
-        $queue = $this->application_deployment_queue;
-        $pinned = data_get($queue->scan_gate_result, 'repo_digest');
-        if (! is_string($pinned) && filled($queue->parent_deployment_uuid)) {
-            $pinned = data_get(ApplicationDeploymentQueue::query()
-                ->where('deployment_uuid', $queue->parent_deployment_uuid)
-                ->where('application_id', $queue->application_id)
-                ->value('scan_gate_result'), 'repo_digest');
-        }
-        if (! is_string($pinned)) {
-            return;
-        }
-
-        try {
-            $ref = ImageRef::parse($pinned);
-            $configured = ImageRef::parse($this->production_image_name);
-        } catch (InvalidArgumentException) {
-            return;
-        }
-
-        if ($ref->digest === null || $ref->qualifiedName() !== $configured->qualifiedName()) {
-            return;
-        }
-
-        $compose = Yaml::parse((string) $this->docker_compose);
-        if (! isset($compose['services'][$this->container_name])) {
-            return;
-        }
-
-        $compose['services'][$this->container_name]['image'] = (string) $ref;
-        $this->docker_compose = $this->generated_docker_compose = Yaml::dump($compose, 10);
-        $this->imageScanPinnedImage = (string) $ref;
-        $this->application_deployment_queue->addLogEntry("Image scan: the deployment starts the blocked image {$ref}.");
-    }
-
-    /**
-     * Gates every image of a Compose deployment before the running containers stop, and keeps Compose from pulling
-     * a different image for a checked service.
-     */
-    private function checkComposeImageScanGate(): void
-    {
-        if (! $this->imageScanGateApplies()) {
-            return;
-        }
-
-        if ($this->usesCustomComposeCommand()) {
-            // The command can build or pull other images than the Compose file names, so no image is checked.
-            if (! $this->imageScanGateSettled && ! $this->settleImageScanGateForDeployment()) {
-                $this->imageScanGateSettled = true;
-                $this->applyImageScanGate(null, ...$this->imageScanErrorBeforeScan());
-            }
-
-            return;
-        }
-
-        $services = collect(data_get(Yaml::parse((string) $this->generated_docker_compose), 'services', []));
-        $images = $services->map(fn ($service) => data_get($service, 'image'))->filter(fn ($image) => is_string($image) && $image !== '')->unique();
-
-        foreach ($images as $image) {
-            $this->checkImageScanGate($image);
-        }
-
-        if (! $this->imageScanGateSettled && $services->contains(fn ($service) => ! is_string(data_get($service, 'image')))) {
-            // A raw Compose service without an image gets a name that Coolify does not know.
-            $this->imageScanGateSettled = true;
-            $this->applyImageScanGate(null, ImageScanErrorCode::Unknown);
-        }
-
-        if ($this->imageScanCheckedImages === [] || $this->application->settings->is_raw_compose_deployment_enabled) {
-            return;
-        }
-
-        $compose = Yaml::parse((string) $this->generated_docker_compose);
-        foreach ($compose['services'] ?? [] as $name => $service) {
-            if (isset($this->imageScanCheckedImages[(string) data_get($service, 'image')])) {
-                $compose['services'][$name]['pull_policy'] = 'never';
-            }
-        }
-
-        $this->generated_docker_compose = Yaml::dump($compose, 10);
-        $this->write_docker_compose_file_to_workdir($this->generated_docker_compose);
-    }
-
-    /**
-     * The gate runs only when the instance allows scanning, the application scan is on, and its rules block deploys.
-     */
-    private function imageScanGateApplies(): bool
-    {
-        // Scanning off on the server still gates: the scan cannot run, and "If the scan cannot run" decides.
-        return ImageScanPolicyResolver::isAllowedFor($this->application)
-            && $this->imageScanPolicy()->gateMode !== ImageScanGateMode::Off->value;
-    }
-
-    /**
-     * The image is scanned on the build server when it is there, else on the main server. The rules always resolve
-     * through the main destination server.
-     */
-    private function imageScanPolicy(): ResolvedImageScanPolicy
-    {
-        $server = $this->imageIsOnBuildServer() ? $this->build_server : null;
-
-        if ($this->imageScanPolicy === null || $this->imageScanPolicyServerId !== $server?->id) {
-            $this->imageScanPolicy = ImageScanPolicyResolver::for($this->application, $server);
-            $this->imageScanPolicyServerId = $server?->id;
-        }
-
-        return $this->imageScanPolicy;
-    }
-
-    /**
-     * The image is on the build server when the deployment built there. A restart and a Docker image app keep the
-     * image on the deployment server, even with a build server.
-     */
-    private function imageIsOnBuildServer(): bool
-    {
-        return $this->use_build_server && isset($this->build_server) && $this->server->is($this->build_server);
-    }
-
-    private function usesCustomComposeCommand(): bool
-    {
-        return filled($this->docker_compose_custom_start_command) || filled($this->docker_compose_custom_build_command);
-    }
-
-    /**
-     * Decisions for the whole deployment that need no image: "Deploy anyway", and a rollback to a commit that ran before.
-     */
-    private function settleImageScanGateForDeployment(): bool
-    {
-        $bypassedBy = $this->imageScanGateBypassedBy();
-        if ($bypassedBy !== null) {
-            $this->imageScanGateSettled = true;
-            $this->logImageScanGateBypass($bypassedBy);
-
-            return true;
-        }
-
-        if ($this->rollback && $this->rollbackCommitRanBefore()) {
-            $this->imageScanGateSettled = true;
-            $this->application_deployment_queue->addLogEntry('Rollback to an image that ran before. The image scan does not block it.');
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * The reason the gate cannot scan: scanning is off where the image is, or a custom Compose command.
-     *
-     * @return array{0: ImageScanErrorCode, 1: array{server: string}}|null
-     */
-    private function imageScanErrorBeforeScan(): ?array
-    {
-        $policy = $this->imageScanPolicy();
-
-        if (! $policy->scanEnabled) {
-            $error = $this->imageIsOnBuildServer() ? ImageScanErrorCode::BuildServerOff : ImageScanErrorCode::ScanningOff;
-
-            return [$error, ['server' => (string) ($policy->scanServer?->name ?? $this->server->name)]];
-        }
-
-        if ($this->usesCustomComposeCommand()) {
-            return [ImageScanErrorCode::CustomCommand, ['server' => (string) $this->server->name]];
-        }
-
-        return null;
-    }
-
-    /**
-     * A rollback is not gated when a finished deployment of this application ran its commit (spec 4.4). A local tag
-     * alone does not count: the image of a blocked deployment stays tagged on the server.
-     */
-    private function rollbackCommitRanBefore(): bool
-    {
-        if (blank($this->commit) || $this->commit === 'HEAD') {
-            return false;
-        }
-
-        return $this->imageScanRollbackRanBefore ??= ApplicationDeploymentQueue::query()
-            ->where('application_id', (string) $this->application->id)
-            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
-            ->where('commit', $this->commit)
-            ->where('pull_request_id', $this->pull_request_id)
-            ->exists();
-    }
-
-    /**
-     * An image ran before when a finished deployment of this application scanned it.
-     */
-    private function imageRanBefore(string $imageId): bool
-    {
-        return $this->application->imageScans()
-            ->where('image_id', $imageId)
-            ->whereHas('deploymentQueue', fn ($query) => $query->where('status', ApplicationDeploymentStatus::FINISHED->value))
-            ->exists();
-    }
-
-    private function completedImageScan(string $imageId): ?ImageScan
-    {
-        return $this->application->imageScans()
-            ->where('image_id', $imageId)
-            ->where('status', ImageScanStatus::Completed)
-            ->first();
-    }
-
-    /**
-     * The local image ID and the registry digest reference of the image, read with one `docker image inspect`.
-     * A locally built image (classic store, no push) has no repo digest.
-     *
-     * @return array{id: string, repo_digest: ?string}|null
-     */
-    private function inspectImageForScan(string $imageRef): ?array
-    {
-        try {
-            $ref = ImageRef::parse($imageRef);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        $format = escapeshellarg('{{.Id}} {{range .RepoDigests}}{{.}} {{end}}');
-        $this->execute_remote_command([
-            "docker image inspect --format {$format} ".escapeshellarg($imageRef).' 2>/dev/null',
-            'hidden' => true,
-            'ignore_errors' => true,
-            'save' => 'image_scan_inspect',
-            'append' => false,
-        ]);
-
-        $parts = preg_split('/\s+/', $this->trimmedSavedOutput('image_scan_inspect')->value(), -1, PREG_SPLIT_NO_EMPTY);
-        $id = array_shift($parts);
-        if (! is_string($id) || ! ImageRef::isValidDigest($id)) {
-            return null;
-        }
-
-        $repoDigest = null;
-        foreach ($parts as $candidate) {
-            try {
-                $parsed = ImageRef::parse($candidate);
-            } catch (InvalidArgumentException) {
-                continue;
-            }
-
-            if ($parsed->digest !== null && $parsed->qualifiedName() === $ref->qualifiedName()) {
-                $repoDigest = (string) $parsed;
-                break;
-            }
-        }
-
-        return ['id' => $id, 'repo_digest' => $repoDigest];
-    }
-
-    /**
-     * Starts the scanned image where the start could pull another one: a Docker image, an image from a build
-     * server, or a Swarm service. Without a repo digest the image stays as it is.
-     */
-    private function pinScannedImage(?string $repoDigest): void
-    {
-        if ($repoDigest === null || $this->application->build_pack === 'dockercompose') {
-            return;
-        }
-
-        if ($this->application->build_pack !== 'dockerimage' && ! $this->use_build_server && ! $this->mainServer->isSwarm()) {
-            return;
-        }
-
-        $compose = Yaml::parse((string) $this->docker_compose);
-        if (! isset($compose['services'][$this->container_name])) {
-            return;
-        }
-
-        $compose['services'][$this->container_name]['image'] = $repoDigest;
-        $this->docker_compose = $this->generated_docker_compose = Yaml::dump($compose, 10);
-        $this->imageScanPinnedImage = $repoDigest;
-        $this->application_deployment_queue->addLogEntry("Image scan: the deployment starts {$repoDigest}.");
-    }
-
-    /**
-     * Writes the result on the deployment, logs it, and stops the deployment when the gate blocks.
-     *
-     * @param  array<string, int|string>  $errorContext
-     * @param  ImageScan|null  $running  The scan of the image the application ran before this deployment.
-     * @param  bool  $baselineMissing  The app was deployed before, but Coolify has no earlier scan to compare with.
-     * @param  string|null  $imageId  The local image ID, stored so a later deploy of a blocked image stays blocked.
-     */
-    private function applyImageScanGate(?ImageScan $scan, ?ImageScanErrorCode $error = null, array $errorContext = [], ?string $imageRef = null, ?string $repoDigest = null, ?ImageScan $running = null, bool $baselineMissing = false, ?string $imageId = null): void
-    {
-        $completed = $scan !== null && $scan->status === ImageScanStatus::Completed;
-
-        if ($scan !== null && ! $completed && $error === null) {
-            $error = $scan->error_code ?? ImageScanErrorCode::Unknown;
-            $errorContext = (array) $scan->error_context;
-        }
-
-        $scan?->setRelation('resource', $this->application);
-        $policy = $this->imageScanPolicy();
-        $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, IgnoreMatcher::forResource($this->application), $error, $errorContext, $policy->onScanError, $baselineMissing);
-        $stored = SecurityGate::stored($result);
-        if ($stored['blocked'] && $completed) {
-            // The action that fixes the blocked image, for the gate popover.
-            try {
-                $action = SecurityCard::blockedImageAction($scan);
-                if ($action !== null) {
-                    $stored['action'] = $action;
-                }
-            } catch (Throwable $e) {
-                report($e);
-            }
-        }
-
-        // A Compose deployment gates several images: keep the worst result (blocked, then error, then pass).
-        $rank = fn (?array $gateResult): int => match (true) {
-            $gateResult === null => -1,
-            (bool) ($gateResult['blocked'] ?? false) => 2,
-            ($gateResult['error'] ?? null) !== null => 1,
-            default => 0,
-        };
-        if ($rank($stored) >= $rank($this->imageScanGateResult)) {
-            // The digest lets "Deploy anyway" start the image that was blocked.
-            $this->imageScanGateResult = [
-                ...$stored,
-                ...($repoDigest !== null ? ['repo_digest' => $repoDigest] : []),
-                ...($imageId !== null && $imageId !== '' ? ['image_id' => $imageId] : []),
-            ];
-            $this->application_deployment_queue->update(['scan_gate_result' => $this->imageScanGateResult]);
-        }
-        if ($result['scan_ran'] && $imageRef !== null) {
-            $this->imageScanScannedImages[$imageRef] = true;
-        }
-
-        // A pass logs "passed" first; the lines after it warn about problems that the running image has too.
-        $failed = $result['blocked'] || $result['error'] !== null;
-        foreach (SecurityGate::logLines($result) as $index => $line) {
-            $this->application_deployment_queue->addLogEntry($line, $failed || $index > 0 ? 'stderr' : 'stdout');
-        }
-
-        if ($result['blocked']) {
-            throw DeploymentException::alreadyLogged($result['headline']);
-        }
-    }
-
-    /**
-     * The user who chose "Deploy anyway" for this deployment, or for the main deployment that queued it.
-     */
-    private function imageScanGateBypassedBy(): ?int
-    {
-        $queue = $this->application_deployment_queue;
-        $userId = $queue->scan_gate_bypassed_by;
-
-        if (blank($userId) && filled($queue->parent_deployment_uuid)) {
-            $userId = ApplicationDeploymentQueue::query()
-                ->where('deployment_uuid', $queue->parent_deployment_uuid)
-                ->where('application_id', $queue->application_id)
-                ->value('scan_gate_bypassed_by');
-        }
-
-        return filled($userId) ? (int) $userId : null;
-    }
-
-    private function logImageScanGateBypass(int $userId): void
-    {
-        $user = User::query()->find($userId);
-        $name = $user?->name ?? 'a deleted user';
-
-        $this->application_deployment_queue->addLogEntry("Deploy anyway by {$name}.", 'stderr');
-
-        auditLog('ui.application.image_scan_gate_bypassed', [
-            'team_id' => $this->application->team()?->id,
-            'application_uuid' => $this->application->uuid,
-            'deployment_uuid' => $this->deployment_uuid,
-            'user_id' => $userId,
-            'actor_id' => $user?->id,
-            'actor_name' => $user?->name,
-            'actor_email' => $user?->email,
-        ]);
-    }
-
-    /**
-     * Remembers the base image of the final stage of a Dockerfile build for the image scan (spec 7.4). Runs no remote
-     * command and never fails the deployment.
-     */
-    private function rememberDockerfileBaseImage(): void
-    {
-        $this->imageScanBaseImageRef = null;
-
-        try {
-            if ($this->application->build_pack !== 'dockerfile'
-                || ! ImageScanPolicyResolver::isAllowedFor($this->application)
-                || (ImageScanPolicyResolver::offState($this->application, $this->server) !== null
-                    && ImageScanPolicyResolver::offState($this->application, $this->mainServer) !== null)) {
-                return;
-            }
-
-            $dockerfile = filled($this->application->dockerfile) ? (string) $this->application->dockerfile : (string) $this->saved_outputs->get('dockerfile_from_repo');
-            $this->imageScanBaseImageRef = DockerfileBaseImage::finalStage($dockerfile, $this->application->dockerfile_target_build);
-        } catch (Throwable $e) {
-            \Log::warning("Deployment {$this->deployment_uuid} could not read the base image for the image scan: {$e->getMessage()}");
-        }
-    }
-
-    /**
-     * Queues one scan of the started images when the gate did not scan them before the start. Restarts, skipped
-     * builds, and additional servers run an image that was scanned before, so they get no scan (spec 4.4), except
-     * for a rollback.
-     */
-    private function dispatchImageScanAfterStart(): void
-    {
-        try {
-            if ((($this->skip_build || $this->is_this_additional_server) && ! $this->rollback)
-                || ImageScanPolicyResolver::offState($this->application, $this->mainServer) !== null) {
-                return;
-            }
-
-            // Images that the gate scanned before the start need no second scan; the others (a scan that could
-            // not run, a rollback image that ran before) are scanned now.
-            if ($this->application->build_pack === 'dockercompose') {
-                $images = collect(data_get(Yaml::parse((string) $this->generated_docker_compose), 'services', []))
-                    ->map(fn ($service) => data_get($service, 'image'))
-                    ->filter(fn ($image) => is_string($image) && $image !== '' && ! isset($this->imageScanScannedImages[$image]))
-                    ->unique()
-                    ->values()
-                    ->all();
-            } else {
-                $images = isset($this->production_image_name) && ! isset($this->imageScanScannedImages[$this->production_image_name])
-                    ? [$this->imageScanPinnedImage ?? $this->production_image_name]
-                    : [];
-            }
-
-            if ($images !== []) {
-                ScanResourceImagesJob::dispatch($this->application, $this->application_deployment_queue->id, $images, false, $this->imageScanBaseImageRef);
-            }
-        } catch (Throwable $e) {
-            \Log::warning("Deployment {$this->deployment_uuid} could not queue the image scan: {$e->getMessage()}");
-        }
+        return $this->imageScan ??= new DeploymentImageScan(
+            $this->application,
+            $this->application_deployment_queue,
+            read: fn (string $property): mixed => match ($property) {
+                'server', 'mainServer', 'use_build_server', 'deployment_uuid', 'pull_request_id', 'commit', 'rollback',
+                'skip_build', 'is_this_additional_server', 'container_name', 'docker_compose', 'generated_docker_compose',
+                'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'workdir',
+                'docker_compose_location', 'saved_outputs' => $this->{$property},
+                // Not set before the build server is chosen or the image is named.
+                'build_server', 'production_image_name' => $this->{$property} ?? null,
+            },
+            write: fn (string $property, string $value): string => match ($property) {
+                'docker_compose', 'generated_docker_compose' => $this->{$property} = $value,
+            },
+            run: fn (array ...$commands) => $this->execute_remote_command(...$commands),
+            checkForCancellation: fn () => $this->checkForCancellation(),
+        );
     }
 
     /**
@@ -3942,7 +3174,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_pull_request_image();
-        $this->rememberDockerfileBaseImage();
+        $this->imageScan()->rememberDockerfileBaseImage();
 
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
@@ -6165,7 +5397,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             if ($this->application->build_pack === 'dockerimage') {
                 $up = [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} up --build -d"), 'hidden' => true];
-                if ($this->imageScanPinnedImage !== null || $this->imageStartPinned) {
+                if ($this->imageScan()->pinnedImage() !== null || $this->imageScan()->startPinned()) {
                     // The gate pulled and scanned the pinned image.
                     $this->execute_remote_command($up);
                 } else {
@@ -6178,7 +5410,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->use_build_server) {
                     // A pinned digest cannot change in the registry, so Compose pulls it only when it is missing.
-                    $pull = $this->imageScanPinnedImage !== null ? '' : '--pull always ';
+                    $pull = $this->imageScan()->pinnedImage() !== null ? '' : '--pull always ';
                     $this->execute_remote_command(
                         [serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up {$pull}--build -d", 'hidden' => true],
                     );

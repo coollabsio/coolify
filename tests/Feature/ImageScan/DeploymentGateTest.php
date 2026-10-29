@@ -23,6 +23,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ImageScan\DeploymentImageScan;
 use App\Services\ImageScan\ImageStartPin;
 use App\Services\ImageScan\ResourceScans;
 use Illuminate\Database\Events\QueryExecuted;
@@ -234,6 +235,11 @@ function deployGateJob(array $overrides = []): DeploymentGateTestJob
 function deployGateCall(DeploymentGateTestJob $job, string $method, mixed ...$arguments): mixed
 {
     return (new ReflectionMethod(ApplicationDeploymentJob::class, $method))->invoke($job, ...$arguments);
+}
+
+function deployGateImageScan(DeploymentGateTestJob $job): DeploymentImageScan
+{
+    return deployGateCall($job, 'imageScan');
 }
 
 /**
@@ -709,7 +715,7 @@ it('blocks a Compose deploy with a custom start command when the rule says block
     $job = deployGateJob(['docker_compose_custom_start_command' => 'docker compose up -d']);
 
     try {
-        deployGateCall($job, 'checkComposeImageScanGate');
+        deployGateImageScan($job)->checkComposeGate();
         $this->fail('Expected the gate to block the deploy.');
     } catch (DeploymentException $exception) {
         expect($exception->getMessage())->toBe('Deploy blocked: Coolify cannot check the image because this application uses a custom build or start command.');
@@ -726,7 +732,7 @@ it('reports the custom command for a raw Compose deploy whose services have no i
     ]);
 
     try {
-        deployGateCall($job, 'checkComposeImageScanGate');
+        deployGateImageScan($job)->checkComposeGate();
         $this->fail('Expected the gate to block the deploy.');
     } catch (DeploymentException $exception) {
         expect($exception->getMessage())->toBe('Deploy blocked: Coolify cannot check the image because this application uses a custom build or start command.')
@@ -747,7 +753,7 @@ it('keeps the worst gate result of a Compose deploy', function () {
     ]], 10)]);
     $job->outputs = ['docker image inspect' => ''];
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
 
     expect(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'error' => ImageScanErrorCode::Timeout->value]);
 });
@@ -762,7 +768,7 @@ it('scans each Compose image and stops Compose from pulling the scanned images',
     ]], 10);
     $job = deployGateJob(['generated_docker_compose' => $compose]);
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
 
     $services = Yaml::parse((new ReflectionProperty(ApplicationDeploymentJob::class, 'generated_docker_compose'))->getValue($job))['services'];
     expect($services['web']['pull_policy'])->toBe('never')
@@ -815,7 +821,7 @@ function deployGateDockerfileJob(string $dockerfile = "FROM node:20.11-alpine AS
 
 function deployGateBaseImageRef(DeploymentGateTestJob $job): ?string
 {
-    return (new ReflectionProperty(ApplicationDeploymentJob::class, 'imageScanBaseImageRef'))->getValue($job);
+    return deployGateImageScan($job)->baseImageRef();
 }
 
 it('passes the base image of a Dockerfile build to the gate scan without a remote command', function () {
@@ -825,7 +831,7 @@ it('passes the base image of a Dockerfile build to the gate scan without a remot
         ->andReturn(deployGateReturnedScan([]));
     $job = deployGateDockerfileJob();
 
-    deployGateCall($job, 'rememberDockerfileBaseImage');
+    deployGateImageScan($job)->rememberDockerfileBaseImage();
 
     expect($job->commands)->toBe([])
         ->and(deployGateReachesStart($job))->toBeTrue();
@@ -835,7 +841,7 @@ it('passes the base image of a Dockerfile build to the scan after the deploy', f
     Queue::fake();
     $job = deployGateDockerfileJob();
 
-    deployGateCall($job, 'rememberDockerfileBaseImage');
+    deployGateImageScan($job)->rememberDockerfileBaseImage();
     deployGateCall($job, 'post_deployment');
 
     Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->baseImageRef === 'node:20.11-alpine');
@@ -853,7 +859,7 @@ it('reads the base image of an inline Dockerfile and of the build target', funct
     $this->application->update($application);
     $job = deployGateDockerfileJob("FROM alpine:3.20\n");
 
-    deployGateCall($job, 'rememberDockerfileBaseImage');
+    deployGateImageScan($job)->rememberDockerfileBaseImage();
 
     expect(deployGateBaseImageRef($job))->toBe($expected);
 })->with([
@@ -866,7 +872,7 @@ it('reads no base image when it cannot be known or scanning is off', function (s
     $this->server->settings->forceFill(['is_image_scan_enabled' => $scanning])->saveQuietly();
     $job = deployGateDockerfileJob($dockerfile, ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
 
-    deployGateCall($job, 'rememberDockerfileBaseImage');
+    deployGateImageScan($job)->rememberDockerfileBaseImage();
 
     expect(deployGateBaseImageRef($job))->toBeNull();
 })->with([
@@ -883,9 +889,9 @@ it('reads no scan rules in a deploy when the app scan is off', function () {
     $job = deployGateDockerfileJob("FROM node:20\n", ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
 
     DB::enableQueryLog();
-    deployGateCall($job, 'rememberDockerfileBaseImage');
-    $applies = deployGateCall($job, 'imageScanGateApplies');
-    deployGateCall($job, 'dispatchImageScanAfterStart');
+    deployGateImageScan($job)->rememberDockerfileBaseImage();
+    $applies = deployGateImageScan($job)->gateApplies();
+    deployGateImageScan($job)->dispatchScanAfterStart();
     $queries = collect(DB::getQueryLog())->pluck('query');
     DB::disableQueryLog();
 
@@ -898,7 +904,7 @@ it('reads no scan rules in a deploy when the app scan is off', function () {
 it('does not fail the deploy when the Dockerfile cannot be read', function () {
     $job = deployGateJob(['saved_outputs' => new Collection]);
 
-    deployGateCall($job, 'rememberDockerfileBaseImage');
+    deployGateImageScan($job)->rememberDockerfileBaseImage();
 
     expect(deployGateBaseImageRef($job))->toBeNull();
 });
@@ -1004,7 +1010,7 @@ function deployGateCurrentImages(): array
 it('keeps the images of the finished deployment current while a Compose redeploy runs', function () {
     ['job' => $job, 'previous' => $previous, 'reused' => $reused] = deployGateComposeRedeploy();
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
 
     expect(deployGateCurrentImages())->toBe(['cache:1', 'web:1', 'worker:1'])
         ->and(ImageScan::query()->whereKey($reused)->pluck('deployment_queue_id')->unique()->all())->toBe([$previous->id]);
@@ -1013,7 +1019,7 @@ it('keeps the images of the finished deployment current while a Compose redeploy
 it('keeps the images of the finished deployment current when the redeploy is blocked', function () {
     ['job' => $job, 'previous' => $previous, 'reused' => $reused] = deployGateComposeRedeploy([deployGateFindingRow()]);
 
-    expect(fn () => deployGateCall($job, 'checkComposeImageScanGate'))->toThrow(DeploymentException::class);
+    expect(fn () => deployGateImageScan($job)->checkComposeGate())->toThrow(DeploymentException::class);
     $job->failed(new DeploymentException('blocked'));
 
     expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
@@ -1025,7 +1031,7 @@ it('links the reused scans to the redeploy when it finished so they stay current
     Queue::fake();
     ['job' => $job, 'reused' => $reused] = deployGateComposeRedeploy();
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
     deployGateCall($job, 'post_deployment');
 
     expect(test()->queue->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value)
@@ -1037,7 +1043,7 @@ it('does not link the reused scans when the deployment was marked failed before 
     Queue::fake();
     ['job' => $job, 'previous' => $previous, 'reused' => $reused] = deployGateComposeRedeploy();
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
     // For example, another process marked it failed: completeDeployment() then changes nothing.
     test()->queue->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
     deployGateCall($job, 'post_deployment');
@@ -1070,7 +1076,7 @@ it('scans a Compose image after the start when its gate scan could not run', fun
         'cache' => ['image' => 'redis:7'],
     ]], 10)]);
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
     deployGateCall($job, 'post_deployment');
 
     Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->imageRefs === ['redis:7']);
@@ -1318,7 +1324,7 @@ it('matches the running image of a Compose service by its name', function () {
     $job->outputs = ["'web:2'" => $idOf('3').' ', "'cache:2'" => $idOf('4').' '];
 
     try {
-        deployGateCall($job, 'checkComposeImageScanGate');
+        deployGateImageScan($job)->checkComposeGate();
         $this->fail('Expected the gate to block the deploy.');
     } catch (DeploymentException $exception) {
         // web:2 has the finding of web:1 and passes; cache:2 adds it and blocks.
@@ -1385,7 +1391,7 @@ it('links the reused scans right when the deployment is finished, before the pos
         }
     });
 
-    deployGateCall($job, 'checkComposeImageScanGate');
+    deployGateImageScan($job)->checkComposeGate();
     deployGateCall($job, 'post_deployment');
 
     expect($linksAtCommand)->toBe([test()->queue->id]);
@@ -1420,7 +1426,7 @@ describe('image overrides of a Compose app', function () {
     });
 
     it('drops an override whose image the compose file no longer names, so it never turns on again', function () {
-        deployGateCall(deployGateJob(), 'forgetStaleComposeImageOverrides');
+        deployGateImageScan(deployGateJob())->forgetStaleComposeImageOverrides();
 
         $application = $this->application->fresh();
         expect($application->docker_compose_image_overrides)->toBe(['db' => ['from' => 'postgres:16', 'to' => 'postgres:16.4']]);
@@ -1435,7 +1441,7 @@ describe('image overrides of a Compose app', function () {
         }
         $stored = $this->application->fresh()->docker_compose_image_overrides;
 
-        deployGateCall(deployGateJob($overrides), 'forgetStaleComposeImageOverrides');
+        deployGateImageScan(deployGateJob($overrides))->forgetStaleComposeImageOverrides();
 
         expect($this->application->fresh()->docker_compose_image_overrides)->toBe($stored);
     })->with([
@@ -1470,9 +1476,9 @@ describe('scanned build of a security update', function () {
         $again = deployGateJob(['production_image_name' => 'nginx:1.27']);
         $tagged = fn (DeploymentGateTestJob $job) => collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'"));
 
-        deployGateCall($main, 'applyImageStartPin');
-        deployGateCall($second, 'applyImageStartPin');
-        deployGateCall($again, 'applyImageStartPin');
+        deployGateImageScan($main)->applyStartPin();
+        deployGateImageScan($second)->applyStartPin();
+        deployGateImageScan($again)->applyStartPin();
 
         expect($tagged($main))->toBeTrue()
             ->and($tagged($second))->toBeTrue()
@@ -1507,7 +1513,7 @@ describe('scanned build of a security update', function () {
         ImageStartPin::put($this->application->fresh(), 'nginx:1.27', GATE_REPO_DIGEST);
         $job = deployGateJob(['production_image_name' => 'nginx:1.27']);
 
-        deployGateCall($job, 'applyComposeImageStartPins');
+        deployGateImageScan($job)->applyComposeStartPins();
 
         expect(collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'")))->toBeTrue()
             ->and(ImageStartPin::take($this->application, $this->server->id))->toBe([]);
