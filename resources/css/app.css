@@ -3070,6 +3070,38 @@ input[type="search"]::-webkit-search-results-decoration {
     background: rgba(255, 255, 255, 0.02);
 }
 
+/* A table cell value that filters the table by that value on click. */
+.table-filter-value {
+    position: relative;
+    z-index: 1;
+    max-width: 100%;
+    pointer-events: auto;
+    cursor: pointer;
+    text-align: left;
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+    transition: color 0.15s, border-color 0.15s, text-decoration-color 0.15s;
+}
+
+.table-filter-value:hover {
+    color: var(--color-black);
+    text-decoration-color: currentColor;
+}
+
+.dark .table-filter-value:hover {
+    color: var(--color-white);
+}
+
+.table-filter-value.table-filter-badge:hover {
+    text-decoration-color: transparent;
+    border-color: var(--color-neutral-400);
+}
+
+.dark .table-filter-value.table-filter-badge:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
 .env-table-grid {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }

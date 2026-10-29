@@ -279,7 +279,12 @@
                             <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg">
                                 {{ $databaseBackup->database->human_name ?: $databaseBackup->database->name }}
                             </span>
-                            <span>Database</span>
+                            <span class="min-w-0">
+                                <button type="button" class="table-filter-value"
+                                    title="Filter by Database"
+                                    x-on:click.stop="typeFilter = typeFilter === 'database' ? 'all' : 'database'"
+                                    x-on:keydown.enter.stop>Database</button>
+                            </span>
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
@@ -333,7 +338,12 @@
                                 title="{{ $backup->targetName() }}">
                                 {{ $backup->targetName() }}
                             </span>
-                            <span>{{ $backup->targetType() }}</span>
+                            <span class="min-w-0">
+                                <button type="button" class="table-filter-value"
+                                    title="Filter by {{ $backup->targetType() }}"
+                                    x-on:click.stop="typeFilter = typeFilter === @js(strtolower($backup->targetType())) ? 'all' : @js(strtolower($backup->targetType()))"
+                                    x-on:keydown.enter.stop>{{ $backup->targetType() }}</button>
+                            </span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>

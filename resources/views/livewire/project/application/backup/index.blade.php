@@ -205,7 +205,12 @@
                                     title="{{ $backup->targetName() }}">
                                     {{ $backup->targetName() }}
                                 </span>
-                                <span>{{ $backup->targetType() }}</span>
+                                <span class="min-w-0">
+                                    <span role="button" tabindex="0" class="table-filter-value"
+                                        title="Filter by {{ $backup->targetType() }}"
+                                        x-on:click.prevent.stop="typeFilter = typeFilter === @js(strtolower($backup->targetType())) ? 'all' : @js(strtolower($backup->targetType()))"
+                                        x-on:keydown.enter.prevent.stop="$el.click()">{{ $backup->targetType() }}</span>
+                                </span>
                                 <span>{{ $backup->frequency }}</span>
                                 <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                                 <span title="{{ $backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? $s3StorageNames->join(', ') : 'S3 storage unavailable') : 'S3 storage is not configured' }}">

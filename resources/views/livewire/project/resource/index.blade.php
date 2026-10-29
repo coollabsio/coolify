@@ -206,11 +206,17 @@
                             </div>
                         </div>
 
-                        <div class="resource-type truncate text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="item.typeLabel"></div>
+                        <div class="resource-type min-w-0">
+                            <button type="button"
+                                class="table-filter-value truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                                x-on:click="toggleFilter('typeFilters', item.type)"
+                                x-bind:title="`Filter by ${item.typeLabel}`" x-text="item.typeLabel"></button>
+                        </div>
 
-                        <div>
-                            <x-status-badge dynamic x-bind:title="statusTitle(item)">
+                        <div class="min-w-0">
+                            <x-status-badge dynamic as="button" class="table-filter-value table-filter-badge"
+                                x-on:click="toggleFilter('statusFilters', statusState(item))"
+                                x-bind:title="`${statusTitle(item)} · Filter by ${statusLabel(item)}`">
                                 <span class="size-1.5 shrink-0 rounded-full"
                                     x-bind:class="statusDotClass(item)"></span>
                                 <span class="truncate" x-text="statusLabel(item)"></span>
@@ -226,8 +232,13 @@
                             <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
                         </div>
 
-                        <div class="resource-server truncate text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="item.destination?.server?.name || 'Unknown'"></div>
+                        <div class="resource-server min-w-0">
+                            <button type="button"
+                                class="table-filter-value truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                                x-on:click="toggleFilter('serverFilters', item.destination?.server?.name || 'Unknown')"
+                                x-bind:title="`Filter by ${item.destination?.server?.name || 'Unknown'}`"
+                                x-text="item.destination?.server?.name || 'Unknown'"></button>
+                        </div>
 
                         <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">
                             <template x-for="tag in item.tags.slice(0, 2)" :key="tag.id">
