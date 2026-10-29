@@ -338,8 +338,6 @@ it('creates ServerSetting with all fillable attributes', function () {
         'is_logdrain_newrelic_enabled' => true,
         'logdrain_newrelic_license_key' => 'nr-license-key-123',
         'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com',
-        'is_logdrain_highlight_enabled' => false,
-        'logdrain_highlight_project_id' => 'hl-proj-123',
         'is_logdrain_axiom_enabled' => true,
         'logdrain_axiom_dataset_name' => 'coolify-logs',
         'logdrain_axiom_api_key' => 'axiom-key-456',

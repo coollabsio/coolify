@@ -71,9 +71,8 @@ function runSentSentinelScriptWithFakes(string $bin): array
 {
     $script = null;
     Process::assertRan(function ($process) use (&$script) {
-        // generateSshCommand sends the script as the body of a heredoc: first line opens it, last line closes it.
-        $lines = explode("\n", $process->command);
-        $script = implode("\n", array_slice($lines, 1, -1));
+        // The script goes to ssh on stdin.
+        $script = rtrim((string) $process->input, "\n");
 
         return true;
     });

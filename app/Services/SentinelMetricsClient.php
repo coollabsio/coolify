@@ -36,6 +36,17 @@ class SentinelMetricsClient
     }
 
     /**
+     * Sentinel averages rows into `bucket_ms` windows. Older Sentinels ignore the param
+     * and return raw rows, which seriesRows() buckets the same way.
+     *
+     * @return array{from: string, bucket_ms: int}
+     */
+    private static function historyQuery(string $range): array
+    {
+        return ['from' => self::rangeFrom($range), 'bucket_ms' => self::bucketMs($range)];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function summary(): ?array
@@ -112,7 +123,7 @@ class SentinelMetricsClient
             default => ['/cpu/history', 'percent'],
         };
 
-        return $this->seriesRows($this->url($path, ['from' => self::rangeFrom($range)]), $field, $range, $metric === 'disk');
+        return $this->seriesRows($this->url($path, self::historyQuery($range)), $field, $range, $metric === 'disk');
     }
 
     /**
@@ -120,7 +131,7 @@ class SentinelMetricsClient
      */
     public function networkHistory(string $range): array
     {
-        $url = $this->url('/network/history', ['from' => self::rangeFrom($range)]);
+        $url = $this->url('/network/history', self::historyQuery($range));
 
         return [
             'rx' => $this->seriesRows($url, 'rxBytesPerSec', $range),
@@ -149,8 +160,9 @@ class SentinelMetricsClient
             $rows = array_filter($rows, fn ($row) => ($row['mount'] ?? null) === $mount);
         }
 
-        // Average raw samples into epoch-aligned buckets so every server shares the same
-        // timestamps and the fleet aggregator can sum them point by point.
+        // Average samples into epoch-aligned buckets so every server shares the same
+        // timestamps and the fleet aggregator can sum them point by point. A no-op for
+        // rows Sentinel already bucketed.
         $bucketMs = self::bucketMs($range);
         $sums = [];
         $counts = [];
@@ -172,7 +184,7 @@ class SentinelMetricsClient
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
-    private static function rootMountName(array $rows): ?string
+    public static function rootMountName(array $rows): ?string
     {
         $mounts = array_column($rows, 'mount');
 

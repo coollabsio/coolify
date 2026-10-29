@@ -56,11 +56,11 @@ beforeEach(function () {
 function fakeRunningContainerWithStopResult(ProcessResult $stopResult): void
 {
     Process::fake(function ($process) use ($stopResult) {
-        if (str_contains($process->command, 'docker ps -a --filter')) {
+        if (str_contains(remoteProcessScript($process), 'docker ps -a --filter')) {
             return Process::result(output: json_encode(['Names' => 'app-container', 'Labels' => '', 'State' => 'running']));
         }
 
-        return str_contains($process->command, 'docker stop') ? $stopResult : Process::result(output: '');
+        return str_contains(remoteProcessScript($process), 'docker stop') ? $stopResult : Process::result(output: '');
     });
 }
 

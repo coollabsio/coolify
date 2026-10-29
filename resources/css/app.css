@@ -6142,6 +6142,18 @@ html .application-settings-navigation .menu-item-icon {
     }
 }
 
+/* setCanvasDots() writes these on the canvas root on every pan and zoom step, and
+   only the root reads them. Inherited, each write restyles every card in the canvas. */
+@property --canvas-dots-size {
+    syntax: '*';
+    inherits: false;
+}
+
+@property --canvas-dots-position {
+    syntax: '*';
+    inherits: false;
+}
+
 /* Canvases at full zoom: the grid dots turn into small Coolify logos, one
    per 20px tile. setCanvasDots() (environment-canvas.js) sets .canvas-zoom-max. */
 .canvas-zoom-max {
@@ -6154,6 +6166,12 @@ html.dark .canvas-zoom-max {
 
 .canvas-zoom-max [data-ec-viewport] {
     background-image: var(--canvas-dots-image);
+}
+
+/* A pan (canvas-core panZoom), also a middle-button pan that started on a card. */
+:is([data-ec-viewport], .cv-viewport).panning,
+:is([data-ec-viewport], .cv-viewport).panning * {
+    cursor: grabbing !important;
 }
 
 /* "Floating" navigation (Appearance → Navigation style): the top bar, sidebar,

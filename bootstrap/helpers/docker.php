@@ -526,6 +526,20 @@ function escapeShellValue(string $value): string
     return "'".str_replace("'", "'\\''", $value)."'";
 }
 
+/**
+ * Prefix for a Docker command that pulls on the server itself, outside the helper container. It makes the CLI use
+ * the SSH user's Docker config, where the registry logins are and which the helper container mounts. On a non-root
+ * server the command runs with sudo, which resets HOME to /root, so without it a private image pull is anonymous.
+ * The SSH user's shell expands $HOME before sudo runs. Without a config of the SSH user, DOCKER_CONFIG is empty and
+ * the CLI keeps /root/.docker, so a login made with `sudo docker login` still works. DOCKER_CONTEXT=default keeps the
+ * pull on the host daemon if that config selects another context, because the next commands use the host daemon.
+ */
+function serverDockerConfigPrefix(Server $server): string
+{
+    // No && or pipe: with them, the sudo parser can wrap the line in `sudo bash -c`, where $HOME is /root.
+    return $server->isNonRoot() ? 'DOCKER_CONTEXT=default DOCKER_CONFIG="$(find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" ' : '';
+}
+
 function executeInDocker(string $containerId, string $command)
 {
     $escapedCommand = str_replace("'", "'\\''", $command);
@@ -787,7 +801,7 @@ function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnable
     return "{$scheme}://{$host}";
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false, bool $is_retry_enabled = false)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -839,11 +853,6 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams $port}}");
         } else {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
-        }
-        if ($is_retry_enabled) {
-            // A failed connection, for example to the old container that stops during a rolling
-            // update, is retried on another upstream. Caddy always retries a connection that failed.
-            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.lb_try_duration=5s");
         }
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
@@ -949,7 +958,7 @@ function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
     ) : $label);
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false, bool $is_retry_enabled = false)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -1003,14 +1012,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         })->flatten()
             ->filter()
             ->unique();
-    }
-    if ($is_retry_enabled) {
-        // Sends a request to another container when the connection fails, for example to the old
-        // container that stops during a rolling update. Traefik does not retry after a response.
-        // A retry can pick the old container again under load; 3 attempts left about 5% of the
-        // requests failing in a live test, 5 attempts less than 1% (#8627).
-        $labels->push("traefik.http.middlewares.retry-{$uuid}.retry.attempts=5");
-        $middlewares_from_labels->push("retry-{$uuid}");
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -1277,7 +1278,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
-                            is_retry_enabled: true,
                             certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                         ));
                         break;
@@ -1302,7 +1302,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                             supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                             domainPortOverrides: $application->domain_port_overrides ?? [],
-                            is_retry_enabled: true,
                         ));
                         break;
                 }
@@ -1323,7 +1322,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
-                    is_retry_enabled: true,
                     certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
@@ -1346,7 +1344,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                     supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                     domainPortOverrides: $application->domain_port_overrides ?? [],
-                    is_retry_enabled: true,
                 ));
             }
         }
@@ -2258,6 +2255,21 @@ function railpackBuilderLockedScript(string $command): string
         ."{$command}; status=\$?; "
         .'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi; '
         .'exit $status';
+}
+
+/**
+ * Start the Railpack builder and wait until buildkitd accepts connections. Run it inside
+ * railpackBuilderLockedScript(), so that no other process stops the builder after it starts.
+ *
+ * buildx waits for buildkitd only when it starts the builder itself. A concurrent build that sees
+ * the container already running connects at once and fails while the BuildKit socket is missing.
+ * The lock makes the other builds wait until the first bootstrap is complete.
+ */
+function railpackBuilderBootstrapScript(): string
+{
+    return 'exec 8>/root/.docker/buildx/coolify-railpack-bootstrap.lock; flock -x 8; '
+        .'DOCKER_CONFIG=/root/.docker docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; '
+        .'flock -u 8';
 }
 
 /**

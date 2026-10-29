@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\VultrController;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -10,11 +11,15 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'app.maintenance.driver' => 'file',
         'cache.default' => 'array',
@@ -301,6 +306,43 @@ describe('POST /api/v1/servers/vultr', function () {
         ]);
     });
 
+    test('explains a Vultr permission error without leaking the Vultr message', function () {
+        Http::fake([
+            'https://api.vultr.com/v2/ssh-keys' => Http::response([
+                'ssh_key' => ['id' => 'key-1', 'ssh_key' => testPublicKey()],
+            ], 201),
+            'https://api.vultr.com/v2/ssh-keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['links' => ['next' => null]],
+            ], 200),
+            'https://api.vultr.com/v2/instances' => Http::response([
+                'error' => 'INTERNAL_LEAK_TOKEN_abc',
+                'status' => 403,
+            ], 403),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/servers/vultr', [
+            'cloud_provider_token_id' => $this->vultrToken->uuid,
+            'region' => 'ewr',
+            'plan' => 'vc2-1c-1gb',
+            'os_id' => 2284,
+            'name' => 'read-only-token',
+            'private_key_uuid' => $this->privateKey->uuid,
+        ]);
+
+        $response->assertStatus(502);
+        $response->assertExactJson([
+            'message' => 'Failed to create Vultr server. The Vultr API token does not have permission for this request. Use a token with read and write access.',
+            'provider_status' => 403,
+            'provider_error_code' => null,
+        ]);
+        expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
+        $this->assertDatabaseMissing('servers', ['name' => 'read-only-token']);
+    });
+
     test('deletes the Vultr instance when local server persistence fails', function () {
         Http::fake([
             'https://api.vultr.com/v2/ssh-keys' => Http::response([
@@ -320,6 +362,7 @@ describe('POST /api/v1/servers/vultr', function () {
             'https://api.vultr.com/v2/instances/instance-persistence-fails' => Http::response(null, 204),
         ]);
 
+        Exceptions::fake();
         $eventDispatcher = Server::getEventDispatcher();
         Server::setEventDispatcher(clone $eventDispatcher);
         Server::created(function (): void {
@@ -347,6 +390,7 @@ describe('POST /api/v1/servers/vultr', function () {
         $this->assertDatabaseMissing('servers', [
             'vultr_instance_id' => 'instance-persistence-fails',
         ]);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'local persistence failed');
         Http::assertSent(fn ($request) => $request->method() === 'DELETE'
             && $request->url() === 'https://api.vultr.com/v2/instances/instance-persistence-fails');
     });

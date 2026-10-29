@@ -48,13 +48,13 @@ class StartProxy
         if ($async) {
             $server->markProxyTransitionStarted();
 
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: ProxyStatusChanged::dataFor($server), queue: deployment_queue());
         } else {
             instant_remote_process($commands, $server);
 
             $server->proxy->set('type', $proxyType);
             $server->save();
-            ProxyStatusChanged::dispatch($server->id);
+            ProxyStatusChanged::dispatch(ProxyStatusChanged::dataFor($server));
 
             return 'OK';
         }
@@ -87,7 +87,7 @@ class StartProxy
                 "echo '$caddyfile' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                "docker compose -f $compose_file pull",
+                serverDockerConfigPrefix($server)."docker compose -f $compose_file pull",
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
                 '    docker stop coolify-proxy 2>/dev/null || true',

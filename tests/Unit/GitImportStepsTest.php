@@ -82,3 +82,39 @@ test('git ssh command stops a stalled connection instead of waiting for the depl
         ->and(gitSshCommand(22))->not->toContain(' -i ')
         ->and(gitSshCommand(22, '/root/.ssh/id_rsa', identitiesOnly: false))->toEndWith('-i /root/.ssh/id_rsa');
 });
+
+test('a shallow clone checks out a short commit sha', function (string $commitName) {
+    $dir = sys_get_temp_dir().'/coolify-short-sha-'.bin2hex(random_bytes(4));
+    $git = 'git -c user.email=test@example.com -c user.name=test';
+    exec("git init -q -b main {$dir}/source && cd {$dir}/source && {$git} commit -q --allow-empty -m main"
+        ." && git checkout -q -b feature && {$git} commit -q --allow-empty -m first && {$git} commit -q --allow-empty -m second"
+        ." && git checkout -q main && git clone -q --bare {$dir}/source {$dir}/remote.git");
+    $commit = trim(shell_exec("git -C {$dir}/source rev-parse {$commitName}"));
+
+    $application = new Application;
+    $application->forceFill(['uuid' => 'test-app-uuid']);
+    $settings = new ApplicationSetting;
+    $settings->is_git_shallow_clone_enabled = true;
+    $settings->is_git_submodules_enabled = false;
+    $settings->is_git_lfs_enabled = false;
+    $application->setRelation('settings', $settings);
+
+    // Bitbucket sends the pull request commit as a 12-character hash.
+    $command = $application->setGitImportSettings(
+        deployment_uuid: 'test-uuid',
+        git_clone_command: "git clone -q --depth=1 -b main file://{$dir}/remote.git {$dir}/checkout",
+        commit: substr($commit, 0, 12),
+        baseDir: "{$dir}/checkout",
+    );
+    $process = Process::fromShellCommandline($command);
+    $process->run();
+    $checkedOutCommit = trim((string) shell_exec("git -C {$dir}/checkout rev-parse HEAD 2>/dev/null"));
+
+    exec('rm -rf '.escapeshellarg($dir));
+
+    expect($process->getExitCode())->toBe(0, $process->getErrorOutput())
+        ->and($checkedOutCommit)->toBe($commit);
+})->with([
+    'tip of a branch' => ['feature'],
+    'older commit of a branch' => ['feature~1'],
+]);

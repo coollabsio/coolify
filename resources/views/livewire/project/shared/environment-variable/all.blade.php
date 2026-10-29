@@ -69,6 +69,8 @@
                 @can('manageEnvironment', $resource)
                     <x-callout type="info" title="Note">
                         Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
+                        To set flags, put <code class="font-mono"># coolify: literal buildtime=false runtime=false</code>
+                        directly above a variable line. Without this line, the flags of a variable do not change.
                     </x-callout>
                     <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
                         wire:model="variables" label="Production"></x-forms.textarea>

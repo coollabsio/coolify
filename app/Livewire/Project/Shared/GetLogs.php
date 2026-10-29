@@ -297,7 +297,7 @@ class GetLogs extends Component
         $stripTimestamps ??= $export && ! $this->showTimeStamps;
         $merged = $this->joinMergedLines($groups, $stripTimestamps, $export);
         if (strlen($merged) > $maxBytes) {
-            $merged = rtrim(substr($merged, 0, $maxBytes), "\n");
+            $merged = rtrim(mb_strcut($merged, 0, $maxBytes, 'UTF-8'), "\n");
             $truncated = true;
         }
         if ($truncated && $merged !== '') {
@@ -496,12 +496,14 @@ class GetLogs extends Component
      */
     private function executeLogCommand(Server $server, string $command, int $maxBytes): array
     {
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $this->boundedLogCommand($command, $maxBytes));
-
         // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
-        $output = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand)->output();
+        $output = Process::timeout(config('constants.ssh.command_timeout'))
+            ->input(SshMultiplexingHelper::sshBatchInput($this->boundedLogCommand($command, $maxBytes)))
+            ->run(SshMultiplexingHelper::generateSshBatchCommand($server))
+            ->output();
         $truncated = strlen($output) > $maxBytes;
-        $logs = rtrim(removeAnsiColors($truncated ? substr($output, 0, $maxBytes) : $output), "\n");
+        // Invalid UTF-8 from a container would make the JSON response fail, so the viewer would stay empty.
+        $logs = rtrim(sanitize_utf8_text(removeAnsiColors($truncated ? substr($output, 0, $maxBytes) : $output)), "\n");
 
         return ['logs' => $logs, 'truncated' => $truncated];
     }

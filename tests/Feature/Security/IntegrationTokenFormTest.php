@@ -520,3 +520,50 @@ test('the token list shows its empty state after the editor deletes the last tok
     $list->dispatch('integration-token-deleted', uuid: $token->uuid)
         ->assertSee('No integration tokens');
 });
+
+test('a cloudflare token is saved when one validation request has a connection failure', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::sequence()
+            ->pushFailedConnection('cURL error 28: Connection timed out after 5001 milliseconds')
+            ->push(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('success');
+
+    $this->assertDatabaseHas('integration_tokens', ['team_id' => $this->team->id, 'name' => 'Production DNS']);
+});
+
+test('a clear error is shown when the provider api cannot be reached', function () {
+    Http::fake(['*' => Http::failedConnection('cURL error 28: Connection timed out after 10001 milliseconds')]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('error', 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.');
+
+    $token = IntegrationToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'cloudflare', 'capabilities' => ['dns']]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->set('newToken', 'new-cloudflare-token')
+        ->call('save')
+        ->assertDispatched('error', 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.');
+
+    $this->assertDatabaseMissing('integration_tokens', ['name' => 'Production DNS']);
+    expect($token->refresh()->token)->not->toBe('new-cloudflare-token');
+});

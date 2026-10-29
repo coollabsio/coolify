@@ -86,14 +86,6 @@ class Show extends Component
 
     public ?string $hostingerVirtualMachineStatus = null;
 
-    public bool $hetznerServerManuallyStarted = false;
-
-    public bool $vultrInstanceManuallyStarted = false;
-
-    public bool $digitalOceanDropletManuallyStarted = false;
-
-    public bool $hostingerVirtualMachineManuallyStarted = false;
-
     public bool $isValidating = false;
 
     // Hetzner linking properties
@@ -780,7 +772,6 @@ class Show extends Component
 
             $this->hetznerServerStatus = 'starting';
             $this->server->update(['hetzner_server_status' => 'starting']);
-            $this->hetznerServerManuallyStarted = true; // Set flag to trigger auto-validation when running
             $this->dispatch('success', 'Hetzner server is starting...');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -803,7 +794,6 @@ class Show extends Component
 
             $this->vultrInstanceStatus = 'starting';
             $this->server->update(['vultr_instance_status' => 'starting']);
-            $this->vultrInstanceManuallyStarted = true;
             $this->dispatch('success', 'Vultr instance is starting...');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -826,7 +816,6 @@ class Show extends Component
 
             $this->digitalOceanDropletStatus = 'new';
             $this->server->update(['digitalocean_droplet_status' => 'new']);
-            $this->digitalOceanDropletManuallyStarted = true;
             $this->dispatch('success', 'DigitalOcean droplet is starting...');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -849,7 +838,6 @@ class Show extends Component
 
             $this->hostingerVirtualMachineStatus = 'starting';
             $this->server->update(['hostinger_virtual_machine_status' => 'starting']);
-            $this->hostingerVirtualMachineManuallyStarted = true;
             $this->dispatch('success', 'Hostinger VPS is starting...');
 
             return null;

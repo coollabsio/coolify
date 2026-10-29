@@ -100,13 +100,49 @@ class DatabaseBackupFileValidator
             return false;
         }
 
-        $withoutComments = self::stripSqlComments($sql);
+        $sql = self::withoutCopyData($sql);
 
-        if (preg_match('/^\s*\\\\(?:!|copy\b[^\r\n]*\bprogram\b|(?:o|g)\s*\|)/mi', $withoutComments) === 1) {
+        // Token separator PostgreSQL treats as whitespace: real whitespace, a block comment
+        // (the lazy match can extend to the outer end of a nested comment), or a line
+        // comment. Comment forms also match inside string literals, which can only block
+        // more input, never less.
+        $sep = '(?:\s|/\*.*?\*/|--[^\r\n]*[\r\n])';
+
+        // psql meta-commands that can run a shell command, anywhere on a line. Same rules as
+        // the restore scan in DatabaseImportCommandBuilder::buildPostgresRestoreScanScript().
+        // A regex error (for example the backtrack limit) returns false and blocks.
+        if (preg_match('~(?:^|[^\\\\])(?:\\\\\\\\)*\\\\(?:!|(?:o|out|gx?|w|write)[^\S\n][^\\\\\n]*\||copy[^\S\n].*program|(?:setenv|e|edit|ef|ev|i|ir|include|include_relative)(?:\s|$)|(?:[^nbv\s\\\\]|[nbv][^\s\\\\])[^\s\\\\]*[^\S\n][^\\\\\n]*`)~mi', $sql) !== 0) {
             return true;
         }
 
-        return preg_match('/(?:^|;)\s*copy\b[^;]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
+        // A TO/FROM PROGRAM token pair anywhere (dynamic SQL, DO blocks, function bodies),
+        // a server-side large-object import or export, or ALTER SYSTEM. Comments are no
+        // longer stripped first, because that cut inside string literals; a commented-out
+        // PROGRAM statement is now blocked too, which is the safer default.
+        return preg_match('~(?:from|to)'.$sep.'+program|lo_(?:import|export)'.$sep.'*\(|alter'.$sep.'+system'.$sep.'+(?:set|reset)~is', $sql) !== 0;
+    }
+
+    /**
+     * Removes the table data of COPY ... FROM stdin blocks: rows are data, not SQL, and ordinary
+     * text such as "how to program" matched the patterns. Same rule as the restore scan in
+     * DatabaseImportCommandBuilder: a block starts at the line "COPY ... FROM stdin;" as pg_dump
+     * writes it and ends at the line "\.".
+     */
+    private static function withoutCopyData(string $sql): string
+    {
+        $kept = '';
+        $offset = 0;
+
+        while (preg_match('/^COPY .* FROM stdin;$/m', $sql, $match, PREG_OFFSET_CAPTURE, $offset) === 1) {
+            $dataStart = $match[0][1] + strlen($match[0][0]);
+            $kept .= substr($sql, $offset, $dataStart - $offset);
+            $end = preg_match('/^\\\\\\.$/m', $sql, $terminator, PREG_OFFSET_CAPTURE, $dataStart) === 1
+                ? $terminator[0][1] + 2
+                : strlen($sql);
+            $offset = $end;
+        }
+
+        return $kept.substr($sql, $offset);
     }
 
     private static function extensionFor(string $name): ?string
@@ -141,14 +177,14 @@ class DatabaseBackupFileValidator
         $sample = (string) file_get_contents($path, false, null, 0, 4096);
 
         return match ($extension) {
-            'sql' => self::looksLikeText($sample) && ! self::containsPostgresqlProgramExecution($sample),
+            'sql' => self::looksLikeText($sample),
             'sql.gz', 'gz', 'tar.gz', 'tgz', 'bson.gz', 'archive.gz', 'db.gz', 'sqlite.gz', 'sqlite3.gz' => str_starts_with($sample, "\x1f\x8b"),
             'zip' => str_starts_with($sample, "PK\x03\x04") || str_starts_with($sample, "PK\x05\x06") || str_starts_with($sample, "PK\x07\x08"),
             'tar' => substr($sample, 257, 5) === 'ustar',
             'bz2' => str_starts_with($sample, 'BZh'),
             'xz' => str_starts_with($sample, "\xfd7zXZ\x00"),
             'dump', 'bak', 'archive', 'dmp' => str_starts_with($sample, 'PGDMP')
-                || (self::looksLikeText($sample) && ! self::containsPostgresqlProgramExecution($sample)),
+                || self::looksLikeText($sample),
             'bson' => self::looksLikeBson($path, $sample),
             'db', 'sqlite', 'sqlite3' => str_starts_with($sample, "SQLite format 3\0"),
             default => false,
@@ -209,12 +245,5 @@ class DatabaseBackupFileValidator
         $fileSize = filesize($path) ?: 0;
 
         return $documentLength >= 5 && $documentLength <= $fileSize;
-    }
-
-    private static function stripSqlComments(string $sql): string
-    {
-        $sql = preg_replace('/\/\*[\s\S]*?\*\//', ' ', $sql) ?? $sql;
-
-        return preg_replace('/--[^\r\n]*/', ' ', $sql) ?? $sql;
     }
 }

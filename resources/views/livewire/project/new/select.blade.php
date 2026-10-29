@@ -1,6 +1,6 @@
 <div class="application-settings-form" x-data x-init="$wire.loadServers">
-    <div x-data="searchResources()">
-        @if ($current_step === 'type')
+    @if ($current_step === 'type')
+        <div x-data="searchResources()">
             <x-application.settings-section title="Choose a resource" flush>
                 <x-slot:actions>
                     <button type="button" class="button" :disabled="loading" @click="loadResources">
@@ -634,8 +634,8 @@
                     }
                 }
             </script>
-        @endif
-    </div>
+        </div>
+    @endif
     @if ($current_step === 'servers')
         <x-application.settings-section title="Select a server"
             description="Choose the machine that will host this resource." flush>

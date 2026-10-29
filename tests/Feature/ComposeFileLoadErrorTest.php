@@ -35,7 +35,7 @@ beforeEach(function () {
 function fakeComposeLoadServer(?string $failingStep, string $errorOutput): void
 {
     Process::fake(function ($process) use ($failingStep, $errorOutput) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if ($failingStep !== null && str_contains($command, $failingStep)) {
             return Process::result(errorOutput: $errorOutput, exitCode: 128);
         }

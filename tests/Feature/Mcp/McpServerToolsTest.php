@@ -434,7 +434,7 @@ test('manage_registry logs in on its own server without echoing the password', f
 
     expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response))
         ->and(mcpSrvText($response))->not->toContain('REGISTRY_PASSWORD_VALUE');
-    Process::assertRan(fn ($process) => str_contains(is_array($process->command) ? implode(' ', $process->command) : $process->command, 'docker'));
+    Process::assertRan(fn ($process) => str_contains(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process), 'docker'));
 });
 
 test('manage_registry cannot touch registries on a server of another team', function (string $action, string $ability, array $extra) {

@@ -1,11 +1,13 @@
 services:
   # Placeholder for "soketi" overrides in docker-compose.custom.yml from versions before 4.4.
   # Realtime runs inside the coolify container now. Without this entry, such an override is an
-  # incomplete service and every upgrade fails; the inactive profile means it never starts.
+  # incomplete service and every upgrade fails. Zero replicas means it never starts, and
+  # "docker compose up" removes the old coolify-realtime container (an inactive profile keeps it).
+  # It uses the coolify image, so install and upgrade do not pull another image.
   soketi:
-    image: busybox:1.37
-    profiles:
-      - legacy-soketi
+    image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    deploy:
+      replicas: 0
   coolify:
     image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     volumes:

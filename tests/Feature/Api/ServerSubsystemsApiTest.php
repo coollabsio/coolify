@@ -190,6 +190,26 @@ describe('Log drains API', function () {
             ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
     });
 
+    test('PATCH sets the Axiom edge domain and rejects a value that is not a hostname', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => 'eu-central-1.aws.edge.axiom.co',
+            ])
+            ->assertOk()
+            ->assertJsonPath('logdrain_axiom_domain', 'eu-central-1.aws.edge.axiom.co');
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => "evil.example.com\nAXIOM_API_KEY=x",
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_axiom_domain');
+
+        expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('eu-central-1.aws.edge.axiom.co');
+    });
+
     test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
         Queue::fake();
 

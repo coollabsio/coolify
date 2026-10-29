@@ -431,6 +431,7 @@ class Change extends Component
             $this->syncData(true);
             $this->github_app->save();
             $this->isConnected = $this->github_app->isConnected();
+            $this->dispatch('name-changed', uuid: $this->github_app->uuid, name: $this->github_app->name);
             $this->dispatch('success', 'Github App updated.');
         } catch (ValidationException $e) {
             throw $e;

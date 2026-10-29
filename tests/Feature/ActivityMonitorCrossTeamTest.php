@@ -1,5 +1,8 @@
 <?php
 
+use App\Events\ProxyStatusChanged;
+use App\Events\ServerValidated;
+use App\Events\ServiceStatusChanged;
 use App\Livewire\ActivityMonitor;
 use App\Models\Project;
 use App\Models\Server;
@@ -7,6 +10,7 @@ use App\Models\Service;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
@@ -253,3 +257,59 @@ test('the process status shows running until the activity ends, then its result'
     'succeeded' => [0, 'finished'],
     'failed' => [1, 'failed'],
 ]);
+
+describe('event dispatched when an activity finishes', function () {
+    beforeEach(function () {
+        $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+        $this->activity = Activity::create([
+            'log_name' => 'default',
+            'description' => 'finished activity',
+            'causer_id' => $this->user->id,
+            'causer_type' => User::class,
+            'properties' => ['team_id' => $this->team->id, 'server_uuid' => $this->server->uuid, 'exitCode' => 0],
+        ]);
+        ActivityMonitor::$eventDispatched = false;
+
+        $this->actingAs($this->user);
+        session(['currentTeam' => ['id' => $this->team->id]]);
+    });
+
+    test('the event properties are locked', function (string $property) {
+        Livewire::test(ActivityMonitor::class)->set($property, ProxyStatusChanged::class);
+    })->with(['eventToDispatch', 'eventData'])->throws(CannotUpdateLockedPropertyException::class);
+
+    test('an event that is not allowed is not dispatched', function (string $event) {
+        Event::fake([ProxyStatusChanged::class, ServerValidated::class]);
+
+        Livewire::test(ActivityMonitor::class)
+            ->call('newMonitorActivity', $this->activity->id, $event)
+            ->assertSet('eventToDispatch', null)
+            ->call('polling')
+            ->assertNotDispatched($event);
+
+        Event::assertNotDispatched(ProxyStatusChanged::class);
+        Event::assertNotDispatched(ServerValidated::class);
+    })->with([ProxyStatusChanged::class, ServerValidated::class, 'someOtherEvent']);
+
+    test('an allowed application event is dispatched with the team of the activity and no client data', function () {
+        Event::fake([ServiceStatusChanged::class]);
+
+        Livewire::test(ActivityMonitor::class)
+            ->call('newMonitorActivity', $this->activity->id, ServiceStatusChanged::class, $this->otherTeam->id)
+            ->call('polling');
+
+        Event::assertDispatched(ServiceStatusChanged::class, fn (ServiceStatusChanged $event) => $event->teamId === $this->team->id);
+    });
+
+    test('allowed browser events are dispatched with their data', function (string $event, mixed $data) {
+        Livewire::test(ActivityMonitor::class)
+            ->call('newMonitorActivity', $this->activity->id, $event, $data)
+            ->call('polling')
+            ->assertDispatched($event);
+    })->with([
+        ['activityFinished', null],
+        ['prerequisitesInstalled', null],
+        ['sysboxInstalled', null],
+        ['init', 2],
+    ]);
+});

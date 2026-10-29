@@ -12,8 +12,11 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelTrafficClient;
+use Illuminate\Contracts\Process\InvokedProcess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -31,6 +34,20 @@ class FakeGlobalAnalyticsTrafficClient extends SentinelTrafficClient
         }
 
         return '{}';
+    }
+}
+
+/**
+ * Answers every dashboard fetch with a real process that takes one second, so a test can
+ * tell concurrent fetches from serial ones.
+ */
+class SlowDashboardTrafficClient extends SentinelTrafficClient
+{
+    protected function startRemoteFetch(string $url): InvokedProcess
+    {
+        $bundle = json_encode(['overview' => ['requests' => 1000], 'apps' => []]);
+
+        return Process::start('sleep 1 && printf %s '.escapeshellarg($bundle));
     }
 }
 
@@ -519,3 +536,17 @@ it('combines the client IP mode of several servers', function (array $modes, str
     'anonymized and off' => [['anonymized', 'off'], 'anonymized'],
     'full and anonymized' => [['full', 'anonymized'], 'full'],
 ]);
+
+it('fetches the dashboard of every server at the same time', function () {
+    Cache::flush();
+    collect(range(1, 3))->each(fn () => bootEnabledGlobalServer());
+    app()->bind(SentinelTrafficClient::class, fn ($app, array $parameters) => new SlowDashboardTrafficClient($parameters['server']));
+
+    $started = microtime(true);
+    $component = loadLazy(Livewire::test(Analytics::class));
+    $elapsed = microtime(true) - $started;
+
+    // Three servers fetched one after another take at least 3 seconds.
+    expect($elapsed)->toBeLessThan(2.5)
+        ->and($component->get('overview')['requests'])->toBe(3000);
+});

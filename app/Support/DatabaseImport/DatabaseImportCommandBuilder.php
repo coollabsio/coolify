@@ -55,6 +55,22 @@ tolower($0) ~ /^[ \t]*create[ \t]+(database|schema)[ \t]/ { if (is_system(databa
 AWK;
 
     /**
+     * mysql and mariadb client commands that run a shell command, write or read a file:
+     * system, tee, pager, edit and source, as a long command at the start of a line or as
+     * a short command (\!, \T, \P, \e, \.) anywhere. An odd backslash run starts a short
+     * command; mysqldump writes a backslash in data as "\\" and escapes only 0, n, r, Z and
+     * quotes, so its rows do not match.
+     */
+    private const MYSQL_CLIENT_COMMAND_PATTERN = '(^|[^\\\\])(\\\\\\\\)*\\\\[!TPe.]';
+
+    private const MYSQL_NAMED_CLIENT_COMMAND_PATTERN = '^[[:space:]]*(system|tee|pager|edit|source)([[:space:]]|;|$)';
+
+    /**
+     * Prints a PostgreSQL SQL dump without the table data of its COPY ... FROM stdin blocks.
+     */
+    private const POSTGRES_COPY_DATA_FILTER = 'data { if ($0 == "\\\\.") data = 0; next } { print } /^COPY .* FROM stdin;$/ { data = 1 }';
+
+    /**
      * @param  bool  $keepOwners  PostgreSQL archives: restore object owners and privileges. Off by default,
      *                            because roles from another host (for example RDS) usually do not exist here.
      * @param  string|null  $sqliteDatabase  SQLite: the database file to restore into, validated by the resource.
@@ -109,22 +125,45 @@ SH;
 
         $escapedPath = escapeshellarg($path);
 
-        // Token separator PostgreSQL treats as whitespace: real whitespace or a
-        // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
-        $sep = '([[:space:]]|/\\*[^*]*\\*/)';
+        // Token separator PostgreSQL treats as whitespace: real whitespace, a /* ... */
+        // block comment (also nested or holding asterisks), or a -- comment through the
+        // line end. The joined scan maps line ends to '~' (after it deletes every real
+        // '~'), so a -- comment ends at the next '~'. Comment forms also match inside
+        // string literals, which can only block more input, never less.
+        $sep = '([[:space:]]|~|/\\*.*\\*/|--[^~]*~)';
 
-        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
-        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
+        // A TO/FROM PROGRAM token pair anywhere (so it is also found inside DO blocks,
+        // EXECUTE strings and function bodies), a server-side large-object import or
+        // export, or ALTER SYSTEM. The pair is matched without the former (^|;) anchor
+        // and [^;]* limit, which a ';' inside a string literal or dynamic SQL bypassed.
+        $sqlPattern = "(from|to){$sep}+program|lo_(import|export){$sep}*\\(|alter{$sep}+system{$sep}+(set|reset)";
+        // psql meta-commands that can run a shell command, anywhere on a line (a meta-command
+        // may follow SQL without a ';'). An odd backslash run starts a meta-command; COPY data
+        // writes a literal backslash as "\\", so its rows do not match. Blocked: \!, output
+        // piped by \o/\out/\g/\gx/\w/\write, \copy ... program, \setenv and the editor commands,
+        // the include commands (they run a file that \o or \copy wrote), and backquotes in the
+        // arguments of a command. \n, \b, \v and \N are COPY escapes that psql does not know,
+        // and psql does not expand backquotes for unknown commands.
+        $psqlPattern = '(^|[^\\\\])(\\\\\\\\)*\\\\(!|(o|out|gx?|w|write)[[:space:]][^\\\\]*\||copy[[:space:]].*program|(setenv|e|edit|ef|ev|i|ir|include|include_relative)([[:space:]]|$)|([^nbv[:space:]\\\\]|[nbv][^[:space:]\\\\])[^[:space:]\\\\]*[[:space:]][^\\\\]*`)';
         $escapedSqlPattern = escapeshellarg($sqlPattern);
         $escapedPsqlPattern = escapeshellarg($psqlPattern);
         $contents = "{ gunzip -cf {$escapedPath} 2>/dev/null || cat {$escapedPath}; }";
-        $scan = static fn (string $source): string => "{$source} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$source} | sed 's/--.*//' | tr '\\n\\r\\t' '   ' | grep -Eiq {$escapedSqlPattern}";
+        // Comments are no longer stripped: deleting the rest of a line on "--" also cut
+        // inside string literals, which let "SELECT '--'; COPY ... PROGRAM" slip through.
+        // A commented-out PROGRAM statement is now blocked too, which is the safer default.
+        // Table data of COPY ... FROM stdin blocks is not scanned: it is data, not SQL, and ordinary
+        // text such as "how to program" matched the patterns. pg_dump writes each block as the line
+        // "COPY ... FROM stdin;", the rows, and the line "\.". When awk is missing or fails, the
+        // scan receives a line that matches, so the restore is blocked.
+        $withoutCopyData = static fn (string $source): string => "{ {$source} | LC_ALL=C awk ".escapeshellarg(self::POSTGRES_COPY_DATA_FILTER)." || echo '\\! from program'; }";
+        $scan = static fn (string $source): string => $withoutCopyData($source)." | LC_ALL=C grep -Eiq {$escapedPsqlPattern} || ".$withoutCopyData($source)." | tr -d '~' | tr '\\n\\r' '~~' | LC_ALL=C grep -Eiq {$escapedSqlPattern}";
         $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
         $sqlScan = $scan($contents);
-        $blockedProgram = 'echo \'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.\'; exit 1';
+        $blockedProgram = 'echo \'Blocked PostgreSQL restore: the backup contains a COPY ... PROGRAM, psql shell command, lo_import/lo_export, or ALTER SYSTEM pattern. If you trust this dump, restore it from the database container terminal.\'; exit 1';
         $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
 
         return <<<SH
+command -v awk >/dev/null 2>&1 || { echo 'Blocked PostgreSQL restore: awk is required to scan the backup.'; exit 1; }
 header=\$({$contents} | head -c 5)
 tar_magic=\$({$contents} | head -c 262 | tail -c 5)
 if [ "\$header" = 'PGDMP' ] || [ "\$tar_magic" = 'ustar' ]; then
@@ -253,6 +292,12 @@ SH;
     /**
      * Checks the backup format before any database is dropped, then recreates the
      * target database and restores archives with pg_restore and SQL with psql.
+     * The restore must not stop on the first error: a pg_dumpall dump always creates the
+     * superuser role (and creates the target database) that already exist here, and an
+     * archive with owners references roles this server may not have. Stopping there would
+     * leave the server without the databases that were just dropped.
+     * pg_dumpall does not create the postgres database (it expects it to exist), so it is
+     * recreated too when POSTGRES_DB names another database.
      */
     private function postgresqlDumpAll(): string
     {
@@ -270,6 +315,7 @@ check_superuser
 psql -U "$pg_user" -d template1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" || exit 1
 psql -U "$pg_user" -d template1 -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U "$pg_user" --maintenance-db=template1 --if-exists {} || exit 1
 createdb -U "$pg_user" "$db" || exit 1
+[ "$db" = postgres ] || createdb -U "$pg_user" postgres || exit 1
 if [ "$kind" = archive ]; then
   stream | pg_restore -U "$pg_user" -d "$db"
 else
@@ -282,24 +328,42 @@ SH;
      * MySQL and MariaDB restore SQL dumps. A tar backup must wrap exactly one dump.
      * The all-databases mode checks the backup before it drops any database and skips
      * the system databases unless their users and privileges are restored as well.
+     * The client runs the dump with its client commands disabled: --sandbox on MariaDB
+     * (10.5.25, 10.6.18, 10.11.8, 11.4.2 and later), --commands=FALSE on MySQL (8.0.43, 8.4.6,
+     * 9.4.0 and later). Older clients do not know these options, so a dump with a client
+     * command that runs a shell command or uses a file is refused on every client.
      */
     private function mysql(string $binary, string $prefix, bool $dumpAll, bool $restoreMysqlUsers = false): string
     {
-        $preflight = <<<'SH'
+        $commandPattern = escapeshellarg(self::MYSQL_CLIENT_COMMAND_PATTERN);
+        $namedCommandPattern = escapeshellarg(self::MYSQL_NAMED_CLIENT_COMMAND_PATTERN);
+        $preflight = <<<SH
 if is_tar; then
   extract_tar
   use_single_tar_member || fail 'A tar backup must contain exactly one SQL dump. Nothing was changed.'
 fi
 is_text || fail 'Unsupported backup format. Use an SQL dump. Nothing was changed.'
+if stream | LC_ALL=C grep -Eq {$commandPattern} || stream | LC_ALL=C grep -Eiq {$namedCommandPattern}; then
+  fail 'Blocked restore: the backup contains a {$binary} client command (system, tee, pager, edit or source). If you trust this dump, restore it from the database container terminal. Nothing was changed.'
+fi
+
+SH;
+        $clientSafety = <<<SH
+client_safety=
+if {$binary} --help 2>/dev/null | grep -q -e '--sandbox'; then
+  client_safety=--sandbox
+elif {$binary} --help 2>/dev/null | grep -q -e '--commands'; then
+  client_safety=--commands=FALSE
+fi
 
 SH;
 
         if (! $dumpAll) {
-            return $preflight.<<<SH
+            return $preflight.$clientSafety.<<<SH
 if [ "$(stream | grep -c '^USE `')" -gt 1 ]; then
   fail 'This backup contains more than one database. Select "Backup contains all databases" to restore it. Nothing was changed.'
 fi
-stream | {$binary} -u \${$prefix}_USER -p\${$prefix}_PASSWORD \${$prefix}_DATABASE
+stream | {$binary} \$client_safety -u \${$prefix}_USER -p\${$prefix}_PASSWORD \${$prefix}_DATABASE
 SH;
         }
 
@@ -315,11 +379,11 @@ SH;
             $source = '{ stream | awk '.escapeshellarg(self::MYSQL_SYSTEM_DATABASE_FILTER)." || echo 'Coolify could not filter the system databases of the backup;'; }";
         }
 
-        return $preflight.<<<SH
+        return $preflight.$clientSafety.<<<SH
 for pid in \$({$root} -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do {$root} -e "KILL \$pid" 2>/dev/null || true; done
 {$root} -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \\`',schema_name,'\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | {$root} || exit 1
 {$root} -e "CREATE DATABASE IF NOT EXISTS \\`{$database}\\`;" || exit 1
-{$source} | {$root} {$database}
+{$source} | {$binary} \$client_safety -u root -p\${{$prefix}_ROOT_PASSWORD} {$database}
 SH;
     }
 

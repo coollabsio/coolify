@@ -67,11 +67,11 @@ it('deletes only named volumes that have the preview suffix enabled', function (
 
     $this->preview->forceDelete();
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker volume rm'), 1);
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'app-data-pr-42'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "sudo docker volume rm -f 'app-data-pr-42'"));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'shared-cache'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'seed-data'));
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume rm'), 1);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f 'app-data-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo docker volume rm -f 'app-data-pr-42'"));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'shared-cache'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'seed-data'));
 });
 
 it('reports Docker volume removal failures and keeps the preview record', function () {
@@ -103,7 +103,7 @@ it('continues removing preview volumes when an earlier volume is already absent'
         'is_preview_suffix_enabled' => true,
     ]);
     Process::fake(function ($process) {
-        if (str_contains($process->command, "docker volume rm -f 'already-removed-pr-42'")) {
+        if (str_contains(remoteProcessScript($process), "docker volume rm -f 'already-removed-pr-42'")) {
             return Process::result(
                 errorOutput: 'Error response from daemon: volume already-removed-pr-42 not found',
                 exitCode: 1,
@@ -115,8 +115,8 @@ it('continues removing preview volumes when an earlier volume is already absent'
 
     $this->preview->forceDelete();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'already-removed-pr-42'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'app-data-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f 'already-removed-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f 'app-data-pr-42'"));
     expect(ApplicationPreview::find($this->preview->id))->toBeNull();
 });
 
@@ -156,7 +156,7 @@ YAML,
 
     $this->preview->forceDelete();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f '{$uuid}_db-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f '{$uuid}_db-pr-42'"));
     expect($this->application->persistentStorages()->pluck('name')->sort()->values()->all())->toBe([
         "{$uuid}_db",
         "{$uuid}_db-pr-43",

@@ -5,7 +5,9 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Rules\ValidFluentBitConfig;
+use App\Rules\ValidHostname;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
@@ -37,6 +39,9 @@ class LogDrains extends Component
 
     #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9_\-\.]+$/'])]
     public ?string $logDrainAxiomApiKey = null;
+
+    #[Validate(['string', 'nullable', new ValidHostname])]
+    public ?string $logDrainAxiomDomain = null;
 
     #[Validate(['string', 'nullable'])]
     public ?string $logDrainCustomConfig = null;
@@ -87,9 +92,11 @@ class LogDrains extends Component
             $this->server->settings->is_logdrain_axiom_enabled = $this->isLogDrainAxiomEnabled;
             $this->server->settings->logdrain_axiom_dataset_name = $this->logDrainAxiomDatasetName;
             $this->server->settings->logdrain_axiom_api_key = $this->logDrainAxiomApiKey;
+            $this->server->settings->logdrain_axiom_domain = $this->logDrainAxiomDomain;
         } else {
             $this->isLogDrainAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
             $this->logDrainAxiomDatasetName = $this->server->settings->logdrain_axiom_dataset_name;
+            $this->logDrainAxiomDomain = $this->server->settings->logdrain_axiom_domain ?: ServerSetting::DEFAULT_AXIOM_DOMAIN;
             $this->logDrainAxiomApiKey = auth()->user()->can('update', $this->server)
                 ? $this->server->settings->logdrain_axiom_api_key
                 : null;
@@ -146,9 +153,6 @@ class LogDrains extends Component
                 $this->syncDataCustom($toModel);
                 $this->syncDataCloudwatch($toModel);
             }
-            if ($this->enabledLogDrainCount() > 0) {
-                $this->server->settings->is_logdrain_highlight_enabled = false;
-            }
             $this->auditLogDrain('updated');
             $this->server->settings->save();
         } else {
@@ -195,6 +199,7 @@ class LogDrains extends Component
                 $this->validate([
                     'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                     'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                    'logDrainAxiomDomain' => ['required', new ValidHostname],
                 ]);
             } catch (\Throwable $e) {
                 $this->isLogDrainAxiomEnabled = false;
@@ -240,6 +245,8 @@ class LogDrains extends Component
                 StopLogDrain::run($this->server);
                 $this->dispatch('success', 'Log drain service stopped.');
             }
+        } catch (ValidationException $e) {
+            return $this->handleValidationError($e);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -251,7 +258,6 @@ class LogDrains extends Component
         $previousAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
         $previousCustomEnabled = $this->server->settings->is_logdrain_custom_enabled;
         $previousCloudwatchEnabled = $this->server->settings->is_logdrain_cloudwatch_enabled;
-        $previousHighlightEnabled = $this->server->settings->is_logdrain_highlight_enabled;
 
         try {
             $this->authorize('update', $this->server);
@@ -279,6 +285,9 @@ class LogDrains extends Component
                 StopLogDrain::run($this->server);
                 $this->dispatch('success', 'Log drain service stopped.');
             }
+        } catch (ValidationException $e) {
+            // Validation runs before anything is saved, so keep the typed values and show the errors under the fields.
+            $this->handleValidationError($e);
         } catch (\Throwable $e) {
             // Restore the previously persisted enabled flags so the UI/DB never
             // claim a runtime state that the Start/StopLogDrain action failed to apply.
@@ -286,7 +295,6 @@ class LogDrains extends Component
             $this->server->settings->is_logdrain_axiom_enabled = $previousAxiomEnabled;
             $this->server->settings->is_logdrain_custom_enabled = $previousCustomEnabled;
             $this->server->settings->is_logdrain_cloudwatch_enabled = $previousCloudwatchEnabled;
-            $this->server->settings->is_logdrain_highlight_enabled = $previousHighlightEnabled;
             $this->server->settings->save();
             $this->syncData();
 
@@ -308,6 +316,13 @@ class LogDrains extends Component
     public function render()
     {
         return view('livewire.server.log-drains');
+    }
+
+    private function handleValidationError(ValidationException $e): mixed
+    {
+        $this->setErrorBag($e->validator->errors());
+
+        return handleError($e, $this);
     }
 
     private function enabledLogDrainCount(): int
@@ -351,6 +366,7 @@ class LogDrains extends Component
             'axiom' => $this->validate([
                 'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                 'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                'logDrainAxiomDomain' => ['required', new ValidHostname],
             ]),
             'custom' => $this->validate([
                 'logDrainCustomConfig' => ['required', new ValidFluentBitConfig],

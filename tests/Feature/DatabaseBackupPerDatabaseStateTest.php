@@ -54,7 +54,7 @@ it('keeps the successful execution of an earlier database when creating the next
     ])->save();
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands->push($command);
 
         return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
@@ -95,7 +95,7 @@ it('finishes the execution of every database in a run with several databases', f
         'team_id' => $team->id,
     ])->save();
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'pg_dump') && str_contains($command, 'second')) {
             return Process::result(errorOutput: 'pg_dump: database "second" does not exist', exitCode: 1);
         }

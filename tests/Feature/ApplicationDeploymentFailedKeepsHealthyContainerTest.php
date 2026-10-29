@@ -67,8 +67,8 @@ function failQueuedCopy(string $queuedCopy): void
 
 function removesContainer(string $containerName): Closure
 {
-    return fn (PendingProcess $process) => str_contains((string) $process->command, 'docker rm -f')
-        && str_contains((string) $process->command, $containerName);
+    return fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker rm -f')
+        && str_contains(remoteProcessScript($process), $containerName);
 }
 
 it('keeps the new container when a deployment fails after the new container became healthy', function () {

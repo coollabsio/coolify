@@ -110,7 +110,7 @@ it('carries the console mode in the token and attaches instead of exec on redeem
         'private_key_id' => $privateKey->id,
     ]);
     $service = app(TerminalSessionService::class);
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker inspect*' => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
         '*' => Process::result(),
     ]);

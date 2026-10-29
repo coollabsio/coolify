@@ -12,8 +12,8 @@
         <div class="application-settings-form flex w-full flex-col gap-6"
             @if ($server->isMetricsEnabled()) x-init="$wire.loadData()" @endif>
             @if ($server->isMetricsEnabled())
-                @if ($live)
-                    <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="loadData" class="hidden"></div>
+                @if ($this->pollSeconds())
+                    <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="pollData" class="hidden"></div>
                 @endif
                 <form wire:submit.prevent="saveMetricsSettings" class="contents">
                     <x-unsaved-bar action="saveMetricsSettings"
@@ -54,7 +54,7 @@
                             ]" />
                         </div>
                         <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                            While live, ranges up to one hour refresh every five seconds. Longer ranges refresh every minute.
+                            Ranges up to one hour refresh live every five seconds. Longer ranges load once; turn on live refresh to update them every minute.
                         </p>
                     </x-application.settings-section>
                 </form>
@@ -63,7 +63,7 @@
                      charts fall into a 2x2 below (mirrors the fleet /metrics layout). --}}
                 <div class="grid gap-6 lg:grid-cols-2">
                     <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage" class="lg:col-span-2"
-                        helper="Percentage of available CPU capacity used by this server.">
+                        helper="Average usage of all CPU cores on this server. 100% means that all cores are fully busy. For example, on a server with 8 cores, one fully busy core shows as 12.5%.">
                         <x-slot:actions>
                             <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
                         </x-slot:actions>
