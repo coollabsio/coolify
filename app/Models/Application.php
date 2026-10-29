@@ -706,13 +706,13 @@ class Application extends BaseModel
         return false;
     }
 
-    public function is_github_based(): bool
+    /**
+     * Watch paths filter Git webhook deployments. Deploy-key applications have no
+     * source but receive manual webhooks, so a source is not required.
+     */
+    public function supportsWatchPaths(): bool
     {
-        if (data_get($this, 'source')) {
-            return true;
-        }
-
-        return false;
+        return $this->git_based() && ! $this->is_public_repository();
     }
 
     public function isGithubAppSource(): bool
