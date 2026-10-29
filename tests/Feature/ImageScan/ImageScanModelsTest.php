@@ -223,28 +223,11 @@ it('keeps one index on the resource of a notification state, the unique key', fu
         ->and($indexes->first()['unique'])->toBeTrue();
 });
 
-it('turns Block deploys on into strict and drops the alert level when it migrates', function () {
-    $migration = require database_path('migrations/2026_10_27_130000_replace_image_scan_gate_enabled_with_gate_mode.php');
-    $migration->down();
-    ImageScanPolicy::query()->whereNull('scope_type')->delete();
-    $rows = [
-        'instance' => [null, null, null],
-        'on' => [$this->server->getMorphClass(), $this->server->id, true],
-        'off' => [$this->team->getMorphClass(), $this->team->id, false],
-        'inherit' => ['App\\Models\\Application', 1, null],
-    ];
-    foreach ($rows as $name => [$type, $id, $gate]) {
-        DB::table('image_scan_policies')->insert(['uuid' => $name, 'scope_type' => $type, 'scope_id' => $id, 'alert_level' => 'high', 'gate_enabled' => $gate]);
-    }
+it('starts with instance rules that do not block deploys and deploy when a scan cannot run', function () {
+    $instance = DB::table('image_scan_policies')->whereNull('scope_type')->whereNull('scope_id')->first();
 
-    $migration->up();
-
-    expect(DB::table('image_scan_policies')->pluck('gate_mode', 'uuid')->all())->toBe([
-        'instance' => 'off',
-        'on' => 'strict',
-        'off' => 'off',
-        'inherit' => null,
-    ])
+    expect($instance->gate_mode)->toBe('off')
+        ->and($instance->on_scan_error)->toBe('deploy')
         ->and(Schema::hasColumns('image_scan_policies', ['alert_level']))->toBeFalse()
         ->and(Schema::hasColumns('image_scan_policies', ['gate_enabled']))->toBeFalse();
 });

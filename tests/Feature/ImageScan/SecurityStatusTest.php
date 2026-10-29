@@ -4,7 +4,6 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityActionType;
 use App\Enums\SecurityStatusType;
-use App\Jobs\RefreshImageScanSummariesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -824,15 +823,5 @@ describe('stored status', function () {
             ->toBe(['check_needed', 'ok', 'check_needed', 'ok'])
             ->and($stored[ResourceScans::key($four[0])]->checkContext)->toBe(['checked' => 1, 'total' => 2])
             ->and($stored[ResourceScans::key($four[0])]->toArray())->toBe(SecurityStatus::stored($four[0])->toArray());
-    });
-
-    it('refreshes the stored status of every team once after the upgrade', function () {
-        statusTestScan($this->application, []);
-        $migration = require database_path('migrations/2026_10_27_120000_refresh_image_scan_security_status.php');
-
-        $migration->up();
-
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job): bool => $job->teamId === $this->team->id);
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
     });
 });
