@@ -4,7 +4,7 @@ use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\TagSelector;
 
 it('selects the newest tag of the line and the newest higher major', function (string $current, array $tags, ?string $line, ?string $major, bool $floating) {
-    expect((new TagSelector)->select($current, $tags))->toBe(['line' => $line, 'major' => $major, 'floating' => $floating]);
+    expect((new TagSelector)->select($current, $tags))->toMatchArray(['line' => $line, 'major' => $major, 'floating' => $floating]);
 })->with([
     'exact tag with suffix' => ['15.0-alpine', ['15.11-alpine', '15.15-alpine', '16.4-alpine', '15.16-rc1-alpine', '15-alpine'], '15.15-alpine', '16.4-alpine', false],
     'floating tag keeps the floating line tag' => ['15-alpine', ['15.11-alpine', '15.15-alpine', '16.4-alpine', '15.16-rc1-alpine', '15-alpine', '16-alpine'], '15-alpine', '16-alpine', true],
@@ -20,12 +20,23 @@ it('selects the newest tag of the line and the newest higher major', function (s
     'invalid tags are ignored' => ['1.0', ['1.1', '1.2 ', '-1.3', '1.4$(id)', '..1.5'], '1.1', null, false],
 ]);
 
+it('selects the newest patch of the same minor before the newest tag of the line', function (string $current, array $tags, ?string $patch, ?string $line) {
+    expect((new TagSelector)->select($current, $tags))->toMatchArray(['patch' => $patch, 'line' => $line]);
+})->with([
+    'patch and newer minor' => ['8.0.40', ['8.0.40', '8.0.41', '8.0.45', '8.4.13', '9.7.4'], '8.0.45', '8.4.13'],
+    'v prefix and suffix are kept' => ['v1.2.3-alpine', ['v1.2.9-alpine', 'v1.2.10', 'v1.5.0-alpine'], 'v1.2.9-alpine', 'v1.5.0-alpine'],
+    'the newest patch is the line tag' => ['1.27.1', ['1.27.1', '1.27.4'], null, '1.27.4'],
+    'no newer patch' => ['8.0.45', ['8.0.45', '8.4.13'], null, '8.4.13'],
+    'two version parts have no patch line' => ['15.4', ['15.4', '15.13'], null, '15.13'],
+    'a floating tag has no patch line' => ['1.27', ['1.27', '1.27.3', '1.28', '1.28.0'], null, '1.28'],
+]);
+
 it('selects tags for an image of a registry with a port', function () {
     $ref = ImageRef::parse('localhost:5000/team/app:1.2');
 
     expect($ref->tag)->toBe('1.2')
         ->and($ref->qualifiedName())->toBe('localhost:5000/team/app')
-        ->and((new TagSelector)->select($ref->tag, ['1.2', '1.3', '2.0']))->toBe(['line' => '1.3', 'major' => '2.0', 'floating' => false]);
+        ->and((new TagSelector)->select($ref->tag, ['1.2', '1.3', '2.0']))->toBe(['line' => '1.3', 'patch' => null, 'major' => '2.0', 'floating' => false]);
 });
 
 it('reads at most 10,000 tags', function () {

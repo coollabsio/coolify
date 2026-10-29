@@ -203,11 +203,12 @@ final class SecuritySentences
                     return null;
                 }
                 $tag = (string) ($action->target ?? self::tagOf((string) $action->ref));
+                $line = self::releaseLine(self::tagOf((string) $scan->image_ref), $tag);
                 $intro = $action->type === SecurityActionType::PullLatest
                     ? "{$registry} has a newer build of {$tag}."
-                    : (self::major($tag) === null
+                    : ($line === null
                         ? "{$tag} is the newest release of this line on {$registry}."
-                        : "{$tag} is the newest ".self::major($tag).".x release on {$registry}.");
+                        : "{$tag} is the newest {$line} release on {$registry}.");
 
                 return "{$intro} Coolify scanned it".self::scannedAt($entry['scanned_at'] ?? null).self::candidateFindings($entry);
             case SecurityActionType::ChangeBase:
@@ -300,11 +301,87 @@ final class SecuritySentences
             return null;
         }
 
-        $major = self::major((string) self::tagOf((string) $scan->image_ref));
-        $release = $major === null ? 'release' : "{$major}.x release";
-        $what = $security->problemCount > 1 ? 'them' : 'this';
+        $one = $security->problemCount <= 1;
+        $entries = collect($scan->candidateEntries());
+        $tag = self::tagOf((string) $scan->image_ref);
+        $checked = 'Coolify checked '.self::registryName((string) $scan->image_ref).self::scannedAt($checkedAt);
 
-        return 'Coolify checked '.self::registryName((string) $scan->image_ref).self::scannedAt($checkedAt).". No newer {$release} fixes {$what} yet.";
+        $newer = $entries->filter(fn (array $entry): bool => in_array($entry['kind'] ?? null, ['same_tag', 'line'], true))
+            ->map(fn (array $entry): string => ($entry['kind'] ?? null) === 'same_tag' ? "a newer build of {$tag}" : (string) self::tagOf((string) ($entry['ref'] ?? '')))
+            ->unique()->values()->all();
+        $line = self::releaseLine($tag, $tag);
+        $sentences = [$newer === []
+            ? "{$checked}: you already run the newest ".($line === null ? "build of {$tag}" : "{$line} version").'.'
+            : "{$checked}: ".self::andList($newer).(count($newer) > 1 ? ' are' : ' is').' newer, but not safer.'];
+
+        $sentences[] = self::noFixPackages($scan, $security, $one);
+
+        $major = $entries->first(fn (array $entry): bool => ($entry['kind'] ?? null) === 'major' && array_key_exists('fixes_problems', $entry));
+        if (is_array($major)) {
+            $fixed = array_flip(array_map(fn ($id): string => mb_strtolower((string) $id), (array) ($major['fixed_ids'] ?? [])));
+            $whyIds = array_map(fn (array $why): string => mb_strtolower((string) $why['display_id']), $security->why);
+            $fixedWhy = count(array_filter($whyIds, fn (string $id): bool => isset($fixed[$id])));
+            $ref = (string) ($major['ref'] ?? '');
+            $sentences[] = ($major['fixes_problems'] ?? false) === true && $fixedWhy > 0
+                ? "{$ref}, a new major version, fixes ".($fixedWhy < count($whyIds) ? 'some of them' : ($one ? 'it' : 'them'))
+                    .'. Coolify does not change major versions for you, because they can need a data migration or code changes: read its upgrade notes first.'
+                : "The newest major version, {$ref}, is not safer either.";
+        }
+
+        return implode(' ', array_filter($sentences));
+    }
+
+    /**
+     * Where the problems of a no_fix image are, and whether a fixed version of those packages exists upstream that the
+     * image does not include yet. Null without known packages.
+     */
+    private static function noFixPackages(ImageScan $scan, ResourceSecurity $security, bool $one): ?string
+    {
+        $packages = array_values(array_unique(array_filter(array_map(fn (array $why): string => (string) $why['package'], $security->why))));
+        if ($packages === []) {
+            return null;
+        }
+
+        $whyIds = array_flip(array_map(fn (array $why): string => mb_strtolower((string) $why['display_id']), $security->why));
+        $findings = array_filter(ResourceScans::findings($scan), fn (Finding $finding): bool => array_intersect_key(
+            array_flip(array_map('mb_strtolower', [$finding->id, $finding->displayId, ...$finding->aliases])), $whyIds) !== []);
+        $withFix = count(array_filter($findings, fn (Finding $finding): bool => $finding->fixState === 'fixed' && filled($finding->fixedIn)));
+        $names = self::andList($packages);
+        $where = ($security->problemCount > count($security->why) ? 'The listed problems are' : ($one ? 'The problem is' : 'The problems are'))." in {$names}";
+
+        return match (true) {
+            $withFix === 0 => "{$where}, and no fixed version of ".(count($packages) > 1 ? 'them' : 'it').' exists yet.',
+            $withFix === count($findings) => "{$where}. Fixed versions exist, but the image does not include them yet.",
+            default => "{$where}. Some of them have a fixed version that the image does not include yet.",
+        };
+    }
+
+    /**
+     * "8.x" for the line of a tag, or "8.0.x" when both tags have three or more version parts with the same minor (a
+     * patch of that minor). Null for a tag that is not a version.
+     */
+    private static function releaseLine(?string $currentTag, ?string $tag): ?string
+    {
+        $parts = fn (?string $value): array => $value !== null && preg_match('/^[^0-9]*(\d+(?:\.\d+)*)/', $value, $match) === 1 ? explode('.', $match[1]) : [];
+        [$current, $candidate] = [$parts($currentTag), $parts($tag)];
+        if ($candidate === []) {
+            return null;
+        }
+        if (count($candidate) >= 3 && count($current) >= 3 && $current[0] === $candidate[0] && $current[1] === $candidate[1] && $currentTag !== $tag) {
+            return "{$candidate[0]}.{$candidate[1]}.x";
+        }
+
+        return "{$candidate[0]}.x";
+    }
+
+    /**
+     * "a", "a and b", "a, b, and c".
+     *
+     * @param  list<string>  $items
+     */
+    private static function andList(array $items): string
+    {
+        return count($items) < 3 ? implode(' and ', $items) : implode(', ', array_slice($items, 0, -1)).', and '.end($items);
     }
 
     /**

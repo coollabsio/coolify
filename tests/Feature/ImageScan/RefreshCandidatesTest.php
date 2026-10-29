@@ -239,6 +239,70 @@ it('says that no newer version is better when the line candidate adds findings w
         ->and(RefreshCandidates::message($scan))->toBe('No newer version of postgres is better yet. Coolify checks again every day.');
 });
 
+it('offers the newest patch of the same minor and does not scan the line when the patch is safer', function () {
+    candidatesFake();
+    $this->tags = ['15.0.1-alpine', '15.0.4-alpine', '15.2.0-alpine'];
+    $this->digests = ['15.0.1-alpine' => CANDIDATES_REPO_DIGEST, '15.0.4-alpine' => CANDIDATES_LINE, '15.2.0-alpine' => CANDIDATES_NEW_BUILD];
+    $scan = candidatesScan('postgres:15.0.1-alpine');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidateStatus())->toBe('ok')
+        ->and(collect($scan->candidateEntries())->where('kind', 'line')->values()->all())->toHaveCount(1)
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'line'))->toMatchArray(['ref' => 'postgres:15.0.4-alpine', 'better' => true])
+        ->and(candidatesRan("'registry:"))->toBe(1);
+});
+
+it('scans the newest tag of the line when the newest patch is not safer', function () {
+    candidatesFake();
+    $this->tags = ['15.0.1-alpine', '15.0.4-alpine', '15.2.0-alpine'];
+    $this->digests = ['15.0.1-alpine' => CANDIDATES_REPO_DIGEST, '15.0.4-alpine' => CANDIDATES_NEW_BUILD, '15.2.0-alpine' => CANDIDATES_LINE];
+    $scan = candidatesScan('postgres:15.0.1-alpine');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    $lines = collect($scan->candidateEntries())->where('kind', 'line')->values();
+    expect($scan->candidateStatus())->toBe('ok')
+        ->and($lines->pluck('better', 'ref')->all())->toBe(['postgres:15.0.4-alpine' => false, 'postgres:15.2.0-alpine' => true])
+        ->and(SecurityActions::forScan($scan, IgnoreMatcher::fromIgnores(collect()))['actions'][0]->target)->toBe('15.2.0-alpine');
+});
+
+it('scans the newest major for information when nothing of the same major is safer', function () {
+    candidatesFake();
+    $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype-candidate-15.11';
+    $this->digests['16.4-alpine'] = CANDIDATES_NEW_BUILD;
+    $this->grype[substr(CANDIDATES_NEW_BUILD, 7)] = 'grype-candidate-15-alpine';
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    $major = collect($scan->candidateEntries())->firstWhere('kind', 'major');
+    expect($scan->candidateStatus())->toBe('no_better')
+        ->and($major)->toMatchArray(['ref' => 'postgres:16.4-alpine', 'better' => false, 'fixes_problems' => true])
+        ->and($major['fixed_ids'])->toContain('CVE-2025-1094')
+        ->and($scan->updateCandidates())->toBe([])
+        ->and(ResourceScans::storedFixedCount($scan))->toBe(0)
+        ->and(candidatesRan("'registry:"))->toBe(2);
+});
+
+it('keeps the status of the check when the scan of the newest major fails', function () {
+    candidatesFake();
+    $this->grype[substr(CANDIDATES_LINE, 7)] = 'grype-candidate-15.11';
+    $this->digests['16.4-alpine'] = 'sha256:'.str_repeat('4', 64);
+    $scan = candidatesScan();
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidateStatus())->toBe('no_better')
+        ->and($scan->candidates['error'])->toBeNull()
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->toMatchArray(['ref' => 'postgres:16.4-alpine', 'scanned_at' => null])
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'major'))->not->toHaveKey('fixes_problems');
+});
+
 it('checks the same tag for a newer build and scans at most 2 candidates', function () {
     candidatesFake();
     $this->digests['15.0-alpine'] = CANDIDATES_NEW_BUILD;

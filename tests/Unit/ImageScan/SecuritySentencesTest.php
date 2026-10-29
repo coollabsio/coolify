@@ -496,10 +496,47 @@ describe('provenance', function () {
         $noFix = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'anyExploited' => true]);
 
         expect(SecuritySentences::provenance(sentenceScan(['candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]), null, $noFix))
-            ->toBe('Coolify checked Docker Hub 3 hours ago. No newer 16.x release fixes this yet.')
-            ->and(SecuritySentences::provenance(sentenceScan(['image_ref' => 'quay.io/keycloak/keycloak:26.0', 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2])))
-            ->toBe('Coolify checked Quay 3 hours ago. No newer 26.x release fixes them yet.')
+            ->toBe('Coolify checked Docker Hub 3 hours ago: you already run the newest 16.x version.')
+            ->and(SecuritySentences::provenance(sentenceScan(['image_ref' => 'quay.io/keycloak/keycloak:26.0', 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => [
+                [...sentenceCandidate('quay.io/keycloak/keycloak:26.0', 'same_tag'), 'better' => false],
+                [...sentenceCandidate('quay.io/keycloak/keycloak:26.4', 'line'), 'better' => false],
+            ]]]), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 2])))
+            ->toBe('Coolify checked Quay 3 hours ago: a newer build of 26.0 and 26.4 are newer, but not safer.')
             ->and(SecuritySentences::provenance(sentenceScan(['candidates' => ['status' => 'failed', 'entries' => []]]), null, $noFix))->toBeNull()
             ->and(SecuritySentences::provenance(sentenceScan(), null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'builderImage' => true])))->toBeNull();
+    });
+
+    it('names the packages of a no-fix problem and whether a fixed version of them exists', function (string $fixState, ?string $fixedIn, string $text) {
+        $finding = ['id' => 'CVE-2024-6119', 'aliases' => [], 'severity' => 'medium', 'package' => 'openssl', 'version' => '3.5.8', 'type' => 'rpm',
+            'artifactId' => 'a', 'fixedIn' => $fixedIn, 'fixState' => $fixState, 'kev' => false, 'epss' => 0.5, 'risk' => 1.0, 'summary' => '', 'displayId' => 'CVE-2024-6119'];
+        $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'medium', 'signal' => 'likely', 'package' => 'openssl', 'version' => '3.5.8']];
+        $scan = sentenceScan(['image_ref' => 'mysql:8', 'findings' => [$finding], 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => []]]);
+
+        expect(SecuritySentences::provenance($scan, null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'why' => $why])))
+            ->toBe('Coolify checked Docker Hub 3 hours ago: you already run the newest 8.x version. '.$text);
+    })->with([
+        'no fixed package' => ['not-fixed', null, 'The problem is in openssl, and no fixed version of it exists yet.'],
+        'a fixed package the image does not include' => ['fixed', '3.5.9', 'The problem is in openssl. Fixed versions exist, but the image does not include them yet.'],
+    ]);
+
+    it('says whether the newest major version would fix the problems, without offering it', function (bool $fixes, array $fixedIds, string $text) {
+        $why = [['title' => 'TLS name checks', 'display_id' => 'CVE-2024-6119', 'link' => null, 'score' => 7.5, 'severity' => 'medium', 'signal' => 'likely', 'package' => '', 'version' => '']];
+        $major = [...sentenceCandidate('mysql:26', 'major'), 'better' => false, 'fixes_problems' => $fixes, 'fixed_ids' => $fixedIds];
+        $scan = sentenceScan(['image_ref' => 'mysql:8', 'candidates' => ['status' => 'no_better', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => [$major]]]);
+
+        expect(SecuritySentences::provenance($scan, null, sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'why' => $why])))
+            ->toBe('Coolify checked Docker Hub 3 hours ago: you already run the newest 8.x version. '.$text);
+    })->with([
+        'fixes it' => [true, ['CVE-2024-6119'], 'mysql:26, a new major version, fixes it. Coolify does not change major versions for you, because they can need a data migration or code changes: read its upgrade notes first.'],
+        'not safer' => [false, ['CVE-2024-6119'], 'The newest major version, mysql:26, is not safer either.'],
+        'safer, but not for these problems' => [true, [], 'The newest major version, mysql:26, is not safer either.'],
+    ]);
+
+    it('names the patch line of an exact tag', function () {
+        $scan = sentenceScan(['image_ref' => 'mysql:8.0.40', 'candidates' => ['status' => 'ok', 'checked_at' => CarbonImmutable::now()->subHours(3)->toIso8601String(), 'entries' => [sentenceCandidate('mysql:8.0.45', 'line')]]]);
+        $action = new SecurityAction(SecurityActionType::UpdateImage, 'Update to 8.0.45.', '8.0.45', null, [], true, 'mysql:8.0.40', 'mysql:8.0.45');
+
+        expect(SecuritySentences::provenance($scan, $action, sentenceUpdateAvailable()))
+            ->toBe('8.0.45 is the newest 8.0.x release on Docker Hub. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.');
     });
 });

@@ -17,16 +17,18 @@ final class TagSelector
     /**
      * `line`: newest tag of the same major. When the current tag is floating (`15-alpine`, other tags such as
      * `15.4-alpine` extend it), that is the newest floating tag of the line, else the newest exact tag.
-     * `major`: newest tag of a higher major, for information only. Both null for a tag that is not a version.
+     * `patch`: for an exact tag with three or more version parts (`8.0.40`), the newest tag of the same major and minor
+     * (`8.0.45`), the smallest change; null when it is the `line` tag.
+     * `major`: newest tag of a higher major, for information only. All null for a tag that is not a version.
      *
      * @param  list<string>  $tags
-     * @return array{line: ?string, major: ?string, floating: bool}
+     * @return array{line: ?string, patch: ?string, major: ?string, floating: bool}
      */
     public function select(string $currentTag, array $tags): array
     {
         $current = $this->parse($currentTag);
         if ($current === null) {
-            return ['line' => null, 'major' => null, 'floating' => false];
+            return ['line' => null, 'patch' => null, 'major' => null, 'floating' => false];
         }
 
         $sameKind = [];
@@ -53,10 +55,17 @@ final class TagSelector
             $line = null;
         }
 
+        $patch = null;
+        if (! $floating && count($current['parts']) >= 3) {
+            $patch = $this->newest(array_filter($sameShape, fn (array $parts) => $parts[0] === $current['parts'][0]
+                && $parts[1] === $current['parts'][1] && $this->compare($parts, $current['parts']) > 0));
+            $patch = $patch === $line ? null : $patch;
+        }
+
         $higherMajor = fn (array $parts) => $parts[0] > $current['parts'][0];
         $major = $this->newest(array_filter($sameShape, $higherMajor)) ?? $this->newest(array_filter($sameKind, $higherMajor));
 
-        return ['line' => $line, 'major' => $major, 'floating' => $floating];
+        return ['line' => $line, 'patch' => $patch, 'major' => $major, 'floating' => $floating];
     }
 
     /**

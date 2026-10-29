@@ -304,7 +304,7 @@ class RefreshCandidates
         $tag = $this->image->tag ?? 'latest';
         $selector = new TagSelector;
         $isVersion = $selector->isVersion($tag);
-        $selected = ['line' => null, 'major' => null, 'floating' => false];
+        $selected = ['line' => null, 'patch' => null, 'major' => null, 'floating' => false];
 
         if ($isVersion) {
             $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
@@ -316,41 +316,45 @@ class RefreshCandidates
             $selected = $selector->select($tag, $tags);
         }
 
-        $toScan = [];
+        // The smallest change first: a newer build of the same tag, the newest patch of the same minor, then the newest
+        // tag of the major. A safer patch ends the search of the line. At most MAX_CANDIDATE_SCANS scans per check.
+        $entries = [];
+        $scannedDigests = [];
         if ($scan->repo_digest !== null) {
             $digest = $this->digest($tag);
             if ($digest === null && ($this->authRequired || ! $isVersion)) {
                 return $this->failure();
             }
             if ($digest !== null && $digest !== $scan->repo_digest) {
-                $toScan[] = ['kind' => 'same_tag', 'tag' => $tag, 'digest' => $digest];
+                $scannedDigests[] = $digest;
+                $entries = [...$entries, ...$this->evaluate($scan, $resource, [['kind' => 'same_tag', 'tag' => $tag, 'digest' => $digest]], $platform, $lockWaitSeconds)];
             }
         }
 
-        if ($selected['line'] !== null && $selected['line'] !== $tag) {
-            $digest = $this->digest($selected['line']);
+        foreach (array_filter([$selected['patch'], $selected['line']], fn (?string $lineTag): bool => $lineTag !== null && $lineTag !== $tag) as $lineTag) {
+            if (count($scannedDigests) >= self::MAX_CANDIDATE_SCANS) {
+                break;
+            }
+            $digest = $this->digest($lineTag);
             if ($digest === null) {
                 $this->error ??= 'registry';
-            } elseif ($digest !== $scan->repo_digest && ! in_array($digest, array_column($toScan, 'digest'), true)) {
-                $toScan[] = ['kind' => 'line', 'tag' => $selected['line'], 'digest' => $digest];
+
+                continue;
+            }
+            if ($digest === $scan->repo_digest || in_array($digest, $scannedDigests, true)) {
+                continue;
+            }
+            $scannedDigests[] = $digest;
+            $lineEntries = $this->evaluate($scan, $resource, [['kind' => 'line', 'tag' => $lineTag, 'digest' => $digest]], $platform, $lockWaitSeconds);
+            $entries = [...$entries, ...$lineEntries];
+            if (($lineEntries[0]['better'] ?? false) === true) {
+                break;
             }
         }
 
-        $entries = $this->evaluate($scan, $resource, array_slice($toScan, 0, self::MAX_CANDIDATE_SCANS), $platform, $lockWaitSeconds);
-
         if ($selected['major'] !== null) {
-            $entries[] = [
-                'ref' => (string) $this->image->withTag($selected['major']),
-                'digest' => null,
-                'kind' => 'major',
-                'better' => false,
-                'fixed_ids' => [],
-                'fixes' => null,
-                'added' => null,
-                'left' => null,
-                'eol' => null,
-                'scanned_at' => null,
-            ];
+            $entries[] = $this->majorEntry($scan, $resource, $selected['major'], $platform, $lockWaitSeconds,
+                withScan: ! in_array(true, array_column($entries, 'better'), true) && count($scannedDigests) < self::MAX_CANDIDATE_SCANS);
         }
 
         $scanned = array_filter($entries, fn (array $entry) => $entry['kind'] !== 'major');
@@ -366,6 +370,44 @@ class RefreshCandidates
             'error' => $this->error,
             'entries' => $entries,
         ];
+    }
+
+    /**
+     * The newest tag of a higher major. It is never offered as an update: a major version can need a data migration or
+     * code changes. When nothing of the same major is safer and the check has a scan left, Coolify scans it, so the
+     * page can say whether it would fix the problems (`fixes_problems`, the "better" rule). Its registry and scan
+     * problems never change the status of the check.
+     *
+     * @return array<string, mixed>
+     */
+    private function majorEntry(ImageScan $scan, Model $resource, string $majorTag, string $platform, int $lockWaitSeconds, bool $withScan): array
+    {
+        $entry = [
+            'ref' => (string) $this->image->withTag($majorTag),
+            'digest' => null,
+            'kind' => 'major',
+            'better' => false,
+            'fixed_ids' => [],
+            'fixes' => null,
+            'added' => null,
+            'left' => null,
+            'eol' => null,
+            'scanned_at' => null,
+        ];
+        if (! $withScan) {
+            return $entry;
+        }
+
+        [$error, $authRequired] = [$this->error, $this->authRequired];
+        $digest = $this->digest($majorTag);
+        $scanned = $digest === null ? [] : $this->evaluate($scan, $resource, [['kind' => 'major', 'tag' => $majorTag, 'digest' => $digest]], $platform, $lockWaitSeconds);
+        [$this->error, $this->authRequired] = [$error, $authRequired];
+
+        if ($scanned === []) {
+            return $entry;
+        }
+
+        return [...$scanned[0], 'better' => false, 'fixes_problems' => $scanned[0]['better']];
     }
 
     /**
