@@ -496,6 +496,21 @@ describe('service', function () {
         expect($service->environment_variables()->where('key', 'NGINX_VERSION')->value('value'))->toBe('{{team.NGINX_VERSION}}');
     });
 
+    it('refuses a variable that the service compose file also uses in another place', function () {
+        $service = updateImageService(['web' => 'nginx:${NGINX_VERSION:-1.27}']);
+        $service->forceFill(['docker_compose_raw' => Yaml::dump(['services' => ['web' => [
+            'image' => 'nginx:${NGINX_VERSION:-1.27}',
+            'labels' => ['version=${NGINX_VERSION}'],
+        ]]], 10, 2)])->save();
+        $web = updateImageSubResource($service, 'web', 'nginx:${NGINX_VERSION:-1.27}');
+        updateImageScan($web, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+        RestartService::shouldRun()->never();
+
+        expect(fn () => UpdateResourceImage::run($web, 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The compose file uses the variable NGINX_VERSION in another place too.');
+        expect($service->environment_variables()->where('key', 'NGINX_VERSION')->exists())->toBeFalse();
+    });
+
     it('offers no update for an image that the compose file sets in a way Coolify cannot change', function () {
         $service = updateImageService(['web' => '${REPO}:${VERSION}']);
         $web = updateImageSubResource($service, 'web', '${REPO}:${VERSION}');
@@ -632,6 +647,65 @@ describe('compose app', function () {
         expect(fn () => UpdateResourceImage::run($application->fresh(), 'nginx:1.29', $this->admin))
             ->toThrow(ImageUpdateRefused::class, 'This app deploys its compose file as written.');
         expect($application->fresh()->docker_compose_image_overrides)->toBeNull();
+    });
+
+    it('refuses a compose app with a custom command and offers no update', function (string $field, string $message) {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->forceFill([$field => 'docker compose up -d'])->save();
+        $scan = updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.27', 'same_tag')]);
+
+        expect(UpdateResourceImage::blockedReason($scan, $application->fresh()))->toBe($message)
+            ->and(fn () => UpdateResourceImage::run($application->fresh(), 'nginx:1.27', $this->admin))->toThrow(ImageUpdateRefused::class, $message);
+        expect(ImageStartPin::take($application))->toBe([])
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+    })->with([
+        'build command' => ['docker_compose_custom_build_command', 'This app uses a custom build command, so Coolify cannot choose the image. Change the image in your compose file.'],
+        'start command' => ['docker_compose_custom_start_command', 'This app uses a custom start command, so Coolify cannot choose the image. Change the image in your compose file.'],
+    ]);
+
+    it('offers no update for a compose service image that Coolify cannot change', function () {
+        $application = updateImageComposeApplication(['web' => '${REGISTRY}/acme/app:1.0']);
+        $scan = updateImageScan($application, 'ghcr.io/acme/app:1.0', [updateImageEntry('ghcr.io/acme/app:1.1')]);
+
+        expect(UpdateResourceImage::blockedReason($scan, $application))
+            ->toBe('No service of the compose file runs this image in a way Coolify can change. Change the version in the compose file.');
+        updateImagePage($this->admin, $application, 'application')->assertDontSeeHtml('updateImage(');
+    });
+
+    it('offers the update for a compose service that an override or a variable sets', function (array $images, ?array $overrides, string $scanned) {
+        $application = updateImageComposeApplication($images);
+        $application->forceFill(['docker_compose_image_overrides' => $overrides])->save();
+        $scan = updateImageScan($application, $scanned, [updateImageEntry('nginx:1.31')]);
+
+        expect(UpdateResourceImage::blockedReason($scan, $application->fresh()))->toBeNull();
+    })->with([
+        'override' => [['web' => 'nginx:1.27'], ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']], 'nginx:1.29'],
+        'variable' => [['web' => 'nginx:${NGINX_VERSION:-1.29}'], null, 'nginx:1.29'],
+    ]);
+
+    it('refuses a variable that the compose file also uses in another place', function (array $web) {
+        $application = updateImageComposeApplication(['web' => 'nginx:1.27']);
+        $application->forceFill(['docker_compose_raw' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:${NGINX_VERSION:-1.27}', ...$web]]], 10, 2)])->save();
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+
+        expect(fn () => UpdateResourceImage::run($application->fresh(), 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The compose file uses the variable NGINX_VERSION in another place too. Change the version in the compose file.');
+        expect($application->environment_variables()->where('key', 'NGINX_VERSION')->exists())->toBeFalse()
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+    })->with([
+        'environment' => [['environment' => ['APP_VERSION' => '${NGINX_VERSION}']]],
+        'label' => [['labels' => ['version=$NGINX_VERSION']]],
+        'command' => [['command' => 'echo ${NGINX_VERSION:-none}']],
+    ]);
+
+    it('refuses a locked variable that sets the image', function () {
+        $application = updateImageComposeApplication(['web' => 'nginx:${NGINX_VERSION:-1.27}']);
+        $application->environment_variables()->create(['key' => 'NGINX_VERSION', 'value' => '1.27', 'is_preview' => false, 'is_shown_once' => true]);
+        updateImageScan($application, 'nginx:1.27', [updateImageEntry('nginx:1.29')]);
+
+        expect(fn () => UpdateResourceImage::run($application->fresh(), 'nginx:1.29', $this->admin))
+            ->toThrow(ImageUpdateRefused::class, 'The variable NGINX_VERSION is locked, so Coolify does not change it.');
+        expect($application->environment_variables()->where('key', 'NGINX_VERSION')->value('value'))->toBe('1.27');
     });
 
     it('shows the override on the Security card and removes it', function () {

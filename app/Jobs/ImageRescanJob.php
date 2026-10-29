@@ -14,6 +14,7 @@ use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScannerCommands;
@@ -201,16 +202,24 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
     /**
      * An ignore that ended counts its findings again: the stored counts of the resources it covered are written again,
-     * also for images that no longer run. Once per team and day, for ignores that ended in the last two days.
+     * also for images that no longer run. Once per team and day, for ignores that ended in the last two days: by their
+     * end date, or by the 90 days after which an ignore no longer covers a problem with an exploit signal.
      */
     private function refreshCountsAfterEndedIgnores(Server $server): void
     {
         try {
+            $signalLimit = now()->subDays(IgnoreMatcher::EXPLOIT_SIGNAL_IGNORE_DAYS);
             $ended = ImageScanIgnore::query()
                 ->where('team_id', $server->team_id)
-                ->whereNotNull('expires_at')
-                ->where('expires_at', '<=', now())
-                ->where('expires_at', '>', now()->subDays(2))
+                ->where(fn ($query) => $query
+                    ->where(fn ($query) => $query
+                        ->whereNotNull('expires_at')
+                        ->where('expires_at', '<=', now())
+                        ->where('expires_at', '>', now()->subDays(2)))
+                    ->orWhere(fn ($query) => $query
+                        ->where('created_at', '<=', $signalLimit)
+                        ->where('created_at', '>', $signalLimit->copy()->subDays(2))
+                        ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()->subDays(2)))))
                 ->get();
             if ($ended->isEmpty() || ! Cache::add("image-scan:ended-ignores:{$server->team_id}:".now()->toDateString(), true, now()->addDay())) {
                 return;

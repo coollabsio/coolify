@@ -165,6 +165,16 @@ class ImageScanPolicyResolver
         };
     }
 
+    /**
+     * The instance allows scanning and an app did not turn its scan off. Reads no rules and no server, so a caller can
+     * stop before it resolves them.
+     */
+    public static function isAllowedFor(Model $resource): bool
+    {
+        return (bool) InstanceSettings::get()->is_image_scanning_allowed
+            && (! $resource instanceof Application || (bool) $resource->settings?->is_image_scan_enabled);
+    }
+
     public static function isScanOn(Model $resource): bool
     {
         return self::offState($resource) === null;

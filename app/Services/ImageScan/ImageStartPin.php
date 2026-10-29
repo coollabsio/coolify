@@ -34,15 +34,28 @@ final class ImageStartPin
     }
 
     /**
-     * The pins of the owner, which the start uses up.
+     * The pins of the owner, which the start uses up. With a server, each server gets the same pins once until they
+     * expire: an app that deploys to more servers runs one deploy per server, and each pulls the scanned build.
      *
      * @return array<string, array{ref: string, pull: string}> Keyed by the normalized image ref.
      */
-    public static function take(Model $owner): array
+    public static function take(Model $owner, int|string|null $server = null): array
     {
-        $pins = Cache::pull(self::key($owner));
+        if ($server === null) {
+            $pins = Cache::pull(self::key($owner));
 
-        return is_array($pins) ? $pins : [];
+            return is_array($pins) ? $pins : [];
+        }
+
+        $pins = self::peek($owner);
+        if ($pins === []) {
+            return [];
+        }
+
+        // A new pin of the owner changes the set, so every server takes it again.
+        $taken = self::key($owner).':taken:'.$server.':'.md5(serialize($pins));
+
+        return Cache::add($taken, true, now()->addHours(self::TTL_HOURS)) ? $pins : [];
     }
 
     public static function forget(Model $owner): void

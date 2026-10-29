@@ -127,6 +127,7 @@ function composeApp(bool $raw = false): Application
     $app->compose_parsing_version = '5';
     $app->setRelation('settings', new ApplicationSetting(['is_raw_compose_deployment_enabled' => $raw]));
     $app->docker_compose = "services:\n  web:\n    build: .\n    image: 'k8w2c9_web:4f1c2d3'\n  worker:\n    build:\n      context: ./worker\n    image: 'ghcr.io/acme/worker:2.0'\n  db:\n    image: 'postgres:16'\n";
+    $app->docker_compose_raw = "services:\n  web:\n    build: .\n  worker:\n    build:\n      context: ./worker\n    image: 'ghcr.io/acme/worker:2.0'\n  db:\n    image: 'postgres:16'\n";
     $app->syncOriginal();
 
     return $app;
@@ -177,7 +178,7 @@ describe('third-party images', function () {
 
         expect($result['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpdateImage)
             ->and($result['byFinding']['CVE-2']->type)->toBe(SecurityActionType::PullLatest)
-            ->and($result['byFinding']['CVE-2']->sentence)->toBe('A newer build of this image fixes it. Pull it and restart.')
+            ->and($result['byFinding']['CVE-2']->sentence)->toBe('Pull the newer build of postgres:15.0-alpine and restart.')
             ->and($result['byFinding']['CVE-2']->button)->toBeTrue()
             ->and($result['actions'])->toHaveCount(2);
     });
@@ -497,7 +498,7 @@ describe('compose builds and builder images', function () {
         $action = actionsFor($scan)['byFinding']['CVE-1'];
 
         expect($action->type)->toBe(SecurityActionType::PullLatest)
-            ->and($action->sentence)->toBe('A newer build of this image fixes it. Pull it and redeploy.')
+            ->and($action->sentence)->toBe('Pull the newer build of postgres:16 and redeploy.')
             ->and($action->target)->toBe('16')
             ->and($action->button)->toBeTrue();
     });

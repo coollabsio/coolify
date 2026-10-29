@@ -12,6 +12,9 @@ use Illuminate\Support\Collection;
  */
 final class IgnoreMatcher
 {
+    /** An ignore of a problem with an exploit signal applies for at most this many days after it was made (spec 15.2). */
+    public const EXPLOIT_SIGNAL_IGNORE_DAYS = 90;
+
     /** @var array<string, list<ImageScanIgnore>> */
     private array $byVulnerability = [];
 
@@ -72,17 +75,38 @@ final class IgnoreMatcher
 
     public function matches(Finding $finding): ?ImageScanIgnore
     {
+        $exploitSignal = SecurityRules::exploitSignal($finding) !== null && ! SecurityRules::isCpeOnlyOsMatch($finding);
+
         foreach ([$finding->id, ...$finding->aliases] as $candidate) {
             foreach ($this->byVulnerability[$this->normalize($candidate)] ?? [] as $ignore) {
                 $package = $this->normalizePackage($ignore->package);
 
-                if ($package === null || $package === $finding->package) {
+                if (($package === null || $package === $finding->package) && $this->applies($ignore, $exploitSignal)) {
                     return $ignore;
                 }
             }
         }
 
-        return $this->byPackage[$finding->package][0] ?? null;
+        foreach ($this->byPackage[$finding->package] ?? [] as $ignore) {
+            if ($this->applies($ignore, $exploitSignal)) {
+                return $ignore;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * An ignore of a problem with an exploit signal ends 90 days after it was made, also when it was set to never end
+     * or the problem got the signal later (a team-wide or package ignore, a new KEV entry).
+     */
+    private function applies(ImageScanIgnore $ignore, bool $exploitSignal): bool
+    {
+        if (! $exploitSignal || $ignore->created_at === null) {
+            return true;
+        }
+
+        return $ignore->created_at->gte(now()->subDays(self::EXPLOIT_SIGNAL_IGNORE_DAYS));
     }
 
     private function normalize(?string $value): ?string

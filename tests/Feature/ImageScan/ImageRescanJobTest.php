@@ -570,6 +570,30 @@ describe('ended ignores', function () {
 
         Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
     });
+
+    it('queues a refresh of the team counts when a never-ending ignore reached its 90 days', function () {
+        rescanTestFake();
+        Queue::fake();
+        $this->travelTo(now()->subDays(90)->subHour());
+        ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => null, 'resource_id' => null, 'expires_at' => null]);
+        $this->travelBack();
+
+        rescanTestRun();
+
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
+    });
+
+    it('queues no refresh for a never-ending ignore before its 90 days', function () {
+        rescanTestFake();
+        Queue::fake();
+        $this->travelTo(now()->subDays(89));
+        ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => null, 'resource_id' => null, 'expires_at' => null]);
+        $this->travelBack();
+
+        rescanTestRun();
+
+        Queue::assertNotPushed(RefreshImageScanSummariesJob::class);
+    });
 });
 
 describe('retention', function () {

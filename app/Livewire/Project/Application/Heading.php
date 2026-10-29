@@ -8,6 +8,7 @@ use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\SecurityCard;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -167,7 +168,8 @@ class Heading extends Component
     #[Computed]
     public function imageScanGate(): ?array
     {
-        if (! instanceSettings()->is_image_scanning_allowed) {
+        // The gate never runs without both. Scanning off on the server still shows: the gate reports it.
+        if (! ImageScanPolicyResolver::isAllowedFor($this->application)) {
             return null;
         }
 

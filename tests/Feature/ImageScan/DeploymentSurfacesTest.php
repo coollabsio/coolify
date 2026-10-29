@@ -380,6 +380,23 @@ describe('topbar warning', function () {
         $component->assertDontSeeHtml('data-image-scan-gate');
     });
 
+    it('reads no deployment when the app scan is off', function () {
+        surfacesDeployment(['scan_gate_result' => surfacesBlockedResult()]);
+        $this->application->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $component = Livewire::test(Heading::class, ['application' => $this->application->fresh()]);
+
+        DB::enableQueryLog();
+        $gate = $component->instance()->imageScanGate();
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        expect($gate)->toBeNull()
+            ->and($queries->filter(fn (string $query) => str_contains($query, 'application_deployment_queues')))->toBeEmpty();
+        $component->assertDontSeeHtml('data-image-scan-gate');
+    });
+
     it('ignores blocked preview deployments', function () {
         surfacesDeployment(['pull_request_id' => 7, 'scan_gate_result' => surfacesBlockedResult()]);
         $this->actingAs($this->admin);

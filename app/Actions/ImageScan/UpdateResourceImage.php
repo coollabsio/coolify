@@ -51,6 +51,8 @@ class UpdateResourceImage
 {
     use AsAction;
 
+    private const NO_COMPOSE_SERVICE = 'No service of the compose file runs this image in a way Coolify can change. Change the version in the compose file.';
+
     /**
      * @throws AuthorizationException When the user may not update the resource, or the resource belongs to Coolify (id 0).
      * @throws ImageUpdateRefused When the ref is not a better candidate, or the update cannot start.
@@ -208,6 +210,14 @@ class UpdateResourceImage
             if ($refused !== null) {
                 return $refused;
             }
+
+            try {
+                if (self::composeMatches($owner, self::composeServices($owner), $owner->activeComposeImageOverrides(), (string) $scan->image_ref) === []) {
+                    return self::NO_COMPOSE_SERVICE;
+                }
+            } catch (ImageUpdateRefused $e) {
+                return $e->getMessage();
+            }
         }
 
         $image = (string) $owner->getAttribute('image');
@@ -306,28 +316,17 @@ class UpdateResourceImage
                 continue;
             }
 
-            $matched = false;
-            foreach ($services as $name => $image) {
-                $variable = ComposeImageVariable::parse($image);
-                if ($variable !== null) {
-                    $current = $variable->resolve($this->variableValue($application, $variable->key));
-                    if ($current !== null && self::sameImage($current, $change['old'])) {
-                        $variables = $this->addVariable($variables, $variable->key, $variable->valueFor($current, $change['tag']));
-                        $variableServices[$name] = true;
-                        $matched = true;
-                    }
-
-                    continue;
-                }
-
-                $current = $overrides[$name]['to'] ?? $image;
-                if (! ComposeImageVariable::hasVariable($image) && self::sameImage($current, $change['old'])) {
-                    $overrides[$name] = ['from' => $image, 'to' => $this->withTag($current, $change['tag'])];
-                    $matched = true;
-                }
+            $matches = self::composeMatches($application, $services, $overrides, $change['old']);
+            if ($matches === []) {
+                throw new ImageUpdateRefused(self::NO_COMPOSE_SERVICE);
             }
-            if (! $matched) {
-                throw new ImageUpdateRefused('No service of the compose file runs this image in a way Coolify can change. Change the version in the compose file.');
+            foreach ($matches as $name => $match) {
+                if ($match['variable'] !== null) {
+                    $variables = $this->addVariable($variables, $match['variable']->key, $match['variable']->valueFor($match['current'], $change['tag']));
+                    $variableServices[$name] = $match['variable']->key;
+                } else {
+                    $overrides[$name] = ['from' => $services[$name], 'to' => $this->withTag($match['current'], $change['tag'])];
+                }
             }
         }
 
@@ -338,6 +337,7 @@ class UpdateResourceImage
                 throw new ImageUpdateRefused("The variable {$variable->key} also sets the image of {$name}. Change the versions in the compose file.");
             }
         }
+        self::refuseOtherVariableUses((string) $application->docker_compose_raw, $variableServices);
 
         $application->docker_compose_image_overrides = $overrides === [] ? null : $overrides;
         $application->save();
@@ -438,6 +438,7 @@ class UpdateResourceImage
         $targets = [];
         $variables = [];
         $variableOwners = [];
+        $variableServices = [];
         $pinned = false;
         foreach ($changes as $change) {
             if ($change['same_tag']) {
@@ -457,6 +458,7 @@ class UpdateResourceImage
                 $this->refuseSharedVariable($service, $variable->key, $changes);
                 $variables = $this->addVariable($variables, $variable->key, $variable->valueFor($current, $change['tag']));
                 $variableOwners[] = (string) $change['owner']->getAttribute('uuid');
+                $variableServices[(string) $change['owner']->getAttribute('name')] = $variable->key;
 
                 continue;
             }
@@ -469,6 +471,8 @@ class UpdateResourceImage
                 $targets[$subResource->getMorphClass().':'.$subResource->getKey()] = ['resource' => $subResource, 'tag' => $change['tag']];
             }
         }
+
+        self::refuseOtherVariableUses((string) $service->docker_compose_raw, $variableServices);
 
         $oldCompose = $service->docker_compose_raw;
         $oldImages = array_map(fn (array $target): string => (string) $target['resource']->image, $targets);
@@ -525,8 +529,77 @@ class UpdateResourceImage
         if ((int) $application->compose_parsing_version < 3) {
             return 'Change the version in the compose file of this app, then redeploy.';
         }
+        // The command can build, pull, or start other images than the compose file names.
+        if (filled($application->docker_compose_custom_build_command)) {
+            return 'This app uses a custom build command, so Coolify cannot choose the image. Change the image in your compose file.';
+        }
+        if (filled($application->docker_compose_custom_start_command)) {
+            return 'This app uses a custom start command, so Coolify cannot choose the image. Change the image in your compose file.';
+        }
 
         return null;
+    }
+
+    /**
+     * The services of the compose file that run the image in a way Coolify can change: an image line (or the override
+     * that replaced it), or a variable that sets the image. Keyed by the service name, with the image it runs now.
+     *
+     * @param  array<string, string>  $services
+     * @param  array<string, array{from: string, to: string}>  $overrides
+     * @return array<string, array{variable: ?ComposeImageVariable, current: string}>
+     */
+    private static function composeMatches(Application $application, array $services, array $overrides, string $imageRef): array
+    {
+        $matches = [];
+        foreach ($services as $name => $image) {
+            $variable = ComposeImageVariable::parse($image);
+            if ($variable !== null) {
+                $current = $variable->resolve(self::variableValue($application, $variable->key));
+            } else {
+                $current = ComposeImageVariable::hasVariable($image) ? null : ($overrides[$name]['to'] ?? $image);
+            }
+
+            if ($current !== null && self::sameImage($current, $imageRef)) {
+                $matches[$name] = ['variable' => $variable, 'current' => $current];
+            }
+        }
+
+        return $matches;
+    }
+
+    /**
+     * A variable that the update changes must set only the image lines it changes. Anywhere else in the compose file
+     * (environment, labels, a command, another image) the new value would change more than the image.
+     *
+     * @param  array<string, string>  $variableServices  The variable per compose service whose image it sets.
+     */
+    private static function refuseOtherVariableUses(string $rawCompose, array $variableServices): void
+    {
+        if ($variableServices === []) {
+            return;
+        }
+
+        try {
+            $compose = parseDockerComposeYaml($rawCompose);
+        } catch (Throwable) {
+            $compose = null;
+        }
+        if (! is_array($compose)) {
+            throw new ImageUpdateRefused('The compose file is not valid.');
+        }
+
+        foreach (array_keys($variableServices) as $name) {
+            if (is_array($compose['services'][$name] ?? null)) {
+                unset($compose['services'][$name]['image']);
+            }
+        }
+
+        $rest = (string) json_encode($compose, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        foreach (array_unique(array_values($variableServices)) as $key) {
+            if (preg_match('/\$\{?'.preg_quote($key, '/').'(?![A-Za-z0-9_])/', $rest) === 1) {
+                throw new ImageUpdateRefused("The compose file uses the variable {$key} in another place too. Change the version in the compose file.");
+            }
+        }
     }
 
     /**
@@ -573,7 +646,7 @@ class UpdateResourceImage
     /**
      * The value of a Coolify environment variable of the resource; null when it is not set.
      */
-    private function variableValue(Application|Service $resource, string $key): ?string
+    private static function variableValue(Application|Service $resource, string $key): ?string
     {
         $variable = $resource->environment_variables()->where('key', $key)->where('is_preview', false)->first();
 
@@ -622,6 +695,9 @@ class UpdateResourceImage
         $old = [];
         foreach ($variables as $key => $value) {
             $variable = $resource->environment_variables()->where('key', $key)->where('is_preview', false)->first();
+            if ($variable instanceof EnvironmentVariable && $variable->is_shown_once) {
+                throw new ImageUpdateRefused("The variable {$key} is locked, so Coolify does not change it.");
+            }
             if ($variable instanceof EnvironmentVariable && str_contains((string) $variable->value, '{{')) {
                 throw new ImageUpdateRefused("The variable {$key} refers to another variable. Change the version there.");
             }

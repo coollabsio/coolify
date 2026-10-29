@@ -60,6 +60,19 @@ describe('pins', function () {
         ]])->and(ImageStartPin::take($database))->toBe([]);
     });
 
+    it('gives the pins once to each server that starts the owner', function () {
+        $database = create_standalone_postgresql($this->environment->id, $this->destination);
+        ImageStartPin::put($database, 'postgres:16-alpine', START_PIN_DIGEST);
+
+        expect(array_keys(ImageStartPin::take($database, 1)))->toBe(['docker.io/library/postgres:16-alpine'])
+            ->and(ImageStartPin::take($database, 1))->toBe([])
+            ->and(array_keys(ImageStartPin::take($database, 2)))->toBe(['docker.io/library/postgres:16-alpine']);
+
+        ImageStartPin::put($database, 'postgres:17-alpine', START_PIN_DIGEST);
+
+        expect(array_keys(ImageStartPin::take($database, 1)))->toBe(['docker.io/library/postgres:16-alpine', 'docker.io/library/postgres:17-alpine']);
+    });
+
     it('refuses an image pinned by digest or a digest that is not one', function (string $ref, string $digest) {
         expect(fn () => ImageStartPin::put(create_standalone_postgresql($this->environment->id, $this->destination), $ref, $digest))
             ->toThrow(InvalidArgumentException::class);

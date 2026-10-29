@@ -110,3 +110,34 @@ it('never matches an expired ignore passed in directly', function () {
     expect(IgnoreMatcher::fromIgnores(collect([$expired]))->matches($this->finding))->toBeNull()
         ->and(IgnoreMatcher::fromIgnores(collect([$expired, $active]))->matches($this->finding))->toBe($active);
 });
+
+it('stops a never-ending team-wide ignore of a problem that attackers use after 90 days', function (int $days, bool $ignored) {
+    $this->travelTo(now()->subDays($days));
+    ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => null, 'package' => 'log4j-core', 'expires_at' => null]);
+    $this->travelBack();
+    $exploited = Finding::fromArray(['id' => 'CVE-2021-44228', 'package' => 'log4j-core', 'severity' => 'critical', 'kev' => true]);
+
+    expect(IgnoreMatcher::forResource($this->application)->matches($exploited) !== null)->toBe($ignored);
+})->with([
+    '89 days' => [89, true],
+    '91 days' => [91, false],
+]);
+
+it('keeps a never-ending ignore of a problem without an exploit signal', function () {
+    $this->travelTo(now()->subYears(2));
+    ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => 'CVE-2021-44228', 'expires_at' => null]);
+    $this->travelBack();
+    $plain = Finding::fromArray(['id' => 'CVE-2021-44228', 'package' => 'log4j-core', 'severity' => 'critical', 'kev' => false]);
+
+    expect(IgnoreMatcher::forResource($this->application)->matches($plain))->not->toBeNull();
+});
+
+it('uses another ignore of the finding when a never-ending one stopped', function () {
+    $this->travelTo(now()->subDays(100));
+    ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => 'CVE-2021-44228', 'expires_at' => null]);
+    $this->travelBack();
+    $recent = ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => null, 'package' => 'log4j-core', 'expires_at' => now()->addDays(30)]);
+    $exploited = Finding::fromArray(['id' => 'CVE-2021-44228', 'package' => 'log4j-core', 'severity' => 'critical', 'kev' => true]);
+
+    expect(IgnoreMatcher::forResource($this->application)->matches($exploited)?->is($recent))->toBeTrue();
+});

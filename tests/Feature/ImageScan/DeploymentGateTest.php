@@ -876,6 +876,25 @@ it('reads no base image when it cannot be known or scanning is off', function (s
     'scanning off on the server' => ["FROM node:20\n", 'dockerfile', false],
 ]);
 
+it('reads no scan rules in a deploy when the app scan is off', function () {
+    deployGatePolicy(onScanError: 'block');
+    Queue::fake();
+    $this->application->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
+    $job = deployGateDockerfileJob("FROM node:20\n", ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
+
+    DB::enableQueryLog();
+    deployGateCall($job, 'rememberDockerfileBaseImage');
+    $applies = deployGateCall($job, 'imageScanGateApplies');
+    deployGateCall($job, 'dispatchImageScanAfterStart');
+    $queries = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    expect($applies)->toBeFalse()
+        ->and(deployGateBaseImageRef($job))->toBeNull()
+        ->and($queries->filter(fn (string $query) => str_contains($query, 'image_scan_policies')))->toBeEmpty();
+    Queue::assertNotPushed(ScanResourceImagesJob::class);
+});
+
 it('does not fail the deploy when the Dockerfile cannot be read', function () {
     $job = deployGateJob(['saved_outputs' => new Collection]);
 
@@ -1169,6 +1188,66 @@ it('counts every finding as new on the first deploy', function () {
         ->and(test()->queue->fresh()->scan_gate_result['baseline_missing'])->toBeFalse();
 });
 
+/**
+ * A blocked first deploy of GATE_IMAGE_ID, then a finished deploy of another image whose scan failed.
+ */
+function deployGateBlockedThenUnscanned(bool $keepBlockedScan = true): void
+{
+    $blocked = deployGatePreviousDeployment('gate-blocked-x', ApplicationDeploymentStatus::FAILED, attributes: [
+        'scan_gate_result' => ['blocked' => true, 'image_id' => GATE_IMAGE_ID],
+    ]);
+    if ($keepBlockedScan) {
+        deployGateStoredScan([deployGateFindingRow()], ['deployment_queue_id' => $blocked->id, 'scanned_at' => now()->subDays(2)]);
+    }
+    $finished = deployGatePreviousDeployment('gate-finished-y', ApplicationDeploymentStatus::FINISHED, commit: str_repeat('2', 40), attributes: [
+        'configuration_snapshot' => test()->application->fresh()->deploymentConfigurationSnapshot(),
+    ]);
+    deployGateStoredScan([], [
+        'image_id' => 'sha256:'.str_repeat('9', 64),
+        'status' => ImageScanStatus::Failed,
+        'error_code' => ImageScanErrorCode::Timeout,
+        'deployment_queue_id' => $finished->id,
+        'scanned_at' => now()->subDay(),
+    ]);
+}
+
+it('blocks a restart of an image that the gate blocked before, after a deploy whose scan failed', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->never();
+    deployGateBlockedThenUnscanned();
+    $job = deployGateJob([
+        'restart_only' => true,
+        'saved_outputs' => new Collection(['local_image_found' => str('sha256:aaaa')]),
+    ]);
+
+    expect(deployGateBlocked($job, 'should_skip_build')->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => true, 'baseline_missing' => false, 'image_id' => GATE_IMAGE_ID]);
+});
+
+it('never compares a blocked image with its own scan without a deployment', function () {
+    deployGatePolicy();
+    ScanImage::shouldRun()->never();
+    // A reused scan of a blocked deploy keeps no deployment.
+    deployGateBlockedThenUnscanned(keepBlockedScan: false);
+    deployGateStoredScan([deployGateFindingRow()], ['deployment_queue_id' => null, 'scanned_at' => now()->subHour()]);
+    $job = deployGateJob([
+        'restart_only' => true,
+        'saved_outputs' => new Collection(['local_image_found' => str('sha256:aaaa')]),
+    ]);
+
+    expect(deployGateBlocked($job, 'should_skip_build')->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => true, 'baseline_missing' => false, 'carried_count' => 0]);
+});
+
+it('keeps blocking an image whose blocked scan was removed', function () {
+    deployGatePolicy();
+    deployGateBlockedThenUnscanned(keepBlockedScan: false);
+    ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([deployGateFindingRow()]));
+
+    expect(deployGateBlocked(deployGateJob())->getMessage())->toBe(DEPLOY_GATE_HEADLINE)
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => true, 'baseline_missing' => false]);
+});
+
 it('blocks a critical problem with a fix only in strict mode', function (string $mode, bool $blocked) {
     deployGatePolicy(mode: $mode);
     deployGateRunningScan([deployGateFindingRow(kev: false)]);
@@ -1331,6 +1410,40 @@ it('links the reused scans when a restart finishes', function () {
         ->and($scan->fresh()->deployment_queue_id)->toBe(test()->queue->id);
 });
 
+describe('image overrides of a Compose app', function () {
+    beforeEach(function () {
+        $this->application->update(['build_pack' => 'dockercompose', 'docker_compose_raw' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:1.30'], 'db' => ['image' => 'postgres:16']]], 10, 2)]);
+        $this->application->forceFill(['docker_compose_image_overrides' => [
+            'web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29'],
+            'db' => ['from' => 'postgres:16', 'to' => 'postgres:16.4'],
+        ]])->save();
+    });
+
+    it('drops an override whose image the compose file no longer names, so it never turns on again', function () {
+        deployGateCall(deployGateJob(), 'forgetStaleComposeImageOverrides');
+
+        $application = $this->application->fresh();
+        expect($application->docker_compose_image_overrides)->toBe(['db' => ['from' => 'postgres:16', 'to' => 'postgres:16.4']]);
+
+        $application->forceFill(['docker_compose_raw' => Yaml::dump(['services' => ['web' => ['image' => 'nginx:1.27']]], 10, 2)])->save();
+        expect($application->fresh()->activeComposeImageOverrides())->toBe([]);
+    });
+
+    it('keeps the overrides for a preview deploy and for a compose file that is not valid', function (array $overrides, ?string $raw) {
+        if ($raw !== null) {
+            $this->application->forceFill(['docker_compose_raw' => $raw])->save();
+        }
+        $stored = $this->application->fresh()->docker_compose_image_overrides;
+
+        deployGateCall(deployGateJob($overrides), 'forgetStaleComposeImageOverrides');
+
+        expect($this->application->fresh()->docker_compose_image_overrides)->toBe($stored);
+    })->with([
+        'preview' => [['pull_request_id' => 4], null],
+        'invalid compose file' => [[], "services: [\n  web"],
+    ]);
+});
+
 describe('scanned build of a security update', function () {
     it('starts the scanned build of a Docker image without a pull of the tag', function () {
         ScanImage::shouldRun()->never();
@@ -1344,7 +1457,26 @@ describe('scanned build of a security update', function () {
         expect($commands->contains(fn (string $command) => str_contains($command, "docker pull 'docker.io/library/nginx@".GATE_REPO_DIGEST."' && ")
             && str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'")))->toBeTrue()
             ->and($commands->contains(fn (string $command) => preg_match('/docker compose .* pull/', $command) === 1))->toBeFalse()
-            ->and(ImageStartPin::take($this->application))->toBe([]);
+            ->and(ImageStartPin::take($this->application, $this->server->id))->toBe([]);
+    });
+
+    it('starts the scanned build on an additional server after the main server took it', function () {
+        ScanImage::shouldRun()->never();
+        $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => '1.27']);
+        ImageStartPin::put($this->application->fresh(), 'nginx:1.27', GATE_REPO_DIGEST);
+        $additional = deployGateServer($this->team, 'additional-server');
+        $main = deployGateJob(['production_image_name' => 'nginx:1.27']);
+        $second = deployGateJob(['production_image_name' => 'nginx:1.27', 'is_this_additional_server' => true, 'server' => $additional, 'mainServer' => $additional]);
+        $again = deployGateJob(['production_image_name' => 'nginx:1.27']);
+        $tagged = fn (DeploymentGateTestJob $job) => collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'"));
+
+        deployGateCall($main, 'applyImageStartPin');
+        deployGateCall($second, 'applyImageStartPin');
+        deployGateCall($again, 'applyImageStartPin');
+
+        expect($tagged($main))->toBeTrue()
+            ->and($tagged($second))->toBeTrue()
+            ->and($tagged($again))->toBeFalse();
     });
 
     it('lets the gate scan the scanned build instead of pulling the tag again', function () {
@@ -1378,6 +1510,6 @@ describe('scanned build of a security update', function () {
         deployGateCall($job, 'applyComposeImageStartPins');
 
         expect(collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'")))->toBeTrue()
-            ->and(ImageStartPin::take($this->application))->toBe([]);
+            ->and(ImageStartPin::take($this->application, $this->server->id))->toBe([]);
     });
 });
