@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="130" height="130" viewBox="0 0 130 130">
+  <title>Hi.Events Icon - Light</title>
+
+  <!-- Icon centered -->
+  <g transform="translate(65, 65)">
+    <g transform="rotate(-6)">
+      <!-- Ticket stub shape -->
+      <path d="M 20 -28 L -54 -28 Q -56 -28 -56 -26 L -56 26 Q -56 28 -54 28 L 20 28"
+            fill="none" stroke="#18181b" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 30 -28 L 54 -28 Q 56 -28 56 -26 L 56 26 Q 56 28 54 28 L 30 28"
+            fill="none" stroke="#18181b" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Soundwave bars -->
+      <line x1="-38" y1="-8" x2="-38" y2="8" stroke="#cd58dd" stroke-width="4" stroke-linecap="round"/>
+      <line x1="-26" y1="-16" x2="-26" y2="16" stroke="#cd58dd" stroke-width="4" stroke-linecap="round"/>
+      <line x1="-14" y1="-16" x2="-14" y2="16" stroke="#cd58dd" stroke-width="4" stroke-linecap="round"/>
+      <line x1="-2" y1="-8" x2="-2" y2="8" stroke="#cd58dd" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>
