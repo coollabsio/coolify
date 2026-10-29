@@ -27,7 +27,7 @@
         <x-server.sidebar :server="$server" activeMenu="security" activeSubMenu="image-scanning" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
-            <x-application.settings-section id="server-image-scanning-section" title="Image Scanning"
+            <x-application.settings-section id="server-image-scanning-section" title="Image scanning"
                 helper="Scan the images on this server for known vulnerabilities before and after deployments.">
                 @if (! $allowed)
                     <x-empty size="sm" title="Image scanning is turned off for this Coolify instance." />

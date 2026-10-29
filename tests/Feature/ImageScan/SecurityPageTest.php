@@ -242,24 +242,61 @@ function securityPage(User $user, Model $resource, string $type, ?Team $sessionT
 }
 
 describe('main card', function () {
-    it('counts the summary tiles from the findings that are not ignored, and opens a severity from its tile', function () {
+    it('puts the sentence and the action first, the why-list inside the image, and no count outside All findings', function () {
         $database = securityPageDatabase();
         securityPageScan($database, 'postgres:15.0', [
-            securityPageFinding('CVE-2026-0001', ['severity' => 'critical']),
-            securityPageFinding('CVE-2026-0002', ['severity' => 'high', 'fixedIn' => null, 'fixState' => 'not-fixed']),
+            securityPageFinding('CVE-2025-1094', ['title' => 'SQL injection in psql quoting', 'cvssScore' => 8.1]),
+            securityPageFinding('CVE-2026-0002', ['severity' => 'critical', 'fixedIn' => null, 'fixState' => 'not-fixed', 'kev' => false]),
             securityPageFinding('CVE-2026-0003', ['severity' => 'medium', 'kev' => false]),
+        ], ['candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', ['CVE-2025-1094'])])]);
+
+        securityPage($this->admin, $database, 'database')
+            ->assertSeeInOrder([
+                'has a security problem that attackers are using. Update to 15.13 to fix it.',
+                'Update to 15.13',
+                'Fixed by this update',
+                'SQL injection in psql quoting',
+                'How Coolify knows:',
+                '3 findings',
+                'All findings (3)',
+            ])
+            ->assertDontSee('Top problems')
+            ->assertDontSee('Most severe problems')
+            ->assertDontSee('A newer version fixes these')
+            ->assertDontSeeHtml('aria-label="Images"')
+            ->assertDontSeeHtml('More for postgres:15.0');
+    });
+
+    it('shows the score next to the severity only when its CVSS range has the same severity', function () {
+        $database = securityPageDatabase();
+        securityPageScan($database, 'postgres:15.0', [
+            securityPageFinding('CVE-2026-0001', ['severity' => 'medium', 'cvssScore' => 7.5, 'title' => 'Medium with a high score']),
+            securityPageFinding('CVE-2026-0002', ['severity' => 'high', 'cvssScore' => 8.1, 'title' => 'High with a high score']),
+        ], ['candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', ['CVE-2026-0001', 'CVE-2026-0002'])])]);
+        $this->actingAs($this->admin);
+
+        $why = collect(SecurityCard::for($database, SecurityStatus::forResource($database), ResourceScans::owners($database), ResourceScans::current($database), $this->admin)['rows'][0]['why'])
+            ->keyBy('display_id');
+
+        expect($why['CVE-2026-0002']['cvss'])->toBe('8.1')
+            ->and($why['CVE-2026-0001']['cvss'])->toBeNull()
+            ->and($why['CVE-2026-0001']['cvssNote'])->toBe('CVSS 7.5');
+
+        securityPage($this->admin, $database, 'database')
+            ->assertSeeHtml('data-tooltip="CVSS 7.5"')
+            ->assertSeeInOrder(['High with a high score', 'High', '8.1']);
+    });
+
+    it('links the more problems of the why-list to All findings', function () {
+        $database = securityPageDatabase();
+        $ids = array_map(fn (int $index): string => sprintf('CVE-2026-%04d', $index), range(1, 5));
+        securityPageScan($database, 'postgres:15.0', array_map(fn (string $id): array => securityPageFinding($id), $ids), [
+            'candidates' => securityPageCandidates([securityPageEntry('postgres:15.13', 'line', $ids)]),
         ]);
 
-        $page = securityPage($this->admin, $database, 'database');
-
-        expect($page->viewData('summary'))->toBe(['critical' => 1, 'high' => 1, 'fixed' => 2, 'no_fix' => 1]);
-
-        $page->set('images', ['postgres:15.0'])
-            ->call('showSeverityFindings', 'critical')
-            ->assertSet('severities', ['critical'])
-            ->assertSet('images', [])
-            ->call('showSeverityFindings', 'not-a-severity')
-            ->assertSet('severities', ['critical']);
+        securityPage($this->admin, $database, 'database')
+            ->assertSeeText('2 more problems this update fixes')
+            ->assertSeeHtml("id: 'all-findings-section'");
     });
 
     it('tells a postgres 15.0 database to update now and why', function () {
@@ -273,7 +310,7 @@ describe('main card', function () {
             ->assertSeeText('postgres:15.0 has a security problem that attackers are using. Update to 15.13 to fix it.')
             ->assertSee('SQL injection in psql quoting')
             ->assertSee('CVE-2025-1094')
-            ->assertSeeInOrder(['Top problems', 'SQL injection in psql quoting', 'High', '8.1'])
+            ->assertSeeInOrder(['Fixed by this update', 'SQL injection in psql quoting', 'High', '8.1'])
             ->assertSee('Used by attackers')
             ->assertSee('Update to 15.13')
             ->assertSee('postgres:15.0 '.substr(ResourceScans::current($database)->first()->image_id, 7, 12).' → postgres:15.13')
@@ -317,7 +354,7 @@ describe('main card', function () {
 
         securityPage($this->admin, $application, 'application')
             ->assertSee('No fix yet')
-            ->assertSeeText($application->uuid.':'.$deployment->commit.' has a security problem that attackers are using. '.SecurityActions::BUILDER_TEXT)
+            ->assertSeeText('This app has a security problem that attackers are using. '.SecurityActions::BUILDER_TEXT)
             ->assertDontSeeHtml('rebuild');
     });
 
@@ -376,7 +413,7 @@ describe('main card', function () {
 
         securityPage($this->admin, $application, 'application')
             ->assertSee('All findings (3)')
-            ->assertSeeText('Fixed by an update (2)')
+            ->assertSeeText('Fix available upstream (2)')
             ->assertSeeText('No fix yet (1)')
             ->assertDontSee('zlib')
             ->call('setFixState', 'no_fix')
@@ -759,7 +796,7 @@ describe('image list', function () {
         return [$service->fresh(), $main, $runners, $postgres];
     }
 
-    it('shows one image as a table row with its sentence, attack note, provenance, and running digest', function () {
+    it('shows one image open without a list frame: sentence, action, attack note, provenance, and running digest', function () {
         $database = securityPageDatabase();
         $database->forceFill(['image' => 'postgres:16-alpine'])->save();
         $ids = ['CVE-2026-0001', 'CVE-2026-0002'];
@@ -781,17 +818,18 @@ describe('image list', function () {
         securityPage($this->admin, $database, 'database')
             ->assertSee('Security update')
             ->assertSeeText('postgres:16-alpine has a newer build that fixes 2 critical problems.')
+            ->assertSeeInOrder(['has a newer build that fixes 2 critical problems.', 'Pull latest and restart', 'No known attacks on these problems.'])
             ->assertSee('No known attacks on these problems.')
             ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.')
             ->assertSee('Pull latest and restart')
             ->assertSee('3f1a2b4c5d6e')
-            ->assertSee('3 known issues')
-            ->assertDontSee('have no fix')
+            ->assertSee('3 findings')
+            ->assertDontSee('known issues')
             ->assertDontSee('images need an update')
-            ->assertSeeHtml('aria-label="Images"');
+            ->assertDontSeeHtml('aria-label="Images"');
     });
 
-    it('lists the images of a service worst first, shows every problem image open, and puts a merged update on its first row', function () {
+    it('lists the images of a service worst first, opens the worst one, and puts a merged update on its first row', function () {
         [$service, $main, $runners, $postgres] = securityPageThreeImageService();
         $this->actingAs($this->admin);
 
@@ -799,7 +837,7 @@ describe('image list', function () {
 
         expect($card['header'])->toBe('2 of 3 images need an update')
             ->and(array_column($card['rows'], 'name'))->toBe(['n8n', 'n8n runners', 'postgres'])
-            ->and(array_column($card['rows'], 'attention'))->toBe([true, true, false])
+            ->and(array_column($card['rows'], 'open'))->toBe([true, false, false])
             ->and($card['rows'][0]['primary']['button']['submit'])->toStartWith('updateImages(')
             ->and($card['rows'][0]['mergedWith'])->toBeNull()
             ->and($card['rows'][1]['primary'])->toBeNull()
@@ -809,6 +847,7 @@ describe('image list', function () {
 
         securityPage($this->admin, $service, 'service')
             ->assertSee('2 of 3 images need an update')
+            ->assertSeeHtml('aria-label="Images"')
             ->assertSeeInOrder(['n8nio/n8n:1.0', 'n8nio/runners:1.0', 'postgres:16-alpine'])
             ->assertSee('Updated with n8n')
             ->assertSeeText('postgres:16-alpine needs no action.');
@@ -857,7 +896,7 @@ describe('image list', function () {
             ->toBe('15.13 is the newest 15.x release on Docker Hub. Coolify scanned it 1 hour ago: it fixes these problems and adds none that attackers use. It has 3 other problems that attackers are not known to use.');
     });
 
-    it('links the Settings section only on the page of an application', function () {
+    it('links the findings, packages, and Settings sections from the footer of every resource page', function () {
         $application = securityPageApplication();
         securityPageScan($application, 'nginx:1.27', [securityPageFinding('CVE-2026-0001')]);
         $database = securityPageDatabase();
@@ -865,8 +904,8 @@ describe('image list', function () {
 
         securityPage($this->admin, $application, 'application')->assertSeeHtml("id: 'image-scan-settings-section'");
         securityPage($this->admin, $database, 'database')
-            ->assertSee('Packages and SBOM')
-            ->assertDontSeeHtml("id: 'image-scan-settings-section'");
+            ->assertSeeInOrder(['Running', 'postgres:15.0', '1 finding', 'Packages and SBOM', 'Settings'])
+            ->assertSeeHtml("id: 'image-scan-settings-section'");
     });
 
     it('filters the findings to the image of a row', function () {
@@ -921,9 +960,9 @@ describe('image list', function () {
 
         securityPage($this->admin, $service, 'service')
             ->assertSee('No fix yet')
-            ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. No fixed version exists yet, and Coolify checks every day.')
+            ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. The fix is not in the newest n8nio/n8n 1.x image yet. Coolify checks every day.')
             ->assertSee('Until then, limit who can reach this service, or ignore the problem if the affected part is not used.')
-            ->assertSeeInOrder(['Top problems', 'No fix yet'])
+            ->assertSeeInOrder(['No fix yet', 'Not fixed yet'])
             ->assertDontSee('images need an update')
             ->assertDontSee('Attackers are using this.');
     });

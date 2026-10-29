@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\Team;
 use App\Services\Access\AccessResolver;
 use App\Services\ImageScan\ImageScanPolicyResolver;
@@ -22,21 +23,26 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * Scan rules of one level (instance, team, server or application), saved on change.
- * A null value inherits from the level above. The scope is reloaded and authorized on every request.
+ * Scan rules of one level (instance, team, server or application), saved on change, and the ignores of that level.
+ * A null value inherits from the level above. Databases and services have no rules of their own: their scope lists
+ * only their ignores (a service with the ignores of its applications and databases). The scope is reloaded and
+ * authorized on every request.
  */
 class ScanSettings extends Component
 {
     use AuthorizesRequests;
 
-    private const SCOPES = ['instance', 'team', 'server', 'application'];
+    private const SCOPES = ['instance', 'team', 'server', 'application', 'database', 'service'];
+
+    /** Scopes that only list their ignores. */
+    private const IGNORE_ONLY_SCOPES = ['database', 'service'];
 
     private const LEVEL_NAMES = ['instance' => 'Coolify', 'team' => 'team', 'server' => 'server'];
 
     #[Locked]
     public string $scopeType;
 
-    /** Server or application uuid, or the team id for the team scope (teams have no uuid). */
+    /** Server, application, database, or service uuid, or the team id for the team scope (teams have no uuid). */
     #[Locked]
     public ?string $scopeUuid = null;
 
@@ -57,6 +63,10 @@ class ScanSettings extends Component
         $this->scopeUuid = $scopeUuid;
 
         $scope = $this->loadScope();
+        if ($this->isIgnoreOnly()) {
+            return;
+        }
+
         $policy = ImageScanPolicyResolver::forScope($scope);
         $this->gateMode = $policy->gate_mode?->value ?? '';
         $this->onScanError = $policy->on_scan_error?->value ?? '';
@@ -119,6 +129,10 @@ class ScanSettings extends Component
         $this->dispatch('success', 'Saved.');
     }
 
+    /**
+     * Removes an ignore of this level. On a resource page only the ignores of that resource (for a service: of its
+     * applications and databases); team-wide ignores are removed on the team settings.
+     */
     public function removeIgnore(string $uuid): void
     {
         $scope = $this->loadScope();
@@ -126,10 +140,7 @@ class ScanSettings extends Component
             $scope instanceof Team => ImageScanIgnore::query()
                 ->where('team_id', $scope->id)
                 ->whereNull('resource_id'),
-            $scope instanceof Application => ImageScanIgnore::query()
-                ->where('team_id', $scope->team()?->id)
-                ->where('resource_type', $scope->getMorphClass())
-                ->where('resource_id', $scope->id),
+            $this->isResourceScope($scope) => $this->resourceIgnores($scope),
             default => null,
         };
         $ignore = $ignore?->where('uuid', $uuid)->first();
@@ -139,8 +150,8 @@ class ScanSettings extends Component
         $ignore->delete();
         if ($ignore->resource_id === null) {
             RefreshImageScanSummariesJob::dispatch((int) $ignore->team_id);
-        } elseif ($scope instanceof Application) {
-            ResourceScans::refreshSummaries(ResourceScans::currentFor($scope));
+        } elseif ($this->isResourceScope($scope)) {
+            ResourceScans::refreshSummaries(ResourceScans::current($scope));
         }
         auditLog('ui.image_scan.ignore_removed', [
             'team_id' => $ignore->team_id,
@@ -154,6 +165,7 @@ class ScanSettings extends Component
 
     private function saveRule(string $column, string $property): void
     {
+        abort_if($this->isIgnoreOnly(), 404);
         $scope = $this->loadScope();
         $this->authorizeEdit($scope);
 
@@ -196,20 +208,57 @@ class ScanSettings extends Component
             'team' => ctype_digit((string) $this->scopeUuid) ? Team::query()->find((int) $this->scopeUuid) : null,
             'server' => Server::query()->where('uuid', (string) $this->scopeUuid)->first(),
             'application' => Application::query()->where('uuid', (string) $this->scopeUuid)->first(),
+            // Found only within the user's teams.
+            'database', 'service' => ResourceScans::find($this->scopeType, (string) $this->scopeUuid, $user->teams->pluck('id')->all()),
         };
-        $teamId = match (true) {
-            $scope instanceof Team => $scope->id,
-            $scope instanceof Server => $scope->team_id,
-            $scope instanceof Application => $scope->team()?->id,
-            default => null,
-        };
+        $teamId = $this->teamIdOf($scope);
         abort_unless($teamId !== null && $user->teams->contains('id', $teamId), 404);
 
-        if ($scope instanceof Application) {
+        if ($this->isResourceScope($scope)) {
             $this->authorize('view', $scope);
         }
 
         return $scope;
+    }
+
+    private function isIgnoreOnly(): bool
+    {
+        return in_array($this->scopeType, self::IGNORE_ONLY_SCOPES, true);
+    }
+
+    /**
+     * An application, database, or service: a resource with its own Security page.
+     */
+    private function isResourceScope(?Model $scope): bool
+    {
+        return $scope instanceof Application || ($scope !== null && in_array($this->scopeType, self::IGNORE_ONLY_SCOPES, true));
+    }
+
+    private function teamIdOf(?Model $scope): ?int
+    {
+        return match (true) {
+            $scope instanceof Team => $scope->id,
+            $scope instanceof Server => $scope->team_id,
+            $scope !== null && method_exists($scope, 'team') => $scope->team()?->id,
+            default => null,
+        };
+    }
+
+    /**
+     * The ignores of a resource: of an application or database itself, of the applications and databases of a service
+     * (the Security page sets them there), and of the service.
+     *
+     * @return Builder<ImageScanIgnore>
+     */
+    private function resourceIgnores(Model $scope): Builder
+    {
+        $owners = $scope instanceof Service ? ResourceScans::owners($scope)->push($scope) : collect([$scope]);
+
+        return ImageScanIgnore::query()
+            ->where('team_id', $this->teamIdOf($scope))
+            ->where(fn (Builder $query) => $owners->each(fn (Model $owner) => $query->orWhere(fn (Builder $query) => $query
+                ->where('resource_type', $owner->getMorphClass())
+                ->where('resource_id', $owner->getKey()))));
     }
 
     private function authorizeEdit(?Model $scope): void
@@ -233,12 +282,7 @@ class ScanSettings extends Component
     private function audit(?Model $scope, string $field): void
     {
         auditLog('ui.image_scan.settings_updated', [
-            'team_id' => match (true) {
-                $scope instanceof Team => $scope->id,
-                $scope instanceof Server => $scope->team_id,
-                $scope instanceof Application => $scope->team()?->id,
-                default => null,
-            },
+            'team_id' => $this->teamIdOf($scope),
             'scope' => $this->scopeType,
             'scope_uuid' => $this->scopeUuid,
             'changed_fields' => [$field],
@@ -268,7 +312,7 @@ class ScanSettings extends Component
      */
     private function inheritLabels(?Model $scope): ?array
     {
-        if ($scope === null) {
+        if ($scope === null || $this->isIgnoreOnly()) {
             return null;
         }
 
@@ -292,13 +336,11 @@ class ScanSettings extends Component
                 ->whereNull('resource_id')
                 ->latest()
                 ->get(),
-            $scope instanceof Application => ImageScanIgnore::query()
-                ->where('team_id', $scope->team()?->id)
+            $this->isResourceScope($scope) => ImageScanIgnore::query()
+                ->where('team_id', $this->teamIdOf($scope))
                 ->where(fn (Builder $query) => $query
                     ->whereNull('resource_id')
-                    ->orWhere(fn (Builder $query) => $query
-                        ->where('resource_type', $scope->getMorphClass())
-                        ->where('resource_id', $scope->id)))
+                    ->orWhereIn('id', $this->resourceIgnores($scope)->select('id')))
                 ->orderByRaw('resource_id is null')
                 ->latest()
                 ->get(),
@@ -307,12 +349,34 @@ class ScanSettings extends Component
     }
 
     /**
+     * For a service: the name of the application or database each ignore was set for.
+     *
+     * @param  Collection<int, ImageScanIgnore>  $ignores
+     * @return array<string, string> By ignore uuid.
+     */
+    private function ownerNames(?Model $scope, Collection $ignores): array
+    {
+        if (! $scope instanceof Service) {
+            return [];
+        }
+
+        $names = ResourceScans::owners($scope)->mapWithKeys(fn (Model $owner): array => [
+            $owner->getMorphClass().':'.$owner->getKey() => (string) ($owner->getAttribute('human_name') ?: $owner->getAttribute('name')),
+        ]);
+
+        return $ignores
+            ->filter(fn (ImageScanIgnore $ignore): bool => $ignore->resource_id !== null && $names->has($ignore->resource_type.':'.$ignore->resource_id))
+            ->mapWithKeys(fn (ImageScanIgnore $ignore): array => [(string) $ignore->uuid => $names->get($ignore->resource_type.':'.$ignore->resource_id)])
+            ->all();
+    }
+
+    /**
      * The team settings page opens the session team, so the link is shown only when that is the team of the
-     * application and the user can open team-wide pages.
+     * resource and the user can open team-wide pages.
      */
     private function showsTeamSettingsLink(?Model $scope): bool
     {
-        $teamId = $scope instanceof Application ? $scope->team()?->id : null;
+        $teamId = $this->isResourceScope($scope) ? $this->teamIdOf($scope) : null;
 
         return $teamId !== null
             && currentTeam()?->id === $teamId
@@ -322,6 +386,7 @@ class ScanSettings extends Component
     public function render(): View
     {
         $scope = $this->loadScope();
+        $ignores = $this->ignores($scope);
 
         return view('livewire.image-scan.scan-settings', [
             'canEdit' => $this->canEdit($scope),
@@ -334,9 +399,10 @@ class ScanSettings extends Component
                 ->all(),
             'appScanOn' => $scope instanceof Application ? (bool) $scope->settings?->is_image_scan_enabled : true,
             'isDockerImage' => $scope instanceof Application && $scope->build_pack === 'dockerimage',
-            'showsIgnores' => $scope instanceof Team || $scope instanceof Application,
+            'showsIgnores' => $scope instanceof Team || $this->isResourceScope($scope),
             'showsTeamSettingsLink' => $this->showsTeamSettingsLink($scope),
-            'ignores' => $this->ignores($scope),
+            'ignores' => $ignores,
+            'ownerNames' => $this->ownerNames($scope, $ignores),
         ]);
     }
 }

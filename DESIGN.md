@@ -1398,21 +1398,29 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     nested rows.
   - Action: the sentence of the primary action (update_now and
     update_available), as a link to the resource's Security card
-    (`#security-section`); muted "Check again: {reason}." as the same link
-    for check_needed; muted, unlinked "why not checked" text for not_checked.
-    No buttons and no bulk actions.
+    (`#security-section`) in the text link style (`underline
+    decoration-neutral-400/40 underline-offset-4`); muted "Check again:
+    {reason}." as the same link for check_needed; muted, unlinked "No fix
+    released yet. Coolify checks daily." for no_fix; muted, unlinked "why not
+    checked" text for not_checked. No buttons and no bulk actions.
   - Sort: update_now, update_available, no_fix, check_needed, ok,
     not_checked, then the resource name. Filters: Status (with a count per
     status, "Update now (3)", and in the URL as `statuses[]`), Server, and
     Project in one `x-table.filter`. 25 rows per page by default.
   - A search by CVE, GHSA, or package lists the resources with a matching
     finding and switches the Status and Action columns to the match and its
-    state ("Fixed by an update", "No fix yet", "Ignored", the words of the
-    resource page). A small status badge stays next to the resource name.
+    state ("Fix available upstream", "No fix yet", "Ignored", the words of
+    All findings). A small status badge stays next to the resource name.
     Only the search decodes findings.
-  - Resources that were not scanned are never hidden silently: a muted line
-    under the table says "{n} resources on {m} servers were not scanned, so
-    Coolify cannot tell."
+  - Resources that were not scanned are hidden by default (no status filter),
+    so they do not bury the ones that need an action, but never silently: a
+    muted line under the table says "{n} resources on {m} servers were not
+    scanned, so Coolify cannot tell." with the link "Show them" / "Hide them"
+    (`showNotChecked`, in the URL). The Status filter "Not checked" shows them
+    too.
+  - A scan event reloads the page at most once per 10 seconds
+    (`FleetVulnerabilities::RELOAD_INTERVAL`); a server scan sends one event
+    per image.
 - Fleet callouts:
   - The dashboard shows one callout, only for update_now: "{n} {resource
     needs/resources need} a security update now." + Review (danger), which
@@ -1441,62 +1449,94 @@ value in `.dark`. They are OKLCH only and never follow the accent or
   someone with write access to deploy anyway."
 - The Security main card (`livewire/image-scan/vulnerabilities.blade.php`, data
   from `SecurityCard::for()`) is the first layer card of a resource's Security
-  page, for people who are not security experts. It is one component for every
-  resource, in the dashboard pattern (summary tiles, then a dense table), not an
-  accordion and not stacked prose blocks.
+  page, for people who are not security experts. It answers "Is this OK, and
+  what do I click?" first: status, sentence, and one action, then the why-list
+  (spec 15.11). It is one component for every resource: a list of the images
+  the status counts. No summary tiles, no severity counts, no separate
+  problems table, and no row menus: a count that the status does not use
+  (upstream package fixes, CPE-only matches, findings that are not relevant)
+  contradicts the sentence.
   - Card header: title "Security" with the status badge of the resource in the
     badges slot ("Update now" error, "Security update" warning, "No fix yet"
     and "Check needed" neutral, none for ok and not checked), and "Checked
-    {time}" (absolute time in the tooltip) and Scan now in the header actions.
-    Scan now is highlighted for check_needed. The well is flush.
-  - Summary tiles: one row of four tiles split by dividers (the fleet Metrics
-    tile language: 11px uppercase label, `text-xl` semibold tabular value, 11px
-    faint note): Critical and High (with the severity dot), Fixed by an update,
-    No fix yet. The counts come from the findings that are not ignored, of every
-    image, before any filter (`Vulnerabilities::summary()`), the same rows as the
-    findings table, so a tile and the table never disagree. A tile is a button:
-    it opens "All findings" with its filter (`showSeverityFindings()` or
-    `setFixState()`). Never add a count that the table cannot show.
-  - Several images: a 13px medium line "{k} of {n} images need an update" above
-    the table, only when k > 0.
-  - Images table (`aria-label="Images"`, also for one image): Image, Status,
-    Summary, Issues, and a row menu. Rows are worst first (update_now,
-    update_available, no_fix, check_needed, ok, not_checked, then the name).
-    Every image the status counts has a row, also one without a result ("Not
-    checked", "{ref} has not been checked yet.").
-    - Image: the name (13px medium; the service application or database, or the
-      Compose service), the ref (mono 11px muted) under it, and the short
-      running digest with `x-copy-button`.
-    - Status: the status badge, or muted text "No action needed" / "Not
-      checked".
-    - Summary (`partials/security-image.blade.php`): the sentence of
-      `SecuritySentences::imageSentence()` in 13px, which starts with the image
-      ref in mono; then 12px dim lines: the attack note (update_available only),
-      the no_fix advice, the extra lines, and the version check notes; then the
-      provenance as one 12px faint line after an `info-circle` icon (the label
-      "How Coolify knows:" is for screen readers). Then the primary action
-      (highlighted button or copy chip), or muted "Updated with {first name}."
-      for the other rows of a merged service update. More actions sit in a
-      closed `<details>` "{n} other fixes".
-    - A Compose app image that a security update replaced shows a 12px
-      faint line "Coolify deploys {to} instead of {from} from your compose
-      file." with the text button "Use the compose file"
-      (`removeImageOverride()`), which drops the override for the next deploy.
-    - Issues: the known issue count as a link that opens "All findings"
-      filtered to the image.
-    - Row menu (`dots-horizontal`): All findings, Packages and SBOM, and Scan
-      settings (applications only). Each dispatches `open-settings-section`;
-      with several images it also filters the section to the image.
-    - Below `md` the Summary cell moves under the image and status, and the
-      Issues column hides.
-  - Top problems card (flush, not collapsible, only when a row has a why-list):
-    one table of the why-lists of all images. Columns: Problem (the title, and
-    under it the ID that links to NVD or GitHub, and the signal: "Used by
-    attackers" in `text-error`, "Likely to be exploited" muted), Package with
-    version (mono), Image (only with several images), Severity (the severity
-    badge and the CVSS score), and Fix ("Fixed by an update" or "No fix yet").
-    "and {n} more serious problems that this update fixes" follows as a muted
-    footer line per image.
+    {time}" (absolute time in the tooltip) and Scan now in the header actions
+    (not for check_needed, where Scan now is the primary action in the body).
+  - Vocabulary: the plain layer (the card) says "problems"; the expert layer
+    (All findings, Packages and SBOM, the row footer, ignores) says
+    "findings". Never "issues" or "vulnerabilities" in the UI.
+  - Not scanned yet: apps say "Not scanned yet. The next deploy scans the
+    image."; databases and services say "Not scanned yet." with a highlighted
+    Scan now (only for users who may update the resource).
+  - One image (a database, a Docker image app, a Dockerfile app): the row is
+    open and has no list frame, no row header, no chevron, and no second status
+    badge; the card badge is the status. The image ref is shown in the
+    sentence only when the sentence starts with it; an own-built app ("This app
+    has…") shows the ref only in the footer.
+  - Rows: every image the status counts. That includes a scanned service
+    application or database without a result and every image of a Compose
+    app without a result in its current deployment (keyed
+    `compose-{md5(service)}`). These rows show "Not checked" and "{ref} has
+    not been checked yet.", and Scan now stays in the card header.
+  - Several images (a service, a Compose app): a 15px medium line "{k} of {n}
+    images need an update" only when k > 0 (k = rows with update_now or
+    update_available). For k = 0 there is no header line: the card badge
+    already says the status, and "All images are up to date" is never used.
+    Then one bordered list (`aria-label="Images"`, rows split by dividers).
+    Rows are worst first (update_now, update_available, no_fix, check_needed,
+    ok, not_checked, then the name). The first row with a problem is open; the
+    others, and every "No action needed" row, are closed.
+  - Row header (several images): a real `<button>` with `aria-expanded` and
+    `aria-controls` that holds the chevron, the name (13px medium; the service
+    application or database, or the Compose service) and the image ref (mono,
+    11px muted under a name, else 12px); then the status badge (muted text "No
+    action needed" or "Not checked" without one) and the primary action
+    (highlighted on the first row, else neutral) or copy chip. A merged
+    service update (spec 15.5) has its button on the first row of the group
+    only; the other rows show muted "Updated with {first name}".
+  - Open row content, from `partials/security-image.blade.php`, in this order:
+    - The sentence of `SecuritySentences::imageSentence()` in 15px medium
+      (starts with the image ref in mono when the sentence does).
+    - One image only: the primary action right under the sentence, on its own
+      line (highlighted button, or the copy chip at full width), or the
+      highlighted Scan now for check_needed. It is the first control of the
+      card in tab order.
+    - The attack note of `attackNote()` (update_available only), the no_fix
+      advice (`noFixAdvice()`), the extra lines, and the version check notes,
+      13px dim.
+    - A Compose app image that a security update replaced: a 12px faint line
+      "Coolify deploys {to} instead of {from} from your compose file." with the
+      text button "Use the compose file" (`removeImageOverride()`), which drops
+      the override for the next deploy.
+    - Why-list "Fixed by this update" ("Not fixed yet" for no_fix): up to 3
+      rows in one bordered list, inside the open row of its image, so the
+      image is always clear. Line 1: the title (13px) and, on the right, the
+      severity badge with the CVSS score next to it. The score shows only when
+      its CVSS range has the same severity (9.0 critical, 7.0 high, 4.0
+      medium); otherwise the badge alone, with "CVSS 7.5" in the tooltip, so a
+      row never reads "Medium 7.5". Line 2, 11px muted: "{package} {version} ·
+      {display ID} · {signal}"; the ID links to NVD or GitHub, and "Used by
+      attackers" is in `text-error`. Then the link "{n} more problems this
+      update fixes →", which opens All findings (filtered to the image when
+      the resource has several).
+    - Provenance: one 12px muted line with the 12px medium label "How Coolify
+      knows:" and the sentence of `SecuritySentences::provenance()`.
+    - Other fixes: a `<details>` "{n} other fixes" whose `chevron-down` points
+      right when closed and turns 90° when open (180ms,
+      `cubic-bezier(0.23,1,0.32,1)`, `motion-reduce:transition-none`). The open
+      list spans the full row width: each action with its sentence and a
+      neutral button or copy chip, then "and {n} more".
+    - Footer, above a divider: "Running {ref} {short digest}" (the first 12
+      characters after `sha256:` of the repo digest, else of the image ID, with
+      `x-copy-button` for the full value) · "{n} findings" · "Packages and
+      SBOM" · "Settings". The links use the text link style (`underline
+      decoration-neutral-400/40 underline-offset-4`, full decoration on
+      hover). "{n} findings" opens All findings, "Packages and SBOM" and
+      "Settings" open their cards: each dispatches `open-settings-section`
+      with the section id (`x-application.settings-section` opens itself and
+      scrolls into view). For several images they also filter the section to
+      that image (`showImageFindings()` and the Packages
+      `security-show-image-packages` event). A "·" separator stays with the
+      part after it, so no line ends with one.
   - Provenance never states a count of its own, so it cannot contradict the
     sentence; the "better" rule guarantees that an offered update adds no
     problem with an exploit signal. When the stored entry has `added` > 0 it
@@ -1517,9 +1557,15 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     warning: the patch release sentence for a database, the template warning
     for a service. Buttons show only to users who may run them (Write for
     updates, Deploy for Rebuild) and never for `id = 0` or a transferred-away
-    server.
-  - Row keys are the scan UUID (or the owner UUID for an image without a scan),
-    never a position.
+    server. Scan now on a transferred-away server says "Another Coolify
+    instance manages this server now." and starts nothing.
+  - Motion: a row opens and closes by animating height and opacity together
+    (`grid-rows-[0fr]` → `grid-rows-[1fr]` with `opacity`, 180ms,
+    `cubic-bezier(0.23,1,0.32,1)`); the chevron turns 90° with the same
+    timing. The server renders the open state, so nothing animates on page
+    load, and `motion-reduce:transition-none` makes it instant. A closed body
+    is `inert`. Row keys are the scan UUID (or the owner UUID for an image
+    without a scan), never a position.
   - Titles: `ScannerText::tidyTitle()` cleans parsed and stored titles. It
     removes advisory labels ("Issue summary:"), leading changelog tokens
     ("[1.0.9-10.0.1] - "), "[Orabug: …]" groups, and trailing "[CVE-…]"
@@ -1528,10 +1574,18 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     changelog. A stored title that still looks like a changelog entry shows
     the fallback "{package} {version}: {severity} vulnerability" until a
     rescan (`ScannerText::storedTitle()`).
-  - The collapsed "All findings", "Packages and SBOM", and "Settings"
-    (applications only) cards follow, with the same `gap-6` between every card.
-    Hidden helpers in the stack (the teleported ignore modal) stay `hidden`, so
-    they add no second gap.
+  - No totals and no severity bar: the only total finding count of the page is
+    in the "All findings ({n})" header, and the row footer has the count of its
+    image. Every count uses `number_format()` ("1,362"). The collapsed "All
+    findings", "Packages and SBOM", and "Settings" cards follow, with the same
+    `gap-6` between every card. Settings holds the rules and ignored findings
+    of an app; on a database or service it lists the ignored findings only (a
+    service with the ignores of its applications and databases, "Set for"
+    names the image). Hidden helpers in the stack (the teleported ignore
+    modal) stay `hidden`, so they add no second gap.
+  - All findings: the fix-state switch "Fix available upstream ({n})" / "No
+    fix yet ({n})" (a fixed package version exists, which is not the same as
+    the card's update), and the column "Findings" in the By package view.
   - Image picker (`x-image-scan.image-select`): the "All findings" and
     "Packages and SBOM" toolbars show a single-select "All images" button
     (`layers` icon, highlighted when one image is picked) left of Filter, only
@@ -1539,6 +1593,7 @@ value in `.dark`. They are OKLCH only and never follow the accent or
     menu, and "Reset filters" does not clear it.
   - Row actions in the findings tables are icon buttons (`eye-off2`, tooltip
     "Ignore" or "Ignore package"), not labelled buttons on every row.
+
 ---
 
 ### Domain rows on mobile

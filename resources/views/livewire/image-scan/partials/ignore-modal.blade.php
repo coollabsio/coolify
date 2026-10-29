@@ -34,7 +34,7 @@
 }" x-on:open-ignore-modal.window="open($event.detail)">
     @php
         $ignoreTitle = new \Illuminate\Support\HtmlString(
-            '<span x-text="kind === \'package\' ? \'Ignore package\' : \'Ignore vulnerability\'">Ignore vulnerability</span>'
+            '<span x-text="kind === \'package\' ? \'Ignore package\' : \'Ignore finding\'">Ignore finding</span>'
         );
     @endphp
     <x-modal-input :title="$ignoreTitle" x-on:open-ignore-modal.window="modalOpen = true">

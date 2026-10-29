@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * The resources of a team and their stored security status, for the team Security page and the dashboard callout
@@ -32,7 +33,7 @@ final class TeamVulnerabilities
 
     /** The fix state of a search match, in the words of the resource page. */
     public const STATE_LABELS = [
-        'fixed' => 'Fixed by an update',
+        'fixed' => 'Fix available upstream',
         'no_fix' => 'No fix yet',
         'ignored' => 'Ignored',
     ];
@@ -40,6 +41,15 @@ final class TeamVulnerabilities
     private const STATE_RANK = ['fixed' => 0, 'no_fix' => 1, 'ignored' => 2];
 
     private const SEVERITY_RANK = ['critical' => 4, 'high' => 3, 'medium' => 2, 'low' => 1, 'unknown' => 0];
+
+    /**
+     * Large text columns the list never reads. The Compose file of a Compose app is read (its images), so those two
+     * columns are loaded only for Compose apps.
+     */
+    private const UNREAD_COLUMNS = [
+        'applications' => ['docker_compose_raw', 'docker_compose', 'docker_compose_domains', 'dockerfile', 'custom_labels', 'custom_nginx_configuration'],
+        'services' => ['docker_compose_raw', 'docker_compose'],
+    ];
 
     /** At most this many scans have their findings decoded in one request. */
     public const MAX_DECODED_SCANS = 200;
@@ -133,15 +143,20 @@ final class TeamVulnerabilities
         };
     }
 
+    /** The Action column of a resource that has a problem with no fix yet (no_fix). */
+    public const NO_FIX_ACTION = 'No fix released yet. Coolify checks daily.';
+
     /**
      * The Action column: the sentence of the primary action (update_now, update_available), "Check again: {reason}."
-     * (check_needed, muted), or why the resource is not checked (not_checked, muted, no link). Null for the others.
+     * (check_needed, muted), that no fix exists yet (no_fix, muted, no link), or why the resource is not checked
+     * (not_checked, muted, no link). Null for ok.
      *
      * @return array{text: string, link: bool, muted: bool}|null
      */
     public static function action(ResourceSecurity $security): ?array
     {
         return match ($security->status) {
+            SecurityStatusType::NoFix => ['text' => SecuritySentences::noFixAction($security) ?? self::NO_FIX_ACTION, 'link' => false, 'muted' => true],
             SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable => filled($security->primary()?->sentence)
                 ? ['text' => (string) $security->primary()->sentence, 'link' => true, 'muted' => false]
                 : null,
@@ -387,13 +402,33 @@ final class TeamVulnerabilities
     {
         $inTeam = fn (Builder $query): Builder => $query->whereRelation('environment.project', 'team_id', $teamId);
 
+        $applications = Application::query()
+            ->select(self::listColumns('applications'))
+            ->selectRaw("CASE WHEN build_pack = 'dockercompose' THEN docker_compose END AS docker_compose")
+            ->selectRaw("CASE WHEN build_pack = 'dockercompose' THEN docker_compose_raw END AS docker_compose_raw");
+
         return collect()
-            ->concat($inTeam(Application::query())->with(['environment.project', 'settings', 'destination.server.settings'])->get())
-            ->concat($inTeam(Service::query())->with(['environment.project', 'destination.server.settings', 'server.settings'])->get())
+            ->concat($inTeam($applications)->with(['environment.project', 'settings', 'destination.server.settings'])->get())
+            ->concat($inTeam(Service::query()->select(self::listColumns('services')))->with(['environment.project', 'destination.server.settings', 'server.settings'])->get())
             ->concat(collect(STANDALONE_DATABASE_MODELS)->flatMap(fn (string $class) => $inTeam($class::query())
                 ->with(['environment.project', 'destination.server.settings'])
                 ->get()))
             ->values();
+    }
+
+    /**
+     * Every column of the table except UNREAD_COLUMNS, read once per request.
+     *
+     * @return list<string>
+     */
+    private static function listColumns(string $table): array
+    {
+        $columns = once(fn (): array => Schema::getColumnListing($table));
+
+        return array_values(array_map(
+            fn (string $column): string => "{$table}.{$column}",
+            array_diff($columns, self::UNREAD_COLUMNS[$table] ?? []),
+        ));
     }
 
     /**

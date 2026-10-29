@@ -7,7 +7,13 @@
     $secondary = 'truncate text-[11px] text-neutral-600 dark:text-fg-dim';
 @endphp
 
-<div class="flex w-full min-w-0 flex-col gap-6">
+<div class="flex w-full min-w-0 flex-col gap-6"
+    x-data="{ reloadTimer: null }"
+    x-init="$watch('$wire.reloadPending', (pending) => {
+        if (pending && reloadTimer === null) {
+            reloadTimer = setTimeout(() => { reloadTimer = null; $wire.reloadPendingResults() }, {{ \App\Livewire\ImageScan\FleetVulnerabilities::RELOAD_INTERVAL * 1000 }})
+        }
+    })">
     <x-slot:title>
         Security | Coolify
     </x-slot>
@@ -111,7 +117,7 @@
             </x-table.toolbar>
 
             <div class="relative">
-                <x-table.loading target="search,toggleStatus,toggleServer,toggleProject,resetFilters,previousPage,nextPage,gotoPage,perPage" />
+                <x-table.loading target="search,toggleStatus,toggleServer,toggleProject,toggleNotChecked,resetFilters,previousPage,nextPage,gotoPage,perPage" />
 
                 @if ($items->isEmpty())
                     @if ($searching)
@@ -121,6 +127,9 @@
                         <x-empty size="sm" title="No matching resources" description="Try other filters, or reset them." />
                     @elseif (! $hasResources)
                         <x-empty size="sm" title="No resources yet" description="The resources of your team show here." />
+                    @elseif ($hidesNotChecked)
+                        <x-empty size="sm" title="No resource was scanned yet"
+                            description="Resources that were not scanned are hidden. Coolify scans an image when it deploys or starts it on a server that scans images." />
                     @endif
                 @else
                     <div class="data-table">
@@ -179,7 +188,7 @@
                                         <span class="min-w-0 truncate font-mono text-[11px] text-neutral-700 dark:text-fg"
                                             title="{{ $match['id'] }} {{ $match['package'] }} {{ $match['version'] }}">{{ $match['id'] }} · {{ $match['package'] }} {{ $match['version'] }}</span>
                                         @if ($match['more'] > 0)
-                                            <span class="{{ $muted }}">+{{ $match['more'] }} more</span>
+                                            <span class="{{ $muted }}">+{{ number_format($match['more']) }} more</span>
                                         @endif
                                     </div>
                                     <span class="image-scan-fleet-action text-[12px] text-neutral-700 dark:text-fg">
@@ -202,11 +211,11 @@
                                     <div class="image-scan-fleet-action min-w-0">
                                         @if ($action !== null)
                                             @php
-                                                $actionClass = $action['muted'] ? 'text-[12px] text-neutral-500 dark:text-fg-faint' : 'text-[12px] text-neutral-700 dark:text-fg';
+                                                $actionClass = $action['muted'] ? 'text-[12px] text-neutral-500 dark:text-fg-faint' : 'text-[12px] text-neutral-800 dark:text-fg';
                                             @endphp
                                             @if ($action['link'] && $entry['link'])
                                                 <a href="{{ $entry['link'] }}#security-section" {{ wireNavigate() }}
-                                                    class="line-clamp-2 hover:underline {{ $actionClass }}"
+                                                    class="line-clamp-2 underline decoration-neutral-400/40 underline-offset-4 transition-colors hover:text-neutral-950 hover:decoration-current dark:decoration-white/25 dark:hover:text-fg dark:hover:decoration-current {{ $actionClass }}"
                                                     title="{{ $action['text'] }}">{{ $action['text'] }}</a>
                                             @else
                                                 <span class="line-clamp-2 {{ $actionClass }}">{{ $action['text'] }}</span>
@@ -240,6 +249,10 @@
             @if ($notScannedLine)
                 <div class="border-t border-neutral-200 px-4 py-2.5 text-[12px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
                     {{ $notScannedLine }}
+                    @if ($notCheckedToggle !== null)
+                        <button type="button" wire:click="toggleNotChecked"
+                            class="font-medium text-neutral-700 underline decoration-neutral-400/40 underline-offset-4 transition-colors hover:text-neutral-950 hover:decoration-current dark:text-fg-dim dark:decoration-white/25 dark:hover:text-fg">{{ $notCheckedToggle }}</button>
+                    @endif
                 </div>
             @endif
         </div>

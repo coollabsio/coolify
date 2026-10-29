@@ -14,6 +14,9 @@ use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -23,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
+use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -462,6 +466,142 @@ describe('ignore list', function () {
 
         expect(ImageScanIgnore::query()->whereKey($this->appIgnore->id)->exists())->toBeTrue();
     });
+});
+
+describe('ignore list of a database and a service', function () {
+    beforeEach(function () {
+        Queue::fake();
+        $environment = $this->application->environment;
+        $destination = $this->application->destination;
+        $this->database = create_standalone_postgresql($environment->id, $destination);
+        $this->service = Service::factory()->create([
+            'environment_id' => $environment->id,
+            'server_id' => $this->server->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ]);
+        $this->serviceApp = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $this->service->id, 'name' => 'web', 'image' => 'nginx:1.27']);
+        $this->serviceDb = ServiceDatabase::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $this->service->id, 'name' => 'db', 'image' => 'postgres:16']);
+
+        $ignore = fn (Model $owner, string $id): ImageScanIgnore => ImageScanIgnore::factory()->create([
+            'team_id' => $this->team->id, 'resource_type' => $owner->getMorphClass(), 'resource_id' => $owner->getKey(), 'vulnerability_id' => $id,
+        ]);
+        $this->teamIgnore = ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'vulnerability_id' => 'CVE-2024-10000']);
+        $this->databaseIgnore = $ignore($this->database, 'CVE-2024-10001');
+        $this->serviceAppIgnore = $ignore($this->serviceApp, 'CVE-2024-10002');
+        $this->serviceDbIgnore = $ignore($this->serviceDb, 'CVE-2024-10003');
+        $this->appIgnore = $ignore($this->application, 'CVE-2024-10004');
+    });
+
+    it('lists the ignores of a database with the team-wide ones and removes a database ignore', function () {
+        scanSettingsAs($this->admin, $this->team, 'database', $this->database->uuid)
+            ->assertSee('Ignored findings')
+            ->assertSeeInOrder(['CVE-2024-10001', 'This resource', 'CVE-2024-10000', 'All team resources'])
+            ->assertDontSee('CVE-2024-10002')
+            ->assertDontSee('CVE-2024-10004')
+            ->assertDontSee('If the scan cannot run')
+            ->call('removeIgnore', $this->databaseIgnore->uuid)
+            ->assertDispatched('success');
+
+        expect(ImageScanIgnore::query()->whereKey($this->databaseIgnore->id)->exists())->toBeFalse();
+    });
+
+    it('lists the ignores of the applications and databases of a service with their names and removes them', function () {
+        scanSettingsAs($this->admin, $this->team, 'service', $this->service->uuid)
+            ->assertSee('CVE-2024-10002')
+            ->assertSee('CVE-2024-10003')
+            ->assertSee('CVE-2024-10000')
+            ->assertDontSee('CVE-2024-10001')
+            ->assertSeeInOrder(['CVE-2024-10003', 'db'])
+            ->call('removeIgnore', $this->serviceDbIgnore->uuid)
+            ->assertDispatched('success')
+            ->call('removeIgnore', $this->serviceAppIgnore->uuid)
+            ->assertDispatched('success');
+
+        expect(ImageScanIgnore::query()->whereKey([$this->serviceAppIgnore->id, $this->serviceDbIgnore->id])->exists())->toBeFalse();
+    });
+
+    it('does not remove a team-wide ignore or an ignore of another resource from a resource page', function (string $scope) {
+        $uuid = $scope === 'database' ? $this->database->uuid : $this->service->uuid;
+        $other = $scope === 'database' ? $this->serviceAppIgnore : $this->databaseIgnore;
+
+        scanSettingsAs($this->admin, $this->team, $scope, $uuid)->call('removeIgnore', $this->teamIgnore->uuid)->assertNotFound();
+        scanSettingsAs($this->admin, $this->team, $scope, $uuid)->call('removeIgnore', $other->uuid)->assertNotFound();
+        scanSettingsAs($this->admin, $this->team, $scope, $uuid)->call('removeIgnore', $this->appIgnore->uuid)->assertNotFound();
+
+        expect(ImageScanIgnore::query()->whereKey([$this->teamIgnore->id, $other->id, $this->appIgnore->id])->count())->toBe(3);
+    })->with(['database', 'service']);
+
+    it('lets a member with write access remove an ignore, and not a member with read or deploy access', function (string $scope) {
+        [$uuid, $ignore] = $scope === 'database' ? [$this->database->uuid, $this->databaseIgnore] : [$this->service->uuid, $this->serviceAppIgnore];
+
+        foreach ([null, [['scope' => 'resource', 'uuid' => $uuid, 'levels' => ['read', 'deploy']]]] as $access) {
+            scanSettingsAs(scanSettingsMember($this->team, 'member', $access), $this->team, $scope, $uuid)
+                ->assertSee($ignore->vulnerability_id)
+                ->assertDontSee('Remove')
+                ->call('removeIgnore', $ignore->uuid)
+                ->assertForbidden();
+        }
+        expect(ImageScanIgnore::query()->whereKey($ignore->id)->exists())->toBeTrue();
+
+        $writer = scanSettingsMember($this->team, 'member', [['scope' => 'resource', 'uuid' => $uuid, 'levels' => ['read', 'write']]]);
+        scanSettingsAs($writer, $this->team, $scope, $uuid)
+            ->call('removeIgnore', $ignore->uuid)
+            ->assertDispatched('success');
+
+        expect(ImageScanIgnore::query()->whereKey($ignore->id)->exists())->toBeFalse();
+    })->with(['database', 'service']);
+
+    it('decides with the team of the resource after the session switches to a team the user owns', function (string $scope) {
+        [$uuid, $ignore] = $scope === 'database' ? [$this->database->uuid, $this->databaseIgnore] : [$this->service->uuid, $this->serviceAppIgnore];
+        $user = scanSettingsMember($this->team);
+        $ownTeam = Team::factory()->create();
+        $user->teams()->attach($ownTeam, ['role' => 'owner']);
+        $user = $user->fresh();
+
+        $page = scanSettingsAs($user, $this->team, $scope, $uuid);
+        session(['currentTeam' => $ownTeam]);
+        $page->call('removeIgnore', $ignore->uuid)->assertForbidden();
+
+        expect(ImageScanIgnore::query()->whereKey($ignore->id)->exists())->toBeTrue();
+    })->with(['database', 'service']);
+
+    it('does not open the ignores of a resource of another team', function (string $scope) {
+        $uuid = $scope === 'database' ? $this->database->uuid : $this->service->uuid;
+        $otherTeam = Team::factory()->create();
+        $stranger = scanSettingsMember($otherTeam, 'owner');
+
+        scanSettingsAs($stranger, $otherTeam, $scope, $uuid)->assertNotFound();
+    })->with(['database', 'service']);
+
+    it('refreshes the stored counts of the service after an ignore is removed', function () {
+        $scan = ImageScan::factory()->create([
+            'server_id' => $this->server->id,
+            'resource_type' => $this->serviceApp->getMorphClass(),
+            'resource_id' => $this->serviceApp->id,
+            'image_ref' => 'nginx:1.27',
+            'builds_image' => false,
+            'findings' => [[
+                'id' => 'CVE-2024-10002', 'aliases' => [], 'severity' => 'critical', 'package' => 'openssl', 'version' => '1',
+                'type' => 'apk', 'artifactId' => 'a', 'fixedIn' => '2', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
+                'risk' => 1.0, 'summary' => '', 'layer' => 'app',
+            ]],
+            'summary' => ['ignored' => 1],
+        ]);
+
+        scanSettingsAs($this->admin, $this->team, 'service', $this->service->uuid)
+            ->call('removeIgnore', $this->serviceAppIgnore->uuid);
+
+        expect($scan->fresh()->summary['ignored'])->toBe(0);
+    });
+
+    it('has no rules to save on a database or service page', function (string $scope) {
+        $uuid = $scope === 'database' ? $this->database->uuid : $this->service->uuid;
+
+        scanSettingsAs($this->admin, $this->team, $scope, $uuid)->set('gateMode', 'strict')->assertNotFound();
+
+        expect(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(0);
+    })->with(['database', 'service']);
 });
 
 describe('stored statuses', function () {

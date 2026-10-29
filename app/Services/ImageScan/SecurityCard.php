@@ -29,8 +29,8 @@ use InvalidArgumentException;
  *
  * @phpstan-type ButtonData array{label: string, title: string, submit: string, actions: list<string>, warning: string}
  * @phpstan-type ActionData array{key: string, type: string, sentence: string, copy: ?string, button: ?ButtonData}
- * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, cvss: ?string, severity: string, signal: ?string, exploited: bool, package: string, version: string}
- * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, attention: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: string, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, issues: ?int, filter: ?string, override: ?array{service: string, from: string, to: string}}
+ * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, cvss: ?string, cvssNote: ?string, severity: string, signal: ?string, exploited: bool, package: string, version: string}
+ * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: int, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, findings: ?int, filter: ?string, override: ?array{service: string, from: string, to: string}}
  */
 final class SecurityCard
 {
@@ -148,6 +148,7 @@ final class SecurityCard
             default => 'this database',
         };
         $composeOverrides = $resource instanceof Application && $resource->build_pack === 'dockercompose' ? $resource->activeComposeImageOverrides() : [];
+        $opened = false;
         $rows = [];
         foreach ($entries as $entry) {
             /** @var ResourceSecurity $imageSecurity */
@@ -182,6 +183,9 @@ final class SecurityCard
                 }
             }
 
+            // A single image is always open; in a list, the first row with a problem (spec 15.11).
+            $open = $single || (! $opened && in_array($status->value, self::PROBLEM_STATUSES, true));
+            $opened = $opened || $open;
             $others = array_slice($actions, 1);
             $counts = $scan === null ? null : ($findingCounts[(string) $scan->uuid] ?? null);
             $digestFull = $scan === null ? null : ($scan->repo_digest ?: $scan->image_id);
@@ -193,8 +197,8 @@ final class SecurityCard
                 'status' => $status->value,
                 'badge' => SecuritySentences::badge($status),
                 'badgeType' => self::badgeType($status),
-                'attention' => in_array($status->value, self::PROBLEM_STATUSES, true),
-                'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref),
+                'open' => $open,
+                'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref, $scan),
                 'attackNote' => SecuritySentences::attackNote($imageSecurity),
                 'advice' => SecuritySentences::noFixAdvice($imageSecurity, $noun),
                 'lines' => [...SecuritySentences::lines($imageSecurity), ...self::eolLine($imageSecurity)],
@@ -203,7 +207,7 @@ final class SecurityCard
                 'why' => in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable, SecurityStatusType::NoFix], true)
                     ? array_map(fn (array $why): array => self::whyRow($why), $imageSecurity->why)
                     : [],
-                'whyMore' => $showsActions ? SecuritySentences::whyMore($imageSecurity->moreFixed) : '',
+                'whyMore' => $showsActions ? max(0, $imageSecurity->moreFixed) : 0,
                 'provenance' => $scan === null || ! in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable, SecurityStatusType::NoFix], true)
                     ? null
                     : SecuritySentences::provenance($scan, $primaryAction, $imageSecurity, self::provenanceCounts($scan, $primaryAction)),
@@ -212,8 +216,8 @@ final class SecurityCard
                 'versionNotes' => $scan === null ? [] : self::versionCheckNotes(collect([$scan]), $user),
                 'digest' => SecuritySentences::shortDigest($digestFull),
                 'digestFull' => $digestFull,
-                'known' => $counts === null ? '' : SecuritySentences::knownIssues($counts),
-                'issues' => $counts,
+                'known' => $counts === null ? '' : self::findingCount($counts),
+                'findings' => $counts,
                 'filter' => $single ? null : $ref,
                 'override' => $name !== null && isset($composeOverrides[$name]) ? ['service' => $name, ...$composeOverrides[$name]] : null,
             ];
@@ -232,18 +236,48 @@ final class SecurityCard
     }
 
     /**
+     * "1,362 findings": the findings of an image that are not ignored, for the row footer (the expert layer).
+     */
+    public static function findingCount(int $count): string
+    {
+        return number_format($count).' '.($count === 1 ? 'finding' : 'findings');
+    }
+
+    /**
+     * The severity of a CVSS base score: 9.0 critical, 7.0 high, 4.0 medium, 0.1 low.
+     */
+    public static function cvssSeverity(float $score): string
+    {
+        return match (true) {
+            $score >= 9.0 => 'critical',
+            $score >= 7.0 => 'high',
+            $score >= 4.0 => 'medium',
+            $score > 0.0 => 'low',
+            default => 'unknown',
+        };
+    }
+
+    /**
+     * A why row. The score shows next to the severity badge only when its CVSS range has the same severity; else it
+     * is only in the tooltip ("CVSS 7.5"), so a badge never reads "Medium 7.5".
+     *
      * @param  array<string, mixed>  $why
      * @return WhyData
      */
     private static function whyRow(array $why): array
     {
+        $severity = strtolower((string) ($why['severity'] ?? 'unknown'));
+        $cvss = $why['score'] === null ? null : number_format((float) $why['score'], 1);
+        $matches = $cvss !== null && self::cvssSeverity((float) $why['score']) === $severity;
+
         return [
             'title' => ScannerText::tidyTitle((string) $why['title']),
             'display_id' => (string) $why['display_id'],
             'link' => $why['link'],
             'score' => $why['score'] === null ? 'No score' : number_format((float) $why['score'], 1).' '.ucfirst((string) $why['severity']),
-            'cvss' => $why['score'] === null ? null : number_format((float) $why['score'], 1),
-            'severity' => strtolower((string) ($why['severity'] ?? 'unknown')),
+            'cvss' => $matches ? $cvss : null,
+            'cvssNote' => $cvss === null ? null : 'CVSS '.$cvss,
+            'severity' => $severity,
             'signal' => match ($why['signal']) {
                 SecurityRules::EXPLOITED => 'Used by attackers',
                 SecurityRules::LIKELY => 'Likely to be exploited',

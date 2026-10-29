@@ -15,7 +15,8 @@ use Livewire\WithPagination;
 /**
  * The team Security page (spec 15.8): the resources of the session team the user can see with their stored security
  * status, most urgent first, and a search by vulnerability ID or package across their current scans. No buttons and
- * no bulk actions: the Action column links to the Security card of each resource.
+ * no bulk actions: the Action column links to the Security card of each resource. Resources that were not scanned are
+ * hidden until the user shows them (the line under the table counts them) or filters by "Not checked".
  */
 class FleetVulnerabilities extends Component
 {
@@ -40,7 +41,20 @@ class FleetVulnerabilities extends Component
     #[Url(except: [])]
     public $statuses = [];
 
+    /** Shows the resources that were not scanned when no status filter is set. */
+    #[Url(except: false)]
+    public bool $showNotChecked = false;
+
     public int $perPage = 25;
+
+    /** At most one reload per this many seconds for scan events of other resources. */
+    public const RELOAD_INTERVAL = 10;
+
+    /** When a scan event last reloaded the page (Unix time). */
+    public int $reloadedAt = 0;
+
+    /** A scan result came in during the interval; the page reloads once the interval ends. */
+    public bool $reloadPending = false;
 
     private ?TeamVulnerabilities $fleet = null;
 
@@ -52,8 +66,9 @@ class FleetVulnerabilities extends Component
     }
 
     /**
-     * A scan finished somewhere in the team: render again with the new results. Progress updates of a running scan
-     * change no result, so they do not reload the page.
+     * A scan finished somewhere in the team: render again with the new results, at most once per RELOAD_INTERVAL
+     * seconds, because a scan of a whole server sends one event per image. Progress updates of a running scan change no
+     * result, so they do not reload the page.
      *
      * @param  array<string, mixed>  $event
      */
@@ -61,7 +76,41 @@ class FleetVulnerabilities extends Component
     {
         if (data_get($event, 'final', true) === false) {
             $this->skipRender();
+
+            return;
         }
+
+        $now = now()->getTimestamp();
+        if ($now - $this->reloadedAt < self::RELOAD_INTERVAL) {
+            $this->reloadPending = true;
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->reloadedAt = $now;
+        $this->reloadPending = false;
+    }
+
+    /**
+     * Render the scan results that came in during the last interval.
+     */
+    public function reloadPendingResults(): void
+    {
+        if (! $this->reloadPending) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->reloadedAt = now()->getTimestamp();
+        $this->reloadPending = false;
+    }
+
+    public function toggleNotChecked(): void
+    {
+        $this->showNotChecked = ! $this->showNotChecked;
+        $this->resetPage();
     }
 
     public function updated(string $property): void
@@ -149,9 +198,11 @@ class FleetVulnerabilities extends Component
             && ($this->projects === [] || in_array($entry['project']?->uuid, $this->projects, true)))->values();
         $statusCounts = $inScope->countBy(fn (array $entry): string => $entry['security']->status->value);
         $statusOptions = collect(TeamVulnerabilities::STATUS_ORDER)
-            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status)).' ('.($statusCounts[$status] ?? 0).')'])
+            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status)).' ('.number_format($statusCounts[$status] ?? 0).')'])
             ->all();
-        $filtered = $inScope->filter(fn (array $entry): bool => $this->statuses === [] || in_array($entry['security']->status->value, $this->statuses, true))->values();
+        $filtered = $inScope->filter(fn (array $entry): bool => $this->statuses === []
+            ? $this->showNotChecked || $entry['security']->status !== SecurityStatusType::NotChecked
+            : in_array($entry['security']->status->value, $this->statuses, true))->values();
 
         $notScanned = $inScope->filter(fn (array $entry): bool => $entry['security']->status === SecurityStatusType::NotChecked);
         $searching = trim($this->search) !== '';
@@ -166,6 +217,9 @@ class FleetVulnerabilities extends Component
             'items' => $this->paginate($rows),
             'searching' => $searching,
             'notScannedLine' => $notScanned->isEmpty() ? null : self::notScannedSentence($notScanned->count(), $notScannedServers),
+            // The toggle only matters while no status filter is set.
+            'notCheckedToggle' => $notScanned->isEmpty() || $this->statuses !== [] || $searching ? null : ($this->showNotChecked ? 'Hide them' : 'Show them'),
+            'hidesNotChecked' => $this->statuses === [] && ! $this->showNotChecked && $notScanned->isNotEmpty(),
             'searchCapped' => $searching && $fleet->searchWasCapped(),
             'serversNotScanning' => $user->isAdminOfTeam($team->id) ? TeamVulnerabilities::serversNotScanning($team->id) : 0,
             'serverOptions' => $serverOptions,

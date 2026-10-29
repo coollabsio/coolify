@@ -2323,6 +2323,37 @@ class Application extends BaseModel
         return $active;
     }
 
+    /**
+     * Removes the overrides whose image the compose file no longer names, so a later compose file that names that
+     * image again does not turn them on. Keeps them all when the compose file cannot be read.
+     */
+    public function forgetStaleComposeImageOverrides(): void
+    {
+        $stored = (array) $this->docker_compose_image_overrides;
+        if ($stored === []) {
+            return;
+        }
+
+        try {
+            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services');
+        } catch (\Throwable) {
+            return;
+        }
+        if (! is_array($services)) {
+            return;
+        }
+
+        $active = $this->activeComposeImageOverrides();
+        if (count($active) === count($stored)) {
+            return;
+        }
+
+        $value = $active === [] ? null : $active;
+        static::query()->whereKey($this->getKey())->update(['docker_compose_image_overrides' => $value === null ? null : json_encode($value)]);
+        $this->docker_compose_image_overrides = $value;
+        $this->syncOriginalAttribute('docker_compose_image_overrides');
+    }
+
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
@@ -2937,5 +2968,16 @@ class Application extends BaseModel
         } catch (\Exception $e) {
             throw new \Exception('Failed to update application settings');
         }
+    }
+
+    /**
+     * The server of a deployment when it is the destination server or an additional server of the application.
+     */
+    public function deploymentServer(ApplicationDeploymentQueue $deployment): ?Server
+    {
+        return collect([$this->destination?->server])
+            ->concat($this->additional_servers()->get())
+            ->filter(fn ($server): bool => $server instanceof Server)
+            ->first(fn (Server $server): bool => (int) $server->id === (int) $deployment->server_id);
     }
 }

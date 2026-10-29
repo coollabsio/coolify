@@ -8,7 +8,7 @@
             <form wire:submit="saveDatabaseUrl">
                 <x-unsaved-bar action="saveDatabaseUrl" targets="imageScanDbUrl" />
 
-                <x-application.settings-section title="Image Scanning"
+                <x-application.settings-section title="Image scanning"
                     helper="Scan images for known vulnerabilities. Each server turns scanning on in its own settings.">
                     <div class="grid gap-4 md:grid-cols-2">
                         <x-forms.listbox id="isImageScanningAllowed" label="Allow image scanning" onChange="$commit"

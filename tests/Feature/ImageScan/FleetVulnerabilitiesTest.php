@@ -170,7 +170,7 @@ describe('page', function () {
 
         $this->actingAs(fleetMember($this->team));
         session(['currentTeam' => $this->team]);
-        $this->get(route('vulnerabilities'))
+        $this->get(route('vulnerabilities', ['showNotChecked' => 1]))
             ->assertOk()
             ->assertSee('Security | Coolify', false)
             ->assertSeeInOrder([
@@ -178,6 +178,31 @@ describe('page', function () {
                 'check-app', 'Check needed', 'a-ok-app', 'No action needed', 'b-ok-app', 'No action needed',
                 'never-app', 'Not checked',
             ]);
+    });
+
+    it('hides the resources that were not scanned until the user shows them', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetApplication('never-app');
+
+        fleetPage($this->admin)
+            ->assertSee('now-app')
+            ->assertDontSee('never-app')
+            ->assertSeeInOrder(['1 resource on 1 server was not scanned, so Coolify cannot tell.', 'Show them'])
+            ->call('toggleNotChecked')
+            ->assertSet('showNotChecked', true)
+            ->assertSeeInOrder(['now-app', 'never-app', 'Not checked', 'Hide them'])
+            ->call('toggleNotChecked')
+            ->assertDontSee('never-app')
+            ->call('toggleStatus', 'not_checked')
+            ->assertSee('never-app')
+            ->assertDontSee('now-app')
+            ->assertDontSee('Show them');
+    });
+
+    it('says that no fix is released yet in the Action column of a no fix resource', function () {
+        fleetScan(fleetApplication('nofix-app'), 'no_fix');
+
+        fleetPage($this->admin)->assertSeeInOrder(['nofix-app', 'No fix yet', TeamVulnerabilities::NO_FIX_ACTION]);
     });
 
     it('shows the primary action as a link to the Security card of the resource, without buttons', function () {
@@ -221,7 +246,8 @@ describe('page', function () {
             ->call('toggleStatus', 'not-a-status')
             ->assertSet('statuses', ['no_fix'])
             ->call('resetFilters')
-            ->assertSee('never-app');
+            ->assertSee('available-app')
+            ->assertDontSee('never-app');
     });
 
     it('opens filtered by the statuses in the URL and counts each status in the filter', function () {
@@ -279,7 +305,7 @@ describe('page', function () {
         $offServer = fleetServer($this->team, 'off-server', scanning: false);
         fleetApplication('off-app', destination: StandaloneDocker::query()->where('server_id', $offServer->id)->firstOrFail());
 
-        fleetPage($this->admin)
+        fleetPage($this->admin, query: ['showNotChecked' => true])
             ->assertSee('Check again: the vulnerability database is out of date.')
             ->assertSeeHtml('href="'.TeamVulnerabilities::vulnerabilitiesUrl($check).'#security-section"')
             ->assertSee('Image scanning is off for this server.')
@@ -291,7 +317,7 @@ describe('page', function () {
 
         fleetPage($this->admin)
             ->set('search', 'openssl')
-            ->assertSeeInOrder(['now-app', 'Update now', 'CVE-2024-0001', 'Fixed by an update']);
+            ->assertSeeInOrder(['now-app', 'Update now', 'CVE-2024-0001', 'Fix available upstream']);
     });
 
     it('never lists resources of another team', function () {
@@ -346,7 +372,7 @@ describe('page', function () {
         fleetPage($this->admin, query: ['search' => 'CVE-2021-44228'])
             ->assertSee('log4j-app')
             ->assertSee('GHSA-jfh8-c2jp-5v3q')
-            ->assertSee('Fixed by an update')
+            ->assertSee('Fix available upstream')
             ->assertDontSee('other-app');
     });
 
@@ -362,7 +388,7 @@ describe('page', function () {
 
         fleetPage($this->admin)
             ->set('search', 'cve-2024-9999')
-            ->assertSeeInOrder(['fixed-app', 'Fixed by an update', 'waiting-app', 'No fix yet', 'ignored-app', 'Ignored']);
+            ->assertSeeInOrder(['fixed-app', 'Fix available upstream', 'waiting-app', 'No fix yet', 'ignored-app', 'Ignored']);
     });
 
     it('counts resources that were not scanned, also during a search', function () {
@@ -372,7 +398,7 @@ describe('page', function () {
         $offApp = fleetApplication('off-app', destination: StandaloneDocker::query()->where('server_id', $offServer->id)->firstOrFail());
         fleetScan($offApp, 'update_now', ['server' => $offServer]);
 
-        fleetPage($this->admin)
+        fleetPage($this->admin, query: ['showNotChecked' => true])
             ->assertSee('2 resources on 2 servers were not scanned, so Coolify cannot tell.')
             ->assertSeeInOrder(['scanned-app', 'Security update', 'off-app', 'Not checked'])
             ->assertDontSeeHtml('<span class="truncate">Update now</span>')
@@ -764,6 +790,43 @@ describe('one scanned rule', function () {
         expect($component->effects)->toHaveKey('html');
     });
 
+    it('reloads the page for scan results at most once per interval', function () {
+        $this->freezeTime();
+        $component = fleetPage($this->admin);
+
+        $component->call('scanUpdated', ['resourceUuid' => 'x', 'scanUuid' => 'a', 'final' => true]);
+        expect($component->effects)->toHaveKey('html');
+
+        $component->call('scanUpdated', ['resourceUuid' => 'y', 'scanUuid' => 'b', 'final' => true]);
+        expect($component->effects)->not->toHaveKey('html')
+            ->and($component->get('reloadPending'))->toBeTrue();
+
+        $component->call('reloadPendingResults');
+        expect($component->effects)->toHaveKey('html')
+            ->and($component->get('reloadPending'))->toBeFalse();
+
+        $component->call('reloadPendingResults');
+        expect($component->effects)->not->toHaveKey('html');
+
+        $this->travel(FleetVulnerabilities::RELOAD_INTERVAL)->seconds();
+        $component->call('scanUpdated', ['resourceUuid' => 'z', 'scanUuid' => 'c', 'final' => true]);
+        expect($component->effects)->toHaveKey('html');
+    });
+
+    it('loads the team resources without their large Compose columns, except for Compose apps', function () {
+        $plain = fleetApplication('plain-app');
+        $plain->forceFill(['docker_compose_raw' => str_repeat('x', 1000)])->saveQuietly();
+        $compose = fleetApplication('compose-app');
+        $compose->forceFill(['build_pack' => 'dockercompose', 'docker_compose_raw' => "services:\n  web:\n    image: 'nginx:1.27'\n"])->saveQuietly();
+
+        $resources = TeamVulnerabilities::load($this->team->id)->entries->pluck('resource')->keyBy('name');
+
+        expect($resources['plain-app']->getAttributes())->not->toHaveKey('dockerfile')
+            ->and($resources['plain-app']->docker_compose_raw)->toBeNull()
+            ->and($resources['compose-app']->docker_compose_raw)->toContain('nginx:1.27')
+            ->and($resources['plain-app']->uuid)->toBe($plain->uuid);
+    });
+
     it('counts only the dashboard resources a limited member can see', function () {
         fleetScan(fleetApplication('visible-app'), 'update_now');
         $hiddenEnvironment = Environment::factory()->create([
@@ -789,7 +852,7 @@ function fleetExpectNotScannedEverywhere(mixed $test, Application $application):
         ->and(TeamVulnerabilities::updateNowResources($test->team->id))->toBe([])
         ->and(ImageScanPolicyResolver::offState($application))->not->toBeNull();
 
-    fleetPage($test->admin)
+    fleetPage($test->admin, query: ['showNotChecked' => true])
         ->assertSeeInOrder(['marked-app', 'Not checked'])
         ->assertDontSeeHtml('<span class="truncate">Update now</span>')
         ->assertSee('1 resource on 1 server was not scanned, so Coolify cannot tell.');

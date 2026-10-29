@@ -171,6 +171,43 @@ describe('authorization', function () {
     });
 });
 
+describe('compose image override', function () {
+    beforeEach(function () {
+        $this->application->forceFill([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: 'nginx:1.27'\n",
+            'docker_compose_image_overrides' => ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']],
+        ])->saveQuietly();
+    });
+
+    it('lets the next deploy use the image of the compose file again', function () {
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('removeImageOverride', 'web')
+            ->assertDispatched('success');
+
+        expect($this->application->fresh()->docker_compose_image_overrides)->toBeNull();
+    });
+
+    it('keeps the override on a server that another Coolify instance manages now', function () {
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+        Server::flushIdentityMap();
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('removeImageOverride', 'web')
+            ->assertDispatched('error', 'Another Coolify instance manages this server now.');
+
+        expect($this->application->fresh()->docker_compose_image_overrides)->toBe(['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']]);
+    });
+
+    it('does not let a member remove the override', function () {
+        vulnerabilitiesPage(vulnerabilitiesMember($this->team), $this->application)
+            ->call('removeImageOverride', 'web')
+            ->assertForbidden();
+
+        expect($this->application->fresh()->docker_compose_image_overrides)->not->toBeNull();
+    });
+});
+
 describe('scan now', function () {
     it('queues one scan of the running image and refuses a second one within a minute', function () {
         vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
@@ -190,6 +227,19 @@ describe('scan now', function () {
         vulnerabilitiesPage($this->admin, $this->application)
             ->call('scanNow')
             ->assertDispatched('error', 'Deploy the app first.');
+
+        Queue::assertNotPushed(ScanResourceImagesJob::class);
+    });
+
+    it('does not start a scan on a server that another Coolify instance manages now', function () {
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+        Server::flushIdentityMap();
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->call('scanNow')
+            ->assertDispatched('error', 'Another Coolify instance manages this server now.')
+            ->assertNotDispatched('success');
 
         Queue::assertNotPushed(ScanResourceImagesJob::class);
     });
@@ -640,9 +690,11 @@ describe('routes', function () {
         $this->get(route('project.application.vulnerabilities', [...$parameters, 'application_uuid' => $this->application->uuid]))
             ->assertOk()->assertSee('Not scanned yet. The next deploy scans the image.');
         $this->get(route('project.service.vulnerabilities', [...$parameters, 'service_uuid' => $service->uuid]))
-            ->assertOk()->assertSee('Not scanned yet. The next deploy scans the image.');
+            ->assertOk()->assertSee('Not scanned yet.')->assertDontSee('The next deploy scans the image.')
+            ->assertSee('Scan now')->assertSee('Ignored findings');
         $this->get(route('project.database.vulnerabilities', [...$parameters, 'database_uuid' => $database->uuid]))
-            ->assertOk()->assertSee('Not scanned yet. The next deploy scans the image.');
+            ->assertOk()->assertSee('Not scanned yet.')->assertDontSee('The next deploy scans the image.')
+            ->assertSee('Scan now')->assertSee('Ignored findings');
     });
 });
 

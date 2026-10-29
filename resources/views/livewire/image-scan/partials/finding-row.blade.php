@@ -44,7 +44,7 @@
         <span class="image-scan-severity-cell flex min-w-0 flex-wrap items-center gap-1">
             <x-image-scan.severity-badge :severity="strtolower($finding->severity)" />
             @if ($finding->kev)
-                <span data-tooltip="Attackers are using this vulnerability, according to CISA.">
+                <span data-tooltip="Attackers are using this, according to CISA.">
                     <x-status-badge type="error" label="Known exploited" />
                 </span>
             @endif

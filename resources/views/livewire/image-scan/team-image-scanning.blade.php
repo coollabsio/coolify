@@ -9,7 +9,7 @@
                 <livewire:image-scan.scan-settings scope-type="team" :scope-uuid="(string) $teamId"
                     :key="'team-image-scan-settings-'.$teamId" />
             @else
-                <x-application.settings-section title="Image Scanning">
+                <x-application.settings-section title="Image scanning">
                     <x-empty size="sm" title="Image scanning is turned off for this Coolify instance." />
                 </x-application.settings-section>
             @endif

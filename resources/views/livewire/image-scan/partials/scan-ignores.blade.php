@@ -1,9 +1,9 @@
 @if ($ignores->isEmpty())
-    <x-empty size="sm" title="No ignored vulnerabilities." />
+    <x-empty size="sm" title="No ignored findings." />
 @else
     <div class="data-table">
         <div class="data-table-header image-scan-ignores-table-grid">
-            <span>Vulnerability or package</span>
+            <span>Finding or package</span>
             <span>Reason</span>
             <span>Expires</span>
             <span>Set for</span>
@@ -17,7 +17,7 @@
                     @if ($ignore->vulnerability_id)
                         <span class="font-mono">{{ $ignore->vulnerability_id }}</span>
                     @else
-                        All vulnerabilities in <span class="font-mono">{{ $ignore->package }}</span>
+                        All findings in <span class="font-mono">{{ $ignore->package }}</span>
                     @endif
                 </div>
                 <div class="min-w-0 truncate text-[12px] text-neutral-600 dark:text-fg-dim"
@@ -26,10 +26,10 @@
                     {{ $ignore->expires_at?->format('Y-m-d') ?? 'Never' }}
                 </div>
                 <div class="min-w-0 text-[11px] text-neutral-500 dark:text-fg-dim">
-                    {{ $isTeamWide ? 'All team resources' : 'This resource' }}
+                    {{ $isTeamWide ? 'All team resources' : ($ownerNames[$ignore->uuid] ?? 'This resource') }}
                 </div>
                 <div class="flex justify-end">
-                    @if ($isApplication && $isTeamWide)
+                    @if ($isResource && $isTeamWide)
                         @if ($showsTeamSettingsLink)
                             <a href="{{ route('team.image-scanning') }}" wire:navigate
                                 class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 hover:bg-neutral-100 dark:text-fg-dim dark:hover:bg-white/[0.06]">
@@ -39,7 +39,7 @@
                     @elseif ($canEdit)
                         <x-modal-confirmation title="Remove this ignore?"
                             submitAction="removeIgnore('{{ $ignore->uuid }}')" :actions="[
-                                'The vulnerability counts again for alerts and Block deploys.',
+                                'The finding counts again for the status, alerts, and Block deploys.',
                             ]"
                             :confirmWithText="false" :confirmWithPassword="false"
                             temporaryDisableTwoStepConfirmation step2ButtonText="Remove">
