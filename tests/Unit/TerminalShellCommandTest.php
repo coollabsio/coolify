@@ -3,12 +3,12 @@
 use App\Services\TerminalSessionService;
 use Symfony\Component\Process\Process;
 
-function runTerminalShellCommand(string $shellName): string
+function runTerminalShellCommand(string $shellName, int $exitCode = 1): Process
 {
     $home = sys_get_temp_dir().'/terminal-shell-'.uniqid();
     mkdir($home);
     $shell = "{$home}/{$shellName}";
-    file_put_contents($shell, "#!/bin/sh\necho {$shellName}-ran\nexit 1\n");
+    file_put_contents($shell, "#!/bin/sh\necho {$shellName}-ran\nexit {$exitCode}\n");
     chmod($shell, 0755);
 
     $command = (fn () => $this->shellCommand())->call(new TerminalSessionService);
@@ -17,16 +17,20 @@ function runTerminalShellCommand(string $shellName): string
     $process->setInput("echo fallback-ran\n");
     $process->run();
 
-    return $process->getOutput();
+    return $process;
 }
 
 it('falls back to a usable shell when $SHELL is a login-disabling shell', function (string $shellName) {
-    $output = runTerminalShellCommand($shellName);
+    $process = runTerminalShellCommand($shellName);
 
-    expect($output)->toContain('fallback-ran')
+    expect($process->getOutput())->toContain('fallback-ran')
         ->not->toContain("{$shellName}-ran");
+    expect($process->getExitCode())->toBe(0);
 })->with(['nologin', 'false']);
 
 it('starts $SHELL when it is a usable shell', function () {
-    expect(runTerminalShellCommand('zsh'))->toContain('zsh-ran');
+    $process = runTerminalShellCommand('zsh', exitCode: 0);
+
+    expect($process->getOutput())->toContain('zsh-ran');
+    expect($process->getExitCode())->toBe(0);
 });
