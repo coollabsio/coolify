@@ -154,7 +154,7 @@ jobs:
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
           jq -r 'to_entries[] | "\(.key) \(.value)"' <<< "$tags" | while read -r tag release; do
             for repository in ghcr.io/coollabsio/coolify docker.io/coollabsio/coolify; do
-              docker buildx imagetools create --tag "$repository:$tag" "$repository:${release#v}"
+              docker buildx imagetools create --tag "$repository:${tag#v}" "$repository:${release#v}"
             done
           done
           latest="$(jq -r '.latest // empty' <<< "$tags")"

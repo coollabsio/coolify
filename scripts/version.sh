@@ -70,7 +70,7 @@ print_tags() {
 }
 
 print_next_build() {
-	local build
+	local build published="$PUBLISHED_VERSION"
 	[[ "$OPTION" =~ ^--(nightly|main)$ ]] || return 0
 	if [ "$OPTION" = --main ]; then
 		branch=main
@@ -85,14 +85,15 @@ print_next_build() {
 	else
 		select_nightly_base
 	fi
+	[ -z "$UPSTREAM" ] || published="${published#*-v}"
 	build="$base.$(date -u +%Y%m%d)"
-	if [[ "$PUBLISHED_VERSION" == "$build".* ]]; then
-		build+=".$((${PUBLISHED_VERSION##*.} + 1))"
+	if [[ "$published" == "$build".* ]]; then
+		build+=".$((${published##*.} + 1))"
 	else
 		build+=".1"
 	fi
 	upstream_lines <(git show "$revision:$UPSTREAM_FILE") | while read -r name upstream; do
-		jq -nc --arg name "$name" --arg version "$upstream" --arg tag "${upstream:+$upstream-}v$build" '{$name, $version, $tag}'
+		jq -nc --arg name "$name" --arg version "$upstream" --arg tag "v${upstream:+$upstream-v}$build" '{$name, $version, $tag}'
 	done | jq -sc --arg branch "$branch" --arg revision "$revision" --arg image "$build" '{$branch, $revision, $image, lines: .}'
 	exit 0
 }
@@ -171,7 +172,7 @@ select_releases() {
 	releases=
 	[ "$publish" = true ] || return 0
 	while read -r name sqlite; do
-		tag="${sqlite:+$sqlite-}v$version"
+		tag="v${sqlite:+$sqlite-v}$version"
 		if grep -qxF "$tag" <<< "$tags"; then
 			info "$tag is published"
 			continue
@@ -179,7 +180,7 @@ select_releases() {
 		previous=
 		while read -r older; do
 			! newer "$sqlite" "$older" || previous="$older"
-		done < <(with_version "$version" <<< "$tags" | sed -n 's/-v.*//p')
+		done < <(with_version "$version" <<< "$tags" | sed -nE 's/^v(.*)-v.*/\1/p')
 		added+="$tag"$'\n'
 		releases+="$(jq -nc --arg name "$name" --arg version "$sqlite" --arg image "$version" --arg tag "$tag" --arg previous "$previous" \
 			'{$name, $version, $image, $tag, $previous}')"$'\n'
@@ -284,8 +285,8 @@ moved_tags() {
 moving_tags() {
 	local tags releases latest preview base image sqlite prefix seen=" "
 	tags="$(cat)"
-	releases="$(sed -nE 's/^((.*)-)?v([^-]*)$/\3 \2/p' <<< "$tags" | sort -k1,1rV -k2,2rV)"
-	latest="$(awk 'NR == 1 && NF { print ($2 == "" ? "" : $2 "-") "v" $1 }' <<< "$releases")"
+	releases="$(sed -nE 's/^v((.*)-v)?([^-]*)$/\3 \2/p' <<< "$tags" | sort -k1,1rV -k2,2rV)"
+	latest="$(awk 'NR == 1 && NF { print "v" ($2 == "" ? "" : $2 "-v") $1 }' <<< "$releases")"
 	preview="$latest"
 	while read -r base; do
 		if newer "$base" "${latest##*v}"; then
@@ -299,7 +300,7 @@ moving_tags() {
 	while read -r image sqlite; do
 		prefix="$sqlite"
 		while [ -n "$prefix" ] && [[ "$seen" != *" $prefix "* ]]; do
-			echo "$prefix $sqlite-v$image"
+			echo "$prefix v$sqlite-v$image"
 			seen+="$prefix "
 			[[ "$prefix" == *.* ]] || break
 			prefix="${prefix%.*}"
@@ -308,7 +309,7 @@ moving_tags() {
 }
 
 release_tags() {
-	git tag --list "$@" | grep -E "^${UPSTREAM:+[^-]+-}v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$" || true
+	git tag --list "$@" | grep -E "^v${UPSTREAM:+[^-]+-v}[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$" || true
 }
 
 tag_versions() {
