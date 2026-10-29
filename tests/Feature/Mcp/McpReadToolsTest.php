@@ -644,6 +644,66 @@ test('get_application omits free-form configuration that can contain secrets', f
         ->and($raw)->not->toContain('custom_nginx_configuration');
 });
 
+function mcpReadCallWithAbilities(array $abilities, string $name, array $arguments = [])
+{
+    auth()->forgetGuards();
+
+    return test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.test()->user->createToken('mcp-abilities', $abilities)->plainTextToken,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => $name, 'arguments' => (object) $arguments],
+    ]);
+}
+
+test('get_application returns commands and configuration to a read:sensitive or root token of an owner', function (array $abilities) {
+    $this->application->update([
+        'build_command' => 'npm run build',
+        'post_deployment_command' => 'php artisan migrate',
+        'custom_docker_run_options' => '--cap-add SYS_ADMIN',
+    ]);
+
+    $response = mcpReadCallWithAbilities($abilities, 'get_application', ['uuid' => $this->application->uuid]);
+    $response->assertOk();
+
+    expect(mcpReadJson($response)['data'])
+        ->toMatchArray([
+            'build_command' => 'npm run build',
+            'post_deployment_command' => 'php artisan migrate',
+            'custom_docker_run_options' => '--cap-add SYS_ADMIN',
+        ])
+        ->not->toHaveKey('git_full_url');
+})->with([
+    'read:sensitive' => [['read', 'read:sensitive']],
+    'root' => [['root']],
+]);
+
+test('get_database returns custom configuration to a read:sensitive token of an owner', function () {
+    $database = StandalonePostgresql::create([
+        'name' => 'Configured database',
+        'postgres_password' => 'database-password',
+        'postgres_conf' => 'max_connections = 200',
+        'custom_docker_run_options' => '--shm-size 1g',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $response = mcpSensitiveReadCall('get_database', ['uuid' => $database->uuid]);
+    $response->assertOk();
+
+    expect(mcpReadJson($response)['data'])
+        ->toMatchArray([
+            'postgres_conf' => 'max_connections = 200',
+            'custom_docker_run_options' => '--shm-size 1g',
+        ])
+        ->not->toHaveKey('postgres_password');
+});
+
 test('get_database omits configuration blobs that can contain secrets', function () {
     $database = StandalonePostgresql::create([
         'name' => 'Secret-bearing config',

@@ -271,6 +271,9 @@ describe('servers', function () {
     })->with([
         'wildcard domain' => ['wildcard_domain', 'not a url'],
         'timezone' => ['server_timezone', 'Mars/Olympus'],
+        'null timezone' => ['server_timezone', null],
+        'empty timezone' => ['server_timezone', ''],
+        'array timezone' => ['server_timezone', ['Europe/Berlin']],
         'compression' => ['backup_compression_cpu_percentage', 30],
     ]);
 

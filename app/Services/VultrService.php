@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use Illuminate\Support\Facades\Http;
 
@@ -28,7 +29,7 @@ class VultrService
                 );
             }
 
-            throw new \Exception('Vultr API error: '.$response->json('error', 'Unknown error'), $response->status());
+            throw new CloudProviderApiException('Vultr', $response->json('error', 'Unknown error'), $response->status());
         }
 
         return $response->json() ?? [];

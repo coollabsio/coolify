@@ -133,7 +133,7 @@ function candidatesScan(string $imageRef = 'postgres:15.0-alpine', ?string $repo
  */
 function candidatesCommand(PendingProcess $process): string
 {
-    return str_replace("'\\''", "'", $process->command);
+    return str_replace("'\\''", "'", remoteProcessScript($process));
 }
 
 function candidatesPayload(string $step, string $payload, int $code = 0, ?int $size = null): string

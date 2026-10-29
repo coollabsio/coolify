@@ -57,7 +57,7 @@ beforeEach(function () {
 function interruptedMongodump(int $exitCode): void
 {
     Process::fake(function ($process) use ($exitCode) {
-        if (str_contains($process->command, 'mongodump')) {
+        if (str_contains(remoteProcessScript($process), 'mongodump')) {
             return Process::result(
                 errorOutput: "2026-08-29T15:44:00.555+0000\tdone dumping `evolution.leaverequests` (0 documents)\n2026-08-29T15:44:00.555+0000\twriting `evolution.printagents` to `archive on stdout`",
                 exitCode: $exitCode,
@@ -86,7 +86,7 @@ it('tells why a dump stopped without an error message', function (int $exitCode,
 
 it('keeps the error of a dump that reports its own failure', function () {
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'mongodump')) {
+        if (str_contains(remoteProcessScript($process), 'mongodump')) {
             return Process::result(errorOutput: 'Failed: error connecting to db server: server returned error on SASL authentication step', exitCode: 1);
         }
 

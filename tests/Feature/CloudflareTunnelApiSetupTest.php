@@ -272,7 +272,7 @@ describe('disable', function () {
             ->assertNotDispatched('warning');
 
         // Detached, so stopping cloudflared does not cut the SSH session that runs through the tunnel.
-        Process::assertRan(fn ($process) => str_contains($process->command, "nohup setsid sh -c 'sleep 2; docker rm -f coolify-cloudflared' > /dev/null 2>&1 < /dev/null &"));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "nohup setsid sh -c 'sleep 2; docker rm -f coolify-cloudflared' > /dev/null 2>&1 < /dev/null &"));
         Sleep::assertNeverSlept();
 
         Http::assertSent(fn (Request $request) => $request->method() === 'DELETE' && str_ends_with($request->url(), CF_TUNNEL_API.'/tun-1'));
@@ -335,7 +335,7 @@ describe('disable', function () {
         Livewire::test(CloudflareTunnel::class, ['server_uuid' => $this->server->uuid])
             ->call('toggleCloudflareTunnels');
 
-        Process::assertRan(fn ($process) => str_contains($process->command,
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process),
             "sudo bash -c 'nohup setsid sh -c '\\''sleep 2; docker rm -f coolify-cloudflared'\\'' > /dev/null 2>&1 < /dev/null &'"));
     });
 

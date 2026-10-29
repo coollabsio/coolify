@@ -64,10 +64,10 @@ function fakeScannerPreparation(array $overrides = []): void
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
         $key = match (true) {
-            str_contains($process->command, 'docker pull') => 'prepare',
-            str_contains($process->command, 'coolify-scan-exit disk-db') => 'disk',
-            str_contains($process->command, 'coolify-scan-exit db-status') => 'db-status',
-            str_contains($process->command, 'coolify-scan-exit db-update') => 'db-update',
+            str_contains(remoteProcessScript($process), 'docker pull') => 'prepare',
+            str_contains(remoteProcessScript($process), 'coolify-scan-exit disk-db') => 'disk',
+            str_contains(remoteProcessScript($process), 'coolify-scan-exit db-status') => 'db-status',
+            str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update') => 'db-update',
             default => null,
         };
 
@@ -148,7 +148,7 @@ describe('server image scanning page', function () {
 
         imageScanningPage()->call('deleteScannerData')->assertDispatched('success', 'Scanner data deleted.');
 
-        Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'docker volume rm -f coolify-grype-db'));
+        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker volume rm -f coolify-grype-db'));
         expect(Cache::has(PrepareImageScannerJob::stateCacheKey($this->server)))->toBeFalse();
     });
 
@@ -269,7 +269,7 @@ describe('prepare image scanner job', function () {
         $job->handle();
         $lock->release();
 
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
         expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('updating_database');
     });
 
@@ -288,13 +288,13 @@ describe('prepare image scanner job', function () {
 
     it('forgets the state when scanning was turned off during the database update', function () {
         Process::fake(function (PendingProcess $process) {
-            if (str_contains($process->command, 'coolify-scan-exit db-update')) {
+            if (str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update')) {
                 $this->server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
 
                 return Process::result(output: 'coolify-scan-exit db-update 0');
             }
 
-            return Process::result(output: str_contains($process->command, 'docker pull')
+            return Process::result(output: str_contains(remoteProcessScript($process), 'docker pull')
                 ? "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 0\ncoolify-scan-exit pull-regctl 0\ncoolify-scan-exit pull-init 0\ncoolify-scan-exit db-volume 0"
                 : '');
         });
@@ -310,7 +310,7 @@ describe('prepare image scanner job', function () {
 
         (new PrepareImageScannerJob($this->server))->handle();
 
-        Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'GRYPE_DB_UPDATE_URL') && str_contains($process->command, 'mirror.example.com'));
+        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'GRYPE_DB_UPDATE_URL') && str_contains(remoteProcessScript($process), 'mirror.example.com'));
     });
 
     it('marks a failed pull and stops before the database update', function () {
@@ -320,7 +320,7 @@ describe('prepare image scanner job', function () {
 
         expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('failed')
             ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBe('pulling');
-        Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
     });
 
     it('marks a failed storage setup and stops before the database update', function () {
@@ -330,7 +330,7 @@ describe('prepare image scanner job', function () {
 
         expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('failed')
             ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBe('setup');
-        Process::assertNotRan(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
     });
 
     it('marks a connection failure separately from a failed pull', function () {

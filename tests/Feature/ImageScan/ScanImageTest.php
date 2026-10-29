@@ -88,7 +88,7 @@ function scanImageTestFake(array $overrides = []): void
     ], $overrides);
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
-        $key = scanImageTestCommandKey($process->command);
+        $key = scanImageTestCommandKey(remoteProcessScript($process));
         $output = $key === null ? '' : $outputs[$key];
 
         return Process::result(output: $output instanceof Closure ? $output() : $output);
@@ -180,8 +180,8 @@ it('reuses the SBOM of an image that was scanned on the server before', function
     $this->travel(1)->hours();
     $scan = scanImageTestRun();
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker save'), 1);
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'df -P'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker save'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'df -P'), 1);
     expect($scan->status)->toBe(ImageScanStatus::Completed)
         ->and($scan->findings)->toHaveCount(166)
         ->and($scan->is_baseline)->toBeFalse()
@@ -203,12 +203,12 @@ it('creates the SBOM again when the stored SBOM file is missing', function () {
 
     $scan = scanImageTestRun();
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker save'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker save'), 1);
     expect($scan->status)->toBe(ImageScanStatus::Completed)
         ->and($grypeRuns)->toBe(2)
         ->and($scan->image_sbom_id)->toBe($oldSbom->id)
         ->and(ImageSbom::query()->sole()->packages)->toHaveCount(46);
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'df -P'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'df -P'), 1);
 });
 
 it('fails with the needed disk space when the server has too little', function () {
@@ -223,7 +223,7 @@ it('fails with the needed disk space when the server has too little', function (
         ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::DiskSpace)
         ->and($scan->error_context)->toBe(['server' => $this->server->name, 'n' => 21]);
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'docker save'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'docker save'));
 });
 
 it('fails with lock busy after the wait when another scan holds the server lock', function () {
@@ -384,8 +384,8 @@ it('removes a leftover scanner container at the start of every command batch', f
     scanImageTestRun();
 
     $firstRemoteLine = fn (string $command) => explode(PHP_EOL, $command)[1] ?? '';
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'coolify-scan-'), 7);
-    Process::assertDidntRun(fn ($process) => ! str_starts_with($firstRemoteLine($process->command), 'docker rm -f coolify-scan-'));
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-'), 7);
+    Process::assertDidntRun(fn ($process) => ! str_starts_with($firstRemoteLine(remoteProcessScript($process)), 'docker rm -f coolify-scan-'));
 });
 
 it('runs nothing and saves nothing when scanning is off on the server', function () {
@@ -472,7 +472,7 @@ it('fails with a timeout when grype is stopped by the server timeout, and still 
 
     expect($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::Timeout);
-    Process::assertRan(fn ($process) => str_contains($process->command, "-name 'tmp-*' -mmin +60"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "-name 'tmp-*' -mmin +60"));
 });
 
 it('fails with a timeout when `timeout` kills a scanner after its grace period', function (string $step, string $output) {
@@ -610,7 +610,7 @@ it('fails as unknown when the server returns no output', function () {
     expect($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::Unknown)
         ->and($scan->error_context)->toBe(['server' => $this->server->name]);
-    Process::assertRan(fn ($process) => str_contains($process->command, "-name 'tmp-*' -mmin +60"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "-name 'tmp-*' -mmin +60"));
 });
 
 it('fails with image missing when the image is not on the server', function () {
@@ -636,8 +636,8 @@ it('updates the vulnerability database once when it is missing', function (?stri
     $scan = scanImageTestRun();
 
     expect($scan->status)->toBe(ImageScanStatus::Completed);
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'coolify-scan-exit db-update'), 1);
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'GRYPE_DB_UPDATE_URL'));
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'), 1);
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'GRYPE_DB_UPDATE_URL'));
 })->with(['no mirror' => [null], 'empty mirror' => ['']]);
 
 it('fails when the vulnerability database is older than 5 days', function () {
@@ -649,7 +649,7 @@ it('fails when the vulnerability database is older than 5 days', function () {
         ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::DbTooOld)
         ->and($scan->error_context)->toBe(['server' => $this->server->name, 'n' => 7]);
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
 });
 
 it('stores the security status of a build server scan with the rules of the main destination server', function () {
@@ -678,7 +678,7 @@ it('scopes the SBOM reuse and the scan writes to the server', function () {
 
     $scan = scanImageTestRun();
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker save'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker save'), 1);
     expect($scan->image_sbom_id)->not->toBe($otherSbom->id)
         ->and($otherScan->fresh()->summary)->toBe(['marker' => 'other'])
         ->and($otherScan->fresh()->server_id)->toBe($otherServer->id)

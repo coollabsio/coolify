@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -379,6 +380,8 @@ class ByHostinger extends Component
             } catch (\Throwable $e) {
                 report($e);
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 currentTeam()->update(['show_boarding' => false]);

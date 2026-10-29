@@ -282,6 +282,7 @@ class Change extends Component
             $this->syncData(true);
             $this->gitea_app->save();
             $this->dispatch('success', 'Gitea App updated.');
+            $this->dispatch('name-changed', uuid: $this->gitea_app->uuid, name: $this->gitea_app->name);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -131,3 +131,20 @@ test('the postgresql shortcut ignores a server that is not in the server list', 
         ->assertSet('server', null)
         ->assertSet('current_step', 'type');
 });
+
+test('the postgresql image step does not reference the resource search script it does not render', function () {
+    Livewire::withQueryParams([
+        'type' => 'postgresql',
+        'server_id' => $this->server->id,
+        'destination' => $this->defaultDestination->uuid,
+    ])->test(Select::class)
+        ->assertSet('current_step', 'select-postgresql-type')
+        ->assertDontSeeHtml('searchResources');
+});
+
+test('the resource type step renders the resource search script with its binding', function () {
+    Livewire::test(Select::class)
+        ->assertSet('current_step', 'type')
+        ->assertSeeHtml('x-data="searchResources()"')
+        ->assertSeeHtml('function searchResources()');
+});

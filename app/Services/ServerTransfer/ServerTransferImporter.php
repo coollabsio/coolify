@@ -2021,6 +2021,7 @@ class ServerTransferImporter
             'secret' => data_get($payload, 'secret'),
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
+            'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
             'is_usable' => (bool) data_get($payload, 'is_usable', true),
         ]);
         $storage->uuid = $uuid;
@@ -2346,6 +2347,7 @@ class ServerTransferImporter
                 'docker_registry_image_tag' => data_get($previewPayload, 'docker_registry_image_tag'),
                 'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
                 'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
+                'keeps_production_values' => (bool) data_get($previewPayload, 'keeps_production_values', false),
             ];
 
             if ($preview) {

@@ -57,7 +57,16 @@ class StandaloneKeydb extends BaseModel
         'health_check_start_period',
     ];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'keydb_conf',
+        'custom_docker_run_options',
+    ];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
@@ -66,6 +75,7 @@ class StandaloneKeydb extends BaseModel
      */
     protected $hidden = [
         'keydb_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
         // Internal start-command state, not part of the API.

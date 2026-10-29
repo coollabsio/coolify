@@ -170,9 +170,9 @@ class General extends Component
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
-            'installCommand' => ValidationPatterns::shellSafeCommandRules(),
-            'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
-            'startCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'installCommand' => $this->changedCommandRules('installCommand', 'install_command'),
+            'buildCommand' => $this->changedCommandRules('buildCommand', 'build_command'),
+            'startCommand' => $this->changedCommandRules('startCommand', 'start_command'),
             'buildPack' => 'required',
             'staticImage' => ['required', Rule::enum(StaticImageTypes::class)],
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
@@ -215,6 +215,19 @@ class General extends Component
             'watchPaths' => 'nullable',
             'redirect' => 'string|required',
         ];
+    }
+
+    /**
+     * Commands saved before they were validated stay valid until they change. The deployment escapes them as one
+     * argument, and the fields are hidden for build packs other than Nixpacks and Railpack, so a user cannot fix them.
+     */
+    private function changedCommandRules(string $property, string $column): array
+    {
+        if (isset($this->application) && (string) $this->{$property} === (string) $this->application->getOriginal($column)) {
+            return ['nullable'];
+        }
+
+        return ValidationPatterns::shellSafeCommandRules();
     }
 
     protected function messages(): array
@@ -447,16 +460,17 @@ class General extends Component
 
             $this->saveApplicationSettingsWithAudit($this->application);
         } else {
-            // From model to properties
+            // From model to properties. Commands, configuration, and secrets can embed credentials, so only users who can update the application get them.
+            $canViewSecrets = auth()->user()?->can('update', $this->application) ?? false;
             $this->name = $this->application->name;
             $this->description = $this->application->description;
             $this->fqdn = $this->application->fqdn;
             $this->gitRepository = $this->application->git_repository;
             $this->gitBranch = $this->application->git_branch;
             $this->gitCommitSha = $this->application->git_commit_sha;
-            $this->installCommand = $this->application->install_command;
-            $this->buildCommand = $this->application->build_command;
-            $this->startCommand = $this->application->start_command;
+            $this->installCommand = $canViewSecrets ? $this->application->install_command : null;
+            $this->buildCommand = $canViewSecrets ? $this->application->build_command : null;
+            $this->startCommand = $canViewSecrets ? $this->application->start_command : null;
             $this->buildPack = $this->application->build_pack;
             $this->staticImage = $this->application->static_image;
             $this->baseDirectory = $this->application->base_directory;
@@ -464,29 +478,26 @@ class General extends Component
             $this->portsExposes = $this->application->ports_exposes;
             $this->portsMappings = $this->application->ports_mappings;
             $this->customNetworkAliases = $this->application->custom_network_aliases;
-            $this->dockerfile = $this->application->dockerfile;
+            $this->dockerfile = $canViewSecrets ? $this->application->dockerfile : null;
             $this->dockerfileLocation = $this->application->dockerfile_location ?? ($this->buildPack === 'dockerfile' ? '/Dockerfile' : null);
             $this->dockerfileTargetBuild = $this->application->dockerfile_target_build;
             $this->dockerRegistryImageName = $this->application->docker_registry_image_name;
             $this->dockerRegistryImageTag = $this->application->docker_registry_image_tag;
             $this->dockerComposeLocation = $this->application->docker_compose_location;
-            $canViewCompose = auth()->user()?->can('update', $this->application) ?? false;
-            $this->dockerCompose = $canViewCompose ? redactLockedValuesInGeneratedCompose($this->application->docker_compose, $this->application) : null;
-            $this->dockerComposeRaw = $canViewCompose ? $this->application->docker_compose_raw : null;
-            $this->dockerComposeCustomStartCommand = $this->application->docker_compose_custom_start_command;
-            $this->dockerComposeCustomBuildCommand = $this->application->docker_compose_custom_build_command;
-            $this->customLabels = $this->application->parseContainerLabels();
-            $this->customDockerRunOptions = $this->application->custom_docker_run_options;
-            $this->preDeploymentCommand = $this->application->pre_deployment_command;
+            $this->dockerCompose = $canViewSecrets ? redactLockedValuesInGeneratedCompose($this->application->docker_compose, $this->application) : null;
+            $this->dockerComposeRaw = $canViewSecrets ? $this->application->docker_compose_raw : null;
+            $this->dockerComposeCustomStartCommand = $canViewSecrets ? $this->application->docker_compose_custom_start_command : null;
+            $this->dockerComposeCustomBuildCommand = $canViewSecrets ? $this->application->docker_compose_custom_build_command : null;
+            $this->customLabels = $canViewSecrets ? $this->application->parseContainerLabels() : null;
+            $this->customDockerRunOptions = $canViewSecrets ? $this->application->custom_docker_run_options : null;
+            $this->preDeploymentCommand = $canViewSecrets ? $this->application->pre_deployment_command : null;
             $this->preDeploymentCommandContainer = $this->application->pre_deployment_command_container;
-            $this->postDeploymentCommand = $this->application->post_deployment_command;
+            $this->postDeploymentCommand = $canViewSecrets ? $this->application->post_deployment_command : null;
             $this->postDeploymentCommandContainer = $this->application->post_deployment_command_container;
-            $this->customNginxConfiguration = $this->application->custom_nginx_configuration;
+            $this->customNginxConfiguration = $canViewSecrets ? $this->application->custom_nginx_configuration : null;
             $this->isHttpBasicAuthEnabled = $this->application->is_http_basic_auth_enabled;
             $this->httpBasicAuthUsername = $this->application->http_basic_auth_username;
-            $this->httpBasicAuthPassword = auth()->user()->can('update', $this->application)
-                ? $this->application->http_basic_auth_password
-                : null;
+            $this->httpBasicAuthPassword = $canViewSecrets ? $this->application->http_basic_auth_password : null;
             $this->httpBasicAuthHashAlgorithm = ($this->application->usesArgon2idBasicAuth() ? HttpBasicAuthHashAlgorithm::ARGON2ID : HttpBasicAuthHashAlgorithm::BCRYPT)->value;
             $this->httpBasicAuthBcryptCost = $this->application->http_basic_auth_bcrypt_cost;
             $this->httpBasicAuthArgon2idMemoryCost = $this->application->http_basic_auth_argon2id_memory_cost;
@@ -973,6 +984,7 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
+            $this->dispatch('name-changed', uuid: $this->application->uuid, name: $this->application->name);
             $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
             $this->syncData();
             if ($oldPortsExposes !== $this->application->ports_exposes || $oldCustomNetworkAliases !== $this->application->custom_network_aliases) {
@@ -992,6 +1004,11 @@ class General extends Component
 
     public function getDetectedPortInfoProperty(): ?array
     {
+        // With readonly labels disabled, Ports Exposes is read-only and custom labels control proxy routing.
+        if (! $this->application->settings->is_container_label_readonly_enabled) {
+            return null;
+        }
+
         $detectedPort = $this->application->detectPortFromEnvironment();
 
         if (! $detectedPort) {

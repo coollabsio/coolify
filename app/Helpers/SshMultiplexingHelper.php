@@ -95,14 +95,17 @@ class SshMultiplexingHelper
         $serverInterval = config('constants.ssh.server_interval');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
-        $establishCommand = 'ssh -fN -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
+        // Not `ssh -fN`: when another process holds the control socket, ssh disables multiplexing and an
+        // `-fN` connection then stays open forever. This form runs `true` and exits. Only a master that
+        // ControlPersist moves to the background stays.
+        $establishCommand = 'ssh -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket)." -o ControlPersist={$muxPersistTime} ";
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
-        $establishCommand .= self::escapedUserAtHost($server);
+        $establishCommand .= self::escapedUserAtHost($server).' true';
 
         $establishProcess = Process::run($establishCommand);
         if ($establishProcess->exitCode() !== 0) {
@@ -251,6 +254,25 @@ class SshMultiplexingHelper
         return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
             .$delimiter;
+    }
+
+    /**
+     * Build an SSH command that runs the command batch given to the process as input (see sshBatchInput()).
+     * The batch is not part of any command line on the Coolify host, where `ps` would show its secrets
+     * (database passwords, registry passwords, tokens), and it is not limited to 128 KiB.
+     * Like the quoted heredoc of generateSshCommand(), the batch gets no local shell expansion.
+     */
+    public static function generateSshBatchCommand(Server $server, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
+    {
+        return self::generateSshStdinCommand($server, self::remoteShellCommand(), $disableMultiplexing, $commandTimeout);
+    }
+
+    /**
+     * The process input for generateSshBatchCommand(). A heredoc ends its content with a newline, so does this.
+     */
+    public static function sshBatchInput(string $command): string
+    {
+        return $command.PHP_EOL;
     }
 
     /**

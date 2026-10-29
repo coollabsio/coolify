@@ -22,6 +22,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
@@ -302,7 +303,7 @@ class ServicesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'type' => ['description' => 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)', 'type' => 'string'],
                         'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
@@ -993,13 +994,6 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Container not found.'], 404);
         }
 
-        $status = getContainerStatus($service->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Container is not running.',
-            ], 400);
-        }
-
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
         $logs = sanitizeLogsForExport(
@@ -1573,7 +1567,9 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
-        $env->value = $request->value;
+        if ($request->has('value')) {
+            $env->value = $request->value;
+        }
         if ($request->has('is_literal')) {
             $env->is_literal = $request->is_literal;
         }
@@ -1700,6 +1696,7 @@ class ServicesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
+            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment']);
             if (array_key_exists('key', $item)) {
                 $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
             }
@@ -2760,7 +2757,7 @@ class ServicesController extends Controller
 
     #[OA\Patch(
         summary: 'Update Storage',
-        description: 'Update a persistent storage or file storage by service UUID.',
+        description: 'Update a persistent storage or file storage by service UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.',
         path: '/services/{uuid}/storages',
         operationId: 'update-storage-by-service-uuid',
         security: [
@@ -3343,7 +3340,7 @@ class ServicesController extends Controller
         $uuid = new_public_id();
         $name = $request->filled('name')
             ? $request->string('name')->toString()
-            : $service->name.'-clone-'.$uuid;
+            : clone_resource_name($service->name, $uuid);
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
         $newService = clone_service($service, $destination, [

@@ -268,11 +268,13 @@ it('stops the railpack builder after the build when no other build uses it', fun
     $command = invokeRailpackMethod($job, $reflection, 'railpack_build_command', ['coollabsio/coolify:test', collect([])]);
 
     $sharedLock = strpos($command, 'flock -s 9');
+    $bootstrap = strpos($command, railpackBuilderBootstrapScript());
     $build = strpos($command, 'docker buildx build --builder coolify-railpack');
     $stop = strpos($command, 'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack');
 
     expect($sharedLock)->not->toBeFalse()
-        ->and($build)->toBeGreaterThan($sharedLock)
+        ->and($bootstrap)->toBeGreaterThan($sharedLock)
+        ->and($build)->toBeGreaterThan($bootstrap)
         ->and($stop)->toBeGreaterThan($build)
         ->and($command)->toEndWith('exit $status');
 });

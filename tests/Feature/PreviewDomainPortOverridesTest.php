@@ -14,9 +14,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Bus\UniqueLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -1103,14 +1101,9 @@ it('does not queue file sync jobs when polling dns checks for compose previews',
     ]);
 
     $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
-    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class);
-
-    // A worker that starts the queued job releases its unique lock, so the next parse queues a new one.
-    Cache::lock(UniqueLock::getKey($queuedOnMount->first()))->forceRelease();
     $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
 
-    expect($queuedOnMount)->toHaveCount(1)
-        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+    expect(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(0)
         ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
 

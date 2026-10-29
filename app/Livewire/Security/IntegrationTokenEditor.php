@@ -6,6 +6,7 @@ use App\Models\IntegrationToken;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -180,6 +181,8 @@ class IntegrationTokenEditor extends Component
                 capabilities: $this->integrationToken->capabilities,
             );
             $this->dispatch('success', 'Integration token updated successfully.');
+        } catch (ConnectionException) {
+            $this->dispatch('error', $validator->connectionErrorMessage($provider));
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

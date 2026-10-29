@@ -42,9 +42,11 @@
                             . ' · ' . ($type['cores'] ?? '?') . ' vCPU'
                             . ' · ' . ($type['memory'] ?? '?') . ' GB RAM'
                             . ' · ' . ($type['disk'] ?? '?') . ' GB';
+                        $label = $price ? $label . ' · €' . number_format($price, 2) . '/mo' : $label;
                         return [
                             'value' => $type['name'],
-                            'label' => $price ? $label . ' · €' . number_format($price, 2) . '/mo' : $label,
+                            'label' => $type['out_of_stock'] ? $label . ' · Out of stock' : $label,
+                            'disabled' => $type['out_of_stock'],
                         ];
                     })->values()->all();
                     $imageOptions = collect($this->availableImages)->map(fn ($image) => [

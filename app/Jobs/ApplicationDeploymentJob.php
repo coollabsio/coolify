@@ -54,6 +54,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\TimeoutExceededException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
@@ -881,14 +882,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $fileStorage->is_directory = true;
                         $fileStorage->content = null;
                         $fileStorage->save();
-                        $fileStorage->deleteStorageOnServer($this->mainServer);
-                        $fileStorage->saveStorageOnServer($this->mainServer);
+                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
+                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
                     } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
                         $fileStorage->is_directory = false;
                         $fileStorage->is_based_on_git = true;
                         $fileStorage->save();
-                        $fileStorage->deleteStorageOnServer($this->mainServer);
-                        $fileStorage->saveStorageOnServer($this->mainServer);
+                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
+                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
                     }
                 }
             }
@@ -921,12 +922,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return $service;
             });
             $composeFile['services'] = $services->toArray();
-            if (empty($composeFile)) {
-                $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
-                $this->fail('Failed to parse docker-compose file.');
-
-                return;
-            }
 
             // Add build secrets to compose file if enabled and BuildKit is supported
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
@@ -1015,7 +1010,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
         // Save build-time .env file BEFORE the build
-        $this->save_buildtime_environment_variables($buildEnvironment);
+        $buildEnvironment ??= $this->generate_buildtime_environment_variables();
+        $this->save_buildtime_environment_variables($buildEnvironment->merge($this->compose_build_interpolation_variables($composeFile, $buildEnvironment)));
 
         if ($this->docker_compose_custom_build_command) {
             // Auto-inject -f (compose file) and --env-file flags using helper function
@@ -1082,14 +1078,67 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * `docker compose build` interpolates the whole Compose file, so a required runtime-only variable
+     * (`${KEY:?}` in `environment:`) fails the build when the build-time .env file does not define it.
+     * This gives the build the runtime .env lines of the variables that the file uses outside its build
+     * sections. A variable that a build section or a build secret can read is left out, so a
+     * runtime-only value never becomes a build argument or part of an image.
+     *
+     * @return Collection<int, string>
+     */
+    private function compose_build_interpolation_variables(mixed $composeFile, Collection $buildEnvironment): Collection
+    {
+        $compose = is_string($composeFile) ? parseDockerComposeYaml($composeFile) : convertToArray($composeFile);
+        $references = fn (array $values): Collection => collect(Arr::flatten($values))
+            ->flatMap(fn (mixed $value): Collection => extractDockerComposeEnvironmentVariableReferences($value));
+
+        $readByBuilds = collect(data_get($compose, 'secrets', []))->pluck('environment')->filter();
+        foreach (data_get($compose, 'services', []) as $serviceName => $service) {
+            $build = data_get($service, 'build');
+            if ($build === null) {
+                continue;
+            }
+            $args = data_get($build, 'args', []);
+            $argNames = is_array($args) && array_is_list($args)
+                ? array_map(fn (mixed $arg): string => explode('=', (string) $arg, 2)[0], $args)
+                : array_keys((array) $args);
+            $readByBuilds = $readByBuilds->merge($argNames)->merge($references((array) $build));
+            unset($compose['services'][$serviceName]['build']);
+        }
+
+        $buildKeys = $buildEnvironment->map(fn (string $line): string => explode('=', $line, 2)[0]);
+        $keys = $references($compose)->unique()->diff($readByBuilds)->diff($buildKeys);
+        if ($keys->isEmpty()) {
+            return collect();
+        }
+
+        return $this->generate_runtime_environment_variables()
+            ->filter(fn (string $line): bool => $keys->contains(explode('=', $line, 2)[0]))
+            ->values();
+    }
+
+    /**
      * Parses the Compose file for this deployment and writes the volume warnings of the parser
      * (for example an external volume that the resource does not use yet) to the deployment log.
+     * A deployment of the application also queues one sync of the file storages with the server, which
+     * loads the content of the files that come from the repository. A preview uses its own copies of the
+     * files, so its deployment does not sync the storages of the application.
+     * The parser gives no services when it cannot parse the file. The deployment stops then, because
+     * an empty Compose file fails later with the unclear Docker error "no service selected".
      *
      * @return Collection<array-key, mixed>
+     *
+     * @throws DeploymentException When the parsed Compose file has no services
      */
     private function parseComposeFileForDeployment(): Collection
     {
         $composeFile = collect($this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit));
+        if (blank(data_get($composeFile, 'services'))) {
+            throw new DeploymentException("The Docker Compose file has no services, or Coolify could not parse it. Check that {$this->application->docker_compose_location} is valid YAML and has a services section.");
+        }
+        if ($this->pull_request_id === 0) {
+            ServerFilesFromServerJob::dispatch($this->application);
+        }
         foreach ($this->application->composeVolumeWarnings() as $warning) {
             $this->application_deployment_queue->addLogEntry("Warning: {$warning}", 'stderr');
         }
@@ -1249,6 +1298,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * The pull request whose file storage paths this deployment writes. Only the current Compose parser
+     * mounts the `-pr-<id>` copies in a preview; other build packs and the legacy parser mount the
+     * paths of the application.
+     */
+    private function previewFileStoragePullRequestId(): int
+    {
+        return $this->application->build_pack === 'dockercompose' && (int) $this->application->compose_parsing_version >= 3
+            ? $this->pull_request_id
+            : 0;
+    }
+
+    /**
      * The queued ServerStorageSaveJob writes new content files, but it can run after the containers
      * start. Preserve-repository deployments write all file storages in write_deployment_configurations().
      * Each deployment writes the missing files on its own server before the containers start, so
@@ -1261,7 +1322,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         EnsureContentFilesOnServer::run(
-            $this->application->fileStorages()->get(),
+            $this->application->fileStorages()->get()->map->forPullRequest($this->previewFileStoragePullRequestId()),
             $this->mainServer,
             function (string $message, string $type): void {
                 $this->application_deployment_queue->addLogEntry($message, $type);
@@ -1425,7 +1486,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             foreach ($this->application->fileStorages as $fileStorage) {
                 if (! $fileStorage->is_host_file && ! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
-                    $fileStorage->saveStorageOnServer($this->mainServer);
+                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
                 }
             }
             if ($this->use_build_server) {
@@ -2036,8 +2097,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
-            // Check for PORT environment variable mismatch with ports_exposes
-            if ($this->build_pack !== 'dockercompose') {
+            // Check for PORT environment variable mismatch with ports_exposes.
+            // With readonly labels disabled, custom labels control proxy routing, so skip the check.
+            if ($this->build_pack !== 'dockercompose' && $this->application->settings->is_container_label_readonly_enabled) {
                 $detectedPort = $this->application->detectPortFromEnvironment(false);
                 if ($detectedPort && ! empty($ports) && ! in_array($detectedPort, $ports)) {
                     $this->application_deployment_queue->addLogEntry(
@@ -2105,6 +2167,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 $envs->push($this->runtimeEnvironmentAssignment($env));
+            }
+
+            // A preview from before v4.5.1 also gets the production variables that have no preview copy.
+            if ($this->preview?->keeps_production_values && $runtime_environment_variables_preview->isNotEmpty()) {
+                $previewKeys = $runtime_environment_variables_preview->pluck('key')->all();
+                $sorted_environment_variables
+                    ->filter(fn (EnvironmentVariable $env) => $env->is_runtime && ! in_array($env->key, $previewKeys, true) && ! $this->shouldOmitBlankComposeEnvironmentVariable($env))
+                    ->each(fn (EnvironmentVariable $env) => $envs->push($this->runtimeEnvironmentAssignment($env)));
             }
 
             // Add PORT if not exists, use the first port as default
@@ -2708,7 +2778,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->previewVariableIdsWithProductionValues;
         }
 
-        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled) {
+        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled || $this->preview?->keeps_production_values) {
             return $this->previewVariableIdsWithProductionValues = [];
         }
 
@@ -4142,18 +4212,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return 'GIT_SSH_COMMAND="'.$sshCommand.'" '.$gitCommand.' ls-remote '.escapeshellarg($this->fullRepoUrl).' '.escapeshellarg($lsRemoteRef);
     }
 
+    private function update_repository_project_id(): void
+    {
+        $repositorySlug = gitRepositorySlug($this->customRepository);
+        $repository = githubApi($this->source, "repos/{$repositorySlug}");
+        $repository_project_id = data_get($repository, 'data.id');
+        if (isset($repository_project_id) && $this->application->repository_project_id !== $repository_project_id) {
+            $this->application->repository_project_id = $repository_project_id;
+            $this->application->save();
+        }
+    }
+
     private function check_git_if_build_needed()
     {
         if (is_object($this->source) && $this->source->getMorphClass() === GithubApp::class && $this->source->is_public === false) {
-            $repository = githubApi($this->source, "repos/{$this->customRepository}");
-            $data = data_get($repository, 'data');
-            $repository_project_id = data_get($data, 'id');
-            if (isset($repository_project_id)) {
-                if (blank($this->application->repository_project_id) || $this->application->repository_project_id !== $repository_project_id) {
-                    $this->application->repository_project_id = $repository_project_id;
-                    $this->application->save();
-                }
-            }
+            $this->update_repository_project_id();
         }
         $this->resolve_bitbucket_pull_request_commit();
         $this->generate_git_import_commands();
@@ -4731,7 +4804,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ." {$this->workdir}";
 
         return 'DOCKER_CONFIG=/root/.docker docker buildx create --name coolify-railpack --driver docker-container 2>/dev/null || true'
-            ."\n".railpackBuilderLockedScript('('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
+            ."\n".railpackBuilderLockedScript(railpackBuilderBootstrapScript().'; ('.$this->wrap_build_command_with_env_export($buildxBuildCommand).')');
     }
 
     private function decode_railpack_config(string $config, string $source): array

@@ -59,14 +59,15 @@ beforeEach(function () {
 });
 
 /**
- * `test -L` prints $symlink and `test -f`/`test -d` print $exists.
+ * `test -L` prints $symlink and `test -f`/`test -d` print $exists. The file state check sees a file when $exists is OK.
  */
 function storageHostPathFakeServer(string $symlink = 'OK', string $exists = 'NOK'): void
 {
     Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'test -L') => $symlink,
-        str_contains($process->command, 'readlink -f') => 'OK',
-        str_contains($process->command, 'test -') => $exists,
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput($exists === 'OK' ? 'file' : 'missing'),
+        str_contains(remoteProcessScript($process), 'test -L') => $symlink,
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        str_contains(remoteProcessScript($process), 'test -') => $exists,
         default => '',
     }));
 }
@@ -138,7 +139,7 @@ function storageHostPathFileVolume(string $fsPath, ?string $content, bool $isDir
 
 function storageHostPathAssertNoDelete(): void
 {
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'rm -') || str_contains($process->command, 'rmdir'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'rm -') || str_contains(remoteProcessScript($process), 'rmdir'));
 }
 
 test('an admin creates a directory mount anywhere on the host in the UI', function () {
@@ -153,7 +154,7 @@ test('an admin creates a directory mount anywhere on the host in the UI', functi
         ->and($volume->is_directory)->toBeTrue();
 
     $volume->saveStorageOnServer();
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '/srv/zz'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '/srv/zz'"));
 });
 
 test('an admin creates a file mount with content anywhere on the host in the UI', function () {
@@ -169,8 +170,8 @@ test('an admin creates a file mount with content anywhere on the host in the UI'
         ->and($volume->mount_path)->toBe('/etc/app.conf');
 
     $volume->saveStorageOnServer();
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '/etc/zz'"));
-    Process::assertRan(fn ($process) => preg_match("#base64 -d \\| (sudo )?tee '/etc/zz/app.conf' > /dev/null#", $process->command) === 1);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '/etc/zz'"));
+    Process::assertRan(fn ($process) => preg_match("#base64 -d \\| (sudo )?tee '/etc/zz/app.conf' > /dev/null#", remoteProcessScript($process)) === 1);
     expect($volume->contentPathOnServer())->toBe('/etc/zz/app.conf');
 });
 
@@ -252,8 +253,8 @@ test('a symbolic link at a file path outside the resource directory is refused',
 
     expect(fn () => $volume->saveStorageOnServer())
         ->toThrow(RuntimeException::class, '/etc/zz/app.conf is a symbolic link on the server.');
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'base64 -d'));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'touch '));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'base64 -d'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'touch '));
 
     $this->withHeaders(['Authorization' => 'Bearer '.storageHostPathToken($this->admin)])
         ->postJson("/api/v1/applications/{$this->application->uuid}/storages", [
@@ -290,7 +291,7 @@ test('deleting a mount inside the resource directory still deletes it on the hos
 
     storageHostPathFileVolume($path, null, isDirectory: true)->deleteStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "rm -rf '{$path}'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "rm -rf '{$path}'"));
 });
 
 test('the UI deletes a mount inside the resource directory on the host only when the user keeps the option checked', function (bool $isDirectory, array $selectedActions, bool $deletesOnHost, string $message) {
@@ -304,7 +305,7 @@ test('the UI deletes a mount inside the resource directory on the host only when
 
     expect($volume->fresh())->toBeNull();
     if ($deletesOnHost) {
-        Process::assertRan(fn ($process) => str_contains($process->command, "rm -rf '{$path}'"));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "rm -rf '{$path}'"));
     } else {
         storageHostPathAssertNoDelete();
     }
@@ -333,10 +334,11 @@ test('the delete dialog offers deletion on the host only for mounts inside the r
 
 test('a file outside the resource directory never replaces a directory on the host', function () {
     Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'test -L') => 'OK',
-        str_contains($process->command, 'test -d') => 'OK',
-        str_contains($process->command, 'test -f') => 'NOK',
-        str_contains($process->command, 'sh -c') => '1:empty-directory',
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('directory'),
+        str_contains(remoteProcessScript($process), 'test -L') => 'OK',
+        str_contains(remoteProcessScript($process), 'test -d') => 'OK',
+        str_contains(remoteProcessScript($process), 'test -f') => 'NOK',
+        str_contains(remoteProcessScript($process), 'sh -c') => '1:empty-directory',
         default => '',
     }));
 
@@ -364,8 +366,8 @@ test('relative host paths stay inside the resource directory', function () {
 
     expect(LocalFileVolume::query()->orderBy('id')->pluck('fs_path')->all())
         ->toBe([$workdir.'/data/zz', $workdir.'/config/app.conf']);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'readlink -f')
-        && str_contains($process->command, "'{$workdir}' '{$workdir}/data/zz'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'readlink -f')
+        && str_contains(remoteProcessScript($process), "'{$workdir}' '{$workdir}/data/zz'"));
 });
 
 test('a token without deploy cannot create a mount outside the resource directory', function (string $resourceType, array $mount) {

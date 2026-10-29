@@ -76,11 +76,10 @@ beforeEach(function () {
  */
 function chainedServiceVolumeClones(): array
 {
-    $first = Bus::dispatched(CallQueuedClosure::class)->first();
+    $first = Bus::dispatched(CallQueuedClosure::class)->first() ?? Bus::dispatched(VolumeCloneJob::class)->first();
     expect($first)->not->toBeNull('No volume clone chain was dispatched.');
 
-    return collect($first->chained)
-        ->map(fn (string $job) => unserialize($job))
+    return collect([$first, ...array_map(fn (string $job) => unserialize($job), $first->chained)])
         ->filter(fn ($job) => $job instanceof VolumeCloneJob)
         ->map(fn (VolumeCloneJob $job) => (fn () => [$this->sourceVolume, $this->targetVolume])->call($job))
         ->values()
@@ -179,4 +178,19 @@ test('cloning a service without volume data dispatches no volume copy', function
     Bus::assertNotDispatched(CallQueuedClosure::class);
     Bus::assertNotDispatched(VolumeCloneJob::class);
     expect(serviceVolumeNames($clone))->toHaveCount(2);
+});
+
+test('cloning a cloned service replaces the clone suffix instead of adding another one', function () {
+    $this->service->update(['name' => 'Gitea Runner']);
+
+    $source = $this->service;
+    foreach (range(1, 10) as $ignored) {
+        Livewire::test(ResourceOperations::class, ['resource' => $source])
+            ->call('cloneTo', $this->destination->uuid)
+            ->assertHasNoErrors();
+
+        $source = Service::query()->latest('id')->firstOrFail();
+    }
+
+    expect($source->name)->toBe("Gitea Runner-clone-{$source->uuid}");
 });

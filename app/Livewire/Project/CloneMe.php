@@ -2,8 +2,7 @@
 
 namespace App\Livewire\Project;
 
-use App\Actions\Database\StartDatabase;
-use App\Actions\Database\StopDatabase;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
@@ -64,7 +63,7 @@ class CloneMe extends Component
             ->where('team_id', $this->project->team_id)
             ->get()
             ->reject(fn ($server) => $server->isBuildServer());
-        $this->newName = str($this->project->name.'-clone-'.new_public_id())->slug();
+        $this->newName = str(clone_resource_name($this->project->name, new_public_id()))->slug();
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -102,6 +101,11 @@ class CloneMe extends Component
             $teamId = $this->project->team_id;
             if (! $this->environment || (int) $this->environment->project_id !== (int) $this->project->id) {
                 throw new \Exception('Environment not found.');
+            }
+            if ($this->cloneVolumeData) {
+                foreach ([...$this->environment->applications, ...$this->environment->databases(), ...$this->environment->services] as $source) {
+                    $this->authorize(CloneVolumeDataWithSourceStopped::sourceAbility($source), $source);
+                }
             }
             $selectedDestination = $this->findProjectTeamDestination($this->selectedDestination);
             if (! $selectedDestination) {
@@ -192,6 +196,7 @@ class CloneMe extends Component
             }
 
             $newDatabase->persistentStorages()->delete();
+            $pendingVolumeClones = [];
             $persistentVolumes = $database->persistentStorages()->get();
             foreach ($persistentVolumes as $volume) {
                 $originalName = $volume->name;
@@ -235,21 +240,17 @@ class CloneMe extends Component
                 $newPersistentVolume->save();
 
                 if ($this->cloneVolumeData) {
-                    try {
-                        StopDatabase::dispatch($database);
-                        $sourceVolume = $volume->name;
-                        $targetVolume = $newPersistentVolume->name;
-                        $sourceServer = $database->destination->server;
-                        $targetServer = $newDatabase->destination->server;
-
-                        VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                        StartDatabase::dispatch($database);
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                    }
+                    $pendingVolumeClones[] = new VolumeCloneJob(
+                        $volume->name,
+                        $newPersistentVolume->name,
+                        $database->destination->server,
+                        $newDatabase->destination->server,
+                        $newPersistentVolume,
+                    );
                 }
             }
+
+            CloneVolumeDataWithSourceStopped::run($database, $pendingVolumeClones);
 
             $fileStorages = $database->fileStorages()->get();
             foreach ($fileStorages as $storage) {

@@ -1,5 +1,7 @@
 <?php
 
+use App\Livewire\Project\Database\Clickhouse\General as ClickhouseGeneral;
+use App\Livewire\Project\Database\Dragonfly\General as DragonflyGeneral;
 use App\Livewire\Project\Database\Dragonfly\StatusInfo as DragonflyStatusInfo;
 use App\Livewire\Project\Database\Keydb\General as KeydbGeneral;
 use App\Livewire\Project\Database\Keydb\StatusInfo as KeydbStatusInfo;
@@ -9,6 +11,7 @@ use App\Livewire\Project\Database\Mysql\General as MysqlGeneral;
 use App\Livewire\Project\Database\Postgresql\General as PostgresqlGeneral;
 use App\Livewire\Project\Database\Redis\General as RedisGeneral;
 use App\Livewire\Project\Database\Redis\StatusInfo as RedisStatusInfo;
+use App\Livewire\Project\Database\Sqlite\General as SqliteGeneral;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
@@ -239,3 +242,129 @@ it('still returns the connection url of an unlocked redis password in the api', 
         ->assertOk()
         ->assertJsonPath('internal_db_url', "redis://default:visible-redis-secret@{$redis->uuid}:6379/0");
 });
+
+dataset('database-api-config', [
+    'postgresql' => ['create_standalone_postgresql', 'postgresqls', ['postgres_conf' => "primary_conninfo = 'password=secret-config-value'"]],
+    'mysql' => ['create_standalone_mysql', 'mysqls', ['mysql_conf' => 'password=secret-config-value']],
+    'mariadb' => ['create_standalone_mariadb', 'mariadbs', ['mariadb_conf' => 'password=secret-config-value']],
+    'mongodb' => ['create_standalone_mongodb', 'mongodbs', ['mongo_conf' => 'keyFile: secret-config-value']],
+    'redis' => ['create_standalone_redis', 'redis', ['redis_conf' => 'masterauth secret-config-value']],
+    'keydb' => ['create_standalone_keydb', null, ['keydb_conf' => 'masterauth secret-config-value']],
+    'dragonfly' => ['create_standalone_dragonfly', null, []],
+    'clickhouse' => ['create_standalone_clickhouse', null, []],
+]);
+
+function apiTokenHeaders(User $user, Team $team, array $abilities): array
+{
+    $token = $user->createToken('config-test', $abilities);
+    DB::table('personal_access_tokens')->where('id', $token->accessToken->id)->update(['team_id' => $team->id]);
+
+    return ['Authorization' => 'Bearer '.$token->plainTextToken];
+}
+
+it('hides custom configs and docker run options from a token without sensitive read access', function (string $createDatabase, ?string $environmentRelation, array $config) {
+    $database = createDatabaseWithConfig($createDatabase, [
+        ...$config,
+        'custom_docker_run_options' => '--env API_TOKEN=secret-docker-value',
+    ]);
+    session(['currentTeam' => $this->team]);
+    $project = $this->environment->project;
+
+    foreach ([
+        [$this->member, ['read']],
+        [$this->member, ['read', 'read:sensitive']],
+        [$this->owner, ['read']],
+    ] as [$user, $abilities]) {
+        $headers = apiTokenHeaders($user, $this->team, $abilities);
+
+        $single = $this->withHeaders($headers)->getJson("/api/v1/databases/{$database->uuid}")->assertOk();
+        expect($single->json('uuid'))->toBe($database->uuid)
+            ->and($single->getContent())->not->toContain('secret-config-value')->not->toContain('secret-docker-value');
+
+        $list = $this->withHeaders($headers)->getJson('/api/v1/databases')->assertOk();
+        expect($list->getContent())->toContain($database->uuid)
+            ->not->toContain('secret-config-value')->not->toContain('secret-docker-value');
+
+        if ($environmentRelation !== null) {
+            $environment = $this->withHeaders($headers)->getJson("/api/v1/projects/{$project->uuid}/{$this->environment->uuid}")->assertOk();
+            expect($environment->getContent())->toContain($database->uuid)
+                ->not->toContain('secret-config-value')->not->toContain('secret-docker-value');
+        }
+    }
+})->with('database-api-config');
+
+it('returns custom configs and docker run options to an owner token with sensitive read access', function (string $createDatabase, ?string $environmentRelation, array $config) {
+    $database = createDatabaseWithConfig($createDatabase, [
+        ...$config,
+        'custom_docker_run_options' => '--env API_TOKEN=secret-docker-value',
+    ]);
+    session(['currentTeam' => $this->team]);
+    $headers = apiTokenHeaders($this->owner, $this->team, ['read', 'read:sensitive']);
+
+    $single = $this->withHeaders($headers)->getJson("/api/v1/databases/{$database->uuid}")->assertOk()
+        ->assertJsonPath('custom_docker_run_options', '--env API_TOKEN=secret-docker-value');
+    foreach ($config as $key => $value) {
+        $single->assertJsonPath($key, $value);
+    }
+
+    if ($environmentRelation !== null) {
+        $project = $this->environment->project;
+        $this->withHeaders($headers)->getJson("/api/v1/projects/{$project->uuid}/{$this->environment->uuid}")->assertOk()
+            ->assertJsonPath("{$environmentRelation}.0.custom_docker_run_options", '--env API_TOKEN=secret-docker-value');
+    }
+})->with('database-api-config');
+
+dataset('database-docker-options-components', [
+    'postgresql' => ['create_standalone_postgresql', PostgresqlGeneral::class],
+    'mysql' => ['create_standalone_mysql', MysqlGeneral::class],
+    'mariadb' => ['create_standalone_mariadb', MariadbGeneral::class],
+    'mongodb' => ['create_standalone_mongodb', MongodbGeneral::class],
+    'redis' => ['create_standalone_redis', RedisGeneral::class],
+    'keydb' => ['create_standalone_keydb', KeydbGeneral::class],
+    'dragonfly' => ['create_standalone_dragonfly', DragonflyGeneral::class],
+    'clickhouse' => ['create_standalone_clickhouse', ClickhouseGeneral::class],
+    'sqlite' => ['create_standalone_sqlite', SqliteGeneral::class],
+]);
+
+it('keeps custom docker run options out of member state and html', function (string $createDatabase, string $generalClass) {
+    $database = createDatabaseWithConfig($createDatabase, ['custom_docker_run_options' => '--env API_TOKEN=secret-docker-value']);
+    $ownTeam = Team::factory()->create();
+    $ownTeam->members()->attach($this->member->id, ['role' => 'owner']);
+
+    $this->actingAs($this->member);
+    foreach ([$this->team, $ownTeam] as $sessionTeam) {
+        session(['currentTeam' => $sessionTeam]);
+
+        $general = Livewire::test($generalClass, ['database' => $database])
+            ->assertSet('customDockerRunOptions', null);
+        expect(json_encode($general->snapshot))->not->toContain('secret-docker-value')
+            ->and($general->html())->not->toContain('secret-docker-value')
+            ->and($general->html())->toContain('Hidden (only admins can view)');
+    }
+})->with('database-docker-options-components');
+
+it('keeps custom docker run options available to an owner', function (string $createDatabase, string $generalClass) {
+    $database = createDatabaseWithConfig($createDatabase, ['custom_docker_run_options' => '--env API_TOKEN=secret-docker-value']);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test($generalClass, ['database' => $database])
+        ->assertSet('customDockerRunOptions', '--env API_TOKEN=secret-docker-value');
+})->with('database-docker-options-components');
+
+it('does not let a member save over hidden custom configs and docker run options', function (string $createDatabase, string $generalClass) {
+    $database = createDatabaseWithConfig($createDatabase, ['custom_docker_run_options' => '--env API_TOKEN=secret-docker-value']);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test($generalClass, ['database' => $database])
+        ->set('name', 'renamed-by-member')
+        ->call('submit')
+        ->call('instantSaveAdvanced');
+
+    $database = $database->fresh();
+    expect($database->name)->not->toBe('renamed-by-member')
+        ->and($database->custom_docker_run_options)->toBe('--env API_TOKEN=secret-docker-value');
+})->with('database-docker-options-components');

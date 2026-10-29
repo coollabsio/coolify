@@ -17,7 +17,9 @@ class RequireTeamTwoFactor
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if (! $user || filled($user->two_factor_confirmed_at)) {
+        // Users who must set a password first (magic link invitees) stay on the password page
+        // (CheckForcePasswordReset); they need a known password to confirm the 2FA setup.
+        if (! $user || filled($user->two_factor_confirmed_at) || $user->force_password_reset) {
             return $next($request);
         }
 

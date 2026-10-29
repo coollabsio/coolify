@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -194,14 +195,43 @@ class Metrics extends Component
     public function setRange(string $range): void
     {
         $this->range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
+        // Every refresh fetches the full range from each server over SSH, so a new range starts paused.
+        $this->live = false;
         $this->loadData();
     }
 
     public function updatedLive(): void
     {
         if ($this->live) {
-            $this->loadData();
+            $this->pollData();
         }
+    }
+
+    /**
+     * The poll target. The server decides the refresh rate, so a client cannot fetch faster
+     * than once a minute or while live refresh is off.
+     */
+    public function pollData(): void
+    {
+        $seconds = $this->pollSeconds();
+        if ($seconds === null) {
+            return;
+        }
+
+        // One second of slack, so a poll that fires slightly early is not dropped.
+        if (RateLimiter::attempt('metrics-poll:'.$this->getId(), 1, fn () => true, $seconds - 1) === false) {
+            return;
+        }
+
+        $this->loadData();
+    }
+
+    /**
+     * Seconds between live refreshes, or null when live refresh is off.
+     */
+    public function pollSeconds(): ?int
+    {
+        return $this->live ? 60 : null;
     }
 
     /**

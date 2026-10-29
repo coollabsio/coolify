@@ -3,8 +3,10 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Rules\ValidFluentBitConfig;
+use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartLogDrain
@@ -13,12 +15,31 @@ class StartLogDrain
 
     public string $jobQueue = 'high';
 
+    /**
+     * Bump when the generated files change (image, config, compose, or README), so that the
+     * server checks start running log drains again with the new files.
+     */
+    public const CONFIG_VERSION = '1';
+
+    public const CONFIG_VERSION_LABEL = 'coolify.logDrainConfigVersion';
+
+    /**
+     * Whether a running log drain container was made with older files. Claims the refresh for
+     * 10 minutes, so that the frequent server checks queue only one restart.
+     */
+    public static function claimOutdatedRefresh(Server $server, mixed $labels): bool
+    {
+        if ((string) collect($labels)->get(self::CONFIG_VERSION_LABEL) === self::CONFIG_VERSION) {
+            return false;
+        }
+
+        return Cache::add("log-drain-refresh:{$server->uuid}", true, now()->addMinutes(10));
+    }
+
     public function handle(Server $server)
     {
         if ($server->settings->is_logdrain_newrelic_enabled) {
             $type = 'newrelic';
-        } elseif ($server->settings->is_logdrain_highlight_enabled) {
-            $type = 'highlight';
         } elseif ($server->settings->is_logdrain_axiom_enabled) {
             $type = 'axiom';
         } elseif ($server->settings->is_logdrain_custom_enabled) {
@@ -34,9 +55,6 @@ class StartLogDrain
 
             return 'Amazon CloudWatch Logs uses the built-in Docker awslogs driver.';
         }
-        if ($type !== 'none') {
-            StopLogDrain::run($server);
-        }
         $serverName = $this->fluentBitValue((string) $server->name);
         try {
             if ($type === 'none') {
@@ -49,8 +67,7 @@ class StartLogDrain
 [SERVICE]
     Flush     5
     Daemon    off
-    Tag container_logs
-    Log_Level debug
+    Log_Level warn
     Parsers_File  parsers.conf
 [INPUT]
     Name              forward
@@ -76,27 +93,6 @@ class StartLogDrain
     # https://log-api.newrelic.com/log/v1 - US
     base_uri \${BASE_URI}
 ");
-            } elseif ($type === 'highlight') {
-                if (! $server->settings->is_logdrain_highlight_enabled) {
-                    throw new \Exception('Highlight log drain is not enabled.');
-                }
-                $config = base64_encode('
-[SERVICE]
-    Flush     5
-    Daemon    off
-    Log_Level debug
-    Parsers_File  parsers.conf
-[INPUT]
-    Name              forward
-    tag               ${HIGHLIGHT_PROJECT_ID}
-    Buffer_Chunk_Size 1M
-    Buffer_Max_Size   6M
-[OUTPUT]
-    Name                forward
-    Match               *
-    Host                otel.highlight.io
-    Port                24224
-');
             } elseif ($type === 'axiom') {
                 if (! $server->settings->is_logdrain_axiom_enabled) {
                     throw new \Exception('Axiom log drain is not enabled.');
@@ -105,7 +101,7 @@ class StartLogDrain
 [SERVICE]
     Flush     5
     Daemon    off
-    Log_Level debug
+    Log_Level warn
     Parsers_File  parsers.conf
 [INPUT]
     Name              forward
@@ -126,9 +122,9 @@ class StartLogDrain
 [OUTPUT]
     Name            http
     Match           *
-    Host            api.axiom.co
+    Host            \${AXIOM_DOMAIN}
     Port            443
-    URI             /v1/datasets/\${AXIOM_DATASET_NAME}/ingest
+    URI             /v1/ingest/\${AXIOM_DATASET_NAME}
     # Authorization Bearer should be an API token
     Header Authorization Bearer \${AXIOM_API_KEY}
     compress gzip
@@ -165,7 +161,7 @@ class StartLogDrain
             $compose = base64_encode('
 services:
   coolify-log-drain:
-    image: cr.fluentbit.io/fluent/fluent-bit:2.0
+    image: cr.fluentbit.io/fluent/fluent-bit:5.1
     container_name: coolify-log-drain
     command: -c /fluent-bit.conf
     env_file:
@@ -177,16 +173,22 @@ services:
       - 127.0.0.1:24224:24224
     labels:
       - coolify.managed=true
+      - '.self::CONFIG_VERSION_LABEL.'='.self::CONFIG_VERSION.'
     restart: unless-stopped
 ');
-            $readme = base64_encode('# New Relic Log Drain
-This log drain is based on [Fluent Bit](https://fluentbit.io/) and New Relic Log Forwarder.
+            $providerName = match ($type) {
+                'newrelic' => 'New Relic',
+                'axiom' => 'Axiom',
+                'custom' => 'Custom',
+            };
+            $readme = base64_encode("# {$providerName} Log Drain
+This log drain is based on [Fluent Bit](https://fluentbit.io/).
 
 Files:
 - `fluent-bit.conf` - configuration file for Fluent Bit
 - `docker-compose.yml` - docker-compose file to run Fluent Bit
 - `.env` - environment variables for Fluent Bit
-');
+");
             $license_key = $server->settings->logdrain_newrelic_license_key;
             $base_uri = $server->settings->logdrain_newrelic_base_uri;
             $base_path = config('constants.coolify.base_config_path');
@@ -198,10 +200,9 @@ Files:
             $readme_path = $config_path.'/README.md';
             if ($type === 'newrelic') {
                 $envContent = "LICENSE_KEY={$license_key}\nBASE_URI={$base_uri}\n";
-            } elseif ($type === 'highlight') {
-                $envContent = "HIGHLIGHT_PROJECT_ID={$server->settings->logdrain_highlight_project_id}\n";
             } elseif ($type === 'axiom') {
-                $envContent = "AXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$server->settings->logdrain_axiom_api_key}\n";
+                $axiomDomain = trim((string) $server->settings->logdrain_axiom_domain) ?: ServerSetting::DEFAULT_AXIOM_DOMAIN;
+                $envContent = "AXIOM_DOMAIN={$axiomDomain}\nAXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$server->settings->logdrain_axiom_api_key}\n";
             } elseif ($type === 'custom') {
                 $envContent = '';
             } else {
@@ -209,6 +210,8 @@ Files:
             }
             $envEncoded = base64_encode($envContent);
 
+            // The running drain is removed only after the checks above and the image pull, so that an
+            // invalid custom config or a slow download does not stop log collection.
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
@@ -217,7 +220,10 @@ Files:
                 "echo '{$compose}' | base64 -d | tee $compose_path > /dev/null",
                 "echo '{$readme}' | base64 -d | tee $readme_path > /dev/null",
                 "echo '{$envEncoded}' | base64 -d | tee $config_path/.env > /dev/null",
+                "echo 'Pulling Fluent Bit'",
+                "docker compose -f $compose_path pull --quiet --ignore-pull-failures",
                 "echo 'Starting Fluent Bit'",
+                'docker rm -f coolify-log-drain >/dev/null 2>&1 || true',
                 "docker compose -f $compose_path up -d",
             ];
             $command = array_merge($command, $this->logDrainNetworkConnectCommands($server));

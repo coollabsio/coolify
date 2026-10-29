@@ -168,8 +168,6 @@ class Index extends Component
                 return;
             }
             $this->parameters = get_route_parameters();
-            $this->query = request()->query();
-            $this->currentRoute = request()->route()->getName();
             $project = currentTeam()
                 ->projects()
                 ->select('id', 'uuid', 'team_id')
@@ -181,32 +179,12 @@ class Index extends Component
                 ->firstOrFail();
             $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
-            if (in_array($this->currentRoute, ['project.service.index', 'project.service.index.advanced'], true)) {
-                return redirect()->route(
-                    'project.service.configuration',
-                    collect($this->parameters)->except('stack_service_uuid')->all(),
-                );
-            }
-            $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
-            if ($service) {
-                $this->serviceApplication = $service;
-                $this->resourceType = 'application';
-                $this->serviceApplication->getFilesFromServer();
-                $this->initializeApplicationProperties();
-            } else {
-                $this->serviceDatabase = $this->service->databases()->whereUuid($this->parameters['stack_service_uuid'])->first();
-                if (! $this->serviceDatabase) {
-                    return redirect()->route('project.service.configuration', [
-                        'project_uuid' => $this->parameters['project_uuid'],
-                        'environment_uuid' => $this->parameters['environment_uuid'],
-                        'service_uuid' => $this->parameters['service_uuid'],
-                    ]);
-                }
-                $this->resourceType = 'database';
-                $this->serviceDatabase->getFilesFromServer();
-                $this->initializeDatabaseProperties();
-            }
-            $this->s3s = $this->serviceTeamS3Storages();
+
+            // The settings of a stack service open in a modal on the configuration page.
+            return redirect()->route(
+                'project.service.configuration',
+                collect($this->parameters)->except('stack_service_uuid')->all(),
+            );
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

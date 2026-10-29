@@ -42,6 +42,13 @@ class EnvironmentVariable extends BaseModel
 {
     use Auditable;
 
+    /**
+     * Flags that a "# coolify:" line of the developer view can set, with their defaults.
+     *
+     * @var array<string, bool>
+     */
+    public const DEV_VIEW_FLAG_DEFAULTS = ['literal' => false, 'buildtime' => true, 'runtime' => true];
+
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
     /**
@@ -53,6 +60,17 @@ class EnvironmentVariable extends BaseModel
         'NIXPACKS_PHP_FALLBACK_PATH',
         'NIXPACKS_SPA_OUTPUT_DIR',
         'RAILPACK_SKIP_MIGRATIONS',
+    ];
+
+    /**
+     * Magic variable commands (SERVICE_<COMMAND>_<NAME>) whose value generateEnvValue() generates.
+     */
+    public const GENERATED_MAGIC_VARIABLE_COMMANDS = [
+        'PASSWORD', 'PASSWORD_64', 'PASSWORDWITHSYMBOLS', 'PASSWORDWITHSYMBOLS_64',
+        'BASE64', 'BASE64_32', 'BASE64_64', 'BASE64_128',
+        'REALBASE64', 'REALBASE64_32', 'REALBASE64_64', 'REALBASE64_128',
+        'HEX_32', 'HEX_64', 'HEX_128',
+        'USER', 'LOWERCASEUSER', 'SUPABASEANON', 'SUPABASESERVICE',
     ];
 
     protected $attributes = [
@@ -90,6 +108,7 @@ class EnvironmentVariable extends BaseModel
         'value' => 'encrypted',
         'preserve_compose_null' => 'boolean',
         'is_multiline' => 'boolean',
+        'is_literal' => 'boolean',
         'is_preview' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
@@ -125,7 +144,8 @@ class EnvironmentVariable extends BaseModel
 
                 if (! $found) {
                     $application = Application::find($environment_variable->resourceable_id);
-                    if ($application) {
+                    // A compose preview generates its own magic secrets on the first pull request parse.
+                    if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
                         ModelsEnvironmentVariable::create([
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,
@@ -154,6 +174,12 @@ class EnvironmentVariable extends BaseModel
             }
             $environmentVariable->updateIsShared();
         });
+    }
+
+    public function isGeneratedMagicVariable(): bool
+    {
+        return str_starts_with($this->key, 'SERVICE_')
+            && in_array(parseCommandFromMagicEnvVariable($this->key)->value(), self::GENERATED_MAGIC_VARIABLE_COMMANDS, true);
     }
 
     public function preservesLegacyComposeNull(): bool

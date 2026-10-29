@@ -512,6 +512,6 @@ class CloudflareDnsProvider
 
     private function client(IntegrationToken $token): PendingRequest
     {
-        return Http::withToken($token->token)->acceptJson()->connectTimeout(5)->timeout(10);
+        return Http::withToken($token->token)->acceptJson();
     }
 }

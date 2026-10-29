@@ -216,7 +216,7 @@ it('ends the proxy restart when the proxy status listener runs', function () {
     $server->markProxyTransitionStarted();
     Process::fake();
 
-    (new ProxyStatusChangedNotification)->handle(new ProxyStatusChanged($server->id));
+    (new ProxyStatusChangedNotification)->handle(new ProxyStatusChanged(ProxyStatusChanged::dataFor($server)));
 
     expect($server->isProxyTransitionInProgress())->toBeFalse();
 });

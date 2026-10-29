@@ -107,7 +107,7 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     private function update_comment()
     {
-        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'patch', data: [
+        ['data' => $data] = githubApi(source: $this->application->source, endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository)."/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'patch', data: [
             'body' => $this->body,
         ], throwError: false);
         if (data_get($data, 'message') === 'Not Found') {
@@ -117,7 +117,7 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     private function create_comment()
     {
-        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/{$this->preview->pull_request_id}/comments", method: 'post', data: [
+        ['data' => $data] = githubApi(source: $this->application->source, endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository)."/issues/{$this->preview->pull_request_id}/comments", method: 'post', data: [
             'body' => $this->body,
         ]);
         $this->preview->pull_request_issue_comment_id = $data['id'];
@@ -126,7 +126,7 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     private function delete_comment()
     {
-        githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'delete');
+        githubApi(source: $this->application->source, endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository)."/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'delete');
     }
 
     private function getPreviewLinks(): string

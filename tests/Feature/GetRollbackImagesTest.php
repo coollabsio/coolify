@@ -107,7 +107,7 @@ describe('on a reachable server', function () {
         ]))->implode(PHP_EOL);
         $images = implode(PHP_EOL, ["{$uuid}#aaaaaaa#2026-10-01 10:00:00", "{$uuid}#bbbbbbb#2026-10-02 10:00:00"]);
 
-        Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'docker images') ? $images : $ps));
+        Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'docker images') ? $images : $ps));
     }
 
     it('finds the current image of containers that are not named after the application uuid', function (string $name) {

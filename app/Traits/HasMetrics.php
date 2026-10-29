@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Server;
+use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Log;
 
@@ -35,7 +36,7 @@ trait HasMetrics
         // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
         // cannot end the heredoc. Responses are separated by a 0x1E record separator.
         $script = implode("\nprintf '\\036'\n", array_map(
-            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
             $types
         ));
 
@@ -80,7 +81,7 @@ trait HasMetrics
 
     /**
      * Root filesystem usage percentage over time. Disk history interleaves every
-     * mount, so we keep only the root mount before mapping.
+     * mount, so we keep only the root mount (see SentinelMetricsClient::rootMountName()).
      */
     public function getDiskMetrics(int $mins = 5): ?array
     {
@@ -90,7 +91,8 @@ trait HasMetrics
         }
 
         if (array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
-            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/'));
+            $mount = SentinelMetricsClient::rootMountName($rows);
+            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === $mount));
         }
 
         return $this->mapRows($rows, 'usedPercent', $mins);
@@ -147,11 +149,11 @@ trait HasMetrics
             unset($this->prefetchedMetricResponses[$key]);
         } else {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $endpoint = $this->getMetricsEndpoint($type, $from);
+            $endpoint = $this->getMetricsEndpoint($type, $from, $mins);
             $token = $this->metricsToken($server);
 
             $response = instant_remote_process(
-                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" {$endpoint}'"],
+                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$endpoint}\"'"],
                 $server,
                 false
             );
@@ -248,13 +250,23 @@ trait HasMetrics
         return $this->isServerMetrics() ? $this : $this->destination->server;
     }
 
-    private function getMetricsEndpoint(string $type, string $from): string
+    /**
+     * Ranges over an hour ask Sentinel to average rows into whole-minute windows, at most
+     * 1000 per range, so it sends far fewer rows. Older Sentinels ignore `bucket_ms`;
+     * mapRows() still downsamples their raw rows.
+     */
+    private function getMetricsEndpoint(string $type, string $from, int $mins): string
     {
         $base = 'http://localhost:8888/api';
-        if ($this->isServerMetrics()) {
-            return "{$base}/{$type}/history?from={$from}";
+        $query = "from={$from}";
+        if ($mins > 60) {
+            $query .= '&bucket_ms='.((int) ceil($mins / 1000) * 60_000);
         }
 
-        return "{$base}/container/{$this->uuid}/{$type}/history?from={$from}";
+        if ($this->isServerMetrics()) {
+            return "{$base}/{$type}/history?{$query}";
+        }
+
+        return "{$base}/container/{$this->uuid}/{$type}/history?{$query}";
     }
 }

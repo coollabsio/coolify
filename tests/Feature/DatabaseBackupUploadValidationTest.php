@@ -257,16 +257,42 @@ test('postgresql backup safety scanner allows copy from stdin data', function ()
     expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($dump))->toBeFalse();
 });
 
-// Decided trade-off: an unanchored "TO/FROM PROGRAM" match cannot tell a real COPY
-// directive from the same two words in a data row, and we keep it unanchored so it
-// also catches dynamic SQL. A dump whose data literally contains "from program" or
-// "to program" is therefore blocked, with an error that points to the container
-// terminal for trusted dumps. This is rare in practice.
-test('postgresql backup safety scanner blocks the program token pair even inside table data', function () {
-    $dump = "COPY notes FROM stdin;\n1\tcopy files from program storage\n\\.\n";
+// pg_dump writes table data as COPY ... FROM stdin rows that end with a "\." line. The rows are
+// data, not SQL, so ordinary text in them must not block the restore. Statements outside such a
+// block are still scanned, also when they follow one.
+dataset('postgresql copy data rows', [
+    'program words' => ["COPY public.notes (id, body) FROM stdin;\n1\thow to program\n2\timported from program files\n3\tcopy files to program storage\n\\.\n"],
+    'large object call text' => ["COPY public.notes (id, body) FROM stdin;\n1\tcall lo_import(path) on the server\n\\.\n"],
+    'alter system text' => ["COPY public.notes (id, body) FROM stdin;\n1\trun ALTER SYSTEM SET work_mem then reload\n\\.\n"],
+    'escaped tab before backquotes' => ["COPY public.notes (id, body) FROM stdin;\n1\ttab\\t `backticks` here\n\\.\n"],
+    'null row before text' => ["COPY a (x) FROM stdin;\n\\N\nfrom program\n\\.\n"],
+    'several blocks' => ["COPY a (x) FROM stdin;\nfrom program\n\\.\n\nCOPY b (y) FROM stdin;\n\\.\nCOPY c (z) FROM stdin;\nto program\n\\.\nSELECT 1;\n"],
+]);
 
+dataset('postgresql statements around copy data', [
+    'program statement after a copy block' => ["COPY notes FROM stdin;\n1\tok\n\\.\nCOPY x FROM PROGRAM 'id';\n"],
+    'shell command after a copy block' => ["COPY notes FROM stdin;\n1\tok\n\\.\n\\! id\n"],
+    'copy header that is not alone on its line' => ["SELECT 1; COPY notes FROM stdin;\nCOPY x FROM PROGRAM 'id';\n\\.\n"],
+    'program statement before a copy block' => ["COPY x TO PROGRAM 'id';\nCOPY notes FROM stdin;\n1\tok\n\\.\n"],
+    'commented-out program statement' => ["-- COPY x FROM PROGRAM 'id'\nSELECT 1;\n"],
+    'program statement in a block comment' => ["/* COPY x TO PROGRAM 'id' */\nSELECT 1;\n"],
+]);
+
+test('postgresql backup safety scanner allows text in copy data rows', function (string $dump) {
+    expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($dump))->toBeFalse();
+})->with('postgresql copy data rows');
+
+test('remote postgresql scanner allows text in copy data rows', function (string $dump) {
+    expect(scannerBlocks(postgresScanScript(writeScanPayload($dump))))->toBeFalse();
+})->with('postgresql copy data rows');
+
+test('postgresql backup safety scanner blocks statements around copy data', function (string $dump) {
     expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($dump))->toBeTrue();
-});
+})->with('postgresql statements around copy data');
+
+test('remote postgresql scanner blocks statements around copy data', function (string $dump) {
+    expect(scannerBlocks(postgresScanScript(writeScanPayload($dump))))->toBeTrue();
+})->with('postgresql statements around copy data');
 
 test('postgresql backup safety scanner blocks program execution hidden in dynamic sql', function (string $payload) {
     expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($payload))->toBeTrue();
@@ -281,10 +307,13 @@ test('postgresql backup safety scanner blocks program execution hidden in dynami
     'mid-statement psql shell' => ["SELECT 1; \\! id\n"],
 ]);
 
-test('backup validator rejects plaintext .dump containing program execution', function () {
-    $file = makeTemporaryUpload('evil.dump', "COPY x FROM PROGRAM 'id';\n");
+// The upload does not know the target database type, so it does not run the PostgreSQL scan:
+// a MySQL dump can hold the same words. A PostgreSQL import scans the whole file when it starts.
+test('backup validator accepts SQL uploads that the PostgreSQL scan would block', function () {
+    $file = makeTemporaryUpload('mysql.sql', "INSERT INTO `notes` VALUES (1,'imported from program files'),(2,'\\! not a command');\n");
 
-    expect(DatabaseBackupFileValidator::isUploadAllowed($file, 10 * 1024 * 1024))->toBeFalse();
+    expect(DatabaseBackupFileValidator::isUploadAllowed($file, 10 * 1024 * 1024))->toBeTrue()
+        ->and(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($file->getPathname()))->toBeTrue();
 });
 
 test('remote postgresql scanner blocks bypass payloads', function (string $content, bool $gzip) {
@@ -320,7 +349,6 @@ test('remote postgresql scanner blocks bypass payloads', function (string $conte
     'large object import' => ["SELECT lo_import('/etc/passwd');\n", false],
     'alter system' => ["ALTER SYSTEM SET archive_command = 'id';\n", false],
     'commented out payload is now blocked' => ["-- COPY x FROM PROGRAM 'id'\nSELECT 1;\n", false],
-    'program words in table data are blocked' => ["COPY notes FROM stdin;\n1\tcopy files from program storage\n\\.\n", false],
 ]);
 
 test('remote postgresql scanner allows legitimate restores', function (string $content, bool $gzip) {

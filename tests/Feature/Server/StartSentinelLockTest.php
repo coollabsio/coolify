@@ -48,7 +48,7 @@ function queuedSentinelStarts(): int
 it('holds the per-server lock while it replaces the Sentinel container', function () {
     $lockHeldDuringDockerRun = null;
     Process::fake(function ($process) use (&$lockHeldDuringDockerRun) {
-        $script = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $script = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($script, 'docker run -d')) {
             $lockHeldDuringDockerRun = ! Cache::lock(StartSentinel::lockKey($this->server), 1)->get();
         }
@@ -69,7 +69,7 @@ it('starts Sentinel with the settings saved after the server was loaded', functi
 
     $scripts = [];
     Process::fake(function ($process) use (&$scripts) {
-        $scripts[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $scripts[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });

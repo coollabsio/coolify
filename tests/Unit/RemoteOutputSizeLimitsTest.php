@@ -36,15 +36,15 @@ it('bounds dynamic proxy configuration files and their combined Livewire payload
     $files = collect(range(1, 101))->map(fn (int $number) => sprintf('file%03d.yml', $number))->implode("\n");
 
     Process::fake(function ($process) use ($files) {
-        if (str_contains($process->command, 'ls -1')) {
+        if (str_contains(remoteProcessScript($process), 'ls -1')) {
             return Process::result(output: $files);
         }
 
-        if (str_contains($process->command, 'file001.yml')) {
+        if (str_contains(remoteProcessScript($process), 'file001.yml')) {
             return Process::result(output: str_repeat('x', DynamicConfigurations::MAX_CONFIGURATION_FILE_SIZE_BYTES + 1));
         }
 
-        if (preg_match('/file00[2-6]\.yml/', $process->command)) {
+        if (preg_match('/file00[2-6]\.yml/', remoteProcessScript($process))) {
             return Process::result(output: str_repeat('x', DynamicConfigurations::MAX_CONFIGURATION_FILE_SIZE_BYTES));
         }
 
@@ -60,7 +60,7 @@ it('bounds dynamic proxy configuration files and their combined Livewire payload
     expect($component->contents)->toHaveCount(5)
         ->toHaveKeys(['file002|yml', 'file003|yml', 'file004|yml', 'file005|yml', 'file006|yml'])
         ->not->toHaveKeys(['file001|yml', 'file007|yml', 'file101|yml']);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'file101.yml'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'file101.yml'));
 });
 it('fails explicitly when a source fixture cannot be read', function () {
     remoteOutputSource('missing-source-fixture.php');
@@ -93,7 +93,7 @@ it('rejects oversized docker compose files loaded from git before parsing', func
     $application->shouldReceive('save')->once();
 
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'git cat-file -s')) {
+        if (str_contains(remoteProcessScript($process), 'git cat-file -s')) {
             return Process::result(output: '__COOLIFY_COMPOSE_TOO_LARGE__');
         }
 
@@ -103,7 +103,7 @@ it('rejects oversized docker compose files loaded from git before parsing', func
     expect(fn () => $application->loadComposeFile())
         ->toThrow(RuntimeException::class, 'Docker Compose file exceeds the 5 MiB size limit.');
     expect($application->docker_compose_raw)->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, '-gt '.Application::MAX_DOCKER_COMPOSE_SIZE_BYTES));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '-gt '.Application::MAX_DOCKER_COMPOSE_SIZE_BYTES));
 });
 it('bounds scheduled task output before storing or notifying', function () {
     $source = remoteOutputSource('app/Jobs/ScheduledTaskJob.php');
@@ -176,5 +176,5 @@ it('rejects oversized proxy configuration backfill before persistence', function
 
     expect(fn () => $method->invoke(new GetProxyConfiguration, $server))
         ->toThrow(RuntimeException::class, 'Proxy configuration exceeds the 5 MiB size limit.');
-    Process::assertRan(fn ($process) => str_contains($process->command, 'head -c '.(GetProxyConfiguration::MAX_CONFIGURATION_SIZE_BYTES + 1)));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'head -c '.(GetProxyConfiguration::MAX_CONFIGURATION_SIZE_BYTES + 1)));
 });

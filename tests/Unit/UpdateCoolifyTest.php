@@ -424,11 +424,11 @@ it('starts an upgrade when the previous upgrade status is older than the lock ex
 
 it('backs up the instance database before the update', function () {
     updateCoolifyTestPrepareUpdate();
-    Process::fake(['*du -b*' => '128', '*' => '']);
+    fakeRemoteProcesses(['*du -b*' => '128', '*' => '']);
 
     (new UpdateCoolify)->handle(manual_update: true);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'pg_dump'));
     expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
         ->toContain("bash /data/coolify/source/upgrade.sh '4.0.10'");
 });
@@ -439,13 +439,13 @@ it('skips the backup before the update when it is disabled', function () {
 
     (new UpdateCoolify)->handle(manual_update: true);
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'pg_dump'));
     expect(Activity::query()->count())->toBe(1);
 });
 
 it('does not start the update when the instance backup fails', function () {
     updateCoolifyTestPrepareUpdate();
-    Process::fake(['*pg_dump*' => Process::result(exitCode: 1), '*' => '']);
+    fakeRemoteProcesses(['*pg_dump*' => Process::result(exitCode: 1), '*' => '']);
 
     expect(fn () => (new UpdateCoolify)->handle(manual_update: true))
         ->toThrow(Exception::class, 'The database backup failed, so the update was not started.')

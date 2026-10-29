@@ -110,28 +110,19 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $activeDeployment = $this->manualCleanup ? null : CleanupDocker::activeDeployment($this->server);
-            if ($activeDeployment) {
-                $this->execution_log->update([
-                    'status' => 'success',
-                    'message' => 'Docker cleanup skipped: deployment '.$activeDeployment->deployment_uuid.' is queued or running on this server. The next scheduled cleanup runs as usual.',
-                ]);
-                event(new DockerCleanupDone($this->execution_log));
-
-                return;
-            }
-
             $this->usageBefore = $this->server->getDiskUsage();
 
             if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {
                 $cleanup_log = CleanupDocker::run(
                     server: $this->server,
                     deleteUnusedVolumes: $this->deleteUnusedVolumes,
-                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks,
+                    pruneBuildCacheDuringDeployment: $this->manualCleanup
                 );
                 $usageAfter = $this->server->getDiskUsage();
                 $message = ($this->manualCleanup ? 'Manual' : 'Forced').' Docker cleanup job executed successfully. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
 
+                $message = $this->withBuildCacheKeptReason($message, $cleanup_log);
                 $this->execution_log->update([
                     'status' => 'success',
                     'message' => $message,
@@ -148,10 +139,12 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $cleanup_log = CleanupDocker::run(
                     server: $this->server,
                     deleteUnusedVolumes: $this->deleteUnusedVolumes,
-                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks,
+                    pruneBuildCacheDuringDeployment: $this->manualCleanup
                 );
                 $message = 'Docker cleanup job executed successfully, but no disk usage could be determined.';
 
+                $message = $this->withBuildCacheKeptReason($message, $cleanup_log);
                 $this->execution_log->update([
                     'status' => 'success',
                     'message' => $message,
@@ -168,7 +161,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $cleanup_log = CleanupDocker::run(
                     server: $this->server,
                     deleteUnusedVolumes: $this->deleteUnusedVolumes,
-                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks,
+                    pruneBuildCacheDuringDeployment: $this->manualCleanup
                 );
                 $usageAfter = $this->server->getDiskUsage();
                 $diskSaved = $this->usageBefore - $usageAfter;
@@ -179,6 +173,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     $message = 'Docker cleanup job executed successfully, but no disk space was saved. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
                 }
 
+                $message = $this->withBuildCacheKeptReason($message, $cleanup_log);
                 $this->execution_log->update([
                     'status' => 'success',
                     'message' => $message,
@@ -225,6 +220,13 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 Cache::forget($this->executionCacheKey());
             }
         }
+    }
+
+    private function withBuildCacheKeptReason(string $message, array $cleanupLog): string
+    {
+        $reason = CleanupDocker::buildCacheKeptReason($cleanupLog);
+
+        return $reason ? $message.' '.$reason : $message;
     }
 
     /**

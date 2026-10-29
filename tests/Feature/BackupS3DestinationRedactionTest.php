@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
@@ -41,6 +42,7 @@ beforeEach(function () {
     defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
     Event::fake([BackupCreated::class]);
     Notification::fake();
+    Sleep::fake();
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();
@@ -91,7 +93,7 @@ it('redacts the credentials of every S3 destination from a database backup uploa
     ]);
     $backup->syncS3Storages($this->storages->pluck('id')->all());
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
     });
@@ -142,7 +144,7 @@ it('redacts the credentials of every S3 destination from a volume backup upload 
     $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
     Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
     Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*mc cp*' => Process::result(errorOutput: $this->uploadError, exitCode: 1),
         '*' => '',

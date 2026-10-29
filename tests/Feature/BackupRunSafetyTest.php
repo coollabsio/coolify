@@ -65,7 +65,7 @@ function backupRunSafetyFakeRemoteCommands(array $outputs = []): Collection
 {
     $commands = collect();
     Process::fake(function ($process) use ($commands, $outputs) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands->push($command);
         foreach ($outputs as $needle => $output) {
             if (str_contains($command, $needle)) {
@@ -403,7 +403,7 @@ it('fails the running backup execution and notifies the team when the worker tim
     $team = $this->team;
     $atTimeout = null;
     Process::fake(function ($process) use ($queuedCopy, $team, &$atTimeout) {
-        if (str_contains($process->command, 'pg_dump')) {
+        if (str_contains(remoteProcessScript($process), 'pg_dump')) {
             $queuedCopy->failed(new TimeoutExceededException('App\Jobs\DatabaseBackupJob has timed out.'));
             $execution = ScheduledDatabaseBackupExecution::query()->sole();
             $atTimeout = [

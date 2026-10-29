@@ -130,10 +130,10 @@ function rescanTestFake(array $overrides = []): void
     ], $overrides);
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
-        $key = rescanTestCommandKey($process->command);
+        $key = rescanTestCommandKey(remoteProcessScript($process));
         $output = $key === null ? '' : $outputs[$key];
 
-        return Process::result(output: $output instanceof Closure ? $output($process->command) : $output);
+        return Process::result(output: $output instanceof Closure ? $output(remoteProcessScript($process)) : $output);
     });
 }
 
@@ -188,7 +188,7 @@ function rescanTestRanCommand(string $needle): int
 {
     $count = 0;
     Process::assertRan(function (PendingProcess $process) use ($needle, &$count) {
-        if (str_contains($process->command, $needle)) {
+        if (str_contains(remoteProcessScript($process), $needle)) {
             $count++;
         }
 
@@ -713,7 +713,7 @@ describe('retention', function () {
         rescanTestQueuedJob($first, 1)->shouldReceive('release')->once()->with(60);
         $first->handle();
 
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
         expect(ImageScan::query()->count())->toBe(0);
 
         $lock->release();
@@ -735,7 +735,7 @@ describe('retention', function () {
         rescanTestQueuedJob($job, 1)->shouldReceive('release')->once()->with(60);
         $job->handle();
 
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit db-update'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
         expect(ScanImage::serverLock($this->server)->get())->toBeTrue();
     });
 
@@ -788,9 +788,9 @@ describe('retention', function () {
 
         expect(ImageSbom::query()->pluck('id')->sort()->values()->all())->toBe(collect([$referenced->id, $recent->id, $otherServer->id])->sort()->values()->all())
             ->and(rescanTestRanCommand('coolify-scan-exit sbom-delete'))->toBe(1);
-        Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'coolify-scan-exit sbom-delete')
-            && str_contains($process->command, '/data/coolify/image-scans/sboms/'.str_repeat('1', 64).'.json')
-            && str_contains($process->command, '/data/coolify/image-scans/sboms/'.str_repeat('2', 64).'.json'));
+        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit sbom-delete')
+            && str_contains(remoteProcessScript($process), '/data/coolify/image-scans/sboms/'.str_repeat('1', 64).'.json')
+            && str_contains(remoteProcessScript($process), '/data/coolify/image-scans/sboms/'.str_repeat('2', 64).'.json'));
     });
 
     it('keeps the SBOM rows when the delete command fails', function () {

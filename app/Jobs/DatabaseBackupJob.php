@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Events\BackupCreated;
+use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -921,8 +923,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     protected function upload_to_s3(S3Storage $s3): void
     {
         try {
-            $key = $s3->key;
-            $secret = $s3->secret;
             $bucket = $s3->bucket;
             $endpoint = $s3->endpoint;
             $s3->testConnection(shouldSave: true);
@@ -940,10 +940,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $mount = escapeshellarg($this->backupMountSource().':'.$this->backup_location.':ro');
             $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm {$s3->minioClientRegionOption()} -v {$mount} {$fullImageName}";
 
-            // Escape S3 credentials to prevent command injection
-            $escapedEndpoint = escapeshellarg($endpoint);
-            $escapedKey = escapeshellarg($key);
-            $escapedSecret = escapeshellarg($secret);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
             $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $s3->trustedInternalHosts()))
@@ -951,9 +947,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ->implode(' ');
             $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
 
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
+            $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
+            S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
+                ["docker exec backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}"],
+                $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
+            ));
 
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
@@ -962,6 +961,32 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $command = dockerRemoveCommand("backup-of-{$this->backup_log_uuid}");
             instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
+    }
+
+    /**
+     * Sets the `temporary` mc alias in a helper container. The S3 keys go to mc through the stdin of the
+     * SSH process, so they are not in the arguments of any process on Coolify or on the server.
+     */
+    private function setMinioClientAlias(Server $server, string $container, S3Storage $s3, string $resolveOptions): void
+    {
+        $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
+            .' mc alias set'.$resolveOptions.$s3->minioClientAliasOptions().' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
+        $timeout = (int) config('constants.ssh.command_timeout');
+
+        SshRetryHandler::retry(
+            function () use ($server, $remoteCommand, $s3, $timeout) {
+                $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+                $process = runSshProcess($sshCommand, $timeout, $s3->key."\n".$s3->secret."\n");
+
+                if ($process->exitCode() !== 0) {
+                    excludeCertainErrors($process->errorOutput(), $process->exitCode());
+                }
+            },
+            [
+                'server' => $server->ip,
+                'function' => 'setMinioClientAlias',
+            ],
+        );
     }
 
     private function getFullImageName(): string

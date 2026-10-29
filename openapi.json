@@ -534,8 +534,6 @@
                                 "required": [
                                     "project_uuid",
                                     "server_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
                                     "git_repository",
                                     "git_branch",
                                     "build_pack"
@@ -1197,8 +1195,6 @@
                                 "required": [
                                     "project_uuid",
                                     "server_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
                                     "github_app_uuid",
                                     "git_repository",
                                     "git_branch",
@@ -1855,8 +1851,6 @@
                                 "required": [
                                     "project_uuid",
                                     "server_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
                                     "private_key_uuid",
                                     "git_repository",
                                     "git_branch",
@@ -2513,8 +2507,6 @@
                                 "required": [
                                     "project_uuid",
                                     "server_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
                                     "dockerfile"
                                 ],
                                 "properties": {
@@ -3056,8 +3048,6 @@
                                 "required": [
                                     "project_uuid",
                                     "server_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
                                     "docker_registry_image_name"
                                 ],
                                 "properties": {
@@ -4373,7 +4363,7 @@
                     {
                         "name": "service_name",
                         "in": "query",
-                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -4477,7 +4467,7 @@
                     {
                         "name": "service_name",
                         "in": "query",
-                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -5415,7 +5405,7 @@
                     "Applications"
                 ],
                 "summary": "Update Storage",
-                "description": "Update a persistent storage or file storage by application UUID.",
+                "description": "Update a persistent storage or file storage by application UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.",
                 "operationId": "update-storage-by-application-uuid",
                 "parameters": [
                     {
@@ -7052,9 +7042,11 @@
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "type": "string"
-                                },
-                                "example": "Content is very complex. Will be implemented later."
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Database"
+                                    }
+                                }
                             }
                         }
                     },
@@ -7298,13 +7290,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Get all databases",
+                        "description": "Get database by UUID",
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "type": "string"
-                                },
-                                "example": "Content is very complex. Will be implemented later."
+                                    "$ref": "#\/components\/schemas\/Database"
+                                }
                             }
                         }
                     },
@@ -7920,9 +7911,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8075,9 +8064,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8214,9 +8201,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8349,9 +8334,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8488,9 +8471,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8627,9 +8608,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8778,9 +8757,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -8929,9 +8906,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -9068,9 +9043,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -10306,7 +10279,7 @@
                     "Databases"
                 ],
                 "summary": "Update Storage",
-                "description": "Update a persistent storage or file storage by database UUID.",
+                "description": "Update a persistent storage or file storage by database UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.",
                 "operationId": "update-storage-by-database-uuid",
                 "parameters": [
                     {
@@ -11576,6 +11549,9 @@
                     },
                     "429": {
                         "description": "DigitalOcean rate limit exceeded."
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12614,6 +12590,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12629,9 +12608,18 @@
                     "Hetzner"
                 ],
                 "summary": "Get Hetzner Server Types",
-                "description": "Get all available Hetzner server types (instance sizes).",
+                "description": "Get the Hetzner server types (instance sizes) that can be ordered now. Each type lists only the locations where it is in stock and not deprecated.",
                 "operationId": "get-hetzner-server-types",
                 "parameters": [
+                    {
+                        "name": "location",
+                        "in": "query",
+                        "description": "Return only the server types that can be ordered in this location, for example nbg1.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "cloud_provider_token_uuid",
                         "in": "query",
@@ -12725,6 +12713,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12805,6 +12796,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12876,6 +12870,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -12941,6 +12938,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -13009,6 +13009,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -13118,7 +13121,7 @@
                                     "instant_validate": {
                                         "type": "boolean",
                                         "example": false,
-                                        "description": "Validate server immediately after creation"
+                                        "description": "Validate the server and install Docker when it is running. Defaults to true for tokens with the deploy permission, and needs that permission."
                                     }
                                 },
                                 "type": "object"
@@ -13169,6 +13172,9 @@
                     },
                     "429": {
                         "$ref": "#\/components\/responses\/429"
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -14671,13 +14677,49 @@
                 "operationId": "list-resources",
                 "responses": {
                     "200": {
-                        "description": "Get all resources",
+                        "description": "Get all applications, services and standalone databases. The other fields of each resource are the fields of the Application, Service or Database schema.",
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "type": "string"
-                                },
-                                "example": "Content is very complex. Will be implemented later."
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "description": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "type": {
+                                                "description": "application, service, or standalone-<engine> for databases (for example standalone-postgresql).",
+                                                "type": "string"
+                                            },
+                                            "status": {
+                                                "description": "For example running:healthy or exited:unhealthy.",
+                                                "type": "string"
+                                            },
+                                            "environment_id": {
+                                                "type": "integer"
+                                            },
+                                            "created_at": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            },
+                                            "updated_at": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
+                                        },
+                                        "type": "object",
+                                        "additionalProperties": true
+                                    }
+                                }
                             }
                         }
                     },
@@ -14730,6 +14772,9 @@
                                             },
                                             "region": {
                                                 "type": "string"
+                                            },
+                                            "use_path_style_endpoint": {
+                                                "type": "boolean"
                                             },
                                             "is_usable": {
                                                 "type": "boolean"
@@ -14809,6 +14854,10 @@
                                         "type": "string",
                                         "example": "us-east-1",
                                         "description": "S3 region."
+                                    },
+                                    "use_path_style_endpoint": {
+                                        "type": "boolean",
+                                        "description": "Use path-style URLs (endpoint\/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints."
                                     },
                                     "key": {
                                         "type": "string",
@@ -14907,6 +14956,9 @@
                                         },
                                         "region": {
                                             "type": "string"
+                                        },
+                                        "use_path_style_endpoint": {
+                                            "type": "boolean"
                                         },
                                         "is_usable": {
                                             "type": "boolean"
@@ -15032,6 +15084,10 @@
                                     "region": {
                                         "type": "string",
                                         "description": "S3 region."
+                                    },
+                                    "use_path_style_endpoint": {
+                                        "type": "boolean",
+                                        "description": "Use path-style URLs (endpoint\/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS."
                                     },
                                     "key": {
                                         "type": "string",
@@ -17136,6 +17192,12 @@
                                                 "null"
                                             ]
                                         },
+                                        "logdrain_axiom_domain": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
                                         "logdrain_axiom_api_key": {
                                             "description": "Only present with read:sensitive.",
                                             "type": "string"
@@ -17232,6 +17294,10 @@
                                         "type": "boolean"
                                     },
                                     "logdrain_axiom_dataset_name": {
+                                        "type": "string"
+                                    },
+                                    "logdrain_axiom_domain": {
+                                        "description": "Base domain of the Axiom edge deployment. Default: us-east-1.aws.edge.axiom.co. Use eu-central-1.aws.edge.axiom.co for EU datasets.",
                                         "type": "string"
                                     },
                                     "logdrain_axiom_api_key": {
@@ -17952,7 +18018,7 @@
                     "Servers"
                 ],
                 "summary": "Migrate server to another Coolify instance",
-                "description": "Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. Follow the progress with GET \/servers\/{uuid}\/transfer. The target URL must use https. Requires read:sensitive and write.",
+                "description": "Start a transfer in the background: export this server, import and claim it on the target instance (with the given token), then disable automations here. All secrets of the server, also locked environment variables, are sent to the target. Follow the progress with GET \/servers\/{uuid}\/transfer. The target URL must use https. Requires read:sensitive and write, and the owner role of the server team.",
                 "operationId": "migrate-server-between-instances",
                 "parameters": [
                     {
@@ -17993,7 +18059,7 @@
                         "description": "Transfer started"
                     },
                     "403": {
-                        "description": "Missing sensitive permission"
+                        "description": "Missing sensitive permission or not an owner of the server team"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -20247,9 +20313,7 @@
                             "schema": {
                                 "required": [
                                     "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid"
+                                    "project_uuid"
                                 ],
                                 "properties": {
                                     "type": {
@@ -21755,7 +21819,7 @@
                     "Services"
                 ],
                 "summary": "Update Storage",
-                "description": "Update a persistent storage or file storage by service UUID.",
+                "description": "Update a persistent storage or file storage by service UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.",
                 "operationId": "update-storage-by-service-uuid",
                 "parameters": [
                     {
@@ -24008,6 +24072,9 @@
                     },
                     "429": {
                         "description": "Vultr API rate limit exceeded."
+                    },
+                    "502": {
+                        "$ref": "#\/components\/responses\/502"
                     }
                 },
                 "security": [
@@ -24195,6 +24262,400 @@
                         "format": "date-time"
                     },
                     "finished_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Database": {
+                "description": "Standalone database. The fields that start with an engine name (for example postgres_ or redis_) are only returned for that engine. Passwords, connection URLs and init_scripts are only returned for tokens with the read:sensitive or root ability.",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "database_type": {
+                        "type": "string",
+                        "enum": [
+                            "standalone-postgresql",
+                            "standalone-redis",
+                            "standalone-mongodb",
+                            "standalone-mysql",
+                            "standalone-mariadb",
+                            "standalone-keydb",
+                            "standalone-dragonfly",
+                            "standalone-clickhouse",
+                            "standalone-sqlite"
+                        ]
+                    },
+                    "image": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "Container status and health, for example running:healthy or exited:unhealthy.",
+                        "type": "string"
+                    },
+                    "server_status": {
+                        "description": "True when the server of the database is reachable and usable.",
+                        "type": "boolean"
+                    },
+                    "environment_id": {
+                        "type": "integer"
+                    },
+                    "environment": {
+                        "$ref": "#\/components\/schemas\/Environment",
+                        "description": "Only returned by GET \/databases\/{uuid}. Includes the project."
+                    },
+                    "destination_id": {
+                        "type": "integer"
+                    },
+                    "destination_type": {
+                        "type": "string"
+                    },
+                    "destination": {
+                        "description": "Docker network destination of the database, with its server.",
+                        "properties": {
+                            "uuid": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "network": {
+                                "type": "string"
+                            },
+                            "server_id": {
+                                "type": "integer"
+                            },
+                            "server": {
+                                "$ref": "#\/components\/schemas\/Server"
+                            },
+                            "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "updated_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "is_public": {
+                        "description": "Not returned for SQLite.",
+                        "type": "boolean"
+                    },
+                    "public_port": {
+                        "description": "Not returned for SQLite.",
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "public_port_timeout": {
+                        "description": "Proxy timeout of the public port in seconds. Not returned for SQLite.",
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "ports_mappings": {
+                        "description": "Comma-separated host:container port mappings. Not returned for SQLite.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "enable_ssl": {
+                        "description": "Not returned for ClickHouse and SQLite.",
+                        "type": "boolean"
+                    },
+                    "ssl_mode": {
+                        "description": "PostgreSQL, MongoDB and MySQL only.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "internal_db_url": {
+                        "description": "Connection URL inside the Docker network. Contains the password. Not returned for SQLite.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "external_db_url": {
+                        "description": "Public connection URL, when the database is public. Contains the password. Not returned for SQLite.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "init_scripts": {
+                        "description": "PostgreSQL only.",
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "index": {
+                                    "type": "integer"
+                                },
+                                "filename": {
+                                    "type": "string"
+                                },
+                                "content": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "custom_docker_run_options": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_log_drain_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_include_timestamps": {
+                        "description": "Not returned for MariaDB.",
+                        "type": "boolean"
+                    },
+                    "include_coolify_default_variables": {
+                        "type": "boolean"
+                    },
+                    "redact_all_env_values_in_logs": {
+                        "type": "boolean"
+                    },
+                    "health_check_enabled": {
+                        "type": "boolean"
+                    },
+                    "health_check_interval": {
+                        "type": "integer"
+                    },
+                    "health_check_timeout": {
+                        "type": "integer"
+                    },
+                    "health_check_retries": {
+                        "type": "integer"
+                    },
+                    "health_check_start_period": {
+                        "type": "integer"
+                    },
+                    "limits_memory": {
+                        "type": "string"
+                    },
+                    "limits_memory_swap": {
+                        "type": "string"
+                    },
+                    "limits_memory_swappiness": {
+                        "type": "integer"
+                    },
+                    "limits_memory_reservation": {
+                        "type": "string"
+                    },
+                    "limits_cpus": {
+                        "type": "string"
+                    },
+                    "limits_cpuset": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "limits_cpu_shares": {
+                        "type": "integer"
+                    },
+                    "config_hash": {
+                        "description": "Internal hash that Coolify uses to find configuration changes that need a restart. It changes only when the database starts, so do not use it to compare configurations.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "restart_count": {
+                        "type": "integer"
+                    },
+                    "last_restart_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "last_restart_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_online_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "started_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "backup_configs": {
+                        "description": "Only returned by GET \/databases. The scheduled backups of the database, as returned by GET \/databases\/{uuid}\/backups.",
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "postgres_user": {
+                        "type": "string"
+                    },
+                    "postgres_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "postgres_db": {
+                        "type": "string"
+                    },
+                    "postgres_initdb_args": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "postgres_host_auth_method": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "postgres_conf": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "redis_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "redis_conf": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mongo_initdb_root_username": {
+                        "type": "string"
+                    },
+                    "mongo_initdb_root_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "mongo_initdb_database": {
+                        "type": "string"
+                    },
+                    "mongo_conf": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mysql_user": {
+                        "type": "string"
+                    },
+                    "mysql_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "mysql_root_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "mysql_database": {
+                        "type": "string"
+                    },
+                    "mysql_conf": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mariadb_user": {
+                        "type": "string"
+                    },
+                    "mariadb_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "mariadb_root_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "mariadb_database": {
+                        "type": "string"
+                    },
+                    "mariadb_conf": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "keydb_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "keydb_conf": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "dragonfly_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "clickhouse_admin_user": {
+                        "type": "string"
+                    },
+                    "clickhouse_admin_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "clickhouse_db": {
+                        "type": "string"
+                    },
+                    "sqlite_databases": {
+                        "description": "Comma-separated SQLite database file names.",
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "deleted_at": {
                         "type": [
                             "string",
                             "null"
@@ -25617,6 +26078,10 @@
                     "logdrain_axiom_dataset_name": {
                         "type": "string"
                     },
+                    "logdrain_axiom_domain": {
+                        "type": "string",
+                        "description": "Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co."
+                    },
                     "logdrain_cloudwatch_region": {
                         "type": "string"
                     },
@@ -26029,6 +26494,35 @@
                                 "message": {
                                     "type": "string",
                                     "example": "Rate limit exceeded. Please try again later."
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "502": {
+                "description": "The cloud provider API rejected the request.",
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Failed to create Hetzner server. The Hetzner API token does not have permission for this request. Use a token with read and write access."
+                                },
+                                "provider_status": {
+                                    "description": "The HTTP status from the cloud provider API.",
+                                    "type": "integer",
+                                    "example": 403
+                                },
+                                "provider_error_code": {
+                                    "description": "The error code from the cloud provider API, if it has one.",
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "example": "forbidden"
                                 }
                             },
                             "type": "object"

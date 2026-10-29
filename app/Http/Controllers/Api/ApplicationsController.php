@@ -126,6 +126,7 @@ class ApplicationsController extends Controller
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === true) {
             $application->makeVisible([
+                ...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
                 'custom_labels',
                 'dockerfile',
                 'docker_compose',
@@ -159,21 +160,6 @@ class ApplicationsController extends Controller
         }
 
         return $payload;
-    }
-
-    /**
-     * Setting or changing a manual webhook secret needs the deploy ability. Sending the stored value
-     * again or clearing it does not.
-     */
-    private function manualWebhookSecretForbiddenResponse(Request $request, ?Application $application = null): ?JsonResponse
-    {
-        foreach (['manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea'] as $field) {
-            if ($request->filled($field) && $request->input($field) !== $application?->{$field}) {
-                return $this->deployAbilityForbiddenResponse($request, 'A manual webhook secret lets anyone who knows it start a deployment, so it needs a token with the deploy permission.');
-            }
-        }
-
-        return null;
     }
 
     private function applicationSettingsFromRequest(Request $request): array
@@ -381,7 +367,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        required: ['project_uuid', 'server_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -593,7 +579,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        required: ['project_uuid', 'server_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -803,7 +789,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        required: ['project_uuid', 'server_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -1013,7 +999,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'dockerfile'],
+                        required: ['project_uuid', 'server_uuid', 'dockerfile'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -1192,7 +1178,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_registry_image_name'],
+                        required: ['project_uuid', 'server_uuid', 'docker_registry_image_name'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -1544,9 +1530,6 @@ class ApplicationsController extends Controller
         }
         if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
             return $internalNameValidation;
-        }
-        if ($forbidden = $this->manualWebhookSecretForbiddenResponse($request)) {
-            return $forbidden;
         }
         if ($type === 'public') {
             $validationRules = [
@@ -2349,6 +2332,10 @@ class ApplicationsController extends Controller
                 $application->fqdn = generateUrl(server: $server, random: $application->uuid);
                 $application->save();
             }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
+            }
             if (isset($isForceHttpsEnabled)) {
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
                 $application->settings->save();
@@ -2413,7 +2400,7 @@ class ApplicationsController extends Controller
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             $validationRules = [
-                'docker_registry_image_name' => ['required', 'string', 'max:255', new DockerImageFormat],
+                'docker_registry_image_name' => ['required', 'string', 'max:255', new DockerImageFormat(allowVariableTag: true)],
                 'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
             ];
@@ -2479,6 +2466,10 @@ class ApplicationsController extends Controller
             if ($autogenerateDomain && blank($fqdn)) {
                 $application->fqdn = generateUrl(server: $server, random: $application->uuid);
                 $application->save();
+            }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
             }
             if (isset($isForceHttpsEnabled)) {
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
@@ -2654,7 +2645,7 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'service_name',
                 in: 'query',
-                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.',
                 required: false,
                 schema: new OA\Schema(type: 'string'),
             ),
@@ -2733,7 +2724,7 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'service_name',
                 in: 'query',
-                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.',
                 required: false,
                 schema: new OA\Schema(type: 'string'),
             ),
@@ -2800,20 +2791,13 @@ class ApplicationsController extends Controller
 
             if (! $matchingContainer) {
                 return response()->json([
-                    'message' => "No running container found for service_name '{$serviceName}'.",
+                    'message' => "No container found for service_name '{$serviceName}'.",
                 ], 404);
             }
 
             $container = $matchingContainer;
         } else {
-            $container = $containers->first();
-        }
-
-        $status = getContainerStatus($application->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Application is not running.',
-            ], 400);
+            $container = $containers->firstWhere('State', 'running') ?? $containers->first();
         }
 
         $lines = normalizeLogLines($request->query('lines'));
@@ -3525,10 +3509,6 @@ class ApplicationsController extends Controller
                 'errors' => $errors,
             ], 422);
         }
-        if ($forbidden = $this->manualWebhookSecretForbiddenResponse($request, $application)) {
-            return $forbidden;
-        }
-
         $githubApp = null;
         if ($request->has('github_app_uuid')) {
             if ($application->build_pack === 'dockerimage' || filled($application->dockerfile) || $application->deploymentType() === 'deploy_key') {
@@ -3855,7 +3835,7 @@ class ApplicationsController extends Controller
             // Must run after fqdn is filled: flags are kept only for domains the app still has.
             $application->setNoindexDomains($request->input('noindex_domains') ?? []);
         }
-        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth) && $server->isProxyShouldRun()) {
+        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth || $application->isDirty('ports_exposes')) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
         $application->withoutAuditLogging(fn () => $application->save());
@@ -4107,7 +4087,9 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
-        $env->value = $request->value;
+        if ($request->has('value')) {
+            $env->value = $request->value;
+        }
         $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']));
         $env->save();
 
@@ -4263,7 +4245,9 @@ class ApplicationsController extends Controller
             if ($is_preview) {
                 $env = $application->environment_variables_preview()->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
+                    }
                     $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
                     $env->save();
                 } else {
@@ -4284,7 +4268,9 @@ class ApplicationsController extends Controller
             } else {
                 $env = $application->environment_variables()->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
+                    }
                     $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
                     $env->save();
                 } else {
@@ -5214,7 +5200,7 @@ class ApplicationsController extends Controller
 
     #[OA\Patch(
         summary: 'Update Storage',
-        description: 'Update a persistent storage or file storage by application UUID.',
+        description: 'Update a persistent storage or file storage by application UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.',
         path: '/applications/{uuid}/storages',
         operationId: 'update-storage-by-application-uuid',
         security: [

@@ -9,7 +9,7 @@ import {
 import {
     TERMINAL_CONNECT_TIMEOUT_MS,
     TERMINAL_CONNECTION_ERRORS,
-    classifyTerminalServerMessage,
+    isTerminalStartupRejection,
     resolveTerminalCloseOutcome,
     terminalSessionStartMethods,
 } from './terminal-connection.js';
@@ -1107,18 +1107,12 @@ export function initializeTerminalComponent() {
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
-                } else if (classifyTerminalServerMessage(event.data) !== null) {
+                } else if (isTerminalStartupRejection(event.data)) {
                     logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
                     this.pendingCommand = null;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
-                    // Newer servers follow an auth rejection with a 4401/4403 close.
-                    this.failTerminalConnection(
-                        classifyTerminalServerMessage(event.data) === 'auth-rejected'
-                            ? TERMINAL_CONNECTION_ERRORS.authRejected
-                            : event.data,
-                        { override: true },
-                    );
+                    this.failTerminalConnection(event.data, { override: true });
                 } else {
                     try {
                         this.pendingWrites++;
