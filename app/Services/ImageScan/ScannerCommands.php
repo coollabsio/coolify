@@ -451,6 +451,11 @@ class ScannerCommands
     {
         $env = array_merge([
             'SYFT_CHECK_FOR_APP_UPDATE' => 'false',
+            // By default Syft runs NumCPU × 4 workers (`--cpus` does not lower NumCPU) and records metadata of every
+            // file a package owns. Together they need more than the 1 GB limit for an app image with many files
+            // (Laravel with vendor and node_modules). Grype and the SBOM use only the packages, which stay the same.
+            'SYFT_PARALLELISM' => '1',
+            'SYFT_FILE_METADATA_SELECTION' => 'none',
             'GRYPE_CHECK_FOR_APP_UPDATE' => 'false',
             'TMPDIR' => '/scratch',
             'XDG_CACHE_HOME' => '/scratch/cache',

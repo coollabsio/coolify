@@ -507,7 +507,7 @@ class ScanImage
      *
      * @param  list<Model>  $resources
      * @param  array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}  $image
-     * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}}
+     * @return array{0: ImageSbom, 1: array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}}
      */
     private function sbomAndReport(ScannerCommands $commands, array $resources, string $imageRef, array $image): array
     {
@@ -518,7 +518,7 @@ class ScanImage
             $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
-                $this->assertSucceeded($grype['code']);
+                $this->assertSucceeded($grype['code'], $grype['killed_early']);
                 $sbom->forceFill(['last_used_at' => now()])->save();
 
                 return [$sbom, $grype];
@@ -530,7 +530,7 @@ class ScanImage
         $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
         $this->progressAll($resources, 'vulnerabilities');
         $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
-        $this->assertSucceeded($grype['code']);
+        $this->assertSucceeded($grype['code'], $grype['killed_early']);
 
         return [$sbom, $grype];
     }
@@ -543,11 +543,11 @@ class ScanImage
         self::checkDiskSpace($commands, $image['size']);
 
         $result = $this->runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
-        $this->assertSucceeded($result['code']);
-        $this->assertSucceeded($result['exit_codes']['sbom'] ?? null);
+        $this->assertSucceeded($result['code'], $result['killed_early']);
+        $this->assertSucceeded($result['exit_codes']['sbom'] ?? null, $result['killed_early']);
 
         $packages = $this->runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_GRYPE);
-        $this->assertSucceeded($packages['code']);
+        $this->assertSucceeded($packages['code'], $packages['killed_early']);
         [$payload, $cut] = $this->readPayload($packages);
         $parsed = (new SyftPackageParser)->parse($payload);
 
@@ -575,7 +575,7 @@ class ScanImage
     /**
      * Findings of the Grype output, with their layer, sorted by risk.
      *
-     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}  $grype
+     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}  $grype
      * @return array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}
      */
     private function report(ImageSbom $sbom, array $grype): array
@@ -891,10 +891,11 @@ class ScanImage
      * Runs one command batch and reads the exit code of $step. No output or no marker means the batch did not run.
      *
      * @param  list<string>  $commands
-     * @return array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}
+     * @return array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}
      */
     private function runStep(Server $server, array $commands, string $step, int $timeout): array
     {
+        $startedAt = now();
         $output = instant_remote_process($commands, $server, throwError: false, timeout: $timeout);
         $parsed = ScannerCommands::parseOutput($output);
 
@@ -907,11 +908,16 @@ class ScanImage
             'size' => $parsed['sizes'][$step] ?? null,
             'payload' => $parsed['payload'],
             'exit_codes' => $parsed['exit_codes'],
+            // A tool killed (137) before the time limit of its step was killed by the memory limit, not by `timeout`.
+            'killed_early' => $startedAt->diffInSeconds(now()) < $timeout,
         ];
     }
 
-    private function assertSucceeded(?int $code): void
+    private function assertSucceeded(?int $code, bool $killedEarly = false): void
     {
+        if ($code === 137 && $killedEarly) {
+            throw new ScanFailed(ImageScanErrorCode::OutOfMemory);
+        }
         if (in_array($code, self::EXIT_TIMEOUT, true)) {
             throw new ScanFailed(ImageScanErrorCode::Timeout);
         }
@@ -923,7 +929,7 @@ class ScanImage
     /**
      * Output over the limit was cut by `head -c`: keep only the complete lines that were read.
      *
-     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>}  $result
+     * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, killed_early: bool}  $result
      * @return array{0: string, 1: bool}
      */
     private function readPayload(array $result): array

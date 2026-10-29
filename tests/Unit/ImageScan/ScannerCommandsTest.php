@@ -79,6 +79,14 @@ function scannerDockerRuns(array $commands): array
     return array_values(array_filter(scannerUnwrapped($commands), fn (string $line) => str_contains($line, 'docker run') && ! str_contains($line, SCANNER_TEST_INIT_IMAGE)));
 }
 
+it('runs syft with one worker and without file metadata, so a large image fits in the memory limit', function () {
+    $syft = str_replace("'\\''", "'", (string) collect($this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'docker-archive:')));
+
+    expect($syft)->toContain("-e 'SYFT_PARALLELISM=1' ")
+        ->and($syft)->toContain("-e 'SYFT_FILE_METADATA_SELECTION=none' ")
+        ->and($syft)->toContain('--memory 1g --memory-swap 1g');
+});
+
 it('starts every command list by removing a leftover scan container', function () {
     foreach (scannerCommandLists($this->commands) as $name => $commands) {
         expect($commands[0])->toBe('docker rm -f coolify-scan-'.SCANNER_TEST_RUN_ID.' >/dev/null 2>&1 || true', $name);

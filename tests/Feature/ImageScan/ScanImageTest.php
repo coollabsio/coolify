@@ -493,12 +493,29 @@ it('fails with a timeout when grype is stopped by the server timeout, and still 
 });
 
 it('fails with a timeout when the server timeout kills grype', function () {
-    scanImageTestFake(['grype' => scanImageTestPayload('grype', '', 0, 137)]);
+    scanImageTestFake(['grype' => function () {
+        $this->travel(361)->seconds();
+
+        return scanImageTestPayload('grype', '', 0, 137);
+    }]);
 
     $scan = scanImageTestRun();
 
     expect($scan->error_code)->toBe(ImageScanErrorCode::Timeout);
 });
+
+it('says that the scanner ran out of memory when it is killed before the time limit', function (string $step, string $output) {
+    scanImageTestFake([$step => $output]);
+
+    $scan = scanImageTestRun();
+
+    expect($scan->status)->toBe(ImageScanStatus::Failed)
+        ->and($scan->error_code)->toBe(ImageScanErrorCode::OutOfMemory)
+        ->and(ImageScanErrorCode::OutOfMemory->message())->toBe('The scanner needed more than 1 GB of memory for this image and was stopped.');
+})->with([
+    'syft' => ['sbom', "coolify-scan-exit save 0\ncoolify-scan-exit sbom 137"],
+    'grype' => ['grype', scanImageTestPayload('grype', '', 0, 137)],
+]);
 
 it('keeps a completed scan when a rescan of the same image fails', function () {
     scanImageTestFake();

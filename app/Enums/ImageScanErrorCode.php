@@ -8,6 +8,7 @@ enum ImageScanErrorCode: string
     case DbTooOld = 'db_too_old';
     case DbMissing = 'db_missing';
     case Timeout = 'timeout';
+    case OutOfMemory = 'out_of_memory';
     case LockBusy = 'lock_busy';
     case RegistryAuth = 'registry_auth';
     case BuildServerOff = 'build_server_off';
@@ -32,6 +33,7 @@ enum ImageScanErrorCode: string
             self::DbTooOld => "The vulnerability database is {$n} days old. {$server} cannot reach grype.anchore.io.",
             self::DbMissing => "The vulnerability database is not on {$server} yet. Wait for the first update to finish or check that {$server} can reach grype.anchore.io.",
             self::Timeout => 'The scan took too long and was stopped.',
+            self::OutOfMemory => 'The scanner needed more than 1 GB of memory for this image and was stopped.',
             self::LockBusy => "Another scan is still running on {$server}.",
             self::RegistryAuth => "Coolify cannot read this image from its registry. Log in to the registry on {$server}.",
             self::BuildServerOff => 'Image scanning is off on the build server.',
