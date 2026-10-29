@@ -200,7 +200,7 @@ class AuditEvent extends Model
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
             'metadata' => self::redact(Arr::except($context, ['audit_changes'])),
             'changes' => $changes,
-            'ip_address' => app()->bound('request') ? request()->ip() : null,
+            'ip_address' => app()->bound('request') ? (client_ip(request()) ?: null) : null,
             'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
         ];
     }

@@ -44,7 +44,7 @@
                                                 {{ data_get($pull_request, 'title') }}
                                             </h4>
                                             <a target="_blank"
-                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-warning"
+                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-brand-light"
                                                 href="{{ data_get($pull_request, 'html_url') }}">
                                                 Open on GitHub
                                                 <x-external-link />
@@ -86,7 +86,7 @@
 
             <div class="w-full">
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
-                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked."
+                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that still have the production value, and shared variables are resolved only in preview variables, not in the compose file of the PR. This is not full isolation: the preview runs on the same server as production, and with the Docker Compose build pack Coolify deploys the compose file of the PR, which can, for example, mount host paths. Give previews their own values, and do not use production secrets in them."
                     :options="[
                         ['value' => false, 'label' => 'Repository members only'],
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
@@ -121,7 +121,7 @@
 
     <x-application.settings-section id="preview-deployments-section" title="Preview deployments"
         helper="Manage domains, deployments, logs, and lifecycle actions for configured previews." flush>
-        @forelse (data_get($application, 'previews') as $previewName => $preview)
+        @forelse (data_get($application, 'previews') as $preview)
             @php
                 $previewStatus = str(data_get($preview, 'status'));
                 $previewIsStopped = $previewStatus->startsWith('exited');
@@ -298,7 +298,7 @@
                             class="application-settings-section-body is-flush mt-3 overflow-visible">
                             <div class="data-table-header grid-cols-1"><span>Docker tag</span></div>
                             <div class="p-3">
-                                <x-forms.input id="previewDockerTags.{{ $previewName }}" canGate="update"
+                                <x-forms.input id="previewDockerTags.{{ $preview->id }}" canGate="update"
                                     :canResource="$application"
                                     wire:change="save_preview('{{ $preview->id }}')" />
                             </div>

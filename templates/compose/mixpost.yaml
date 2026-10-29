@@ -19,9 +19,33 @@ services:
       - DB_USERNAME=${SERVICE_USER_MYSQL}
       - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - SSL_EMAIL=${SSL_EMAIL:-user@example.com}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
     volumes:
       - mixpost-storage:/var/www/html/storage/app
       - mixpost-logs:/var/www/html/storage/logs
+      - type: bind
+        source: ./etc/coolify-start.sh
+        target: /usr/local/bin/coolify-start.sh
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          # start.sh always creates admin@example.com with the password "changeme".
+          # Replace that password with ADMIN_PASSWORD once, while it is still the default.
+          (
+            for i in $(seq 1 60); do
+              sleep 5
+              result=$(php /var/www/html/artisan tinker --no-ansi --execute='$u = Inovector\MixpostAuth\MixpostAuth::getUserClass()::where("email", "admin@example.com")->first(); if (! $u) { echo "wait"; } elseif (Illuminate\Support\Facades\Hash::check("changeme", $u->password)) { $u->password = bcrypt(getenv("ADMIN_PASSWORD")); $u->save(); echo "done"; } else { echo "done"; }' 2>/dev/null)
+              [ "$result" = "done" ] && break
+            done
+          ) &
+          exec /usr/local/bin/start.sh
+    entrypoint: ["/usr/local/bin/coolify-start.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1/mixpost/login || exit 1"]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 10
     depends_on:
       - mysql
       - redis

@@ -1102,11 +1102,11 @@ it('fails only its own execution and notifies the team when the worker timeout s
     $commands = collect();
     $atTimeout = null;
     Process::fake(function ($process) use ($application, $task, $queuedCopy, $team, $commands, &$atTimeout) {
-        $commands->push($process->command);
-        if (str_contains($process->command, 'docker ps')) {
+        $commands->push(remoteProcessScript($process));
+        if (str_contains(remoteProcessScript($process), 'docker ps')) {
             return Process::result(output: json_encode(['Names' => 'app-'.$application->uuid, 'Labels' => "coolify.applicationUuid={$application->uuid}", 'State' => 'running']));
         }
-        if (str_contains($process->command, 'docker exec')) {
+        if (str_contains(remoteProcessScript($process), 'docker exec')) {
             Carbon::setTestNow(now()->addMinute());
             $newerRun = ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'running', 'started_at' => now()]);
             $ownRun = ScheduledTaskExecution::query()->whereKeyNot([$newerRun->id])->where('status', 'running')->sole();
@@ -1175,6 +1175,26 @@ it('records a midnight schedule in the server timezone, not in UTC', function ()
         ->and($service->recordSkipped('midnight', '0 0 * * *', 'America/New_York', Carbon::parse('2026-10-03 04:09:00', 'UTC')))->toBeFalse()
         ->and(ScheduledJobState::query()->where('schedule_key', 'midnight')->value('last_scheduled_for')->toDateTimeString())->toBe('2026-10-03 04:00:00');
 });
+
+it('runs a scheduled task in the server timezone, not in the instance timezone', function (string $serverTimezone, string $utcNow, bool $expectDispatch) {
+    config(['constants.coolify.self_hosted' => true]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]))->update(['instance_timezone' => 'Europe/Istanbul']);
+    Carbon::setTestNow(Carbon::parse($utcNow, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $application->destination->server->settings()->update(['server_timezone' => $serverTimezone]);
+    createScheduledApplicationTask($application, ['frequency' => '59 23 * * *']);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(ScheduledTaskJob::class, $expectDispatch ? 1 : 0);
+})->with([
+    // 23:59 in Istanbul (UTC+3) is 20:59Z.
+    'UTC server at 23:59 Istanbul' => ['UTC', '2026-10-26 20:59:00', false],
+    'UTC server at 23:59 UTC' => ['UTC', '2026-10-26 23:59:00', true],
+    'Istanbul server at 23:59 Istanbul' => ['Europe/Istanbul', '2026-10-26 20:59:00', true],
+]);
 
 function createStaleEnqueuedOccurrence(string $scheduleKey, string $jobType, int $resourceId, Carbon $scheduledFor, int $minutesAgo = ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1): ScheduledJobDelivery
 {

@@ -85,6 +85,7 @@ class Edit extends Component
                 'name' => $this->name,
                 'description' => $this->description,
             ]);
+            $this->dispatch('name-changed', uuid: $this->project->uuid, name: $this->project->name);
         } else {
             $this->name = $this->project->name;
             $this->description = $this->project->description;

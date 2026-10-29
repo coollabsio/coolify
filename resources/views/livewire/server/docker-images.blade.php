@@ -48,14 +48,20 @@
                             : 'Images pulled or built on this server will appear here.'" icon-name="layers" />
                     </div>
                 @else
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-images-table-grid">
-                            <span>Repository</span>
-                            <span>Tag</span>
-                            <span>Image ID</span>
-                            <span>Created</span>
-                            <span>Size</span>
-                            <span>Used by</span>
+                            <x-table.sort-header label="Repository" asc="repository_asc" desc="repository_desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Tag" asc="tag_asc" desc="tag_desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Image ID" asc="id_asc" desc="id_desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Created" asc="created_asc" desc="created_desc" first="desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Size" asc="size_asc" desc="size_desc" first="desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Used by" asc="used_asc" desc="used_desc" action="setSort"
+                                :current="$sort" />
                             <span>Actions</span>
                         </div>
                         @foreach ($visibleImages as $image)

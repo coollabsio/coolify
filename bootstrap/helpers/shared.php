@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -38,13 +39,13 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Process\Pool;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -131,6 +132,18 @@ function new_public_id(int $length = 24): string
     $length = max(1, $length);
 
     return Str::lower(Str::random($length));
+}
+
+/**
+ * The name of a clone: the source name without the "-clone-<id>" suffixes of earlier clones, then a new suffix.
+ * Without this, each clone of a clone adds a suffix, and the name soon becomes longer than the 255 characters of the column.
+ */
+function clone_resource_name(string $name, string $uuid): string
+{
+    $suffix = '-clone-'.$uuid;
+    $baseName = preg_replace('/(-clone-[a-z0-9]{7,})+$/i', '', $name);
+
+    return Str::limit($baseName, 255 - strlen($suffix), '').$suffix;
 }
 
 /**
@@ -701,14 +714,8 @@ function get_route_parameters(): array
 
 function get_latest_sentinel_version(): string
 {
-    try {
-        $response = Http::get(config('constants.coolify.versions_url'));
-        $versions = $response->json();
-
-        return data_get($versions, 'coolify.sentinel.version');
-    } catch (Throwable) {
-        return '0.0.0';
-    }
+    // Read the local versions.json, which CheckForUpdatesJob refreshes every hour. Do not ask the CDN for each server.
+    return data_get(get_versions_data(), 'coolify.sentinel.version') ?? '0.0.0';
 }
 function get_latest_version_of_coolify(): string
 {
@@ -891,6 +898,10 @@ function profile_avatar_url(User $user): string
         }
     }
 
+    if (auth()->check() && $user->id !== auth()->id()) {
+        return route('team.member.avatar', ['user_id' => $user->id, 'v' => $user->updated_at->timestamp]);
+    }
+
     return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
 }
 
@@ -906,6 +917,21 @@ function project_icon_url(Project $project): string
     return route('project.icon', [
         'project_uuid' => $project->uuid,
         'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function team_avatar_url(Team $team): string
+{
+    if ($team->avatar_storage_type === 's3') {
+        $url = s3_image_url($team->avatar_s3_storage_id, $team->avatar_path, $team->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('team.avatar', [
+        'team_id' => $team->id,
+        'v' => $team->updated_at->timestamp,
     ]);
 }
 
@@ -1242,6 +1268,123 @@ function parseEnvFormatToArray($env_file_contents)
     }
 
     return $env_array;
+}
+
+/**
+ * Format a value for a KEY=VALUE line of the developer view, so that parseEnvFormatToArray()
+ * reads it back unchanged. Returns null when the format cannot hold the value: it has a line
+ * break, or it needs quotes and has both quote types.
+ */
+function formatEnvValueForDevView(?string $value): ?string
+{
+    $value ??= '';
+    if (str_contains($value, "\n")) {
+        return null;
+    }
+
+    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1;
+    if (! $needsQuotes) {
+        return $value;
+    }
+    if (! str_contains($value, "'")) {
+        return "'{$value}'";
+    }
+    if (! str_contains($value, '"')) {
+        return "\"{$value}\"";
+    }
+
+    return null;
+}
+
+/**
+ * Format a variable for the developer view: its KEY=value line, with a "# coolify:" directive
+ * line above it when a flag is not its default. A variable that the view cannot edit gets a
+ * placeholder line and no directive.
+ */
+function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue): string
+{
+    if (! $canViewValue) {
+        return "{$variable->key}=(Hidden, only admins can view)";
+    }
+    if ($variable->is_shown_once) {
+        return "{$variable->key}=(Locked Secret, delete and add again to change)";
+    }
+    if ($variable->is_multiline) {
+        return "{$variable->key}=(Multiline environment variable, edit in normal view)";
+    }
+    $value = formatEnvValueForDevView($variable->value);
+    if ($value === null) {
+        return "{$variable->key}=(Value cannot be shown in this view, edit in normal view)";
+    }
+
+    $flags = [];
+    foreach ($variable::DEV_VIEW_FLAG_DEFAULTS as $flag => $default) {
+        if ((bool) $variable->{"is_{$flag}"} !== $default) {
+            $flags[] = $default ? "{$flag}=false" : $flag;
+        }
+    }
+    $line = "{$variable->key}={$value}";
+
+    return $flags === [] ? $line : '# coolify: '.implode(' ', $flags)."\n".$line;
+}
+
+/**
+ * Parse developer view text. Returns the result of parseEnvFormatToArray() with a 'settings'
+ * entry per key: the flags of the "# coolify:" line directly above the key line, as model
+ * attributes (for example ['is_literal' => true]). A key without a directive gets empty
+ * settings, so its current flags stay.
+ *
+ * @param  array<string, bool>  $flagDefaults  the allowed flags and their defaults
+ * @return array<string, array{value: string, comment: ?string, settings: array<string, bool>}>
+ *
+ * @throws InvalidArgumentException when a directive is not directly above a KEY=value line, or has an unknown flag or value
+ */
+function parseEnvDevView(?string $contents, array $flagDefaults): array
+{
+    $contents ??= '';
+    $settingsByKey = [];
+    $directive = null;
+    $directiveLine = 0;
+
+    foreach (explode("\n", $contents) as $index => $line) {
+        $isKeyLine = $line !== '' && ! str_starts_with($line, '#') && str_contains($line, '=');
+        if ($directive !== null && ! $isKeyLine) {
+            throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+        }
+
+        if ($isKeyLine) {
+            $settingsByKey[substr($line, 0, strpos($line, '='))] = $directive ?? [];
+            $directive = null;
+        } elseif (str_starts_with($line, '# coolify:')) {
+            $directiveLine = $index + 1;
+            $flags = preg_split('/\s+/', trim(substr($line, strlen('# coolify:'))), -1, PREG_SPLIT_NO_EMPTY);
+            if ($flags === []) {
+                throw new InvalidArgumentException("Line {$directiveLine}: the \"# coolify:\" line has no flags.");
+            }
+
+            $directive = [];
+            foreach ($flags as $flag) {
+                [$name, $value] = array_pad(explode('=', $flag, 2), 2, 'true');
+                if (! array_key_exists($name, $flagDefaults)) {
+                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', array_keys($flagDefaults)).'.');
+                }
+                if ($value !== 'true' && $value !== 'false') {
+                    throw new InvalidArgumentException("Line {$directiveLine}: the value of \"{$name}\" must be true or false.");
+                }
+                $directive["is_{$name}"] = $value === 'true';
+            }
+        }
+    }
+    if ($directive !== null) {
+        throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+    }
+
+    $variables = parseEnvFormatToArray($contents);
+    foreach ($variables as $key => $data) {
+        $variables[$key]['settings'] = $settingsByKey[$key] ?? [];
+    }
+
+    return $variables;
 }
 
 /**
@@ -1741,10 +1884,14 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
-function sanitizeLogsForExport(string $text): string
+/**
+ * Redact log text before it leaves Coolify (copy, download, API, MCP).
+ *
+ * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Resource values to hide, usually from EnvironmentVariable::logRedactionSecretsFor().
+ */
+function sanitizeLogsForExport(string $text, array $secrets = []): string
 {
-    // All sanitization is now handled by remove_iip()
-    return remove_iip($text);
+    return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
 }
 
 function getTopLevelNetworks(Service|Application $resource): Collection
@@ -2430,7 +2577,7 @@ function isCloudflareIp(string $ip): bool
     $cloudflareIps = [
         '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
         '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
-        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14',
         '172.64.0.0/13', '131.0.72.0/22', '2400:cb00::/32', '2606:4700::/32',
         '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29',
         '2c0f:f248::/32',
@@ -2714,15 +2861,21 @@ function get_public_ips(): void
 function detect_public_ips(array $columns = ['public_ipv4', 'public_ipv6']): array
 {
     $versions = array_intersect_key(['public_ipv4' => 4, 'public_ipv6' => 6], array_flip($columns));
-    $results = Process::concurrently(function (Pool $pool) use ($versions) {
-        foreach ($versions as $column => $version) {
-            $pool->as($column)->path(__DIR__)->command("curl -{$version}s https://ifconfig.io");
-        }
-    });
+
+    // Start the lookups together, but wait for each one alone, so a timeout of one family does not discard the other.
+    $processes = [];
+    foreach ($versions as $column => $version) {
+        $processes[$column] = Process::path(__DIR__)->start("curl -{$version}s --max-time 10 https://ifconfig.io");
+    }
 
     $detected = [];
-    foreach ($versions as $column => $version) {
-        $ip = trim($results[$column]->output());
+    foreach ($processes as $column => $process) {
+        try {
+            $ip = trim($process->wait()->output());
+        } catch (Throwable) {
+            continue;
+        }
+        $version = $versions[$column];
         if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) !== false) {
             $detected[$column] = $ip;
         }
@@ -2783,20 +2936,20 @@ function isAnyDeploymentInprogress(bool $showAll = false)
 }
 
 /**
- * Counts scheduled task, database backup, and volume backup runs that are still running.
+ * Counts scheduled task, database backup, and volume backup runs that are still running on this host.
  * A run that started longer ago than its job timeout is stale: the worker has stopped it.
  */
 function runningScheduledJobCount(): int
 {
     $startedWithin = fn (Model $execution, int $timeoutSeconds): bool => $execution->created_at?->gt(now()->subSeconds($timeoutSeconds)) ?? false;
 
-    $tasks = ScheduledTaskExecution::with('scheduledTask')->where('status', 'running')->get()
+    $tasks = ScheduledTaskExecution::with('scheduledTask')->onThisHost()->where('status', 'running')->get()
         ->filter(fn (ScheduledTaskExecution $execution) => $startedWithin($execution, ($execution->scheduledTask?->timeout ?? 300) + ScheduledTaskJob::WORKER_TIMEOUT_MARGIN_SECONDS));
 
-    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->where('status', 'running')->get()
+    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->onThisHost()->where('status', 'running')->get()
         ->filter(fn (ScheduledDatabaseBackupExecution $execution) => $startedWithin($execution, ($execution->scheduledDatabaseBackup?->timeout ?? 3600) + DatabaseBackupJob::WORKER_TIMEOUT_MARGIN_SECONDS));
 
-    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->where('status', 'running')->get()
+    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->onThisHost()->where('status', 'running')->get()
         ->filter(fn (ScheduledVolumeBackupExecution $execution) => $startedWithin($execution, $execution->scheduledVolumeBackup?->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT));
 
     return $tasks->count() + $databaseBackups->count() + $volumeBackups->count();
@@ -3588,7 +3741,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
-                    data_set($service, 'logging', generate_fluentd_configuration());
+                    data_set($service, 'logging', generate_log_drain_configuration($resource->server));
                 }
                 if ($serviceLabels->count() > 0) {
                     if ($resource->is_container_label_escape_enabled) {
@@ -4413,7 +4566,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             if ($server->isLogDrainEnabled()) {
                 if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
-                    data_set($service, 'logging', generate_fluentd_configuration());
+                    data_set($service, 'logging', generate_log_drain_configuration($server));
                 }
             }
             if ($serviceLabels->count() > 0) {
@@ -4470,6 +4623,31 @@ function generate_fluentd_configuration(): array
             // env vars are used in the LogDrain configurations
             'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
         ],
+    ];
+}
+
+function generate_log_drain_configuration(Server $server): array
+{
+    if ($server->isFluentBitLogDrainEnabled()) {
+        return generate_fluentd_configuration();
+    }
+
+    $settings = $server->settings;
+    $options = [
+        'awslogs-region' => $settings->logdrain_cloudwatch_region,
+        'awslogs-group' => $settings->logdrain_cloudwatch_group,
+        'awslogs-create-group' => 'true',
+        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
+        'mode' => 'non-blocking',
+        // The stream is named after the container; awslogs-stream is never set because it would override this tag.
+        'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
+    ];
+
+    return [
+        'driver' => 'awslogs',
+        'options' => collect($options)
+            ->reject(fn ($value) => blank($value))
+            ->all(),
     ];
 }
 
@@ -4579,6 +4757,20 @@ function wireNavigate(): string
 }
 
 /**
+ * Registers a resource menu that the main sidebar and the mobile drawer show in place of their main menu
+ * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
+ * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
+ */
+function registerMainNavContext(int $depth, string $label, string $backTitle): void
+{
+    $levels = request()->attributes->get('mainNavContext', []);
+    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle];
+    ksort($levels);
+
+    request()->attributes->set('mainNavContext', $levels);
+}
+
+/**
  * Flattens a grouped settings sidebar into the items that the command palette
  * shows for the current page: every page, its child pages, and its in-page sections.
  *
@@ -4603,6 +4795,10 @@ function settingsSearchItems(iterable $groupedItems, array $routeParameters, arr
 
     foreach ($groupedItems as $groupLabel => $groupItems) {
         foreach ($groupItems as $item) {
+            if ($item['disabled'] ?? false) {
+                continue;
+            }
+
             $href = route($item['route'], $routeParameters);
             $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
 
@@ -4856,7 +5052,7 @@ function gitRepositorySlug(?string $gitRepository): string
     return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
 }
 
-function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|null $source = null): array
+function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|GiteaApp|null $source = null): array
 {
     $repository = $gitRepository;
     $providerInfo = [
@@ -4876,6 +5072,7 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         switch ($source->getMorphClass()) {
             case GithubApp::class:
             case GitlabApp::class:
+            case GiteaApp::class:
                 $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
                 $providerInfo['port'] = $source->custom_port;
                 $providerInfo['user'] = $source->custom_user;
@@ -4996,8 +5193,8 @@ function formatBytes(?int $bytes, int $precision = 2): string
 }
 
 /**
- * Compact human-readable count (e.g. 26_360 -> "26.36k", 1_200_000 -> "1.2M").
- * Trailing zeros are trimmed so round values read cleanly ("1k", not "1.00k").
+ * Compact human-readable count (e.g. 26_360 -> "26.36K", 1_200_000 -> "1.2M").
+ * Trailing zeros are trimmed so round values read cleanly ("1K", not "1.00K").
  * Used for the dense metric columns in the traffic-analytics lists.
  */
 function compactNumber(?int $n): string
@@ -5011,10 +5208,25 @@ function compactNumber(?int $n): string
     [$divisor, $suffix] = match (true) {
         $n >= 1_000_000_000 => [1_000_000_000, 'B'],
         $n >= 1_000_000 => [1_000_000, 'M'],
-        default => [1000, 'k'],
+        default => [1000, 'K'],
     };
 
     return rtrim(rtrim(number_format($n / $divisor, 2, '.', ''), '0'), '.').$suffix;
+}
+
+/**
+ * Compact response time for the traffic-analytics latency figures
+ * (e.g. 85.4 -> "85.4 ms", 2_450 -> "2.5 s", 312_000 -> "5.2 min").
+ */
+function formatLatency(float|int|null $ms): string
+{
+    $ms = (float) $ms;
+
+    return match (true) {
+        $ms >= 60_000 => number_format($ms / 60_000, 1).' min',
+        $ms >= 1000 => number_format($ms / 1000, 1).' s',
+        default => number_format($ms, 1).' ms',
+    };
 }
 
 /**
@@ -5583,6 +5795,80 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
 }
 
 /**
+ * Replace locked values in the generated compose file of a resource, for display only.
+ *
+ * The compose parsers write resolved values into `docker_compose`: environment variables, database
+ * overrides, and shared variable references. Deployments need those values, so only the displayed
+ * copy is redacted. Covered: the resource's locked variables (also variables that reference a locked
+ * shared variable) and locked team, project, and environment variables that the raw compose references.
+ * Values shorter than 4 characters are not replaced, because they would match unrelated text.
+ * A parsed compose (array or collection) gets the same replacement in every string value.
+ *
+ * @template T of string|array|Collection|null
+ *
+ * @param  T  $compose
+ * @return T
+ */
+function redactLockedValuesInGeneratedCompose(string|array|Collection|null $compose, Application|Service $resource): string|array|Collection|null
+{
+    if (blank($compose)) {
+        return $compose;
+    }
+
+    $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
+
+    preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
+    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], ['team', 'project', 'environment'], true));
+    $teamId = $resource->team()?->id;
+    if ($references->isNotEmpty() && $teamId !== null) {
+        $scopeIds = [
+            'team' => $teamId,
+            'project' => $resource->environment?->project_id,
+            'environment' => $resource->environment_id,
+        ];
+        $values = SharedEnvironmentVariable::query()
+            ->where('team_id', $teamId)
+            ->where('is_shown_once', true)
+            ->whereIn('key', $references->pluck(2)->unique()->values())
+            ->get()
+            ->filter(fn (SharedEnvironmentVariable $shared): bool => $references->contains(fn (array $match): bool => $match[1] === $shared->type && $match[2] === $shared->key)
+                && $scopeIds[$shared->type] !== null
+                && (int) $shared->{"{$shared->type}_id"} === (int) $scopeIds[$shared->type])
+            ->pluck('value')
+            ->merge($values)
+            ->all();
+    }
+
+    $variants = collect($values)
+        ->filter(fn (mixed $value): bool => is_string($value))
+        ->flatMap(fn (string $value): array => [
+            $value,
+            escapeDollarSign($value),
+            str_replace("'", "''", $value),
+            substr((string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 1, -1),
+        ])
+        ->filter(fn (string $value): bool => mb_strlen($value) >= 4)
+        ->unique()
+        ->mapWithKeys(fn (string $value): array => [$value => '<locked>']);
+
+    if ($variants->isEmpty()) {
+        return $compose;
+    }
+
+    // strtr() replaces the longest match first and does not search the replaced text again.
+    $redact = function (mixed $value) use (&$redact, $variants): mixed {
+        return match (true) {
+            is_string($value) => strtr($value, $variants->all()),
+            is_array($value) => array_map($redact, $value),
+            $value instanceof Collection => $value->map($redact),
+            default => $value,
+        };
+    };
+
+    return $redact($compose);
+}
+
+/**
  * Convert an ISO 3166-1 alpha-2 country code into its regional-indicator flag emoji.
  *
  * The input is case-insensitive (e.g. "us" and "US" both yield the United States flag).
@@ -5712,6 +5998,126 @@ function deviceLabel(?string $device): string
         'crawler' => 'Bot',
         default => Str::title($value),
     };
+}
+
+/**
+ * Whether a raw User-Agent comes from container tooling (Docker CLI and Engine,
+ * BuildKit, containerd, Podman, Skopeo) instead of a person or a bot. The
+ * analytics views hide these rows behind a toggle: image pulls and builds are
+ * normal, but the raw strings look like an attack or a leak of internal data.
+ */
+function isContainerToolingUserAgent(?string $userAgent): bool
+{
+    return preg_match('#^(docker|docker-client|buildkit|containerd|podman|skopeo|cri-o)/#i', trim((string) $userAgent)) === 1;
+}
+
+/**
+ * Prepare aggregated `city` breakdown rows (`CC|subdivision|City`, from
+ * TrafficAnalyticsAggregator::breakdowns(), not raw Sentinel rows) for display,
+ * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
+ * "BE, Germany"). `CC||` (sent by older Sentinel builds) is an unknown city of
+ * that country. `__other__` and malformed values are merged into one "Other"
+ * row, which stays last. Returns [] when no row has a real city.
+ *
+ * @param  iterable<int, array{value?: string, requests?: int, bytesOut?: int, lat?: float, lon?: float}>  $rows
+ * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
+ */
+function trafficCityRows(iterable $rows): array
+{
+    $out = [];
+    $hasCity = false;
+
+    foreach ($rows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests <= 0) {
+            continue;
+        }
+
+        $value = (string) data_get($row, 'value', '');
+        $parts = explode('|', $value, 3);
+        $parts[0] = strtoupper($parts[0]);
+        $isCityKey = count($parts) === 3 && preg_match('/^[A-Z]{2}$/', $parts[0]) === 1;
+
+        $key = '__other__';
+        $country = '';
+        $label = 'Other';
+        $name = 'Other';
+        $detail = '';
+        $lat = null;
+        $lon = null;
+
+        if ($isCityKey) {
+            [$country, $subdivision, $city] = array_map('trim', $parts);
+            $key = $value;
+
+            if ($city === '') {
+                $label = 'Unknown, '.$country;
+                $name = 'Unknown';
+                $detail = countryName($country);
+            } else {
+                $hasCity = true;
+                $region = preg_match('/^[A-Z]{2,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
+                $label = $city.', '.$region.$country;
+                $name = $city;
+                $detail = $region.countryName($country);
+
+                $rawLat = data_get($row, 'lat');
+                $rawLon = data_get($row, 'lon');
+                if (is_numeric($rawLat) && is_numeric($rawLon)) {
+                    $lat = (float) $rawLat;
+                    $lon = (float) $rawLon;
+                }
+            }
+        }
+
+        $out[$key] ??= ['key' => $key, 'country' => $country, 'label' => $label, 'name' => $name, 'detail' => $detail, 'requests' => 0, 'bytesOut' => 0, 'lat' => $lat, 'lon' => $lon];
+        $out[$key]['requests'] += $requests;
+        $out[$key]['bytesOut'] += (int) data_get($row, 'bytesOut', 0);
+    }
+
+    if (! $hasCity) {
+        return [];
+    }
+
+    $other = $out['__other__'] ?? null;
+    unset($out['__other__']);
+    $out = array_values($out);
+    usort($out, fn (array $a, array $b): int => $b['requests'] <=> $a['requests']);
+
+    return $other === null ? $out : [...$out, $other];
+}
+
+/**
+ * Marker data for the analytics globe, one set for each view of the Locations
+ * card: a marker per country with a valid ISO-A2 code, and a marker per city
+ * that has coordinates.
+ *
+ * @param  iterable<int, mixed>  $countryRows
+ * @param  iterable<int, mixed>  $cityRows
+ * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
+ */
+function trafficGeoMarkers(iterable $countryRows, iterable $cityRows): array
+{
+    $countries = [];
+    foreach ($countryRows as $row) {
+        $code = strtoupper((string) data_get($row, 'value', ''));
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests > 0 && preg_match('/^[A-Z]{2}$/', $code) === 1) {
+            $countries[] = ['code' => $code, 'requests' => $requests];
+        }
+    }
+
+    $cities = [];
+    foreach ($cityRows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        $lat = data_get($row, 'lat');
+        $lon = data_get($row, 'lon');
+        if ($requests > 0 && is_numeric($lat) && is_numeric($lon)) {
+            $cities[] = ['lat' => (float) $lat, 'lon' => (float) $lon, 'requests' => $requests];
+        }
+    }
+
+    return ['countries' => $countries, 'cities' => $cities];
 }
 
 /**

@@ -2,6 +2,7 @@
 
 use App\Livewire\Tags\Show;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -33,7 +34,7 @@ it('shows an empty state when there are no tags', function () {
     Livewire::test(Show::class)
         ->assertSee('Tags')
         ->assertSee('No tags yet')
-        ->assertSee('Open a resource and add a tag to start grouping related deployments.');
+        ->assertSee('Create a tag, then connect it to resources to group related deployments.');
 });
 
 it('shows a card grid overview when tags exist and none is selected', function () {
@@ -50,7 +51,7 @@ it('shows a card grid overview when tags exist and none is selected', function (
         ->assertSee('Table view', false)
         ->assertSee('Grid view', false)
         ->assertSee('tagsIndex', false)
-        ->assertSee('tags-view', false)
+        ->assertSee('Number(filteredTags.length)', false)
         ->assertDontSee('Switch tag')
         ->assertDontSee('Deploy webhook URL');
 });
@@ -97,4 +98,110 @@ it('redirects to the overview when the requested tag does not exist', function (
 
     Livewire::test(Show::class, ['tagName' => 'missing-tag'])
         ->assertRedirect(route('tags.show'));
+});
+
+it('lists the team resources in the connect modal and toggles the tag on a resource', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'shop']);
+    $environment = Environment::factory()->create(['project_id' => $project->id, 'name' => 'prod']);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'name' => 'untagged-app',
+    ]);
+
+    $component = Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->assertDontSee('shop / prod')
+        ->call('openConnectResources')
+        ->assertSee('shop / prod')
+        ->assertSee('untagged-app')
+        ->call('toggleResource', $application->uuid);
+
+    expect($application->tags()->whereKey($tag->id)->exists())->toBeTrue();
+    expect($component->get('applications')->pluck('uuid')->all())->toBe([$application->uuid]);
+
+    $component->call('toggleResource', $application->uuid);
+
+    expect($application->tags()->whereKey($tag->id)->exists())->toBeFalse();
+});
+
+it('does not tag a resource of another team from the connect modal', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $otherTeam = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->call('toggleResource', $application->uuid)
+        ->assertDispatched('error');
+
+    expect($application->tags()->exists())->toBeFalse();
+});
+
+it('does not let a member change tags from the connect modal', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->call('toggleResource', $application->uuid);
+
+    expect($application->tags()->exists())->toBeFalse();
+});
+
+it('sorts active deployments by the chosen column and ignores unknown sort values', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    foreach ([['zeta-app', 'alpha-server', 'queued'], ['alpha-app', 'zeta-server', 'in_progress'], ['mid-app', 'alpha-server', 'in_progress']] as [$name, $serverName, $status]) {
+        $application = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+            'name' => $name,
+        ]);
+        $application->tags()->attach($tag->id);
+        ApplicationDeploymentQueue::create([
+            'application_id' => $application->id,
+            'deployment_uuid' => $name,
+            'application_name' => $name,
+            'server_id' => $server->id,
+            'server_name' => $serverName,
+            'status' => $status,
+        ]);
+    }
+
+    Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->assertSeeInOrder(['Active deployments', 'zeta-app', 'mid-app', 'alpha-app'])
+        ->call('setDeploymentSort', 'resource-asc')
+        ->assertSeeInOrder(['Active deployments', 'alpha-app', 'mid-app', 'zeta-app'])
+        ->call('setDeploymentSort', 'server-desc')
+        ->assertSeeInOrder(['Active deployments', 'alpha-app', 'zeta-app', 'mid-app'])
+        ->call('setDeploymentSort', 'status-desc')
+        ->assertSeeInOrder(['Active deployments', 'zeta-app', 'alpha-app', 'mid-app'])
+        ->call('setDeploymentSort', 'deployment_url-asc')
+        ->assertSet('deploymentSort', 'status-desc');
 });

@@ -41,6 +41,7 @@ beforeEach(function () {
     ]);
     $this->server->proxy->set('type', ProxyTypes::TRAEFIK->value);
     $this->server->save();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
 function serverDeployAbilityHeaders(User $user, int $teamId, array $abilities): array
@@ -209,7 +210,7 @@ describe('destination create', function () {
             ->assertJsonPath('errors.network.0', 'A Docker network with this name already exists on the server. Use a new network name.');
 
         expect(StandaloneDocker::query()->count())->toBe($countBefore);
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker network ls'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker network ls'));
     });
 
     test('rejects the destination when the server networks cannot be read', function () {

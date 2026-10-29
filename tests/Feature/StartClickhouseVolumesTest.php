@@ -56,7 +56,7 @@ function startedClickhouseCompose(): array
 {
     $compose = null;
     Process::assertRan(function ($process) use (&$compose) {
-        if (preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d \| (?:sudo )?tee \S+\/docker-compose\.yml/", $process->command, $matches)) {
+        if (preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d \| (?:sudo )?tee \S+\/docker-compose\.yml/", remoteProcessScript($process), $matches)) {
             $compose = Yaml::parse(base64_decode($matches[1]));
         }
 
@@ -91,7 +91,7 @@ it('keeps the data volume when a file mount is added', function () {
 function fakeClickhouseDataMount(string $volumeName): void
 {
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'docker inspect') ? "volume {$volumeName}" : 'OK',
+        output: str_contains(remoteProcessScript($process), 'docker inspect') ? "volume {$volumeName}" : 'OK',
     ));
 }
 
@@ -99,7 +99,7 @@ function ranRemoteCommandContaining(string $needle): bool
 {
     $ran = false;
     Process::assertRan(function ($process) use ($needle, &$ran) {
-        $ran = $ran || str_contains($process->command, $needle);
+        $ran = $ran || str_contains(remoteProcessScript($process), $needle);
 
         return true;
     });

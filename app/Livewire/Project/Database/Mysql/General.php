@@ -129,7 +129,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     private function syncData(bool $toModel = false): void
@@ -151,22 +151,23 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->mysqlRootPassword = $canSeeCredentials ? $this->database->mysql_root_password : '';
             $this->mysqlUser = $this->database->mysql_user;
             $this->mysqlPassword = $canSeeCredentials ? $this->database->mysql_password : '';
             $this->mysqlDatabase = $this->database->mysql_database;
-            $this->mysqlConf = $this->database->mysql_conf;
+            $this->mysqlConf = $canSeeCredentials ? $this->database->mysql_conf : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 

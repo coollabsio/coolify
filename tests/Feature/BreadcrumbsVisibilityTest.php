@@ -55,14 +55,13 @@ it('hides the breadcrumb trail on mobile while keeping the current status visibl
     $response->assertSee('title="Switch resource"', false);
 
     // Desktop resource actions dock into the top bar; the slot is hidden below xl.
-    $response->assertSee('<div id="resource-action-hud-slot" class="hidden shrink-0 items-center xl:flex"></div>', false);
+    $response->assertSee('<div id="resource-action-hud-slot" x-ref="resourceActions" class="hidden shrink-0 items-center xl:flex"></div>', false);
 
-    // Below xl, the heading keeps the resource name, current status, and a split action visible.
+    // Below xl, the heading keeps the resource name, current status, and a split action in one row.
     expect(preg_match(
-        '/<div class="mb-3 w-full xl:hidden">.*?<h1[^>]*>\s*Pure Dockerfile Example\s*<\/h1>.*?Application status/s',
+        '/<div class="mb-3 flex w-full min-w-0 items-start gap-3 xl:hidden">.*?<h1[^>]*>\s*Pure Dockerfile Example\s*<\/h1>.*?Application status.*?id="application-mobile-actions"/s',
         $response->getContent()
     ))->toBe(1);
-    $response->assertSee('id="application-mobile-actions"', false);
     $response->assertSee('Running');
 
     expect($response->getContent())->not->toContain('hidden pt-2 pb-10 md:flex');

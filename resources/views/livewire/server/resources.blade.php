@@ -14,12 +14,12 @@
             <x-slot:actions>
                 <div class="inline-flex w-fit rounded-[10px] bg-neutral-100 p-1 dark:bg-white/[0.05]">
                     <button type="button" wire:click="loadManagedContainers" wire:loading.attr="disabled" wire:target="loadManagedContainers,loadUnmanagedContainers"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'managed' ? 'bg-white text-neutral-950 shadow-sm dark:bg-warning/15 dark:text-warning' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
+                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'managed' ? 'bg-white text-neutral-950 shadow-sm dark:bg-brand/15 dark:text-brand-light' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
                         <x-loading-on-button wire:loading wire:target="loadManagedContainers" />
                         Managed
                     </button>
                     <button type="button" wire:click="loadUnmanagedContainers" wire:loading.attr="disabled" wire:target="loadManagedContainers,loadUnmanagedContainers"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'unmanaged' ? 'bg-white text-neutral-950 shadow-sm dark:bg-warning/15 dark:text-warning' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
+                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:cursor-wait {{ $activeTab === 'unmanaged' ? 'bg-white text-neutral-950 shadow-sm dark:bg-brand/15 dark:text-brand-light' : 'text-neutral-500 hover:text-neutral-900 dark:text-fg-dim dark:hover:text-fg' }}">
                         <x-loading-on-button wire:loading wire:target="loadUnmanagedContainers" />
                         Unmanaged
                     </button>
@@ -28,6 +28,9 @@
                     <x-reicon name="refresh" class="size-3.5" />
                     Refresh
                 </x-forms.button>
+                <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]"
+                    :list-url="route('server.resources', ['server_uuid' => $server->uuid])"
+                    :canvas-url="route('server.canvas', ['server_uuid' => $server->uuid])" />
             </x-slot:actions>
 
             <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
@@ -51,20 +54,24 @@
                 wire:loading.attr="inert" wire:target="search">
             @if ($activeTab === 'managed')
                 @if ($resources->total() > 0)
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-resources-managed-table-grid">
-                            <span>Name</span>
-                            <span>Project</span>
-                            <span>Environment</span>
-                            <span>Type</span>
-                            <span>Status</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Project" asc="project_asc" desc="project_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Environment" asc="environment_asc" desc="environment_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="setSort" :current="$sort" />
                         </div>
                         @foreach ($resources as $resource)
                             @php($resourceStatus = (string) data_get($resource, 'status', 'unknown'))
                             <div wire:key="managed-{{ $resource->type() }}-{{ $resource->uuid }}"
                                 class="data-table-row server-resources-managed-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
-                                <div class="min-w-0">
-                                    <a class="block max-w-full truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
+                                <div class="flex min-w-0 items-center gap-2">
+                                    <span
+                                        class="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded text-neutral-500 dark:text-fg-dim">
+                                        <x-resource-logo :resource="$resource" icon-class="size-3.5" />
+                                    </span>
+                                    <a class="block min-w-0 truncate text-[12px] font-medium text-neutral-950 hover:underline dark:text-fg"
                                         {{ wireNavigate() }} href="{{ $resource->link() }}">
                                         {{ $resource->name }}
                                     </a>
@@ -100,11 +107,11 @@
                 @endif
             @else
                 @if ($resources->total() > 0)
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-resources-unmanaged-table-grid">
-                            <span>Name</span>
-                            <span>Image</span>
-                            <span>Status</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Image" asc="image_asc" desc="image_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="setSort" :current="$sort" />
                             <span>Actions</span>
                         </div>
                         @foreach ($resources as $resource)

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\ByHetzner;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
@@ -8,12 +9,15 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'cache.default' => 'array',
         'session.driver' => 'array',
@@ -115,4 +119,5 @@ it('creates the server with the real IP when Hetzner assigns one immediately', f
         'hetzner_server_id' => '777',
         'hetzner_server_status' => 'running',
     ]);
+    Bus::assertDispatched(ValidateNewCloudServerJob::class);
 });

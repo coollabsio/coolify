@@ -208,7 +208,7 @@ test('configure backup creates the instance database instead of using a team dat
     Storage::fake('ssh-mux');
     Server::query()->whereKey(0)->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => 0])->id]);
     Server::flushIdentityMap();
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker inspect coolify-db*' => Process::result(output: json_encode([[
             'Config' => ['Env' => ['POSTGRES_USER=coolify', 'POSTGRES_PASSWORD=instance-secret', 'POSTGRES_DB=coolify']],
         ]])),

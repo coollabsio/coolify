@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
@@ -104,7 +105,7 @@ class Source extends Component
             if ($source instanceof GithubApp) {
                 return ! is_null($source->app_id);
             }
-            if ($source instanceof GitlabApp) {
+            if ($source instanceof GitlabApp || $source instanceof GiteaApp) {
                 return $source->isConnected();
             }
 
@@ -149,7 +150,7 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
+            $allowedSourceTypes = [GithubApp::class, GitlabApp::class, GiteaApp::class];
             abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
             $teamId = $this->application->team()->id;
             $source = $sourceType::query()
@@ -162,16 +163,23 @@ class Source extends Component
             $this->dispatch('configurationChanged');
 
             ['repository' => $customRepository] = $this->application->customRepository();
+            $repositorySlug = gitRepositorySlug($customRepository);
             $repository_project_id = null;
 
             if ($sourceType === GithubApp::class) {
-                $repository = githubApi($source, "repos/{$customRepository}");
+                $repository = githubApi($source, "repos/{$repositorySlug}");
                 $repository_project_id = data_get($repository, 'data.id');
             } elseif ($sourceType === GitlabApp::class) {
                 if ($source->isConnected()) {
-                    $encoded = urlencode($customRepository);
+                    $encoded = urlencode($repositorySlug);
                     $project = gitlabApi($source, "/projects/{$encoded}");
                     $repository_project_id = data_get($project, 'data.id');
+                }
+            } elseif ($sourceType === GiteaApp::class) {
+                if ($source->isConnected()) {
+                    $repositoryPath = collect(explode('/', $repositorySlug, 2))->map(fn ($part) => rawurlencode($part))->implode('/');
+                    $repository = giteaApi($source, "/repos/{$repositoryPath}");
+                    $repository_project_id = data_get($repository, 'data.id');
                 }
             }
 

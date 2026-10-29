@@ -251,6 +251,7 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->server->load('settings');
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
         $this->dispatchProxyConfigurationState();
     }
 

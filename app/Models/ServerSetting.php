@@ -5,9 +5,12 @@ namespace App\Models;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -26,8 +29,8 @@ use OpenApi\Attributes as OA;
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
+        'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean'],
         'is_logdrain_custom_enabled' => ['type' => 'boolean'],
-        'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_traffic_analytics_enabled' => ['type' => 'boolean'],
@@ -47,9 +50,12 @@ use OpenApi\Attributes as OA;
         'is_usable' => ['type' => 'boolean'],
         'logdrain_axiom_api_key' => ['type' => 'string'],
         'logdrain_axiom_dataset_name' => ['type' => 'string'],
+        'logdrain_axiom_domain' => ['type' => 'string', 'description' => 'Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co.'],
+        'logdrain_cloudwatch_region' => ['type' => 'string'],
+        'logdrain_cloudwatch_group' => ['type' => 'string'],
+        'logdrain_cloudwatch_stream_prefix' => ['type' => 'string'],
         'logdrain_custom_config' => ['type' => 'string'],
         'logdrain_custom_config_parser' => ['type' => 'string'],
-        'logdrain_highlight_project_id' => ['type' => 'string'],
         'logdrain_newrelic_base_uri' => ['type' => 'string'],
         'logdrain_newrelic_license_key' => ['type' => 'string'],
         'sentinel_metrics_history_days' => ['type' => 'integer'],
@@ -88,6 +94,11 @@ class ServerSetting extends Model
 
     public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
 
+    /**
+     * Axiom edge deployment for US East 1. See https://axiom.co/docs/reference/edge-deployments.
+     */
+    public const string DEFAULT_AXIOM_DOMAIN = 'us-east-1.aws.edge.axiom.co';
+
     protected $fillable = [
         'server_id',
         'is_swarm_manager',
@@ -98,18 +109,24 @@ class ServerSetting extends Model
         'is_usable',
         'wildcard_domain',
         'is_cloudflare_tunnel',
+        'cloudflare_tunnel_id',
+        'cloudflare_tunnel_account_id',
+        'cloudflare_tunnel_integration_token_id',
         'is_logdrain_newrelic_enabled',
         'logdrain_newrelic_license_key',
         'logdrain_newrelic_base_uri',
-        'is_logdrain_highlight_enabled',
-        'logdrain_highlight_project_id',
         'is_logdrain_axiom_enabled',
         'logdrain_axiom_dataset_name',
         'logdrain_axiom_api_key',
+        'logdrain_axiom_domain',
         'is_swarm_worker',
         'is_logdrain_custom_enabled',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'is_logdrain_cloudwatch_enabled',
+        'logdrain_cloudwatch_region',
+        'logdrain_cloudwatch_group',
+        'logdrain_cloudwatch_stream_prefix',
         'concurrent_builds',
         'dynamic_timeout',
         'force_disabled',
@@ -150,6 +167,12 @@ class ServerSetting extends Model
         'docker_version_checked_at',
         'compose_version',
         'compose_version_checked_at',
+        'patch_check_frequency',
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
+        'is_auto_security_updates_enabled',
+        'auto_security_updates_time',
     ];
 
     /**
@@ -188,6 +211,10 @@ class ServerSetting extends Model
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
         'server_disk_usage_notification_interval_hours' => 'integer',
+        'patch_check_result' => 'array',
+        'patch_checked_at' => 'datetime',
+        'is_auto_security_updates_enabled' => 'boolean',
+        'is_logdrain_cloudwatch_enabled' => 'boolean',
     ];
 
     /**
@@ -205,6 +232,9 @@ class ServerSetting extends Model
         'logdrain_custom_config_parser',
         'geoip_maxmind_license_key',
     ];
+
+    /** @var list<string>|null */
+    private static ?array $columnsWithoutPatchCheckResult = null;
 
     protected static function booted()
     {
@@ -438,5 +468,39 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    /**
+     * Selects every column except patch_check_result, which holds the full update list of the last patch
+     * check (often tens of kilobytes). Use it for instance-wide server loops that do not read the result.
+     */
+    public function scopeWithoutPatchCheckResult(Builder $query): Builder
+    {
+        self::$columnsWithoutPatchCheckResult ??= array_values(array_diff(Schema::getColumnListing($this->getTable()), ['patch_check_result']));
+
+        return $query->select(self::$columnsWithoutPatchCheckResult);
+    }
+
+    /**
+     * Summary of the saved patch check, or null when the server was never checked.
+     * Results saved before security and reboot detection count as 0 and false.
+     *
+     * @return array{updates: int, security: int, reboot_required: bool, error: ?string, checked_at: Carbon}|null
+     */
+    public function patchStatus(): ?array
+    {
+        if ($this->patch_checked_at === null) {
+            return null;
+        }
+
+        $result = $this->patch_check_result ?? [];
+
+        return [
+            'updates' => (int) ($result['total_updates'] ?? 0),
+            'security' => (int) ($result['security_updates'] ?? 0),
+            'reboot_required' => ($result['reboot_required'] ?? null) === true,
+            'error' => filled($this->patch_check_error) ? $this->patch_check_error : null,
+            'checked_at' => $this->patch_checked_at,
+        ];
     }
 }

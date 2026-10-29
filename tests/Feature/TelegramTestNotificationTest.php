@@ -50,3 +50,27 @@ it('sends the test notification synchronously and reports success', function () 
         && $request['chat_id'] === '123456');
     Queue::assertNothingPushed();
 });
+
+it('ignores whitespace around the stored bot token and chat ID', function () {
+    $this->team->telegramNotificationSettings->update([
+        'telegram_token' => " bot-token \n",
+        'telegram_chat_id' => ' 123456 ',
+    ]);
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => []])]);
+
+    Livewire::test(TelegramNotification::class)
+        ->call('sendTestNotification')
+        ->assertDispatched('success', 'Test notification sent.');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.telegram.org/botbot-token/sendMessage'
+        && $request['chat_id'] === '123456');
+});
+
+it('tells the user to check the bot token when Telegram does not find the bot', function () {
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'error_code' => 404, 'description' => 'Not Found'], 404)]);
+
+    Livewire::test(TelegramNotification::class)
+        ->call('sendTestNotification')
+        ->assertDispatched('error', 'Telegram rejected the test notification.', 'The Bot API token is not valid. Copy it again from @BotFather.')
+        ->assertNotDispatched('success');
+});

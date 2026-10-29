@@ -648,7 +648,7 @@ class ImportForm extends Component
                 'secret' => $s3Storage->secret,
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
-                'use_path_style_endpoint' => true,
+                'use_path_style_endpoint' => $s3Storage->usesPathStyleEndpoint(),
                 'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
             ]);
 

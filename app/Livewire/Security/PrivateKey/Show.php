@@ -142,7 +142,6 @@ class Show extends Component
             $this->private_key->updatePrivateKey([
                 'private_key' => formatPrivateKey($this->private_key->private_key),
             ]);
-            refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
             if ($this->modalMode) {
                 $this->dispatch('privateKeyUpdated');

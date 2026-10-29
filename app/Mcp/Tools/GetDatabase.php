@@ -8,12 +8,14 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetDatabase extends Tool
 {
     protected string $name = 'get_database';
 
-    protected string $description = 'Get full details for a standalone database by UUID. Detects type across postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse, sqlite.';
+    protected string $description = 'Get full details for a standalone database by UUID. Detects type across postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse, sqlite. Custom configuration (database config file, docker run options) needs read:sensitive.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -43,8 +45,11 @@ class GetDatabase extends Tool
         $database->setRelations([]);
         $database->makeHidden(['destination', 'source', 'environment', 'environment_variables', 'environment_variables_preview']);
 
+        $visibleSensitiveKeys = $this->canReadSensitiveData($request) ? $database::CONFIGURATION_ATTRIBUTES : [];
+        $database->makeVisible($visibleSensitiveKeys);
+
         return $this->mcpSuccess($request, $this->respond(
-            $this->scrubSensitive($database->toArray()),
+            $this->scrubSensitive($database->toArray(), $visibleSensitiveKeys),
             $this->actionsForDatabase($uuid, $database->status ?? null),
         ), ['resource_uuid' => $uuid]);
     }

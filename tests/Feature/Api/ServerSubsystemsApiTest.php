@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StartSentinel;
+use App\Actions\Server\StopLogDrain;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\InstanceSettings;
@@ -188,6 +190,39 @@ describe('Log drains API', function () {
             ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
     });
 
+    test('PATCH sets the Axiom edge domain and rejects a value that is not a hostname', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => 'eu-central-1.aws.edge.axiom.co',
+            ])
+            ->assertOk()
+            ->assertJsonPath('logdrain_axiom_domain', 'eu-central-1.aws.edge.axiom.co');
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => "evil.example.com\nAXIOM_API_KEY=x",
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_axiom_domain');
+
+        expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('eu-central-1.aws.edge.axiom.co');
+    });
+
+    test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_axiom_enabled' => false,
+            ])
+            ->assertOk();
+
+        StopLogDrain::assertNotPushed();
+        StartLogDrain::assertNotPushed();
+    });
+
     test('PATCH requires the deploy permission to change the custom log drain config', function (string $field) {
         Queue::fake();
         $writeOnlyToken = $this->user->createToken('server-subsystems-write', ['write'])->plainTextToken;
@@ -238,6 +273,89 @@ describe('Log drains API', function () {
             ->assertOk();
 
         expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[OUTPUT]\n    Name stdout");
+    });
+
+    test('PATCH enables the Amazon CloudWatch Logs drain', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_group' => '/coolify/prod',
+                'logdrain_cloudwatch_region' => 'us-east-1',
+                'logdrain_cloudwatch_stream_prefix' => 'docker/',
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_logdrain_cloudwatch_enabled', true)
+            ->assertJsonPath('logdrain_cloudwatch_group', '/coolify/prod')
+            ->assertJsonPath('logdrain_cloudwatch_stream_prefix', 'docker/');
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->is_logdrain_cloudwatch_enabled)->toBeTrue()
+            ->and($settings->logdrain_cloudwatch_region)->toBe('us-east-1');
+    });
+
+    test('PATCH rejects enabling CloudWatch without a log group', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_region' => 'us-east-1',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_cloudwatch_group');
+
+        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+    });
+
+    test('PATCH rejects enabling CloudWatch without a region', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_group' => 'coolify',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_cloudwatch_region');
+
+        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+    });
+
+    test('PATCH rejects CloudWatch values that could break the compose file', function (string $field, mixed $value) {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                $field => $value,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        'prefix with interpolation' => ['logdrain_cloudwatch_stream_prefix', 'docker/${HOME}'],
+        'prefix with colon' => ['logdrain_cloudwatch_stream_prefix', 'docker:'],
+        'prefix with template braces' => ['logdrain_cloudwatch_stream_prefix', '{{.ID}}'],
+        'invalid region' => ['logdrain_cloudwatch_region', 'not a region'],
+        'group with spaces' => ['logdrain_cloudwatch_group', 'my group'],
+    ]);
+
+    test('PATCH rejects enabling CloudWatch together with another log drain', function () {
+        Queue::fake();
+        $this->server->settings->update([
+            'is_logdrain_axiom_enabled' => true,
+            'logdrain_axiom_dataset_name' => 'ds',
+            'logdrain_axiom_api_key' => 'key',
+        ]);
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'is_logdrain_cloudwatch_enabled' => true,
+                'logdrain_cloudwatch_group' => 'coolify',
+                'logdrain_cloudwatch_region' => 'us-east-1',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_logdrain_cloudwatch_enabled');
     });
 
     test('other-team log drains endpoints return 404', function () {

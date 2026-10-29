@@ -45,10 +45,12 @@ beforeEach(function () {
     $this->withoutDefer();
     config()->set('app.maintenance.store', 'array');
     Bus::fake();
-    // Remote `test -f` / `test -d` probes report a missing path; path confinement checks pass.
-    Process::fake(fn ($process) => Process::result(
-        output: str_contains(implode(' ', (array) $process->command), '&& echo OK || echo NOK') ? 'NOK' : 'OK'
-    ));
+    // Remote file probes report a missing path; path confinement checks pass.
+    Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
+        str_contains(remoteProcessScript($process), '&& echo OK || echo NOK') => 'NOK',
+        default => 'OK',
+    }));
     Server::flushIdentityMap();
 
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(

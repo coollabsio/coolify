@@ -59,9 +59,9 @@
                 description="Configure how the selected backup is applied to this database.">
                 <div class="space-y-4">
             @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
-                            <x-callout type="warning" title="Full restore overwrites administrator passwords">
-                                The backup replaces PostgreSQL administrator role passwords, including the destination administrator password.
-                                <span class="mt-1 block">If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
+                            <x-callout type="warning" title="Full restore runs as a superuser">
+                                Restoring all databases needs a PostgreSQL superuser (it recreates databases and roles), so Coolify cannot restrict it. Only use a backup you trust.
+                                <span class="mt-1 block">The backup also replaces PostgreSQL administrator role passwords, including the destination administrator password. If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
                             </x-callout>
             @endif
                             <x-forms.textarea rows="10" readonly label="Import command"
@@ -125,7 +125,7 @@
                     <button type="button" @click="restoreType = 'file'"
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
-                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
                             : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                         <span
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
@@ -142,7 +142,7 @@
                         <button type="button" @click="restoreType = 's3'"
                             class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                             :class="restoreType === 's3'
-                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
                                 : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                             <span
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
@@ -184,7 +184,7 @@
                         @csrf
                     </form>
                     <div x-show="isUploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
-                        <div class="h-full rounded-full bg-coollabs dark:bg-warning"
+                        <div class="h-full rounded-full bg-coollabs dark:bg-brand"
                             :style="`width: ${progress}%`"></div>
                     </div>
 
@@ -281,7 +281,7 @@
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
                     <div class="flex h-full min-h-0 flex-col" wire:ignore>
-                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" header="Logs" fullHeight />
+                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" fullHeight />
                     </div>
                 </x-slot:content>
             </x-process-dialog>

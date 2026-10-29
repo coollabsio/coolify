@@ -93,7 +93,7 @@ test('database proxy resolves the database container on every connection', funct
 
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -126,7 +126,7 @@ test('database proxy runs Docker Compose only with the compose file that Coolify
 
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });

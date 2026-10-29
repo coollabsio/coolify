@@ -87,6 +87,8 @@ it('creates Server with all fillable attributes', function () {
         'hetzner_server_status' => 'running',
         'digitalocean_droplet_id' => 987654,
         'digitalocean_droplet_status' => 'active',
+        'hostinger_virtual_machine_id' => 17923,
+        'hostinger_virtual_machine_status' => 'running',
         'is_validating' => false,
         'detected_traefik_version' => 'v2.10.0',
         'traefik_outdated_info' => 'Up to date',
@@ -106,6 +108,8 @@ it('creates Server with all fillable attributes', function () {
     expect($server->hetzner_server_status)->toBe('running');
     expect($server->digitalocean_droplet_id)->toBe(987654);
     expect($server->digitalocean_droplet_status)->toBe('active');
+    expect($server->hostinger_virtual_machine_id)->toBe(17923);
+    expect($server->hostinger_virtual_machine_status)->toBe('running');
     expect($server->ip_previous)->toBe('10.0.0.1');
 });
 
@@ -334,8 +338,6 @@ it('creates ServerSetting with all fillable attributes', function () {
         'is_logdrain_newrelic_enabled' => true,
         'logdrain_newrelic_license_key' => 'nr-license-key-123',
         'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com',
-        'is_logdrain_highlight_enabled' => false,
-        'logdrain_highlight_project_id' => 'hl-proj-123',
         'is_logdrain_axiom_enabled' => true,
         'logdrain_axiom_dataset_name' => 'coolify-logs',
         'logdrain_axiom_api_key' => 'axiom-key-456',

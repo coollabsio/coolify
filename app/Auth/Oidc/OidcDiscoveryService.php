@@ -21,7 +21,7 @@ class OidcDiscoveryService
             $url = $issuerUrl.'/.well-known/openid-configuration';
 
             try {
-                $response = Http::timeout(5)->connectTimeout(3)->acceptJson()->get($url);
+                $response = Http::timeout(15)->acceptJson()->get($url);
             } catch (Throwable $e) {
                 throw new OidcDiscoveryException("Failed to fetch discovery document: {$e->getMessage()}", previous: $e);
             }
@@ -68,7 +68,7 @@ class OidcDiscoveryService
 
         return Cache::remember($cacheKey, 21600, function () use ($jwksUri): array {
             try {
-                $response = Http::timeout(5)->connectTimeout(3)->acceptJson()->get($jwksUri);
+                $response = Http::timeout(15)->acceptJson()->get($jwksUri);
             } catch (Throwable $e) {
                 throw new OidcJwksException("Failed to fetch JWKS: {$e->getMessage()}", previous: $e);
             }

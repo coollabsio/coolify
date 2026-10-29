@@ -28,9 +28,9 @@ class Select extends Component
 
     public bool $onlyBuildServerAvailable = false;
 
-    public ?Collection $standaloneDockers;
+    public ?Collection $standaloneDockers = null;
 
-    public ?Collection $swarmDockers;
+    public ?Collection $swarmDockers = null;
 
     public array $parameters;
 
@@ -79,11 +79,14 @@ class Select extends Component
             $queryDestination = request()->query('destination');
 
             if ($queryType === 'postgresql' && $queryServerId !== null && $queryDestination) {
-                $this->type = $queryType;
-                $this->server_id = $queryServerId;
-                $this->destination_uuid = $queryDestination;
-                $this->server = Server::ownedByCurrentTeam()->find($queryServerId);
-                $this->current_step = 'select-postgresql-type';
+                $server = Server::isUsable()->whereKey($queryServerId)->first();
+                if ($server && $this->findDestination($server, $queryDestination)) {
+                    $this->type = $queryType;
+                    $this->server_id = $server->id;
+                    $this->destination_uuid = $queryDestination;
+                    $this->server = $server;
+                    $this->current_step = 'select-postgresql-type';
+                }
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -157,28 +160,34 @@ class Select extends Component
                 'name' => 'Public Git Repository',
                 'description' => 'Deploy any public Git repository. Coolify builds it from source, no credentials required.',
                 'documentation' => 'https://coolify.io/docs/applications/ci-cd',
-                'logo' => asset('svgs/resources/public-repo.svg'),
+                'logo' => resource_logo_url('public-repo'),
             ],
             [
                 'id' => 'private-deploy-key',
                 'name' => 'Private Git Repository (with Deploy Key)',
                 'description' => 'Deploy a private repository over SSH with a repository-scoped deploy key. Set the URL and branch manually, no automatic deploys.',
                 'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/deploy-key',
-                'logo' => asset('svgs/resources/deploy-key.svg'),
+                'logo' => resource_logo_url('deploy-key'),
             ],
             [
                 'id' => 'private-gh-app',
                 'name' => 'Git Repository (with GitHub App)',
                 'description' => 'Deploy public or private GitHub repositories through a GitHub App, with automatic webhooks and pull request previews.',
                 'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/setup-app',
-                'logo' => asset('svgs/resources/github-app.svg'),
-                'logoDark' => asset('svgs/resources/github-app-dark.svg'),
+                'logo' => resource_logo_url('github-app'),
+                'logoDark' => resource_logo_url('github-app-dark'),
             ],
             [
                 'id' => 'private-gitlab-app',
                 'name' => 'Git Repository (with GitLab App)',
                 'description' => 'Deploy public or private GitLab projects through a GitLab App, with automatic webhooks and merge request previews.',
-                'logo' => asset('svgs/resources/gitlab-app.svg'),
+                'logo' => resource_logo_url('gitlab-app'),
+            ],
+            [
+                'id' => 'private-gitea-app',
+                'name' => 'Git Repository (with Gitea App)',
+                'description' => 'Deploy public or private Gitea repositories through a Gitea App, with automatic webhooks and pull request previews.',
+                'logo' => asset('svgs/gitea.svg'),
             ],
         ];
         $dockerBasedApplications = [
@@ -187,21 +196,21 @@ class Select extends Component
                 'name' => 'Dockerfile',
                 'description' => 'Deploy an application using a Dockerfile, without a Git repository.',
                 'documentation' => 'https://coolify.io/docs/applications/build-packs/dockerfile',
-                'logo' => asset('svgs/resources/dockerfile.svg'),
+                'logo' => resource_logo_url('dockerfile'),
             ],
             [
                 'id' => 'docker-compose-empty',
                 'name' => 'Docker Compose',
                 'description' => 'Deploy a multi-container application using a Docker Compose file, without a Git repository.',
                 'documentation' => 'https://coolify.io/docs/applications/build-packs/docker-compose',
-                'logo' => asset('svgs/resources/docker-compose.svg'),
+                'logo' => resource_logo_url('docker-compose'),
             ],
             [
                 'id' => 'docker-image',
                 'name' => 'Docker Image',
                 'description' => 'Deploy an application using a prebuilt image from any Docker registry, without a Git repository.',
                 'documentation' => 'https://coolify.io/docs/applications',
-                'logo' => asset('svgs/resources/docker-image.svg'),
+                'logo' => resource_logo_url('docker-image'),
             ],
         ];
         $databases = [
@@ -209,58 +218,58 @@ class Select extends Component
                 'id' => 'postgresql',
                 'name' => 'PostgreSQL',
                 'description' => 'A relational database with strong SQL standards support and extensibility.',
-                'logo' => asset('svgs/resources/postgres.svg'),
+                'logo' => resource_logo_url('postgres'),
             ],
             [
                 'id' => 'mysql',
                 'name' => 'MySQL',
                 'description' => 'A relational database for web and general-purpose applications.',
-                'logo' => asset('svgs/resources/mysql.svg'),
+                'logo' => resource_logo_url('mysql'),
 
             ],
             [
                 'id' => 'mariadb',
                 'name' => 'MariaDB',
                 'description' => 'A relational database and drop-in replacement for MySQL.',
-                'logo' => asset('svgs/resources/mariadb.svg'),
+                'logo' => resource_logo_url('mariadb'),
             ],
             [
                 'id' => 'redis',
                 'name' => 'Redis',
                 'description' => 'An in-memory key-value store used as a database, cache, and message broker.',
-                'logo' => asset('svgs/resources/redis.svg'),
+                'logo' => resource_logo_url('redis'),
             ],
             [
                 'id' => 'keydb',
                 'name' => 'KeyDB',
                 'description' => 'A multithreaded, Redis-compatible in-memory store.',
-                'logo' => asset('svgs/resources/keydb.svg'),
-                'logoDark' => asset('svgs/resources/keydb-dark.svg'),
+                'logo' => resource_logo_url('keydb'),
+                'logoDark' => resource_logo_url('keydb-dark'),
             ],
             [
                 'id' => 'dragonfly',
                 'name' => 'Dragonfly',
                 'description' => 'An in-memory datastore compatible with Redis and Memcached.',
-                'logo' => asset('svgs/resources/dragonfly.svg'),
-                'logoDark' => asset('svgs/resources/dragonfly-dark.svg'),
+                'logo' => resource_logo_url('dragonfly'),
+                'logoDark' => resource_logo_url('dragonfly-dark'),
             ],
             [
                 'id' => 'mongodb',
                 'name' => 'MongoDB',
                 'description' => 'A document-oriented NoSQL database that stores JSON-like documents.',
-                'logo' => asset('svgs/resources/mongodb.svg'),
+                'logo' => resource_logo_url('mongodb'),
             ],
             [
                 'id' => 'clickhouse',
                 'name' => 'ClickHouse',
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
-                'logo' => asset('svgs/resources/clickhouse.svg'),
+                'logo' => resource_logo_url('clickhouse'),
             ],
             [
                 'id' => 'sqlite',
                 'name' => 'SQLite',
                 'description' => 'A lightweight relational database stored in a single file.',
-                'logo' => asset('svgs/resources/sqlite.svg'),
+                'logo' => resource_logo_url('sqlite'),
                 'experimental' => true,
             ],
 
@@ -427,20 +436,23 @@ class Select extends Component
         if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
-                $this->setServer($server);
+                $this->setServer($server->id);
             }
         }
         if (! is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
-                return $this->setServer($foundServer);
+                return $this->setServer($foundServer->id);
             }
         }
         $this->current_step = 'servers';
     }
 
-    public function setServer(Server $server)
+    public function setServer(int $serverId)
     {
+        $server = $this->servers?->firstWhere('id', $serverId);
+        abort_unless($server instanceof Server, 404);
+
         $this->server_id = $server->id;
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
@@ -459,9 +471,16 @@ class Select extends Component
 
     public function setDestination(string $destination_uuid)
     {
+        abort_unless($this->server && $this->findDestination($this->server, $destination_uuid), 404);
+
         $this->destination_uuid = $destination_uuid;
 
         return $this->whatToDoNext();
+    }
+
+    private function findDestination(Server $server, string $destinationUuid): ?object
+    {
+        return $server->standaloneDockers->concat($server->swarmDockers)->firstWhere('uuid', $destinationUuid);
     }
 
     public function setPostgresqlType(string $type)

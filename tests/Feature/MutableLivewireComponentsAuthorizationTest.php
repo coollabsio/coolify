@@ -182,7 +182,7 @@ it('authorizes every volume backup form control', function (string $path, array 
         [
             '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*>\s*Enable S3\s*<\/x-forms\.button>/s',
             '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*>\s*Disable S3\s*<\/x-forms\.button>/s',
-            '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="s3StorageId"[\s\S]*?:disabled="! auth\(\)->user\(\)\?->can\(\'update\', \$resource\)"/',
+            '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="s3StorageIds"/',
             '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="disableLocalBackup"[\s\S]*?:disabled="! \$saveToS3 \|\| ! auth\(\)->user\(\)\?->can\(\'update\', \$resource\)"/',
         ],
     ],

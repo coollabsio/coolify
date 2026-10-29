@@ -3,6 +3,7 @@
 use App\Livewire\Server\New\ByHetzner;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -219,7 +220,7 @@ describe('Boarding Flow Integration', function () {
             ->assertSeeHtml('x-text="current">Select SSH keys</span>');
     });
 
-        test('shows the cloud init script name only when saving the script', function () {
+    test('shows the cloud init script name only when saving the script', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
             ->set('show_cloud_init_script', true)
@@ -306,6 +307,44 @@ describe('Hetzner data loading', function () {
             ->and($component->get('hetznerNetworks'))->toHaveCount(1);
     });
 
+    test('deletes the Hetzner server when saving it in Coolify fails', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/ssh_keys' => Http::response(['ssh_key' => ['id' => 123]], 201),
+            'https://api.hetzner.cloud/v1/ssh_keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/servers' => Http::response([
+                'server' => ['id' => 456, 'public_net' => ['ipv4' => ['ip' => '203.0.113.10']]],
+            ], 201),
+            'https://api.hetzner.cloud/v1/servers/456' => Http::response([], 200),
+        ]);
+
+        $eventDispatcher = Server::getEventDispatcher();
+        Server::setEventDispatcher(clone $eventDispatcher);
+        Server::created(function (): void {
+            throw new RuntimeException('local persistence failed');
+        });
+
+        try {
+            Livewire::test(ByHetzner::class)
+                ->set('current_step', 2)
+                ->set('selected_token_id', $this->hetznerToken->id)
+                ->set('server_name', 'test-server')
+                ->set('selected_location', 'nbg1')
+                ->set('selected_server_type', 'cx11')
+                ->set('selected_image', 15512617)
+                ->set('private_key_id', $this->privateKey->id)
+                ->call('submit');
+        } finally {
+            Server::setEventDispatcher($eventDispatcher);
+        }
+
+        $this->assertDatabaseMissing('servers', ['hetzner_server_id' => 456]);
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+            && $request->url() === 'https://api.hetzner.cloud/v1/servers/456');
+    });
+
     test('rejects submitting without a public IP protocol before calling Hetzner', function () {
         Http::fake();
 
@@ -323,5 +362,58 @@ describe('Hetzner data loading', function () {
             ->assertHasErrors(['enable_ipv4', 'enable_ipv6']);
 
         Http::assertNothingSent();
+    });
+    test('lists server types that are out of stock in the selected location as out of stock', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx22', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => false, 'deprecation' => null],
+                        ['id' => 2, 'name' => 'fsn1', 'available' => true, 'deprecation' => null],
+                    ]],
+                    ['id' => 2, 'name' => 'cx32', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => null],
+                    ]],
+                    ['id' => 3, 'name' => 'cx11', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => true, 'deprecation' => ['announced' => '2025-09-24T00:00:00+00:00', 'unavailable_after' => '2025-12-31T00:00:00+00:00']],
+                    ]],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/*' => Http::response(['locations' => [], 'images' => [], 'ssh_keys' => [], 'firewalls' => [], 'networks' => [], 'meta' => ['pagination' => ['next_page' => null]]], 200),
+        ]);
+
+        $component = Livewire::test(ByHetzner::class, ['selectedTokenUuid' => $this->hetznerToken->uuid])
+            ->call('loadHetznerData')
+            ->set('selected_location', 'nbg1');
+
+        expect(collect($component->instance()->availableServerTypes)->mapWithKeys(fn ($type) => [$type['name'] => $type['out_of_stock']])->all())
+            ->toBe(['cx32' => false, 'cx22' => true]);
+    });
+
+    test('does not create a server with a server type that is out of stock in the selected location', function () {
+        Http::fake([
+            'https://api.hetzner.cloud/v1/server_types*' => Http::response([
+                'server_types' => [
+                    ['id' => 1, 'name' => 'cx22', 'locations' => [
+                        ['id' => 1, 'name' => 'nbg1', 'available' => false, 'deprecation' => null],
+                    ]],
+                ],
+                'meta' => ['pagination' => ['next_page' => null]],
+            ], 200),
+            'https://api.hetzner.cloud/v1/*' => Http::response(['locations' => [], 'images' => [], 'ssh_keys' => [], 'firewalls' => [], 'networks' => [], 'meta' => ['pagination' => ['next_page' => null]]], 200),
+        ]);
+
+        Livewire::test(ByHetzner::class, ['selectedTokenUuid' => $this->hetznerToken->uuid])
+            ->call('loadHetznerData')
+            ->set('server_name', 'test-server')
+            ->set('selected_location', 'nbg1')
+            ->set('selected_server_type', 'cx22')
+            ->set('selected_image', 15512617)
+            ->set('private_key_id', $this->privateKey->id)
+            ->call('submit')
+            ->assertHasErrors(['selected_server_type']);
+
+        Http::assertNotSent(fn ($request) => $request->method() === 'POST');
     });
 });
