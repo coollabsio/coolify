@@ -3,6 +3,7 @@
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\ScannerText;
+use Illuminate\Support\Arr;
 
 function imageScanFixture(string $name): string
 {
@@ -143,10 +144,12 @@ it('ignores lines nested deeper than the allowed depth', function () {
     expect($r['findings'])->toHaveCount(1);
 });
 
-it('keeps the other fields when setting the layer', function () {
+it('keeps the layer of a stored finding', function () {
     $f = (new GrypeReportParser)->parse(imageScanFixture('grype-kev.ndjson'))['findings'][0];
-    $base = $f->withLayer('base');
-    expect($base->layer)->toBe('base')->and([...$base->toArray(), 'layer' => 'app'])->toBe($f->toArray());
+    $stored = Finding::fromArray([...$f->toArray(), 'layer' => 'base']);
+    expect($f->layer)->toBe('app')
+        ->and($stored->toArray())->toBe([...$f->toArray(), 'layer' => 'base'])
+        ->and(Finding::fromArray(Arr::except($f->toArray(), 'layer'))->layer)->toBe('app');
 });
 
 it('round trips a finding through toArray and fromArray', function () {
@@ -332,8 +335,7 @@ it('round trips the new fields', function () {
     expect($array['cvssScore'])->toBe(6.5)->and($array['title'])->toBe('Something dangerous happens in the library')
         ->and($array['displayId'])->toBe('CVE-2024-0001')->and($array['namespace'])->toBe('alpine:distro:alpine:3.19')
         ->and($array['matchType'])->toBe('exact-indirect-match')
-        ->and(Finding::fromArray($array))->toEqual($f)
-        ->and($f->withLayer('base')->cvssScore)->toBe(6.5);
+        ->and(Finding::fromArray($array))->toEqual($f);
 });
 
 it('keeps code-like tokens in the title intact', function (string $desc) {

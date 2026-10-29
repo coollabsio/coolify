@@ -9,32 +9,27 @@ class SyftPackageParser
     private const MAX_LICENSES = 32;
 
     /**
-     * @return array{packages: list<Package>, truncated: bool, layerIds: list<string>}
+     * Rows without a package `id` (such as the `{"layers":…}` trailer of older templates) are skipped.
+     *
+     * @return array{packages: list<Package>, truncated: bool}
      */
     public function parse(string $ndjson, int $limit = 10000): array
     {
         $packages = [];
         $truncated = false;
-        $layerIds = [];
 
         if (strlen($ndjson) > self::MAX_BYTES) {
-            return ['packages' => [], 'truncated' => true, 'layerIds' => []];
+            return ['packages' => [], 'truncated' => true];
         }
 
         foreach (explode("\n", $ndjson) as $line) {
             $line = trim($line);
-            if ($line === '' || ($truncated && ! str_starts_with($line, '{"layers"'))) {
+            if ($line === '') {
                 continue;
             }
 
             $row = json_decode($line, true, 8);
             if (! is_array($row)) {
-                continue;
-            }
-
-            if (array_key_exists('layers', $row) && ! array_key_exists('id', $row)) {
-                $layerIds = $this->layerIds($row['layers']);
-
                 continue;
             }
 
@@ -46,29 +41,13 @@ class SyftPackageParser
             if (count($packages) >= $limit) {
                 $truncated = true;
 
-                continue;
+                break;
             }
 
             $packages[] = $package;
         }
 
-        return ['packages' => $packages, 'truncated' => $truncated, 'layerIds' => $layerIds];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function layerIds(mixed $layers): array
-    {
-        $ids = [];
-        foreach (is_array($layers) ? $layers : [] as $layer) {
-            $id = ScannerText::clean($layer, 80);
-            if ($id !== '') {
-                $ids[] = $id;
-            }
-        }
-
-        return $ids;
+        return ['packages' => $packages, 'truncated' => $truncated];
     }
 
     /**

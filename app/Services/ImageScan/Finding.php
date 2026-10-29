@@ -21,6 +21,7 @@ final readonly class Finding
         public ?float $epss,
         public ?float $risk,
         public string $summary,
+        /** New findings are always "app"; kept because stored findings carry it. */
         public string $layer = 'app',
         public ?float $cvssScore = null,
         public string $title = '',
@@ -28,11 +29,6 @@ final readonly class Finding
         public string $namespace = '',
         public string $matchType = '',
     ) {}
-
-    public function withLayer(string $layer): self
-    {
-        return self::fromArray([...$this->toArray(), 'layer' => $layer]);
-    }
 
     /**
      * @return array{id: string, aliases: list<string>, severity: string, package: string, version: string, type: string, artifactId: string, fixedIn: ?string, fixState: string, kev: bool, epss: ?float, risk: ?float, summary: string, layer: string, cvssScore: ?float, title: string, displayId: string, namespace: string, matchType: string}

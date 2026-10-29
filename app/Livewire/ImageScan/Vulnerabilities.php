@@ -5,7 +5,6 @@ namespace App\Livewire\ImageScan;
 use App\Actions\ImageScan\ScanImage;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Enums\ImageScanErrorCode;
-use App\Enums\ImageScanFixState;
 use App\Jobs\RefreshImageScanSummariesJob;
 use App\Jobs\ScanResourceImagesJob;
 use App\Models\Application;
@@ -763,7 +762,7 @@ class Vulnerabilities extends Component
                     'key' => $scan->uuid.'-'.$index,
                     'scan' => (string) $scan->uuid,
                     'finding' => $finding,
-                    'state' => $classify($finding) === ImageScanFixState::NoFix ? 'no_fix' : 'fixed',
+                    'state' => $classify($finding)->value,
                     'ignore' => $matcher->matches($finding),
                     'image' => (string) $scan->image_ref,
                     'owner' => (string) $owner->getAttribute('uuid'),

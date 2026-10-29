@@ -607,10 +607,9 @@ it('marks the findings that a better candidate fixes as fixed by an update', fun
     RefreshCandidates::run($scan);
 
     $scan = $scan->fresh();
-    $classify = SecurityActions::fixStates($scan, IgnoreMatcher::forResource($scan->resource));
-    $finding = collect(candidatesFindings())->firstWhere('id', 'CVE-2025-1094');
+    $byFinding = SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding'];
 
-    expect($classify($finding)->value)->toBe('fixable_now');
+    expect($byFinding)->toHaveKey('CVE-2025-1094');
 });
 
 it('is a unique queued job per scan', function () {
@@ -888,7 +887,7 @@ it('never makes base image candidates fix an image that the team does not build'
     $finding = collect(candidatesFindings())->first(fn (Finding $finding) => $finding->id === $fixedId || in_array($fixedId, $finding->aliases, true));
     $scan->builds_image = false;
 
-    expect(SecurityActions::fixStates($scan, IgnoreMatcher::forResource($scan->resource))($finding)->value)->not->toBe('fixable_now');
+    expect(SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding'])->not->toHaveKey($finding->id);
 });
 
 it('says that no newer base image is better when the line candidate has as many findings as the current base', function () {

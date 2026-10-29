@@ -2,7 +2,6 @@
 
 namespace App\Services\ImageScan;
 
-use App\Enums\ImageScanFixState;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityStatusType;
 use App\Models\Application;
@@ -314,11 +313,7 @@ final class TeamVulnerabilities
                             'version' => $finding->version,
                             'fixedIn' => $finding->fixedIn,
                             'severity' => self::severityOf($finding),
-                            'state' => match (true) {
-                                $matcher->matches($finding) !== null => 'ignored',
-                                $classify($finding) === ImageScanFixState::NoFix => 'no_fix',
-                                default => 'fixed',
-                            },
+                            'state' => $matcher->matches($finding) !== null ? 'ignored' : $classify($finding)->value,
                         ];
                     }
                 }

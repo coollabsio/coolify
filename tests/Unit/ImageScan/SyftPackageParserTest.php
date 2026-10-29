@@ -18,21 +18,17 @@ it('parses the postgres 15.0 package list', function () {
     expect($p)->toBeInstanceOf(Package::class)
         ->and($p->name)->toBe('.postgresql-rundeps')->and($p->type)->toBe('apk')
         ->and($p->layerId)->toStartWith('sha256:')->and($p->licenses)->toBe([])
-        ->and($p->purl)->toStartWith('pkg:apk/alpine/.postgresql-rundeps@')
-        ->and($r['layerIds'])->toHaveCount(8)
-        ->and($r['layerIds'][0])->toBe('sha256:994393dc58e7931862558d06e46aa2bb17487044f670f310dffe1d24e4d1eec7')
-        ->and($r['layerIds'][3])->toBe('sha256:427eca9eca256d5db3002eb8993b59d663e44ac34a8098f3dcfe151c8bb32d54');
-    expect(collect($r['packages'])->pluck('layerId')->unique()->all())->each->toBeIn($r['layerIds']);
+        ->and($p->purl)->toStartWith('pkg:apk/alpine/.postgresql-rundeps@');
 });
 
-it('does not count the layers trailer as a package', function () {
+it('ignores the layers trailer of older templates', function () {
     $r = (new SyftPackageParser)->parse(syftLine()."\n".'{"layers":["sha256:1","sha256:2"]}');
-    expect($r['packages'])->toHaveCount(1)->and($r['layerIds'])->toBe(['sha256:1', 'sha256:2']);
+    expect($r)->toEqual(['packages' => [(new SyftPackageParser)->parse(syftLine())['packages'][0]], 'truncated' => false]);
 });
 
 it('caps packages and marks truncation', function () {
     $r = (new SyftPackageParser)->parse(file_get_contents(dirname(__DIR__, 2).'/Fixtures/image-scan/syft-packages.ndjson'), 10);
-    expect($r['packages'])->toHaveCount(10)->and($r['truncated'])->toBeTrue()->and($r['layerIds'])->toHaveCount(8);
+    expect($r['packages'])->toHaveCount(10)->and($r['truncated'])->toBeTrue();
 });
 
 it('drops invalid lines, strips control characters and cuts long strings', function () {
@@ -46,7 +42,7 @@ it('drops invalid lines, strips control characters and cuts long strings', funct
 
 it('rejects input over 10 MB as truncated and empty', function () {
     $r = (new SyftPackageParser)->parse(str_repeat('a', 10 * 1024 * 1024 + 1));
-    expect($r)->toBe(['packages' => [], 'truncated' => true, 'layerIds' => []]);
+    expect($r)->toBe(['packages' => [], 'truncated' => true]);
 });
 
 it('round trips a package through toArray and fromArray', function () {

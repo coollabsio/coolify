@@ -34,8 +34,8 @@ final class SecurityActions
     private const BUTTON_TYPES = [SecurityActionType::UpdateImage, SecurityActionType::PullLatest, SecurityActionType::Rebuild];
 
     /**
-     * The fix state of each finding of a scan for the findings lists: fixed by an action of the scan, a package fix
-     * that no action brings to this image, or no fix.
+     * The fix state of each finding of a scan for the findings lists: fixed when an action of the scan fixes it or a
+     * fixed package version exists, else no fix.
      *
      * @return \Closure(Finding): ImageScanFixState
      */
@@ -43,11 +43,9 @@ final class SecurityActions
     {
         $byFinding = self::forScan($scan, $ignores)['byFinding'];
 
-        return fn (Finding $finding): ImageScanFixState => match (true) {
-            isset($byFinding[$finding->id]) => ImageScanFixState::FixableNow,
-            $finding->fixState === 'fixed' && filled($finding->fixedIn) => ImageScanFixState::NotReleased,
-            default => ImageScanFixState::NoFix,
-        };
+        return fn (Finding $finding): ImageScanFixState => isset($byFinding[$finding->id]) || ($finding->fixState === 'fixed' && filled($finding->fixedIn))
+            ? ImageScanFixState::Fixed
+            : ImageScanFixState::NoFix;
     }
 
     /**
