@@ -991,8 +991,25 @@ class All extends Component
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(fn ($item) => formatEnvVariableForDevView($item, $canViewValues))
+            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues))
             ->join("\n");
+    }
+
+    /**
+     * An empty value makes the deployment use the Compose default, so show that default above the line.
+     */
+    private function composeDefaultHint(EnvironmentVariable $variable): string
+    {
+        if (filled($variable->value) || ! $this->showsHardcodedEnvironmentVariables()) {
+            return '';
+        }
+
+        $default = $this->composeInfoFor($variable->key)['default'] ?? null;
+        if (blank($default) || str_contains($default, "\n")) {
+            return '';
+        }
+
+        return "# Compose default: {$default}\n";
     }
 
     public function switch()
