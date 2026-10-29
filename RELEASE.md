@@ -151,6 +151,7 @@ Print what the next run builds with `scripts/version.sh --main`.
 Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and its nightlies and before `4.6.0-beta.2`.
 
 - Pull requests from forks and Dependabot are built, not published
+- Pull requests from `main`, `next`, a release branch or a patch branch are not built, the release, nightly and main workflows build their commits
 - Pull request builds are published to ghcr.io only, as the Docker Hub credentials are in the `release` environment, which no pull request run can use
 - Pull request builds create no git tag and no GitHub release
 
