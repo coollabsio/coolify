@@ -6,6 +6,7 @@ use App\Jobs\CheckHelperImageJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTaskExecution;
+use App\Support\DevelopmentIngressTarget;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -48,6 +49,8 @@ class Dev extends Command
         } else {
             echo "   INFO  Instance already initialized.\n";
         }
+
+        DevelopmentIngressTarget::write();
 
         // Clean up stuck jobs and stale locks on development startup
         try {

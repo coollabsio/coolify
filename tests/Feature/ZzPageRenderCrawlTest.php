@@ -2,11 +2,13 @@
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\CloudInitScript;
+use App\Models\CloudProviderToken;
 use App\Models\Environment;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
-use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
@@ -23,7 +25,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportRedirects\SupportRedirects;
 
 uses(RefreshDatabase::class);
 
@@ -70,9 +74,9 @@ it('renders every GET page', function () {
     ]);
     $task = ScheduledTask::factory()->create(['application_id' => $application->id, 'team_id' => $team->id]);
 
-    $cloudToken = \App\Models\CloudProviderToken::factory()->create(['team_id' => $team->id]);
-    $cloudInit = \App\Models\CloudInitScript::forceCreate(['uuid' => (string) Str::uuid(), 'team_id' => $team->id, 'name' => 'init', 'script' => '#!/bin/sh']);
-    $gitea = \App\Models\GiteaApp::forceCreate(['uuid' => (string) Str::uuid(), 'name' => 'gitea', 'api_url' => 'https://gitea.example.com/api/v1', 'html_url' => 'https://gitea.example.com', 'team_id' => $team->id, 'private_key_id' => PrivateKey::query()->value('id')]);
+    $cloudToken = CloudProviderToken::factory()->create(['team_id' => $team->id]);
+    $cloudInit = CloudInitScript::forceCreate(['uuid' => (string) Str::uuid(), 'team_id' => $team->id, 'name' => 'init', 'script' => '#!/bin/sh']);
+    $gitea = GiteaApp::forceCreate(['uuid' => (string) Str::uuid(), 'name' => 'gitea', 'api_url' => 'https://gitea.example.com/api/v1', 'html_url' => 'https://gitea.example.com', 'team_id' => $team->id, 'private_key_id' => PrivateKey::query()->value('id')]);
 
     $params = [
         'token_uuid' => $cloudToken->uuid,
@@ -103,7 +107,7 @@ it('renders every GET page', function () {
 
     $originalRedirector = app('redirect');
     $renderedViews = [];
-    \Illuminate\Support\Facades\View::composer('*', function ($view) use (&$renderedViews) {
+    View::composer('*', function ($view) use (&$renderedViews) {
         $renderedViews[$view->getPath()] = true;
     });
     $failures = [];
@@ -144,7 +148,7 @@ it('renders every GET page', function () {
             }
             $count++;
             app()->instance('redirect', $originalRedirector);
-            \Livewire\Features\SupportRedirects\SupportRedirects::$redirectorCacheStack = [];
+            SupportRedirects::$redirectorCacheStack = [];
             session(['currentTeam' => $team]);
             $response = $this->actingAs($user)->get('/'.ltrim($path, '/'));
             if ($response->isRedirect()) {
@@ -155,7 +159,7 @@ it('renders every GET page', function () {
             }
             if ($response->getStatusCode() >= 500) {
                 $e = $response->exception;
-                $failures[] = "/".$path." => ".$response->getStatusCode()." ".($e ? get_class($e).": ".Str::limit($e->getMessage(), 120)."\n   ".collect($e->getTrace())->filter(fn ($f) => isset($f["file"]))->take(0)->map(fn ($f) => str_replace(base_path()."/", "", $f["file"]).":".$f["line"])->implode("\n   ") : "");
+                $failures[] = '/'.$path.' => '.$response->getStatusCode().' '.($e ? get_class($e).': '.Str::limit($e->getMessage(), 120)."\n   ".collect($e->getTrace())->filter(fn ($f) => isset($f['file']))->take(0)->map(fn ($f) => str_replace(base_path().'/', '', $f['file']).':'.$f['line'])->implode("\n   ") : '');
             }
         }
     }

@@ -104,7 +104,7 @@
                                 x-bind:style="frameStyle(frame(`cluster:${cluster.uuid}`))">
                                 <div class="flex h-[52px] min-w-0 items-center justify-between gap-2 px-4">
                                     <div class="flex min-w-0 items-center gap-2.5">
-                                        <span class="{{ $iconTile }}"><x-reicon name="layers" class="size-3.5" /></span>
+                                        <span class="{{ $iconTile }}"><x-reicon name="cluster" class="size-3.5" /></span>
                                         <a x-bind:href="cluster.href" {{ wireNavigate() }}
                                             class="min-w-0 truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                             x-text="cluster.name" x-bind:title="cluster.name"></a>
@@ -323,7 +323,7 @@
                 <section
                     class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <div class="flex min-w-0 items-center gap-2.5 border-b border-neutral-200 px-3 py-2.5 dark:border-white/[0.08]">
-                        <span class="{{ $iconTile }}"><x-reicon name="layers" class="size-3.5" /></span>
+                        <span class="{{ $iconTile }}"><x-reicon name="cluster" class="size-3.5" /></span>
                         <a x-bind:href="cluster.href" {{ wireNavigate() }}
                             class="min-w-0 flex-1 truncate text-[13px] font-semibold text-black dark:text-fg"
                             x-text="cluster.name"></a>

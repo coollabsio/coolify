@@ -16,21 +16,38 @@
                 $canAddClusterServer = $clusterServersEnabled && auth()->user()->can('create', App\Models\Node::class);
             @endphp
             @if ($canAddClusterServer)
-                <x-modal-input title="Add server" subtitle="Choose the kind of server to add.">
-                    <x-slot:content>
-                        <button type="button" class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
-                            <x-reicon name="plus" class="size-3.5" />
-                            Add server
+                {{-- The shared split button (as Deploy on application pages). Both parts open the menu;
+                     each item opens its form through a hidden trigger. The New cluster form lives in node-cluster.index. --}}
+                <x-split-action id="server-index-add-actions">
+                    <x-slot:main x-on:click="open = !open">
+                        <x-reicon name="plus" class="size-3.5" />
+                        Add
+                    </x-slot:main>
+                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                        x-on:click="open = false; document.getElementById('add-server-trigger')?.click()">
+                        <x-reicon name="servers" class="size-3.5 opacity-70" />
+                        Server
+                    </button>
+                    @can('create', App\Models\NodeCluster::class)
+                        <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                            x-on:click="open = false; document.getElementById('new-cluster-trigger')?.click()">
+                            <x-reicon name="cluster" class="size-3.5 opacity-70" />
+                            Cluster
                         </button>
+                    @endcan
+                </x-split-action>
+                <x-modal-input title="Add server" subtitle="Choose the kind of server to add." class="hidden">
+                    <x-slot:content>
+                        <button type="button" id="add-server-trigger" class="hidden" aria-hidden="true" tabindex="-1"></button>
                     </x-slot:content>
                     <div data-testid="add-server-choice" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <a href="{{ route('node.onboarding') }}" {{ wireNavigate() }}
                             class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             <span
                                 class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                <x-reicon name="layers" class="size-4" />
+                                <x-reicon name="cluster" class="size-4" />
                             </span>
-                            <div class="mt-auto pt-5">
+                            <div class="pt-5">
                                 <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Cluster server</h3>
                                 <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
                                     Podman host managed by Sentinel. Joins a cluster and runs cluster applications.
@@ -44,7 +61,7 @@
                                     class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                                     <x-reicon name="servers" class="size-4" />
                                 </span>
-                                <div class="mt-auto pt-5">
+                                <div class="pt-5">
                                     <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Docker server</h3>
                                     <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
                                         Docker host managed over SSH. Runs applications, databases, and services.

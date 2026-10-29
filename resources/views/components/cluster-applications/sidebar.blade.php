@@ -11,6 +11,13 @@
             'group' => 'Settings',
         ],
         [
+            'key' => 'domains',
+            'label' => 'Domains',
+            'route' => 'project.cluster-application.domains',
+            'icon' => 'globe',
+            'group' => 'Settings',
+        ],
+        [
             'key' => 'environment-variables',
             'label' => 'Environment Variables',
             'route' => 'project.cluster-application.environment-variables',
@@ -32,6 +39,13 @@
             'group' => 'Observe & troubleshoot',
         ],
         [
+            'key' => 'servers',
+            'label' => 'Servers',
+            'route' => 'project.cluster-application.servers',
+            'icon' => 'servers',
+            'group' => 'Deploy',
+        ],
+        [
             'key' => 'resource-limits',
             'label' => 'Resource Limits',
             'route' => 'project.cluster-application.resource-limits',
@@ -51,9 +65,9 @@
     $pageSections = [
         'general' => [
             ['id' => 'cluster-application-details', 'label' => 'Application details'],
-            ['id' => 'cluster-application-overview', 'label' => 'Overview'],
-            ['id' => 'cluster-application-runtime', 'label' => 'Runtime'],
-            ['id' => 'cluster-application-domains', 'label' => 'Domains'],
+            ['id' => 'cluster-application-access', 'label' => 'Access'],
+            ['id' => 'cluster-application-build', 'label' => 'Build & deploy'],
+            ['id' => 'cluster-application-container', 'label' => 'Container'],
         ],
         'resource-limits' => [
             ['id' => 'cluster-application-cpu-limits', 'label' => 'CPU'],

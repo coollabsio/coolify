@@ -21,7 +21,11 @@
         <div>
             <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Status</dt>
             <dd class="mt-1">
-                <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+                @if ($cluster->hasNetworkStatus())
+                    <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+                @else
+                    <span class="text-sm text-neutral-500 dark:text-fg-dim">No servers yet</span>
+                @endif
             </dd>
         </div>
         @foreach ($overview as $detailLabel => $detailValue)

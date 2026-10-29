@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\New;
 
 use App\Actions\Node\CreateClusterDockerImageWorkload;
-use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\Application;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -204,7 +203,7 @@ class DockerImage extends Component
                 ->where('team_id', $project->team_id)
                 ->where('uuid', $targetUuid)
                 ->firstOrFail();
-            $deployment = CreateClusterDockerImageWorkload::run(
+            $created = CreateClusterDockerImageWorkload::run(
                 $project,
                 $environment,
                 $cluster,
@@ -213,13 +212,12 @@ class DockerImage extends Component
                 $targetNode,
                 $this->name,
             );
-            DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
 
-            return redirectRoute($this, 'project.cluster-application.deployment.show', [
+            // Like v4 applications: creating does not deploy. The user deploys from the application page.
+            return redirectRoute($this, 'project.cluster-application.show', [
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
-                'workload_uuid' => $deployment['workload']->uuid,
-                'deployment_uuid' => $deployment['operation']->uuid,
+                'workload_uuid' => $created['workload']->uuid,
             ]);
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\ClusterApplication;
 
+use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
@@ -22,6 +23,7 @@ use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\Project;
+use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -36,7 +38,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'logs', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'logs', 'servers', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -50,6 +52,13 @@ class Show extends Component
     public ?string $deploymentUuid = null;
 
     public int $deploymentPage = 1;
+
+    public string $deploymentSearch = '';
+
+    /** @var list<string> Selected filters, like v4: `status:success` or `server:<node uuid>`. */
+    public array $deploymentFilters = [];
+
+    public string $deploymentSort = 'newest';
 
     public Project $project;
 
@@ -78,11 +87,26 @@ class Show extends Component
 
     public string $memoryReservationMb = '';
 
+    public string $imageName = '';
+
+    public string $imageTag = '';
+
     public string $startCommand = '';
 
-    public string $domains = '';
-
     public string $httpPort = '';
+
+    public string $newDomain = '';
+
+    public string $newDomainPort = '';
+
+    public bool $showEditDomainModal = false;
+
+    #[Locked]
+    public ?string $editingDomainOriginal = null;
+
+    public string $editingDomain = '';
+
+    public string $editingPort = '';
 
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null): void
     {
@@ -184,34 +208,109 @@ class Show extends Component
     public function saveConfiguration(): void
     {
         $this->authorize('update', $this->workload);
-        $this->validate(['startCommand' => ['nullable', 'string', 'max:16384']]);
+        $this->validate([
+            'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
+            'imageTag' => ValidationPatterns::dockerImageTagRules(),
+            'startCommand' => ['nullable', 'string', 'max:16384'],
+        ]);
         $command = $this->parseStartCommand();
         if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
+        $tag = filled($this->imageTag) ? trim($this->imageTag) : 'latest';
+        $image = CreateClusterDockerImageWorkload::qualifiedImage(
+            trim($this->imageName).(preg_match('/^[a-f0-9]{64}$/i', $tag) === 1 ? '@sha256:' : ':').$tag,
+        );
 
-        UpdateNodeWorkloadConfiguration::run($this->workload, $command);
+        UpdateNodeWorkloadConfiguration::run($this->workload, $command, null, $image);
         $this->loadData();
         $this->loadConfiguration();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Configuration saved. Redeploy the application to apply it.');
     }
 
-    public function saveDomains(): void
+    public function addDomain(): void
     {
         $this->authorize('update', $this->workload);
-        try {
-            $this->workload = UpdateNodeWorkloadDomains::run($this->workload, $this->domains, $this->httpPort, auth()->user());
-        } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $key => $messages) {
-                $this->addError($key === 'http_port' ? 'httpPort' : 'domains', $messages[0]);
-            }
+        if (blank($this->newDomain)) {
+            $this->addError('newDomain', 'Enter a domain.');
 
             return;
         }
+        if ($this->persistDomains([...($this->workload->domains ?? []), $this->newDomain], $this->newDomainPort, 'newDomain', 'newDomainPort')) {
+            $this->dispatch('close-modal');
+            $this->dispatch('success', 'Domain added. Ingress servers apply it without a redeploy.');
+        }
+    }
+
+    public function generateDomain(): void
+    {
+        $this->authorize('update', $this->workload);
+        $suggestedDomain = $this->suggestedDomain($this->ingressAddresses());
+        if ($suggestedDomain === null) {
+            $this->addError('newDomain', 'Turn on ingress for a server of the cluster to generate a domain.');
+
+            return;
+        }
+        $this->newDomain = $suggestedDomain;
+    }
+
+    public function editDomain(string $domain): void
+    {
+        $this->authorize('update', $this->workload);
+        $this->resetErrorBag();
+        $this->editingDomainOriginal = $domain;
+        $this->editingDomain = $domain;
+        $this->editingPort = $this->httpPort;
+        $this->showEditDomainModal = true;
+    }
+
+    public function updateDomain(): void
+    {
+        $this->authorize('update', $this->workload);
+        if (blank($this->editingDomain)) {
+            $this->addError('editingDomain', 'Enter a domain.');
+
+            return;
+        }
+        $domains = collect($this->workload->domains ?? [])
+            ->map(fn (string $domain): string => $domain === $this->editingDomainOriginal ? $this->editingDomain : $domain)
+            ->all();
+        if ($this->persistDomains($domains, $this->editingPort, 'editingDomain', 'editingPort')) {
+            $this->showEditDomainModal = false;
+            $this->dispatch('success', 'Domain saved. Ingress servers apply it without a redeploy.');
+        }
+    }
+
+    public function removeDomain(string $domain): void
+    {
+        $this->authorize('update', $this->workload);
+        $domains = array_values(array_diff($this->workload->domains ?? [], [$domain]));
+        if ($this->persistDomains($domains, $this->httpPort, 'newDomain', 'newDomainPort')) {
+            $this->dispatch('success', 'Domain removed.');
+        }
+    }
+
+    /**
+     * Saves the full domain list with one port. Validation errors go to the given form fields.
+     *
+     * @param  list<string>  $domains
+     */
+    private function persistDomains(array $domains, string $port, string $domainField, string $portField): bool
+    {
+        try {
+            $this->workload = UpdateNodeWorkloadDomains::run($this->workload, $domains, $port, auth()->user());
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($key === 'http_port' ? $portField : $domainField, $messages[0]);
+            }
+
+            return false;
+        }
         $this->loadData();
         $this->loadDomains();
-        $this->dispatch('success', 'Domains saved. Ingress servers apply them without a redeploy.');
+
+        return true;
     }
 
     public function saveDetails(): void
@@ -270,6 +369,68 @@ class Show extends Component
         ]);
     }
 
+    public function updatedDeploymentSearch(): void
+    {
+        $this->deploymentPage = 1;
+    }
+
+    public function toggleDeploymentFilter(string $filter): void
+    {
+        $this->deploymentFilters = in_array($filter, $this->deploymentFilters, true)
+            ? array_values(array_diff($this->deploymentFilters, [$filter]))
+            : [...$this->deploymentFilters, $filter];
+        $this->deploymentPage = 1;
+    }
+
+    public function clearDeploymentFilters(): void
+    {
+        $this->deploymentFilters = [];
+        $this->deploymentPage = 1;
+    }
+
+    public function setDeploymentSort(string $sort): void
+    {
+        $this->deploymentSort = $sort === 'oldest' ? 'oldest' : 'newest';
+        $this->deploymentPage = 1;
+    }
+
+    /** @return array{status: list<array{value: string, label: string}>, server: list<array{value: string, label: string}>} */
+    private function deploymentFilterOptions(): array
+    {
+        return [
+            'status' => [
+                ['value' => 'status:success', 'label' => 'Success'],
+                ['value' => 'status:failed', 'label' => 'Failed'],
+                ['value' => 'status:active', 'label' => 'In progress'],
+                ['value' => 'status:other', 'label' => 'Cancelled or uncertain'],
+            ],
+            'server' => $this->workload->nodes
+                ->map(fn (Node $node): array => ['value' => 'server:'.$node->uuid, 'label' => $node->name])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * Shows the log of a deployment without a page load, like the v4 deployment page.
+     */
+    public function selectDeployment(string $deploymentUuid): void
+    {
+        $uuid = $this->deploymentQuery()->where('uuid', $deploymentUuid)->value('uuid');
+        if ($uuid === null) {
+            return;
+        }
+        $this->section = 'deployment';
+        $this->deploymentUuid = $uuid;
+        $url = route('project.cluster-application.deployment.show', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'workload_uuid' => $this->workload->uuid,
+            'deployment_uuid' => $uuid,
+        ]);
+        $this->js('history.replaceState(history.state, "", '.json_encode($url).')');
+    }
+
     public function goToPage(int $page): void
     {
         $this->deploymentPage = max(1, $page);
@@ -324,9 +485,10 @@ class Show extends Component
             'internalHostname' => $this->workload->internal_dns_name
                 ? $this->workload->internal_dns_name.'.default.coolify.internal'
                 : null,
-            ...($this->section === 'general' ? $this->ingressData() : []),
+            ...($this->section === 'domains' ? $this->ingressData() : []),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
+            'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentFilterOptions() : null,
             'selectedDeployment' => $this->section === 'deployment' ? $this->selectedDeployment() : null,
             'routeParameters' => [
                 'project_uuid' => $this->project->uuid,
@@ -336,24 +498,48 @@ class Show extends Component
         ]);
     }
 
-    /** @return array{publicUrls: list<string>, ingressAddresses: list<string>, ingressCluster: ?NodeCluster} */
+    /** @return array{ingressAddresses: list<string>, ingressCluster: ?NodeCluster, suggestedDomain: ?string} */
     private function ingressData(): array
+    {
+        $ingressAddresses = $this->ingressAddresses();
+
+        return [
+            'ingressAddresses' => $ingressAddresses,
+            'ingressCluster' => $this->node->cluster,
+            'suggestedDomain' => $this->suggestedDomain($ingressAddresses),
+        ];
+    }
+
+    /** @return list<string> */
+    private function ingressAddresses(): array
     {
         $cluster = $this->node->cluster;
 
-        return [
-            'publicUrls' => collect($this->workload->domains ?? [])->map(fn (string $domain): string => 'http://'.$domain)->all(),
-            'ingressAddresses' => $cluster === null ? [] : Node::query()
-                ->where('team_id', $this->workload->team_id)
-                ->where('node_cluster_id', $cluster->id)
-                ->where('is_ingress', true)
-                ->orderBy('name')
-                ->pluck('ip')
-                ->filter()
-                ->values()
-                ->all(),
-            'ingressCluster' => $cluster,
-        ];
+        return $cluster === null ? [] : Node::query()
+            ->where('team_id', $this->workload->team_id)
+            ->where('node_cluster_id', $cluster->id)
+            ->where('is_ingress', true)
+            ->orderBy('name')
+            ->pluck('ip')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * An sslip.io domain that points to the first ingress server, like the generated domains of v4.
+     * In development, the ingress servers are VMs on a private network, so it uses DEV_SEED_IP, like the seeded v4 domains.
+     *
+     * @param  list<string>  $ingressAddresses
+     */
+    private function suggestedDomain(array $ingressAddresses): ?string
+    {
+        $ip = isDev() ? config('constants.coolify.dev_seed_ip') : ($ingressAddresses[0] ?? null);
+        if ($ip === null || filter_var(normalizeIpAddress($ip), FILTER_VALIDATE_IP) === false) {
+            return null;
+        }
+
+        return $this->workload->uuid.'.'.sslipHostLabel($ip).'.sslip.io';
     }
 
     /** @return array{rows: list<array<string, mixed>>, total: int, currentPage: int, lastPage: int, from: int, to: int} */
@@ -365,7 +551,7 @@ class Show extends Component
         $skip = ($this->deploymentPage - 1) * self::DEPLOYMENTS_PER_PAGE;
         $rows = $this->deploymentQuery()
             ->with(['node', 'revision'])
-            ->latest('id')
+            ->orderBy('id', $this->deploymentSort === 'oldest' ? 'asc' : 'desc')
             ->skip($skip)
             ->take(self::DEPLOYMENTS_PER_PAGE)
             ->get()
@@ -493,9 +679,35 @@ class Show extends Component
 
     private function deploymentQuery(): Builder
     {
+        $statuses = collect($this->deploymentFilters)
+            ->filter(fn (string $filter): bool => str_starts_with($filter, 'status:'))
+            ->flatMap(fn (string $filter): array => match (substr($filter, 7)) {
+                'success' => [NodeOperationStatus::SUCCEEDED],
+                'failed' => [NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT],
+                'active' => [NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED, NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING],
+                'other' => [NodeOperationStatus::CANCELLED, NodeOperationStatus::UNCERTAIN],
+                default => [],
+            })
+            ->map(fn (NodeOperationStatus $status): string => $status->value)
+            ->unique()
+            ->values();
+        $serverUuids = collect($this->deploymentFilters)
+            ->filter(fn (string $filter): bool => str_starts_with($filter, 'server:'))
+            ->map(fn (string $filter): string => substr($filter, 7))
+            ->values();
+        $search = trim($this->deploymentSearch);
+
         return NodeOperation::query()
             ->where('node_workload_id', $this->workload->id)
-            ->whereIn('command_type', self::DEPLOYMENT_COMMAND_TYPES);
+            ->whereIn('command_type', self::DEPLOYMENT_COMMAND_TYPES)
+            ->when($statuses->isNotEmpty(), fn (Builder $query) => $query->whereIn('status', $statuses->all()))
+            ->when($serverUuids->isNotEmpty(), fn (Builder $query) => $query->whereHas('node', fn (Builder $node) => $node->whereIn('uuid', $serverUuids->all())))
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $match) => $match
+                ->where('uuid', 'like', $search.'%')
+                ->orWhereHas('revision', fn (Builder $revision) => $revision
+                    ->where('uuid', 'like', $search.'%')
+                    ->orWhere('image', 'like', '%'.$search.'%'))
+                ->orWhereHas('node', fn (Builder $node) => $node->where('name', 'like', '%'.$search.'%'))));
     }
 
     private function resolveSection(?string $routeName): string
@@ -528,6 +740,11 @@ class Show extends Component
             ->whereIn('node_id', $this->workload->nodes->modelKeys())
             ->where('is_managed', true)
             ->exists();
+        // A new application is created stopped and has no container until its first deployment, like v4 shows it.
+        if (! $this->containerPresent && $this->workload->isExited()) {
+            $this->status = 'Exited';
+            $this->statusType = 'error';
+        }
     }
 
     private function loadDetails(): void
@@ -540,6 +757,9 @@ class Show extends Component
     {
         $revision = $this->workload->revisions->first();
         $configuration = $revision?->configuration ?? [];
+        $image = (new DockerImageParser)->parse($revision?->image ?? '');
+        $this->imageName = $image->getFullImageNameWithoutTag();
+        $this->imageTag = $image->getTag();
         $this->startCommand = collect($configuration['command'] ?? [])
             ->map(fn (string $argument): string => preg_match('/[\s"]/', $argument) === 1 ? '"'.str_replace('"', '""', $argument).'"' : $argument)
             ->implode(' ');
@@ -563,8 +783,9 @@ class Show extends Component
 
     private function loadDomains(): void
     {
-        $this->domains = implode("\n", $this->workload->domains ?? []);
         $this->httpPort = $this->workload->http_port === null ? '' : (string) $this->workload->http_port;
+        $this->newDomain = '';
+        $this->newDomainPort = $this->httpPort ?: '80';
     }
 
     private function loadResourceSettings(): void

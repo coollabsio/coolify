@@ -6,7 +6,9 @@
         <span class="min-w-0 truncate px-2 font-semibold text-black dark:text-fg">
             {{ $cluster->name }}
         </span>
-        <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+        @if ($cluster->hasNetworkStatus())
+            <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+        @endif
     </div>
 @endteleport
 
@@ -15,7 +17,9 @@
         <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
             {{ $cluster->name }}
         </h1>
-        <x-status-badge class="self-start" :status="$cluster->networkStatusLabel()"
-            :type="$cluster->networkStatusBadgeType()" />
+        @if ($cluster->hasNetworkStatus())
+            <x-status-badge class="self-start" :status="$cluster->networkStatusLabel()"
+                :type="$cluster->networkStatusBadgeType()" />
+        @endif
     </div>
 </div>

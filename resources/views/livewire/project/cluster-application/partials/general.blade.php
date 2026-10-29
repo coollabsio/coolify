@@ -1,5 +1,8 @@
 @php
-    $latestDeployment = $workload->operations->firstWhere('command_type', 'workload.deploy.v1');
+    $domainList = $workload->domains ?? [];
+    $primaryDomain = $domainList[0] ?? null;
+    $additionalDomainCount = max(0, count($domainList) - 1);
+    $domainsUrl = route('project.cluster-application.domains', $routeParameters);
 @endphp
 
 <form wire:submit="saveDetails" class="flex flex-col gap-6">
@@ -16,146 +19,81 @@
     </x-application.settings-section>
 </form>
 
-<x-application.settings-section id="cluster-application-overview" title="Overview"
-    helper="Where this application runs and how other workloads in the cluster reach it.">
-    <dl class="grid gap-x-6 gap-y-5 text-sm sm:grid-cols-2">
-        <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Status</dt>
-            <dd class="mt-1">
-                <x-status-badge :status="$status" :type="$statusType" />
-            </dd>
+<x-application.settings-section id="cluster-application-access" title="Access"
+    helper="How this application is reached publicly, and how other workloads in the cluster reach it.">
+    <x-application.settings-subsection title="Public access" first>
+        <div class="group relative flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 transition-colors hover:bg-neutral-100 focus-within:ring-2 focus-within:ring-coollabs/40 dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] dark:focus-within:ring-brand-light/40">
+            <a class="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+                aria-label="{{ $primaryDomain ? 'Manage application domains' : 'Add an application domain' }}"
+                href="{{ $domainsUrl }}" {{ wireNavigate() }}>
+                <div class="flex size-9 shrink-0 items-center justify-center rounded-md bg-neutral-200/70 text-neutral-600 dark:bg-white/[0.07] dark:text-fg-dim">
+                    <x-reicon name="globe" class="size-4" />
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-black dark:text-fg">
+                        @if ($primaryDomain)
+                            <span class="block truncate">{{ $primaryDomain }}</span>
+                        @else
+                            No public domain configured
+                        @endif
+                    </p>
+                    <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                        @if ($additionalDomainCount > 0)
+                            +{{ $additionalDomainCount }} more {{ Str::plural('domain', $additionalDomainCount) }}
+                        @elseif (! $primaryDomain)
+                            Make this application available from a URL
+                        @else
+                            Served by the ingress servers of the cluster
+                        @endif
+                    </p>
+                </div>
+            </a>
+            <a class="button relative z-10 ml-auto shrink-0"
+                aria-label="{{ $primaryDomain ? 'Manage application domains' : 'Add an application domain' }}"
+                href="{{ $domainsUrl }}" {{ wireNavigate() }}>
+                {{ $primaryDomain ? 'Manage domains' : 'Add domain' }}
+                <x-reicon name="arrow-right" class="size-4" />
+            </a>
         </div>
-        <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Image</dt>
-            <dd class="mt-1 break-all font-mono text-xs">{{ $image ?? 'Unknown' }}</dd>
+    </x-application.settings-subsection>
+
+    <x-application.settings-subsection title="Internal access">
+        <div class="grid gap-4 sm:grid-cols-2">
+            @if ($internalHostname)
+                <x-forms.copy-input label="Internal hostname" :text="$internalHostname" />
+            @else
+                <x-forms.copy-input label="Internal hostname" text="Pending" />
+            @endif
         </div>
-        <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Cluster</dt>
-            <dd class="mt-1">
-                @if ($node->cluster)
-                    <a class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
-                        {{ wireNavigate() }}
-                        href="{{ route('node-cluster.show', ['cluster_uuid' => $node->cluster->uuid]) }}">
-                        {{ $node->cluster->name }}
-                    </a>
-                @else
-                    <span class="text-neutral-500 dark:text-fg-dim">None</span>
-                @endif
-            </dd>
-        </div>
-        <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">{{ $servers->count() > 1 ? 'Servers' : 'Server' }}</dt>
-            <dd class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                @foreach ($servers as $server)
-                    <a wire:key="cluster-application-server-{{ $server->uuid }}"
-                        class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
-                        {{ wireNavigate() }}
-                        href="{{ route('node.show', ['node_uuid' => $server->uuid]) }}">
-                        {{ $server->name }}
-                    </a>
-                @endforeach
-            </dd>
-        </div>
-        <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Internal hostname</dt>
-            <dd class="mt-1 flex min-w-0 items-center gap-1.5">
-                @if ($internalHostname)
-                    <span class="truncate font-mono text-xs">{{ $internalHostname }}</span>
-                    <x-copy-button :value="$internalHostname" label="Copy internal hostname" />
-                @else
-                    <span class="text-neutral-500 dark:text-fg-dim">Pending</span>
-                @endif
-            </dd>
-        </div>
-        <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Last deployment</dt>
-            <dd class="mt-1">
-                @if ($latestDeployment)
-                    <a class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
-                        title="{{ $latestDeployment->created_at }}" {{ wireNavigate() }}
-                        href="{{ route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $latestDeployment->uuid]) }}">
-                        {{ $latestDeployment->created_at->diffForHumans() }}
-                    </a>
-                @else
-                    <span class="text-neutral-500 dark:text-fg-dim">Never</span>
-                @endif
-            </dd>
-        </div>
-    </dl>
+        <p class="mt-4 border-t border-neutral-200 pt-4 text-sm text-neutral-500 dark:border-white/[0.07] dark:text-fg-dim">
+            Internal hostnames are only reachable by other workloads in the cluster.
+        </p>
+    </x-application.settings-subsection>
 </x-application.settings-section>
 
 <form wire:submit="saveConfiguration" class="flex flex-col gap-6">
     @can('update', $workload)
-        <x-unsaved-bar action="saveConfiguration" targets="startCommand" />
+        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand" />
     @endcan
 
-    <x-application.settings-section id="cluster-application-runtime" title="Runtime"
-        helper="Changes create a new revision. Redeploy the application to apply them.">
+    <x-application.settings-section id="cluster-application-build" title="Build & deploy"
+        helper="How Coolify deploys the application. Changes create a new revision. Redeploy the application to apply them.">
+        <p class="text-sm text-neutral-500 dark:text-fg-dim">Nothing to build. This application deploys a prebuilt Docker image.</p>
+        <x-application.settings-subsection title="Image">
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input id="imageName" label="Image" placeholder="nginx" required
+                    canGate="update" :canResource="$workload" />
+                <x-forms.input id="imageTag" label="Tag" placeholder="latest"
+                    canGate="update" :canResource="$workload"
+                    helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')" />
+            </div>
+        </x-application.settings-subsection>
+    </x-application.settings-section>
+
+    <x-application.settings-section id="cluster-application-container" title="Container"
+        helper="Options applied to the container when it starts. Changes create a new revision. Redeploy the application to apply them.">
         <x-forms.input id="startCommand" label="Start command" placeholder="nginx -g &quot;daemon off;&quot;"
             canGate="update" :canResource="$workload"
             helper="Overrides the image command. Use double quotes for arguments with spaces. Leave empty to use the image default." />
-    </x-application.settings-section>
-</form>
-
-<form wire:submit="saveDomains" class="flex flex-col gap-6">
-    @can('update', $workload)
-        <x-unsaved-bar action="saveDomains" targets="domains,httpPort" />
-    @endcan
-
-    <x-application.settings-section id="cluster-application-domains" title="Domains"
-        helper="Ingress servers of the cluster route HTTP traffic for these domains to this application. Changes apply without a redeploy.">
-        <div class="flex flex-col gap-4">
-            <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
-                <x-forms.textarea id="domains" label="Domains" rows="3" placeholder="app.example.com"
-                    canGate="update" :canResource="$workload"
-                    helper="One domain per line, or separated by commas. Use the hostname only, without http://, a path, or a port. At most 20 domains." />
-                <x-forms.input id="httpPort" type="number" min="1" max="65535" label="Port" placeholder="80"
-                    canGate="update" :canResource="$workload"
-                    helper="The port inside the container that receives HTTP traffic. Required when you set domains." />
-            </div>
-
-            @if ($publicUrls !== [])
-                <div class="text-sm">
-                    <div class="text-neutral-500 dark:text-fg-dim">URLs</div>
-                    <ul class="mt-1 flex flex-col gap-1">
-                        @foreach ($publicUrls as $publicUrl)
-                            <li wire:key="cluster-application-url-{{ $publicUrl }}">
-                                <a class="font-mono text-xs underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
-                                    href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer">{{ $publicUrl }}</a>
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            @if ($ingressAddresses === [])
-                <x-callout type="warning" title="No ingress server">
-                    This cluster has no ingress server, so the domains are not reachable yet.
-                    @if ($ingressCluster)
-                        <a class="font-medium underline" {{ wireNavigate() }}
-                            href="{{ route('node-cluster.nodes', ['cluster_uuid' => $ingressCluster->uuid]) }}">Turn on
-                            ingress for a server</a>.
-                    @endif
-                </x-callout>
-            @else
-                <div class="text-sm">
-                    <div class="text-neutral-500 dark:text-fg-dim">
-                        Point an A record for each domain to one or more of these addresses.
-                    </div>
-                    <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                        @foreach ($ingressAddresses as $ingressAddress)
-                            <span wire:key="cluster-application-ingress-{{ $ingressAddress }}"
-                                class="flex items-center gap-1.5">
-                                <span class="font-mono text-xs">{{ $ingressAddress }}</span>
-                                <x-copy-button :value="$ingressAddress" label="Copy address" />
-                            </span>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
-            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">HTTPS is not available yet. Ingress serves
-                these domains over HTTP on port 80.</p>
-        </div>
     </x-application.settings-section>
 </form>

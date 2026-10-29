@@ -3,11 +3,11 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeRole;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeCluster;
-use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\Project;
@@ -20,7 +20,12 @@ class CreateClusterDockerImageWorkload
 {
     use AsAction;
 
-    /** @return array{workload: NodeWorkload, revision: NodeWorkloadRevision, operation: NodeOperation} */
+    /**
+     * Creates the application and places it on a server, without deploying it. It stays stopped until
+     * the user clicks Deploy; CreateDeploymentOperation then sets the desired state to running.
+     *
+     * @return array{workload: NodeWorkload, revision: NodeWorkloadRevision}
+     */
     public function handle(
         Project $project,
         Environment $environment,
@@ -30,7 +35,7 @@ class CreateClusterDockerImageWorkload
         ?Node $targetNode = null,
         ?string $name = null,
     ): array {
-        $image = $this->qualifiedImage($image);
+        $image = self::qualifiedImage($image);
         $name = filled($name) ? trim($name) : null;
         if ($environment->project_id !== $project->id) {
             throw new RuntimeException('The environment does not belong to this project.');
@@ -45,7 +50,7 @@ class CreateClusterDockerImageWorkload
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        return DB::transaction(function () use ($project, $environment, $cluster, $image, $requestedBy, $targetNode, $name): array {
+        return DB::transaction(function () use ($project, $environment, $cluster, $image, $targetNode, $name): array {
             $availableNodes = $cluster->nodes()
                 ->where('is_usable', true)
                 ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
@@ -77,16 +82,15 @@ class CreateClusterDockerImageWorkload
                 'project_id' => $project->id,
                 'environment_id' => $environment->id,
                 'name' => $name ?? self::uniqueName($environment, self::defaultName($image)),
+                'desired_state' => NodeWorkloadDesiredState::STOPPED,
             ]);
             $revision = $workload->createRevision($image, ['restart_policy' => 'unless-stopped']);
             $workload->nodes()->attach($node);
             EnsureNodeWorkloadDnsNames::run($node);
-            $deployment = CreateDeploymentOperation::run($node, $revision, $requestedBy);
 
             return [
                 'workload' => $workload->refresh(),
                 'revision' => $revision,
-                'operation' => $deployment['operation'],
             ];
         });
     }
@@ -135,7 +139,8 @@ class CreateClusterDockerImageWorkload
         return $candidate;
     }
 
-    private function qualifiedImage(string $image): string
+    /** Adds the Docker Hub registry to an image reference without a registry. */
+    public static function qualifiedImage(string $image): string
     {
         $name = str($image)->before('@')->toString();
         $lastSlash = strrpos($name, '/');

@@ -15,12 +15,10 @@
                 @endcan
             @endif
             @can('create', App\Models\NodeCluster::class)
-                <x-modal-input title="New cluster" :wireIgnore="false">
+                {{-- Opened from the Add menu on the Servers page header. --}}
+                <x-modal-input title="New cluster" :wireIgnore="false" class="hidden">
                     <x-slot:content>
-                        <button type="button" class="button">
-                            <x-reicon name="plus" class="size-3.5" />
-                            New cluster
-                        </button>
+                        <button type="button" id="new-cluster-trigger" class="hidden" aria-hidden="true" tabindex="-1"></button>
                     </x-slot:content>
                     <form wire:submit="createCluster" class="flex flex-col gap-4">
                         <x-forms.input id="name" label="Name" required />
@@ -53,7 +51,7 @@
     @endif
 
     @if ($clusters->isEmpty() && $unassignedNodes->isEmpty())
-        <x-empty title="No clusters yet" description="Create a cluster, then add cluster servers to it." icon-name="layers" />
+        <x-empty title="No clusters yet" description="Create a cluster, then add cluster servers to it." icon-name="cluster" />
     @endif
 
     <div class="flex flex-col gap-4">
@@ -64,39 +62,28 @@
                     <div class="flex min-w-0 items-center gap-3">
                         <div
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
-                            <x-reicon name="layers" class="size-4" />
+                            <x-reicon name="cluster" class="size-4" />
                         </div>
                         <div class="min-w-0">
                             <div class="flex min-w-0 flex-wrap items-center gap-2">
                                 <a href="{{ route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]) }}" {{ wireNavigate() }}
                                     class="truncate text-[13px] font-semibold text-black hover:underline dark:text-fg">{{ $cluster->name }}</a>
-                                <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+                                @if ($cluster->hasNetworkStatus())
+                                    <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+                                @endif
                             </div>
                             <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                 {{ $cluster->nodes->count() }} {{ Str::plural('server', $cluster->nodes->count()) }}
-                                <span class="font-mono">&middot; {{ $cluster->cidr }}</span>
                                 @if (filled($cluster->description))
                                     &middot; {{ $cluster->description }}
                                 @endif
                             </p>
                         </div>
                     </div>
-                    <a href="{{ route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]) }}" {{ wireNavigate() }}
-                        class="button w-fit shrink-0">
-                        <x-reicon name="settings" class="size-3.5" />
-                        Cluster settings
-                    </a>
                 </div>
                 @if ($cluster->nodes->isEmpty())
-                    <div class="flex flex-col items-start gap-2 px-4 py-4 text-[12px] text-neutral-500 sm:flex-row sm:items-center sm:justify-between dark:text-fg-dim">
-                        <span>No servers in this cluster yet.</span>
-                        @can('update', $cluster)
-                            <a href="{{ route('node-cluster.nodes', ['cluster_uuid' => $cluster->uuid]) }}" {{ wireNavigate() }}
-                                class="button w-fit">
-                                <x-reicon name="plus" class="size-3.5" />
-                                Add server
-                            </a>
-                        @endcan
+                    <div class="px-4 py-4 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        No servers in this cluster yet.
                     </div>
                 @else
                     @include('livewire.node-cluster.partials.server-table', ['nodes' => $cluster->nodes, 'cluster' => $cluster])

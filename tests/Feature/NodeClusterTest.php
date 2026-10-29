@@ -610,7 +610,7 @@ it('renders one page per cluster menu item with the sidebar', function (string $
         $response->assertSee($text);
     }
 })->with([
-    'general' => ['node-cluster.show', ['Overview', 'Servers ready', 'Private network', 'Last synced', 'Sync network', 'Pending']],
+    'general' => ['node-cluster.show', ['Overview', 'Servers ready', 'Private network', 'Last synced', 'Sync network', 'No servers yet']],
     'nodes' => ['node-cluster.nodes', ['No servers in this cluster', 'Connect new server']],
     'firewall' => ['node-cluster.firewall', ['Traffic map', 'Application rules', 'System rules']],
     'advanced' => ['node-cluster.advanced', ['Private network', 'WireGuard interface', 'Deployment limits', 'Troubleshooting', 'Recent operations']],
@@ -850,4 +850,26 @@ it('shows an empty resources page for a cluster without applications', function 
     $this->get(route('node-cluster.resources', $cluster->uuid))
         ->assertSuccessful()
         ->assertSee('No resources yet');
+});
+
+it('shows no network status or private range for a cluster without servers', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $empty = CreateNodeCluster::run($team, $this->user, 'Empty cluster');
+    $withServer = CreateNodeCluster::run($team, $this->user, 'Busy cluster');
+    AssignNodeToCluster::run($withServer, Node::factory()->create(['team_id' => $team->id, 'is_usable' => true]));
+
+    expect($empty->fresh()->hasNetworkStatus())->toBeFalse()
+        ->and($withServer->fresh()->hasNetworkStatus())->toBeTrue();
+
+    $html = Livewire::test(Index::class)->html();
+    $rowOf = fn (NodeCluster $cluster): string => str($html)->after('wire:key="cluster-group-'.$cluster->uuid.'"')->before('cluster-group-')->toString();
+
+    expect($rowOf($withServer->fresh()))->toContain($withServer->fresh()->networkStatusLabel())
+        ->not->toContain($withServer->cidr)
+        ->and($rowOf($empty))->not->toContain($empty->networkStatusLabel())
+        ->not->toContain($empty->cidr);
+
+    $this->get(route('node-cluster.show', $empty->uuid))
+        ->assertOk()
+        ->assertDontSee('>Pending<', escape: false);
 });

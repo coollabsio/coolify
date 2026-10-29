@@ -324,6 +324,20 @@ host_qemu_artisan() {
     "${privileged[@]}" php artisan "$@"
 }
 
+# Forward DEV_SEED_IP:80 to the ingress Node of this instance, so the sslip.io domains of cluster
+# applications work. Coolify writes the Node IP to storage/app/dev-ingress-target when ingress
+# changes, and socat reads it for each connection. One forward per host: the last started instance owns port 80.
+start_ingress_forward() {
+  local ip=""
+  [[ -f .env ]] && ip="$(grep -E '^DEV_SEED_IP=' .env | tail -n1 | cut -d= -f2- | tr -d "\"'" || true)"
+  [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 0
+  docker rm -f coolify-dev-ingress >/dev/null 2>&1 || true
+  docker run -d --name coolify-dev-ingress --network host --restart unless-stopped \
+    -v "$ROOT/storage/app:/state:ro" alpine/socat -d "TCP-LISTEN:80,bind=$ip,fork,reuseaddr" \
+    'SYSTEM:exec socat STDIO TCP\:$(cat /state/dev-ingress-target)\:80' >/dev/null ||
+    echo "Could not forward $ip:80 to the ingress Node; another process may use the port." >&2
+}
+
 # A failure leaves the stack and VMs running for inspection instead of tearing everything down.
 start_node_workers() {
   echo "Starting QEMU worker Nodes: ${NODE_WORKER_PROFILES[*]}"
@@ -468,6 +482,7 @@ start_backend() {
     if node_workers_enabled; then
       start_node_workers
     fi
+    start_ingress_forward
   elif [[ "$backend" == "lima" ]]; then
     echo "Using Lima profile: $profile"
     start_lima_vm

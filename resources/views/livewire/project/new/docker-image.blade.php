@@ -1,5 +1,5 @@
 <div x-data x-init="$nextTick(() => { if ($refs.autofocusInput) $refs.autofocusInput.focus(); })"
-    class="mt-8 w-full max-w-[920px] lg:mt-3">
+    class="mx-auto mt-8 w-full max-w-[920px] lg:mt-3">
     <form wire:submit="submit">
         <section class="application-settings-section">
             <div class="application-settings-section-header">

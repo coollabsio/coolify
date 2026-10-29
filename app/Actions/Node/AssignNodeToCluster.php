@@ -56,7 +56,11 @@ class AssignNodeToCluster
                 }
             }
             $workloadCidr = $node->workload_cidr ?? $this->nextWorkloadCidr();
-            $node->update(['node_cluster_id' => $cluster->id, 'wireguard_ip' => $ip, 'workload_cidr' => $workloadCidr, 'network_applied_revision' => null]);
+            // A cluster serves domains from the start: the first server that joins without an ingress server turns ingress on.
+            $isIngress = $node->is_ingress || ($node->node_cluster_id === null
+                && $node->supportsCapability(ReconcileNodeClusterNetwork::INGRESS_CAPABILITY) !== false
+                && ! $cluster->nodes()->where('is_ingress', true)->exists());
+            $node->update(['node_cluster_id' => $cluster->id, 'wireguard_ip' => $ip, 'workload_cidr' => $workloadCidr, 'is_ingress' => $isIngress, 'network_applied_revision' => null]);
             $cluster->increment('desired_revision');
 
             return $node;

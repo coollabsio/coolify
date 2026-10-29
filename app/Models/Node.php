@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeRole;
+use App\Support\DevelopmentIngressTarget;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +25,17 @@ class Node extends BaseModel
     protected $guarded = [];
 
     protected $hidden = ['sentinel_token'];
+
+    protected static function booted(): void
+    {
+        // Development only: keep the DEV_SEED_IP:80 forward of scripts/dev on the current ingress Node.
+        static::saved(function (Node $node): void {
+            if ($node->wasChanged(['is_ingress', 'node_cluster_id', 'ip']) || $node->wasRecentlyCreated) {
+                DevelopmentIngressTarget::write();
+            }
+        });
+        static::deleted(fn (): null => DevelopmentIngressTarget::write());
+    }
 
     protected function casts(): array
     {

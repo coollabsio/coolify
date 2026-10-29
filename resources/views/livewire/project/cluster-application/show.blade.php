@@ -2,11 +2,13 @@
     @php
         $sectionTitles = [
             'general' => 'General',
+            'domains' => 'Domains',
             'environment-variables' => 'Environment Variables',
             'resource-limits' => 'Resource Limits',
             'deployments' => 'Deployments',
             'deployment' => 'Deployment',
             'logs' => 'Logs',
+            'servers' => 'Servers',
             'danger' => 'Danger Zone',
         ];
         $isRunning = $status === 'Running';

@@ -2666,6 +2666,13 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     box-shadow: 0 3px 0 var(--button-depth-color);
 }
 
+/* After the hover lift, so a click (hover + active) sinks both parts instead of lifting them. */
+.split-action-main:not(:disabled):active,
+.split-action-caret:not(:disabled):active {
+    transform: translateY(2px);
+    box-shadow: none;
+}
+
 .split-action-main:focus-visible,
 .split-action-caret:focus-visible {
     outline: 1px solid var(--color-accent);

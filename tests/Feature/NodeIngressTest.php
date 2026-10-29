@@ -92,6 +92,8 @@ function ingressCluster(User $user, int $count): array
             'network_applied_revision' => $cluster->desired_revision,
             'network_status' => 'converged',
             'corrosion_status' => 'converged',
+            // Tests turn ingress on where they need it.
+            'is_ingress' => false,
         ]);
         connectIngressNode($node);
     }
@@ -738,14 +740,19 @@ describe('cluster application domains page', function () {
         $this->edge->update(['is_ingress' => true]);
 
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->assertSee('Domains')
-            ->assertSee('HTTPS is not available yet.')
-            ->set('domains', "App.Example.com\nwww.example.com")
-            ->set('httpPort', '3000')
-            ->call('saveDomains')
+            ->set('newDomain', 'App.Example.com')
+            ->set('newDomainPort', '3000')
+            ->call('addDomain')
             ->assertHasNoErrors()
             ->assertDispatched('success')
-            ->assertSet('domains', "app.example.com\nwww.example.com")
+            ->set('newDomain', 'www.example.com')
+            ->call('addDomain')
+            ->assertHasNoErrors()
+            ->assertSet('httpPort', '3000');
+
+        $this->get(route('project.cluster-application.domains', $this->parameters))
+            ->assertOk()
+            ->assertSee('HTTPS is not available yet.')
             ->assertSee('http://app.example.com')
             ->assertSee('http://www.example.com')
             ->assertSee('Point an A record for each domain to one or more of these addresses.')
@@ -759,20 +766,20 @@ describe('cluster application domains page', function () {
 
     it('shows validation errors on the domain fields', function () {
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->set('domains', '*.example.com')
-            ->set('httpPort', '80')
-            ->call('saveDomains')
-            ->assertHasErrors(['domains'])
-            ->set('domains', 'app.example.com')
-            ->set('httpPort', '')
-            ->call('saveDomains')
-            ->assertHasErrors(['httpPort']);
+            ->set('newDomain', '*.example.com')
+            ->set('newDomainPort', '80')
+            ->call('addDomain')
+            ->assertHasErrors(['newDomain'])
+            ->set('newDomain', 'app.example.com')
+            ->set('newDomainPort', '')
+            ->call('addDomain')
+            ->assertHasErrors(['newDomainPort']);
 
         expect($this->workload->refresh()->domains)->toBeNull();
     });
 
     it('warns when the cluster has no ingress Node', function () {
-        Livewire::test(ClusterApplicationShow::class, $this->parameters)
+        $this->get(route('project.cluster-application.domains', $this->parameters))
             ->assertSee('No ingress server')
             ->assertSee(route('node-cluster.nodes', ['cluster_uuid' => $this->cluster->uuid]), false);
     });
@@ -783,9 +790,9 @@ describe('cluster application domains page', function () {
         $this->actingAs($member);
 
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->set('domains', 'app.example.com')
-            ->set('httpPort', '80')
-            ->call('saveDomains')
+            ->set('newDomain', 'app.example.com')
+            ->set('newDomainPort', '80')
+            ->call('addDomain')
             ->assertForbidden();
 
         expect($this->workload->refresh()->domains)->toBeNull()

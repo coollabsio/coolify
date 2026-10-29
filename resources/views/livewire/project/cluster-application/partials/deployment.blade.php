@@ -45,6 +45,17 @@
         link.click();
         URL.revokeObjectURL(url);
     },
+    findShortcutLabel: /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘F' : 'Ctrl+F',
+    handleFindShortcut(event) {
+        const isFind = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key?.toLowerCase() === 'f';
+        if (!isFind) return;
+        const active = document.activeElement;
+        if (active === this.$refs.search) return;
+        if (!this.$root.contains(active) && (active?.isContentEditable || active?.matches('input, textarea, select'))) return;
+        event.preventDefault();
+        this.$refs.search.focus();
+        this.$refs.search.select();
+    },
     commitCleanup: null,
     init() {
         this.$watch('searchQuery', () => this.applySearch());
@@ -53,22 +64,15 @@
     destroy() {
         if (typeof this.commitCleanup === 'function') this.commitCleanup();
     }
-}" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full min-w-0 flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none 2xl:sticky 2xl:top-4 2xl:h-[calc(100dvh-10rem)] 2xl:min-h-[32rem]">
+}" @keydown.window="handleFindShortcut($event)" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full min-w-0 flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none 2xl:sticky 2xl:top-4 2xl:h-[calc(100dvh-10rem)] 2xl:min-h-[32rem]">
     <div :class="fullscreen ? 'fullscreen flex flex-col' : 'flex flex-1 min-h-0 flex-col overflow-hidden'">
         <div class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"
             :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-200 shadow-sm dark:border-coolgray-200'">
             <div class="logs-viewer-toolbar">
                 <div class="logs-viewer-toolbar-controls">
+                    {{-- Same layout as the v4 deployment log: fullscreen, status, search, View and Export menus. --}}
                     <div class="logs-viewer-primary">
                         <div class="logs-viewer-actions">
-                            <button type="button" title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps"
-                                :class="showTimestamps ? 'logs-viewer-btn-active' : ''" class="logs-viewer-btn">
-                                <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                            </button>
                             <button type="button" title="Fullscreen" x-show="!fullscreen" x-on:click="fullscreen = true"
                                 class="logs-viewer-btn">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -84,32 +88,74 @@
                                         stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                                 </svg>
                             </button>
-                            <button type="button" title="Copy Logs" x-on:click="copyLogs()" class="logs-viewer-btn">
-                                <x-reicon name="copy" class="size-4" />
-                            </button>
-                            <button type="button" title="Download Logs" x-on:click="downloadLogs()" class="logs-viewer-btn">
-                                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                </svg>
-                            </button>
                         </div>
-                        <x-status-badge :status="$selectedDeployment['status']" :type="$selectedDeployment['statusType']"
-                            class="logs-viewer-status-badge" />
+                        <span class="flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-600 dark:text-fg-dim">
+                            <span @class([
+                                'size-2 shrink-0 rounded-full',
+                                'bg-emerald-500' => $selectedDeployment['statusType'] === 'success',
+                                'bg-warning motion-safe:animate-pulse' => $selectedDeployment['statusType'] === 'warning',
+                                'bg-red-500' => $selectedDeployment['statusType'] === 'error',
+                                'bg-neutral-400 dark:bg-neutral-500' => ! in_array($selectedDeployment['statusType'], ['success', 'warning', 'error'], true),
+                            ])></span>
+                            {{ $selectedDeployment['status'] }}
+                        </span>
                     </div>
                     <div class="logs-viewer-end">
                         <div class="logs-viewer-search relative">
                             <x-reicon name="search"
-                                class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" />
-                            <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
-                                aria-label="Find in logs"
-                                class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! text-neutral-800! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.05]! dark:text-white! dark:placeholder:text-neutral-500" />
+                                class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                            <input type="search" x-ref="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
+                                aria-label="Find in logs" :aria-keyshortcuts="findShortcutLabel === '⌘F' ? 'Meta+F' : 'Control+F'"
+                                class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint" />
+                            <kbd x-cloak x-show="!searchQuery" x-text="findShortcutLabel" aria-hidden="true"
+                                class="pointer-events-none absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded border border-neutral-200 px-1 font-sans text-[10px] leading-4 text-neutral-400 dark:border-white/[0.08] dark:text-fg-faint"></kbd>
                             <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
-                                class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                                class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
                                 aria-label="Clear search">
                                 <x-reicon name="x" class="size-3" />
                             </button>
+                        </div>
+                        <div class="runtime-log-menus">
+                            <x-table.dropdown panel-class="runtime-log-menu min-w-48! max-h-none!" role="menu">
+                                <x-slot:trigger><button type="button" title="View Options" class="button"
+                                    aria-haspopup="menu" :aria-expanded="open">
+                                    <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                                    </svg>
+                                    <span>View</span>
+                                    <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open ? 'rotate-180' : ''" />
+                                </button></x-slot:trigger>
+                                <div>
+                                    <p class="runtime-log-menu-label">Display</p>
+                                    <button type="button" class="listbox-option" role="menuitemcheckbox"
+                                        :aria-checked="showTimestamps" x-on:click="showTimestamps = !showTimestamps">
+                                        <span class="flex-1 text-left">Timestamps</span>
+                                        <span x-show="showTimestamps">✓</span>
+                                    </button>
+                                </div>
+                            </x-table.dropdown>
+                            <x-table.dropdown panel-class="runtime-log-menu min-w-52!" role="menu">
+                                <x-slot:trigger><button type="button" title="Copy or Download Logs" class="button"
+                                    aria-haspopup="menu" :aria-expanded="open">
+                                    <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                    <span>Export</span>
+                                    <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open ? 'rotate-180' : ''" />
+                                </button></x-slot:trigger>
+                                <div>
+                                    <button type="button" role="menuitem" class="listbox-option" x-on:click="copyLogs(); open = false">
+                                        <span class="flex-1 text-left">Copy visible logs</span>
+                                    </button>
+                                    <button type="button" role="menuitem" class="listbox-option" x-on:click="downloadLogs(); open = false">
+                                        <span class="flex-1 text-left">Download visible logs</span>
+                                    </button>
+                                </div>
+                            </x-table.dropdown>
                         </div>
                         <div class="logs-viewer-meta">
                             <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"

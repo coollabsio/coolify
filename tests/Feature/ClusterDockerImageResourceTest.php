@@ -882,10 +882,12 @@ it('renders every cluster application section as its own page', function (string
 
     foreach ([
         'project.cluster-application.show',
+        'project.cluster-application.domains',
         'project.cluster-application.environment-variables',
         'project.cluster-application.resource-limits',
         'project.cluster-application.deployments',
         'project.cluster-application.logs',
+        'project.cluster-application.servers',
         'project.cluster-application.danger',
     ] as $sidebarRoute) {
         $response->assertSee('href="'.route($sidebarRoute, $routeParameters).'"', false);
@@ -900,11 +902,13 @@ it('renders every cluster application section as its own page', function (string
     )->and(substr_count($response->getContent(), 'aria-current="page"'))->toBe(2)
         ->and(ClusterApplicationShow::SECTIONS)->toContain($section);
 })->with([
-    'general' => ['project.cluster-application.show', 'general', ['Overview', 'Internal hostname', 'Copy internal hostname', 'Runtime', 'Start command']],
+    'general' => ['project.cluster-application.show', 'general', ['Access', 'Internal hostname', 'Build &amp; deploy', 'Container', 'Start command']],
+    'domains' => ['project.cluster-application.domains', 'domains', ['Domains', 'HTTPS is not available yet.']],
     'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'Developer view']],
     'resource limits' => ['project.cluster-application.resource-limits', 'resource-limits', ['CPU limit (cores)', 'Memory reservation (MiB)']],
     'deployments' => ['project.cluster-application.deployments', 'deployments', ['Deployment history', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
     'logs' => ['project.cluster-application.logs', 'logs', ['Runtime Logs', 'Find in logs']],
+    'servers' => ['project.cluster-application.servers', 'servers', ['Open cluster', 'Open server']],
     'danger' => ['project.cluster-application.danger', 'danger', ['Danger zone', 'Delete application']],
 ]);
 
@@ -1133,6 +1137,8 @@ it('does not expose any cluster application section to another team', function (
     ]))->assertNotFound();
 })->with([
     'project.cluster-application.show',
+    'project.cluster-application.domains',
+    'project.cluster-application.servers',
     'project.cluster-application.environment-variables',
     'project.cluster-application.resource-limits',
     'project.cluster-application.deployments',

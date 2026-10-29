@@ -60,6 +60,12 @@ class NodeCluster extends BaseModel
         return in_array($this->network_status, ['active', 'degraded'], true) || $this->last_reconciled_at !== null;
     }
 
+    /** A cluster without servers has no network yet, so it shows no network status. */
+    public function hasNetworkStatus(): bool
+    {
+        return $this->relationLoaded('nodes') ? $this->nodes->isNotEmpty() : $this->nodes()->exists();
+    }
+
     public function networkStatusLabel(): string
     {
         return match ($this->network_status) {
