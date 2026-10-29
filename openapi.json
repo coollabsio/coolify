@@ -20992,10 +20992,6 @@
                                         "type": "string",
                                         "description": "The value of the environment variable."
                                     },
-                                    "is_preview": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -21087,10 +21083,6 @@
                                         "type": "string",
                                         "description": "The value of the environment variable."
                                     },
-                                    "is_preview": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -21180,10 +21172,6 @@
                                                 "value": {
                                                     "type": "string",
                                                     "description": "The value of the environment variable."
-                                                },
-                                                "is_preview": {
-                                                    "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable is used in preview deployments."
                                                 },
                                                 "is_literal": {
                                                     "type": "boolean",
@@ -25986,9 +25974,6 @@
                     "is_logdrain_custom_enabled": {
                         "type": "boolean"
                     },
-                    "is_logdrain_highlight_enabled": {
-                        "type": "boolean"
-                    },
                     "is_logdrain_newrelic_enabled": {
                         "type": "boolean"
                     },
@@ -26070,9 +26055,6 @@
                         "type": "string"
                     },
                     "logdrain_custom_config_parser": {
-                        "type": "string"
-                    },
-                    "logdrain_highlight_project_id": {
                         "type": "string"
                     },
                     "logdrain_newrelic_base_uri": {
