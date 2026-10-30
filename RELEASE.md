@@ -132,7 +132,7 @@ The nightly workflow publishes a nightly twice a day when its branch has a new c
 | after 5.1.0                    | `5.2.0-alpha.0.20261016.1` |
 
 - It comes from `next`, or from the lowest release branch while one is in progress: `release/v5.1` takes it over once it is cut and hands it back once `5.1.0` is released
-- The base is the prerelease `preview` of that branch sets in `release.json`, else its next version with `-alpha.0`, which is never released
+- The base is the `preview` version of that branch in `release.json` while it is ahead of the newest stable version, a plain one with `-alpha.0`. Otherwise it is the next version with `-alpha.0`, which is never released. A pull request takes the same base
 - N counts up per day and base
 - No git tag and no GitHub release, only its image tag, the moving `nightly` tag and the nightly channel of the CDN
 
@@ -148,8 +148,11 @@ Print what the next run builds with `scripts/plan-version.sh --main`.
 
 ## Pull requests
 
-Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and its nightlies and before `4.6.0-beta.2`.
+The pull request workflow builds every pull request and publishes the image of a pull request from a branch of this repository as `ghcr.io/coollabsio/coolify:pr-<number>`. Its version is `<base>-pr.<number>`, with the base a nightly of its base branch takes, or the stable version for `main`:
 
+- Into `next`: `4.6.0-beta.1-pr.1234` after `4.6.0-beta.1`, or `4.7.0-alpha.0-pr.1234` before the first alpha of 4.7.0
+- Into `main`: `4.5.3-pr.1234`
+- PHP's `version_compare` sorts it after its base and the nightlies of the base and before the next prerelease or release, so an instance on it updates to the release that ships it
 - Pull requests from forks and Dependabot are built, not published
 - A push to a pull request from `main`, `next`, a release branch or a patch branch that changes `release.json` is not built, the release workflow builds it
 - Pull request builds are published to ghcr.io only, as the Docker Hub credentials are in the `release` environment, which no pull request run can use
