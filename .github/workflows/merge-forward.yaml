@@ -1,8 +1,6 @@
 name: Merge forward
 
 on:
-  schedule:
-    - cron: "40 8,19 * * *"
   workflow_dispatch:
   workflow_call:
 
