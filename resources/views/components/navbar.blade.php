@@ -109,6 +109,10 @@
             @php
                 // Members limited to some projects only see project pages; team-level pages return 403 for them.
                 $teamWide = app(App\Services\Access\AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
+                // Project and environment variables need read access there; opening a parent of a granted resource is not enough.
+                $readableProjects = $teamWide ? null : App\Models\Project::ownedByCurrentTeamCached();
+                $canReadProjectVariables = $teamWide || $readableProjects->contains(fn ($project) => auth()->user()->can('viewSharedVariables', $project));
+                $canReadEnvironmentVariables = $teamWide || $readableProjects->contains(fn ($project) => $project->environments->contains(fn ($environment) => auth()->user()->can('viewSharedVariables', $environment)));
                 // An entry with children opens a submenu in place of the main menu (back button + its pages).
                 $navSections = collect([
                     'Workspace' => [
@@ -131,8 +135,8 @@
                         ['label' => 'Shared Variables', 'icon' => 'variables', 'children' => [
                             ['label' => 'Overview', 'icon' => 'dashboard', 'href' => route('shared-variables.index'), 'active' => request()->is('shared-variables'), 'visible' => $teamWide],
                             ['label' => 'Team', 'icon' => 'teams', 'href' => route('shared-variables.team.index'), 'active' => request()->is('shared-variables/team*'), 'visible' => $teamWide],
-                            ['label' => 'Projects', 'icon' => 'projects', 'href' => route('shared-variables.project.index'), 'active' => request()->is('shared-variables/projects', 'shared-variables/project/*')],
-                            ['label' => 'Environments', 'icon' => 'layers', 'href' => route('shared-variables.environment.index'), 'active' => request()->is('shared-variables/environments*')],
+                            ['label' => 'Projects', 'icon' => 'projects', 'href' => route('shared-variables.project.index'), 'active' => request()->is('shared-variables/projects', 'shared-variables/project/*'), 'visible' => $canReadProjectVariables],
+                            ['label' => 'Environments', 'icon' => 'layers', 'href' => route('shared-variables.environment.index'), 'active' => request()->is('shared-variables/environments*'), 'visible' => $canReadEnvironmentVariables],
                             ['label' => 'Servers', 'icon' => 'servers', 'href' => route('shared-variables.server.index'), 'active' => request()->is('shared-variables/servers', 'shared-variables/server/*'), 'visible' => $teamWide],
                         ]],
                     ],
@@ -178,9 +182,13 @@
                         }
                         $children = array_values(array_filter($item['children'], fn (array $child): bool => (bool) ($child['visible'] ?? true)));
 
-                        return [...$item, 'children' => $children, 'href' => $children[0]['href'], 'active' => collect($children)->contains('active', true)];
+                        return [...$item, 'children' => $children, 'href' => $children[0]['href'] ?? null, 'active' => collect($children)->contains('active', true)];
                     })
-                    ->all());
+                    // A parent whose children are all hidden has nothing to open.
+                    ->reject(fn (array $item): bool => isset($item['children']) && $item['children'] === [])
+                    ->values()
+                    ->all())
+                    ->reject(fn (array $items): bool => $items === []);
                 $activeSubmenu = $navSections->flatten(1)->first(fn (array $item): bool => isset($item['children']) && $item['active']);
                 // Resource menus by depth, registered by registerMainNavContext() (e.g. from
                 // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth}

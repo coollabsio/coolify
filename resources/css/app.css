@@ -515,7 +515,7 @@ option {
 }
 
 .button.button-error:disabled {
-    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800;
+    @apply text-neutral-300 dark:text-fg-faint bg-transparent dark:bg-transparent border-neutral-200 dark:border-white/[0.06];
 }
 
 .button-error:not(:disabled) {

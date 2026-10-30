@@ -12,7 +12,9 @@ class Index extends Component
 
     public function mount()
     {
-        $this->projects = Project::ownedByCurrentTeamCached();
+        $this->projects = Project::ownedByCurrentTeamCached()
+            ->filter(fn (Project $project) => auth()->user()->can('viewSharedVariables', $project))
+            ->values();
     }
 
     public function render()

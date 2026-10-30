@@ -11,7 +11,7 @@
             }
         }">
             @if ($projects->isEmpty())
-                <x-empty title="No environments yet" description="Create a project environment before adding environment-wide variables." icon-name="layers" />
+                <x-empty title="No environments" description="Environments that you can read show here. Create an environment to add environment-wide variables." icon-name="layers" />
             @else
                 <x-shared-variables.view-controls label="environments" storage-key="shared-variables-environments-view" />
 

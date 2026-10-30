@@ -37,7 +37,7 @@ class SharedVariableCanvasController extends Controller
         if ($owner instanceof JsonResponse) {
             return $owner;
         }
-        $this->authorize('view', $owner);
+        $this->authorize('viewSharedVariables', $owner);
 
         return response()->json($this->canvas->payload($scope, $owner, $this->canEdit($request, $scope, $owner)));
     }
@@ -49,7 +49,7 @@ class SharedVariableCanvasController extends Controller
         if ($owner instanceof JsonResponse) {
             return $owner;
         }
-        $this->authorize('view', $owner);
+        $this->authorize('viewSharedVariables', $owner);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -108,7 +108,7 @@ class SharedVariableCanvasController extends Controller
         if ($owner instanceof JsonResponse) {
             return $owner;
         }
-        $this->authorize('view', $owner);
+        $this->authorize('viewSharedVariables', $owner);
 
         [$source, $target] = array_pad(explode('|', (string) $request->route('link_id'), 2), 2, '');
         $resource = $this->canvas->resources($scope, $owner)->get($target);

@@ -164,9 +164,10 @@ class Show extends Component
      */
     public function loadValues(): void
     {
-        $this->authorize('viewSensitive', $this->env);
+        $this->authorize('view', $this->env);
 
-        if ($this->valuesLoaded) {
+        // Users without viewSensitive open the editor with the value hidden; nothing to decrypt.
+        if ($this->valuesLoaded || $this->valuesHiddenForUser()) {
             return;
         }
 

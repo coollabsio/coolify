@@ -27,6 +27,15 @@ class EnvironmentPolicy
     }
 
     /**
+     * Determine whether the user can read the shared variables of the environment.
+     * Opening an environment for navigation is not enough; this needs read access on the environment.
+     */
+    public function viewSharedVariables(User $user, Environment $environment): bool
+    {
+        return $user->canAccess(AccessLevel::Read, $environment);
+    }
+
+    /**
      * Determine whether the user can create environments, in the project when one is given.
      */
     public function create(User $user, ?Project $project = null): bool
