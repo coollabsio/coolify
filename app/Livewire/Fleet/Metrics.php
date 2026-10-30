@@ -5,13 +5,13 @@ namespace App\Livewire\Fleet;
 use App\Livewire\Concerns\BuildsMetricsChartPayload;
 use App\Models\Application;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
 use App\Services\FleetMetricsAggregator;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Concurrency;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
@@ -257,34 +257,21 @@ class Metrics extends Component
 
         $targets = $this->targetServers();
         $clients = [];
-        $summaryTasks = [];
         foreach ($targets as $server) {
-            // Coolify does not connect to an unreachable server, and its SSH retries would hold a worker past the process timeout.
-            if (! $server->isFunctional()) {
-                continue;
-            }
-            $client = $clients[$server->uuid] = $this->metricsClient($server);
-            $summaryTasks[$server->uuid] = static fn () => $client->summary();
-        }
-        $summaries = $this->runMetricTasks($summaryTasks);
-        $tasks = [];
-        $range = $this->range;
-        foreach ($clients as $uuid => $client) {
-            $metrics = $summaries[$uuid] === null ? ['cpu', 'memory'] : ['cpu', 'memory', 'disk', 'load'];
-            foreach ($metrics as $metric) {
-                $tasks[$uuid.':'.$metric] = static fn () => $client->history($metric, $range);
-            }
-            if ($summaries[$uuid] !== null) {
-                $tasks[$uuid.':containers'] = static fn () => $client->containersCurrent();
-                $tasks[$uuid.':network'] = static fn () => $client->networkHistory($range);
+            // Coolify does not connect to an unreachable server.
+            if ($server->isFunctional()) {
+                $clients[$server->uuid] = $this->metricsClient($server);
             }
         }
-        $results = $this->runMetricTasks($tasks);
+        SentinelMetricsClient::prefetchConcurrently($clients, $this->range);
 
         foreach ($targets as $server) {
-            $summary = $summaries[$server->uuid] ?? null;
+            $client = $clients[$server->uuid] ?? null;
+            $summary = $client === null ? null : $this->attempt(fn () => $client->summary());
             foreach (['cpu', 'memory', 'disk', 'load'] as $metric) {
-                $series[$metric][] = $results[$server->uuid.':'.$metric] ?? [];
+                // A Sentinel without a summary endpoint still has cpu and memory history.
+                $read = $client !== null && ($summary !== null || in_array($metric, ['cpu', 'memory'], true));
+                $series[$metric][] = $read ? ($this->attempt(fn () => $client->history($metric, $this->range)) ?? []) : [];
             }
 
             if ($summary === null) {
@@ -293,19 +280,17 @@ class Metrics extends Component
                 continue;
             }
 
-            $current = $results[$server->uuid.':containers'] ?? [];
+            $current = $this->attempt(fn () => $client->containersCurrent()) ?? [];
             $rows[] = array_merge(
                 $summary,
                 ['uuid' => $server->uuid, 'name' => $server->name, 'online' => true, 'reporting' => true, 'containers' => count($current)]
             );
 
             foreach ($current as $c) {
-                // Names/images are resolved lazily for the displayed rows only (containerMeta),
-                // so a server with many containers doesn't trigger a resolve storm here.
                 $containers[] = array_merge($c, ['server' => $server->name, 'serverUuid' => $server->uuid]);
             }
 
-            $net = $results[$server->uuid.':network'] ?? ['rx' => [], 'tx' => []];
+            $net = $this->attempt(fn () => $client->networkHistory($this->range)) ?? ['rx' => [], 'tx' => []];
             $series['networkRx'][] = $net['rx'];
             $series['networkTx'][] = $net['tx'];
         }
@@ -320,34 +305,15 @@ class Metrics extends Component
     }
 
     /**
-     * Bound the number of PHP workers and SSH connections for large fleets.
-     *
-     * @param  array<string, \Closure>  $tasks
-     * @return array<string, mixed>
+     * One failed metric must not fail the others.
      */
-    protected function runMetricTasks(array $tasks): array
+    private function attempt(\Closure $read): mixed
     {
-        foreach ($tasks as $key => $task) {
-            $tasks[$key] = static function () use ($task) {
-                try {
-                    return $task();
-                } catch (\Throwable) {
-                    return null;
-                }
-            };
+        try {
+            return $read();
+        } catch (\Throwable) {
+            return null;
         }
-        $results = [];
-        foreach (array_chunk($tasks, 8, true) as $batch) {
-            try {
-                $results += Concurrency::run($batch);
-            } catch (\Throwable $e) {
-                // A worker that runs past the process timeout fails its batch. Show those metrics as missing, not a server error.
-                Log::warning('Fleet metrics batch failed', ['error' => $e->getMessage()]);
-                $results += array_fill_keys(array_keys($batch), null);
-            }
-        }
-
-        return $results;
     }
 
     /**
@@ -383,18 +349,27 @@ class Metrics extends Component
      */
     public function containerMeta(string $id): array
     {
-        if (isset($this->containerMetaCache[$id])) {
-            return $this->containerMetaCache[$id];
+        if (! isset($this->containerMetaCache[$id])) {
+            // Resolve every listed container at once, not one lookup per table row.
+            $this->resolveContainerMeta([...array_column($this->containersRaw, 'id'), $id]);
         }
 
+        return $this->containerMetaCache[$id];
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     */
+    private function resolveContainerMeta(array $ids): void
+    {
+        $ids = array_values(array_diff(array_unique($ids), array_keys($this->containerMetaCache)));
         $teamId = currentTeam()?->id;
-        $resource = $teamId !== null ? getResourceByUuid($id, $teamId) : null;
+        $resources = $teamId === null ? [] : $this->teamResourcesByUuid($ids, $teamId);
 
-        $image = null;
-        $link = null;
-        if ($resource) {
-            $image = data_get($resource, 'docker_registry_image_name') ?: data_get($resource, 'image');
-
+        foreach ($ids as $id) {
+            $resource = $resources[$id] ?? null;
+            $image = $resource ? (data_get($resource, 'docker_registry_image_name') ?: data_get($resource, 'image')) : null;
+            $link = null;
             if ($resource instanceof Application && data_get($resource, 'environment.project.uuid')) {
                 $link = route('project.application.metrics', [
                     'project_uuid' => $resource->environment->project->uuid,
@@ -402,13 +377,41 @@ class Metrics extends Component
                     'application_uuid' => $resource->uuid,
                 ]);
             }
+
+            $this->containerMetaCache[$id] = [
+                'name' => $resource?->name ?? $id,
+                'image' => $image ?: null,
+                'link' => $link,
+            ];
+        }
+    }
+
+    /**
+     * The team's resources with these uuids, one query per resource type.
+     *
+     * @param  array<int, string>  $uuids
+     * @return array<string, mixed> uuid => resource
+     */
+    private function teamResourcesByUuid(array $uuids, int $teamId): array
+    {
+        $found = [];
+        foreach ([Application::class, Service::class, ...array_values(STANDALONE_DATABASE_MODELS), ServiceDatabase::class] as $model) {
+            $missing = array_values(array_diff($uuids, array_keys($found)));
+            if ($missing === []) {
+                break;
+            }
+            $teamPath = $model === ServiceDatabase::class ? 'service.environment.project' : 'environment.project';
+            $model::query()
+                ->whereIn('uuid', $missing)
+                ->whereRelation($teamPath, 'team_id', $teamId)
+                ->with($teamPath)
+                ->get()
+                ->each(function ($resource) use (&$found) {
+                    $found[$resource->uuid] = $resource;
+                });
         }
 
-        return $this->containerMetaCache[$id] = [
-            'name' => $resource?->name ?? $id,
-            'image' => $image ?: null,
-            'link' => $link,
-        ];
+        return $found;
     }
 
     public function placeholder(): View

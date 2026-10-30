@@ -3,7 +3,6 @@
 use App\Models\Server;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
@@ -53,7 +52,6 @@ class FakeBrowserFleetMetricsClient extends SentinelMetricsClient
 
 beforeEach(function () {
     $this->stack = seedBrowserResourceStack(['serverName' => 'alpha']);
-    Concurrency::setDefaultInstance('sync');
     // The dashboard chart reads metrics over SSH for each server with metrics on.
     Process::fake();
 
@@ -121,11 +119,12 @@ it('sorts the servers and containers tables when a column header is selected', f
     $page->script('document.querySelector(\'#metrics-containers-section button[title="Sort by container"]\').click()');
     expect(visibleFleetMetricsRowNames($page, 'metrics-containers-section'))->toBe(['beta', 'zeta']);
 
+    // The CPU title is a tooltip, so select by the aria-label, which always starts with the column name.
     foreach (['memory' => ['beta', 'zeta'], 'disk' => ['beta', 'zeta'], 'network' => ['zeta', 'beta'], 'cpu' => ['zeta', 'beta']] as $metric => $expected) {
-        $page->script("document.querySelector('#metrics-containers-section button[title=\"Sort by {$metric}\"]').click()");
+        $page->script("document.querySelector('#metrics-containers-section button[aria-label^=\"Sort by {$metric}\"]').click()");
         expect(visibleFleetMetricsRowNames($page, 'metrics-containers-section'))->toBe($expected);
 
-        $page->script("document.querySelector('#metrics-containers-section button[title=\"Sort by {$metric}\"]').click()");
+        $page->script("document.querySelector('#metrics-containers-section button[aria-label^=\"Sort by {$metric}\"]').click()");
         expect(visibleFleetMetricsRowNames($page, 'metrics-containers-section'))->toBe(array_reverse($expected));
     }
 
