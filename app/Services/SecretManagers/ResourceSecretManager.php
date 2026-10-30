@@ -5,9 +5,11 @@ namespace App\Services\SecretManagers;
 use App\Models\IntegrationToken;
 use App\Models\SecretManagerLink;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -18,13 +20,19 @@ use Illuminate\Validation\ValidationException;
 class ResourceSecretManager
 {
     /**
-     * Secret manager tokens of the resource's team that have the secrets capability.
+     * Secret manager tokens of the resource's team that have the secrets capability. Without write access on
+     * the whole team, only the linked token: such a user cannot link another token.
      *
      * @return Collection<int, IntegrationToken>
      */
     public function availableTokens(Model $resource): Collection
     {
-        return $this->teamTokens($resource)->get()
+        $tokens = $this->teamTokens($resource);
+        if (! Gate::allows('useTeamCredentials', $resource)) {
+            $tokens->whereIn('id', $resource->secretManagerLink()->select('integration_token_id'));
+        }
+
+        return $tokens->get()
             ->filter(fn (IntegrationToken $token): bool => $token->hasCapability('secrets'))
             ->values();
     }
@@ -65,11 +73,15 @@ class ResourceSecretManager
 
     /**
      * Links the token as the source of the resource, or changes the token or settings of the existing link.
+     * Both need write access on the whole team: the token and its settings decide which secrets the resource reads.
      *
      * @param  array<string, mixed>  $settings
+     *
+     * @throws AuthorizationException
      */
     public function link(Model $resource, IntegrationToken $token, array $settings, string $auditSource): SecretManagerLink
     {
+        Gate::authorize('useTeamCredentials', $resource);
         $settings = array_filter($settings, fn ($value) => filled($value));
         $link = $resource->secretManagerLink()->updateOrCreate([], [
             'integration_token_id' => $token->id,

@@ -110,6 +110,7 @@ class GithubPrivateRepository extends Component
         $this->branches = collect();
         $this->total_branches_count = 0;
         $this->page = 1;
+        $this->authorize('useTeamCredentials');
         $this->selected_github_app_id = $github_app_id;
         $this->github_app = GithubApp::ownedByCurrentTeam()
             ->where('is_public', false)
@@ -230,6 +231,7 @@ class GithubPrivateRepository extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             $this->authorize('create', [Application::class, $environment]);
+            $this->authorize('useTeamCredentials');
 
             $application_init = [
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),

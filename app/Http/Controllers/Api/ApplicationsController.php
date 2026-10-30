@@ -5771,7 +5771,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $this->authorize('update', $application);
+        $this->authorize('delete', $application);
 
         $storageUuid = $request->route('storage_uuid');
 

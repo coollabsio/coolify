@@ -396,7 +396,7 @@ class VolumeBackupsController extends Controller
             return response()->json(['message' => 'Resource not found.'], 404);
         }
 
-        $this->authorize('update', $resource);
+        $this->authorize('delete', $resource);
 
         $storage = $this->findStorage($resource, $request->route('storage_uuid'));
         if (! $storage) {

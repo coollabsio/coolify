@@ -198,6 +198,7 @@ class Previews extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
+            $this->authorize('update', $this->application);
 
             $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
             $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
@@ -213,6 +214,7 @@ class Previews extends Component
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
             if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
+                $this->authorize('update', $this->application);
                 $found = ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
@@ -221,7 +223,8 @@ class Previews extends Component
                 ]);
                 $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
             }
-            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
+            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty() && $docker_registry_image_tag !== $found->docker_registry_image_tag) {
+                $this->authorize('update', $this->application);
                 $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
             }
             $result = queue_application_deployment(
@@ -230,7 +233,7 @@ class Previews extends Component
                 force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
-                docker_registry_image_tag: $docker_registry_image_tag,
+                docker_registry_image_tag: $this->application->build_pack === 'dockerimage' ? $found?->docker_registry_image_tag : null,
             );
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);

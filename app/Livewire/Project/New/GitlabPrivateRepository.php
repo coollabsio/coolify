@@ -63,6 +63,8 @@ class GitlabPrivateRepository extends Component
 
     private function getGitlabApp(): GitlabApp
     {
+        $this->authorize('useTeamCredentials');
+
         return GitlabApp::private()->where('id', $this->gitlab_app_id)->firstOrFail();
     }
 

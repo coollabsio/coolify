@@ -45,9 +45,9 @@
                             @if ($selectedToken->dopplerTokenType() === 'service_account')
                                 <div class="grid gap-4 lg:grid-cols-2">
                                     <x-forms.input required id="settings.project" label="Project (required)"
-                                        wire:blur="saveSettings" />
+                                        canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                                     <x-forms.input required id="settings.config" label="Config (required)" placeholder="prd"
-                                        wire:blur="saveSettings" />
+                                        canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                                 </div>
                             @else
                                 <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
@@ -57,18 +57,18 @@
                         @elseif ($selectedToken?->provider === 'infisical')
                             <div class="grid gap-4 lg:grid-cols-3">
                                 <x-forms.input required id="settings.project_id" label="Project ID"
-                                    wire:blur="saveSettings" />
+                                    canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                                 <x-forms.input required id="settings.environment" label="Environment slug"
-                                    placeholder="prod" wire:blur="saveSettings" />
+                                    placeholder="prod" canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                                 <x-forms.input id="settings.secret_path" label="Secret path" placeholder="/"
-                                    wire:blur="saveSettings" />
+                                    canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                             </div>
                         @elseif ($selectedToken?->provider === 'vault')
                             <div class="grid gap-4 lg:grid-cols-2">
                                 <x-forms.input required id="settings.mount" label="KV v2 mount" placeholder="secret"
-                                    wire:blur="saveSettings" />
+                                    canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                                 <x-forms.input required id="settings.path" label="Secret path"
-                                    placeholder="my-app/production" wire:blur="saveSettings" />
+                                    placeholder="my-app/production" canGate="useTeamCredentials" :canResource="$resource" wire:blur="saveSettings" />
                             </div>
                         @endif
 

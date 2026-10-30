@@ -3069,7 +3069,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3205,7 +3205,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -4999,7 +4999,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         $storageUuid = $request->route('storage_uuid');
 

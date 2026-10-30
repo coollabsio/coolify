@@ -250,6 +250,8 @@ trait InteractsWithDnsProviders
             return;
         }
 
+        $event = $this->teamChannelPayload($event);
+
         if (! is_string($event['hostname'] ?? null) || ! is_string($event['resourceType'] ?? null)
             || ! is_scalar($event['resourceId'] ?? null) || ! is_bool($event['successful'] ?? null)
             || ! is_string($event['credential'] ?? null) || ! is_string($event['message'] ?? null)

@@ -3040,7 +3040,7 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $this->authorize('update', $service);
+        $this->authorize('delete', $service);
 
         $storageUuid = $request->route('storage_uuid');
 

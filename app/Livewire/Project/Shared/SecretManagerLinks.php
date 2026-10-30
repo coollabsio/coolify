@@ -135,6 +135,7 @@ class SecretManagerLinks extends Component
     public function saveSettings(): void
     {
         $this->authorize('update', $this->resource);
+        $this->authorize('useTeamCredentials', $this->resource);
 
         if (! $this->link) {
             return;

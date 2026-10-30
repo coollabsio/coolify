@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
@@ -26,6 +27,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
+use Livewire\Livewire;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
@@ -52,6 +54,16 @@ class AppServiceProvider extends ServiceProvider
         $this->configureOidcSocialite();
         $this->configureQueue();
         $this->configureServerTransferImport();
+        $this->configureLivewire();
+    }
+
+    /**
+     * Livewire updates skip route middleware. Run the team-wide access check again on each update,
+     * so a page that is already open stops working when an admin limits the member to some projects.
+     */
+    private function configureLivewire(): void
+    {
+        Livewire::addPersistentMiddleware([EnsureTeamWideAccess::class]);
     }
 
     /**

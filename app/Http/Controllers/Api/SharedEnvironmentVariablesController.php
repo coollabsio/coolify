@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\Team;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -337,7 +338,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $teamId;
         }
 
-        $this->authorize('viewAny', SharedEnvironmentVariable::class);
+        $this->authorize('viewSharedVariables', Team::findOrFail($teamId));
 
         return $this->listEnvs($teamId, 'team');
     }
@@ -463,7 +464,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $project;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('viewSharedVariables', $project);
 
         return $this->listEnvs($teamId, 'project', ['project_id' => $project->id]);
     }
@@ -619,7 +620,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $environment);
+        $this->authorize('viewSharedVariables', $environment);
 
         return $this->listEnvs($teamId, 'environment', ['environment_id' => $environment->id]);
     }
@@ -787,7 +788,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $server;
         }
 
-        $this->authorize('view', $server);
+        $this->authorize('viewSharedVariables', $server);
 
         return $this->listEnvs($teamId, 'server', ['server_id' => $server->id]);
     }

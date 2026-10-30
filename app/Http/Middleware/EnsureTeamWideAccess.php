@@ -19,7 +19,7 @@ class EnsureTeamWideAccess
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        $teamId = $user?->currentTeam()?->id;
+        $teamId = data_get($user?->currentAccessToken(), 'team_id') ?? $user?->currentTeam()?->id;
 
         if ($teamId !== null && ! app(AccessResolver::class)->coversWholeTeam($user, $teamId)) {
             abort(403, 'Your access in this team is limited to some projects.');
