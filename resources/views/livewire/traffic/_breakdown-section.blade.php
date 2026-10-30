@@ -21,7 +21,8 @@
         <x-empty size="sm" title="No data"
             :description="'No '.strtolower($label).' data for the selected range.'" icon-name="network" />
     @else
-        <div x-data="trafficTable()">
+        {{-- Keyed so the lazy-load morph does not reuse the placeholder skeleton nodes. --}}
+        <div wire:key="analytics-{{ $dimension }}-table" x-data="trafficTable()">
             <div class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
                 @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Name', 'text' => true, 'class' => 'min-w-0 flex-1'])
                 <span class="hidden w-16 shrink-0 sm:inline" aria-hidden="true"></span>
