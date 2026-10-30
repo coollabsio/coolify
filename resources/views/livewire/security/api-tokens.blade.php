@@ -196,12 +196,12 @@
                                                 </x-slot:trigger>
                                                 <button type="button" role="menuitem"
                                                     x-on:click="close(); editToken(@js(App\Livewire\Forms\ApiTokenForm::valuesOf($token)))"
-                                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                    class="listbox-option justify-start!">
                                                     Edit
                                                 </button>
                                                 <button type="button" role="menuitem" x-on:click="close()"
                                                     wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})"
-                                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                    class="listbox-option justify-start!">
                                                     {{ $token->isPaused() ? 'Resume' : 'Pause' }}
                                                 </button>
                                                 <x-modal-confirmation title="Roll API Token?" buttonFullWidth
@@ -215,11 +215,12 @@
                                                     :confirmWithPassword="false" step2ButtonText="Roll token">
                                                     <x-slot:trigger>
                                                         <button type="button" role="menuitem" x-on:click="close()"
-                                                            class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                            class="listbox-option justify-start!">
                                                             Roll
                                                         </button>
                                                     </x-slot:trigger>
                                                 </x-modal-confirmation>
+                                                <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
                                                 <x-modal-confirmation title="Confirm API Token Revocation?" buttonFullWidth
                                                     submitAction="revoke({{ $token->id }})" :actions="[
                                                         'This API token will be permanently revoked.',
@@ -230,7 +231,7 @@
                                                     :confirmWithPassword="false" step2ButtonText="Revoke token">
                                                     <x-slot:trigger>
                                                         <button type="button" role="menuitem" x-on:click="close()"
-                                                            class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-error hover:bg-error/10">
+                                                            class="listbox-option justify-start! text-error! hover:text-error!">
                                                             Revoke
                                                         </button>
                                                     </x-slot:trigger>

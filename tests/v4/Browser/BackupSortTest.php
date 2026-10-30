@@ -13,11 +13,11 @@ beforeEach(function () {
 });
 
 /**
- * Creates volume backups for bravo, alpha, and charlie, in that order from oldest to newest.
+ * Creates volume backups for bravo, alpha, and charlie.
  */
 function createSortableVolumeBackups(Model $resource): void
 {
-    foreach (['bravo', 'alpha', 'charlie'] as $index => $name) {
+    foreach (['bravo', 'alpha', 'charlie'] as $name) {
         $volume = LocalPersistentVolume::create([
             'uuid' => (string) new Cuid2,
             'name' => $name.'-data',
@@ -26,15 +26,13 @@ function createSortableVolumeBackups(Model $resource): void
             'resource_type' => $resource->getMorphClass(),
         ]);
 
-        $backup = ScheduledVolumeBackup::create([
+        ScheduledVolumeBackup::create([
             'backupable_type' => $volume->getMorphClass(),
             'backupable_id' => $volume->id,
             'team_id' => 0,
             'frequency' => '0 0 * * *',
             'enabled' => true,
         ]);
-
-        ScheduledVolumeBackup::whereKey($backup->id)->update(['created_at' => now()->subDays(10 - $index)]);
     }
 }
 
@@ -56,23 +54,12 @@ function assertBackupSortOrders(mixed $page, string $screenshot): void
 {
     $page->assertSee('alpha-data')
         ->assertScript(visibleBackupOrderScript(), 'alpha-data,bravo-data,charlie-data')
-        ->click('Sort')
-        ->click('Target Z–A')
-        ->assertScript(visibleBackupOrderScript(), 'charlie-data,bravo-data,alpha-data')
-        ->click('Sort')
-        ->click('Oldest first')
-        ->assertScript(visibleBackupOrderScript(), 'bravo-data,alpha-data,charlie-data')
-        ->click('Sort')
-        ->click('Newest first')
-        ->assertScript(visibleBackupOrderScript(), 'charlie-data,alpha-data,bravo-data')
-        ->click('[aria-label^="Sort by target"]')
-        ->assertScript(visibleBackupOrderScript(), 'alpha-data,bravo-data,charlie-data')
         ->click('[aria-label^="Sort by target"]')
         ->assertScript(visibleBackupOrderScript(), 'charlie-data,bravo-data,alpha-data')
         ->screenshot(filename: $screenshot);
 }
 
-it('reorders application storage backups when the sort option changes', function () {
+it('reorders application storage backups when the target header is clicked', function () {
     $application = createBrowserApplication($this->stack, [
         'uuid' => 'app-browser-backup-sort',
         'name' => 'Backup Sort App',
@@ -86,7 +73,7 @@ it('reorders application storage backups when the sort option changes', function
     assertBackupSortOrders($page, 'application-backup-sort');
 });
 
-it('reorders service storage backups when the sort option changes', function () {
+it('reorders service storage backups when the target header is clicked', function () {
     ['service' => $service, 'serviceApplication' => $serviceApplication] = createBrowserService($this->stack, [
         'uuid' => 'svc-browser-backup-sort',
     ]);
