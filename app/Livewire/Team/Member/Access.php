@@ -25,7 +25,11 @@ use Livewire\Component;
  * Edits the access grants (`team_user.access`) of one member with the `member` role.
  *
  * The members page renders one editor; a member row opens it with the `open-member-access` event.
- * A row target is `team`, or `<scope>:<uuid>` for a project, environment, or resource of the team.
+ * A row has one or more targets, and its levels apply to each of them: `team`, or `<scope>:<uuid>`
+ * for a project, environment, or resource of the team. Saving stores one grant for each target.
+ *
+ * The invite form opens the same editor with `open-invitation-access`. Then saving sends the grants
+ * back to the invite form with `invitation-access-chosen` and stores nothing.
  */
 class Access extends Component
 {
@@ -37,9 +41,12 @@ class Access extends Component
     #[Locked]
     public ?int $memberId = null;
 
+    #[Locked]
+    public bool $forInvitation = false;
+
     public bool $open = false;
 
-    /** @var list<array{key: string, target: string, levels: array<string, bool>}> */
+    /** @var list<array{key: string, targets: list<string>, levels: array<string, bool>}> */
     public array $grants = [];
 
     public function mount(): void
@@ -54,67 +61,59 @@ class Access extends Component
     {
         $this->authorize('manageMembers', Team::findOrFail($this->teamId));
         $this->memberId = $memberId;
+        $this->forInvitation = false;
         $this->resetValidation();
 
         $stored = $this->member()->pivot->access;
-        $grants = $stored === null ? AccessResolver::defaultMemberGrants() : Grant::listFrom($stored);
-        $this->grants = array_map(
-            fn (Grant $grant) => $this->row($grant->scope === AccessScope::Team ? 'team' : "{$grant->scope->value}:{$grant->uuid}", $grant->levels),
-            $grants,
-        );
+        $this->grants = $this->rowsFrom($stored === null ? AccessResolver::defaultMemberGrants() : Grant::listFrom($stored));
         $this->open = true;
     }
 
-    public function addGrant(): void
+    /**
+     * @param  list<array{scope: string, uuid: string|null, levels: list<string>}>  $access
+     */
+    #[On('open-invitation-access')]
+    public function openForInvitation(array $access): void
     {
-        $this->grants[] = $this->row('', []);
-    }
-
-    public function removeGrant(string $key): void
-    {
-        $this->grants = array_values(array_filter($this->grants, fn (array $row) => $row['key'] !== $key));
-    }
-
-    public function applyPreset(string $preset, ?string $projectUuid = null): void
-    {
-        $this->grants = match ($preset) {
-            'viewer' => [$this->row('team', [AccessLevel::Read])],
-            'developer' => [$this->row("project:{$projectUuid}", [AccessLevel::Write, AccessLevel::Deploy])],
-            'operator' => [$this->row('team', [AccessLevel::Write, AccessLevel::Deploy, AccessLevel::Delete])],
-            'full' => [$this->row('team', [AccessLevel::Root])],
-            default => $this->grants,
-        };
+        $this->authorize('manageInvitations', Team::findOrFail($this->teamId));
+        $this->memberId = null;
+        $this->forInvitation = true;
         $this->resetValidation();
+
+        $this->grants = $this->rowsFrom(Grant::listFrom($access));
+        $this->open = true;
+    }
+
+    /**
+     * The grants of a preset, or null for an unknown preset. The developer preset needs a project UUID.
+     *
+     * @return list<Grant>|null
+     */
+    public static function presetGrants(string $preset, ?string $projectUuid = null): ?array
+    {
+        return match ($preset) {
+            'viewer' => [Grant::team([AccessLevel::Read])],
+            'developer' => filled($projectUuid) ? [new Grant(AccessScope::Project, $projectUuid, [AccessLevel::Write, AccessLevel::Deploy])] : null,
+            'operator' => [Grant::team([AccessLevel::Write, AccessLevel::Deploy, AccessLevel::Delete])],
+            'full' => [Grant::team([AccessLevel::Root])],
+            default => null,
+        };
     }
 
     public function save(): void
     {
+        if ($this->forInvitation) {
+            $this->authorize('manageInvitations', Team::findOrFail($this->teamId));
+            $grants = $this->validatedGrants();
+            $this->dispatch('invitation-access-chosen', access: Grant::listToArray($grants));
+            $this->open = false;
+
+            return;
+        }
+
         $this->authorize('manageMembers', Team::findOrFail($this->teamId));
         $member = $this->member();
-
-        $validTargets = collect($this->scopeOptions)->reject(fn (array $option) => $option['header'] ?? false)->pluck('value')->all();
-        $grants = [];
-        $errors = [];
-        foreach ($this->grants as $index => $row) {
-            $target = (string) ($row['target'] ?? '');
-            $levels = array_values(array_filter(AccessLevel::cases(), fn (AccessLevel $level) => (bool) ($row['levels'][$level->name] ?? false)));
-
-            if (! in_array($target, $validTargets, true)) {
-                $errors["grants.{$index}.target"] = 'Choose a scope in this team.';
-            }
-            if ($levels === []) {
-                $errors["grants.{$index}.levels"] = 'Choose at least one level.';
-            }
-            if (isset($errors["grants.{$index}.target"]) || isset($errors["grants.{$index}.levels"])) {
-                continue;
-            }
-
-            [$scope, $uuid] = $target === 'team' ? ['team', null] : explode(':', $target, 2);
-            $grants[] = new Grant(AccessScope::from($scope), $uuid, $levels);
-        }
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
-        }
+        $grants = $this->validatedGrants();
 
         $member->teams()->updateExistingPivot($this->teamId, ['access' => json_encode(Grant::listToArray($grants))]);
         app(AccessResolver::class)->flush();
@@ -133,6 +132,50 @@ class Access extends Component
     }
 
     /**
+     * Grant targets (`team` or `<scope>:<uuid>`) that exist in a team.
+     *
+     * @return list<string>
+     */
+    public static function validTargets(int $teamId): array
+    {
+        return collect(self::scopeOptionsFor($teamId))->reject(fn (array $option) => $option['header'] ?? false)->pluck('value')->all();
+    }
+
+    /**
+     * @return list<Grant>
+     */
+    private function validatedGrants(): array
+    {
+        $validTargets = self::validTargets($this->teamId);
+        $grants = [];
+        $errors = [];
+        foreach ($this->grants as $index => $row) {
+            $targets = array_values(array_unique(array_map('strval', (array) ($row['targets'] ?? []))));
+            $levels = array_values(array_filter(AccessLevel::cases(), fn (AccessLevel $level) => (bool) ($row['levels'][$level->name] ?? false)));
+
+            if ($targets === [] || array_diff($targets, $validTargets) !== []) {
+                $errors["grants.{$index}.targets"] = 'Choose at least one scope in this team.';
+            }
+            if ($levels === []) {
+                $errors["grants.{$index}.levels"] = 'Choose at least one level.';
+            }
+            if (isset($errors["grants.{$index}.targets"]) || isset($errors["grants.{$index}.levels"])) {
+                continue;
+            }
+
+            foreach ($targets as $target) {
+                [$scope, $uuid] = $target === 'team' ? ['team', null] : explode(':', $target, 2);
+                $grants[] = new Grant(AccessScope::from($scope), $uuid, $levels);
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $grants;
+    }
+
+    /**
      * Every project, environment, and resource of the team, for the scope picker.
      * Queries skip the access-grant scope: only owners and admins open this editor, and they see the whole team.
      *
@@ -141,8 +184,16 @@ class Access extends Component
     #[Computed]
     public function scopeOptions(): array
     {
+        return self::scopeOptionsFor($this->teamId);
+    }
+
+    /**
+     * @return list<array{value: string, label: string, header?: bool}>
+     */
+    private static function scopeOptionsFor(int $teamId): array
+    {
         $projects = Project::withoutGlobalScope(VisibleThroughAccessGrants::class)
-            ->where('team_id', $this->teamId)
+            ->where('team_id', $teamId)
             ->orderBy('name')
             ->get(['id', 'uuid', 'name']);
         $environments = Environment::withoutGlobalScope(VisibleThroughAccessGrants::class)
@@ -206,16 +257,30 @@ class Access extends Component
 
     public function render(): View
     {
-        if ($this->memberId === null) {
-            return view('livewire.team.member.access', ['member' => null]);
+        if ($this->forInvitation) {
+            $title = 'Access for the invited member';
+            $currentSummary = null;
+        } elseif ($this->memberId !== null) {
+            $member = $this->member();
+            $title = "Access for {$member->name}";
+            $currentSummary = self::summary($member->pivot->access);
+        } else {
+            return view('livewire.team.member.access', ['title' => null]);
         }
-        $member = $this->member();
 
         return view('livewire.team.member.access', [
-            'member' => $member,
+            'title' => $title,
             'team' => Team::findOrFail($this->teamId),
-            'currentSummary' => self::summary($member->pivot->access),
-            'levels' => AccessLevel::cases(),
+            'currentSummary' => $currentSummary,
+            'levels' => collect(AccessLevel::cases())->map(fn (AccessLevel $level) => [
+                'name' => $level->name,
+                'label' => $level->label(),
+                'description' => $level->description(),
+                'includes' => array_map(fn (AccessLevel $included) => $included->name, $level->includes()),
+            ])->all(),
+            'presets' => collect(['viewer', 'developer', 'operator', 'full'])->mapWithKeys(fn (string $preset) => [
+                $preset => $this->rowsFrom(self::presetGrants($preset, '__project__'))[0],
+            ])->all(),
             'projectOptions' => collect($this->scopeOptions)->filter(fn (array $option) => str_starts_with($option['value'], 'project:'))->values(),
         ]);
     }
@@ -229,14 +294,33 @@ class Access extends Component
     }
 
     /**
-     * @param  list<AccessLevel>  $levels
-     * @return array{key: string, target: string, levels: array<string, bool>}
+     * Editor rows for stored grants. Grants with the same levels share one row.
+     *
+     * @param  list<Grant>  $grants
+     * @return list<array{key: string, targets: list<string>, levels: array<string, bool>}>
      */
-    private function row(string $target, array $levels): array
+    private function rowsFrom(array $grants): array
+    {
+        return collect($grants)
+            ->groupBy(fn (Grant $grant) => implode(',', array_map(fn (AccessLevel $level) => $level->name, $grant->levels)))
+            ->map(fn ($group) => $this->row(
+                $group->map(fn (Grant $grant) => $grant->scope === AccessScope::Team ? 'team' : "{$grant->scope->value}:{$grant->uuid}")->unique()->values()->all(),
+                $group->first()->levels,
+            ))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $targets
+     * @param  list<AccessLevel>  $levels
+     * @return array{key: string, targets: list<string>, levels: array<string, bool>}
+     */
+    private function row(array $targets, array $levels): array
     {
         return [
             'key' => Str::random(10),
-            'target' => $target,
+            'targets' => $targets,
             'levels' => collect(AccessLevel::cases())->mapWithKeys(fn (AccessLevel $level) => [$level->name => in_array($level, $levels, true)])->all(),
         ];
     }

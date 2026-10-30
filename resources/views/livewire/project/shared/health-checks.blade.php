@@ -92,19 +92,19 @@
                 </div>
             </x-application.settings-subsection>
         @endif
-    </x-application.settings-section>
 
-    <x-application.settings-section id="healthcheck-timing-section" title="Timing and retries"
-        helper="Control how quickly healthchecks start, repeat, and fail.">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckInterval" placeholder="30" label="Interval (seconds)" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckTimeout" placeholder="30" label="Timeout (seconds)" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckRetries" placeholder="3" label="Retries" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckStartPeriod" placeholder="30" label="Start period (seconds)" required />
-        </div>
+        <x-application.settings-subsection id="healthcheck-timing-section" title="Timing and retries"
+            helper="Control how quickly healthchecks start, repeat, and fail.">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckInterval" placeholder="30" label="Interval (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckTimeout" placeholder="30" label="Timeout (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckRetries" placeholder="3" label="Retries" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckStartPeriod" placeholder="30" label="Start period (seconds)" required />
+            </div>
+        </x-application.settings-subsection>
     </x-application.settings-section>
 </form>
