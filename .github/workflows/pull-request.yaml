@@ -16,9 +16,37 @@ defaults:
     shell: bash
 
 jobs:
+  detect:
+    name: Detect release push
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    outputs:
+      release: ${{ steps.detect.outputs.release }}
+    steps:
+      - name: Check whether the push releases
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTION: ${{ github.event.action }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          release=false
+          if [ "$ACTION" = synchronize ] && [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] \
+            && [[ "$HEAD_BRANCH" =~ ^(main|next|v[0-9]+(\.[0-9]+)?\.x|release/v[0-9]+\.[0-9]+)$ ]]; then
+            files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$AFTER" --jq '.files[].filename')"
+            ! grep -qxE 'release\.json' <<< "$files" || release=true
+          fi
+          echo "release=$release" | tee -a "$GITHUB_OUTPUT"
+
   build:
     name: Build
-    if: ${{ github.event.pull_request.head.repo.full_name != github.repository || !(github.head_ref == 'main' || github.head_ref == 'next' || startsWith(github.head_ref, 'release/') || endsWith(github.head_ref, '.x')) }}
+    needs: detect
+    if: ${{ needs.detect.outputs.release == 'false' }}
     permissions:
       contents: read
     uses: $/.github/workflows/build.yaml
