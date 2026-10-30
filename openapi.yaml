@@ -10879,7 +10879,7 @@ paths:
         - 'Secret Managers'
       summary: 'Set Secret Manager Source'
       description: 'Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.'
-      operationId: configure-application-secret-manager
+      operationId: set-secret-manager-source
       parameters:
         -
           name: resource_type
@@ -10911,6 +10911,47 @@ paths:
                   type: string
                 settings:
                   description: 'Doppler service account: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.'
+                  type: object
+              type: object
+      responses:
+        '200':
+          description: 'Secret manager configured.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'No write access to the resource.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/secret-manager':
+    patch:
+      tags:
+        - 'Secret Managers'
+      summary: 'Configure Application Secret Manager'
+      description: 'Configure the secret manager source used by an application. Same as Set Secret Manager Source with resource_type applications.'
+      operationId: configure-application-secret-manager
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - integration_token_uuid
+              properties:
+                integration_token_uuid:
+                  type: string
+                settings:
                   type: object
               type: object
       responses:
