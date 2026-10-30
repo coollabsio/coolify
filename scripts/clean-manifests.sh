@@ -10,6 +10,7 @@ KEEP_NIGHTLY_DAYS=14
 MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
+GHCR_TOKEN=""
 TO_DELETE_FILE=scripts/manifests-to-delete.tsv
 DELETED_FILE=scripts/deleted-manifests.tsv
 WORK_DIR="$(mktemp -d)"
@@ -30,6 +31,8 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 main() {
 	[[ "$OPTION" =~ ^(--delete [1-9][0-9]*)?$ ]] || die "'$OPTION' is not an option, expected --delete with a count or none"
+	[ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || die "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set to read docker.io/$IMAGE"
+	GHCR_TOKEN="$(gh auth token)" || die "gh is not signed in with a token that has read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
 	heading "Reading ghcr.io/$IMAGE and docker.io/$IMAGE"
 	read_ghcr_versions
 	read_dockerhub_tags
@@ -87,7 +90,7 @@ select_kept_tags() {
 }
 
 read_manifests() {
-	local digest tag
+	local digest tag hub
 	mkdir "$WORK_DIR/manifests"
 	request_manifests ghcr.io "$WORK_DIR/on-ghcr.txt" -f -o "$WORK_DIR/manifests/{}" -w '{}\t%{size_download}\n' > "$WORK_DIR/bytes.tsv" \
 		|| die "could not read the manifests of ghcr.io/$IMAGE"
@@ -95,8 +98,9 @@ read_manifests() {
 		"$WORK_DIR/kept-tags.txt" "$WORK_DIR/on-ghcr.txt" "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/dockerhub-roots.tsv"
 	awk -F '\t' '$2 ~ /oci\.image\.index/ { print $1 }' "$WORK_DIR/dockerhub-roots.tsv" > "$WORK_DIR/dockerhub-indexes.txt"
 	request_manifests docker.io "$WORK_DIR/dockerhub-indexes.txt" -f -o "$WORK_DIR/manifests/{}" || die "could not read the kept manifests that only docker.io has"
+	hub="$(hub_token)" || die "could not sign in to the Docker Hub API as $DOCKERHUB_USERNAME"
 	while IFS=$'\t' read -r digest tag; do
-		curl -sSf --retry 3 "https://hub.docker.com/v2/namespaces/${IMAGE%%/*}/repositories/${IMAGE#*/}/tags/$tag" | jq -r --arg root "$digest" '.images[] | [$root, .digest] | @tsv' \
+		curl -sSf --retry 3 -H "Authorization: Bearer $hub" "https://hub.docker.com/v2/namespaces/${IMAGE%%/*}/repositories/${IMAGE#*/}/tags/$tag" | jq -r --arg root "$digest" '.images[] | [$root, .digest] | @tsv' \
 			|| die "could not read the images of $tag from the Docker Hub API"
 	done < <(awk -F '\t' -v OFS='\t' '$2 !~ /oci\.image\.index/ { print $1, $3 }' "$WORK_DIR/dockerhub-roots.tsv") > "$WORK_DIR/children.tsv"
 	manifest_fields '.manifests[]? | [manifest, .digest, (.platform | [.os, .architecture, .variant] | map(values) | join("/")), .annotations["vnd.docker.reference.digest"]]' \
@@ -157,7 +161,6 @@ delete_manifests() {
 		info "a dry run deletes nothing, --delete with a count deletes that many from the top of the list"
 		return
 	fi
-	[ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || die "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set to delete manifests on docker.io"
 	heading "Deleting"
 	write_table /dev/null "$DELETED_FILE"
 	while IFS='|' read -r on_ghcr type tags version digest rest; do
@@ -272,13 +275,18 @@ delete_dockerhub_manifest() {
 
 registry_token() {
 	case "$1" in
-		ghcr.io) curl -sSf --retry 3 "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
-		docker.io) basic_auth "${DOCKERHUB_USERNAME:+$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN}" | curl -sSf --retry 3 -K - "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
+		ghcr.io) basic_auth "x:$GHCR_TOKEN" | curl -sSf --retry 3 -K - "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
+		docker.io) basic_auth "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" | curl -sSf --retry 3 -K - "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
 	esac | jq -r .token
 }
 
 basic_auth() {
-	[ -z "$1" ] || printf 'header = "Authorization: Basic %s"\n' "$(printf '%s' "$1" | jq -Rrj @base64)"
+	printf 'header = "Authorization: Basic %s"\n' "$(printf '%s' "$1" | jq -Rrj @base64)"
+}
+
+hub_token() {
+	jq -n --arg identifier "$DOCKERHUB_USERNAME" --arg secret "$DOCKERHUB_TOKEN" '{identifier: $identifier, secret: $secret}' \
+		| curl -sSf --retry 3 -X POST -H 'Content-Type: application/json' --data-binary @- https://hub.docker.com/v2/auth/token | jq -er .access_token
 }
 
 count() { awk 'END { print NR }'; }
