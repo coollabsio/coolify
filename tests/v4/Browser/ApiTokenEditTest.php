@@ -62,4 +62,5 @@ it('pauses and resumes a token from the token list', function () {
         ->assertSee('API token resumed.');
 
     expect($this->token->fresh()->isPaused())->toBeFalse();
+    $page->screenshot(filename: 'api-token-resumed');
 });
