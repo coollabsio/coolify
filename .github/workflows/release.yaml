@@ -127,12 +127,18 @@ jobs:
     runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
     timeout-minutes: 10
     outputs:
-      tags: ${{ steps.tags.outputs.tags }}
+      tags: ${{ steps.plan.outputs.tags }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Plan the moving tags
+        id: plan
+        run: |
+          tags="$(scripts/plan-version.sh --tags)"
+          echo "tags=$tags" | tee -a "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
         with:
@@ -145,20 +151,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Move the tags the releases take over
-        id: tags
+      - name: Move the tags on ghcr.io and docker.io
         env:
-          GH_TOKEN: ${{ github.token }}
+          TAGS: ${{ steps.plan.outputs.tags }}
         run: |
-          tags="$(scripts/plan-version.sh --tags)"
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
-          jq -r 'to_entries[] | "\(.key) \(.value)"' <<< "$tags" | while read -r tag release; do
+          jq -r 'to_entries[] | "\(.key) \(.value)"' <<< "$TAGS" | while read -r tag release; do
             for repository in ghcr.io/coollabsio/coolify docker.io/coollabsio/coolify; do
               docker buildx imagetools create --tag "$repository:${tag#v}" "$repository:${release#v}"
             done
           done
-          latest="$(jq -r '.latest // empty' <<< "$tags")"
-          [ -z "$latest" ] || gh release edit "$latest" --latest
+
+      - name: Mark the latest GitHub release
+        if: ${{ fromJSON(steps.plan.outputs.tags).latest }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ fromJSON(steps.plan.outputs.tags).latest }}
+        run: gh release edit "$LATEST" --latest
 
   cdn:
     name: Sync the CDN
