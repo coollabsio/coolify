@@ -154,12 +154,7 @@ class ApplicationsController extends Controller
             $application->settings?->makeHidden(['id', 'application_id', 'created_at', 'updated_at']);
         }
 
-        $payload = serializeApiResponse($application);
-        if ($application instanceof Application && filled(data_get($payload, 'docker_compose'))) {
-            $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $application);
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($application, serializeApiResponse($application));
     }
 
     private function applicationSettingsFromRequest(Request $request): array
@@ -5087,20 +5082,25 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
-        // Validate ports_mappings
-        if ($request->has('ports_mappings')) {
-            $ports = [];
+        // Validate that each host binding (IP, port, protocol) of ports_mappings is unique
+        if (is_string($request->ports_mappings)) {
+            $hostBindings = [];
             foreach (explode(',', $request->ports_mappings) as $portMapping) {
-                $port = explode(':', $portMapping);
-                if (in_array($port[0], $ports)) {
+                // The container port is after the last ":", an empty host port makes Docker pick a free port
+                $hostBinding = preg_replace('#/(tcp|udp|sctp)#', '', substr($portMapping, 0, (int) strrpos($portMapping, ':')));
+                if ($hostBinding === '' || str_ends_with($hostBinding, ':')) {
+                    continue;
+                }
+                $protocol = preg_match('#/(udp|sctp)#', $portMapping, $matches) === 1 ? $matches[1] : 'tcp';
+                if (in_array("{$hostBinding}/{$protocol}", $hostBindings, true)) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
-                            'ports_mappings' => 'The first number before : should be unique between mappings.',
+                            'ports_mappings' => 'Each host IP, port, and protocol can only be used once.',
                         ],
                     ], 422);
                 }
-                $ports[] = $port[0];
+                $hostBindings[] = "{$hostBinding}/{$protocol}";
             }
         }
         // Validate custom_labels
