@@ -142,7 +142,7 @@ write_list() {
 		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub.tsv" \
 		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k1,1 -k6,6 > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
-	ok "$(awk -F '\t' 'END { print $9 " to delete, " $3 ", they free " $7 }' "$TO_DELETE_FILE")"
+	ok "$(awk -F '\t' 'END { print ($9 + 0 ? $9 " to delete, " $3 ", they free " $7 : "nothing to delete") }' "$TO_DELETE_FILE")"
 	ok "$(awk -F '\t' '$1 == "no"' "$WORK_DIR/rows.tsv" | count) of them on docker.io alone, ghcr.io deleted them already or never had them, their size stays empty as reading it counts as a pull"
 	info "$TO_DELETE_FILE lists every manifest to delete with its type, platform, tags, date and size, indexes first"
 }
@@ -178,7 +178,7 @@ delete_manifests() {
 			*) die "could not delete the $type $name from docker.io, it answered $status" ;;
 		esac
 	done < <(head -n "$LIMIT" "$WORK_DIR/rows.tsv" | awk -F '\t' -v OFS='|' '{ rest = $3; for (i = 4; i <= NF; i++) rest = rest "\t" $i; print $1, $3, $5, $8, $9, rest }')
-	ok "$(awk -F '\t' 'END { print "deleted " $9 ", " $3 ", they free " $7 }' "$DELETED_FILE")"
+	ok "$(awk -F '\t' 'END { print ($9 + 0 ? "deleted " $9 ", " $3 ", they free " $7 : "deleted nothing") }' "$DELETED_FILE")"
 	info "$DELETED_FILE lists what this run deleted and where, ghcr.io restores it for 30 days, docker.io deletes for good"
 }
 
@@ -236,7 +236,7 @@ write_table() {
 		END {
 			for (digest in blob) { before += blob[digest]; if (digest in used) after += blob[digest] }
 			print "total", "", amount(types["index"], "index", "indexes") ", " amount(types["image"], "image", "images") ", " amount(types["attestation"], "attestation", "attestations"),
-				"", "", "", human(before - after) ", " human(before) " → " human(after) " on ghcr.io", "", amount(manifests, "manifest", "manifests")
+				"", "", "", human(before - after) " on ghcr.io (" human(before) " → " human(after) ")", "", amount(manifests, "manifest", "manifests")
 		}' "$1" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" > "$2"
 }
 
