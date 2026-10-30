@@ -7,6 +7,7 @@ IMAGE=coollabsio/coolify
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
 KEEP_TAG_EXCEPTIONS='v3 4.0.0-beta.420.1 4.0.0-beta.420.2 4.0.0-beta.420.3 4.0.0-beta.420.4 4.0.0-beta.420.5 4.0.0-beta.420.6 4.0.0-beta.420.7 4.0.0-beta.420.8 4.0.0-beta.420.9 4.0.0-beta.420.10'
 KEEP_NIGHTLY_DAYS=14
+MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
 TO_DELETE_FILE=scripts/manifests-to-delete.tsv
@@ -129,7 +130,10 @@ find_dockerhub_only_manifests() {
 }
 
 write_list() {
-	awk -F '\t' -v OFS='\t' 'function platform_of(digest) { return (reference[digest] in platform) ? platform[reference[digest]] : platform[digest] }
+	local cutoff
+	cutoff="$(jq -nr --argjson days "$MIN_AGE_DAYS" 'now - $days * 86400 | strftime("%Y-%m-%dT%H:%M:%SZ")')"
+	ok "keeping the $(awk -F '\t' -v cutoff="$cutoff" '$4 >= cutoff && !seen[$1]++' "$WORK_DIR/ghcr-active.tsv" | count) versions ghcr.io got since $cutoff, a build may still push the index that needs them"
+	awk -F '\t' -v OFS='\t' -v cutoff="$cutoff" 'function platform_of(digest) { return (reference[digest] in platform) ? platform[reference[digest]] : platform[digest] }
 		FILENAME == ARGV[1] { kept[$1]; next }
 		FILENAME == ARGV[2] { kind[$1] = $2; next }
 		FILENAME == ARGV[3] { size[$1] = $2; next }
@@ -138,7 +142,7 @@ write_list() {
 		FILENAME == ARGV[6] { tags[$1] = tags[$1] (tags[$1] == "" ? "" : ",") $3; next }
 		FILENAME == ARGV[7] { version[$1] = $2; created[$1] = $4; next }
 		FILENAME == ARGV[8] { if ($1 == 200) print "no", "yes", ($3 ~ /index|list/ ? "index" : "image"), platform_of($2), tags[$2], created[$2], "", version[$2], $2; next }
-		!($1 in kept) { print "yes", "undefined", kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
+		!($1 in kept) && $4 < cutoff && !seen[$1]++ { print "yes", "undefined", kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
 		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub.tsv" \
 		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k1,1 -k6,6 > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
