@@ -144,7 +144,7 @@ test('a database backup page keeps the database menu one back away in the main s
         ->toContain('x-teleport="#main-nav-context-1"')
         ->toMatch('#@click="navLevel = -1; navSwap = \'back\'"\s+title="Back to the main menu"#')
         ->toMatch('#@click="navLevel = 0; navSwap = \'back\'"\s+title="Back to the database menu"#')
-        ->toContain('Back to the orders-db menu')
+        ->toContain('Back to the Backup menu')
         ->and(substr_count($html, 'aria-label="Database settings"'))->toBe(1)
         ->and(substr_count($html, 'aria-label="Backup settings"'))->toBe(2);
 });

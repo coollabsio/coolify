@@ -11,7 +11,8 @@
         @if (! $embedded && $resourceType === 'database')
             <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" />
         @elseif (! $embedded)
-            <x-main-nav-menu :depth="1" back-label="Service" back-title="Back to the service menu">
+            <x-main-nav-menu :depth="1" back-label="Service" back-title="Back to the service menu"
+                :name="$serviceApplication->human_name ?: $serviceApplication->name">
                 <nav aria-label="Compose resource settings"
                     class="grid grid-cols-1 gap-0.5">
                 <a class="menu-item" data-page-only {{ wireNavigate() }}

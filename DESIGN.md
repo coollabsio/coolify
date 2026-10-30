@@ -312,7 +312,8 @@ Class names below are examples. Keep the values and structure.
 - A menu that replaces another menu in place starts with a back row: a
   centered label and a 12px left chevron (`‹ Dashboard`).
 - On a resource page, the main menu starts with a row that opens the resource
-  menu again. It points right and shows the resource name (`adonisjs ›`). On
+  menu again. It points right and shows the name of the deepest menu (`adonisjs ›`,
+  `Backup ›`). On
   other pages the main menu has no row above its items, and Dashboard is the
   first item, right under Search.
 
