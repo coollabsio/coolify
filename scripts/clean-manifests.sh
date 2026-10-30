@@ -138,18 +138,18 @@ write_list() {
 		FILENAME == ARGV[5] { platform[$2] = $3; reference[$2] = $4; next }
 		FILENAME == ARGV[6] { tags[$1] = tags[$1] (tags[$1] == "" ? "" : ",") $3; next }
 		FILENAME == ARGV[7] { version[$1] = $2; created[$1] = $4; next }
-		FILENAME == ARGV[8] { if ($1 == 200) print "docker.io", ($3 ~ /index|list/ ? "index" : "image"), platform_of($2), tags[$2], created[$2], "", version[$2], $2; next }
-		!($1 in kept) { print "ghcr.io and docker.io", kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
+		FILENAME == ARGV[8] { if ($1 == 200) print "no", "yes", ($3 ~ /index|list/ ? "index" : "image"), platform_of($2), tags[$2], created[$2], "", version[$2], $2; next }
+		!($1 in kept) { print "yes", "undefined", kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
 		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub.tsv" \
-		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k2,2r -k5,5 > "$WORK_DIR/rows.tsv"
+		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k6,6 > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
-	ok "$(awk -F '\t' 'END { print $8 " to delete, " $2 ", they free " $6 }' "$TO_DELETE_FILE")"
-	ok "$(awk -F '\t' '$1 == "docker.io"' "$WORK_DIR/rows.tsv" | count) of them on docker.io alone, ghcr.io deleted them already or never had them, their size stays empty as reading it counts as a pull"
+	ok "$(awk -F '\t' 'END { print $9 " to delete, " $3 ", they free " $7 }' "$TO_DELETE_FILE")"
+	ok "$(awk -F '\t' '$1 == "no"' "$WORK_DIR/rows.tsv" | count) of them on docker.io alone, ghcr.io deleted them already or never had them, their size stays empty as reading it counts as a pull"
 	info "$TO_DELETE_FILE lists every manifest to delete with its type, platform, tags, date and size, indexes first"
 }
 
 delete_manifests() {
-	local registries type tags version digest row name deleted status
+	local on_ghcr type tags version digest rest name deleted ghcr docker_hub status
 	if [ -z "$LIMIT" ]; then
 		info "nothing is deleted, a run with --delete and a count deletes that many from the top of the list"
 		return
@@ -157,18 +157,20 @@ delete_manifests() {
 	[ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || die "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set to delete manifests on docker.io"
 	heading "Deleting"
 	write_table /dev/null "$DELETED_FILE"
-	while IFS='|' read -r registries type tags version digest row; do
+	while IFS='|' read -r on_ghcr type tags version digest rest; do
 		name="$digest${tags:+ ($tags)}"
-		deleted=""
-		if [ "$registries" != docker.io ]; then
+		deleted="" ghcr=no docker_hub=no
+		if [ "$on_ghcr" = yes ]; then
 			delete_ghcr_version "$version" "$type $name" || continue
-			deleted=ghcr.io
+			deleted=ghcr.io ghcr=yes
 		fi
 		status="$(delete_dockerhub_manifest "$digest")"
-		[[ "$status" != 2?? ]] || deleted="${deleted:+$deleted and }docker.io"
+		if [[ "$status" == 2?? ]]; then
+			deleted="${deleted:+$deleted and }docker.io" docker_hub=yes
+		fi
 		if [ -n "$deleted" ]; then
 			ok "deleted the $type $BOLD$name$RESET from $deleted"
-			printf '%s\t%s\n' "$deleted" "${row#*$'\t'}" >> "$WORK_DIR/deleted.tsv"
+			printf '%s\t%s\t%s\n' "$ghcr" "$docker_hub" "$rest" >> "$WORK_DIR/deleted.tsv"
 			write_table "$WORK_DIR/deleted.tsv" "$DELETED_FILE"
 		fi
 		case "$status" in
@@ -176,8 +178,8 @@ delete_manifests() {
 			403 | 5??) warn "docker.io keeps the $type $name for now, it answered $status, the next run tries again" ;;
 			*) die "could not delete the $type $name from docker.io, it answered $status" ;;
 		esac
-	done < <(head -n "$LIMIT" "$WORK_DIR/rows.tsv" | awk -F '\t' -v OFS='|' '{ print $1, $2, $4, $7, $8, $0 }')
-	ok "$(awk -F '\t' 'END { print "deleted " $8 ", " $2 ", they free " $6 }' "$DELETED_FILE")"
+	done < <(head -n "$LIMIT" "$WORK_DIR/rows.tsv" | awk -F '\t' -v OFS='|' '{ rest = $3; for (i = 4; i <= NF; i++) rest = rest "\t" $i; print $1, $3, $5, $8, $9, rest }')
+	ok "$(awk -F '\t' 'END { print "deleted " $9 ", " $3 ", they free " $7 }' "$DELETED_FILE")"
 	info "$DELETED_FILE lists what this run deleted and where, ghcr.io restores it for 30 days, docker.io deletes for good"
 }
 
@@ -220,13 +222,13 @@ kept_manifests() {
 write_table() {
 	awk -F '\t' -v OFS='\t' 'function human(bytes, unit) { for (unit = 1; bytes >= 1000 && unit < 5; unit++) bytes /= 1000; return sprintf(unit == 1 ? "%d %s" : "%.1f %s", bytes, units[unit]) }
 		function amount(count, one, many) { return (count + 0) " " (count == 1 ? one : many) }
-		BEGIN { split("B kB MB GB TB", units, " "); print "registries", "type", "platform", "tags", "created", "size", "ghcr_id", "digest" }
-		FILENAME == ARGV[1] { removed[$8]; types[$2]++; manifests++; if ($6 != "") $6 = human($6); print; next }
+		BEGIN { split("B kB MB GB TB", units, " "); print "ghcr", "docker_hub", "type", "platform", "tags", "created", "size", "ghcr_id", "digest" }
+		FILENAME == ARGV[1] { removed[$9]; types[$3]++; manifests++; if ($7 != "") $7 = human($7); print; next }
 		FILENAME == ARGV[2] { before += $2; if (!($1 in removed)) after += $2; next }
 		{ blob[$2] = $3; if (!($1 in removed)) used[$2] }
 		END {
 			for (digest in blob) { before += blob[digest]; if (digest in used) after += blob[digest] }
-			print "total", amount(types["index"], "index", "indexes") ", " amount(types["image"], "image", "images") ", " amount(types["attestation"], "attestation", "attestations"),
+			print "total", "", amount(types["index"], "index", "indexes") ", " amount(types["image"], "image", "images") ", " amount(types["attestation"], "attestation", "attestations"),
 				"", "", "", human(before - after) ", " human(before) " → " human(after) " on ghcr.io", "", amount(manifests, "manifest", "manifests")
 		}' "$1" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" > "$2"
 }
