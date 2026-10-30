@@ -59,6 +59,8 @@ class UpdateIntegrationToken
         $newToken = filled($newToken) ? $newToken : null;
         $metadata = array_filter($metadata, fn ($value) => filled($value));
         if ($provider === 'cloudflare') {
+            // Cloudflare has no user settings in metadata; keep system keys such as zones_synced_at.
+            $metadata = $integrationToken->metadata ?? [];
             unset($metadata['automatic_dns'], $metadata['proxied_dns']);
             if (! $automaticDns) {
                 $metadata['automatic_dns'] = false;
