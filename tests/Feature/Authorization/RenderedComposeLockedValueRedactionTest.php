@@ -164,3 +164,24 @@ it('hides locked values in the generated compose returned by the API', function 
     expectLockedValuesRedacted($response->json('docker_compose'));
     expect($response->json('docker_compose_raw'))->toBe(LOCKED_COMPOSE_RAW);
 })->with(['service', 'application']);
+
+it('hides locked values in the generated compose returned by the resource list API', function () {
+    $response = $this->withToken(lockedComposeApiToken())->getJson('/api/v1/resources')->assertOk();
+
+    foreach ([$this->service, $this->application] as $resource) {
+        expectLockedValuesRedacted(collect($response->json())->firstWhere('uuid', $resource->uuid)['docker_compose']);
+    }
+});
+
+it('hides locked values in the generated compose returned by the environment API', function (string $relation, string $resource) {
+    $response = $this->withToken(lockedComposeApiToken())
+        ->getJson("/api/v1/projects/{$this->project->uuid}/{$this->environment->uuid}")
+        ->assertOk();
+
+    expectLockedValuesRedacted($response->json("{$relation}.0.docker_compose"));
+    expect($response->json("{$relation}.0.uuid"))->toBe($this->{$resource}->uuid)
+        ->and($response->json("{$relation}.0.docker_compose_raw"))->toBe(LOCKED_COMPOSE_RAW);
+})->with([
+    'service' => ['services', 'service'],
+    'application' => ['applications', 'application'],
+]);

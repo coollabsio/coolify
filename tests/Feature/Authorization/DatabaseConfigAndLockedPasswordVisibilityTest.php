@@ -228,6 +228,18 @@ it('redacts a locked redis password and its connection urls in the api', functio
 
     $list = $this->withHeaders($headers)->getJson('/api/v1/databases')->assertOk();
     expect($list->getContent())->not->toContain('locked-redis-secret');
+
+    $resources = $this->withHeaders($headers)->getJson('/api/v1/resources')->assertOk();
+    expect($resources->getContent())->not->toContain('locked-redis-secret')
+        ->and($resources->json('0.uuid'))->toBe($redis->uuid)
+        ->and($resources->json('0.internal_db_url'))->toBeNull();
+
+    $environment = $this->withHeaders($headers)
+        ->getJson("/api/v1/projects/{$this->environment->project->uuid}/{$this->environment->uuid}")
+        ->assertOk();
+    expect($environment->getContent())->not->toContain('locked-redis-secret')
+        ->and($environment->json('redis.0.uuid'))->toBe($redis->uuid)
+        ->and($environment->json('redis.0.internal_db_url'))->toBeNull();
 });
 
 it('still returns the connection url of an unlocked redis password in the api', function () {

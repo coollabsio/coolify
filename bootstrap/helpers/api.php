@@ -10,6 +10,7 @@ use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\ServerSetting;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
@@ -176,6 +177,41 @@ function exposeSensitiveFields(Model $model): Model
     }
 
     return $model;
+}
+
+/**
+ * Hide the locked (shown once) values that a serialized resource still contains, also for tokens
+ * that can read sensitive data: the generated compose of an application or service, and the
+ * connection URLs of a database with a locked password.
+ *
+ * @template T of array|SupportCollection
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function redactLockedApiResourceValues(Model $resource, array|SupportCollection $payload): array|SupportCollection
+{
+    if (($resource instanceof Application || $resource instanceof Service) && filled($payload['docker_compose'] ?? null)) {
+        $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $resource);
+    }
+
+    $urlKeys = array_filter(['internal_db_url', 'external_db_url'], fn (string $key): bool => filled($payload[$key] ?? null));
+    if ($urlKeys !== [] && method_exists($resource, 'isCredentialLocked') && $resource->isCredentialLocked()) {
+        foreach ($urlKeys as $key) {
+            $payload[$key] = null;
+        }
+    }
+
+    return $payload;
+}
+
+/**
+ * Serialize a resource for a list API response: sensitive fields when the token can read them,
+ * without locked values.
+ */
+function serializeApiResource(Model $resource): array
+{
+    return redactLockedApiResourceValues($resource, exposeSensitiveFields($resource)->toArray());
 }
 
 /**
