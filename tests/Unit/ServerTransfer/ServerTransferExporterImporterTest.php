@@ -263,6 +263,7 @@ test('dry run import reports counts without creating server', function () {
 });
 
 test('round trip import preserves uuids secrets and related resources after source removal', function () {
+    $this->application->forceFill(['git_https_username' => 'deploy-bot', 'git_https_password' => 'transfer-pat-secret'])->save();
     $bundle = $this->exporter->export($this->server);
     $originalServerUuid = $this->server->uuid;
     $originalAppUuid = $this->application->uuid;
@@ -310,7 +311,9 @@ test('round trip import preserves uuids secrets and related resources after sour
         ->and($app->environment_variables()->where('key', 'APP_SECRET')->first()?->value)->toBe('super-secret-value')
         ->and($app->persistentStorages)->toHaveCount(1)
         ->and($app->scheduled_tasks)->toHaveCount(1)
-        ->and($app->tags()->pluck('name')->all())->toContain('transfer-demo');
+        ->and($app->tags()->pluck('name')->all())->toContain('transfer-demo')
+        ->and($app->git_https_username)->toBe('deploy-bot')
+        ->and($app->git_https_password)->toBe('transfer-pat-secret');
 
     $db = StandalonePostgresql::where('uuid', $originalDbUuid)->first();
     expect($db)->not->toBeNull()
@@ -1216,6 +1219,7 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
 test('transfer keeps the link between an application volume and its sqlite database', function () {
     $sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
+        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),

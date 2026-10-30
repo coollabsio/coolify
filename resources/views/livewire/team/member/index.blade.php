@@ -89,7 +89,7 @@
                                 ['value' => 'member', 'label' => 'Member'],
                             ]" />
                     </div>
-                    <div class="w-full sm:w-40">
+                    <div class="w-full sm:w-40 min-[901px]:hidden">
                         <x-forms.listbox id="member-sort" :wire="false" x-model="sortBy"
                             x-effect="page = 1" :value="'name-asc'" :options="[
                                 ['value' => 'name-asc', 'label' => 'Name A–Z'],
@@ -142,6 +142,10 @@
                 previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"
                 next-disabled="page >= lastPage" />
         </x-application.settings-section>
+
+        @can('manageMembers', currentTeam())
+            <livewire:team.member.access />
+        @endcan
 
         @can('manageInvitations', currentTeam())
             <livewire:team.invite-link />

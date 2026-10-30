@@ -225,6 +225,8 @@ function sharedDataApplications(?Application $application = null): array
     return [
         'git_repository' => 'string',
         'git_branch' => ['string', new ValidGitBranch],
+        'git_https_username' => ['string', 'nullable', 'max:255', 'regex:/^[^:\r\n]*$/'],
+        'git_https_password' => ['string', 'nullable', 'max:2048', 'regex:/^[^\r\n]*$/'],
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
         'is_spa' => 'boolean',

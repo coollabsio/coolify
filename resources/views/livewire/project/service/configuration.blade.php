@@ -51,7 +51,7 @@
                                         <div>Resource</div>
                                         <div>Image</div>
                                         <div class="justify-self-start">Status</div>
-                                        <div></div>
+                                        <span class="text-right">Actions</span>
                                     </div>
                                 @endif
 

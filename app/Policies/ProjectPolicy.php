@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class ProjectPolicy
 {
@@ -20,15 +22,26 @@ class ProjectPolicy
      */
     public function view(User $user, Project $project): bool
     {
-        return $user->teams->contains('id', $project->team_id);
+        return app(AccessResolver::class)->canOpen($user, $project);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can read the shared variables of the project.
+     * Opening a project for navigation is not enough; this needs read access on the project.
+     */
+    public function viewSharedVariables(User $user, Project $project): bool
+    {
+        return $user->canAccess(AccessLevel::Read, $project);
+    }
+
+    /**
+     * Determine whether the user can create projects in the current team.
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        $teamId = $user->currentTeam()?->id;
+
+        return $teamId !== null && app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, $teamId);
     }
 
     /**
@@ -36,7 +49,7 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        return $user->isAdminOfTeam($project->team_id);
+        return $user->canAccess(AccessLevel::Write, $project);
     }
 
     /**
@@ -44,7 +57,7 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        return $user->isAdminOfTeam($project->team_id);
+        return $user->canAccess(AccessLevel::Delete, $project);
     }
 
     /**

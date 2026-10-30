@@ -218,7 +218,7 @@ class ScheduledTasksController extends Controller
 
     private function deleteTask(Request $request, Application|Service $resource): JsonResponse
     {
-        $this->authorize('update', $resource);
+        $this->authorize('delete', $resource);
 
         $task = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->first();
         if (! $task) {

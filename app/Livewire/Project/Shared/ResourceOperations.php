@@ -82,6 +82,7 @@ class ResourceOperations extends Component
                     return $this->addError('environment_id', 'Environment not found.');
                 }
             }
+            $this->authorize('createAnyResource', [$new_environment]);
 
             $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
@@ -281,6 +282,7 @@ class ResourceOperations extends Component
             if (! $new_environment) {
                 return $this->addError('environment_id', 'Environment not found.');
             }
+            $this->authorize('createAnyResource', [$new_environment]);
             $this->resource->fill([
                 'environment_id' => $new_environment->id,
             ])->save();

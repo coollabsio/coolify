@@ -158,26 +158,29 @@
                                 @endforeach
                             @endif
                 </x-table.filter>
-                <x-table.sort>
-                            @foreach ([
-                                'newest' => 'Newest first',
-                                'oldest' => 'Oldest first',
-                            ] as $sortValue => $sortLabel)
-                                <button type="button" class="listbox-option" role="option"
-                                    aria-selected="{{ $deploymentSort === $sortValue ? 'true' : 'false' }}"
-                                    wire:click="setDeploymentSort('{{ $sortValue }}')"
-                                    @click="open = false">
-                                    <span>{{ $sortLabel }}</span>
-                                    @if ($deploymentSort === $sortValue)
-                                        <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
-                                            <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
-                                                stroke-width="2.5" stroke-linecap="round"
-                                                stroke-linejoin="round" />
-                                        </svg>
-                                    @endif
-                                </button>
-                            @endforeach
-                </x-table.sort>
+                {{-- The Started header sorts the full table; the embedded history has no such header. --}}
+                @if ($embedded)
+                    <x-table.sort>
+                                @foreach ([
+                                    'newest' => 'Newest first',
+                                    'oldest' => 'Oldest first',
+                                ] as $sortValue => $sortLabel)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ $deploymentSort === $sortValue ? 'true' : 'false' }}"
+                                        wire:click="setDeploymentSort('{{ $sortValue }}')"
+                                        @click="open = false">
+                                        <span>{{ $sortLabel }}</span>
+                                        @if ($deploymentSort === $sortValue)
+                                            <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                                                <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
+                                                    stroke-width="2.5" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        @endif
+                                    </button>
+                                @endforeach
+                    </x-table.sort>
+                @endif
             </x-table.toolbar>
 
             @if ($deployments->isNotEmpty())

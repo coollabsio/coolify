@@ -162,7 +162,7 @@
 
                 <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
                     wire:target="setProjectSort">
-                    <div class="grid grid-cols-[minmax(0,1fr)_7rem_4rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4rem] {{ $tableHead }}">
+                    <div class="grid grid-cols-[minmax(0,1fr)_7rem_4.5rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4.5rem] {{ $tableHead }}">
                         <x-table.sort-header label="Project" asc="name-asc" desc="name-desc"
                             action="setProjectSort" :current="$projectSort" />
                         <x-table.sort-header label="Contents" asc="resources-asc" desc="resources-desc" first="desc"
@@ -171,14 +171,14 @@
                             <x-table.sort-header label="Description" asc="description-asc" desc="description-desc"
                                 action="setProjectSort" :current="$projectSort" />
                         </div>
-                        <div></div>
+                        <span class="text-right">Actions</span>
                     </div>
                     @foreach ($dashboardProjects as $project)
                         @php
                             $firstEnvironment = $project->environments->first();
                         @endphp
                         <div wire:key="dashboard-project-row-{{ $project->uuid }}"
-                            class="relative grid grid-cols-[minmax(0,1fr)_7rem_4rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4rem] {{ $tableRow }}">
+                            class="relative grid grid-cols-[minmax(0,1fr)_7rem_4.5rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4.5rem] {{ $tableRow }}">
                             <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }}
                                 class="absolute inset-0" aria-label="Open {{ $project->name }}"></a>
                             <div class="flex min-w-0 items-center gap-3">
@@ -237,6 +237,7 @@
             @endif
         </section>
 
+        @if ($showsTeamSections)
         <section class="@container mb-0! min-w-0" x-data="{
             viewMode: @js($this->listView('dashboard_servers', 'table')),
             setViewMode(mode) {
@@ -430,6 +431,7 @@
                 </div>
             @endif
         </section>
+        @endif
         </div>
         </div>
     </div>

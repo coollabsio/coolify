@@ -8,7 +8,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -66,7 +65,6 @@ class DenseTestableMetrics extends Metrics
 beforeEach(function () {
     // The settings hook starts Sentinel when metrics turn on. A sync queue would run it and make a real SSH call.
     Queue::fake();
-    Concurrency::setDefaultInstance('sync');
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $user = User::factory()->create();
     $team = Team::factory()->create();

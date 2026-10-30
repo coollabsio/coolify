@@ -131,15 +131,13 @@ it('declares explicit authorization on the changed storage controls', function (
         ->toContain('canGate="update"')
         ->toContain(':canResource="$resource"');
 
-    preg_match_all('/<x-forms\.button\b[^>]*>\s*Backup\s*<\/x-forms\.button>/s', $view, $backupButtons);
+    $backupAction = '/<x-table\.row-action>Backup<\/x-table\.row-action>/';
+    preg_match('/@if \(\$canUpdate\)\s*<x-modal-input\b.*?<\/x-modal-input>/s', $view, $canUpdateBlock);
+    preg_match('/@can\(\'update\', \$resource\)(.*?)@endcan/s', $view, $canBlock);
 
-    expect($backupButtons[0])->toHaveCount(3);
-
-    foreach ($backupButtons[0] as $backupButton) {
-        expect($backupButton)
-            ->toContain('canGate="update"')
-            ->toContain(':canResource="$resource"');
-    }
+    expect(preg_match_all($backupAction, $view))->toBe(3)
+        ->and(preg_match_all($backupAction, $canUpdateBlock[0] ?? ''))->toBe(1)
+        ->and(preg_match_all($backupAction, $canBlock[0] ?? ''))->toBe(2);
 });
 
 it('creates named volumes without a host path in swarm mode', function () {
@@ -329,7 +327,8 @@ YAML,
     ]);
 
     Livewire::test(All::class, ['resource' => $application])
-        ->assertSee('Delete stale volume entry')
+        ->assertSee('Remove stale volume entry?')
+        ->assertSee('Delete stale entry')
         ->call('delete', $volume->id, 'password');
 
     expect($volume->fresh())->toBeNull();

@@ -26,9 +26,9 @@ describe('token creation with expiration', function () {
 
     test('livewire component stores expires_at when expiresInDays set', function () {
         Livewire::test(ApiTokens::class)
-            ->set('description', 'test-token')
-            ->set('expiresInDays', 7)
-            ->set('permissions', ['read'])
+            ->set('form.description', 'test-token')
+            ->set('form.expiresInDays', 7)
+            ->set('form.permissions', ['read'])
             ->call('addNewToken')
             ->assertHasNoErrors();
 
@@ -42,9 +42,9 @@ describe('token creation with expiration', function () {
 
     test('livewire component stores null expires_at when expiresInDays null (Never)', function () {
         Livewire::test(ApiTokens::class)
-            ->set('description', 'never-token')
-            ->set('expiresInDays', null)
-            ->set('permissions', ['read'])
+            ->set('form.description', 'never-token')
+            ->set('form.expiresInDays', null)
+            ->set('form.permissions', ['read'])
             ->call('addNewToken')
             ->assertHasNoErrors();
 
@@ -56,9 +56,9 @@ describe('token creation with expiration', function () {
 
     test('livewire component rejects invalid expiresInDays value', function () {
         Livewire::test(ApiTokens::class)
-            ->set('description', 'bad-token')
-            ->set('expiresInDays', 42)
-            ->set('permissions', ['read'])
+            ->set('form.description', 'bad-token')
+            ->set('form.expiresInDays', 42)
+            ->set('form.permissions', ['read'])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -67,10 +67,10 @@ describe('token creation with expiration', function () {
 
     test('livewire component keeps Never (null) after an intermediate live update', function () {
         Livewire::test(ApiTokens::class)
-            ->set('description', 'never-token')
-            ->set('expiresInDays', '')
-            ->set('permissions', ['read', 'deploy'])
-            ->set('permissions', ['read'])
+            ->set('form.description', 'never-token')
+            ->set('form.expiresInDays', '')
+            ->set('form.permissions', ['read', 'deploy'])
+            ->set('form.permissions', ['read'])
             ->call('addNewToken')
             ->assertHasNoErrors();
 

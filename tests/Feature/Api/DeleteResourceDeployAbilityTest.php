@@ -79,43 +79,43 @@ function deleteAbilityHeaders(User $user, int $teamId, array $abilities): array
     return ['Authorization' => 'Bearer '.$token->getKey().'|'.$plainTextToken];
 }
 
-test('write-only token cannot delete a resource', function (string $type) {
+test('token without the delete permission cannot delete a resource', function (string $type) {
     $resource = $this->resources[$type];
 
-    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['write']))
+    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
         ->deleteJson("/api/v1/{$type}/{$resource->uuid}")
         ->assertForbidden()
-        ->assertJsonPath('message', 'Missing required permissions: deploy');
+        ->assertJsonPath('message', 'Missing required permissions: delete');
 
     expect($resource::query()->whereKey($resource->getKey())->exists())->toBeTrue();
     Queue::assertNotPushed(DeleteResourceJob::class);
 })->with(['applications', 'services', 'databases']);
 
-test('write and deploy token deletes a resource', function (string $type) {
+test('token with the delete permission deletes a resource', function (string $type) {
     $resource = $this->resources[$type];
 
-    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
+    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['delete']))
         ->deleteJson("/api/v1/{$type}/{$resource->uuid}")
         ->assertOk();
 
     expect($resource::query()->whereKey($resource->getKey())->exists())->toBeFalse();
 })->with(['applications', 'services', 'databases']);
 
-test('write-only token cannot delete a preview deployment', function () {
+test('token without the delete permission cannot delete a preview deployment', function () {
     $application = $this->resources['applications'];
 
-    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['write']))
+    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
         ->deleteJson("/api/v1/applications/{$application->uuid}/previews/42")
         ->assertForbidden()
-        ->assertJsonPath('message', 'Missing required permissions: deploy');
+        ->assertJsonPath('message', 'Missing required permissions: delete');
 
     expect($this->preview->fresh()->trashed())->toBeFalse();
 });
 
-test('write and deploy token deletes a preview deployment', function () {
+test('token with the delete permission deletes a preview deployment', function () {
     $application = $this->resources['applications'];
 
-    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
+    $this->withHeaders(deleteAbilityHeaders($this->user, $this->team->id, ['delete']))
         ->deleteJson("/api/v1/applications/{$application->uuid}/previews/42")
         ->assertOk();
 

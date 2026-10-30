@@ -116,7 +116,7 @@
                         <span>Scope</span>
                         <span>{{ count($readOnlyKeys) ? 'Value / comment' : 'Comment' }}</span>
                         <span class="text-center">Multiline</span>
-                        <span></span>
+                        <span class="text-right">Actions</span>
                     </div>
                     @foreach ($variables as $env)
                         @if (in_array($env->key, $readOnlyKeys))

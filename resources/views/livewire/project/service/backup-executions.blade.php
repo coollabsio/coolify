@@ -41,7 +41,7 @@
         @else
             <div class="data-table relative w-full overflow-x-auto">
                 <x-table.loading target="previousPage,nextPage,setPage,perPage" text="Loading executions..." />
-                <div class="data-table-header grid min-w-[900px] grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_190px_90px_48px]">
+                <div class="data-table-header grid min-w-[900px] grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_190px_90px_4.5rem]">
                     <span>Target</span><span>Type</span><span>Schedule</span><span>Status</span><span>Started</span><span>Size</span><span class="text-right">Actions</span>
                 </div>
                 @foreach ($executions as $execution)
@@ -56,7 +56,7 @@
                     <div wire:key="service-backup-execution-{{ $execution['id'] }}"
                         wire:click="openExecution('{{ $execution['uuid'] }}')"
                         wire:keydown.enter="openExecution('{{ $execution['uuid'] }}')" role="button" tabindex="0"
-                        class="data-table-row grid min-w-[900px] cursor-pointer grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_190px_90px_48px] text-left text-[13px] text-neutral-700 dark:text-fg-dim">
+                        class="data-table-row grid min-w-[900px] cursor-pointer grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_190px_90px_4.5rem] text-left text-[13px] text-neutral-700 dark:text-fg-dim">
                         <span class="flex min-w-0 items-center gap-2 font-medium text-neutral-950 dark:text-fg">
                             <span class="truncate" title="{{ $execution['target'] }}">{{ $execution['target'] }}</span>
                             <span tabindex="0" data-tooltip="{{ $execution['s3_tooltip'] }}"

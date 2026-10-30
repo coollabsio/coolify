@@ -515,7 +515,7 @@ option {
 }
 
 .button.button-error:disabled {
-    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800;
+    @apply text-neutral-300 dark:text-fg-faint bg-transparent dark:bg-transparent border-neutral-200 dark:border-white/[0.06];
 }
 
 .button-error:not(:disabled) {
@@ -2806,6 +2806,12 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     background: transparent;
 }
 
+/* Destructive items of a table row action menu (x-table.row-actions). */
+.row-actions-danger .listbox-option,
+.dark .row-actions-danger .listbox-option {
+    color: var(--color-error);
+}
+
 /* Searchable listbox: sticky search field + scrollable options */
 .searchable-listbox-panel {
     max-height: 18rem;
@@ -3150,7 +3156,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .env-table-grid {
-    grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+    grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 4.5rem;
 }
 
 /* File browser: icon, name, perms, size, modified, actions.
@@ -3198,11 +3204,11 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .environment-table-scroll .env-table-grid {
-    min-width: 53rem;
+    min-width: 54.5rem;
 }
 
 .env-table-grid.env-table-grid-no-type {
-    grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+    grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 4.5rem;
 }
 
 @media (max-width: 768px) {
@@ -3225,20 +3231,20 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.env-table-grid > :last-child {
-        display: block;
+        display: flex;
         justify-self: end;
     }
 }
 
 /* Shared variables only store value shape (multiline), not per-resource flags. */
 .env-table-grid-shared {
-    grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 3rem;
+    grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 4.5rem;
 }
 
 /* Shared env vars collapse secondary columns on tablet and use cards on phone. */
 @media (max-width: 1100px) {
     .env-table-grid-shared {
-        grid-template-columns: minmax(0, 1.4fr) 6rem minmax(0, 1fr) 3rem;
+        grid-template-columns: minmax(0, 1.4fr) 6rem minmax(0, 1fr) 4.5rem;
         gap: 0.75rem;
     }
 
@@ -3250,7 +3256,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 @media (max-width: 900px) {
     .env-table-grid-shared {
-        grid-template-columns: minmax(0, 1fr) 6rem 3rem;
+        grid-template-columns: minmax(0, 1fr) 6rem 4.5rem;
     }
 
     .env-table-grid-shared > :nth-child(3) {
@@ -3505,7 +3511,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 12.5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 4.5rem;
     width: 100%;
 }
 
@@ -3533,11 +3539,11 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .volumes-table-grid {
-    grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 15rem;
+    grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 4.5rem;
 }
 
 .volumes-table-grid-with-pr {
-    grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 15rem;
+    grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 4.5rem;
 }
 
 .volumes-table-grid-readonly.has-source {
@@ -3545,11 +3551,11 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .volumes-table-grid.has-source {
-    grid-template-columns: minmax(9rem, 1.1fr) minmax(14rem, 1.5fr) minmax(6rem, 1fr) 5rem 15rem;
+    grid-template-columns: minmax(9rem, 1.1fr) minmax(14rem, 1.5fr) minmax(6rem, 1fr) 5rem 4.5rem;
 }
 
 .volumes-table-grid-with-pr.has-source {
-    grid-template-columns: minmax(9rem, 1fr) minmax(14rem, 1.4fr) minmax(6rem, 1fr) 8.5rem 5rem 15rem;
+    grid-template-columns: minmax(9rem, 1fr) minmax(14rem, 1.4fr) minmax(6rem, 1fr) 8.5rem 5rem 4.5rem;
 }
 
 .volumes-mobile-label {
@@ -3766,7 +3772,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .api-tokens-table-grid {
-    grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
+    grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 10.5rem;
 }
 
 .fleet-servers-table-grid {
@@ -3795,7 +3801,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .server-resources-unmanaged-table-grid {
-    grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
+    grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem 4.5rem;
 }
 
 .server-images-table-grid {
@@ -3861,7 +3867,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .api-tokens-table-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(9rem, 1.3fr) 6.5rem 4.5rem;
+        grid-template-columns: minmax(0, 1fr) minmax(9rem, 1.3fr) 6.5rem 10.5rem;
     }
 
     .api-tokens-table-grid > :nth-child(3),
@@ -6821,13 +6827,14 @@ html.dark .resource-glyph {
     color: var(--color-brand-light);
 }
 
+/* Row and card actions stay neutral: the brand color is for the primary action of an area. */
 html.dark .card-icon-button {
-    color: var(--color-brand-light);
+    color: var(--color-fg-faint);
 }
 
 html.dark .card-icon-button:hover {
-    background-color: color-mix(in srgb, var(--color-brand) 16%, transparent);
-    color: #fff;
+    background-color: rgb(255 255 255 / 0.06);
+    color: var(--color-fg);
 }
 
 html.dark .app-main :is(article.group, a.group).rounded-xl {

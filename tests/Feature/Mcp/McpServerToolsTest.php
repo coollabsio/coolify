@@ -3,13 +3,19 @@
 use App\Actions\Destination\RemoveStandaloneDockerNetwork;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\RestartProxyJob;
+use App\Models\Application;
 use App\Models\AuditEvent;
 use App\Models\CloudProviderToken;
 use App\Models\DiscordNotificationSettings;
+use App\Models\DnsProviderZone;
+use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -108,7 +114,7 @@ afterEach(function () {
     Server::flushIdentityMap();
 });
 
-function mcpSrvToken(User $user, array $abilities = ['read', 'write']): string
+function mcpSrvToken(User $user, array $abilities = ['read', 'write', 'delete']): string
 {
     return $user->createToken('mcp-srv', $abilities)->plainTextToken;
 }
@@ -205,7 +211,7 @@ test('server group write actions reject member tokens', function (string $tool, 
     $response = mcpSrvCall(mcpSrvToken($member, ['read', 'write']), $tool, $arguments + ['confirm' => true]);
 
     expect($response->json('result'))->toBeNull()
-        ->and($response->json('error.message'))->toBe('Missing required team role.');
+        ->and($response->json('error.message'))->toBe('This API token has more access than you have in this team. Revoke it and create a new token.');
 })->with([
     'manage_server update' => ['manage_server', ['action' => 'update', 'data' => ['name' => 'x']]],
     'manage_private_key create' => ['manage_private_key', ['action' => 'create']],
@@ -215,7 +221,7 @@ test('server group write actions reject member tokens', function (string $tool, 
 ]);
 
 test('server group destructive actions need confirm=true', function (string $tool, array $arguments) {
-    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), $tool, $arguments);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy', 'delete']), $tool, $arguments);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('requires confirm=true');
@@ -233,6 +239,13 @@ test('server group destructive actions need confirm=true', function (string $too
     'manage_git_source delete' => ['manage_git_source', ['action' => 'delete', 'resource' => 'github', 'source_id' => '1']],
     'cloud_provider delete_token' => ['cloud_provider', ['action' => 'delete_token', 'uuid' => 'x']],
     'cloud_provider provision_server' => ['cloud_provider', ['action' => 'provision_server', 'resource' => 'hetzner']],
+    'manage_integration_tokens delete' => ['manage_integration_tokens', ['action' => 'delete', 'uuid' => 'x']],
+    'manage_dns replace' => ['manage_dns', ['action' => 'replace', 'resource' => 'application', 'uuid' => 'x']],
+    'manage_dns release' => ['manage_dns', ['action' => 'release', 'resource' => 'application', 'uuid' => 'x', 'hostname' => 'app.example.com']],
+    'manage_secret_manager remove' => ['manage_secret_manager', ['action' => 'remove', 'resource' => 'application', 'uuid' => 'x']],
+    'manage_cloudflare_tunnel update' => ['manage_cloudflare_tunnel', ['action' => 'update', 'uuid' => 'x', 'data' => ['is_cloudflare_tunnel' => false]]],
+    'manage_cloudflare_tunnel enable' => ['manage_cloudflare_tunnel', ['action' => 'enable', 'uuid' => 'x']],
+    'manage_cloudflare_tunnel disable' => ['manage_cloudflare_tunnel', ['action' => 'disable', 'uuid' => 'x']],
 ]);
 
 // ---------------------------------------------------------------- manage_server
@@ -602,7 +615,7 @@ test('manage_git_source cannot change or delete GitHub apps of another team, inc
 ])->with(['update', 'delete']);
 
 test('manage_git_source creates, updates, and deletes a GitLab app without returning secrets', function () {
-    $token = mcpSrvToken($this->user, ['read', 'write']);
+    $token = mcpSrvToken($this->user, ['read', 'write', 'delete']);
 
     $create = mcpSrvCall($token, 'manage_git_source', ['action' => 'create', 'resource' => 'gitlab', 'data' => [
         'name' => 'mcp-gitlab', 'html_url' => 'https://gitlab.com', 'client_secret' => 'GL_CLIENT_SECRET_VALUE', 'webhook_token' => 'GL_WEBHOOK_TOKEN_VALUE',
@@ -880,4 +893,122 @@ test('get_server_metrics explains when metrics are disabled', function () {
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('Metrics are not enabled');
+});
+
+// ---------------------------------------------------------------- manage_integration_tokens and manage_dns
+
+test('manage_integration_tokens lists team tokens without the secret and cannot read another team token', function () {
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'token' => 'CF_SECRET_VALUE', 'capabilities' => ['dns']]);
+    $foreign = IntegrationToken::factory()->for($this->otherTeam)->create(['provider' => 'cloudflare']);
+    $bearer = mcpSrvToken($this->user, ['read']);
+
+    $list = mcpSrvCall($bearer, 'manage_integration_tokens', ['action' => 'list']);
+    $other = mcpSrvCall($bearer, 'manage_integration_tokens', ['action' => 'get', 'uuid' => $foreign->uuid]);
+
+    expect(mcpSrvIsError($list))->toBeFalse()
+        ->and(collect(mcpSrvData($list))->pluck('uuid')->all())->toBe([$token->uuid])
+        ->and($list->getContent())->not->toContain('CF_SECRET_VALUE')
+        ->and(mcpSrvIsError($other))->toBeTrue()
+        ->and(mcpSrvText($other))->toContain('Integration token not found.');
+});
+
+test('manage_dns creates the dns record of an application domain', function () {
+    $this->server->update(['ip' => '203.0.113.10']);
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'capabilities' => ['dns']]);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records' => Http::response(['success' => true, 'result' => ['id' => 'record-1']]),
+    ]);
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write']), 'manage_dns', [
+        'action' => 'create', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['hostname' => 'app.example.com'],
+    ]);
+
+    expect(mcpSrvIsError($response))->toBeFalse()
+        ->and(mcpSrvData($response)['record'])->toMatchArray(['hostname' => 'app.example.com', 'address' => '203.0.113.10'])
+        ->and(ManagedDnsRecord::query()->where('name', 'app.example.com')->exists())->toBeTrue();
+});
+
+test('manage_dns returns the conflict of a create so the agent can replace the record', function () {
+    $this->server->update(['ip' => '203.0.113.10']);
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'capabilities' => ['dns']]);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response(['success' => true, 'result' => [
+            ['id' => 'record-old', 'type' => 'A', 'name' => 'app.example.com', 'content' => '198.51.100.7'],
+        ]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/*' => Http::response(['success' => true, 'result' => ['id' => 'record-old']]),
+    ]);
+    $bearer = mcpSrvToken($this->user, ['read', 'write']);
+
+    $create = mcpSrvCall($bearer, 'manage_dns', [
+        'action' => 'create', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['hostname' => 'app.example.com'],
+    ]);
+    $text = mcpSrvText($create);
+    $conflict = json_decode(substr($text, strpos($text, '{"conflict"')), true)['conflict'];
+
+    expect(mcpSrvIsError($create))->toBeTrue()
+        ->and($conflict)->toBe(['record_id' => 'record-old', 'current' => '198.51.100.7', 'proposed' => '203.0.113.10']);
+
+    $replace = mcpSrvCall($bearer, 'manage_dns', [
+        'action' => 'replace', 'resource' => 'application', 'uuid' => $application->uuid, 'confirm' => true,
+        'data' => ['hostname' => 'app.example.com', 'record_id' => $conflict['record_id'], 'current' => $conflict['current']],
+    ]);
+
+    expect(mcpSrvIsError($replace))->toBeFalse(mcpSrvText($replace))
+        ->and(mcpSrvData($replace)['record'])->toMatchArray(['address' => '203.0.113.10', 'owned' => false]);
+});
+
+test('manage_integration_tokens renames a token', function () {
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'doppler', 'token' => 'dp.st.secret', 'capabilities' => ['secrets']]);
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write']), 'manage_integration_tokens', [
+        'action' => 'update', 'uuid' => $token->uuid, 'data' => ['name' => 'Renamed'],
+    ]);
+
+    expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response))
+        ->and($token->fresh()->name)->toBe('Renamed');
+});
+
+test('manage_secret_manager links a token of the team to an application', function () {
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'doppler', 'token' => 'dp.st.secret', 'capabilities' => ['secrets']]);
+    $bearer = mcpSrvToken($this->user, ['read', 'write']);
+
+    $set = mcpSrvCall($bearer, 'manage_secret_manager', ['action' => 'set', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['integration_token_uuid' => $token->uuid]]);
+    $get = mcpSrvCall($bearer, 'manage_secret_manager', ['action' => 'get', 'resource' => 'application', 'uuid' => $application->uuid]);
+
+    expect(mcpSrvIsError($set))->toBeFalse(mcpSrvText($set))
+        ->and(mcpSrvData($get))->toMatchArray(['linked' => true, 'integration_token_uuid' => $token->uuid, 'provider' => 'doppler']);
+});
+
+test('manage_cloudflare_tunnel reads the tunnel of its own server only', function () {
+    $bearer = mcpSrvToken($this->user, ['read']);
+
+    $own = mcpSrvCall($bearer, 'manage_cloudflare_tunnel', ['action' => 'get', 'uuid' => $this->server->uuid]);
+    $foreign = mcpSrvCall($bearer, 'manage_cloudflare_tunnel', ['action' => 'get', 'uuid' => $this->otherServer->uuid]);
+
+    expect(mcpSrvIsError($own))->toBeFalse(mcpSrvText($own))
+        ->and(mcpSrvData($own))->toHaveKey('is_cloudflare_tunnel')
+        ->and(mcpSrvIsError($foreign))->toBeTrue();
 });

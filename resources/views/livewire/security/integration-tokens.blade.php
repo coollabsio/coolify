@@ -74,10 +74,12 @@
                                                 </span>
                                             @endif
                                         </div>
-                                        <button type="button" class="icon-button" title="Edit integration token"
-                                            :aria-label="`Edit ${tokenName}`" @click="modalOpen=true">
-                                            <x-reicon name="settings" class="size-3.5" />
-                                        </button>
+                                        <div class="flex justify-end">
+                                            <button type="button" class="icon-button" title="Edit integration token"
+                                                :aria-label="`Edit ${tokenName}`" @click="modalOpen=true">
+                                                <x-reicon name="settings" class="size-3.5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </x-slot:content>
                                 <livewire:security.integration-token-editor

@@ -40,7 +40,7 @@ beforeEach(function () {
 
 function teamToken(User $user, Team $team): string
 {
-    $token = $user->createToken('test', ['write']);
+    $token = $user->createToken('test', ['write', 'delete']);
     $token->accessToken->forceFill(['team_id' => $team->id])->save();
     auth()->forgetGuards();
 

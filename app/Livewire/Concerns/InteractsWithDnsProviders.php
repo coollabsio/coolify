@@ -250,6 +250,8 @@ trait InteractsWithDnsProviders
             return;
         }
 
+        $event = $this->teamChannelPayload($event);
+
         if (! is_string($event['hostname'] ?? null) || ! is_string($event['resourceType'] ?? null)
             || ! is_scalar($event['resourceId'] ?? null) || ! is_bool($event['successful'] ?? null)
             || ! is_string($event['credential'] ?? null) || ! is_string($event['message'] ?? null)
@@ -397,33 +399,15 @@ trait InteractsWithDnsProviders
             ->whereHas('integrationToken', fn ($query) => $query->where('team_id', $this->dnsTeamId()))->first();
     }
 
-    /**
-     * Server addresses that a DNS provider may publish. Private, reserved, CGNAT, and link-local addresses are excluded:
-     * a public DNS record must not expose them, and the record would not be reachable anyway.
-     *
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     protected function publicServerIpsForDnsProvider(): array
     {
-        return array_values(array_filter(
-            $this->serverIpsForDnsHints(),
-            fn (?string $address): bool => is_string($address) && DnsRecordHints::isPublicAddress($address),
-        ));
+        return $this->serverDnsAddresses()->publicAddresses();
     }
 
-    /**
-     * Content of a DNS record for this resource: one of its public server addresses (IPv4 or IPv6),
-     * the first one when none is requested. Any other address is rejected.
-     */
     protected function dnsRecordContent(?string $requested = null): ?string
     {
-        $addresses = $this->publicServerIpsForDnsProvider();
-
-        if ($requested === null) {
-            return $addresses[0] ?? null;
-        }
-
-        return collect($addresses)->first(fn (string $address): bool => DnsRecordHints::sameAddress($address, $requested));
+        return $this->serverDnsAddresses()->recordContent($requested);
     }
 
     abstract protected function persistDomainDnsStatuses(): void;

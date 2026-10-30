@@ -24,6 +24,7 @@
     'searchPlaceholder' => 'Search…',
     'searchEmptyText' => 'No matching options',
     'allowCustom' => false, // true (with searchable) = the search text can be chosen as a custom value
+    'countLabel' => null, // with multiple: always show a count such as "3 resources" instead of the selected labels
 ])
 
 @php
@@ -49,8 +50,10 @@
         $selectedLabels = collect($options)
             ->filter(fn ($option) => empty($option['header']) && in_array((string) $option['value'], $selectedValues, true))
             ->pluck('label');
+        $countLabels = $countLabel ? [$countLabel, Illuminate\Support\Str::plural($countLabel)] : null;
         $multipleLabel = match (true) {
             $selectedLabels->isEmpty() => $placeholder,
+            $countLabels !== null => $selectedLabels->count().' '.$countLabels[$selectedLabels->count() === 1 ? 0 : 1],
             $selectedLabels->count() <= 2 => $selectedLabels->implode(', '),
             default => $selectedLabels->count().' selected',
         };
@@ -138,6 +141,9 @@
         get current() {
             const labels = this.selectedLabels;
             if (labels.length === 0) return @js($placeholder);
+            @if ($countLabels)
+            return `${labels.length} ${labels.length === 1 ? @js($countLabels[0]) : @js($countLabels[1])}`;
+            @endif
             return labels.length <= 2 ? labels.join(', ') : `${labels.length} selected`;
         },
         get title() {

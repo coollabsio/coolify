@@ -2,14 +2,88 @@
 
 namespace App\Services;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use Illuminate\Contracts\Process\InvokedProcess;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 
 class SentinelMetricsClient
 {
+    private const REMOTE_TIMEOUT = 20;
+
+    /** Mounts that can hold the root disk, in the order of rootMountName(). */
+    private const ROOT_MOUNTS = ['/', '/app/db', '/data/coolify', '/data'];
+
     private string $base = 'http://localhost:8888/api';
 
+    /** @var array<string, ?string> url => response from prefetchConcurrently(); null when it failed */
+    private array $prefetched = [];
+
     public function __construct(protected Server $server) {}
+
+    /**
+     * Fetch the Fleet Metrics responses of several servers at the same time, with one SSH
+     * command per server, so a page waits for the slowest server only. raw() then reads the
+     * responses; a failed fetch is not tried again per metric.
+     *
+     * @param  iterable<int|string, self>  $clients
+     */
+    public static function prefetchConcurrently(iterable $clients, string $range): void
+    {
+        $started = [];
+        foreach ($clients as $client) {
+            // A subclass is a test fake with canned data; it must not reach real SSH.
+            if ($client::class !== self::class) {
+                continue;
+            }
+            $urls = array_values(array_filter($client->pageUrls($range), fn (string $url) => ! Cache::has($client->cacheKey($url))));
+            if ($urls === []) {
+                continue;
+            }
+
+            try {
+                $started[] = [$client, $urls, $client->startBatch($urls)];
+            } catch (\Throwable) {
+                $client->prefetched += array_fill_keys($urls, null);
+            }
+        }
+
+        foreach ($started as [$client, $urls, $process]) {
+            try {
+                $responses = explode("\x1e", $client->awaitBatch($process));
+            } catch (\Throwable) {
+                $responses = [];
+            }
+            if (count($responses) !== count($urls)) {
+                $responses = [];
+            }
+
+            foreach ($urls as $index => $url) {
+                try {
+                    $body = $client->guard(trim($responses[$index] ?? ''));
+                    Cache::put($client->cacheKey($url), $body, 60);
+                    $client->prefetched[$url] = $body;
+                } catch (\Throwable) {
+                    $client->prefetched[$url] = null;
+                }
+            }
+        }
+    }
+
+    /**
+     * Every URL that the Fleet Metrics page reads for one server.
+     *
+     * @return array<int, string>
+     */
+    private function pageUrls(string $range): array
+    {
+        return [
+            $this->url('/summary'),
+            $this->url('/containers/current'),
+            ...array_map(fn (string $metric) => $this->historyUrl($metric, $range), ['cpu', 'memory', 'disk', 'load', 'network']),
+        ];
+    }
 
     /** Rounded to the minute so the history URL (and its cache key) is stable within a minute. */
     public static function rangeFrom(string $range): string
@@ -116,14 +190,14 @@ class SentinelMetricsClient
      */
     public function history(string $metric, string $range): array
     {
-        [$path, $field] = match ($metric) {
-            'memory' => ['/memory/history', 'used'],
-            'disk' => ['/disk/history', 'usedPercent'],
-            'load' => ['/load/history', 'load1'],
-            default => ['/cpu/history', 'percent'],
+        $field = match ($metric) {
+            'memory' => 'used',
+            'disk' => 'usedPercent',
+            'load' => 'load1',
+            default => 'percent',
         };
 
-        return $this->seriesRows($this->url($path, self::historyQuery($range)), $field, $range, $metric === 'disk');
+        return $this->seriesRows($this->historyUrl($metric, $range), $field, $range, $metric === 'disk');
     }
 
     /**
@@ -131,7 +205,7 @@ class SentinelMetricsClient
      */
     public function networkHistory(string $range): array
     {
-        $url = $this->url('/network/history', self::historyQuery($range));
+        $url = $this->historyUrl('network', $range);
 
         return [
             'rx' => $this->seriesRows($url, 'rxBytesPerSec', $range),
@@ -188,7 +262,7 @@ class SentinelMetricsClient
     {
         $mounts = array_column($rows, 'mount');
 
-        return collect(['/', '/app/db', '/data/coolify', '/data'])->first(fn ($mount) => in_array($mount, $mounts, true));
+        return collect(self::ROOT_MOUNTS)->first(fn ($mount) => in_array($mount, $mounts, true));
     }
 
     /**
@@ -214,6 +288,21 @@ class SentinelMetricsClient
         ];
     }
 
+    private function historyUrl(string $metric, string $range): string
+    {
+        $path = match ($metric) {
+            'memory', 'disk', 'load', 'network' => "/{$metric}/history",
+            default => '/cpu/history',
+        };
+        $query = self::historyQuery($range);
+        if ($metric === 'disk') {
+            // Sentinel 1.1.4+ returns only these mounts; older versions ignore the param.
+            $query['mount'] = implode(',', self::ROOT_MOUNTS);
+        }
+
+        return $this->url($path, $query);
+    }
+
     /**
      * @param  array<string, mixed>  $query
      */
@@ -231,6 +320,10 @@ class SentinelMetricsClient
 
     protected function raw(string $url): string
     {
+        if (array_key_exists($url, $this->prefetched)) {
+            return $this->prefetched[$url] ?? throw new \RuntimeException('Metrics request failed.');
+        }
+
         return Cache::remember($this->cacheKey($url), 60, fn () => $this->guard($this->remoteFetch($url)));
     }
 
@@ -246,6 +339,41 @@ class SentinelMetricsClient
             // Metrics are read again on the next refresh. SSH retries would keep a worker past its timeout.
             maxAttempts: 1
         );
+    }
+
+    /**
+     * Start one `docker exec` that curls every URL in order, with the responses separated by
+     * a 0x1E record separator. The token reaches curl on stdin, so it is not a process argument.
+     * The token only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
+     * cannot end the heredoc. No pipe or `sh -c` is used, so the non-root sudo parser only puts
+     * sudo in front of the line. Unlike instant_remote_process(), there are no SSH retries.
+     *
+     * @param  array<int, string>  $urls
+     */
+    private function startBatch(array $urls): InvokedProcess
+    {
+        $token = $this->server->settings->ensureValidSentinelToken();
+        $script = implode("\nprintf '\\036'\n", array_map(
+            fn (string $url) => "curl -s --connect-timeout 3 --max-time 10 -H @- \"{$url}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            $urls
+        ));
+        // `true` last: a failed curl empties only its own response, not the whole batch.
+        $command = "docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\ntrue\nCOOLIFY_SENTINEL_SCRIPT";
+        $commands = $this->server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $this->server) : [$command];
+
+        return Process::timeout(self::REMOTE_TIMEOUT)->start(
+            SshMultiplexingHelper::generateSshCommand($this->server, implode("\n", $commands), commandTimeout: self::REMOTE_TIMEOUT)
+        );
+    }
+
+    private function awaitBatch(InvokedProcess $invoked): string
+    {
+        $process = $invoked->wait();
+        if ($process->exitCode() !== 0) {
+            excludeCertainErrors($process->errorOutput(), $process->exitCode());
+        }
+
+        return $process->output();
     }
 
     private function guard(string $response): string

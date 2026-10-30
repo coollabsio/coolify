@@ -82,6 +82,14 @@ class CoolifyHelp extends Tool
                 ['tool' => 'deploy', 'note' => 'Redeploy after the fix; force=true to rebuild.'],
             ],
         ],
+        'configure_dns' => [
+            'description' => 'Point the domains of an application or service to its server with Cloudflare DNS',
+            'steps' => [
+                ['tool' => 'manage_integration_tokens', 'action' => 'create', 'note' => 'Add a Cloudflare token once (provider=cloudflare, capabilities=[dns]); the secret is never returned.'],
+                ['tool' => 'manage_dns', 'action' => 'status', 'note' => 'Check the providers and records of each domain.'],
+                ['tool' => 'manage_dns', 'action' => 'create', 'note' => 'Create the record for one hostname. On a conflict, ask the user before replace.'],
+            ],
+        ],
         'backup_database' => [
             'description' => 'Back up a database to S3',
             'steps' => [
@@ -157,7 +165,7 @@ class CoolifyHelp extends Tool
      */
     private function visibleTools(): array
     {
-        return collect(CoolifyServer::TOOLS)
+        return collect(CoolifyServer::toolsForCurrentActor())
             ->map(fn (string $class): Tool => app($class))
             ->filter(fn (Tool $tool): bool => $tool->eligibleForRegistration())
             ->mapWithKeys(fn (Tool $tool): array => [$tool->name() => [
