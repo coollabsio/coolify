@@ -262,7 +262,7 @@
                 @open-api-token-create.window="modalOpen = true" @api-token-issued.window="modalOpen = false">
                 <x-slot:content><span></span></x-slot:content>
 
-                <form wire:submit="addNewToken" id="api-token-create-form" class="lg:w-2xl">
+                <form wire:submit="addNewToken" id="api-token-create-form" class="lg:w-3xl">
                     @include('livewire.security.partials.api-token-fields', [
                         'form' => 'form',
                         'expiryOptions' => $expirationList,
@@ -280,7 +280,7 @@
                 @open-api-token-edit.window="modalOpen = true" @api-token-updated.window="modalOpen = false">
                 <x-slot:content><span></span></x-slot:content>
 
-                <form x-on:submit.prevent="$wire.updateToken(editingToken.id)" id="api-token-edit-form" class="lg:w-2xl">
+                <form x-on:submit.prevent="$wire.updateToken(editingToken.id)" id="api-token-edit-form" class="lg:w-3xl">
                     <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
                         The token value does not change. Clients that use it get the new access on their next request.
                     </p>

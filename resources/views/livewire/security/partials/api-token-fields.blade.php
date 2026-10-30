@@ -14,8 +14,24 @@
         <h4 class="text-[12px] font-semibold text-black dark:text-fg">Permissions</h4>
         <x-helper helper="Only grant the abilities this token needs." />
     </div>
+    {{-- A fixed panel escapes the scrolling modal body, so it is not cut off. --}}
     <div class="relative" x-data="{
         permissionsOpen: false,
+        panelPosition: {},
+        positionPanel() {
+            const gap = 4;
+            const edge = 12;
+            const triggerRect = this.$refs.permissionsTrigger.getBoundingClientRect();
+            const panelHeight = Math.min(this.$refs.permissionsPanel.scrollHeight, 256);
+            const fitsBelow = window.innerHeight - triggerRect.bottom - gap >= panelHeight;
+            this.panelPosition = {
+                top: `${fitsBelow ? triggerRect.bottom + gap : Math.max(edge, triggerRect.top - gap - panelHeight)}px`,
+                left: `${triggerRect.left}px`,
+                width: `${triggerRect.width}px`,
+                minWidth: `${triggerRect.width}px`,
+                maxWidth: `${triggerRect.width}px`,
+            };
+        },
         get isRoot() {
             return ($wire.{{ $form }}.permissions ?? []).includes('root');
         },
@@ -24,15 +40,17 @@
                 .map((permission) => permission.split(':').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))
                 .join(', ');
         },
-    }" @click.outside="permissionsOpen = false" @keydown.escape.window="permissionsOpen = false">
-        <button type="button" class="listbox-trigger" @click="permissionsOpen = !permissionsOpen"
+    }" @click.outside="permissionsOpen = false" @keydown.escape.window="permissionsOpen = false"
+        @resize.window="permissionsOpen && positionPanel()" @scroll.window.capture="permissionsOpen && positionPanel()">
+        <button type="button" x-ref="permissionsTrigger" class="listbox-trigger" @click="permissionsOpen = !permissionsOpen"
             aria-haspopup="listbox" :aria-expanded="permissionsOpen">
             <span class="truncate" x-text="'Selected permissions: ' + summary"></span>
             <x-reicon name="chevron-down" class="size-3.5 shrink-0 opacity-60" />
         </button>
 
-        <div x-cloak x-show="permissionsOpen" x-transition.origin.top
-            class="listbox-panel top-full! mt-1! w-full!" role="listbox">
+        <div x-cloak x-show="permissionsOpen" x-ref="permissionsPanel" x-transition.origin.top
+            x-effect="if (permissionsOpen) $nextTick(() => positionPanel())"
+            class="listbox-panel" style="position: fixed; z-index: 9999" :style="panelPosition" role="listbox">
             <div class="listbox-option p-0!">
                 <x-forms.checkbox id="permission-root" label="Root" fullWidth
                     wire:model.live="{{ $form }}.permissions" domValue="root"
