@@ -1219,6 +1219,7 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
 test('transfer keeps the link between an application volume and its sqlite database', function () {
     $sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
+        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
