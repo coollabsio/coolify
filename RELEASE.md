@@ -3,7 +3,7 @@
 Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the image tag `4.6.0-beta.1`.
 
 > [!IMPORTANT]
-> A push that changes `release.json` publishes the release of it whose tag does not exist yet. Check what a push publishes with `scripts/version.sh` first.
+> A push that changes `release.json` publishes the release of it whose tag does not exist yet. Check what a push publishes with `scripts/plan-version.sh` first.
 
 ## Rules
 
@@ -39,7 +39,7 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 2. Check what the branch releases:
 
     ```sh
-    scripts/version.sh
+    scripts/plan-version.sh
     ```
 
 3. Select the stage and the version, the script commits them and asks to push:
@@ -137,7 +137,7 @@ The nightly workflow publishes a nightly twice a day when its branch has a new c
 - No word `nightly` in the version: PHP's `version_compare` sorts words below numbers, plain numbers sort right in semver and PHP
 - No git tag and no GitHub release, only its image tag, the moving `nightly` tag and the nightly channel of the CDN
 
-Print what the next run publishes with `scripts/version.sh --nightly`.
+Print what the next run publishes with `scripts/plan-version.sh --nightly`.
 
 ## Main builds
 
@@ -146,7 +146,7 @@ The main workflow builds `main` twice a day when it changed since the last build
 - ghcr.io only, no version tag, no git tag, no GitHub release and no channel of the CDN, an instance installs it through the custom channel with the tag `main`
 - The build it replaces is left untagged, the clean manifests workflow deletes it
 
-Print what the next run builds with `scripts/version.sh --main`.
+Print what the next run builds with `scripts/plan-version.sh --main`.
 
 ## Pull requests
 

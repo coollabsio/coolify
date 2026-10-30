@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Keep the Coolify versions in `release.json`, `stable.coolify` for `main` and the maintenance branches and `preview.coolify` for `next` and the release branches
     - Pin the helper, Sentinel and Traefik versions in `upstream.json` instead of `versions.json`, the CDN and the image write `versions.json` from it
     - Select the stage and the version with `scripts/release.sh`, which offers the versions the branch allows and preselects the bump the commits need
-    - Decide the version, the releases, the moving tags and the nightlies with `scripts/version.sh`, which also reports what a push publishes
+    - Plan the version, the releases, the moving tags and the nightlies with `scripts/plan-version.sh`, which also reports what a push publishes
     - Publish every release a push of `release.json` names and whose tag does not exist yet, instead of a reviewed draft release
     - Build each platform once and publish exactly that build
     - Write the notes of the GitHub release from `CHANGELOG.md` instead of git-cliff

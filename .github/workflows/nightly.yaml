@@ -42,7 +42,7 @@ jobs:
           PUBLISHED_VERSION="$(jq -r '.["org.opencontainers.image.version"] // empty' <<< "$annotations")"
           PUBLISHED_REVISION="$(jq -r '.["org.opencontainers.image.revision"] // empty' <<< "$annotations")"
           export PUBLISHED_VERSION PUBLISHED_REVISION
-          nightly="$(scripts/version.sh --nightly)"
+          nightly="$(scripts/plan-version.sh --nightly)"
           echo "nightly=$nightly" | tee -a "$GITHUB_OUTPUT"
 
   build:
