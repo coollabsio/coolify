@@ -278,7 +278,7 @@
                                                 class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
                                                 Edit
                                             </button>
-                                            <button type="button" wire:click="togglePause({{ $token->id }})"
+                                            <button type="button" wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})"
                                                 class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
                                                 {{ $token->isPaused() ? 'Resume' : 'Pause' }}
                                             </button>

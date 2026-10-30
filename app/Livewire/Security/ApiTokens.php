@@ -261,7 +261,7 @@ class ApiTokens extends Component
             $this->authorize('update', $token);
 
             $teamId = currentTeam()->id;
-            ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($teamId);
+            ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($teamId, editing: true);
             $before = ['abilities' => $token->abilities, 'scopes' => $token->scopes, 'expires_at' => $token->expires_at?->toIso8601String()];
 
             $token->forceFill([
@@ -298,10 +298,10 @@ class ApiTokens extends Component
      *
      * @return array{permissions: list<string>, scopes: list<array{scope: string, uuid: string}>|null, expiresInDays: int|string|null}
      */
-    private function validateTokenForm(int $teamId): array
+    private function validateTokenForm(int $teamId, bool $editing = false): array
     {
         $expiryChoices = array_keys($this->expirationOptions);
-        if ($this->editingTokenId !== null) {
+        if ($editing) {
             $expiryChoices[] = self::KEEP_EXPIRY;
         }
 
@@ -372,21 +372,23 @@ class ApiTokens extends Component
 
     /**
      * Pause a token so it stops authenticating requests, or resume a paused token. The token value does not change.
+     * The caller sends the wanted state, so a stale page cannot resume a token that another page paused.
      */
-    public function togglePause(int $id)
+    public function setPaused(int $id, bool $paused)
     {
         try {
             $token = $this->findOwnToken($id);
             $this->authorize('update', $token);
 
-            $pausing = ! $token->isPaused();
-            $token->forceFill(['paused_at' => $pausing ? now() : null])->save();
-            auditLog($pausing ? 'ui.api_token.paused' : 'ui.api_token.resumed', [
-                'team_id' => currentTeam()->id,
-                'api_token_name' => $token->name,
-            ]);
+            if ($token->isPaused() !== $paused) {
+                $token->forceFill(['paused_at' => $paused ? now() : null])->save();
+                auditLog($paused ? 'ui.api_token.paused' : 'ui.api_token.resumed', [
+                    'team_id' => currentTeam()->id,
+                    'api_token_name' => $token->name,
+                ]);
+            }
             $this->getTokens();
-            $this->dispatch('success', $pausing ? 'API token paused.' : 'API token resumed.');
+            $this->dispatch('success', $paused ? 'API token paused.' : 'API token resumed.');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

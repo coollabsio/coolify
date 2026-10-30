@@ -404,6 +404,7 @@ describe('token form', function () {
 
         Livewire::test(ApiTokens::class)
             ->call('startEditing', $token->id)
+            ->assertSet('editingTokenId', $token->id)
             ->set('selectedScopes', ["project:{$this->blog->uuid}"])
             ->call('updateToken')
             ->assertDispatched('error');
@@ -433,16 +434,20 @@ describe('token form', function () {
         $this->actingAs($this->admin);
 
         Livewire::test(ApiTokens::class)
-            ->call('togglePause', $token->id)
+            ->call('setPaused', $token->id, true)
             ->assertDispatched('success', 'API token paused.');
 
+        expect($token->fresh()->isPaused())->toBeTrue();
+
+        // A stale page that still shows "Pause" must not resume the token.
+        Livewire::test(ApiTokens::class)->call('setPaused', $token->id, true);
         expect($token->fresh()->isPaused())->toBeTrue();
         scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertUnauthorized();
         scopedTokenTestMcp($plainToken, 'tools/list')->assertUnauthorized();
 
         $this->actingAs($this->admin);
         Livewire::test(ApiTokens::class)
-            ->call('togglePause', $token->id)
+            ->call('setPaused', $token->id, false)
             ->assertDispatched('success', 'API token resumed.');
 
         expect($token->fresh()->isPaused())->toBeFalse();
@@ -457,7 +462,7 @@ describe('token form', function () {
         $token = PersonalAccessToken::query()->sole();
         $this->actingAs($this->admin);
 
-        Livewire::test(ApiTokens::class)->call('togglePause', $token->id);
+        Livewire::test(ApiTokens::class)->call('setPaused', $token->id, true);
 
         expect($token->fresh()->isPaused())->toBeFalse();
     });
