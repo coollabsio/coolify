@@ -90,6 +90,24 @@ class StartSentinel
     }
 
     /**
+     * Docker reads an env file line by line, so a line break in a value would add a variable.
+     *
+     * @param  array<string, mixed>  $environments
+     */
+    public static function envFileContent(array $environments): string
+    {
+        $lines = [];
+        foreach ($environments as $key => $value) {
+            if (preg_match('/[\r\n]/', (string) $value)) {
+                throw new \RuntimeException("The Sentinel setting {$key} must not contain a line break.");
+            }
+            $lines[] = "{$key}={$value}";
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    /**
      * @throws LockTimeoutException when another start for the server does not finish in time
      */
     public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null): void
@@ -141,7 +159,8 @@ class StartSentinel
                 $image = $customImage;
             }
         }
-        $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
+        $envFile = devHostDockerPath($server, base_configuration_dir().'/sentinel.env');
+        $envFileContent = self::envFileContent($environments);
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
         $trafficLogDirectory = self::trafficLogDirectory($server);
         $trafficMount = self::collectsTraffic($server)
@@ -150,7 +169,7 @@ class StartSentinel
         $network = $server->isLocalhost() ? ' --network coolify' : '';
         // A userns-remap daemon refuses --pid host unless the container opts out of remapping.
         // On other daemons --userns host has no effect. https://docs.docker.com/engine/security/userns-remap/
-        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--userns host --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        $dockerCommand = "docker run -d$network --env-file $envFile --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--userns host --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
         $server->sentinelHeartbeat(isReset: true);
         $server->forceFill(['sentinel_waiting_since' => now()])->save();
@@ -159,7 +178,14 @@ class StartSentinel
             'docker rm -f coolify-sentinel || true',
             "mkdir -p $mountDir",
             ...self::trafficLogPreparationCommands($server),
+            // The mode is set before the token is written, so it does not depend on the umask of the server.
+            "rm -f $envFile",
+            "touch $envFile",
+            "chmod 600 $envFile",
+            "echo '".base64_encode($envFileContent)."' | base64 -d | tee $envFile > /dev/null",
             $dockerCommand,
+            // Docker keeps the environment in the container configuration, so restarts do not read the file again.
+            "rm -f $envFile",
             "chown -R 9999:root $mountDir",
             "chmod -R 700 $mountDir",
         ], $server);

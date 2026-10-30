@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
@@ -200,6 +201,21 @@ class Sentinel extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * A remote Sentinel sends its token in the Authorization header of every push. Over plain HTTP the token
+     * is readable on the network. The local Sentinel pushes on the coolify Docker network and is not affected.
+     */
+    public function isPushUrlInsecure(): bool
+    {
+        if ($this->server->isLocalhost() || ! str_starts_with(strtolower((string) $this->sentinelCustomUrl), 'http://')) {
+            return false;
+        }
+
+        $fqdn = InstanceSettings::get()->fqdn;
+
+        return blank($fqdn) || str_starts_with(strtolower($fqdn), 'https://');
     }
 
     public function render()

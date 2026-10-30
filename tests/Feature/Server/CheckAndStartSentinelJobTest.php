@@ -165,7 +165,7 @@ it('reads the push status with the token from inside the Sentinel container on a
     (new CheckAndStartSentinelJob($this->server->refresh()))->handle();
 
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'docker exec coolify-sentinel sh -c '\\''curl")
-        && str_contains(remoteProcessScript($process), 'Bearer $TOKEN'));
+        && str_contains(remoteProcessScript($process), '"$TOKEN" | curl -sf -H @-'));
 });
 
 it('does not restart a starting Sentinel whose API does not answer yet', function () {
