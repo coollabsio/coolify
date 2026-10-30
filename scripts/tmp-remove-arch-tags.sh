@@ -98,6 +98,7 @@ remove_arch_tags() {
 		[ -s "$WORK_DIR/remove-$registry.txt" ] || continue
 		upload_empty_blob "$registry" || die "could not upload the empty blob of the placeholder to $registry/$IMAGE"
 		while read -r tag; do
+			[[ "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] || die "the list names the tag '$tag' on $registry, expected a tag name"
 			curl -sSf --retry 3 -X PUT -o /dev/null -H "Authorization: Bearer $(registry_token "$registry" pull,push)" -H 'Content-Type: application/vnd.oci.image.manifest.v1+json' \
 				--data-binary "@$WORK_DIR/placeholder.json" "https://$(registry_host "$registry")/v2/$IMAGE/manifests/$tag" || die "could not move $tag on $registry to the placeholder"
 			ok "moved $BOLD$tag$RESET on $registry off its image to the placeholder"
@@ -156,6 +157,7 @@ upload_empty_blob() {
 	curl -sSf --head -o /dev/null -H "Authorization: Bearer $token" "https://$host/v2/$IMAGE/blobs/$EMPTY_BLOB" 2> /dev/null && return 0
 	location="$(curl -sSf -X POST -o /dev/null -w '%header{location}' -H "Authorization: Bearer $token" "https://$host/v2/$IMAGE/blobs/uploads/")" || return 1
 	[[ "$location" == http* ]] || location="https://$host$location"
+	[[ "$location" == "https://$host/"* ]] || die "$1 answered the blob upload with ${location%%\?*}, expected a URL on https://$host for the push token"
 	case "$location" in
 		*\?*) location="$location&digest=$EMPTY_BLOB" ;;
 		*) location="$location?digest=$EMPTY_BLOB" ;;
@@ -173,7 +175,7 @@ delete_placeholder() {
 				[ -z "$id" ] || break
 				sleep "$attempt"
 			done
-			[ -n "$id" ] || die "found no version for the placeholder $2 among the newest 100 on ghcr.io, it holds the moved tags until it is deleted in the package settings"
+			[[ "$id" =~ ^[0-9]+$ ]] || die "found no version for the placeholder $2 among the newest 100 on ghcr.io, it holds the moved tags until it is deleted in the package settings"
 			gh api -X DELETE "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions/$id" > /dev/null \
 				|| die "could not delete the placeholder $2 (version $id) from ghcr.io, it holds the moved tags until it is deleted"
 			;;
@@ -201,9 +203,13 @@ request_manifests() {
 
 registry_token() {
 	case "$1" in
-		ghcr.io) curl -sSf --retry 3 ${GHCR_TOKEN:+-u "x:$GHCR_TOKEN"} "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
-		docker.io) curl -sSf --retry 3 -u "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
+		ghcr.io) basic_auth "${GHCR_TOKEN:+x:$GHCR_TOKEN}" | curl -sSf --retry 3 -K - "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
+		docker.io) basic_auth "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" | curl -sSf --retry 3 -K - "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
 	esac | jq -r .token
+}
+
+basic_auth() {
+	[ -z "$1" ] || printf 'header = "Authorization: Basic %s"\n' "$(printf '%s' "$1" | jq -Rrj @base64)"
 }
 
 hub_token() {
