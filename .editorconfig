@@ -17,7 +17,7 @@ indent_size = 2
 [docker-compose.yml]
 indent_size = 4
 
-[scripts/clean-manifests.sh]
+[scripts/{clean-manifests,tmp-remove-arch-tags}.sh]
 indent_style = tab
 binary_next_line = true
 switch_case_indent = true
