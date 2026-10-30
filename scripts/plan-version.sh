@@ -26,6 +26,7 @@ cd "$(dirname "$0")/.."
 main() {
 	[[ "$OPTION" =~ ^(--build|--release|--tags|--nightly|--main)?$ ]] || die "'$OPTION' is not an option, expected --build, --release, --tags, --nightly, --main or none"
 	read_version
+	print_build_version
 	fetch_origin
 	print_tags
 	print_next_build
@@ -43,10 +44,21 @@ read_version() {
 	[[ ! "$branch" =~ ^(next|release/v[0-9]+\.[0-9]+)$ ]] || channel=preview
 	version="$(artifact_version "$channel")"
 	[ -n "$version" ] || die "$VERSION_FILE has no $channel version of $ARTIFACT"
-	if [ "$OPTION" = --build ]; then
-		echo "$version${PULL_REQUEST:+-pr.$PULL_REQUEST}"
-		exit 0
+}
+
+print_build_version() {
+	[ "$OPTION" = --build ] || return 0
+	if [ -n "$PULL_REQUEST" ] && [ "$channel" = preview ]; then
+		tags="$(git ls-remote --tags --refs origin | sed 's|.*refs/tags/||' | filter_release_tags | sort -V)" || die "could not list the tags of origin"
+		line="${branch#release/v}"
+		[ "$line" != "$branch" ] || line=""
+		revision=HEAD
+		select_newest_stable
+		select_preview_base
+		version="$base"
 	fi
+	echo "$version${PULL_REQUEST:+-pr.$PULL_REQUEST}"
+	exit 0
 }
 
 fetch_origin() {
@@ -83,7 +95,7 @@ print_next_build() {
 		base="$(artifact_version stable <(git show "$revision:$VERSION_FILE" 2> /dev/null))"
 		[ -n "$base" ] || die "main has no stable version of $ARTIFACT in $VERSION_FILE, expected the release process there"
 	else
-		select_nightly_base
+		select_preview_base
 	fi
 	[ -z "$UPSTREAM" ] || published="${published#*-v}"
 	build="$base.$(date -u +%Y%m%d)"
@@ -99,25 +111,12 @@ print_next_build() {
 }
 
 select_nightly_branch() {
-	stable="$(tag_versions <<< "$tags" | awk '!/-/' | newest)"
-	stable="${stable:-$(artifact_version stable)}"
+	select_newest_stable
 	line="$(git for-each-ref --format='%(refname:lstrip=4)' 'refs/remotes/origin/release/v*' | sed -n 's/^v\([0-9]*\.[0-9]*\)$/\1/p' | sort -V \
 		| while read -r release; do ! newer "$release.0" "$stable" || { echo "$release" && break; }; done)"
 	branch="${line:+release/v$line}"
 	branch="${branch:-next}"
 	revision="$(git rev-parse "origin/$branch")"
-}
-
-select_nightly_base() {
-	version="$(artifact_version preview <(git show "$revision:$VERSION_FILE"))"
-	if [ -n "$line" ]; then
-		base="$line.0-alpha.0"
-		[[ "$version" != "$line.0-"* ]] || base="$version"
-	elif [[ "$version" == *-* ]] && newer "$version" "$stable"; then
-		base="$version"
-	else
-		base="$(next_version "$stable" minor)-alpha.0"
-	fi
 }
 
 check_branch() {
@@ -229,6 +228,24 @@ print_releases() {
 	jq -sc . <<< "$releases"
 }
 
+select_newest_stable() {
+	stable="$(tag_versions <<< "$tags" | awk '!/-/' | newest)"
+	stable="${stable:-$(artifact_version stable)}"
+}
+
+select_preview_base() {
+	version="$(artifact_version preview <(git show "$revision:$VERSION_FILE"))"
+	if [ -n "$line" ]; then
+		base="$line.0-alpha.0"
+		[[ "$version" != "$line.0-"* ]] || base="$version"
+	elif newer "$version" "$stable"; then
+		base="$version"
+		[[ "$version" == *-* ]] || base="$version-alpha.0"
+	else
+		base="$(next_version "$stable" minor)-alpha.0"
+	fi
+}
+
 artifact_version() {
 	jq -r --arg channel "$1" --arg artifact "$ARTIFACT" '.[$channel][$artifact] // empty' "${2:-$VERSION_FILE}"
 }
@@ -309,7 +326,11 @@ moving_tags() {
 }
 
 release_tags() {
-	git tag --list "$@" | grep -E "^v${UPSTREAM:+[^-]+-v}[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$" || true
+	git tag --list "$@" | filter_release_tags
+}
+
+filter_release_tags() {
+	grep -E "^v${UPSTREAM:+[^-]+-v}[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$" || true
 }
 
 tag_versions() {
