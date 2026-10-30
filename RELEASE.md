@@ -153,7 +153,7 @@ Print what the next run builds with `scripts/plan-version.sh --main`.
 Every push to a pull request from a branch of this repository publishes `ghcr.io/coollabsio/coolify:pr-<number>`, versioned `<version of the base branch>-pr.<number>`. Pull request 1234 into `next` is `pr-1234` with the version `4.6.0-beta.1-pr.1234`, which sorts after `4.6.0-beta.1` and its nightlies and before `4.6.0-beta.2`.
 
 - Pull requests from forks and Dependabot are built, not published
-- Pull requests from `main`, `next`, a release branch or a patch branch are not built, the release and nightly workflows build their commits
+- A push to a pull request from `main`, `next`, a release branch or a patch branch that changes `release.json` is not built, the release workflow builds it
 - ghcr.io only, no git tag and no GitHub release, the clean manifests workflow keeps the image while the pull request is open
 
 ## CDN
