@@ -17,7 +17,7 @@ class ManageCloudflareTunnel extends RestActionTool
     {
         return [
             'get' => ['method' => 'GET', 'path' => 'servers/{uuid}/cloudflare-tunnel', 'ability' => 'read', 'description' => 'tunnel settings and the server address'],
-            'update' => ['method' => 'PATCH', 'path' => 'servers/{uuid}/cloudflare-tunnel', 'ability' => 'write', 'description' => 'change the stored setting (data: is_cloudflare_tunnel)'],
+            'update' => ['method' => 'PATCH', 'path' => 'servers/{uuid}/cloudflare-tunnel', 'ability' => 'write', 'confirm' => true, 'description' => 'change the stored setting (data: is_cloudflare_tunnel)'],
             'enable' => ['method' => 'POST', 'path' => 'servers/{uuid}/cloudflare-tunnel/enable', 'ability' => 'write', 'confirm' => true, 'description' => 'mark the tunnel as enabled after cloudflared was set up by hand'],
             'disable' => ['method' => 'POST', 'path' => 'servers/{uuid}/cloudflare-tunnel/disable', 'ability' => 'write', 'confirm' => true, 'description' => 'mark the tunnel as disabled and restore the previous server address when known'],
         ];

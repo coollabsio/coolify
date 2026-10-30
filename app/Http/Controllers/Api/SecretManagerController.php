@@ -11,6 +11,8 @@ use App\Services\SecretManagers\ResourceSecretManager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Throwable;
@@ -132,15 +134,17 @@ class SecretManagerController extends Controller
             return response()->json(['message' => 'Secret manager integration token not found.'], 404);
         }
 
+        $settingsRules = $this->secretManager->settingsRules($token);
         $body = $this->validateBody($body, [
             'integration_token_uuid' => ['required', 'string'],
             'settings' => ['sometimes', 'array'],
-        ] + $this->secretManager->settingsRules($token));
+        ] + $settingsRules);
         if ($body instanceof JsonResponse) {
             return $body;
         }
 
-        $link = $this->secretManager->link($resource, $token, $body['settings'] ?? [], 'api');
+        $settingKeys = array_map(fn (string $field): string => Str::after($field, 'settings.'), array_keys($settingsRules));
+        $link = $this->secretManager->link($resource, $token, Arr::only($body['settings'] ?? [], $settingKeys), 'api');
 
         return response()->json([
             'integration_token_uuid' => $token->uuid,

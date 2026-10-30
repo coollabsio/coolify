@@ -19,6 +19,7 @@ use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsHostnameLock;
 use App\Support\DnsRecordHints;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -264,6 +265,21 @@ describe('integration tokens', function () {
 
         expect($this->token->dnsZones()->orderBy('name')->pluck('name')->all())->toBe(['example.com', 'example.net']);
     });
+
+    test('a cloudflare connection failure returns 502', function (string $method, string $path, array $body) {
+        Http::fake(fn () => throw new ConnectionException('Connection refused'));
+
+        $this->withToken(dnsApiToken($this->user, $this->team))
+            ->json($method, str_replace('{uuid}', $this->token->uuid, $path), $body)
+            ->assertStatus(502)
+            ->assertJson(['message' => 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.']);
+
+        expect(IntegrationToken::query()->where('name', 'Offline')->exists())->toBeFalse();
+    })->with([
+        'create' => ['POST', '/api/v1/security/integration-tokens', ['provider' => 'cloudflare', 'name' => 'Offline', 'token' => 'x']],
+        'update' => ['PATCH', '/api/v1/security/integration-tokens/{uuid}', ['name' => 'Offline', 'token' => 'new-secret']],
+        'sync zones' => ['POST', '/api/v1/security/integration-tokens/{uuid}/sync-zones', []],
+    ]);
 });
 
 describe('resource dns', function () {

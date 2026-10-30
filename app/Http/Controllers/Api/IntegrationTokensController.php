@@ -7,6 +7,8 @@ use App\Actions\IntegrationToken\UpdateIntegrationToken;
 use App\Http\Controllers\Controller;
 use App\Models\IntegrationToken;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\IntegrationTokenValidator;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -116,6 +118,7 @@ class IntegrationTokensController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 502, description: 'Coolify could not connect to the provider API.'),
         ],
     )]
     public function store(Request $request): JsonResponse
@@ -168,6 +171,8 @@ class IntegrationTokensController extends Controller
                 $validated['automatic_dns'] ?? true,
                 $validated['proxied_dns'] ?? false,
             );
+        } catch (ConnectionException) {
+            return $this->connectionErrorResponse($validated['provider']);
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         }
@@ -211,6 +216,7 @@ class IntegrationTokensController extends Controller
             new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 502, description: 'Coolify could not connect to the provider API.'),
         ],
     )]
     public function update(Request $request): JsonResponse
@@ -270,6 +276,8 @@ class IntegrationTokensController extends Controller
             );
         } catch (ValidationException $e) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
+        } catch (ConnectionException) {
+            return $this->connectionErrorResponse($token->provider);
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         }
@@ -336,6 +344,7 @@ class IntegrationTokensController extends Controller
             new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, description: 'The token is not a Cloudflare token.'),
+            new OA\Response(response: 502, description: 'Coolify could not connect to the Cloudflare API.'),
         ],
     )]
     public function syncZones(Request $request, CloudflareDnsProvider $cloudflare): JsonResponse
@@ -353,6 +362,8 @@ class IntegrationTokensController extends Controller
 
         try {
             $count = $cloudflare->syncZones($token);
+        } catch (ConnectionException) {
+            return $this->connectionErrorResponse($token->provider);
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         }
@@ -369,6 +380,11 @@ class IntegrationTokensController extends Controller
 
         return IntegrationToken::query()->where('team_id', $teamId)->where('uuid', $request->route('uuid'))->first()
             ?? response()->json(['message' => 'Integration token not found.'], 404);
+    }
+
+    private function connectionErrorResponse(string $provider): JsonResponse
+    {
+        return response()->json(['message' => app(IntegrationTokenValidator::class)->connectionErrorMessage($provider)], 502);
     }
 
     /**

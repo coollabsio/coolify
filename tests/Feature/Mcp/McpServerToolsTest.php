@@ -243,6 +243,7 @@ test('server group destructive actions need confirm=true', function (string $too
     'manage_dns replace' => ['manage_dns', ['action' => 'replace', 'resource' => 'application', 'uuid' => 'x']],
     'manage_dns release' => ['manage_dns', ['action' => 'release', 'resource' => 'application', 'uuid' => 'x', 'hostname' => 'app.example.com']],
     'manage_secret_manager remove' => ['manage_secret_manager', ['action' => 'remove', 'resource' => 'application', 'uuid' => 'x']],
+    'manage_cloudflare_tunnel update' => ['manage_cloudflare_tunnel', ['action' => 'update', 'uuid' => 'x', 'data' => ['is_cloudflare_tunnel' => false]]],
     'manage_cloudflare_tunnel enable' => ['manage_cloudflare_tunnel', ['action' => 'enable', 'uuid' => 'x']],
     'manage_cloudflare_tunnel disable' => ['manage_cloudflare_tunnel', ['action' => 'disable', 'uuid' => 'x']],
 ]);
@@ -934,6 +935,43 @@ test('manage_dns creates the dns record of an application domain', function () {
     expect(mcpSrvIsError($response))->toBeFalse()
         ->and(mcpSrvData($response)['record'])->toMatchArray(['hostname' => 'app.example.com', 'address' => '203.0.113.10'])
         ->and(ManagedDnsRecord::query()->where('name', 'app.example.com')->exists())->toBeTrue();
+});
+
+test('manage_dns returns the conflict of a create so the agent can replace the record', function () {
+    $this->server->update(['ip' => '203.0.113.10']);
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'capabilities' => ['dns']]);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response(['success' => true, 'result' => [
+            ['id' => 'record-old', 'type' => 'A', 'name' => 'app.example.com', 'content' => '198.51.100.7'],
+        ]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/*' => Http::response(['success' => true, 'result' => ['id' => 'record-old']]),
+    ]);
+    $bearer = mcpSrvToken($this->user, ['read', 'write']);
+
+    $create = mcpSrvCall($bearer, 'manage_dns', [
+        'action' => 'create', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['hostname' => 'app.example.com'],
+    ]);
+    $text = mcpSrvText($create);
+    $conflict = json_decode(substr($text, strpos($text, '{"conflict"')), true)['conflict'];
+
+    expect(mcpSrvIsError($create))->toBeTrue()
+        ->and($conflict)->toBe(['record_id' => 'record-old', 'current' => '198.51.100.7', 'proposed' => '203.0.113.10']);
+
+    $replace = mcpSrvCall($bearer, 'manage_dns', [
+        'action' => 'replace', 'resource' => 'application', 'uuid' => $application->uuid, 'confirm' => true,
+        'data' => ['hostname' => 'app.example.com', 'record_id' => $conflict['record_id'], 'current' => $conflict['current']],
+    ]);
+
+    expect(mcpSrvIsError($replace))->toBeFalse(mcpSrvText($replace))
+        ->and(mcpSrvData($replace)['record'])->toMatchArray(['address' => '203.0.113.10', 'owned' => false]);
 });
 
 test('manage_integration_tokens renames a token', function () {

@@ -153,7 +153,8 @@ test('a secret manager source is linked, read, and removed for each resource typ
     $resource = secretManagerApiResource($this, $type);
     $headers = secretManagerApiHeaders($this->bearerToken);
 
-    $this->withHeaders($headers)->patchJson("/api/v1/{$type}/{$resource->uuid}/secret-manager", ['integration_token_uuid' => $token->uuid])->assertOk();
+    $update = $this->withHeaders($headers)->patchJson("/api/v1/{$type}/{$resource->uuid}/secret-manager", ['integration_token_uuid' => $token->uuid])->assertOk();
+    expect($update->getContent())->not->toContain('secret-value');
     $read = $this->withHeaders($headers)->getJson("/api/v1/{$type}/{$resource->uuid}/secret-manager")
         ->assertOk()
         ->assertJson(['linked' => true, 'integration_token_uuid' => $token->uuid, 'provider' => 'doppler', 'available_tokens' => [['uuid' => $token->uuid]]]);
@@ -174,11 +175,28 @@ test('remote key names are listed and imported as references, and values are nev
     $base = "/api/v1/applications/{$this->application->uuid}/secret-manager";
 
     $keys = $this->withHeaders($headers)->getJson("{$base}/keys")->assertOk()->assertExactJson(['keys' => ['API_KEY', 'EXISTING', 'db-password']]);
-    $this->withHeaders($headers)->postJson("{$base}/import")->assertOk()->assertExactJson(['imported' => ['API_KEY'], 'skipped' => ['db-password']]);
+    $import = $this->withHeaders($headers)->postJson("{$base}/import")->assertOk()->assertExactJson(['imported' => ['API_KEY'], 'skipped' => ['db-password']]);
 
-    expect($keys->getContent())->not->toContain('remote-value')
+    expect($keys->getContent())->not->toContain('remote-value')->not->toContain('secret-value')
+        ->and($import->getContent())->not->toContain('remote-value')->not->toContain('secret-value')
         ->and($this->application->environment_variables()->where('key', 'API_KEY')->value('value'))->toBe('{{vault.API_KEY}}');
 });
+
+test('a failing secret manager returns 400 without the token secret', function (string $method, string $path) {
+    $token = secretManagerApiDopplerToken($this);
+    $this->application->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    Http::fake(['https://api.doppler.com/*' => Http::response(['messages' => ['Internal error']], 500)]);
+
+    $response = $this->withHeaders(secretManagerApiHeaders($this->bearerToken))
+        ->json($method, "/api/v1/applications/{$this->application->uuid}/secret-manager/{$path}", ['key' => 'API_KEY'])
+        ->assertStatus(400);
+
+    expect($response->getContent())->not->toContain('secret-value');
+})->with([
+    'keys' => ['GET', 'keys'],
+    'references' => ['POST', 'references'],
+    'import' => ['POST', 'import'],
+]);
 
 test('a reference is added only for a remote key with a valid name that has no variable yet', function (string $key, ?string $error) {
     $token = secretManagerApiDopplerToken($this);
