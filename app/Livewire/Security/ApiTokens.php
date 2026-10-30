@@ -20,6 +20,17 @@ class ApiTokens extends Component
 {
     use AuthorizesRequests;
 
+    /**
+     * Expiry choice in the edit form that keeps the current expiry date.
+     */
+    private const KEEP_EXPIRY = 'keep';
+
+    /**
+     * The token loaded in the form for editing; null when the form creates a new token.
+     */
+    #[Locked]
+    public ?int $editingTokenId = null;
+
     public ?string $description = null;
 
     /**
@@ -186,37 +197,9 @@ class ApiTokens extends Component
         try {
             $this->authorize('create', PersonalAccessToken::class);
 
-            $validated = $this->validate([
-                'description' => 'required|min:3|max:255',
-                'expiresInDays' => 'nullable|integer|in:7,30,60,90,365',
-                'permissions' => 'required|array|min:1',
-                'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root'])],
-                'scopeMode' => ['required', Rule::in(['team', 'selected'])],
-                'selectedScopes' => ['exclude_unless:scopeMode,selected', 'required', 'array', 'min:1'],
-                'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource):[A-Za-z0-9_-]+$/'],
-            ], [
-                'selectedScopes.required' => 'Select at least one project, environment, or resource.',
-            ]);
-            $permissions = array_values($validated['permissions']);
             $teamId = currentTeam()->id;
-            $scopes = $this->scopeMode === 'selected' ? $this->parseSelectedScopes($teamId) : null;
-
-            // Never trust the $this->canUse* booleans: check the current user's access in the team again.
-            $resolver = app(AccessResolver::class);
-            $isAdmin = auth()->user()->isAdminOfTeam($teamId);
-            if (in_array('write:sensitive', $permissions, true) && ! $isAdmin) {
-                throw new \Exception('You do not have permission to create tokens with write:sensitive permissions.');
-            }
-            $levels = AccessLevel::parseMany($permissions);
-            $grants = $scopes === null
-                ? [Grant::team($levels)]
-                : array_map(fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels), $scopes);
-            if (! $resolver->userHolds(auth()->user(), $teamId, $grants)) {
-                throw new \Exception('A token cannot have more access than you have. Choose fewer permissions or narrower projects, environments, or resources.');
-            }
-
-            $expiresAt = filled($validated['expiresInDays'] ?? null) ? now()->addDays((int) $validated['expiresInDays']) : null;
-            $storedScopes = $scopes === null ? null : array_map(fn (Grant $scope) => ['scope' => $scope->scope->value, 'uuid' => $scope->uuid], $scopes);
+            ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($teamId);
+            $expiresAt = filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null;
             // One transaction, so a token never exists team-wide when saving its scopes fails.
             $token = DB::transaction(function () use ($permissions, $expiresAt, $teamId, $storedScopes) {
                 $token = auth()->user()->createToken($this->description, $permissions, $expiresAt, $teamId);
@@ -237,6 +220,129 @@ class ApiTokens extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Load a token into the form, so its description, permissions, access, and expiry can be changed.
+     */
+    public function startEditing(int $id)
+    {
+        try {
+            $token = $this->findOwnToken($id);
+            $this->authorize('update', $token);
+
+            $this->resetValidation();
+            $this->editingTokenId = $token->id;
+            $this->description = $token->name;
+            $this->permissions = $token->abilities ?? ['read'];
+            sort($this->permissions);
+            $this->scopeMode = $token->scopes === null ? 'team' : 'selected';
+            $this->selectedScopes = collect($token->scopes ?? [])->map(fn (array $scope) => "{$scope['scope']}:{$scope['uuid']}")->values()->all();
+            $this->expiresInDays = self::KEEP_EXPIRY;
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function cancelEditing(): void
+    {
+        $this->resetValidation();
+        $this->reset('editingTokenId', 'description', 'expiresInDays', 'permissions', 'selectedScopes');
+        $this->scopeMode = $this->canUseTeamScope ? 'team' : 'selected';
+    }
+
+    /**
+     * Save the edited token. The token value does not change, and the next request with it uses the new access.
+     */
+    public function updateToken()
+    {
+        try {
+            $token = $this->findOwnToken((int) $this->editingTokenId);
+            $this->authorize('update', $token);
+
+            $teamId = currentTeam()->id;
+            ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($teamId);
+            $before = ['abilities' => $token->abilities, 'scopes' => $token->scopes, 'expires_at' => $token->expires_at?->toIso8601String()];
+
+            $token->forceFill([
+                'name' => $this->description,
+                'abilities' => $permissions,
+                'scopes' => $storedScopes,
+            ]);
+            if ($expiresInDays !== self::KEEP_EXPIRY) {
+                $token->forceFill([
+                    'expires_at' => filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null,
+                    // A new expiry date needs a new expiration warning.
+                    'api_token_expiration_warning_sent_at' => null,
+                ]);
+            }
+            $token->save();
+
+            auditLog('ui.api_token.updated', [
+                'team_id' => $teamId,
+                'api_token_name' => $token->name,
+                'before' => $before,
+                'after' => ['abilities' => $permissions, 'scopes' => $storedScopes, 'expires_at' => $token->expires_at?->toIso8601String()],
+            ]);
+            $this->cancelEditing();
+            $this->getTokens();
+            $this->dispatch('success', 'API token updated.');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Validate the form and check that the user may give the token this access.
+     * Never trust the $this->canUse* booleans: check the current user's access in the team again.
+     *
+     * @return array{permissions: list<string>, scopes: list<array{scope: string, uuid: string}>|null, expiresInDays: int|string|null}
+     */
+    private function validateTokenForm(int $teamId): array
+    {
+        $expiryChoices = array_keys($this->expirationOptions);
+        if ($this->editingTokenId !== null) {
+            $expiryChoices[] = self::KEEP_EXPIRY;
+        }
+
+        $validated = $this->validate([
+            'description' => 'required|min:3|max:255',
+            'expiresInDays' => ['nullable', Rule::in($expiryChoices)],
+            'permissions' => 'required|array|min:1',
+            'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root'])],
+            'scopeMode' => ['required', Rule::in(['team', 'selected'])],
+            'selectedScopes' => ['exclude_unless:scopeMode,selected', 'required', 'array', 'min:1'],
+            'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource):[A-Za-z0-9_-]+$/'],
+        ], [
+            'selectedScopes.required' => 'Select at least one project, environment, or resource.',
+        ]);
+        $permissions = array_values($validated['permissions']);
+        $scopes = $this->scopeMode === 'selected' ? $this->parseSelectedScopes($teamId) : null;
+
+        if (in_array('write:sensitive', $permissions, true) && ! auth()->user()->isAdminOfTeam($teamId)) {
+            throw new \Exception('You do not have permission to give tokens write:sensitive permissions.');
+        }
+        $levels = AccessLevel::parseMany($permissions);
+        $grants = $scopes === null
+            ? [Grant::team($levels)]
+            : array_map(fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels), $scopes);
+        if (! app(AccessResolver::class)->userHolds(auth()->user(), $teamId, $grants)) {
+            throw new \Exception('A token cannot have more access than you have. Choose fewer permissions or narrower projects, environments, or resources.');
+        }
+
+        return [
+            'permissions' => $permissions,
+            'scopes' => $scopes === null ? null : array_map(fn (Grant $scope) => ['scope' => $scope->scope->value, 'uuid' => $scope->uuid], $scopes),
+            'expiresInDays' => $validated['expiresInDays'] ?? null,
+        ];
+    }
+
+    private function findOwnToken(int $id): PersonalAccessToken
+    {
+        return auth()->user()->tokens()
+            ->where('team_id', currentTeam()->id)
+            ->where('id', $id)
+            ->firstOrFail();
     }
 
     /**
@@ -264,14 +370,36 @@ class ApiTokens extends Component
         return $scopes;
     }
 
+    /**
+     * Pause a token so it stops authenticating requests, or resume a paused token. The token value does not change.
+     */
+    public function togglePause(int $id)
+    {
+        try {
+            $token = $this->findOwnToken($id);
+            $this->authorize('update', $token);
+
+            $pausing = ! $token->isPaused();
+            $token->forceFill(['paused_at' => $pausing ? now() : null])->save();
+            auditLog($pausing ? 'ui.api_token.paused' : 'ui.api_token.resumed', [
+                'team_id' => currentTeam()->id,
+                'api_token_name' => $token->name,
+            ]);
+            $this->getTokens();
+            $this->dispatch('success', $pausing ? 'API token paused.' : 'API token resumed.');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function revoke(int $id)
     {
         try {
-            $token = auth()->user()->tokens()
-                ->where('team_id', currentTeam()->id)
-                ->where('id', $id)
-                ->firstOrFail();
+            $token = $this->findOwnToken($id);
             $this->authorize('delete', $token);
+            if ($this->editingTokenId === $token->id) {
+                $this->cancelEditing();
+            }
             $tokenName = $token->name;
             $token->delete();
             auditLog('ui.api_token.revoked', [

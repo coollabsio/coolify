@@ -14,6 +14,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'api_token_expiration_warning_sent_at',
         'team_id',
         'scopes',
+        'paused_at',
     ];
 
     protected function casts(): array
@@ -21,6 +22,15 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         return [
             'api_token_expiration_warning_sent_at' => 'datetime',
             'scopes' => 'array',
+            'paused_at' => 'datetime',
         ];
+    }
+
+    /**
+     * A paused token is kept, but it does not authenticate requests until it is resumed.
+     */
+    public function isPaused(): bool
+    {
+        return $this->paused_at !== null;
     }
 }

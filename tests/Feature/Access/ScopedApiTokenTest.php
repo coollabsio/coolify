@@ -343,4 +343,122 @@ describe('token form', function () {
 
         expect($member->tokens()->pluck('name')->all())->toBe(['shop']);
     });
+
+    test('edits a team-wide token to one project, and the same token value then sees only that project', function () {
+        $plainToken = scopedTokenTestToken($this->admin, $this->team, ['read'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)
+            ->call('startEditing', $token->id)
+            ->assertSet('editingTokenId', $token->id)
+            ->assertSet('description', 'scoped-test')
+            ->assertSet('permissions', ['read'])
+            ->assertSet('scopeMode', 'team')
+            ->assertSet('expiresInDays', 'keep')
+            ->set('scopeMode', 'selected')
+            ->set('selectedScopes', ["project:{$this->shop->uuid}"])
+            ->call('updateToken')
+            ->assertHasNoErrors()
+            ->assertNotDispatched('error')
+            ->assertSet('editingTokenId', null);
+
+        expect($token->fresh()->scopes)->toBe([['scope' => 'project', 'uuid' => $this->shop->uuid]])
+            ->and(scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertOk()->json('*.name'))->toBe(['shop']);
+    });
+
+    test('edits permissions and keeps the expiry, then sets a new expiry', function () {
+        $plainToken = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $expiresAt = now()->addDays(10)->startOfSecond();
+        $token->forceFill(['expires_at' => $expiresAt, 'api_token_expiration_warning_sent_at' => now()])->save();
+        $this->actingAs($this->admin);
+
+        $form = Livewire::test(ApiTokens::class)
+            ->call('startEditing', $token->id)
+            ->set('permissions', ['read'])
+            ->call('updateToken')
+            ->assertHasNoErrors();
+
+        $token->refresh();
+        expect($token->abilities)->toBe(['read'])
+            ->and($token->expires_at->equalTo($expiresAt))->toBeTrue()
+            ->and($token->api_token_expiration_warning_sent_at)->not->toBeNull();
+        scopedTokenTestApi($plainToken, 'POST', '/api/v1/projects', ['name' => 'new'])->assertForbidden();
+
+        $form->call('startEditing', $token->id)
+            ->set('expiresInDays', 90)
+            ->call('updateToken')
+            ->assertHasNoErrors();
+
+        $token->refresh();
+        expect(round(now()->diffInDays($token->expires_at)))->toEqual(90)
+            ->and($token->api_token_expiration_warning_sent_at)->toBeNull();
+    });
+
+    test('a member cannot give a token more access than their grants by editing it', function () {
+        $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['read']]]);
+        scopedTokenTestToken($member, $this->team, ['read'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($member);
+
+        Livewire::test(ApiTokens::class)
+            ->call('startEditing', $token->id)
+            ->set('selectedScopes', ["project:{$this->blog->uuid}"])
+            ->call('updateToken')
+            ->assertDispatched('error');
+
+        expect($token->fresh()->scopes)->toBe([['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+    });
+
+    test('cannot edit a token of another user or of another team', function () {
+        $otherAdmin = User::factory()->create();
+        $this->team->members()->attach($otherAdmin->id, ['role' => 'admin']);
+        scopedTokenTestToken($otherAdmin, $this->team, ['read'], null);
+        $otherTeam = Team::factory()->create();
+        $otherTeam->members()->attach($this->admin->id, ['role' => 'admin']);
+        scopedTokenTestToken($this->admin, $otherTeam, ['read'], null);
+        $this->actingAs($this->admin);
+
+        foreach (PersonalAccessToken::query()->get() as $token) {
+            Livewire::test(ApiTokens::class)
+                ->call('startEditing', $token->id)
+                ->assertSet('editingTokenId', null);
+        }
+    });
+
+    test('a paused token is rejected by the API and MCP until it is resumed', function () {
+        $plainToken = scopedTokenTestToken($this->admin, $this->team, ['read'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)
+            ->call('togglePause', $token->id)
+            ->assertDispatched('success', 'API token paused.');
+
+        expect($token->fresh()->isPaused())->toBeTrue();
+        scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertUnauthorized();
+        scopedTokenTestMcp($plainToken, 'tools/list')->assertUnauthorized();
+
+        $this->actingAs($this->admin);
+        Livewire::test(ApiTokens::class)
+            ->call('togglePause', $token->id)
+            ->assertDispatched('success', 'API token resumed.');
+
+        expect($token->fresh()->isPaused())->toBeFalse();
+        scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertOk();
+        scopedTokenTestMcp($plainToken, 'tools/list')->assertOk();
+    });
+
+    test('cannot pause a token of another user', function () {
+        $otherAdmin = User::factory()->create();
+        $this->team->members()->attach($otherAdmin->id, ['role' => 'admin']);
+        scopedTokenTestToken($otherAdmin, $this->team, ['read'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)->call('togglePause', $token->id);
+
+        expect($token->fresh()->isPaused())->toBeFalse();
+    });
 });
