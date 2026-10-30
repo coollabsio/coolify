@@ -43,14 +43,13 @@ main() {
 }
 
 read_ghcr_versions() {
-	local state
-	for state in active deleted; do
-		gh api --paginate "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&state=$state" \
-			--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv' > "$WORK_DIR/ghcr-$state.tsv" 2> /dev/null \
-			|| die "gh could not list the $state versions of ghcr.io/$IMAGE, it needs read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
-	done
+	local page window=$((${LIMIT:-0} * 2))
+	list_ghcr_versions "state=active" --paginate > "$WORK_DIR/ghcr-active.tsv"
+	for ((page = 1; page <= (window + 99) / 100; page++)); do
+		list_ghcr_versions "state=deleted&page=$page"
+	done | awk -v window="$window" 'NR <= window' > "$WORK_DIR/ghcr-deleted.tsv"
 	cut -f 1 "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/on-ghcr.txt"
-	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged, and lists $(count < "$WORK_DIR/ghcr-deleted.tsv") deleted ones"
+	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged, and $(count < "$WORK_DIR/ghcr-deleted.tsv") of the versions it deleted last are checked on docker.io, twice as many as the run deletes"
 }
 
 read_dockerhub_tags() {
@@ -141,7 +140,7 @@ write_list() {
 		FILENAME == ARGV[8] { if ($1 == 200) print "no", "yes", ($3 ~ /index|list/ ? "index" : "image"), platform_of($2), tags[$2], created[$2], "", version[$2], $2; next }
 		!($1 in kept) { print "yes", "undefined", kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
 		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub.tsv" \
-		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k6,6 > "$WORK_DIR/rows.tsv"
+		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k1,1 -k6,6 > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
 	ok "$(awk -F '\t' 'END { print $9 " to delete, " $3 ", they free " $7 }' "$TO_DELETE_FILE")"
 	ok "$(awk -F '\t' '$1 == "no"' "$WORK_DIR/rows.tsv" | count) of them on docker.io alone, ghcr.io deleted them already or never had them, their size stays empty as reading it counts as a pull"
@@ -192,6 +191,14 @@ verify_kept_manifests() {
 		[ -z "$missing" ] || die "$(count <<< "$missing") manifests the kept tags point at are gone from $registry, expected all of them: $(head -n 3 <<< "$missing" | paste -sd ' ' -)"
 	done
 	ok "every kept tag and every manifest it points at is still on ghcr.io and docker.io"
+}
+
+list_ghcr_versions() {
+	local query="$1"
+	shift
+	gh api "$@" "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&$query" \
+		--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv' 2> /dev/null \
+		|| die "gh could not list the versions of ghcr.io/$IMAGE with $query, it needs read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
 }
 
 request_manifests() {
