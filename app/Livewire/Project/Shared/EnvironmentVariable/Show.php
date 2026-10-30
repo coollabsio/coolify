@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Reactive;
 use Livewire\Component;
 
 class Show extends Component
@@ -28,6 +29,13 @@ class Show extends Component
 
     /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
     public ?array $composeInfo = null;
+
+    /**
+     * A preview variable that still has the production value. The parent list compares the values.
+     * Null when the parent does not compare (for example shared variables).
+     */
+    #[Reactive]
+    public ?bool $sameAsProduction = null;
 
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
 
@@ -379,6 +387,10 @@ class Show extends Component
             $this->dispatch('environment-variable-updated', envId: $this->env->id);
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
+            if ($this->env instanceof ModelsEnvironmentVariable && $this->env->resourceable_type === Application::class) {
+                // The value change can add or remove "Same as production" badges on other rows.
+                $this->dispatch('refreshEnvs')->to(All::class);
+            }
 
             if ($this->is_required && $this->resource instanceof Service) {
                 event(new ApplicationConfigurationChanged($this->resource->team()->id));

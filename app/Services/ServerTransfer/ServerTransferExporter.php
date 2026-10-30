@@ -1245,6 +1245,7 @@ class ServerTransferExporter
                 'is_literal' => (bool) $variable->is_literal,
                 'is_multiline' => (bool) $variable->is_multiline,
                 'is_preview' => (bool) $variable->is_preview,
+                'is_production_value_copy' => (bool) $variable->is_production_value_copy,
                 'is_runtime' => (bool) $variable->is_runtime,
                 'is_buildtime' => (bool) $variable->is_buildtime,
                 'is_shown_once' => (bool) $variable->is_shown_once,

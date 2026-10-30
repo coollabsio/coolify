@@ -594,6 +594,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1030,6 +1033,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1466,6 +1472,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1839,6 +1848,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2198,6 +2210,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2734,6 +2749,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -16354,6 +16372,9 @@ components:
           type: boolean
         is_pr_deployments_public_enabled:
           type: boolean
+        use_production_values_in_previews:
+          type: boolean
+          description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value.'
         use_build_secrets:
           type: boolean
         redact_all_env_values_in_logs:

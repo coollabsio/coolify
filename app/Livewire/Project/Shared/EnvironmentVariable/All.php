@@ -69,6 +69,9 @@ class All extends Component
 
     private ?Collection $composeEnvironmentAssignments = null;
 
+    /** @var array<int, int>|null */
+    private ?array $previewVariableIdsWithProductionValues = null;
+
     private ?bool $canViewComposeContent = null;
 
     protected $listeners = [
@@ -109,6 +112,7 @@ class All extends Component
         unset($this->environmentVariableRowCount);
         unset($this->environmentVariableLastPage);
         unset($this->currentEnvironmentVariablePage);
+        $this->previewVariableIdsWithProductionValues = null;
     }
 
     public function mount()
@@ -766,7 +770,23 @@ class All extends Component
             'scope' => $environmentVariable->is_preview ? 'preview' : 'production',
             'environmentVariable' => $environmentVariable,
             'composeInfo' => $this->composeInfoFor($environmentVariable->key),
+            'sameAsProduction' => $environmentVariable->is_preview
+                && in_array($environmentVariable->id, $this->previewVariableIdsWithProductionValues(), true),
         ];
+    }
+
+    /**
+     * Compared on the server, so the "Production value" badge sends no values to the browser.
+     *
+     * @return array<int, int>
+     */
+    private function previewVariableIdsWithProductionValues(): array
+    {
+        if (! $this->supportsPreviewEnvironmentVariables()) {
+            return [];
+        }
+
+        return $this->previewVariableIdsWithProductionValues ??= $this->resource->previewEnvironmentVariableIdsWithProductionValues();
     }
 
     private function hardcodedEnvironmentVariableRow(array $environmentVariable, bool $isPreview, int $index): array
