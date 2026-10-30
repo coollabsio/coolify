@@ -10,6 +10,7 @@ KEEP_NIGHTLY_DAYS=14
 MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
+GHCR_TOKEN=""
 TO_DELETE_FILE=scripts/manifests-to-delete.tsv
 DELETED_FILE=scripts/deleted-manifests.tsv
 WORK_DIR="$(mktemp -d)"
@@ -30,6 +31,8 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 main() {
 	[[ "$OPTION" =~ ^(--delete [1-9][0-9]*)?$ ]] || die "'$OPTION' is not an option, expected --delete with a count or none"
+	[ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || die "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set to read docker.io/$IMAGE"
+	GHCR_TOKEN="$(gh auth token)" || die "gh is not signed in with a token that has read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
 	heading "Reading ghcr.io/$IMAGE and docker.io/$IMAGE"
 	read_ghcr_versions
 	read_dockerhub_tags
@@ -50,7 +53,7 @@ read_ghcr_versions() {
 		list_ghcr_versions "state=deleted&page=$page"
 	done | awk -v window="$window" 'NR <= window' > "$WORK_DIR/ghcr-deleted.tsv"
 	cut -f 1 "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/on-ghcr.txt"
-	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged, and $(count < "$WORK_DIR/ghcr-deleted.tsv") of the versions it deleted last are checked on docker.io, twice as many as the run deletes"
+	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged"
 }
 
 read_dockerhub_tags() {
@@ -83,28 +86,29 @@ select_kept_tags() {
 		grep -E -e '-(alpha|beta|rc)\.[0-9]+\.20[0-9]{6}\.[0-9]+$' "$WORK_DIR/tags.txt" | awk -F . -v cutoff="$cutoff" '$(NF - 1) >= cutoff' || true
 	} | sort -u > "$WORK_DIR/kept-tags.txt"
 	grep -qx latest "$WORK_DIR/kept-tags.txt" || die "found no latest tag, expected it among the tags to keep"
-	ok "keeping $(count < "$WORK_DIR/kept-tags.txt") tags: every tag KEEP_TAG_PATTERN matches or KEEP_TAG_EXCEPTIONS lists, the nightlies of the last $KEEP_NIGHTLY_DAYS days, every git tag of github.com/$IMAGE and the tags of open pull requests"
+	ok "keeping $(count < "$WORK_DIR/kept-tags.txt") tags: the ones KEEP_TAG_PATTERN matches or KEEP_TAG_EXCEPTIONS lists, the nightlies of the last $KEEP_NIGHTLY_DAYS days, the git tags of github.com/$IMAGE and the tags of open pull requests"
 }
 
 read_manifests() {
-	local digest tag
+	local digest tag hub
 	mkdir "$WORK_DIR/manifests"
 	request_manifests ghcr.io "$WORK_DIR/on-ghcr.txt" -f -o "$WORK_DIR/manifests/{}" -w '{}\t%{size_download}\n' > "$WORK_DIR/bytes.tsv" \
 		|| die "could not read the manifests of ghcr.io/$IMAGE"
 	awk -F '\t' -v OFS='\t' 'FILENAME == ARGV[1] { kept[$1]; next } FILENAME == ARGV[2] { ghcr[$1]; next } ($3 in kept) && !($1 in ghcr) && !seen[$1]++ { print $1, $2, $3 }' \
 		"$WORK_DIR/kept-tags.txt" "$WORK_DIR/on-ghcr.txt" "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/dockerhub-roots.tsv"
 	awk -F '\t' '$2 ~ /oci\.image\.index/ { print $1 }' "$WORK_DIR/dockerhub-roots.tsv" > "$WORK_DIR/dockerhub-indexes.txt"
-	request_manifests docker.io "$WORK_DIR/dockerhub-indexes.txt" -f -o "$WORK_DIR/manifests/{}" || die "could not read the indexes kept tags point at on docker.io"
+	request_manifests docker.io "$WORK_DIR/dockerhub-indexes.txt" -f -o "$WORK_DIR/manifests/{}" || die "could not read the kept manifests that only docker.io has"
+	hub="$(hub_token)" || die "could not sign in to the Docker Hub API as $DOCKERHUB_USERNAME"
 	while IFS=$'\t' read -r digest tag; do
-		curl -sSf --retry 3 "https://hub.docker.com/v2/namespaces/${IMAGE%%/*}/repositories/${IMAGE#*/}/tags/$tag" | jq -r --arg root "$digest" '.images[] | [$root, .digest] | @tsv' \
-			|| die "could not read the manifests $tag points at on docker.io"
+		curl -sSf --retry 3 -H "Authorization: Bearer $hub" "https://hub.docker.com/v2/namespaces/${IMAGE%%/*}/repositories/${IMAGE#*/}/tags/$tag" | jq -r --arg root "$digest" '.images[] | [$root, .digest] | @tsv' \
+			|| die "could not read the images of $tag from the Docker Hub API"
 	done < <(awk -F '\t' -v OFS='\t' '$2 !~ /oci\.image\.index/ { print $1, $3 }' "$WORK_DIR/dockerhub-roots.tsv") > "$WORK_DIR/children.tsv"
 	manifest_fields '.manifests[]? | [manifest, .digest, (.platform | [.os, .architecture, .variant] | map(values) | join("/")), .annotations["vnd.docker.reference.digest"]]' \
 		>> "$WORK_DIR/children.tsv"
 	manifest_fields '(.config // empty), .layers[]? | [manifest, .digest, .size]' > "$WORK_DIR/blobs.tsv"
 	manifest_fields '[manifest, if .manifests then "index" elif any(.layers[]?; .mediaType == "application/vnd.in-toto+json") then "attestation" else "image" end]' \
 		> "$WORK_DIR/kinds.tsv"
-	ok "read the $(count < "$WORK_DIR/bytes.tsv") manifests of ghcr.io/$IMAGE and the $(count < "$WORK_DIR/dockerhub-roots.tsv") that kept tags point at on docker.io alone"
+	ok "read the $(count < "$WORK_DIR/bytes.tsv") manifests on ghcr.io and $(count < "$WORK_DIR/dockerhub-roots.tsv") kept manifests that only docker.io has"
 }
 
 select_kept_manifests() {
@@ -113,10 +117,11 @@ select_kept_manifests() {
 	kept_manifests "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/kept-docker.io.txt"
 	sort -u "$WORK_DIR/kept-ghcr.io.txt" "$WORK_DIR/kept-docker.io.txt" > "$WORK_DIR/kept.txt"
 	awk 'FILENAME == ARGV[1] { ghcr[$1]; next } !($1 in ghcr) { exit 1 }' "$WORK_DIR/on-ghcr.txt" "$WORK_DIR/kept-ghcr.io.txt" \
-		|| die "manifests the kept tags point at are missing from the versions gh listed on ghcr.io, expected every one of them"
-	kinds="$(awk -F '\t' 'FILENAME == ARGV[1] { kept[$1]; next } ($1 in kept) { count[$2]++ }
-		END { printf "%d indexes, %d images and %d attestations", count["index"], count["image"], count["attestation"] }' "$WORK_DIR/kept-ghcr.io.txt" "$WORK_DIR/kinds.tsv")"
-	ok "keeping $(count < "$WORK_DIR/kept-ghcr.io.txt") manifests on ghcr.io, $kinds, and $(count < "$WORK_DIR/kept-docker.io.txt") on docker.io: the kept tags and every manifest they point at"
+		|| die "ghcr.io lists no version for some kept manifests, expected one for each"
+	kinds="$(awk -F '\t' 'function amount(count, one, many) { return (count + 0) " " (count == 1 ? one : many) }
+		FILENAME == ARGV[1] { kept[$1]; next } ($1 in kept) { count[$2]++ }
+		END { print amount(count["index"], "index", "indexes") ", " amount(count["image"], "image", "images") ", " amount(count["attestation"], "attestation", "attestations") }' "$WORK_DIR/kept-ghcr.io.txt" "$WORK_DIR/kinds.tsv")"
+	ok "keeping $(count < "$WORK_DIR/kept-ghcr.io.txt") manifests on ghcr.io ($kinds) and $(count < "$WORK_DIR/kept-docker.io.txt") on docker.io"
 }
 
 find_dockerhub_only_manifests() {
@@ -125,14 +130,14 @@ find_dockerhub_only_manifests() {
 	request_manifests docker.io "$WORK_DIR/candidates.txt" --head -o /dev/null -w '%{http_code}\t{}\t%header{content-type}\n' \
 		> "$WORK_DIR/dockerhub-only.tsv" || die "could not check which manifests docker.io has"
 	awk '$1 != 200 && $1 != 404 { exit 1 }' "$WORK_DIR/dockerhub-only.tsv" \
-		|| die "could not check docker.io for the manifests ghcr.io does not have, expected 200 or 404"
-	ok "docker.io still has $(awk '$1 == 200' "$WORK_DIR/dockerhub-only.tsv" | count) of the $(count < "$WORK_DIR/candidates.txt") unused manifests ghcr.io does not have"
+		|| die "docker.io answered neither 200 nor 404 for an unused manifest"
+	ok "found $(awk '$1 == 200' "$WORK_DIR/dockerhub-only.tsv" | count) unused manifests that only docker.io has"
 }
 
 write_list() {
 	local cutoff
 	cutoff="$(jq -nr --argjson days "$MIN_AGE_DAYS" 'now - $days * 86400 | strftime("%Y-%m-%dT%H:%M:%SZ")')"
-	ok "keeping the $(awk -F '\t' -v cutoff="$cutoff" '$4 >= cutoff && !seen[$1]++' "$WORK_DIR/ghcr-active.tsv" | count) versions ghcr.io got since $cutoff, a build may still push the index that needs them"
+	ok "keeping the $(awk -F '\t' -v cutoff="$cutoff" '$4 >= cutoff && !seen[$1]++' "$WORK_DIR/ghcr-active.tsv" | count) versions pushed since $cutoff, a running build may still need them"
 	awk -F '\t' -v OFS='\t' -v cutoff="$cutoff" 'function platform_of(digest) { return (reference[digest] in platform) ? platform[reference[digest]] : platform[digest] }
 		FILENAME == ARGV[1] { kept[$1]; next }
 		FILENAME == ARGV[2] { kind[$1] = $2; next }
@@ -146,18 +151,16 @@ write_list() {
 		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub.tsv" \
 		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k1,1 -k6,6 > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
-	ok "$(awk -F '\t' 'END { print ($9 + 0 ? $9 " to delete, " $3 ", they free " $7 : "nothing to delete") }' "$TO_DELETE_FILE")"
-	ok "$(awk -F '\t' '$1 == "no"' "$WORK_DIR/rows.tsv" | count) of them on docker.io alone, ghcr.io deleted them already or never had them, their size stays empty as reading it counts as a pull"
+	ok "$(awk -F '\t' 'END { print ($9 + 0 ? $9 " to delete (" $3 "), they free " $7 : "nothing to delete") }' "$TO_DELETE_FILE")"
 	info "$TO_DELETE_FILE lists every manifest to delete with its type, platform, tags, date and size, indexes first"
 }
 
 delete_manifests() {
 	local on_ghcr type tags version digest rest name deleted ghcr docker_hub status
 	if [ -z "$LIMIT" ]; then
-		info "nothing is deleted, a run with --delete and a count deletes that many from the top of the list"
+		info "a dry run deletes nothing, --delete with a count deletes that many from the top of the list"
 		return
 	fi
-	[ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || die "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set to delete manifests on docker.io"
 	heading "Deleting"
 	write_table /dev/null "$DELETED_FILE"
 	while IFS='|' read -r on_ghcr type tags version digest rest; do
@@ -183,8 +186,8 @@ delete_manifests() {
 			*) die "could not delete the $type $name from docker.io, it answered $status" ;;
 		esac
 	done < <(head -n "$LIMIT" "$WORK_DIR/rows.tsv" | awk -F '\t' -v OFS='|' '{ rest = $3; for (i = 4; i <= NF; i++) rest = rest "\t" $i; print $1, $3, $5, $8, $9, rest }')
-	ok "$(awk -F '\t' 'END { print ($9 + 0 ? "deleted " $9 ", " $3 ", they free " $7 : "deleted nothing") }' "$DELETED_FILE")"
-	info "$DELETED_FILE lists what this run deleted and where, ghcr.io restores it for 30 days, docker.io deletes for good"
+	ok "$(awk -F '\t' 'END { print ($9 + 0 ? "deleted " $9 " (" $3 "), they free " $7 : "deleted nothing") }' "$DELETED_FILE")"
+	info "$DELETED_FILE lists what this run deleted and where, ghcr.io can restore them for 30 days, docker.io deletes them permanently"
 }
 
 verify_kept_manifests() {
@@ -193,9 +196,9 @@ verify_kept_manifests() {
 	for registry in ghcr.io docker.io; do
 		missing="$(request_manifests "$registry" "$WORK_DIR/kept-$registry.txt" --head -o /dev/null -w '%{http_code}\t{}\n' | awk '$1 != 200 { print $2 }')" \
 			|| die "could not check the kept manifests on $registry"
-		[ -z "$missing" ] || die "$(count <<< "$missing") manifests the kept tags point at are gone from $registry, expected all of them: $(head -n 3 <<< "$missing" | paste -sd ' ' -)"
+		[ -z "$missing" ] || die "$(count <<< "$missing") kept manifests are gone from $registry: $(head -n 3 <<< "$missing" | paste -sd ' ' -)"
 	done
-	ok "every kept tag and every manifest it points at is still on ghcr.io and docker.io"
+	ok "every kept manifest is still on ghcr.io and docker.io"
 }
 
 list_ghcr_versions() {
@@ -203,7 +206,7 @@ list_ghcr_versions() {
 	shift
 	gh api "$@" "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&$query" \
 		--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv' 2> /dev/null \
-		|| die "gh could not list the versions of ghcr.io/$IMAGE with $query, it needs read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
+		|| die "gh could not list the versions of ghcr.io/$IMAGE, its token needs read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
 }
 
 request_manifests() {
@@ -252,7 +255,7 @@ delete_ghcr_version() {
 		case "$error" in
 			*"rate limit"*) sleep 60 ;;
 			*downloads*)
-				warn "ghcr.io and docker.io keep the $2, it has more than 5,000 downloads on ghcr.io"
+				warn "ghcr.io and docker.io keep the $2, ghcr.io deletes no version with more than 5,000 downloads"
 				return 1
 				;;
 			*) die "could not delete the $2 from ghcr.io: $error" ;;
@@ -272,13 +275,18 @@ delete_dockerhub_manifest() {
 
 registry_token() {
 	case "$1" in
-		ghcr.io) curl -sSf --retry 3 "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
-		docker.io) basic_auth "${DOCKERHUB_USERNAME:+$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN}" | curl -sSf --retry 3 -K - "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
+		ghcr.io) basic_auth "x:$GHCR_TOKEN" | curl -sSf --retry 3 -K - "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
+		docker.io) basic_auth "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" | curl -sSf --retry 3 -K - "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
 	esac | jq -r .token
 }
 
 basic_auth() {
-	[ -z "$1" ] || printf 'header = "Authorization: Basic %s"\n' "$(printf '%s' "$1" | jq -Rrj @base64)"
+	printf 'header = "Authorization: Basic %s"\n' "$(printf '%s' "$1" | jq -Rrj @base64)"
+}
+
+hub_token() {
+	jq -n --arg identifier "$DOCKERHUB_USERNAME" --arg secret "$DOCKERHUB_TOKEN" '{identifier: $identifier, secret: $secret}' \
+		| curl -sSf --retry 3 -X POST -H 'Content-Type: application/json' --data-binary @- https://hub.docker.com/v2/auth/token | jq -er .access_token
 }
 
 count() { awk 'END { print NR }'; }
