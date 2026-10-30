@@ -619,6 +619,7 @@ describe('adding a volume to an application with additional servers', function (
     test('connecting a SQLite database rejects the volume', function () {
         $sqlite = StandaloneSqlite::create([
             'name' => 'app-sqlite',
+            'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
             'environment_id' => $this->application->environment_id,
             'destination_id' => $this->mainDestination->id,
             'destination_type' => $this->mainDestination->getMorphClass(),
