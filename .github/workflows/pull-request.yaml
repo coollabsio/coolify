@@ -24,7 +24,7 @@ jobs:
     uses: $/.github/workflows/build.yaml
 
   publish:
-    name: Publish pr-${{ github.event.pull_request.number }}
+    name: Publish image
     needs: build
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
     permissions:
@@ -32,12 +32,14 @@ jobs:
     runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
     timeout-minutes: 30
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # https://github.com/actions/download-artifact/releases/tag/v8.0.2
+      - name: Download the built images
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # https://github.com/actions/download-artifact/releases/tag/v8.0.2
         with:
           pattern: image-*
           path: ${{ runner.temp }}/images
 
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+      - name: Log in to ghcr.io
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
