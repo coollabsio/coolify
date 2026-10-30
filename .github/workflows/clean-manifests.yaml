@@ -17,7 +17,7 @@ defaults:
 
 jobs:
   clean:
-    name: Clean
+    name: Clean manifests
     if: ${{ github.repository == 'coollabsio/coolify' }}
     permissions:
       contents: read
