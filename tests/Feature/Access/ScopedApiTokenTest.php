@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Forms\ApiTokenForm;
 use App\Livewire\Security\ApiTokens;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -72,6 +73,16 @@ function scopedTokenTestToken(User $user, Team $team, array $abilities, ?array $
     $token->accessToken->forceFill(['scopes' => $scopes])->save();
 
     return $token->plainTextToken;
+}
+
+/**
+ * Fill the edit form the way the browser does when the user clicks Edit.
+ */
+function scopedTokenTestEdit($component, PersonalAccessToken $token)
+{
+    $values = collect(ApiTokenForm::valuesOf($token))->except(['id', 'keepLabel']);
+
+    return $component->set($values->mapWithKeys(fn ($value, $field) => ["editForm.{$field}" => $value])->all());
 }
 
 function scopedTokenTestMember(Team $team, ?array $access): User
@@ -289,10 +300,10 @@ describe('token form', function () {
         $this->actingAs($this->admin);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'shop deploys')
-            ->set('permissions', ['deploy'])
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$this->shop->uuid}"])
+            ->set('form.description', 'shop deploys')
+            ->set('form.permissions', ['deploy'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["project:{$this->shop->uuid}"])
             ->call('addNewToken')
             ->assertHasNoErrors()
             ->assertNotDispatched('error');
@@ -309,10 +320,10 @@ describe('token form', function () {
         $this->actingAs($this->admin);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'foreign')
-            ->set('permissions', ['read'])
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$otherProject->uuid}"])
+            ->set('form.description', 'foreign')
+            ->set('form.permissions', ['read'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["project:{$otherProject->uuid}"])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -323,22 +334,22 @@ describe('token form', function () {
         $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['write']]]);
         $this->actingAs($member);
 
-        $form = Livewire::test(ApiTokens::class)->assertSet('scopeMode', 'selected');
+        $form = Livewire::test(ApiTokens::class)->assertSet('form.scopeMode', 'selected');
         expect(collect($form->instance()->scopeOptions())->pluck('value')->filter(fn ($value) => str_starts_with($value, 'project:'))->values()->all())
             ->toBe(["project:{$this->shop->uuid}"]);
 
-        $form->set('description', 'too wide')
-            ->set('permissions', ['write'])
-            ->set('scopeMode', 'team')
+        $form->set('form.description', 'too wide')
+            ->set('form.permissions', ['write'])
+            ->set('form.scopeMode', 'team')
             ->call('addNewToken')
             ->assertDispatched('error');
-        $form->set('description', 'blog')
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$this->blog->uuid}"])
+        $form->set('form.description', 'blog')
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["project:{$this->blog->uuid}"])
             ->call('addNewToken')
             ->assertDispatched('error');
-        $form->set('description', 'shop')
-            ->set('selectedScopes', ["project:{$this->shop->uuid}"])
+        $form->set('form.description', 'shop')
+            ->set('form.selectedScopes', ["project:{$this->shop->uuid}"])
             ->call('addNewToken');
 
         expect($member->tokens()->pluck('name')->all())->toBe(['shop']);
@@ -349,19 +360,20 @@ describe('token form', function () {
         $token = PersonalAccessToken::query()->sole();
         $this->actingAs($this->admin);
 
-        Livewire::test(ApiTokens::class)
-            ->call('startEditing', $token->id)
-            ->assertSet('editingTokenId', $token->id)
-            ->assertSet('description', 'scoped-test')
-            ->assertSet('permissions', ['read'])
-            ->assertSet('scopeMode', 'team')
-            ->assertSet('expiresInDays', 'keep')
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$this->shop->uuid}"])
-            ->call('updateToken')
+        expect(ApiTokenForm::valuesOf($token))->toMatchArray([
+            'description' => 'scoped-test',
+            'permissions' => ['read'],
+            'scopeMode' => 'team',
+            'expiresInDays' => 'keep',
+        ]);
+
+        scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+            ->set('editForm.scopeMode', 'selected')
+            ->set('editForm.selectedScopes', ["project:{$this->shop->uuid}"])
+            ->call('updateToken', $token->id)
             ->assertHasNoErrors()
             ->assertNotDispatched('error')
-            ->assertSet('editingTokenId', null);
+            ->assertDispatched('api-token-updated');
 
         expect($token->fresh()->scopes)->toBe([['scope' => 'project', 'uuid' => $this->shop->uuid]])
             ->and(scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertOk()->json('*.name'))->toBe(['shop']);
@@ -374,10 +386,9 @@ describe('token form', function () {
         $token->forceFill(['expires_at' => $expiresAt, 'api_token_expiration_warning_sent_at' => now()])->save();
         $this->actingAs($this->admin);
 
-        $form = Livewire::test(ApiTokens::class)
-            ->call('startEditing', $token->id)
-            ->set('permissions', ['read'])
-            ->call('updateToken')
+        $form = scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+            ->set('editForm.permissions', ['read'])
+            ->call('updateToken', $token->id)
             ->assertHasNoErrors();
 
         $token->refresh();
@@ -386,9 +397,9 @@ describe('token form', function () {
             ->and($token->api_token_expiration_warning_sent_at)->not->toBeNull();
         scopedTokenTestApi($plainToken, 'POST', '/api/v1/projects', ['name' => 'new'])->assertForbidden();
 
-        $form->call('startEditing', $token->id)
-            ->set('expiresInDays', 90)
-            ->call('updateToken')
+        scopedTokenTestEdit($form, $token)
+            ->set('editForm.expiresInDays', 90)
+            ->call('updateToken', $token->id)
             ->assertHasNoErrors();
 
         $token->refresh();
@@ -402,11 +413,9 @@ describe('token form', function () {
         $token = PersonalAccessToken::query()->sole();
         $this->actingAs($member);
 
-        Livewire::test(ApiTokens::class)
-            ->call('startEditing', $token->id)
-            ->assertSet('editingTokenId', $token->id)
-            ->set('selectedScopes', ["project:{$this->blog->uuid}"])
-            ->call('updateToken')
+        scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+            ->set('editForm.selectedScopes', ["project:{$this->blog->uuid}"])
+            ->call('updateToken', $token->id)
             ->assertDispatched('error');
 
         expect($token->fresh()->scopes)->toBe([['scope' => 'project', 'uuid' => $this->shop->uuid]]);
@@ -422,9 +431,12 @@ describe('token form', function () {
         $this->actingAs($this->admin);
 
         foreach (PersonalAccessToken::query()->get() as $token) {
-            Livewire::test(ApiTokens::class)
-                ->call('startEditing', $token->id)
-                ->assertSet('editingTokenId', null);
+            scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+                ->set('editForm.description', 'taken over')
+                ->call('updateToken', $token->id)
+                ->assertStatus(404);
+
+            expect($token->fresh()->name)->toBe('scoped-test');
         }
     });
 

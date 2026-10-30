@@ -1,4 +1,13 @@
-<div>
+<div x-data="{
+    editingToken: null,
+    editToken(values) {
+        this.editingToken = values;
+        for (const field of ['description', 'expiresInDays', 'permissions', 'scopeMode', 'selectedScopes']) {
+            this.$wire.$set(`editForm.${field}`, values[field], false);
+        }
+        this.$dispatch('open-api-token-edit');
+    },
+}">
     <x-slot:title>
         API Tokens | Coolify
     </x-slot>
@@ -11,14 +20,6 @@
                 ->values()
                 ->push(['value' => '', 'label' => 'Never'])
                 ->all();
-            $editingToken = $editingTokenId ? $tokens->firstWhere('id', $editingTokenId) : null;
-            if ($editingToken) {
-                $currentExpiry = $editingToken->expires_at?->format('Y-m-d') ?? 'Never';
-                array_unshift($expirationList, [
-                    'value' => 'keep',
-                    'label' => 'Keep current ('.($editingToken->expires_at?->isPast() ? 'expired '.$currentExpiry : $currentExpiry).')',
-                ]);
-            }
         @endphp
 
         <div class="application-settings-form flex flex-col gap-6">
@@ -26,120 +27,44 @@
                 message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
 
             @can('create', App\Models\PersonalAccessToken::class)
-                <form wire:submit="{{ $editingToken ? 'updateToken' : 'addNewToken' }}" id="api-token-form">
-                    <x-application.settings-section :title="$editingToken ? 'Edit API token' : 'New API token'">
+                <form wire:submit="addNewToken">
+                    <x-application.settings-section title="New API token">
                         <x-slot:actions>
-                            @if ($editingToken)
-                                <button type="button" wire:click="cancelEditing" class="button">
-                                    Cancel
-                                </button>
-                                <button type="submit" class="button button-highlighted">
-                                    Save changes
-                                </button>
-                            @else
-                                <button type="submit"
-                                    class="button button-highlighted">
-                                    <x-reicon name="plus" class="size-3.5" />
-                                    Create token
-                                </button>
-                            @endif
+                            <button type="submit" class="button button-highlighted">
+                                <x-reicon name="plus" class="size-3.5" />
+                                Create token
+                            </button>
                         </x-slot:actions>
 
-                        @if ($editingToken)
-                            <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
-                                The token value does not change. Clients that use it get the new access on their next request.
-                            </p>
-                        @endif
-
-                        <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.input required id="description" label="Description"
-                                placeholder="CI deployment token" />
-                            <x-forms.listbox id="expiresInDays" label="Expires in"
-                                :options="$expirationList" />
-                        </div>
-
-                        <div class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                            <div class="mb-3 flex items-center gap-2">
-                                <h4 class="text-[12px] font-semibold text-black dark:text-fg">Permissions</h4>
-                                <x-helper helper="Only grant the abilities this token needs." />
-                            </div>
-                            <div class="relative" x-data="{ permissionsOpen: false }"
-                                @click.outside="permissionsOpen = false" @keydown.escape.window="permissionsOpen = false">
-                                <button type="button" class="listbox-trigger" @click="permissionsOpen = !permissionsOpen"
-                                    aria-haspopup="listbox" :aria-expanded="permissionsOpen">
-                                    <span class="truncate">
-                                        Selected permissions: {{ collect($permissions)->map(fn ($permission) => str($permission)->replace(':', ' ')->headline())->join(', ') }}
-                                    </span>
-                                    <x-reicon name="chevron-down" class="size-3.5 shrink-0 opacity-60" />
-                                </button>
-
-                                <div x-cloak x-show="permissionsOpen" x-transition.origin.top
-                                    class="listbox-panel top-full! mt-1! w-full!" role="listbox">
-                                    <div class="listbox-option p-0!">
-                                        <x-forms.checkbox id="permission-root" label="Root" fullWidth
-                                            wire:model.live="permissions" domValue="root"
-                                            helper="Full access to every API operation."
-                                            :checked="in_array('root', $permissions)" :disabled="!$canUseRootPermissions" />
-                                    </div>
-                                    <div class="listbox-option p-0!">
-                                        <x-forms.checkbox id="permission-write" label="Write" fullWidth
-                                            wire:model.live="permissions" domValue="write"
-                                            helper="Create and update resources."
-                                            :checked="in_array('write', $permissions)"
-                                            :disabled="in_array('root', $permissions) || !$canUseWritePermissions" />
-                                    </div>
-                                    <div class="listbox-option p-0!">
-                                        <x-forms.checkbox id="permission-delete" label="Delete" fullWidth
-                                            wire:model.live="permissions" domValue="delete"
-                                            helper="Delete resources and their settings (every DELETE request)."
-                                            :checked="in_array('delete', $permissions)"
-                                            :disabled="in_array('root', $permissions) || !$canUseDeletePermissions" />
-                                    </div>
-                                    <div class="listbox-option p-0!">
-                                        <x-forms.checkbox id="permission-deploy" label="Deploy" fullWidth
-                                            wire:model.live="permissions" domValue="deploy"
-                                            helper="Deploy, start, stop, and restart resources. With Write, also apply changes that run on servers immediately, such as scheduled tasks, proxy configuration, and imports."
-                                            :checked="in_array('deploy', $permissions)"
-                                            :disabled="in_array('root', $permissions) || !$canUseDeployPermissions" />
-                                    </div>
-                                    <div class="listbox-option p-0!">
-                                        <x-forms.checkbox id="permission-read" label="Read" fullWidth
-                                            wire:model.live="permissions" domValue="read"
-                                            helper="Read non-sensitive resource data."
-                                            :checked="in_array('read', $permissions)"
-                                            :disabled="in_array('root', $permissions)" />
-                                    </div>
-                                    <div class="listbox-option p-0!">
-                                        <x-forms.checkbox id="permission-read-sensitive" label="Read sensitive data"
-                                            fullWidth wire:model.live="permissions" domValue="read:sensitive"
-                                            helper="Include secrets, logs, passwords, and Compose content."
-                                            :checked="in_array('read:sensitive', $permissions)"
-                                            :disabled="in_array('root', $permissions) || !$canUseSensitivePermissions" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                            <div class="mb-3 flex items-center gap-2">
-                                <h4 class="text-[12px] font-semibold text-black dark:text-fg">Access</h4>
-                                <x-helper helper="A limited token sees only the selected projects, environments, and resources, and cannot use team-level endpoints such as servers, keys, or notifications." />
-                            </div>
-                            <div class="grid gap-4 lg:grid-cols-2">
-                                <x-forms.listbox id="scopeMode" label="Resources" live :options="[
-                                    ['value' => 'team', 'label' => 'All resources in the team', 'disabled' => !$canUseTeamScope],
-                                    ['value' => 'selected', 'label' => 'Selected projects, environments, or resources'],
-                                ]" />
-                                @if ($scopeMode === 'selected')
-                                    <x-forms.listbox id="selectedScopes" label="Selected" multiple searchable portal
-                                        placeholder="Choose projects, environments, or resources"
-                                        emptyText="No projects or resources available."
-                                        :options="$this->scopeOptions" />
-                                @endif
-                            </div>
-                        </div>
+                        @include('livewire.security.partials.api-token-fields', [
+                            'form' => 'form',
+                            'expiryOptions' => $expirationList,
+                            'inModal' => false,
+                        ])
                     </x-application.settings-section>
                 </form>
+
+                <x-modal-input title="Edit API token" :wireIgnore="false" :closeOutside="false"
+                    @open-api-token-edit.window="modalOpen = true" @api-token-updated.window="modalOpen = false">
+                    <x-slot:content><span></span></x-slot:content>
+
+                    <form x-on:submit.prevent="$wire.updateToken(editingToken.id)" id="api-token-edit-form">
+                        <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
+                            The token value does not change. Clients that use it get the new access on their next request.
+                        </p>
+
+                        @include('livewire.security.partials.api-token-fields', [
+                            'form' => 'editForm',
+                            'expiryOptions' => [['value' => 'keep', 'label' => 'Keep current'], ...$expirationList],
+                            'inModal' => true,
+                        ])
+                    </form>
+
+                    <x-slot:footer>
+                        <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
+                        <x-forms.button isHighlighted type="submit" form="api-token-edit-form">Save changes</x-forms.button>
+                    </x-slot:footer>
+                </x-modal-input>
             @endcan
 
             @if (session()->has('token'))
@@ -241,7 +166,37 @@
                                             @if ($token->scopes === null)
                                                 All resources in the team
                                             @else
-                                                {{ collect($token->scopes)->map(fn ($scope) => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? 'Unavailable '.($scope['scope'] ?? 'scope'))->join(', ') }}
+                                                @php
+                                                    $tokenScopes = collect($token->scopes)
+                                                        ->map(fn ($scope) => [
+                                                            'type' => $scope['scope'] ?? 'scope',
+                                                            'label' => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? 'Unavailable '.($scope['scope'] ?? 'scope'),
+                                                        ])
+                                                        ->sortBy([
+                                                            fn ($a, $b) => array_search($a['type'], ['project', 'environment', 'resource']) <=> array_search($b['type'], ['project', 'environment', 'resource']),
+                                                            fn ($a, $b) => strnatcasecmp($a['label'], $b['label']),
+                                                        ]);
+                                                @endphp
+                                                {{-- The modal is wire:ignore, so a new key re-renders it when the scopes change. --}}
+                                                <x-modal-input title="Access of {{ $token->name }}"
+                                                    wire:key="api-token-scopes-{{ $token->id }}-{{ md5(json_encode($token->scopes)) }}"
+                                                    subtitle="This token can use only these projects, environments, and resources.">
+                                                    <x-slot:content>
+                                                        <button type="button"
+                                                            class="max-w-full truncate underline decoration-dotted underline-offset-2 hover:text-black dark:hover:text-fg">
+                                                            {{ $tokenScopes->countBy('type')->map(fn ($count, $type) => $count.' '.Str::plural($type, $count))->join(', ') }}
+                                                        </button>
+                                                    </x-slot:content>
+                                                    <div
+                                                        class="divide-y divide-neutral-200 rounded-md border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]">
+                                                        @foreach ($tokenScopes as $tokenScope)
+                                                            <div class="flex min-h-8 items-center gap-3 px-3 py-1.5 text-[12px]">
+                                                                <span class="w-20 shrink-0 text-[11px] capitalize text-neutral-500 dark:text-fg-dim">{{ $tokenScope['type'] }}</span>
+                                                                <span class="min-w-0 flex-1 break-words text-black dark:text-fg">{{ $tokenScope['label'] }}</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </x-modal-input>
                                             @endif
                                         </div>
                                     </div>
@@ -273,15 +228,6 @@
                                     </div>
                                     <div class="flex items-center justify-end gap-1">
                                         @if (auth()->id() === $token->tokenable_id)
-                                            <button type="button" wire:click="startEditing({{ $token->id }})"
-                                                x-on:click="document.getElementById('api-token-form')?.scrollIntoView({ behavior: 'smooth' })"
-                                                class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
-                                                Edit
-                                            </button>
-                                            <button type="button" wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})"
-                                                class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
-                                                {{ $token->isPaused() ? 'Resume' : 'Pause' }}
-                                            </button>
                                             <x-table.dropdown panel-class="w-36!" role="menu">
                                                 <x-slot:trigger>
                                                     <button type="button" class="icon-button" title="Token actions"
@@ -289,6 +235,16 @@
                                                         <x-reicon name="dots-horizontal" class="size-4" />
                                                     </button>
                                                 </x-slot:trigger>
+                                                <button type="button" role="menuitem"
+                                                    x-on:click="close(); editToken(@js(App\Livewire\Forms\ApiTokenForm::valuesOf($token)))"
+                                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                    Edit
+                                                </button>
+                                                <button type="button" role="menuitem" x-on:click="close()"
+                                                    wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})"
+                                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                    {{ $token->isPaused() ? 'Resume' : 'Pause' }}
+                                                </button>
                                                 <x-modal-confirmation title="Roll API Token?" buttonFullWidth
                                                     submitAction="roll({{ $token->id }})" :actions="[
                                                         'A new secret replaces this token. The current secret stops working at once.',
