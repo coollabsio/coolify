@@ -106,8 +106,8 @@ describe('ApiTokenExpirationWarningJob', function () {
         Notification::assertSentToTimes($this->team, ApiTokenExpiringNotification::class, 2);
     });
 
-    test('skips tokens expiring more than 24h out', function () {
-        createTokenExpiring($this->user, $this->team, Carbon::now()->addDays(3));
+    test('skips tokens expiring more than 7 days out', function () {
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addDays(8));
 
         (new ApiTokenExpirationWarningJob)->handle();
 

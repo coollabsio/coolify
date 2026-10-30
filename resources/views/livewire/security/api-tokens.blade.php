@@ -234,7 +234,7 @@
                                         <div class="flex min-w-0 items-center gap-1.5">
                                             <span class="truncate text-[12px] font-medium text-black dark:text-fg">{{ $token->name }}</span>
                                             @if ($token->isPaused())
-                                                <x-status-badge label="Paused" type="warning" />
+                                                <x-status-badge label="Paused" type="warning" size="sm" />
                                             @endif
                                         </div>
                                         <div class="truncate text-[11px] text-neutral-500 dark:text-fg-dim">
@@ -266,7 +266,7 @@
                                         @if (!$token->expires_at)
                                             Never
                                         @elseif ($token->expires_at->isPast())
-                                            <x-status-badge label="Expired" type="error" />
+                                            <x-status-badge label="Expired" type="error" size="sm" />
                                         @else
                                             {{ $token->expires_at->format('Y-m-d') }}
                                         @endif

@@ -5,6 +5,7 @@
     'as' => 'span',
     'dynamic' => false,
     'pulse' => false, // ping the dot for a state that is still in progress
+    'size' => 'md', // sm fits inline next to 12px table text without growing the row
 ])
 
 @php
@@ -15,7 +16,12 @@
         'error' => 'bg-red-500',
     ];
 
-    $baseClasses = 'inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white';
+    $sizeClasses = [
+        'sm' => 'h-4 gap-1 px-1.5 text-[10px]',
+        'md' => 'h-6 gap-1.5 px-2 text-xs',
+    ];
+
+    $baseClasses = 'inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-100 font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white ' . ($sizeClasses[$size] ?? $sizeClasses['md']);
 @endphp
 
 @if ($as === 'button')
