@@ -264,6 +264,26 @@ class ApiTokens extends Component
         return $scopes;
     }
 
+    public function roll(int $id)
+    {
+        try {
+            $token = auth()->user()->tokens()
+                ->where('team_id', currentTeam()->id)
+                ->where('id', $id)
+                ->firstOrFail();
+            $this->authorize('update', $token);
+            $plainTextToken = $token->roll();
+            auditLog('ui.api_token.rolled', [
+                'team_id' => $token->team_id,
+                'api_token_name' => $token->name,
+            ]);
+            $this->getTokens();
+            session()->flash('token', $plainTextToken);
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function revoke(int $id)
     {
         try {

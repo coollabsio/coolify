@@ -15,7 +15,7 @@
 
         this.panelStyle = 'position: fixed; min-width: 0; visibility: hidden;';
         this.open = true;
-        this.$nextTick(() => this.updatePosition());
+        this.$nextTick(() => requestAnimationFrame(() => this.updatePosition()));
     },
     close() {
         this.open = false;
