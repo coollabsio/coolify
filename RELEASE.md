@@ -3,7 +3,7 @@
 Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the image with the tag `4.6.0-beta.1` on ghcr.io and Docker Hub.
 
 > [!IMPORTANT]
-> A push that changes `release.json` releases the version it sets, unless that version is released already. Run `scripts/version.sh` first to see what a push releases.
+> A push that changes `release.json` releases the version it sets, unless that version is released already. Run `scripts/plan-version.sh` first to see what a push releases.
 
 ## Rules
 
@@ -39,7 +39,7 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 2. Check what the branch releases:
 
     ```sh
-    scripts/version.sh
+    scripts/plan-version.sh
     ```
 
 3. Select the stage and the version, the script commits them and asks to push:
@@ -136,7 +136,7 @@ The nightly workflow publishes a nightly twice a day when its branch has a new c
 - N counts up per day and base
 - No git tag and no GitHub release, only its image tag, the moving `nightly` tag and the nightly channel of the CDN
 
-Print what the next run publishes with `scripts/version.sh --nightly`.
+Print what the next run publishes with `scripts/plan-version.sh --nightly`.
 
 ## Main builds
 
@@ -144,7 +144,7 @@ The main workflow builds `main` twice a day when it changed since the last build
 
 - ghcr.io only, no version tag, no git tag, no GitHub release and no channel of the CDN
 
-Print what the next run builds with `scripts/version.sh --main`.
+Print what the next run builds with `scripts/plan-version.sh --main`.
 
 ## Pull requests
 

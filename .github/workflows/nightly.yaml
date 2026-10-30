@@ -42,7 +42,7 @@ jobs:
           NIGHTLY_VERSION="$(jq -r '.["org.opencontainers.image.version"] // empty' <<< "$labels")"
           NIGHTLY_REVISION="$(jq -r '.["org.opencontainers.image.revision"] // empty' <<< "$labels")"
           export NIGHTLY_VERSION NIGHTLY_REVISION
-          nightly="$(scripts/version.sh --nightly)"
+          nightly="$(scripts/plan-version.sh --nightly)"
           echo "nightly=$nightly" | tee -a "$GITHUB_OUTPUT"
 
   build:

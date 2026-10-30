@@ -42,7 +42,7 @@ jobs:
           MAIN_VERSION="$(jq -r '.["org.opencontainers.image.version"] // empty' <<< "$labels")"
           MAIN_REVISION="$(jq -r '.["org.opencontainers.image.revision"] // empty' <<< "$labels")"
           export MAIN_VERSION MAIN_REVISION
-          build="$(scripts/version.sh --main)"
+          build="$(scripts/plan-version.sh --main)"
           echo "build=$build" | tee -a "$GITHUB_OUTPUT"
 
   build:

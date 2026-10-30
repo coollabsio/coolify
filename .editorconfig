@@ -20,7 +20,7 @@ indent_size = 4
 [{release.json,upstream.json}]
 indent_style = tab
 
-[scripts/{clean-manifests,release,sync-cdn,undo-release,version}.sh]
+[scripts/{clean-manifests,plan-version,release,sync-cdn,undo-release}.sh]
 indent_style = tab
 binary_next_line = true
 switch_case_indent = true

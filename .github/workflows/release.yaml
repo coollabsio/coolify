@@ -45,7 +45,7 @@ jobs:
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
-          releases="$(scripts/version.sh --release)"
+          releases="$(scripts/plan-version.sh --release)"
           echo "releases=$releases" | tee -a "$GITHUB_OUTPUT"
 
   build:
@@ -150,7 +150,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tags="$(scripts/version.sh --tags)"
+          tags="$(scripts/plan-version.sh --tags)"
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
           jq -r 'to_entries[] | "\(.key) \(.value)"' <<< "$tags" | while read -r tag release; do
             for repository in ghcr.io/coollabsio/coolify docker.io/coollabsio/coolify; do
