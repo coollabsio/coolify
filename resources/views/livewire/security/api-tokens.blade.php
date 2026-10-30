@@ -11,6 +11,14 @@
                 ->values()
                 ->push(['value' => '', 'label' => 'Never'])
                 ->all();
+            $editingToken = $editingTokenId ? $tokens->firstWhere('id', $editingTokenId) : null;
+            if ($editingToken) {
+                $currentExpiry = $editingToken->expires_at?->format('Y-m-d') ?? 'Never';
+                array_unshift($expirationList, [
+                    'value' => 'keep',
+                    'label' => 'Keep current ('.($editingToken->expires_at?->isPast() ? 'expired '.$currentExpiry : $currentExpiry).')',
+                ]);
+            }
         @endphp
 
         <div class="application-settings-form flex flex-col gap-6">
@@ -18,15 +26,30 @@
                 message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
 
             @can('create', App\Models\PersonalAccessToken::class)
-                <form wire:submit="addNewToken">
-                    <x-application.settings-section title="New API token">
+                <form wire:submit="{{ $editingToken ? 'updateToken' : 'addNewToken' }}" id="api-token-form">
+                    <x-application.settings-section :title="$editingToken ? 'Edit API token' : 'New API token'">
                         <x-slot:actions>
-                            <button type="submit"
-                                class="button button-highlighted">
-                                <x-reicon name="plus" class="size-3.5" />
-                                Create token
-                            </button>
+                            @if ($editingToken)
+                                <button type="button" wire:click="cancelEditing" class="button">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="button button-highlighted">
+                                    Save changes
+                                </button>
+                            @else
+                                <button type="submit"
+                                    class="button button-highlighted">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    Create token
+                                </button>
+                            @endif
                         </x-slot:actions>
+
+                        @if ($editingToken)
+                            <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
+                                The token value does not change. Clients that use it get the new access on their next request.
+                            </p>
+                        @endif
 
                         <div class="grid gap-4 lg:grid-cols-2">
                             <x-forms.input required id="description" label="Description"
@@ -208,8 +231,11 @@
                                     x-show="isVisible(@js((string) $token->id))"
                                     class="data-table-row api-tokens-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                                     <div class="min-w-0">
-                                        <div class="truncate text-[12px] font-medium text-black dark:text-fg">
-                                            {{ $token->name }}
+                                        <div class="flex min-w-0 items-center gap-1.5">
+                                            <span class="truncate text-[12px] font-medium text-black dark:text-fg">{{ $token->name }}</span>
+                                            @if ($token->isPaused())
+                                                <x-status-badge label="Paused" type="warning" />
+                                            @endif
                                         </div>
                                         <div class="truncate text-[11px] text-neutral-500 dark:text-fg-dim">
                                             @if ($token->scopes === null)
@@ -245,8 +271,17 @@
                                             {{ $token->expires_at->format('Y-m-d') }}
                                         @endif
                                     </div>
-                                    <div class="flex justify-end">
+                                    <div class="flex items-center justify-end gap-1">
                                         @if (auth()->id() === $token->tokenable_id)
+                                            <button type="button" wire:click="startEditing({{ $token->id }})"
+                                                x-on:click="document.getElementById('api-token-form')?.scrollIntoView({ behavior: 'smooth' })"
+                                                class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                                Edit
+                                            </button>
+                                            <button type="button" wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})"
+                                                class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                                {{ $token->isPaused() ? 'Resume' : 'Pause' }}
+                                            </button>
                                             <x-table.dropdown panel-class="w-36!" role="menu">
                                                 <x-slot:trigger>
                                                     <button type="button" class="icon-button" title="Token actions"
