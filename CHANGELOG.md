@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Publish every release a push of `release.json` names and whose tag does not exist yet, instead of a reviewed draft release
     - Build each platform once and publish exactly that build
     - Write the notes of the GitHub release from `CHANGELOG.md` instead of git-cliff
-    - Merge `main` forward into `next` and the release branches twice a day and after every release, instead of `main` into `next` every 10 minutes
+    - Merge `main` forward into `next` and the release branches after every release, instead of `main` into `next` every 10 minutes
     - Sync the CDN with `scripts/sync-cdn.sh` instead of `php artisan sync:cdn`, from the release workflow when `latest` or `preview` moves and from the nightly workflow, the stable channel opens a pull request, the preview and nightly channels push to `main`
     - Skip the build of a pull request from `main`, `next`, a release branch or a patch branch, the release and nightly workflows build their commits
 - Read the helper version and the Coolify version of builds without `COOLIFY_VERSION` from `upstream.json` and `release.json` in `config/constants.php`
