@@ -81,14 +81,22 @@ class ApiTokens extends Component
      * Projects, environments, and resources of the current team that the user can see, for the scope picker.
      *
      * Each option lists its "parents": the project and environment scopes that already include it.
+     * A project or environment is an option only when the member has a grant on all of it, because a token
+     * cannot have more access than its owner. Parents that a member sees only through a granted child are not options.
      *
      * @return list<array{value: string, label: string, header?: bool, parents?: list<string>}>
      */
     #[Computed]
     public function scopeOptions(): array
     {
+        $resolver = app(AccessResolver::class);
+        $memberGrants = $resolver->memberGrants(auth()->user(), currentTeam()->id);
+        $memberLayer = $memberGrants === null ? null : $resolver->resolve(currentTeam()->id, $memberGrants);
+
         $projects = Project::query()->where('team_id', currentTeam()->id)->orderBy('name')->get(['id', 'uuid', 'name']);
         $environments = Environment::query()->whereIn('project_id', $projects->pluck('id'))->get(['id', 'uuid', 'name', 'project_id']);
+        $selectableProjects = $projects->filter(fn (Project $project) => $memberLayer?->allows(AccessLevel::Read, $project->id) ?? true);
+        $selectableEnvironments = $environments->filter(fn (Environment $environment) => $memberLayer?->allows(AccessLevel::Read, $environment->project_id, $environment->id) ?? true);
         $projectNames = $projects->pluck('name', 'id');
         $projectUuids = $projects->pluck('uuid', 'id');
         $environmentParents = $environments->mapWithKeys(fn (Environment $environment) => [
@@ -109,10 +117,10 @@ class ApiTokens extends Component
             ->values();
 
         return [
-            ...($projects->isEmpty() ? [] : [['value' => '__projects', 'label' => 'Projects', 'header' => true]]),
-            ...$projects->map(fn (Project $project) => ['value' => "project:{$project->uuid}", 'label' => $project->name])->all(),
-            ...($environments->isEmpty() ? [] : [['value' => '__environments', 'label' => 'Environments', 'header' => true]]),
-            ...$environments->map(fn (Environment $environment) => [
+            ...($selectableProjects->isEmpty() ? [] : [['value' => '__projects', 'label' => 'Projects', 'header' => true]]),
+            ...$selectableProjects->map(fn (Project $project) => ['value' => "project:{$project->uuid}", 'label' => $project->name])->values()->all(),
+            ...($selectableEnvironments->isEmpty() ? [] : [['value' => '__environments', 'label' => 'Environments', 'header' => true]]),
+            ...$selectableEnvironments->map(fn (Environment $environment) => [
                 'value' => "environment:{$environment->uuid}",
                 'label' => $environmentPaths[$environment->id],
                 'parents' => ["project:{$projectUuids[$environment->project_id]}"],
