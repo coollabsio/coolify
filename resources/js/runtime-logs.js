@@ -45,7 +45,28 @@ export function isExpandableLog(content, truncated) {
     return truncated || formatLogDetails(content) !== content;
 }
 
+const LEVEL_FIELD = /\b(?:level|lvl|severity|loglevel)"?\s*[=:]\s*"?([a-z]+)\b/;
+// A level word at the start of the line, after timestamps: `2026-10-30t16:35:49z info msg`, `[debug] msg`.
+const LEADING_LEVEL = /^(?:\S*\d\S*\s+){0,3}[[(<]?([a-z]+)[\])>:]?(?:\s|$)/;
+const LEVEL_NAMES = {
+    error: ['error', 'err', 'fatal', 'panic', 'critical', 'crit', 'alert', 'emerg', 'emergency'],
+    warning: ['warn', 'warning', 'wrn'],
+    debug: ['debug', 'dbg', 'trace', 'verbose'],
+    info: ['info', 'inf', 'information', 'notice'],
+};
+
+/**
+ * Prefer the declared level (`level=debug`, `"level":"debug"`, a leading
+ * `INFO`) over keywords, so `INFO ... 0 error events` or `level=debug err=EOF`
+ * is not shown as an error.
+ */
 export function getLogLevel(content) {
+    for (const pattern of [LEVEL_FIELD, LEADING_LEVEL]) {
+        const declared = content.match(pattern)?.[1];
+        for (const [level, names] of Object.entries(LEVEL_NAMES)) {
+            if (names.includes(declared)) return level;
+        }
+    }
     if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(content)) return 'error';
     if (/\b(warn|warning|wrn|caution)\b/.test(content)) return 'warning';
     if (/\b(debug|dbg|trace|verbose)\b/.test(content)) return 'debug';
