@@ -108,6 +108,9 @@ class AppServiceProvider extends ServiceProvider
     private function configureSanctumModel(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid && ! $token->isPaused()
+        );
     }
 
     private function configureOidcSocialite(): void

@@ -3766,7 +3766,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .api-tokens-table-grid {
-    grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
+    grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 10.5rem;
 }
 
 .fleet-servers-table-grid {
@@ -3861,7 +3861,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .api-tokens-table-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(9rem, 1.3fr) 6.5rem 4.5rem;
+        grid-template-columns: minmax(0, 1fr) minmax(9rem, 1.3fr) 6.5rem 10.5rem;
     }
 
     .api-tokens-table-grid > :nth-child(3),
