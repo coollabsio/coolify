@@ -1,0 +1,326 @@
+# documentation: https://docs.superplane.com/
+# slogan: Open source factory for one-shot engineering
+# category: automation
+# tags: automation,ai,ci,workflows
+# logo: svgs/superplane.svg
+# port: 8000
+
+services:
+  init:
+    image: alpine:3.22
+    user: "0:0"
+    restart: "no"
+    exclude_from_hc: true
+    volumes:
+      - oidc-keys:/oidc-keys
+      - blobs:/blobs
+      - runner-logs:/runner-logs
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ ! -f /oidc-keys/oidc.pem ]; then
+          apk add --no-cache openssl
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out /oidc-keys/oidc.pem
+        fi
+        chown -R 65534:65534 /oidc-keys /blobs /runner-logs
+        chmod 700 /oidc-keys /blobs /runner-logs
+        chmod 400 /oidc-keys/oidc.pem
+
+  db:
+    image: postgres:17.5
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-superplane}'
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.8.17-management-alpine
+    environment:
+      - 'RABBITMQ_DEFAULT_USER=${SERVICE_USER_RABBITMQ}'
+      - 'RABBITMQ_DEFAULT_PASS=${SERVICE_PASSWORD_RABBITMQ}'
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION:-v1.0.0}
+    stop_grace_period: 45s
+    expose:
+      - "8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - oidc-keys:/app/oidc-keys:ro
+      - blobs:/var/lib/superplane/blobs
+      - runner-logs:/var/lib/superplane/runner-logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
+    environment:
+      - SERVICE_URL_APP_8000
+      - 'BASE_URL=${SERVICE_URL_APP}'
+      - 'WEBHOOKS_BASE_URL=${SERVICE_URL_APP}'
+      - PUBLIC_API_BASE_PATH=/api/v1
+      - WEB_BASE_PATH=
+      - RUNNER_API_BASE_URL=http://app:8000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - 'DB_NAME=${POSTGRES_DB:-superplane}'
+      - 'DB_USERNAME=${SERVICE_USER_POSTGRES}'
+      - 'DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - APPLICATION_NAME=superplane
+      - POSTGRES_DB_SSL=false
+      - DB_POOL_SIZE=20
+      - DB_STATEMENT_TIMEOUT=60s
+      - DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=30s
+      - 'RABBITMQ_URL=amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@rabbitmq:5672'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+      - 'SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}'
+      - 'BLOB_STORAGE_SIGNING_KEY=${SERVICE_PASSWORD_64_BLOBSIGNING}'
+      - 'ENCRYPTION_MASTER_KEYS=${ENCRYPTION_MASTER_KEYS:-env://coolify-v1:${SERVICE_REALBASE64_32_ENCRYPTION}}'
+      - SWAGGER_BASE_PATH=/app/api/swagger
+      - RBAC_MODEL_PATH=/app/rbac/rbac_model.conf
+      - RBAC_ORG_POLICY_PATH=/app/rbac/rbac_org_policy.csv
+      - RBAC_CANVAS_POLICY_PATH=/app/rbac/rbac_canvas_policy.csv
+      - TEMPLATE_DIR=/app/templates
+      - OIDC_KEYS_PATH=/app/oidc-keys
+      - BLOB_STORAGE_PROVIDER=filesystem
+      - BLOB_STORAGE_LOCAL_PATH=/var/lib/superplane/blobs
+      - RUNNER_ACTIVE_LOG_FS_PATH=/var/lib/superplane/runner-logs
+      - START_PUBLIC_API=yes
+      - START_WEB_SERVER=yes
+      - START_WEBSOCKET_SERVER=yes
+      - START_GRPC_GATEWAY=yes
+      - START_EVENT_DISTRIBUTER=yes
+      - START_RBAC_POLICY_RELOAD_CONSUMER=yes
+      - START_CONSUMERS=yes
+      - START_EVENT_ROUTER=yes
+      - START_RUN_FINALIZER=yes
+      - START_RUN_INITIALIZER=yes
+      - START_NODE_EXECUTOR=yes
+      - START_EXECUTION_TERMINATOR=yes
+      - START_NODE_QUEUE_WORKER=yes
+      - START_NODE_REQUEST_WORKER=yes
+      - START_APP_MESSAGE_WORKER=yes
+      - START_INTEGRATION_REQUEST_WORKER=yes
+      - START_WEBHOOK_PROVISIONER=yes
+      - START_WEBHOOK_CLEANUP_WORKER=yes
+      - START_INTEGRATION_CLEANUP_WORKER=yes
+      - START_CANVAS_CLEANUP_WORKER=yes
+      - START_NODE_REQUEST_CLEANUP_WORKER=yes
+      - START_ORGANIZATION_CLEANUP_WORKER=yes
+      - START_FACTORY_CLEANUP_WORKER=yes
+      - START_FACTORY_VELOCITY_SYNC_WORKER=yes
+      - START_PRICE_BOOK_SYNC_WORKER=yes
+      - START_PLANNING_SESSION_CLEANUP_WORKER=yes
+      - START_EVENT_RETENTION_WORKER=yes
+      - START_FILE_CLEANUP_WORKER=yes
+      - START_RUNNER_API=yes
+      - START_RUNNER_LOG_COMPACTOR=yes
+      - START_RUNNER_CLEANUP_WORKER=yes
+      - APP_ENV=production
+      - OWNER_SETUP_ENABLED=yes
+      - ENABLE_PASSWORD_LOGIN=yes
+      - BLOCK_SIGNUP=yes
+      - REDIRECT_HTTP_REQUESTS=yes
+      - 'SUPERPLANE_VERSION=${SUPERPLANE_VERSION:-v1.0.0}'
+      - 'RUNNER_STABLE_VERSION=${RUNNER_VERSION:-v0.2.1}'
+      - SUPERPLANE_INSTALLATION_TYPE=single-host
+      - SUPERPLANE_BILLING_ENABLED=no
+      - SUPERPLANE_BEACON_ENABLED=yes
+      - OTEL_ENABLED=no
+      - 'RESEND_API_KEY=${RESEND_API_KEY:-}'
+      - 'EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-}'
+      - 'EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-}'
+      - 'GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}'
+      - 'GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}'
+      - 'GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}'
+      - 'GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}'
+      - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'
+      - 'SENTRY_DSN=${SENTRY_DSN:-}'
+      - 'SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-single-host}'
+
+  fleet-token:
+    image: postgres:17.5
+    user: "0:0"
+    restart: on-failure
+    exclude_from_hc: true
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    volumes:
+      - fleet-token:/token
+    environment:
+      - 'INSTALLATION_ADMIN_TOKEN=${INSTALLATION_ADMIN_TOKEN:-}'
+      - DB_HOST=db
+      - DB_PORT=5432
+      - 'DB_NAME=${POSTGRES_DB:-superplane}'
+      - 'DB_USERNAME=${SERVICE_USER_POSTGRES}'
+      - 'DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -n "$${INSTALLATION_ADMIN_TOKEN:-}" ]; then
+          echo "Using the supplied INSTALLATION_ADMIN_TOKEN. Skipping token mint."
+          exit 0
+        fi
+        token_file=/token/installation-admin-token
+        pending_file=/token/installation-admin-token.pending
+        token_name=superplane.coolify.fleet-manager
+        if [ -s "$$token_file" ]; then
+          mv "$$token_file" "$$pending_file"
+        fi
+        echo "Waiting for the owner account."
+        owner_user_id=""
+        while [ -z "$$owner_user_id" ]; do
+          owner_user_id="$$(
+            PGPASSWORD="$$DB_PASSWORD" psql -X -Atq \
+              -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
+              -c "SELECT users.id FROM users INNER JOIN accounts ON accounts.id = users.account_id WHERE accounts.installation_admin = true AND accounts.blocked_at IS NULL AND accounts.deleted_at IS NULL AND users.type = 'human' AND users.deleted_at IS NULL ORDER BY accounts.created_at ASC NULLS LAST, users.created_at ASC LIMIT 1" \
+              2>/dev/null || true
+          )"
+          if [ -z "$$owner_user_id" ]; then
+            sleep 2
+          fi
+        done
+        if [ -s "$$pending_file" ]; then
+          token_hash="$$(printf '%s' "$$(cat "$$pending_file")" | sha256sum | cut -d ' ' -f 1)"
+          stored_hash="$$(
+            PGPASSWORD="$$DB_PASSWORD" psql -X -Atq -v ON_ERROR_STOP=1 \
+              -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
+              -v owner_user_id="$$owner_user_id" \
+              -v token_hash="$$token_hash" \
+              -v token_name="$$token_name" <<'SQL'
+        SELECT token_hash
+        FROM user_api_tokens
+        WHERE user_id = :'owner_user_id'::uuid
+          AND name = :'token_name'
+          AND token_hash = :'token_hash'
+        LIMIT 1;
+        SQL
+          )"
+          if [ "$$stored_hash" = "$$token_hash" ]; then
+            mv "$$pending_file" "$$token_file"
+            echo "Fleet Manager token is still valid."
+            exit 0
+          fi
+          echo "Stored Fleet Manager token is missing or revoked. Minting a replacement."
+          rm -f "$$pending_file"
+        fi
+        token="$$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+        token_hash="$$(printf '%s' "$$token" | sha256sum | cut -d ' ' -f 1)"
+        PGPASSWORD="$$DB_PASSWORD" psql -X -v ON_ERROR_STOP=1 \
+          -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USERNAME" -d "$$DB_NAME" \
+          -v owner_user_id="$$owner_user_id" \
+          -v token_hash="$$token_hash" \
+          -v token_name="$$token_name" <<'SQL'
+        BEGIN;
+        INSERT INTO user_api_tokens (user_id, name, token_hash)
+        SELECT :'owner_user_id'::uuid, :'token_name', :'token_hash'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM user_api_tokens
+          WHERE user_id = :'owner_user_id'::uuid AND name = :'token_name'
+        );
+        UPDATE user_api_tokens
+        SET token_hash = :'token_hash', last_used_at = NULL
+        WHERE user_id = :'owner_user_id'::uuid AND name = :'token_name';
+        COMMIT;
+        SQL
+        printf '%s' "$$token" > "$$token_file.tmp"
+        chmod 400 "$$token_file.tmp"
+        mv "$$token_file.tmp" "$$token_file"
+        echo "Fleet Manager token is ready."
+
+  fleet-manager:
+    image: ghcr.io/superplanehq/fleet-manager:${FLEET_MANAGER_VERSION:-v0.1.6}-docker
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - fleet-token:/token:ro
+    environment:
+      - 'INSTALLATION_ADMIN_TOKEN=${INSTALLATION_ADMIN_TOKEN:-}'
+      - 'FLEET_MANAGER_ID=${FLEET_MANAGER_ID:-${COMPOSE_PROJECT_NAME:-coolify}}'
+      - 'RUNNER_FLEET_ID=${RUNNER_FLEET_ID:-e1-large-amd64}'
+      - 'RUNNER_VERSION=${RUNNER_VERSION:-v0.2.1}'
+      - 'RUNNER_ARCH=${RUNNER_ARCH:-amd64}'
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -z "$${INSTALLATION_ADMIN_TOKEN:-}" ]; then
+          echo "Waiting for the Fleet Manager token after owner setup."
+          while [ ! -s /token/installation-admin-token ]; do
+            sleep 2
+          done
+          INSTALLATION_ADMIN_TOKEN="$$(cat /token/installation-admin-token)"
+          export INSTALLATION_ADMIN_TOKEN
+        fi
+        # Runners join the resource network that Coolify gave this container, so they reach app.
+        RUNNER_NETWORK="$$(docker inspect -f '{{range $$name, $$_ := .NetworkSettings.Networks}}{{println $$name}}{{end}}' "$$HOSTNAME" | head -n 1)"
+        if [ -z "$$RUNNER_NETWORK" ]; then
+          echo "Could not find the Fleet Manager container network." >&2
+          exit 1
+        fi
+        echo "Runners join network $$RUNNER_NETWORK."
+        # The runner image has no Docker client, so the fleet omits the docker capability.
+        FLEET_MANAGER_CONFIG="$$(cat <<EOF
+        id: $${FLEET_MANAGER_ID}
+        superplaneUrl: http://app:8000
+        reconciliation:
+          pollTimeout: 30s
+          errorRetryInterval: 2s
+        http:
+          requestTimeout: 60s
+        fleets:
+          - id: $${RUNNER_FLEET_ID}
+            runnerVersion: $${RUNNER_VERSION}
+            provider: docker
+            maxCapacity: 1
+            warmCapacity: 1
+            spec:
+              operatingSystem: linux
+              architecture: $${RUNNER_ARCH}
+              cpuMillicores: 2000
+              memoryMb: 8192
+              diskGb: 30
+            docker:
+              image: ghcr.io/superplanehq/runner:$${RUNNER_VERSION}
+              architecture: $${RUNNER_ARCH}
+              runnerApiUrl: http://app:8000
+              network: $${RUNNER_NETWORK}
+              extraHosts:
+                - host.docker.internal:host-gateway
+        EOF
+        )"
+        export FLEET_MANAGER_CONFIG
+        exec /usr/local/bin/fleet-manager-docker-entrypoint
