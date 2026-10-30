@@ -16684,9 +16684,9 @@ components:
           type: string
       type: object
     SecretManagerSource:
+      description: 'The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.'
       properties:
         linked:
-          description: "The secret manager source of an application, service, or database. Routes start with the resource type\n(`applications`, `services`, `databases`), so tokens limited to some resources can use them."
           type: boolean
         integration_token_uuid:
           type:
@@ -16700,6 +16700,7 @@ components:
             - doppler
             - infisical
             - vault
+            - null
         settings:
           description: 'Doppler: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.'
           type:

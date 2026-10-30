@@ -15,17 +15,14 @@ use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Throwable;
 
-/**
- * The secret manager source of an application, service, or database. Routes start with the resource type
- * (`applications`, `services`, `databases`), so tokens limited to some resources can use them.
- */
 #[OA\Schema(
     schema: 'SecretManagerSource',
+    description: 'The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.',
     type: 'object',
     properties: [
         new OA\Property(property: 'linked', type: 'boolean'),
         new OA\Property(property: 'integration_token_uuid', type: 'string', nullable: true),
-        new OA\Property(property: 'provider', type: 'string', nullable: true, enum: ['doppler', 'infisical', 'vault']),
+        new OA\Property(property: 'provider', type: 'string', nullable: true, enum: ['doppler', 'infisical', 'vault', null]),
         new OA\Property(property: 'settings', type: 'object', nullable: true, description: 'Doppler: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.'),
         new OA\Property(property: 'available_tokens', type: 'array', items: new OA\Items(type: 'object', properties: [
             new OA\Property(property: 'uuid', type: 'string'),
@@ -67,7 +64,7 @@ class SecretManagerController extends Controller
         summary: 'Set Secret Manager Source',
         description: 'Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.',
         path: '/{resource_type}/{uuid}/secret-manager',
-        operationId: 'configure-application-secret-manager',
+        operationId: 'set-secret-manager-source',
         security: [['bearerAuth' => []]],
         tags: ['Secret Managers'],
         parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string'))],
@@ -78,6 +75,32 @@ class SecretManagerController extends Controller
                 properties: [
                     new OA\Property(property: 'integration_token_uuid', type: 'string'),
                     new OA\Property(property: 'settings', type: 'object', description: 'Doppler service account: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Secret manager configured.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'No write access to the resource.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    #[OA\Patch(
+        summary: 'Configure Application Secret Manager',
+        description: 'Configure the secret manager source used by an application. Same as Set Secret Manager Source with resource_type applications.',
+        path: '/applications/{uuid}/secret-manager',
+        operationId: 'configure-application-secret-manager',
+        security: [['bearerAuth' => []]],
+        tags: ['Secret Managers'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['integration_token_uuid'],
+                properties: [
+                    new OA\Property(property: 'integration_token_uuid', type: 'string'),
+                    new OA\Property(property: 'settings', type: 'object'),
                 ],
             ),
         ),

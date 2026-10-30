@@ -26279,9 +26279,9 @@
                 "type": "object"
             },
             "SecretManagerSource": {
+                "description": "The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
                 "properties": {
                     "linked": {
-                        "description": "The secret manager source of an application, service, or database. Routes start with the resource type\n(`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
                         "type": "boolean"
                     },
                     "integration_token_uuid": {
@@ -26298,7 +26298,8 @@
                         "enum": [
                             "doppler",
                             "infisical",
-                            "vault"
+                            "vault",
+                            null
                         ]
                     },
                     "settings": {
