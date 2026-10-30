@@ -9,6 +9,15 @@
         'name' => strtolower($backup->targetName()),
         'type' => strtolower($backup->targetType()),
         'frequency' => strtolower($backup->frequency),
+        'status' => match ($backup->latestExecution?->status) {
+            'running' => 'in progress',
+            'success' => 'success',
+            'failed' => 'failed',
+            default => $backup->enabled ? 'waiting' : 'disabled',
+        },
+        's3' => $backup->save_s3 ? ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->count() : -1,
+        'lastRunAt' => $backup->latestExecution?->finished_at?->timestamp ?? ($backup->latestExecution?->status === 'running' ? now()->timestamp : 0),
+        'executions' => $backup->executions_count,
         'createdAt' => $backup->created_at?->timestamp ?? 0,
     ])->values()),
     filterOptions: @js(collect([['value' => 'all', 'label' => 'All targets']])->merge(
@@ -30,11 +39,25 @@
             const matchesType = this.typeFilter === 'all' || backup.type === this.typeFilter;
             return matchesSearch && matchesType;
         });
+        const [column, direction] = this.sortBy.split('_');
+        const sortValues = {
+            target: (backup) => backup.name,
+            type: (backup) => backup.type,
+            schedule: (backup) => backup.frequency,
+            status: (backup) => backup.status,
+            s3: (backup) => backup.s3,
+            lastrun: (backup) => backup.lastRunAt,
+            executions: (backup) => backup.executions,
+        };
+        const sortValue = sortValues[column] || sortValues.target;
+        const order = direction === 'desc' ? -1 : 1;
         return filtered.sort((left, right) => {
-            if (this.sortBy === 'target_desc') return right.name.localeCompare(left.name);
             if (this.sortBy === 'newest') return right.createdAt - left.createdAt;
             if (this.sortBy === 'oldest') return left.createdAt - right.createdAt;
-            return left.name.localeCompare(right.name);
+            const leftValue = sortValue(left);
+            const rightValue = sortValue(right);
+            return order * (typeof leftValue === 'number' ? leftValue - rightValue : leftValue.localeCompare(rightValue)) ||
+                left.name.localeCompare(right.name);
         });
     },
     isVisible(id) {
@@ -168,13 +191,14 @@
                 @if ($backups->isNotEmpty())
                     <div class="data-table flex w-full flex-col overflow-x-auto" x-show="filteredBackups.length > 0">
                         <div class="data-table-header backup-table-grid">
-                            <span>Target</span>
-                            <span>Type</span>
-                            <span>Schedule</span>
-                            <span>Status</span>
-                            <span>S3</span>
-                            <span>Last run</span>
-                            <span class="text-right">Executions</span>
+                            <x-table.sort-header label="Target" asc="target_asc" desc="target_desc" />
+                            <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" />
+                            <x-table.sort-header label="Schedule" asc="schedule_asc" desc="schedule_desc" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" />
+                            <x-table.sort-header label="S3" asc="s3_asc" desc="s3_desc" />
+                            <x-table.sort-header label="Last run" asc="lastrun_asc" desc="lastrun_desc" first="desc" />
+                            <x-table.sort-header label="Executions" asc="executions_asc" desc="executions_desc" first="desc"
+                                class="justify-self-end" />
                         </div>
 
                         @foreach ($backups as $backup)
@@ -205,7 +229,12 @@
                                     title="{{ $backup->targetName() }}">
                                     {{ $backup->targetName() }}
                                 </span>
-                                <span>{{ $backup->targetType() }}</span>
+                                <span class="min-w-0">
+                                    <span role="button" tabindex="0" class="table-filter-value"
+                                        title="Filter by {{ $backup->targetType() }}"
+                                        x-on:click.prevent.stop="typeFilter = typeFilter === @js(strtolower($backup->targetType())) ? 'all' : @js(strtolower($backup->targetType()))"
+                                        x-on:keydown.enter.prevent.stop="$el.click()">{{ $backup->targetType() }}</span>
+                                </span>
                                 <span>{{ $backup->frequency }}</span>
                                 <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                                 <span title="{{ $backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? $s3StorageNames->join(', ') : 'S3 storage unavailable') : 'S3 storage is not configured' }}">

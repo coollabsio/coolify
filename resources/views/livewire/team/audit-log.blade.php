@@ -36,12 +36,16 @@
                 @if ($events->isNotEmpty())
                     <div class="overflow-x-auto">
                         <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
-                            wire:target="search,action,source,setPage,previousPage,nextPage">
+                            wire:target="search,action,source,setSort,setPage,previousPage,nextPage">
                         <div class="grid min-w-[760px] grid-cols-[14rem_minmax(0,1fr)_12rem_9rem] gap-4 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-white/[0.07] dark:text-fg-faint">
-                            <span>Actor</span>
-                            <span>Activity</span>
-                            <span>Source</span>
-                            <span class="text-right">Time</span>
+                            <x-table.sort-header label="Actor" asc="actor-asc" desc="actor-desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Activity" asc="activity-asc" desc="activity-desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Source" asc="source-asc" desc="source-desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Time" asc="time-asc" desc="time-desc" first="desc"
+                                action="setSort" :current="$sort" class="justify-self-end" />
                         </div>
                         @foreach ($events as $event)
                             <div wire:key="audit-event-{{ $event->id }}" x-data="{ expanded: false }"

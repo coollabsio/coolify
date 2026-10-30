@@ -1,0 +1,89 @@
+# documentation: https://hi.events/docs
+# slogan: Open-source event management and ticketing platform.
+# category: productivity
+# tags: events, ticketing, tickets, booking, conferences, concerts, event-management, eventbrite
+# logo: svgs/hi-events.svg
+# port: 80
+
+services:
+  hi-events:
+    # Use an HTTPS domain: Hi.Events always sets its login cookie as Secure, so sign-in fails over plain HTTP.
+    image: daveearley/hi.events-all-in-one:v2.0.0
+    environment:
+      - SERVICE_URL_HIEVENTS_80
+      - VITE_APP_NAME=${VITE_APP_NAME:-Hi.Events}
+      - VITE_FRONTEND_URL=${SERVICE_URL_HIEVENTS}
+      - VITE_API_URL_CLIENT=${SERVICE_URL_HIEVENTS}/api
+      - VITE_API_URL_SERVER=http://localhost:80/api
+      - VITE_STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLIC_KEY}
+      - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
+      - JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
+      - APP_FRONTEND_URL=${SERVICE_URL_HIEVENTS}
+      - APP_CDN_URL=${SERVICE_URL_HIEVENTS}/storage
+      - APP_DISABLE_REGISTRATION=${APP_DISABLE_REGISTRATION:-false}
+      - APP_SAAS_MODE_ENABLED=${APP_SAAS_MODE_ENABLED:-false}
+      - APP_SAAS_STRIPE_APPLICATION_FEE_PERCENT=${APP_SAAS_STRIPE_APPLICATION_FEE_PERCENT:-0}
+      - APP_SAAS_STRIPE_APPLICATION_FEE_FIXED=${APP_SAAS_STRIPE_APPLICATION_FEE_FIXED:-0}
+      - APP_EMAIL_LOGO_URL=${APP_EMAIL_LOGO_URL}
+      - APP_EMAIL_LOGO_LINK_URL=${APP_EMAIL_LOGO_LINK_URL}
+      - LOG_CHANNEL=stderr
+      - QUEUE_CONNECTION=redis
+      - DB_CONNECTION=pgsql
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-hi-events}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_PORT=6379
+      - MAIL_MAILER=${MAIL_MAILER:-log}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-noreply@example.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Hi.Events}
+      - FILESYSTEM_PUBLIC_DISK=public
+      - FILESYSTEM_PRIVATE_DISK=local
+      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - WEBHOOK_QUEUE_NAME=webhook-queue
+    volumes:
+      - hi-events-storage:/app/backend/storage/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-hi-events}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - hi-events-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - hi-events-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 10s
+      retries: 10

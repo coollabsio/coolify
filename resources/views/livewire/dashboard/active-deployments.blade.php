@@ -19,8 +19,8 @@
         return [$label, $type];
     };
 
-    $hasActiveDeployments = $activeDeployments->isNotEmpty();
-    $hasRecentDeployments = $recentDeployments->isNotEmpty();
+    $hasActiveDeployments = $this->activeDeployments->isNotEmpty();
+    $hasRecentDeployments = $this->recentDeployments->isNotEmpty();
     $hasAnyDeployments = $hasActiveDeployments || $hasRecentDeployments;
 @endphp
 
@@ -52,7 +52,7 @@
                             <span>Started</span>
                         </div>
 
-                        @foreach ($activeDeployments as $deployment)
+                        @foreach ($this->activeDeployments as $deployment)
                             @php
                                 [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
                                 $projectName = $deployment->application?->environment?->project?->name;
@@ -112,7 +112,7 @@
                             <span>Started</span>
                         </div>
 
-                        @foreach ($recentDeployments as $deployment)
+                        @foreach ($this->recentDeployments as $deployment)
                             @php
                                 [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
                                 $projectName = $deployment->application?->environment?->project?->name;

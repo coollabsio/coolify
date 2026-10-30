@@ -126,10 +126,12 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="tags-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Tag</div>
-                    <div>Resources</div>
-                    <div>Applications</div>
-                    <div class="tag-services">Services</div>
+                    <x-table.sort-header label="Tag" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Resources" asc="resources-asc" desc="resources-desc" first="desc" then="page = 1" />
+                    <x-table.sort-header label="Applications" asc="applications-asc" desc="applications-desc" first="desc"
+                        then="page = 1" />
+                    <x-table.sort-header label="Services" asc="services-asc" desc="services-desc" first="desc" then="page = 1"
+                        class="tag-services" />
                 </div>
 
                 <template x-for="tag in paginatedTags" :key="tag.id">
@@ -185,7 +187,7 @@
                             label: 'Name Z–A'
                         },
                         {
-                            value: 'resources',
+                            value: 'resources-desc',
                             label: 'Most resources'
                         },
                     ],
@@ -195,17 +197,22 @@
                             return !query || tag.name.toLowerCase().includes(query);
                         });
 
-                        return tags.sort((first, second) => {
-                            if (this.sortBy === 'name-desc') {
-                                return second.name.localeCompare(first.name);
-                            }
-                            if (this.sortBy === 'resources') {
-                                return second.resourceCount - first.resourceCount ||
-                                    first.name.localeCompare(second.name);
-                            }
+                        const [column, direction] = this.sortBy.split('-');
+                        const sortValues = {
+                            name: (tag) => tag.name,
+                            resources: (tag) => Number(tag.resourceCount),
+                            applications: (tag) => Number(tag.applicationsCount),
+                            services: (tag) => Number(tag.servicesCount),
+                        };
+                        const sortValue = sortValues[column] || sortValues.name;
+                        const order = direction === 'desc' ? -1 : 1;
+                        const compare = (first, second) => typeof first === 'number' ?
+                            first - second :
+                            first.localeCompare(second);
 
-                            return first.name.localeCompare(second.name);
-                        });
+                        return tags.sort((first, second) =>
+                            order * compare(sortValue(first), sortValue(second)) ||
+                            first.name.localeCompare(second.name));
                     },
                     get totalPages() {
                         return Math.max(1, Math.ceil(this.filteredTags.length / this.pageSize));
@@ -411,7 +418,8 @@
                     @endif
                 </x-slot:actions>
 
-                <div wire:poll="getDeployments" class="overflow-x-auto">
+                <div wire:poll="getDeployments" class="overflow-x-auto transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setDeploymentSort">
                     @if (count($deploymentsPerTagPerServer ?? []) === 0)
                         <div class="p-3">
                             <x-empty title="No active deployments"
@@ -421,25 +429,26 @@
                     @else
                         <div
                             class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                            <div>Resource</div>
-                            <div>Server</div>
-                            <div>Status</div>
+                            <x-table.sort-header label="Resource" asc="resource-asc" desc="resource-desc"
+                                action="setDeploymentSort" :current="$deploymentSort" />
+                            <x-table.sort-header label="Server" asc="server-asc" desc="server-desc"
+                                action="setDeploymentSort" :current="$deploymentSort" />
+                            <x-table.sort-header label="Status" asc="status-asc" desc="status-desc"
+                                action="setDeploymentSort" :current="$deploymentSort" />
                         </div>
 
-                        @foreach ($deploymentsPerTagPerServer as $serverName => $deployments)
-                            @foreach ($deployments as $deployment)
-                                <a {{ wireNavigate() }} href="{{ data_get($deployment, 'deployment_url') }}"
-                                    class="grid min-h-13 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
-                                    <div class="truncate font-medium text-black dark:text-fg">
-                                        {{ data_get($deployment, 'application_name') }}
-                                    </div>
-                                    <div class="truncate text-neutral-500 dark:text-fg-dim">{{ $serverName }}</div>
-                                    <div>
-                                        <x-status-badge :status="str(data_get($deployment, 'status'))->headline()"
-                                            :type="data_get($deployment, 'status') === 'in_progress' ? 'warning' : 'neutral'" />
-                                    </div>
-                                </a>
-                            @endforeach
+                        @foreach ($activeDeployments as $deployment)
+                            <a {{ wireNavigate() }} href="{{ data_get($deployment, 'deployment_url') }}"
+                                class="grid min-h-13 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                                <div class="truncate font-medium text-black dark:text-fg">
+                                    {{ data_get($deployment, 'application_name') }}
+                                </div>
+                                <div class="truncate text-neutral-500 dark:text-fg-dim">{{ data_get($deployment, 'server_name') }}</div>
+                                <div>
+                                    <x-status-badge :status="str(data_get($deployment, 'status'))->headline()"
+                                        :type="data_get($deployment, 'status') === 'in_progress' ? 'warning' : 'neutral'" />
+                                </div>
+                            </a>
                         @endforeach
                     @endif
                 </div>

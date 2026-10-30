@@ -370,6 +370,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $this->validateDeploymentEnvironmentVariableKeys();
             $this->ensureRegistryImageForMultipleServers();
+            $this->ensureRegistryImageIsNotShared();
             $this->warnAboutVolumesOnMultipleServers();
             $this->warnAboutMixedProxiesOnMultipleServers();
         } catch (Exception $e) {
@@ -507,7 +508,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->build_server = $buildServers->random();
-        $this->application_deployment_queue->build_server_id = $this->build_server->id;
+        // Saved now: the cancel action looks for the helper container on this server.
+        $this->application_deployment_queue->update(['build_server_id' => $this->build_server->id]);
         $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
         $this->use_build_server = true;
     }
@@ -2588,6 +2590,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         throw new DeploymentException('Before deploying to multiple servers, you must set a Docker image in the General tab. More information: https://coolify.io/docs/knowledge-base/server/multiple-servers');
+    }
+
+    /**
+     * Two applications that build the same Docker image name overwrite each other's image tags.
+     */
+    private function ensureRegistryImageIsNotShared(): void
+    {
+        $otherApplication = $this->application->otherApplicationBuildingSameImage();
+        if ($otherApplication) {
+            throw new DeploymentException($this->application->sharedImageNameMessage($otherApplication));
+        }
     }
 
     /**
@@ -5235,8 +5248,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $timeout = $this->application->settings->deploymentStopGracePeriodSeconds();
 
             if ($skipRemove) {
+                // The helper container (started with --rm) must also stop when the deployment was cancelled.
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true, 'skip_cancellation_check' => true]
                 );
             } else {
                 $this->execute_remote_command(
