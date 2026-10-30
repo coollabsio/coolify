@@ -315,6 +315,11 @@ describe('UI service domain edit', function () {
 });
 
 describe('API domain edit', function () {
+    beforeEach(function () {
+        // A new domain of an automatic DNS zone also queues a record; DnsApiTest covers that.
+        Queue::fake([CheckDomainDnsJob::class, ConfigureDnsRecordJob::class]);
+    });
+
     test('an application domain update releases the removed hostname', function () {
         $cloudflare = fakeCloudflareDns();
         $application = createDnsTestApplication($this, 'https://app.example.com,https://keep.example.com');

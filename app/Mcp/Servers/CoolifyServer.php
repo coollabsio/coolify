@@ -64,10 +64,13 @@ use App\Mcp\Tools\ListTeamMembers;
 use App\Mcp\Tools\ListUnhealthyResources;
 use App\Mcp\Tools\ManageApplication;
 use App\Mcp\Tools\ManageBackup;
+use App\Mcp\Tools\ManageCloudflareTunnel;
 use App\Mcp\Tools\ManageDatabase;
 use App\Mcp\Tools\ManageDestination;
+use App\Mcp\Tools\ManageDns;
 use App\Mcp\Tools\ManageEnv;
 use App\Mcp\Tools\ManageGitSource;
+use App\Mcp\Tools\ManageIntegrationTokens;
 use App\Mcp\Tools\ManageNotifications;
 use App\Mcp\Tools\ManagePreview;
 use App\Mcp\Tools\ManagePrivateKey;
@@ -76,6 +79,7 @@ use App\Mcp\Tools\ManageProxy;
 use App\Mcp\Tools\ManageRegistry;
 use App\Mcp\Tools\ManageS3Storage;
 use App\Mcp\Tools\ManageScheduledTask;
+use App\Mcp\Tools\ManageSecretManager;
 use App\Mcp\Tools\ManageServer;
 use App\Mcp\Tools\ManageService;
 use App\Mcp\Tools\ManageSharedEnv;
@@ -198,14 +202,18 @@ MD;
         ManageBackup::class,
         ManageStorage::class,
         ManageTags::class,
+        ManageDns::class,
+        ManageSecretManager::class,
         ManageServer::class,
         ManageProxy::class,
+        ManageCloudflareTunnel::class,
         DockerCleanup::class,
         ManageDestination::class,
         ManageRegistry::class,
         ManagePrivateKey::class,
         ManageS3Storage::class,
         ManageGitSource::class,
+        ManageIntegrationTokens::class,
         CloudProvider::class,
         ManageNotifications::class,
         ListAuditEvents::class,
@@ -236,12 +244,14 @@ MD;
         ManageTags::class,
         ManageServer::class,
         ManageProxy::class,
+        ManageCloudflareTunnel::class,
         DockerCleanup::class,
         ManageDestination::class,
         ManageRegistry::class,
         ManagePrivateKey::class,
         ManageS3Storage::class,
         ManageGitSource::class,
+        ManageIntegrationTokens::class,
         CloudProvider::class,
         ManageNotifications::class,
     ];

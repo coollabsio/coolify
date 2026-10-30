@@ -18,6 +18,7 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -1337,6 +1338,7 @@ class ServicesController extends Controller
         }
         // URLs of some containers can be saved before a later container fails, so release before any error response.
         $this->queueReleaseOfRemovedServiceHostnames($service, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($service, array_merge(...array_values($previousDnsHostnames)));
         if ($urlResult !== null) {
             if (isset($urlResult['errors'])) {
                 return response()->json([
