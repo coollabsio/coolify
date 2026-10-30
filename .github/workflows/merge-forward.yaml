@@ -35,10 +35,6 @@ jobs:
       - name: Merge main into the release branches and next, the release branches into next
         env:
           GH_TOKEN: ${{ github.token }}
-          BODY: |
-            The branches do not merge without conflicts. Resolve them on this branch, with the Resolve conflicts button of this pull request or with a merge of the base branch on a checkout of it. Both leave the source branch as it is.
-
-            Then merge this pull request with a merge commit. A squash merge leaves the source branch unmerged, so the next merge conflicts again.
         run: |
           gh auth setup-git
           git config user.name "github-actions[bot]"
@@ -78,9 +74,15 @@ jobs:
             pull_request="$(gh pr list --head "$head" --base "$2" --json url --jq '.[0].url')"
             if [ -n "$pull_request" ]; then
               gh pr edit "$pull_request" --title "$title"
-            else
-              gh pr create --base "$2" --head "$head" --title "$title" --body "$BODY"
+              return
             fi
+            cat > "$RUNNER_TEMP/body.md" <<BODY
+          $1 and $2 have conflicts. Resolve them and merge this PR.
+
+          > [!IMPORTANT]
+          > Merge this PR with a merge commit, not a squash merge, so the next merge forward does not conflict again.
+          BODY
+            gh pr create --base "$2" --head "$head" --title "$title" --body-file "$RUNNER_TEMP/body.md"
           }
           releases="$(git branch --remotes --list 'origin/release/*' --format='%(refname:lstrip=3)' | grep -vE '\.0$' | sort -V || true)"
           for release in $releases; do
