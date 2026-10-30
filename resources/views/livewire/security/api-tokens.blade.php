@@ -271,7 +271,7 @@
                                             {{ $token->expires_at->format('Y-m-d') }}
                                         @endif
                                     </div>
-                                    <div class="flex justify-end gap-1">
+                                    <div class="flex items-center justify-end gap-1">
                                         @if (auth()->id() === $token->tokenable_id)
                                             <button type="button" wire:click="startEditing({{ $token->id }})"
                                                 x-on:click="document.getElementById('api-token-form')?.scrollIntoView({ behavior: 'smooth' })"
@@ -282,21 +282,45 @@
                                                 class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg">
                                                 {{ $token->isPaused() ? 'Resume' : 'Pause' }}
                                             </button>
-                                            <x-modal-confirmation title="Confirm API Token Revocation?"
-                                                submitAction="revoke({{ $token->id }})" :actions="[
-                                                    'This API token will be permanently revoked.',
-                                                ]"
-                                                confirmationText="{{ $token->name }}"
-                                                confirmationLabel="Enter the token description to confirm"
-                                                shortConfirmationLabel="Token description"
-                                                :confirmWithPassword="false" step2ButtonText="Revoke token">
+                                            <x-table.dropdown panel-class="w-36!" role="menu">
                                                 <x-slot:trigger>
-                                                    <button type="button"
-                                                        class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-error transition-colors hover:bg-error/10">
-                                                        Revoke
+                                                    <button type="button" class="icon-button" title="Token actions"
+                                                        aria-label="Token actions" aria-haspopup="menu" :aria-expanded="open">
+                                                        <x-reicon name="dots-horizontal" class="size-4" />
                                                     </button>
                                                 </x-slot:trigger>
-                                            </x-modal-confirmation>
+                                                <x-modal-confirmation title="Roll API Token?" buttonFullWidth
+                                                    submitAction="roll({{ $token->id }})" :actions="[
+                                                        'A new secret replaces this token. The current secret stops working at once.',
+                                                        'The description, permissions, scopes, and expiry do not change.',
+                                                    ]"
+                                                    confirmationText="{{ $token->name }}"
+                                                    confirmationLabel="Enter the token description to confirm"
+                                                    shortConfirmationLabel="Token description"
+                                                    :confirmWithPassword="false" step2ButtonText="Roll token">
+                                                    <x-slot:trigger>
+                                                        <button type="button" role="menuitem" x-on:click="close()"
+                                                            class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                            Roll
+                                                        </button>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
+                                                <x-modal-confirmation title="Confirm API Token Revocation?" buttonFullWidth
+                                                    submitAction="revoke({{ $token->id }})" :actions="[
+                                                        'This API token will be permanently revoked.',
+                                                    ]"
+                                                    confirmationText="{{ $token->name }}"
+                                                    confirmationLabel="Enter the token description to confirm"
+                                                    shortConfirmationLabel="Token description"
+                                                    :confirmWithPassword="false" step2ButtonText="Revoke token">
+                                                    <x-slot:trigger>
+                                                        <button type="button" role="menuitem" x-on:click="close()"
+                                                            class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors text-error hover:bg-error/10">
+                                                            Revoke
+                                                        </button>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
+                                            </x-table.dropdown>
                                         @endif
                                     </div>
                                 </div>

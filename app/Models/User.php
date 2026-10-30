@@ -23,7 +23,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -269,12 +268,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
 
     public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null, ?int $teamId = null)
     {
-        $plainTextToken = sprintf(
-            '%s%s%s',
-            config('sanctum.token_prefix', ''),
-            $tokenEntropy = Str::random(40),
-            hash('crc32b', $tokenEntropy)
-        );
+        $plainTextToken = PersonalAccessToken::generateSecret();
 
         $token = $this->tokens()->create([
             'name' => $name,
