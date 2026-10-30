@@ -161,6 +161,7 @@ delete_manifests() {
 	heading "Deleting"
 	write_table /dev/null "$DELETED_FILE"
 	while IFS='|' read -r on_ghcr type tags version digest rest; do
+		[[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || die "the list names '$digest', expected a sha256 digest"
 		name="$digest${tags:+ ($tags)}"
 		deleted="" ghcr=no docker_hub=no
 		if [ "$on_ghcr" = yes ]; then
@@ -246,6 +247,7 @@ write_table() {
 
 delete_ghcr_version() {
 	local error
+	[[ "$1" =~ ^[0-9]+$ ]] || die "the version id of the $2 is '$1', expected a number from the GitHub API"
 	until error="$(gh api -X DELETE "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions/$1" 2>&1 > /dev/null)"; do
 		case "$error" in
 			*"rate limit"*) sleep 60 ;;
@@ -271,8 +273,12 @@ delete_dockerhub_manifest() {
 registry_token() {
 	case "$1" in
 		ghcr.io) curl -sSf --retry 3 "https://ghcr.io/token?scope=repository:$IMAGE:$2" ;;
-		docker.io) curl -sSf --retry 3 ${DOCKERHUB_USERNAME:+-u "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN"} "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
+		docker.io) basic_auth "${DOCKERHUB_USERNAME:+$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN}" | curl -sSf --retry 3 -K - "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$IMAGE:$2" ;;
 	esac | jq -r .token
+}
+
+basic_auth() {
+	[ -z "$1" ] || printf 'header = "Authorization: Basic %s"\n' "$(printf '%s' "$1" | jq -Rrj @base64)"
 }
 
 count() { awk 'END { print NR }'; }
