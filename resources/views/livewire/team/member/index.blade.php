@@ -89,7 +89,7 @@
                                 ['value' => 'member', 'label' => 'Member'],
                             ]" />
                     </div>
-                    <div class="w-full sm:w-40">
+                    <div class="w-full sm:w-40 min-[901px]:hidden">
                         <x-forms.listbox id="member-sort" :wire="false" x-model="sortBy"
                             x-effect="page = 1" :value="'name-asc'" :options="[
                                 ['value' => 'name-asc', 'label' => 'Name A–Z'],
