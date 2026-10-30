@@ -149,7 +149,7 @@
                     <x-table.sort-header label="Created" asc="created-asc" desc="created-desc" first="desc" then="page = 1" />
                     <x-table.sort-header label="Description" asc="description-asc" desc="description-desc" then="page = 1"
                         class="project-description" />
-                    <div></div>
+                    <span class="text-right">Actions</span>
                 </div>
 
                 <template x-for="project in paginatedProjects" :key="project.uuid">

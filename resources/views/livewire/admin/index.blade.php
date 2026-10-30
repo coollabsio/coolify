@@ -64,7 +64,7 @@
                                 <span>Name</span>
                                 <span>Email</span>
                                 <span>Subscription</span>
-                                <span class="text-right">Action</span>
+                                <span class="text-right">Actions</span>
                             </div>
                             @foreach ($foundUsers as $user)
                                 @php

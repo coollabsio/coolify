@@ -74,8 +74,9 @@
                                     shortConfirmationLabel="User name">
                                     <x-slot:trigger>
                                         <button type="button"
-                                            class="text-[12px] font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
-                                            Delete
+                                            class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                            title="Delete user" aria-label="Delete {{ $user->name }}">
+                                            <x-reicon name="trash" class="size-3.5" />
                                         </button>
                                     </x-slot:trigger>
                                 </x-modal-confirmation>

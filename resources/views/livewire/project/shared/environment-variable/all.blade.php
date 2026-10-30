@@ -235,7 +235,7 @@
                             <span class="text-center">Multiline</span>
                             <span class="text-center">Buildtime</span>
                             <span class="text-center">Runtime</span>
-                            <span></span>
+                            <span class="text-right">Actions</span>
                         </div>
                             @php $renderedScope = null; @endphp
                             @foreach ($this->environmentVariablePageRows as $row)

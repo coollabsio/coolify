@@ -187,23 +187,15 @@
                                     </div>
                                     <div class="flex items-center justify-end gap-1">
                                         @if (auth()->id() === $token->tokenable_id)
-                                            <x-table.dropdown panel-class="w-36!" role="menu">
-                                                <x-slot:trigger>
-                                                    <button type="button" class="icon-button" title="Token actions"
-                                                        aria-label="Token actions" aria-haspopup="menu" :aria-expanded="open">
-                                                        <x-reicon name="dots-horizontal" class="size-4" />
-                                                    </button>
-                                                </x-slot:trigger>
-                                                <button type="button" role="menuitem"
-                                                    x-on:click="close(); editToken(@js(App\Livewire\Forms\ApiTokenForm::valuesOf($token)))"
-                                                    class="listbox-option justify-start!">
+                                            <x-table.row-actions label="Token actions">
+                                                <x-table.row-action
+                                                    x-on:click="editToken({{ \Illuminate\Support\Js::from(App\Livewire\Forms\ApiTokenForm::valuesOf($token)) }})">
                                                     Edit
-                                                </button>
-                                                <button type="button" role="menuitem" x-on:click="close()"
-                                                    wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})"
-                                                    class="listbox-option justify-start!">
+                                                </x-table.row-action>
+                                                <x-table.row-action
+                                                    wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})">
                                                     {{ $token->isPaused() ? 'Resume' : 'Pause' }}
-                                                </button>
+                                                </x-table.row-action>
                                                 <x-modal-confirmation title="Roll API Token?" buttonFullWidth
                                                     submitAction="roll({{ $token->id }})" :actions="[
                                                         'A new secret replaces this token. The current secret stops working at once.',
@@ -214,13 +206,10 @@
                                                     shortConfirmationLabel="Token description"
                                                     :confirmWithPassword="false" step2ButtonText="Roll token">
                                                     <x-slot:trigger>
-                                                        <button type="button" role="menuitem" x-on:click="close()"
-                                                            class="listbox-option justify-start!">
-                                                            Roll
-                                                        </button>
+                                                        <x-table.row-action>Roll</x-table.row-action>
                                                     </x-slot:trigger>
                                                 </x-modal-confirmation>
-                                                <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
+                                                <x-slot:danger>
                                                 <x-modal-confirmation title="Confirm API Token Revocation?" buttonFullWidth
                                                     submitAction="revoke({{ $token->id }})" :actions="[
                                                         'This API token will be permanently revoked.',
@@ -230,13 +219,11 @@
                                                     shortConfirmationLabel="Token description"
                                                     :confirmWithPassword="false" step2ButtonText="Revoke token">
                                                     <x-slot:trigger>
-                                                        <button type="button" role="menuitem" x-on:click="close()"
-                                                            class="listbox-option justify-start! text-error! hover:text-error!">
-                                                            Revoke
-                                                        </button>
+                                                        <x-table.row-action>Revoke</x-table.row-action>
                                                     </x-slot:trigger>
                                                 </x-modal-confirmation>
-                                            </x-table.dropdown>
+                                                </x-slot:danger>
+                                            </x-table.row-actions>
                                         @endif
                                     </div>
                                 </div>

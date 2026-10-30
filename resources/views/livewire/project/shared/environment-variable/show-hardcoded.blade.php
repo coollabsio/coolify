@@ -29,7 +29,7 @@
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
-        <div class="flex items-center gap-0.5 justify-self-end">
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
             @unless ($isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endunless

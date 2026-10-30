@@ -6,7 +6,7 @@
     <x-forms.input required id="{{ $form }}.description" label="Description"
         placeholder="CI deployment token" />
     <x-forms.listbox id="{{ $form }}.expiresInDays" label="Expires in" :options="$expiryOptions"
-        x-effect="{{ $form === 'editForm' ? 'options[0].label = editingToken?.keepLabel ?? options[0].label' : '' }}" />
+        :x-effect="$form === 'editForm' ? 'options[0].label = editingToken?.keepLabel ?? options[0].label' : null" />
 </div>
 
 <div class="mt-4 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">

@@ -155,7 +155,7 @@
                         class="environment-resource-count" />
                     <x-table.sort-header label="Description" asc="description-asc" desc="description-desc" then="page = 1"
                         class="environment-description" />
-                    <div></div>
+                    <span class="text-right">Actions</span>
                 </div>
 
                 <template x-for="environment in paginatedEnvironments" :key="environment.uuid">

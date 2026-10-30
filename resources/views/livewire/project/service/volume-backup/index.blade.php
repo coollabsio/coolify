@@ -290,18 +290,17 @@
                                     :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
-                            <span class="flex justify-end gap-2" x-on:keydown.enter.stop>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    :disabled="! str($databaseBackup->database->status)->startsWith('running')"
-                                    :tooltip="! str($databaseBackup->database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
-                                    wire:click.stop="backupNow('database', '{{ $databaseBackup->uuid }}')"
-                                    wire:target="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-forms.button>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
-                                    title="Edit backup schedule" aria-label="Edit backup schedule"
-                                    wire:click.stop="openSchedule('{{ $databaseBackup->uuid }}')">
-                                    <x-reicon name="settings" class="size-4" />
-                                </x-forms.button>
+                            <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
+                                @can('update', $service)
+                                    <x-table.row-actions label="Backup schedule actions">
+                                        <x-table.row-action
+                                            :disabled="! str($databaseBackup->database->status)->startsWith('running')"
+                                            :title="! str($databaseBackup->database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
+                                            wire:click="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-table.row-action>
+                                        <x-table.row-action
+                                            wire:click="openSchedule('{{ $databaseBackup->uuid }}')">Edit</x-table.row-action>
+                                    </x-table.row-actions>
+                                @endcan
                             </span>
                         </div>
                     @endforeach
@@ -351,16 +350,15 @@
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
-                            <span class="flex justify-end gap-2" x-on:keydown.enter.stop>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    wire:click.stop="backupNow('storage', '{{ $backup->uuid }}')"
-                                    wire:target="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-forms.button>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
-                                    title="Edit backup schedule" aria-label="Edit backup schedule"
-                                    wire:click.stop="openSchedule('{{ $backup->uuid }}')">
-                                    <x-reicon name="settings" class="size-4" />
-                                </x-forms.button>
+                            <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
+                                @can('update', $service)
+                                    <x-table.row-actions label="Backup schedule actions">
+                                        <x-table.row-action
+                                            wire:click="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-table.row-action>
+                                        <x-table.row-action
+                                            wire:click="openSchedule('{{ $backup->uuid }}')">Edit</x-table.row-action>
+                                    </x-table.row-actions>
+                                @endcan
                             </span>
                         </div>
                     @endforeach
