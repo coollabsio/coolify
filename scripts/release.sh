@@ -84,7 +84,7 @@ read_changes() {
 	if [ -n "$(git log -E --grep="$BREAKING_CHANGE" --format=%h "$range")" ]; then
 		required=major
 		[ "${stable%%.*}" != 0 ] || required=minor
-	elif git log --format=%s "$range" | awk '/^feat(\([^)]*\))?!?: / && !/^feat\(release\): / { found = 1 } END { exit !found }'; then
+	elif git log --format=%s "$range" | awk '/^feat(\([^)]*\))?!?: / && !/^feat\(release\): bump / { found = 1 } END { exit !found }'; then
 		required=minor
 	fi
 	info "the commits since ${tag:-the first commit} need a $BOLD$required$RESET release"
