@@ -6,11 +6,11 @@
     <x-forms.input required id="{{ $form }}.description" label="Description"
         placeholder="CI deployment token" />
     <x-forms.listbox id="{{ $form }}.expiresInDays" label="Expires in" :options="$expiryOptions"
-        x-effect="{{ $inModal ? 'options[0].label = editingToken?.keepLabel ?? options[0].label' : '' }}" />
+        x-effect="{{ $form === 'editForm' ? 'options[0].label = editingToken?.keepLabel ?? options[0].label' : '' }}" />
 </div>
 
-<div class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-    <div class="mb-3 flex items-center gap-2">
+<div class="mt-4 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
+    <div class="mb-2 flex items-center gap-2">
         <h4 class="text-[12px] font-semibold text-black dark:text-fg">Permissions</h4>
         <x-helper helper="Only grant the abilities this token needs." />
     </div>
@@ -77,7 +77,7 @@
     </div>
 </div>
 
-<div class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]" x-data="{
+<div class="mt-4 border-t border-neutral-200 pt-3 dark:border-white/[0.08]" x-data="{
     labels: @js($scopeLabels),
     types: ['project', 'environment', 'resource'],
     get isSelectedMode() {
@@ -106,7 +106,7 @@
         }
     },
 }">
-    <div class="mb-3 flex items-center gap-2">
+    <div class="mb-2 flex items-center gap-2">
         <h4 class="text-[12px] font-semibold text-black dark:text-fg">Access</h4>
         <x-helper helper="A limited token sees only the selected projects, environments, and resources, and cannot use team-level endpoints such as servers, keys, or notifications." />
     </div>
@@ -115,8 +115,9 @@
             ['value' => 'team', 'label' => 'All resources in the team', 'disabled' => !$canUseTeamScope],
             ['value' => 'selected', 'label' => 'Selected projects, environments, or resources'],
         ]" />
-        <div x-show="isSelectedMode">
-            <x-forms.listbox id="{{ $form }}.selectedScopes" label="Selected" multiple searchable :portal="! $inModal"
+        <div class="min-w-0">
+            <x-forms.listbox id="{{ $form }}.selectedScopes" label="Selected" multiple searchable :portal="! $inModal" countLabel="resource"
+                x-bind:disabled="!isSelectedMode"
                 placeholder="Choose projects, environments, or resources"
                 emptyText="No projects or resources available."
                 :options="$this->scopeOptions" x-effect="coverScopes($data)" />

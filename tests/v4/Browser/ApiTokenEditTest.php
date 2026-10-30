@@ -16,7 +16,7 @@ it('edits a token from the token list and saves the changes', function () {
     loginAndSkipBoarding();
 
     $page = visit('/security/api-tokens')
-        ->assertSee('New API token')
+        ->assertSee('Issued tokens')
         ->click('button[aria-label="Token actions"]')
         ->click('button:visible:has-text("Edit")')
         ->assertSee('Edit API token')
@@ -25,7 +25,7 @@ it('edits a token from the token list and saves the changes', function () {
         ->fill('editForm.description', 'deploy-token')
         ->click('button:visible:has-text("Save changes")')
         ->wait(1)
-        ->assertSee('New API token')
+        ->assertSee('Issued tokens')
         ->assertSee('deploy-token');
 
     expect(PersonalAccessToken::query()->sole()->name)->toBe('deploy-token');
@@ -41,7 +41,7 @@ it('cancels editing without saving', function () {
         ->fill('editForm.description', 'changed')
         ->click('button:visible:has-text("Cancel")')
         ->wait(1)
-        ->assertSee('New API token')
+        ->assertSee('Issued tokens')
         ->assertValue('form.description', '');
 
     expect($this->token->fresh()->name)->toBe('ci-token');

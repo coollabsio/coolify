@@ -166,8 +166,10 @@ class ApiTokens extends Component
                 'expires_at' => $expiresAt?->toIso8601String(),
             ]);
             $this->getTokens();
+            $this->form->reset();
+            $this->form->scopeMode = $this->canUseTeamScope ? 'team' : 'selected';
             // Do NOT strip the numeric prefix (e.g. "69|...") — Sanctum uses it to index and look up tokens.
-            session()->flash('token', $token->plainTextToken);
+            $this->dispatch('api-token-issued', token: $token->plainTextToken);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
@@ -330,7 +332,7 @@ class ApiTokens extends Component
                 'api_token_name' => $token->name,
             ]);
             $this->getTokens();
-            session()->flash('token', $plainTextToken);
+            $this->dispatch('api-token-issued', token: $plainTextToken);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

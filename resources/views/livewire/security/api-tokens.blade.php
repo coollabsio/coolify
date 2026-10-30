@@ -1,5 +1,7 @@
+{{-- The new token value lives only in Alpine, so a Livewire update can not hide it or close its modal. --}}
 <div x-data="{
     editingToken: null,
+    issuedToken: null,
     editToken(values) {
         this.editingToken = values;
         for (const field of ['description', 'expiresInDays', 'permissions', 'scopeMode', 'selectedScopes']) {
@@ -7,7 +9,7 @@
         }
         this.$dispatch('open-api-token-edit');
     },
-}">
+}" @api-token-issued.window="issuedToken = $event.detail.token">
     <x-slot:title>
         API Tokens | Coolify
     </x-slot>
@@ -26,71 +28,26 @@
             <x-api-disabled-callout
                 message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
 
-            @can('create', App\Models\PersonalAccessToken::class)
-                <form wire:submit="addNewToken">
-                    <x-application.settings-section title="New API token">
-                        <x-slot:actions>
-                            <button type="submit" class="button button-highlighted">
-                                <x-reicon name="plus" class="size-3.5" />
-                                Create token
-                            </button>
-                        </x-slot:actions>
-
-                        @include('livewire.security.partials.api-token-fields', [
-                            'form' => 'form',
-                            'expiryOptions' => $expirationList,
-                            'inModal' => false,
-                        ])
-                    </x-application.settings-section>
-                </form>
-
-                <x-modal-input title="Edit API token" :wireIgnore="false" :closeOutside="false"
-                    @open-api-token-edit.window="modalOpen = true" @api-token-updated.window="modalOpen = false">
-                    <x-slot:content><span></span></x-slot:content>
-
-                    <form x-on:submit.prevent="$wire.updateToken(editingToken.id)" id="api-token-edit-form">
-                        <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
-                            The token value does not change. Clients that use it get the new access on their next request.
-                        </p>
-
-                        @include('livewire.security.partials.api-token-fields', [
-                            'form' => 'editForm',
-                            'expiryOptions' => [['value' => 'keep', 'label' => 'Keep current'], ...$expirationList],
-                            'inModal' => true,
-                        ])
-                    </form>
-
-                    <x-slot:footer>
-                        <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
-                        <x-forms.button isHighlighted type="submit" form="api-token-edit-form">Save changes</x-forms.button>
-                    </x-slot:footer>
-                </x-modal-input>
-            @endcan
-
-            @if (session()->has('token'))
-                <x-application.settings-section title="Copy your token">
-                    <div class="flex flex-col gap-3">
-                        <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                            This value will not be shown again after you leave this page.
-                        </p>
-                        <div class="relative">
-                            <input type="text" value="{{ session('token') }}" readonly
-                                class="input w-full pr-12! font-mono text-[12px] text-black dark:text-fg">
-                            <x-copy-button :value="session('token')" label="Copy token"
-                                class="absolute top-1/2 right-2 -translate-y-1/2" />
-                        </div>
-                    </div>
-                </x-application.settings-section>
-            @endif
-
             <x-application.settings-section title="Issued tokens" flush>
+                @can('create', App\Models\PersonalAccessToken::class)
+                    <x-slot:actions>
+                        <button type="button" class="button button-highlighted" @click="$dispatch('open-api-token-create')">
+                            <x-reicon name="plus" class="size-3.5" />
+                            New token
+                        </button>
+                    </x-slot:actions>
+                @endcan
                 <div x-data="{
                     search: '',
                     page: 1,
                     perPage: 10,
                     tokens: @js($tokens->map(fn ($token) => [
                         'id' => (string) $token->id,
-                        'search' => strtolower($token->name . ' ' . implode(' ', $token->abilities ?? [])),
+                        'search' => Str::lower(collect([$token->name, ...($token->abilities ?? [])])
+                            ->merge($token->scopes === null
+                                ? ['All resources in the team']
+                                : collect($token->scopes)->map(fn ($scope) => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? null)->filter())
+                            ->join(' ')),
                     ])->values()),
                     get filteredTokens() {
                         const query = this.search.trim().toLowerCase();
@@ -120,8 +77,8 @@
                     }
                 }">
                     @if ($tokens->count() > 1)
-                        <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
-                            <div class="relative max-w-sm">
+                        <div class="flex items-center gap-2 border-b border-neutral-200 p-3 dark:border-white/[0.08]">
+                            <div class="relative w-full max-w-sm">
                                 <x-reicon name="search"
                                     class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                                 <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
@@ -133,6 +90,8 @@
                                     <x-reicon name="x" class="size-3" />
                                 </button>
                             </div>
+                            <x-helper label="Search help"
+                                helper="Search by token name, ability, or the name of a project, environment, or resource that the token can use." />
                         </div>
                     @endif
 
@@ -297,5 +256,68 @@
                 </div>
             </x-application.settings-section>
         </div>
+
+        @can('create', App\Models\PersonalAccessToken::class)
+            <x-modal-input title="New API token" :wireIgnore="false" :closeOutside="false"
+                @open-api-token-create.window="modalOpen = true" @api-token-issued.window="modalOpen = false">
+                <x-slot:content><span></span></x-slot:content>
+
+                <form wire:submit="addNewToken" id="api-token-create-form" class="lg:w-2xl">
+                    @include('livewire.security.partials.api-token-fields', [
+                        'form' => 'form',
+                        'expiryOptions' => $expirationList,
+                        'inModal' => true,
+                    ])
+                </form>
+
+                <x-slot:footer>
+                    <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
+                    <x-forms.button isHighlighted type="submit" form="api-token-create-form">Create token</x-forms.button>
+                </x-slot:footer>
+            </x-modal-input>
+
+            <x-modal-input title="Edit API token" :wireIgnore="false" :closeOutside="false"
+                @open-api-token-edit.window="modalOpen = true" @api-token-updated.window="modalOpen = false">
+                <x-slot:content><span></span></x-slot:content>
+
+                <form x-on:submit.prevent="$wire.updateToken(editingToken.id)" id="api-token-edit-form" class="lg:w-2xl">
+                    <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        The token value does not change. Clients that use it get the new access on their next request.
+                    </p>
+
+                    @include('livewire.security.partials.api-token-fields', [
+                        'form' => 'editForm',
+                        'expiryOptions' => [['value' => 'keep', 'label' => 'Keep current'], ...$expirationList],
+                        'inModal' => true,
+                    ])
+                </form>
+
+                <x-slot:footer>
+                    <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
+                    <x-forms.button isHighlighted type="submit" form="api-token-edit-form">Save changes</x-forms.button>
+                </x-slot:footer>
+            </x-modal-input>
+        @endcan
+
+        <x-modal-input title="Copy your token" :closeOutside="false"
+            @api-token-issued.window="modalOpen = true" x-effect="if (!modalOpen) issuedToken = null">
+            <x-slot:content><span></span></x-slot:content>
+
+            <div class="flex flex-col gap-3 lg:w-2xl">
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                    Copy the token now. It is not shown again after you close this window.
+                </p>
+                <div class="relative">
+                    <input type="text" :value="issuedToken" readonly @focus="$el.select()"
+                        class="input w-full pr-12! font-mono text-[12px] text-black dark:text-fg">
+                    <x-copy-button resolve="issuedToken" label="Copy token"
+                        class="absolute top-1/2 right-2 -translate-y-1/2" />
+                </div>
+            </div>
+
+            <x-slot:footer>
+                <x-forms.button isHighlighted @click="modalOpen = false">Done</x-forms.button>
+            </x-slot:footer>
+        </x-modal-input>
     </x-security.settings-layout>
 </div>
