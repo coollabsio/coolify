@@ -25,7 +25,17 @@
             @endif
         </div>
     </div>
-    <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $member->email }}</div>
+    <div class="min-w-0">
+        <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $member->email }}</div>
+        @can('manageMembers', currentTeam())
+            @if (data_get($member, 'pivot.role') === 'member')
+                @php($accessSummary = App\Livewire\Team\Member\Access::summary(data_get($member, 'pivot.access')))
+                <div class="mt-0.5 truncate text-[11px] text-neutral-400 dark:text-fg-faint" title="Access: {{ $accessSummary }}">
+                    Access: {{ $accessSummary }}
+                </div>
+            @endif
+        @endcan
+    </div>
     <div>
         <button type="button"
             class="table-filter-value table-filter-badge inline-flex rounded-full border border-transparent bg-neutral-100 px-2 py-0.5 text-[10px] font-medium capitalize text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim"
@@ -33,13 +43,6 @@
             x-on:click="roleFilter = roleFilter === @js(data_get($member, 'pivot.role')) ? 'all' : @js(data_get($member, 'pivot.role')); page = 1">
             {{ data_get($member, 'pivot.role') }}
         </button>
-        @can('manageMembers', currentTeam())
-            @if (data_get($member, 'pivot.role') === 'member')
-                <div class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-dim">
-                    {{ App\Livewire\Team\Member\Access::summary(data_get($member, 'pivot.access')) }}
-                </div>
-            @endif
-        @endcan
     </div>
     @can('manageMembers', currentTeam())
         <div class="flex items-center">
