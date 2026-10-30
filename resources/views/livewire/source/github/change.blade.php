@@ -47,7 +47,7 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations"
+                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations" :name="$github_app->name ?: 'GitHub App'"
                         data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-1 gap-0.5">

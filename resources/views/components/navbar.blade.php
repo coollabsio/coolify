@@ -184,6 +184,7 @@
                 // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth}
                 // (the desktop sidebar); the mobile drawer moves it into its own slot while it shows (see init).
                 $navContext = request()->attributes->get('mainNavContext', []);
+                $navContextName = collect($navContext)->pluck('name')->filter()->last() ?? 'Resource menu';
             @endphp
             {{-- On a resource page the deepest resource menu replaces the main menu. Back shows the
                  menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
@@ -262,6 +263,20 @@
             @endforeach
             <li x-show="navLevel === -1 && !submenu" @if ($activeSubmenu || $navContext) x-cloak @endif class="contents">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
+                    @if ($navContext)
+                        {{-- On a resource page the main menu opens the deepest resource menu again. --}}
+                        <li class="mb-1">
+                            <button type="button" @click="navLevel = {{ array_key_last($navContext) }}; navSwap = 'forward'"
+                                title="Back to the {{ $navContextName }} menu" aria-label="Back to the {{ $navContextName }} menu"
+                                class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
+                                <span class="flex-1 truncate pl-6 text-center font-medium text-black dark:text-fg"
+                                    :class="collapsed && 'lg:hidden'">{{ $navContextName }}</span>
+                                <span class="menu-back-icon flex shrink-0 items-center justify-center">
+                                    <x-reicon name="chevron-down" class="size-3 -rotate-90 text-coollabs dark:text-fg-dim" />
+                                </span>
+                            </button>
+                        </li>
+                    @endif
             @foreach ($navSections as $sectionLabel => $sectionItems)
                 {{-- The first section needs no title. --}}
                 @unless ($loop->first)

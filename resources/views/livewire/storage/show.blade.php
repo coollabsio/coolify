@@ -36,7 +36,7 @@
     @if ($showSettingsSidebar)
         <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
             <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                <x-main-nav-menu back-label="S3 Storage" back-title="Back to Integrations"
+                <x-main-nav-menu back-label="S3 Storage" back-title="Back to Integrations" :name="$storage->name"
                     data-settings-search-items="{{ json_encode(settingsSearchItems(['S3 storage' => $settingsMenuItems], $storageRouteParameters)) }}">
                     <nav aria-label="S3 storage settings"
                         class="grid grid-cols-1 gap-0.5">
