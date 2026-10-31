@@ -153,7 +153,8 @@ trait HasMetrics
             $token = $this->metricsToken($server);
 
             $response = instant_remote_process(
-                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$endpoint}\"'"],
+                // The token reaches curl on stdin, so it is not a process argument (see prefetchMetrics()).
+                ["docker exec -i coolify-sentinel curl -s -H @- \"{$endpoint}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH"],
                 $server,
                 false
             );

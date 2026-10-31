@@ -239,7 +239,9 @@ class SentinelMetricsClient
         $token = $this->server->settings->ensureValidSentinelToken();
 
         return instant_remote_process(
-            ["docker exec coolify-sentinel sh -c 'curl -s --max-time 10 -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
+            // The token reaches curl on stdin, so it is not a process argument. It only has letters, digits
+            // and `._-+/=` (ServerSetting::isValidSentinelToken), so it cannot end the heredoc.
+            ["docker exec -i coolify-sentinel curl -s --max-time 10 -H @- \"{$url}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH"],
             $this->server,
             false,
             timeout: 15,
