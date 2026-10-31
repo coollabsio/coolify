@@ -81,7 +81,6 @@ it('includes Reverb but not the terminal server in the Coolify container healthc
         ->not->toContain('6002/ready');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-    'windows compose' => ['docker-compose.windows.yml'],
 ]);
 
 it('removes the legacy realtime container during upgrades', function (string $script) {
@@ -142,7 +141,6 @@ it('removes the dedicated realtime service from bundled compose files', function
     'development compose' => ['docker-compose.dev.yml', true],
     'maxio development compose' => ['docker-compose-maxio.dev.yml', true],
     'multi-instance development compose' => ['docker-compose.dev-multi.yml', true],
-    'windows compose' => ['docker-compose.windows.yml', true],
 ]);
 
 it('keeps the internal Reverb listen port separate from the public Pusher port', function () {
@@ -184,11 +182,9 @@ it('proxies Reverb and terminal websocket traffic to the Coolify app container',
 it('uses Pusher environment keys for self-hosted Reverb compatibility', function () {
     $files = [
         '.env.production',
-        '.env.windows-docker-desktop.example',
         'docker-compose.prod.yml',
         'docker-compose.dev.yml',
         'docker-compose-maxio.dev.yml',
-        'docker-compose.windows.yml',
         'scripts/install.sh',
         'scripts/upgrade.sh',
     ];
@@ -204,9 +200,6 @@ it('keeps the public websocket port adaptive and configures only the internal Re
     expect(file_get_contents(base_path('.env.production')))
         ->not->toContain('PUSHER_PORT=')
         ->not->toContain('PUSHER_BACKEND_PORT=')
-        ->and(file_get_contents(base_path('.env.windows-docker-desktop.example')))
-        ->not->toContain('PUSHER_PORT=')
-        ->toContain('PUSHER_BACKEND_PORT=6001')
         ->and(file_get_contents(base_path('scripts/install.sh')))
         ->not->toContain('update_env_var "PUSHER_PORT"')
         ->toContain('update_env_var "PUSHER_BACKEND_PORT" "6001"')
@@ -221,7 +214,6 @@ it('does not use the browser websocket port as the Docker host port', function (
         ->not->toContain('"${PUSHER_PORT:-6001}:6001"');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-    'windows compose' => ['docker-compose.windows.yml'],
 ]);
 
 it('preserves existing public websocket port overrides during install and upgrade', function (string $script) {
@@ -262,15 +254,6 @@ it('keeps 4.3.23 realtime setups working with the production compose files', fun
         ->and(implode("\n", [...$coolify['ports'], ...$coolify['expose']]))->not->toContain('TERMINAL_PORT');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-]);
-
-it('keeps TERMINAL_PORT browser-only in the Windows compose files', function (string $composeFile) {
-    $coolify = Yaml::parseFile(base_path($composeFile))['services']['coolify'];
-
-    expect($coolify['ports'])->toContain('6002:6002')
-        ->and(implode("\n", [...$coolify['ports'], ...$coolify['expose']]))->not->toContain('TERMINAL_PORT');
-})->with([
-    'windows compose' => ['docker-compose.windows.yml'],
 ]);
 
 it('resolves the browser websocket port like 4.3.23', function (string $pageUrl, ?string $pusherPort, ?string $expectedPort) {
