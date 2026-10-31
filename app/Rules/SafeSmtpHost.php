@@ -23,12 +23,17 @@ class SafeSmtpHost implements ValidationRule
         $host = is_string($value) ? normalizeIpAddress($value) : '';
         if (filter_var($host, FILTER_VALIDATE_IP) === false
             && filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false) {
-            $fail('The :attribute must be a valid hostname or IP address.');
+            $fail('The SMTP host must be a valid hostname or IP address.');
 
             return;
         }
 
-        SafeWebhookUrl::forGitSource()->validate($attribute, 'https://'.formatHostForUrl($host), $fail);
+        // The URL rule names the field in two ways: the raw attribute and the :attribute placeholder.
+        SafeWebhookUrl::forGitSource()->validate(
+            'SMTP host',
+            'https://'.formatHostForUrl($host),
+            fn (string $message) => $fail(str_replace([':attribute host', ':attribute'], 'SMTP host', $message)),
+        );
     }
 
     /**
