@@ -134,6 +134,7 @@ class ImportForm extends Component
     #[Locked]
     public string $resourceDbType = '';
 
+    #[Locked]
     public array $parameters = [];
 
     public array $containers = [];
@@ -315,7 +316,7 @@ class ImportForm extends Component
         }
     }
 
-    public function getContainers()
+    private function getContainers()
     {
         $this->containers = [];
         $teamId = data_get(auth()->user()->currentTeam(), 'id');

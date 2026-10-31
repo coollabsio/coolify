@@ -3,10 +3,9 @@
 use App\Actions\Shared\CheckDomainDns;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Services\Dns\DnsRecord;
+use App\Services\Dns\DnsResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use PurplePixie\PhpDns\DNSQuery;
-use PurplePixie\PhpDns\DNSResult;
-use PurplePixie\PhpDns\DNSTypes;
 
 uses(RefreshDatabase::class);
 
@@ -43,8 +42,8 @@ it('stops querying DNS servers after finding a matching IP', function (string $r
     $queriedServers = new ArrayObject;
     $targetIp = '203.0.113.10';
 
-    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queriedServers, $resolvedIp) {
-        return new class($parameters['server'], $queriedServers, $resolvedIp) extends DNSQuery
+    app()->bind(DnsResolver::class, function ($app, array $parameters) use ($queriedServers, $resolvedIp) {
+        return new class($parameters['server'], $queriedServers, $resolvedIp) extends DnsResolver
         {
             public function __construct(
                 private readonly string $dnsServer,
@@ -54,11 +53,11 @@ it('stops querying DNS servers after finding a matching IP', function (string $r
                 parent::__construct($dnsServer);
             }
 
-            public function query(string $question, string $typeName = DNSTypes::NAME_A)
+            public function query(string $question, string $typeName = DnsResolver::TYPE_A): array|false
             {
                 $this->queriedServers->append($this->dnsServer);
 
-                return [new DNSResult($typeName, 1, 'IN', 60, $this->resolvedIp, $question, '', [])];
+                return [new DnsRecord($typeName, $this->resolvedIp)];
             }
 
             public function hasError(): bool
@@ -93,10 +92,10 @@ it('does not start another resolver query after the total dns budget is exhauste
     ));
 
     $queryCount = new ArrayObject;
-    app()->bind(DNSQuery::class, function () use ($queryCount) {
+    app()->bind(DnsResolver::class, function () use ($queryCount) {
         $queryCount->append(true);
 
-        return new DNSQuery('192.0.2.1');
+        return new DnsResolver('192.0.2.1');
     });
 
     $result = CheckDomainDns::run(
@@ -120,9 +119,9 @@ it('falls back to the system resolver when custom dns servers return no answers'
         ]
     ));
 
-    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1') extends DNSQuery
+    app()->bind(DnsResolver::class, fn () => new class('192.0.2.1') extends DnsResolver
     {
-        public function query(string $question, string $typeName = DNSTypes::NAME_A): false
+        public function query(string $question, string $typeName = DnsResolver::TYPE_A): false
         {
             return false;
         }
@@ -159,11 +158,11 @@ it('does not use the system resolver after a custom dns server returns an addres
         ]
     ));
 
-    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1') extends DNSQuery
+    app()->bind(DnsResolver::class, fn () => new class('192.0.2.1') extends DnsResolver
     {
-        public function query(string $question, string $typeName = DNSTypes::NAME_A): array
+        public function query(string $question, string $typeName = DnsResolver::TYPE_A): array
         {
-            return [new DNSResult($typeName, 1, 'IN', 60, '198.51.100.20', $question, '', [])];
+            return [new DnsRecord($typeName, '198.51.100.20')];
         }
 
         public function hasError(): bool
@@ -195,16 +194,16 @@ it('treats equivalent IPv6 notations as the same address', function (string $res
         ['is_dns_validation_enabled' => true, 'custom_dns_servers' => '192.0.2.1'],
     ));
 
-    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1', $resolvedIp) extends DNSQuery
+    app()->bind(DnsResolver::class, fn () => new class('192.0.2.1', $resolvedIp) extends DnsResolver
     {
         public function __construct(string $server, private readonly string $resolvedIp)
         {
             parent::__construct($server);
         }
 
-        public function query(string $question, string $typeName = DNSTypes::NAME_A)
+        public function query(string $question, string $typeName = DnsResolver::TYPE_A): array|false
         {
-            return [new DNSResult($typeName, 1, 'IN', 60, $this->resolvedIp, $question, '', [])];
+            return [new DnsRecord($typeName, $this->resolvedIp)];
         }
 
         public function hasError(): bool
@@ -249,11 +248,11 @@ it('validateDNSEntry treats equivalent IPv6 notations as the same address', func
         ['is_dns_validation_enabled' => true, 'custom_dns_servers' => '192.0.2.1'],
     ));
 
-    app()->bind(DNSQuery::class, fn () => new class('192.0.2.1') extends DNSQuery
+    app()->bind(DnsResolver::class, fn () => new class('192.0.2.1') extends DnsResolver
     {
-        public function query(string $question, string $typeName = DNSTypes::NAME_A)
+        public function query(string $question, string $typeName = DnsResolver::TYPE_A): array|false
         {
-            return [new DNSResult($typeName, 1, 'IN', 60, '2001:db8::1', $question, '', [])];
+            return [new DnsRecord($typeName, '2001:db8::1')];
         }
 
         public function hasError(): bool
@@ -278,12 +277,12 @@ it('passes bracketed IPv6 custom dns servers to the dns query', function () {
     ));
 
     $queriedServers = new ArrayObject;
-    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queriedServers) {
+    app()->bind(DnsResolver::class, function ($app, array $parameters) use ($queriedServers) {
         $queriedServers->append($parameters['server']);
 
-        return new class('192.0.2.1') extends DNSQuery
+        return new class('192.0.2.1') extends DnsResolver
         {
-            public function query(string $question, string $typeName = DNSTypes::NAME_A): false
+            public function query(string $question, string $typeName = DnsResolver::TYPE_A): false
             {
                 return false;
             }

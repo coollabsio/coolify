@@ -44,6 +44,8 @@ class Index extends Component
 
     public function stripeCustomerPortal()
     {
+        abort_unless(auth()->user()?->isAdminOfTeam(currentTeam()->id), 403);
+
         $session = getStripeCustomerPortalSession(currentTeam());
         if (is_null($session)) {
             return;

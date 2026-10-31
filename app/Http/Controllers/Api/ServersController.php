@@ -823,6 +823,9 @@ class ServersController extends Controller
                 return response()->json(['message' => 'Invalid proxy type.'], 422);
             }
         }
+        if ($request->filled('ip') && ModelsServer::whereIp(ModelsServer::normalizeIp($request->ip))->whereKeyNot($server->id)->exists()) {
+            return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
+        }
         $updateFields = $request->only(['name', 'description', 'ip', 'port', 'user']);
         if ($request->filled('private_key_uuid')) {
             $privateKey = PrivateKey::whereTeamId($teamId)->whereUuid($request->private_key_uuid)->first();

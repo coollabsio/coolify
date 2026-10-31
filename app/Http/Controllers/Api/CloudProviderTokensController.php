@@ -120,6 +120,9 @@ class CloudProviderTokensController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        if (! $request->user()?->isAdminOfTeam((int) $teamId)) {
+            return response()->json(['message' => 'This action is unauthorized.'], 403);
+        }
 
         $tokens = CloudProviderToken::whereTeamId($teamId)
             ->withCount('servers')

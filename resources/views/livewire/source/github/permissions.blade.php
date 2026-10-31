@@ -2,7 +2,7 @@
                 <x-application.settings-section title="Permissions"
                     description="GitHub permissions currently granted to this App.">
                     <x-slot:actions>
-                        @can('view', $github_app)
+                        @can('update', $github_app)
                             <x-forms.button type="button" wire:click.prevent="checkPermissions">
                                 <x-reicon name="refresh" class="size-3.5" />
                                 Refetch

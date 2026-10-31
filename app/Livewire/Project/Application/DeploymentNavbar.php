@@ -29,7 +29,7 @@ class DeploymentNavbar extends Component
     {
         $this->application = Application::ownedByCurrentTeam()->find($this->application_deployment_queue->application_id);
         $this->server = $this->application->destination->server;
-        $this->is_debug_enabled = auth()->user()->isMember()
+        $this->is_debug_enabled = ! auth()->user()->can('update', $this->application)
             ? false
             : $this->application->settings->is_debug_enabled;
     }

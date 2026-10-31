@@ -2,12 +2,10 @@
 
 use App\Models\InstanceSettings;
 use App\Rules\SafeWebhookUrl;
+use App\Services\Dns\DnsRecord;
+use App\Services\Dns\DnsResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
-use PurplePixie\PhpDns\DNSAnswer;
-use PurplePixie\PhpDns\DNSQuery;
-use PurplePixie\PhpDns\DNSResult;
-use PurplePixie\PhpDns\DNSTypes;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -456,12 +454,12 @@ it('still rejects private targets after system DNS fallback when host is not all
 
 it('passes bracketed IPv6 custom dns servers to the dns query', function () {
     $queriedServers = new ArrayObject;
-    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queriedServers) {
+    app()->bind(DnsResolver::class, function ($app, array $parameters) use ($queriedServers) {
         $queriedServers->append($parameters['server']);
 
-        return new class('192.0.2.1') extends DNSQuery
+        return new class('192.0.2.1') extends DnsResolver
         {
-            public function query(string $question, string $typeName = DNSTypes::NAME_A): false
+            public function query(string $question, string $typeName = DnsResolver::TYPE_A): false
             {
                 return false;
             }
@@ -493,8 +491,8 @@ it('accepts bracketed IPv6 custom dns servers from instance settings', function 
  */
 function bindTruncatingDnsResolver(ArrayObject $queries, string $truncatedError = 'Response too big for UDP, retry with TCP'): void
 {
-    app()->bind(DNSQuery::class, function ($app, array $parameters) use ($queries, $truncatedError) {
-        return new class($parameters['udp'], $queries, $truncatedError) extends DNSQuery
+    app()->bind(DnsResolver::class, function ($app, array $parameters) use ($queries, $truncatedError) {
+        return new class($parameters['udp'], $queries, $truncatedError) extends DnsResolver
         {
             private string $fakeError = '';
 
@@ -506,22 +504,20 @@ function bindTruncatingDnsResolver(ArrayObject $queries, string $truncatedError 
                 parent::__construct('192.0.2.1');
             }
 
-            public function query(string $question, string $typeName = DNSTypes::NAME_A)
+            public function query(string $question, string $typeName = DnsResolver::TYPE_A): array|false
             {
                 $this->queries->append([$typeName, $this->useUdp ? 'udp' : 'tcp']);
                 $this->fakeError = '';
 
-                if ($typeName === DNSTypes::NAME_A && $this->useUdp) {
+                if ($typeName === DnsResolver::TYPE_A && $this->useUdp) {
                     $this->fakeError = $this->truncatedError;
 
                     return false;
                 }
 
-                $answer = new DNSAnswer;
-                $ip = $typeName === DNSTypes::NAME_A ? '172.64.66.1' : '2606:4700:113::1';
-                $answer->addResult(new DNSResult($typeName, 0, 'IN', 300, $ip, $question, '', []));
+                $ip = $typeName === DnsResolver::TYPE_A ? '172.64.66.1' : '2606:4700:113::1';
 
-                return $answer;
+                return [new DnsRecord($typeName, $ip)];
             }
 
             public function hasError(): bool
@@ -546,9 +542,9 @@ it('retries custom dns lookups over TCP when the UDP answer is truncated', funct
     expect($method->invoke(new SafeWebhookUrl, 'bucket.r2.cloudflarestorage.com', ['1.1.1.1']))
         ->toBe(['172.64.66.1', '2606:4700:113::1'])
         ->and($queries->getArrayCopy())->toBe([
-            [DNSTypes::NAME_A, 'udp'],
-            [DNSTypes::NAME_A, 'tcp'],
-            [DNSTypes::NAME_AAAA, 'udp'],
+            [DnsResolver::TYPE_A, 'udp'],
+            [DnsResolver::TYPE_A, 'tcp'],
+            [DnsResolver::TYPE_AAAA, 'udp'],
         ]);
 });
 
@@ -561,7 +557,7 @@ it('does not retry custom dns lookups over TCP for other UDP failures', function
     expect($method->invoke(new SafeWebhookUrl, 'bucket.r2.cloudflarestorage.com', ['1.1.1.1']))
         ->toBe(['2606:4700:113::1'])
         ->and($queries->getArrayCopy())->toBe([
-            [DNSTypes::NAME_A, 'udp'],
-            [DNSTypes::NAME_AAAA, 'udp'],
+            [DnsResolver::TYPE_A, 'udp'],
+            [DnsResolver::TYPE_AAAA, 'udp'],
         ]);
 });

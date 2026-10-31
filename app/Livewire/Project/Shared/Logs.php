@@ -16,6 +16,7 @@ use App\Models\StandaloneSqlite;
 use App\Support\RuntimeLogTargets;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -31,6 +32,7 @@ class Logs extends Component
 
     public Collection $containers;
 
+    #[Locked]
     public array $serverContainers = [];
 
     /** @var array<int, string> */

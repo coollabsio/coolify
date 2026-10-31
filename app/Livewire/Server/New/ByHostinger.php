@@ -12,6 +12,7 @@ use App\Rules\ValidHostname;
 use App\Services\HostingerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -106,7 +107,7 @@ class ByHostinger extends Component
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ];
 
         if ($this->current_step === 2) {
@@ -165,7 +166,7 @@ class ByHostinger extends Component
     public function nextStep(): mixed
     {
         $this->validate([
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         try {

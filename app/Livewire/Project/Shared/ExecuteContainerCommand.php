@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -17,6 +18,7 @@ class ExecuteContainerCommand extends Component
 
     public $selected_container = 'default';
 
+    #[Locked]
     public Collection $containers;
 
     public $parameters;

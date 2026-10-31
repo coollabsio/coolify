@@ -6,6 +6,7 @@ use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Rules\ValidProxyConfigFilename;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
@@ -19,15 +20,22 @@ class NewDynamicConfiguration extends Component
 
     public bool $newFile = false;
 
-    public Server $server;
+    public ?Server $server = null;
 
+    #[Locked]
     public $server_id;
 
+    #[Locked]
     public $parameters = [];
 
     public function mount()
     {
         $this->server = Server::ownedByCurrentTeam()->whereId($this->server_id)->first();
+        if (is_null($this->server)) {
+            $this->redirectRoute('server.index');
+
+            return;
+        }
         $this->parameters = get_route_parameters();
         if ($this->fileName !== '') {
             $this->fileName = str_replace('|', '.', $this->fileName);
@@ -37,6 +45,9 @@ class NewDynamicConfiguration extends Component
     public function addDynamicConfiguration()
     {
         try {
+            if (is_null($this->server)) {
+                return redirect()->route('server.index');
+            }
             $this->authorize('update', $this->server);
             $this->validate([
                 'fileName' => ['required', new ValidProxyConfigFilename],
@@ -45,13 +56,6 @@ class NewDynamicConfiguration extends Component
 
             validateFilenameSafe($this->fileName, 'proxy configuration filename');
 
-            if (data_get($this->parameters, 'server_uuid')) {
-                $this->server = Server::ownedByCurrentTeam()->whereUuid(data_get($this->parameters, 'server_uuid'))->first();
-            }
-
-            if (is_null($this->server)) {
-                return redirect()->route('server.index');
-            }
             $proxy_type = $this->server->proxyType();
             if ($proxy_type === ProxyTypes::TRAEFIK->value) {
                 if (! str($this->fileName)->endsWith('.yaml') && ! str($this->fileName)->endsWith('.yml')) {

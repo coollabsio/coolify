@@ -186,6 +186,7 @@ class Show extends Component
     public function validateToken()
     {
         try {
+            $this->authorize('update', $this->server);
             $token = $this->server->cloudProviderToken;
             if (! $token) {
                 $this->dispatch('error', "No {$this->providerName} token is associated with this server.");

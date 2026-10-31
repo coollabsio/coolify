@@ -85,11 +85,13 @@
                                                 source to an application.
                                             </p>
                                         </div>
+                                        @can('update', $github_app)
                                         <a class="button shrink-0 button-highlighted"
                                             href="{{ getInstallationPath($github_app) }}">
                                             Install repositories
                                             <x-external-link />
                                         </a>
+                                        @endcan
                                     </div>
                                 </x-application.settings-section>
                             </div>
@@ -112,7 +114,7 @@
                                     description="Connection and authentication settings for this private GitHub source.">
                                     <x-slot:actions>
                                         @if ($isConnected)
-                                            <x-forms.button type="button" canGate="view" :canResource="$github_app"
+                                            <x-forms.button type="button" canGate="update" :canResource="$github_app"
                                                 wire:click.prevent="testConnection">
                                                 Test connection
                                             </x-forms.button>
@@ -369,6 +371,7 @@
             </x-callout>
         @endcan
 
+        @can('update', $github_app)
         <script>
             function createGithubApp(webhook_endpoint, use_custom_webhook_endpoint, custom_webhook_endpoint,
                 preview_deployment_permissions, administration, github_runners) {
@@ -446,5 +449,6 @@
                 form.submit();
             }
         </script>
+        @endcan
     @endif
 </div>

@@ -4,6 +4,7 @@ namespace App\Livewire\Project;
 
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class DeleteProject extends Component
@@ -12,6 +13,7 @@ class DeleteProject extends Component
 
     public array $parameters;
 
+    #[Locked]
     public int $project_id;
 
     public bool $disabled = false;

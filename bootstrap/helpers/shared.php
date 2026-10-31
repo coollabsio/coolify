@@ -39,6 +39,8 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Dns\DnsRecord;
+use App\Services\Dns\DnsResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
@@ -72,9 +74,6 @@ use Nubs\RandomNameGenerator\Alliteration;
 use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
-use PurplePixie\PhpDns\DNSQuery;
-use PurplePixie\PhpDns\DNSResult;
-use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
@@ -2512,7 +2511,7 @@ function validateDNSEntry(string $fqdn, Server $server)
     $dns_servers = str($dns_servers)->explode(',');
     $ip = serverDnsTargetIp($server);
     $found_matching_ip = false;
-    $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
+    $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DnsResolver::TYPE_AAAA : DnsResolver::TYPE_A;
     foreach ($dns_servers as $dns_server) {
         try {
             $results = queryDnsServer($dns_server, $host, $type);
@@ -2537,9 +2536,9 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DNSQuery
+function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DnsResolver
 {
-    return app()->make(DNSQuery::class, [
+    return app()->make(DnsResolver::class, [
         'server' => formatHostForUrl($dnsServer),
         'port' => 53,
         'timeout' => $timeout,
@@ -2552,7 +2551,7 @@ function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): 
  * retry over TCP: resolvers such as 1.1.1.1 can truncate even small answers, and the
  * records would otherwise be silently dropped.
  *
- * @return iterable<int, DNSResult>|false
+ * @return iterable<int, DnsRecord>|false
  */
 function queryDnsServer(string $dnsServer, string $host, string $type, int $timeout = 5): iterable|false
 {
