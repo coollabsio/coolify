@@ -8,16 +8,11 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'docker/build-push-action@v7.4.0'
         - 'docker/setup-buildx-action@v4.4.1'
-    '.github/workflows/chore-lock-closed-issues-discussions-and-prs.yml':
-        - 'dessant/lock-threads@v6.0.2'
-    '.github/workflows/chore-manage-pr-branch.yaml':
-        - 'actions/github-script@v9.0.0'
-    '.github/workflows/chore-manage-stale-issues-and-prs.yml':
-        - 'actions/stale@v11.0.0'
-    '.github/workflows/chore-pr-comments.yml': []
     '.github/workflows/clean-manifests.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.2'
+    '.github/workflows/lock-threads.yaml':
+        - 'dessant/lock-threads@v6.0.2'
     '.github/workflows/main.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
@@ -37,6 +32,9 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
         - 'docker/login-action@v4.7.0'
+    '.github/workflows/request-docs-update.yaml': []
+    '.github/workflows/stale.yaml':
+        - 'actions/stale@v11.0.0'
 dependencies:
     'actions/checkout@v7.0.1':
         ref: 'v7.0.1'
@@ -48,11 +46,6 @@ dependencies:
         commit: 'sha1-9000827ccba6bdab643e8b6fd33ac0654aef8333'
         owner_id: 44036562
         repo_id: 192626254
-    'actions/github-script@v9.0.0':
-        ref: 'v9.0.0'
-        commit: 'sha1-3a2844b7e9c422d3c10d287c895573f7108da1b3'
-        owner_id: 44036562
-        repo_id: 205262760
     'actions/stale@v11.0.0':
         ref: 'v11.0.0'
         commit: 'sha1-4391f3da665fdf50b6810c1a66712fb9ba21aa93'
