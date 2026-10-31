@@ -89,6 +89,45 @@ function cdn_retry_delay_ms(int $attempt, Throwable $exception): int
 }
 
 /**
+ * @return array{versions: array, upgrade_script_url: string}|null
+ */
+function fetch_latest_versions(int $tries = 3): ?array
+{
+    $cdnUrl = dirname(config('constants.coolify.versions_url'));
+    $channels = match (instanceSettings()->update_channel) {
+        'preview' => ['stable', 'preview'],
+        'nightly' => ['stable', 'preview', 'nightly'],
+        default => ['stable'],
+    };
+    $channel = 'stable';
+    if (count($channels) > 1) {
+        $response = cdn_http($tries)->get("{$cdnUrl}/release.json");
+        $release = $response->json();
+        if ($response->failed() || ! is_array($release)) {
+            return null;
+        }
+        foreach ($channels as $candidate) {
+            $version = data_get($release, "{$candidate}.coolify");
+            if (is_string($version) && version_compare($version, (string) data_get($release, "{$channel}.coolify"), '>')) {
+                $channel = $candidate;
+            }
+        }
+    }
+
+    $channelUrl = $channel === 'stable' ? null : "{$cdnUrl}/{$channel}";
+    $response = cdn_http($tries)->get($channelUrl ? "{$channelUrl}/versions.json" : config('constants.coolify.versions_url'));
+    $versions = $response->json();
+    if ($response->failed() || ! is_string(data_get($versions, 'coolify.v4.version'))) {
+        return null;
+    }
+
+    return [
+        'versions' => $versions,
+        'upgrade_script_url' => $channelUrl ? "{$channelUrl}/upgrade.sh" : config('constants.coolify.upgrade_script_url'),
+    ];
+}
+
+/**
  * Fetch versions.json from the CDN and write it to the local file of this node.
  * The Coolify version never goes below the cached or the running version.
  * When the CDN fails, the local file stays as it is.
@@ -97,10 +136,9 @@ function cdn_retry_delay_ms(int $attempt, Throwable $exception): int
  */
 function refresh_versions_file(int $tries = 3): ?array
 {
-    $response = cdn_http($tries)->get(config('constants.coolify.versions_url'));
-    $versions = $response->json();
-    if ($response->failed() || ! is_array($versions)) {
-        Log::warning('Could not fetch versions.json from the CDN, using the local file', ['status' => $response->status()]);
+    $versions = fetch_latest_versions($tries)['versions'] ?? null;
+    if ($versions === null) {
+        Log::warning('Could not fetch versions.json from the CDN, using the local file');
 
         return null;
     }

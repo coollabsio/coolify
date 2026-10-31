@@ -115,6 +115,10 @@ class CoolifyUpgradeStatus
             return false;
         }
 
+        if (! preg_match('/^\d+\.\d+/', $targetVersion)) {
+            return true;
+        }
+
         return version_compare($runningVersion, $targetVersion, '>=');
     }
 }

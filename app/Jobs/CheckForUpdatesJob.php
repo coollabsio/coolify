@@ -39,7 +39,8 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             CheckTraefikVersionJob::dispatch();
 
             $latestVersion = data_get($versions, 'coolify.v4.version');
-            $newVersionAvailable = version_compare($latestVersion, config('constants.coolify.version'), '>');
+            $newVersionAvailable = instanceSettings()->update_channel !== 'custom'
+                && version_compare($latestVersion, config('constants.coolify.version'), '>');
             instanceSettings()->update(['new_version_available' => $newVersionAvailable]);
 
             return true;

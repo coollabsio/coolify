@@ -185,6 +185,7 @@ The pull request workflow builds every pull request and publishes the image of o
 }
 ```
 
+- An instance on the preview or nightly channel reads it and takes the newest version of its channel and the more stable ones, then the files of that channel
 - `versions.json` in each channel names its version and the helper, Sentinel and Traefik versions of `upstream.json`, the instance reads them from there, `install.sh` and older instances read it alone
 
 The CDN lets Cloudflare keep a file for 10 minutes, `Cache-Control: max-age=600`. To clear it sooner, for example once the pull request of the stable channel is merged and deployed, set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` in `.env` or the environment, with a token that can purge the cache of the zone:
