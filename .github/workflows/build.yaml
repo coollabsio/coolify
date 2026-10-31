@@ -1,0 +1,106 @@
+name: Build
+
+on:
+  schedule:
+    - cron: "50 7 * * 1"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit to build, the commit of the run when empty
+        type: string
+        default: ""
+      coolify:
+        description: The Coolify version to build, the version release.json sets for the branch when empty
+        type: string
+        default: ""
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: Plan build
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    outputs:
+      coolify: ${{ inputs.coolify || steps.plan.outputs.coolify }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Plan the Coolify version
+        id: plan
+        env:
+          BRANCH: ${{ github.base_ref || github.ref_name }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          coolify="$(scripts/plan-version.sh --build)"
+          echo "coolify=$coolify" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build image (${{ matrix.platform }})
+    needs: plan
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.runner }} # https://github.com/actions/runner-images
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-26.04
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-26.04-arm
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Read the commit date
+        id: args
+        run: echo "epoch=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # https://github.com/docker/setup-buildx-action/releases/tag/v4.4.1
+        with:
+          cache-binary: false
+
+      - name: Build the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # https://github.com/docker/build-push-action/releases/tag/v7.4.0
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          tags: coollabsio/coolify:test
+          outputs: type=oci,dest=${{ runner.temp }}/image,tar=false,rewrite-timestamp=true
+          build-args: |
+            COOLIFY_VERSION=${{ needs.plan.outputs.coolify }}
+            SOURCE_DATE_EPOCH=${{ steps.args.outputs.epoch }}
+
+      - name: Upload the image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # https://github.com/actions/upload-artifact/releases/tag/v7.0.2
+        with:
+          name: image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/image
+          if-no-files-found: error
+          retention-days: 1

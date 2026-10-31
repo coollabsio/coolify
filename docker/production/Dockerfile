@@ -198,7 +198,9 @@ COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
 # Version data for Traefik, Sentinel, and helper checks until CheckForUpdatesJob refreshes it
-COPY --chown=www-data:www-data versions.json ./versions.json
+COPY --chown=www-data:www-data release.json upstream.json ./
+RUN jq --arg version "$COOLIFY_VERSION" '{coolify: ({v4: {$version}} + del(.traefik)), traefik}' upstream.json > versions.json \
+    && chown www-data:www-data versions.json
 
 RUN composer dump-autoload
 

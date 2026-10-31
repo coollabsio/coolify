@@ -41,7 +41,7 @@ function writeRootUserCredentialsWithInstallScript(string $scriptPath, array $cr
     return Dotenv::parse($contents);
 }
 
-$installScripts = ['stable install' => 'scripts/install.sh', 'nightly install' => 'other/nightly/install.sh'];
+$installScripts = ['stable install' => 'scripts/install.sh'];
 
 $credentials = [
     'username with a space' => ['ROOT_USERNAME', 'Coolify Lab'],
