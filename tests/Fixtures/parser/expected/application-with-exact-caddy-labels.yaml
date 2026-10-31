@@ -133,7 +133,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=web-referenceapplication0001-20260102t030405
+          - coolify.name=web-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -220,7 +220,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=api-referenceapplication0001-20260102t030405
+          - coolify.name=api-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -276,7 +276,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=my-app-referenceapplication0001-20260102t030405
+          - coolify.name=my-app-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -302,7 +302,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=apiv2-referenceapplication0001-20260102t030405
+          - coolify.name=apiv2-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -381,7 +381,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=admin-referenceapplication0001-20260102t030405
+          - coolify.name=admin-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -435,7 +435,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=blog-referenceapplication0001-20260102t030405
+          - coolify.name=blog-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -501,7 +501,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=db-referenceapplication0001-20260102t030405
+          - coolify.name=db-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -521,7 +521,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=sidecar-referenceapplication0001-20260102t030405
+          - coolify.name=sidecar-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -600,7 +600,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=worker-referenceapplication0001-20260102t030405
+          - coolify.name=worker-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -782,7 +782,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=web-referenceapplication0001-20260102t030405
+          - coolify.name=web-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -871,7 +871,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=api-referenceapplication0001-20260102t030405
+          - coolify.name=api-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -930,7 +930,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=my-app-referenceapplication0001-20260102t030405
+          - coolify.name=my-app-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -956,7 +956,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=apiv2-referenceapplication0001-20260102t030405
+          - coolify.name=apiv2-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -1048,7 +1048,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=admin-referenceapplication0001-20260102t030405
+          - coolify.name=admin-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -1104,7 +1104,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=blog-referenceapplication0001-20260102t030405
+          - coolify.name=blog-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -1172,7 +1172,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=db-referenceapplication0001-20260102t030405
+          - coolify.name=db-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -1192,7 +1192,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=sidecar-referenceapplication0001-20260102t030405
+          - coolify.name=sidecar-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference
@@ -1275,7 +1275,7 @@
           - coolify.version=<coolify-version>
           - coolify.applicationUuid=referenceapplication0001
           - coolify.type=application
-          - coolify.name=worker-referenceapplication0001-20260102t030405
+          - coolify.name=worker-referenceapplication0001
           - coolify.resourceName=reference
           - coolify.projectName=reference-project
           - coolify.serviceName=reference

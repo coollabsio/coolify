@@ -4555,7 +4555,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             $defaultLabels = defaultLabels(
                 uuid: $resource->uuid,
-                name: $containerName,
+                name: generateComposeContainerMetricsName($resource, $serviceName, $pull_request_id),
                 projectName: $resource->project()->name,
                 resourceName: $resource->name,
                 environment: $resource->environment->name,

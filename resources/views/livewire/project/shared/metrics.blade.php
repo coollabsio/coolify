@@ -1,18 +1,6 @@
 <div class="flex flex-col gap-6"
-    @if (
-        $resource->getMorphClass() !== 'App\Models\Application' ||
-            ($resource->build_pack !== 'dockercompose' &&
-                $resource->destination->server->isMetricsEnabled() &&
-                str($resource->status)->contains('running'))) x-init="$wire.loadData()"
-    @endif>
-    @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
-        <x-application.settings-section id="metrics-overview-section" title="Metrics"
-            helper="Inspect CPU and memory usage for this application.">
-            <x-empty size="sm" title="Metrics unavailable"
-                description="Container metrics are not currently available for Docker Compose applications."
-                icon-name="dashboard" />
-        </x-application.settings-section>
-    @elseif (!$resource->destination->server->isMetricsEnabled())
+    @if ($resource->destination->server->isMetricsEnabled() && $this->isRunning()) x-init="$wire.loadData()" @endif>
+    @if (!$resource->destination->server->isMetricsEnabled())
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect CPU and memory usage for this application.">
             <x-slot:actions>
@@ -27,7 +15,7 @@
                 description="Enable metrics for this server before collecting application usage data."
                 icon-name="dashboard" />
         </x-application.settings-section>
-    @elseif (!str($resource->status)->contains('running'))
+    @elseif (!$this->isRunning())
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect CPU and memory usage for this application.">
             <x-slot:actions>
@@ -46,17 +34,29 @@
             <x-slot:actions>
                 <x-live-toggle :active="$live" storageKey="resource-metrics-live" />
             </x-slot:actions>
-            <div class="max-w-xs">
-                <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
-                    ['value' => 5, 'label' => 'Last 5 minutes'],
-                    ['value' => 10, 'label' => 'Last 10 minutes'],
-                    ['value' => 30, 'label' => 'Last 30 minutes'],
-                    ['value' => 60, 'label' => 'Last hour'],
-                    ['value' => 720, 'label' => 'Last 12 hours'],
-                    ['value' => 10080, 'label' => 'Last week'],
-                    ['value' => 43200, 'label' => 'Last 30 days'],
-                ]" />
+            <div class="flex flex-wrap gap-4">
+                @if (count($containerOptions) > 1)
+                    <div class="w-full max-w-xs">
+                        <x-forms.listbox id="container" label="Service" onChange="loadData" :options="$containerOptions" />
+                    </div>
+                @endif
+                <div class="w-full max-w-xs">
+                    <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
+                        ['value' => 5, 'label' => 'Last 5 minutes'],
+                        ['value' => 10, 'label' => 'Last 10 minutes'],
+                        ['value' => 30, 'label' => 'Last 30 minutes'],
+                        ['value' => 60, 'label' => 'Last hour'],
+                        ['value' => 720, 'label' => 'Last 12 hours'],
+                        ['value' => 10080, 'label' => 'Last week'],
+                        ['value' => 43200, 'label' => 'Last 30 days'],
+                    ]" />
+                </div>
             </div>
+            @if ($containersLoaded && $containerOptions === [])
+                <p class="mt-3 text-xs leading-5 text-amber-700 dark:text-warning">
+                    No containers of this application are running right now. Live refresh picks them up again once they start.
+                </p>
+            @endif
             <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
                 Ranges up to one hour refresh live every five seconds. Longer ranges load once; turn on live refresh to update them every minute.
             </p>
