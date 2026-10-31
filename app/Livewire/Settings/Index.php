@@ -258,7 +258,7 @@ class Index extends Component
             }
 
             $imageRef = escapeshellarg(coolifyHelperImage().":{$version}");
-            $buildCommand = "docker build -t {$imageRef} -f docker/coolify-helper/Dockerfile .";
+            $buildCommand = "docker build -t {$imageRef} --build-arg IMAGE_VERSION={$version} https://github.com/coollabsio/coolify-helper.git#main:src";
 
             $activity = remote_process(
                 command: [$buildCommand],

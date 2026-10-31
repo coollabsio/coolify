@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
+- Move the helper image to [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper), which releases it
 - Remove the git-cliff workflow that generated `CHANGELOG.md`, it is written by hand
 - Remove the copies of the install and upgrade scripts and the compose files in `other/nightly`, `scripts/sync-cdn.sh` writes the nightly channel from the files of the commit the nightly is built from
 - Remove the temporary hotfix release workflow, patch branches release hotfixes

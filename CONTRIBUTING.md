@@ -230,7 +230,7 @@ To build and run Coolify locally, see: [Development](./DEVELOPMENT.md)
 
 ### Testing the Coolify Helper Locally
 
-When you change a tool version in `docker/coolify-helper/Dockerfile`, run `./scripts/helper-checksums` to update the SHA256 checksums of the downloads.
+The helper image lives in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). `scripts/dev-helper` builds it from there, or from a local checkout with `HELPER_CONTEXT=../coolify-helper/src`.
 
 Use `scripts/dev-helper` to build a local helper image and test it with the running development instance. The script requires the standard local Coolify container and the seeded Dockerfile, Docker Compose, and Nixpacks applications.
 
