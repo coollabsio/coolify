@@ -286,9 +286,34 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 
 ## Git Workflow
 
-- Production branch: `main`
-- Development branch: `next`. Do not create `release/v*` branches.
-- Fix PRs should target the current production branch; feature PRs should target `next`
+- Production branch: `main`. It takes fixes only. A new minor or major version gets to `main` as a merge of `next` or a release branch.
+- Development branch: `next`. It takes features and publishes prereleases only.
+- Fix PRs target `main`. Feature PRs target `next`.
+- Name a branch after its change: `fix/<topic>` or `feat/<topic>`. Name a backport branch after the version that releases it: `fix/<topic>-v4.4.8`.
+- Merge `next`, `release/v*` branches, and patch branches (`v4.x`, `v4.4.x`) with a merge commit. Never squash merge them, because their commits then come back as conflicts in each later merge.
+- Create `release/v*` and patch branches only when the user asks.
+
+## Releases
+
+[`RELEASE.md`](RELEASE.md) is the source of truth for releases. Read it before you do a release, a backport, or a major version, and before you change `release.json`, `upstream.json`, `scripts/release.sh`, `scripts/plan-version.sh`, `scripts/sync-cdn.sh`, or the release, nightly, pull request, or merge forward workflows.
+
+- Describe each change that users can see under `## [Unreleased]` in `CHANGELOG.md`. The release notes come from these entries.
+- A push that changes `release.json` publishes a release. Do not edit `release.json` by hand. `scripts/release.sh` changes it.
+- `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly. You can run these scripts. They change nothing.
+- `scripts/release.sh` is interactive and makes a signed commit. Do not run it, push a release commit, or start the release or nightly workflow yourself. Give the user the commands from `RELEASE.md` for the release type:
+
+| Release | Branch | Command |
+| --- | --- | --- |
+| Alpha, beta, or RC of the next minor or major | `next` | `scripts/release.sh`, then select the stage and the version |
+| Prerelease of one minor or major | `release/v4.6`, `release/v5.0` | `scripts/release.sh` |
+| Stable patch or minor | `main` | Merge `next` or the release branch with a merge commit when needed, then `scripts/release.sh` |
+| Stable major | `main` | Do the steps in "Release a major version" of `RELEASE.md`, then `scripts/release.sh` |
+| Backport or hotfix | `v4.4.x` | Merge `fix/<topic>-v4.4.8` with a merge commit, then `scripts/release.sh` |
+| Nightly | `next`, or the release branch in progress | Automatic, two times each day |
+| Pull request image `pr-<number>` | PR from a branch of this repository | Automatic, on each push |
+
+- `upstream.json` pins the helper, Sentinel, and Traefik versions. A change of `upstream.json` releases nothing. `RELEASE.md` tells how to ship it.
+- The helper image is in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). Change it there, not in this repository.
 
 <laravel-boost-guidelines>
 === foundation rules ===
