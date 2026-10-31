@@ -10,6 +10,7 @@ use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\WebhookNotificationSettings;
+use App\Rules\SafeSmtpHost;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidHostname;
 use Illuminate\Database\Eloquent\Model;
@@ -33,7 +34,7 @@ class NotificationsController extends Controller
                     'smtp_from_address' => 'sometimes|nullable|email',
                     'smtp_from_name' => 'sometimes|nullable|string|max:255',
                     'smtp_recipients' => 'sometimes|nullable|string|max:1000',
-                    'smtp_host' => 'sometimes|nullable|string|max:255',
+                    'smtp_host' => ['sometimes', 'nullable', 'string', 'max:255', new SafeSmtpHost],
                     'smtp_port' => 'sometimes|nullable|integer|min:1|max:65535',
                     'smtp_encryption' => 'sometimes|nullable|string|in:starttls,tls,none',
                     'smtp_username' => 'sometimes|nullable|string|max:255',

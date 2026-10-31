@@ -5,6 +5,7 @@ namespace App\Notifications\Channels;
 use App\Exceptions\NonReportableException;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
+use App\Rules\SafeSmtpHost;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\SmtpTransportFactory;
 use Exception;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Resend;
 use Resend\Exceptions\ErrorException;
 use Resend\Exceptions\TransporterException;
+use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Email;
@@ -96,9 +98,26 @@ class EmailChannel
                     throw new ErrorException($error);
                 }
             } elseif ($isSmtpEnabled) {
+                // The team's own SMTP host: check it again and connect to the checked address.
+                $connectAddress = null;
+                if ($settings instanceof EmailNotificationSettings) {
+                    try {
+                        $connectAddress = SafeSmtpHost::connectionAddress((string) $settings->smtp_host, (int) $settings->smtp_port);
+                    } catch (RuntimeException $e) {
+                        if (! $isTestNotification) {
+                            $settings->recordDeliveryFailure($e->getMessage());
+
+                            return;
+                        }
+
+                        throw NonReportableException::fromException($e);
+                    }
+                }
+
                 $transport = SmtpTransportFactory::fromSettings(
                     $settings,
-                    config('mail.mailers.smtp.local_domain')
+                    config('mail.mailers.smtp.local_domain'),
+                    $connectAddress,
                 );
                 $mailer = new Mailer($transport);
 

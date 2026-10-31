@@ -219,6 +219,17 @@ class SafeWebhookUrl implements ValidationRule
         return [sprintf('%s:%d=%s', $target['host'], $target['port'], $ip)];
     }
 
+    /**
+     * Resolve and check a host for a connection that is not HTTP (for example SMTP).
+     * Throws a RuntimeException when the host is not allowed.
+     *
+     * @return array<int, string> The checked addresses, or an empty list when the host is an IP address.
+     */
+    public static function resolveHostForConnection(string $host, int $port, bool $allowPrivateNetworks = false): array
+    {
+        return self::resolveUrlForRequest('https://'.formatHostForUrl($host).':'.$port, allowPrivateNetworks: $allowPrivateNetworks)['ips'];
+    }
+
     public static function redactedUrlForLog(string $url): string
     {
         $scheme = parse_url($url, PHP_URL_SCHEME);

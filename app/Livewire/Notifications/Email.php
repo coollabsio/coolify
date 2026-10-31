@@ -6,6 +6,7 @@ use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeSmtpHost;
 use App\Rules\ValidHostname;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\RateLimiter;
@@ -388,7 +389,7 @@ class Email extends Component
             'smtpEnabled' => 'boolean',
             'smtpFromAddress' => 'required|email',
             'smtpFromName' => 'required|string',
-            'smtpHost' => 'required|string',
+            'smtpHost' => ['required', 'string', new SafeSmtpHost],
             'smtpPort' => 'required|numeric',
             'smtpEncryption' => 'required|string|in:starttls,tls,none',
             'smtpUsername' => 'nullable|string',

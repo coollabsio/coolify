@@ -37,9 +37,11 @@ class ValidationPatterns
 
     /**
      * Pattern for SSH usernames.
-     * Allows alphanumeric characters, dots, hyphens, and underscores.
+     * Allows alphanumeric characters, dots, hyphens, and underscores. The first character must be
+     * a letter, digit, or underscore, so ssh and scp cannot read the user as an option.
+     * The terminal server uses the same rule (docker/coolify-terminal/terminal-utils.js).
      */
-    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9._-]+$/';
+    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9_][a-zA-Z0-9._-]*$/';
 
     /**
      * Pattern for removing characters not allowed in SSH usernames.

@@ -152,11 +152,14 @@ class Change extends Component
             $this->isConnected = $this->gitea_app->isConnected();
             $this->fqdn = $settings->fqdn;
 
-            if ($settings->public_ipv4) {
-                $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
-            }
-            if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+            // On cloud, the instance IPs are the addresses of the Coolify hosts. Do not send them to the browser.
+            if (! isCloud()) {
+                if ($settings->public_ipv4) {
+                    $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
+                }
+                if ($settings->public_ipv6) {
+                    $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+                }
             }
 
             $this->parameters = get_route_parameters();

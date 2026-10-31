@@ -259,12 +259,15 @@ wss.on('close', () => clearInterval(heartbeat));
 
 const messageHandlers = {
     message: (session, data) => {
+        if (typeof data !== 'string') {
+            return;
+        }
         session.ptyProcess.write(data);
     },
-    resize: (session, { cols, rows }) => {
-        cols = cols > 0 ? cols : 80;
-        rows = rows > 0 ? rows : 30;
-        session.ptyProcess.resize(cols, rows)
+    resize: (session, size) => {
+        const cols = terminalDimension(size?.cols, 80);
+        const rows = terminalDimension(size?.rows, 30);
+        session.ptyProcess.resize(cols, rows);
     },
     pause: (session) => session.ptyProcess.pause(),
     resume: (session) => session.ptyProcess.resume(),
@@ -289,10 +292,17 @@ function handleMessage(userSession, message) {
         return;
     }
 
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        logTerminal('warn', 'Ignoring websocket message because it is not a JSON object.', {
+            userId: userSession.userId,
+        });
+        return;
+    }
+
     Object.entries(parsed).forEach(([key, value]) => {
-        const handler = messageHandlers[key];
+        const handler = Object.hasOwn(messageHandlers, key) ? messageHandlers[key] : null;
         if (handler && (userSession.isActive || key === 'checkActive' || key === 'terminalToken' || key === 'ping')) {
-            handler(userSession, value);
+            runMessageHandler(handler, userSession, key, value);
         } else if (!handler) {
             logTerminal('warn', 'Ignoring websocket message with unknown handler key.', {
                 userId: userSession.userId,
@@ -305,6 +315,28 @@ function handleMessage(userSession, message) {
             });
         }
     });
+}
+
+/**
+ * Run one handler. A handler that throws must not stop the process, because one
+ * process serves the terminals of all users.
+ */
+function runMessageHandler(handler, userSession, key, value) {
+    const logFailure = (error) => logTerminal('error', 'Websocket message handler failed.', {
+        userId: userSession.userId,
+        key,
+        error: error?.message ?? error,
+    });
+
+    try {
+        Promise.resolve(handler(userSession, value)).catch(logFailure);
+    } catch (error) {
+        logFailure(error);
+    }
+}
+
+function terminalDimension(value, fallback) {
+    return Number.isInteger(value) && value > 0 && value <= 1000 ? value : fallback;
 }
 
 function parseMessage(message) {

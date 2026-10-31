@@ -7,7 +7,11 @@ use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 
 class SmtpTransportFactory
 {
-    public static function fromSettings(object $settings, ?string $localDomain = null): EsmtpTransport
+    /**
+     * @param  string|null  $connectAddress  Connect to this checked address instead of resolving the host
+     *                                       again. TLS still verifies the certificate for the host name.
+     */
+    public static function fromSettings(object $settings, ?string $localDomain = null, ?string $connectAddress = null): EsmtpTransport
     {
         $mode = self::encryptionMode($settings);
 
@@ -36,6 +40,12 @@ class SmtpTransportFactory
         $stream = $transport->getStream();
         if (isset($settings->smtp_timeout) && $stream instanceof SocketStream) {
             $stream->setTimeout((float) $settings->smtp_timeout);
+        }
+
+        $host = normalizeIpAddress((string) $settings->smtp_host);
+        if ($connectAddress !== null && $connectAddress !== $host && $stream instanceof SocketStream) {
+            $stream->setHost(formatHostForUrl($connectAddress));
+            $stream->setStreamOptions(['ssl' => ['peer_name' => $host]]);
         }
 
         return $transport;

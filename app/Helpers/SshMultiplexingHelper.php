@@ -439,6 +439,12 @@ class SshMultiplexingHelper
 
     private static function escapedUserAtHost(Server $server): string
     {
+        // ssh and scp read an argument that starts with "-" as an option, also after escaping.
+        // Validation rejects such values; this also stops rows that were saved before it did.
+        if (str_starts_with((string) $server->user, '-') || str_starts_with((string) $server->ip, '-')) {
+            throw new \RuntimeException('The SSH user and the server IP must not start with "-".');
+        }
+
         return escapeshellarg($server->user).'@'.escapeshellarg($server->ip);
     }
 

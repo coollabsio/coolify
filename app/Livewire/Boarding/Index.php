@@ -7,6 +7,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
+use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -220,7 +221,7 @@ class Index extends Component
     {
         return [
             'remoteServerName' => 'required|string',
-            'remoteServerHost' => 'required|string',
+            'remoteServerHost' => ['required', 'string', new ValidServerIp],
             'remoteServerPort' => 'required|integer|min:1|max:65535',
             'remoteServerUser' => ValidationPatterns::serverUsernameRules(),
         ];

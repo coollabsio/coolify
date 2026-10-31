@@ -321,11 +321,14 @@ class Change extends Component
             $this->fqdn = $settings->fqdn;
             $this->manifestState = $this->createGithubAppSetupState('manifest');
 
-            if ($settings->public_ipv4) {
-                $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
-            }
-            if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
+            // On cloud, the instance IPs are the addresses of the Coolify hosts. Do not send them to the browser.
+            if (! isCloud()) {
+                if ($settings->public_ipv4) {
+                    $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
+                }
+                if ($settings->public_ipv6) {
+                    $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
+                }
             }
             if ($this->github_app->installation_id && session('from')) {
                 $source_id = data_get(session('from'), 'source_id');
