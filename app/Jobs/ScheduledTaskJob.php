@@ -161,11 +161,19 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
             if ($this->resource->type() === 'application') {
                 // `docker ps -a` also lists stopped containers, for example the old container of a rolling update.
-                getCurrentApplicationContainerStatus($this->server, $this->resource, 0)
-                    ->filter(fn ($container) => data_get($container, 'State') === 'running')
-                    ->each(function ($container) {
-                        $this->containers[] = str_replace('/', '', $container['Names']);
-                    });
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource, 0)
+                    ->filter(fn ($container) => data_get($container, 'State') === 'running');
+                $namesExactly = filled($this->task->container)
+                    && $containers->contains(fn ($container) => str_replace('/', '', $container['Names']) === $this->task->container);
+                if ($this->resource->build_pack !== 'dockercompose' && ! $namesExactly) {
+                    // Compose runs one container per service and the task names which one; any other build pack
+                    // serves from a single container, even while a rolling update keeps two running, so the task
+                    // runs in the serving one unless it names a running container exactly.
+                    $containers = collect([selectServingContainer($containers)])->filter();
+                }
+                $containers->each(function ($container) {
+                    $this->containers[] = str_replace('/', '', $container['Names']);
+                });
             } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
