@@ -58,10 +58,12 @@ class PrivateKey extends BaseModel
     protected static function booted()
     {
         static::saving(function ($key) {
-            $key->private_key = formatPrivateKey($key->private_key);
+            $storedPrivateKey = $key->exists ? $key->getOriginal('private_key') : null;
+            $submittedPrivateKey = $key->private_key;
+            $key->private_key = formatPrivateKey($submittedPrivateKey);
 
             // Check only new or changed keys, so older keys can still be renamed.
-            $error = $key->isDirty('private_key') ? self::validationError($key->private_key) : null;
+            $error = $submittedPrivateKey !== $storedPrivateKey ? self::validationError($key->private_key) : null;
             if ($error) {
                 throw ValidationException::withMessages([
                     'private_key' => [$error],

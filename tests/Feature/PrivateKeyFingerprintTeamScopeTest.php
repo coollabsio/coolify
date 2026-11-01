@@ -6,7 +6,9 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use phpseclib3\Crypt\RSA;
 
 uses(RefreshDatabase::class);
 
@@ -133,3 +135,22 @@ describe('POST /api/v1/security/keys', function () {
         expect(PrivateKey::query()->where('team_id', $this->teamA->id)->count())->toBe(1);
     });
 });
+
+test('unchanged legacy keys can be renamed before normalization', function (bool $whitespace) {
+    $material = trim((string) RSA::createKey(1024)->toString('PKCS8'));
+    if ($whitespace) {
+        $material = " \n".$material."\n ";
+    }
+    $key = new PrivateKey(['name' => 'legacy', 'private_key' => $material, 'team_id' => $this->teamA->id]);
+    $key->uuid = (string) Str::uuid();
+    $key->saveQuietly();
+    $key = $key->fresh();
+
+    $key->update(['name' => 'renamed']);
+
+    expect($key->fresh()->name)->toBe('renamed');
+    expect($key->fresh()->private_key)->toBe(formatPrivateKey($material));
+
+    $key->private_key = (string) RSA::createKey(1024)->toString('PKCS8');
+    expect(fn () => $key->save())->toThrow(ValidationException::class);
+})->with([false, true]);
