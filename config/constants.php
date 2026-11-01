@@ -99,7 +99,7 @@ return [
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
         'retry_multiplier' => env('SSH_RETRY_MULTIPLIER', 2),
         // SSH host key check of managed servers: warn (connect, report a changed key), enforce (refuse a changed key), off.
-        'host_key_checking' => env('SSH_HOST_KEY_CHECKING', 'warn'),
+        'host_key_checking' => strtolower(trim((string) env('SSH_HOST_KEY_CHECKING', 'warn'))),
     ],
 
     'invitation' => [

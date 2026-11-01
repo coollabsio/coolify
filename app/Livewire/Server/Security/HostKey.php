@@ -6,8 +6,10 @@ use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Models\Server;
 use App\Models\ServerSetting;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use Livewire\Features\SupportEvents\Event;
 
 class HostKey extends Component
 {
@@ -17,7 +19,7 @@ class HostKey extends Component
 
     public array $parameters = [];
 
-    public function mount(string $server_uuid)
+    public function mount(string $server_uuid): mixed
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
@@ -28,7 +30,7 @@ class HostKey extends Component
         }
     }
 
-    public function trustPendingKey($password)
+    public function trustPendingKey(?string $password): bool|string|Event
     {
         return $this->changeHostKey($password, 'trusted', function (ServerSetting $settings) {
             if (blank($settings->ssh_host_key_pending)) {
@@ -43,7 +45,7 @@ class HostKey extends Component
         });
     }
 
-    public function resetHostKey($password)
+    public function resetHostKey(?string $password): bool|string|Event
     {
         return $this->changeHostKey($password, 'reset', fn (ServerSetting $settings) => $settings->forceFill([
             'ssh_host_key' => null,
@@ -53,7 +55,7 @@ class HostKey extends Component
         ]));
     }
 
-    public function toggleHostKeyCheck($password)
+    public function toggleHostKeyCheck(?string $password): bool|string|Event
     {
         $action = $this->server->settings->is_ssh_host_key_check_disabled ? 'check_enabled' : 'check_disabled';
 
@@ -63,9 +65,9 @@ class HostKey extends Component
     }
 
     /**
-     * @param  callable(ServerSetting): void  $change
+     * @param  callable(ServerSetting): mixed  $change
      */
-    private function changeHostKey($password, string $action, callable $change)
+    private function changeHostKey(?string $password, string $action, callable $change): bool|string|Event
     {
         try {
             $this->authorize('update', $this->server);
@@ -96,7 +98,7 @@ class HostKey extends Component
         }
     }
 
-    public function render()
+    public function render(): View
     {
         $settings = $this->server->settings;
 

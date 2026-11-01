@@ -728,10 +728,11 @@ class ServerTransferImporter
                 ->all();
             $server->settings->fill($safe);
             // The pinned host key moves with the server, so the target does not trust a new key on its first connection.
+            $sshHostKey = ServerSetting::normalizeSshHostKeys(data_get($settingsPayload, 'ssh_host_key'));
             $server->settings->forceFill([
-                'ssh_host_key' => ServerSetting::normalizeSshHostKeys(data_get($settingsPayload, 'ssh_host_key')),
-                'ssh_host_key_source' => filled(data_get($settingsPayload, 'ssh_host_key')) ? 'transfer' : null,
-                'ssh_host_key_trusted_at' => data_get($settingsPayload, 'ssh_host_key_trusted_at'),
+                'ssh_host_key' => $sshHostKey,
+                'ssh_host_key_source' => filled($sshHostKey) ? 'transfer' : null,
+                'ssh_host_key_trusted_at' => filled($sshHostKey) ? data_get($settingsPayload, 'ssh_host_key_trusted_at') : null,
                 'is_ssh_host_key_check_disabled' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_disabled', false),
             ]);
             $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(

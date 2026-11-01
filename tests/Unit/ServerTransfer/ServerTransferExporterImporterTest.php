@@ -1981,3 +1981,20 @@ test('an application with a system-wide GitHub App that the target lacks is list
         ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
 });
+
+test('import clears trust metadata when the host key normalizes to null', function (?string $hostKey) {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importServer');
+    $server = $method->invoke($this->importer, [
+        'name' => 'imported-server',
+        'ip' => '10.55.0.99',
+        'settings' => [
+            'ssh_host_key' => $hostKey,
+            'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        ],
+    ], $this->privateKey, $this->team->id, false, false);
+
+    expect($server->settings->fresh())
+        ->ssh_host_key->toBeNull()
+        ->ssh_host_key_source->toBeNull()
+        ->ssh_host_key_trusted_at->toBeNull();
+})->with([null, '', '# comment only', 'invalid key']);

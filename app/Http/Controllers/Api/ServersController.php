@@ -574,7 +574,8 @@ class ServersController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        $sshHostKey = ServerSetting::normalizeSshHostKeys($request->input('ssh_host_key'));
+        $rawSshHostKey = $request->input('ssh_host_key');
+        $sshHostKey = is_string($rawSshHostKey) ? ServerSetting::normalizeSshHostKeys($rawSshHostKey) : null;
         if ($validator->fails() || ! empty($extraFields) || ($request->filled('ssh_host_key') && $sshHostKey === null)) {
             $errors = $validator->errors();
             if ($request->filled('ssh_host_key') && $sshHostKey === null && ! $errors->has('ssh_host_key')) {
@@ -1298,7 +1299,8 @@ class ServersController extends Controller
         $validator = customApiValidator($request->all(), [
             'ssh_host_key' => 'string|nullable|max:16384',
         ]);
-        $sshHostKey = ServerSetting::normalizeSshHostKeys($request->input('ssh_host_key'));
+        $rawSshHostKey = $request->input('ssh_host_key');
+        $sshHostKey = is_string($rawSshHostKey) ? ServerSetting::normalizeSshHostKeys($rawSshHostKey) : null;
         if ($validator->fails() || ($request->filled('ssh_host_key') && $sshHostKey === null)) {
             $errors = $validator->errors();
             if (! $errors->has('ssh_host_key')) {
