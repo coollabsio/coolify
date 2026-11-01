@@ -63,7 +63,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
         $servers = Server::where('team_id', $oldKey->team_id)->where('private_key_id', $oldKey->id)->get();
         foreach ($servers as $server) {
             $result = $this->rotateServer($server, $oldKey, $newKey);
-            $state['servers'][$server->uuid] = ['name' => $server->name, 'ip' => $server->ip, ...$result];
+            $state['servers'][$server->uuid] = ['name' => $server->name, ...$result];
             $this->storeState($oldKey, $state);
 
             auditLog('system.server.ssh_key_rotated', [
@@ -108,7 +108,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
         try {
             AuthorizedKeys::add($server, $newKey);
         } catch (Throwable $e) {
-            return ['status' => 'unreachable', 'message' => 'Could not connect: '.remove_iip($e->getMessage())];
+            return ['status' => 'unreachable', 'message' => 'Could not connect: '.$this->errorWithoutHost($server, $e)];
         }
 
         $probe = clone $server;
@@ -134,7 +134,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
                 return ['status' => 'moved_old_not_removed', 'message' => 'The old key stays, because another server for this host uses it.'];
             }
         } catch (Throwable $e) {
-            return ['status' => 'moved_old_not_removed', 'message' => 'The old key was not removed: '.remove_iip($e->getMessage())];
+            return ['status' => 'moved_old_not_removed', 'message' => 'The old key was not removed: '.$this->errorWithoutHost($server, $e)];
         }
 
         return ['status' => 'moved', 'message' => 'Moved to the new key.'];
@@ -146,5 +146,13 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
     private function storeState(PrivateKey $oldKey, array $state): void
     {
         Cache::put(self::cacheKey($oldKey), $state, self::RESULT_TTL_SECONDS);
+    }
+
+    /** The UI shows server names only, so remove the host address from SSH errors. */
+    private function errorWithoutHost(Server $server, Throwable $e): string
+    {
+        $message = str_replace((string) $server->ip, 'the server', remove_iip($e->getMessage()));
+
+        return trim(preg_replace('/^ssh: connect to host the server port \d+:\s*/i', '', $message));
     }
 }

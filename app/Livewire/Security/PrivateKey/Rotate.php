@@ -16,6 +16,11 @@ class Rotate extends Component
 
     public PrivateKey $privateKey;
 
+    /** The dialog stays open when the component renders again. */
+    public bool $open = false;
+
+    public bool $wasRunning = false;
+
     public function mount(int $privateKeyId): void
     {
         $this->privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
@@ -57,6 +62,7 @@ class Rotate extends Component
                 'private_key_name' => $this->privateKey->name,
                 'new_private_key_uuid' => $newKey->uuid,
             ]);
+            $this->wasRunning = true;
             $this->dispatch('success', 'Key rotation started.');
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -93,11 +99,17 @@ class Rotate extends Component
         foreach ($servers as $server) {
             $rows[$server->uuid] ??= [
                 'name' => $server->name,
-                'ip' => $server->ip,
                 'status' => null,
                 'reachable' => (bool) data_get($server, 'settings.is_reachable'),
             ];
         }
+
+        $isRunning = data_get($state, 'status') === 'running';
+        if ($this->wasRunning && ! $isRunning) {
+            // The servers moved to the new key, so the "Used by" list of the key changed.
+            $this->dispatch('privateKeyRotated')->to(Show::class);
+        }
+        $this->wasRunning = $isRunning;
 
         return view('livewire.security.private-key.rotate', [
             'rows' => $rows,
@@ -106,7 +118,7 @@ class Rotate extends Component
                 || $this->privateKey->gitlabApps()->exists() || $this->privateKey->giteaApps()->exists(),
             'state' => $state,
             'newKey' => $newKey,
-            'isRunning' => data_get($state, 'status') === 'running',
+            'isRunning' => $isRunning,
         ]);
     }
 }

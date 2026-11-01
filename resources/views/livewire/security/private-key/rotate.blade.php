@@ -1,6 +1,6 @@
 <div @if ($isRunning) wire:poll.3s @endif>
     @if ($rows->isNotEmpty())
-        <x-modal-input title="Rotate key" buttonTitle="Rotate key" :wireIgnore="false"
+        <x-modal-input title="Rotate key" buttonTitle="Rotate key" :wireIgnore="false" wireOpen="open" :closeEvent="false"
             subtitle="Move the servers to a new key. Servers that fail stay on this key.">
             <div class="flex flex-col gap-3 text-sm">
                 <ul class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.06]">
@@ -8,7 +8,6 @@
                         <li wire:key="rotate-row-{{ $uuid }}" class="flex flex-col gap-0.5 py-2">
                             <span class="flex items-center gap-2">
                                 <span>{{ data_get($row, 'name') }}</span>
-                                <span class="text-xs text-neutral-500 dark:text-fg-dim">{{ data_get($row, 'ip') }}</span>
                                 <span class="ml-auto">
                                     @switch(data_get($row, 'status'))
                                         @case('moved')
@@ -39,14 +38,16 @@
                     @endforeach
                 </ul>
 
+                @if (! $state)
+                    <p class="text-xs text-neutral-500 dark:text-fg-dim">Rotation progress and logs will appear here.</p>
+                @endif
                 @if (data_get($state, 'status') === 'failed')
                     <p class="text-xs text-red-500">{{ data_get($state, 'error') }}</p>
                 @endif
                 @if ($newKey)
                     <p class="text-xs text-neutral-500 dark:text-fg-dim">
                         New key:
-                        <a class="underline" {{ wireNavigate() }}
-                            href="{{ route('security.private-key.show', ['private_key_uuid' => $newKey->uuid]) }}">{{ $newKey->name }}</a>
+                        <span class="font-medium">{{ $newKey->name }}</span>
                     </p>
                 @endif
                 @if ($usedByOthers)
@@ -55,6 +56,14 @@
                     <p class="text-xs text-neutral-500 dark:text-fg-dim">Nothing uses this key now. You can delete it.</p>
                 @endif
                 <div class="flex items-center justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                    @if (! $isRunning && ! $hasServers && ! $usedByOthers)
+                        @can('delete', $privateKey)
+                            <x-forms.button isError
+                                x-on:click="modalOpen = false; $dispatch('confirm-old-key-deletion', { id: {{ $privateKey->id }} })">
+                                Delete old key
+                            </x-forms.button>
+                        @endcan
+                    @endif
                     <x-forms.button isHighlighted wire:click="rotate" :disabled="$isRunning || ! $hasServers">
                         {{ $isRunning ? 'Rotating...' : ($state ? 'Rotate again' : 'Rotate key') }}
                     </x-forms.button>

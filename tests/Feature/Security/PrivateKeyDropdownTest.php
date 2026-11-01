@@ -3,6 +3,7 @@
 use App\Livewire\Security\PrivateKey\Create;
 use App\Livewire\Security\PrivateKey\Index;
 use App\Livewire\Security\PrivateKey\Show;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -67,7 +68,6 @@ test('saving a private key from its modal editor closes the modal', function () 
 
     Livewire::test(Show::class, [
         'private_key_uuid' => $privateKey->uuid,
-        'modalMode' => true,
     ])->set('name', 'Updated SSH key')
         ->call('changePrivateKey')
         ->assertDispatched('privateKeyUpdated')
@@ -82,33 +82,39 @@ test('manual private key form does not expose key generation controls', function
         ->assertDontSee('Generate new RSA SSH Key');
 });
 
-test('private key details view reminds users to install the public key', function () {
+test('private key editor reminds users to install the public key', function () {
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,
     ]);
 
-    $this->get(route('security.private-key.show', [
-        'private_key_uuid' => $privateKey->uuid,
-    ]))
-        ->assertSuccessful()
+    Livewire::test(Show::class, ['private_key_uuid' => $privateKey->uuid])
         ->assertSee('Copy this value to ~/.ssh/authorized_keys on the target server.');
 });
 
-test('github app private key shows a highlighted badge under the title', function () {
+test('private key editor lists the github app that uses the key', function () {
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,
         'is_git_related' => true,
     ]);
+    $githubApp = GithubApp::create([
+        'name' => 'Key user GitHub App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'private_key_id' => $privateKey->id,
+        'team_id' => $this->team->id,
+        'is_system_wide' => false,
+        'is_public' => false,
+    ]);
 
-    $this->get(route('security.private-key.show', [
-        'private_key_uuid' => $privateKey->uuid,
-    ]))
-        ->assertSuccessful()
-        ->assertSee('Used by GitHub App')
-        ->assertDontSee('Is used by a Git App?');
+    Livewire::test(Show::class, ['private_key_uuid' => $privateKey->uuid])
+        ->assertSee('Key user GitHub App')
+        ->assertSee(route('source.github.show', ['github_app_uuid' => $githubApp->uuid]), false)
+        ->assertDontSee('Used by GitHub App');
 });
 
-test('used private key details disable delete with an explanation', function () {
+test('used private key editor disables delete with an explanation', function () {
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,
     ]);
@@ -118,10 +124,7 @@ test('used private key details disable delete with an explanation', function () 
         'private_key_id' => $privateKey->id,
     ]);
 
-    $this->get(route('security.private-key.show', [
-        'private_key_uuid' => $privateKey->uuid,
-    ]))
-        ->assertSuccessful()
+    Livewire::test(Show::class, ['private_key_uuid' => $privateKey->uuid])
         ->assertSee('This private key is currently used by a server, application, or Git app and cannot be deleted.', false)
         ->assertSee('disabled', false);
 });
