@@ -17,7 +17,7 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
     /** A manual check runs in the web request, so it does not wait for CDN retries. */
     public int $cdnTries = 3;
 
-    public function __construct(int $cdnTries = 3, public bool $channelChanged = false)
+    public function __construct(int $cdnTries = 3)
     {
         $this->cdnTries = $cdnTries;
     }
@@ -31,14 +31,14 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             if (isDev() || isCloud()) {
                 return false;
             }
-            $versions = refresh_versions_file($this->cdnTries, $this->channelChanged);
+            $versions = refresh_versions_file($this->cdnTries);
             if ($versions === null) {
                 return false;
             }
 
             CheckTraefikVersionJob::dispatch();
 
-            $latestVersion = data_get($versions, 'coolify.v4.version');
+            $latestVersion = data_get($versions, 'coolify.version');
             $newVersionAvailable = instanceSettings()->update_channel !== 'custom'
                 && version_compare($latestVersion, config('constants.coolify.version'), '>');
             instanceSettings()->update(['new_version_available' => $newVersionAvailable]);

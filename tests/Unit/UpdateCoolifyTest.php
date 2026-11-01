@@ -99,7 +99,7 @@ function updateCoolifyTestPrepareUpgrade(): void
 
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
+            'stable' => ['coolify' => ['version' => '4.0.10']],
         ], 200),
     ]);
 }
@@ -123,7 +123,7 @@ it('validates cache against running version before fallback', function () {
 
     // Mock cache returning older version
     Cache::shouldReceive('remember')
-        ->andReturn(['coolify' => ['v4' => ['version' => '4.0.5']]]);
+        ->andReturn(['coolify' => ['version' => '4.0.5']]);
 
     config(['constants.coolify.version' => '4.0.10']);
 
@@ -150,7 +150,7 @@ it('uses validated cache when CDN fails and cache is newer', function () {
 
     // Cache has newer version than current
     Cache::shouldReceive('remember')
-        ->andReturn(['coolify' => ['v4' => ['version' => '4.0.10']]]);
+        ->andReturn(['coolify' => ['version' => '4.0.10']]);
 
     config(['constants.coolify.version' => '4.0.5']);
 
@@ -183,7 +183,7 @@ it('passes the saved registry URL to the upgrade script command', function () {
 
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
+            'stable' => ['coolify' => ['version' => '4.0.10']],
         ], 200),
     ]);
 
@@ -212,7 +212,7 @@ it('falls back to docker io for the upgrade script command when no registry is s
 
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
+            'stable' => ['coolify' => ['version' => '4.0.10']],
         ], 200),
     ]);
 
@@ -364,7 +364,7 @@ it('prevents downgrade even with manual update', function () {
     // CDN returns older version
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.0']],
+            'stable' => ['coolify' => ['version' => '4.0.0']],
         ], 200),
     ]);
 
@@ -396,7 +396,7 @@ it('does not start a second upgrade while a recent upgrade status is in progress
         'constants.ssh.mux_enabled' => false,
     ]);
     updateCoolifyTestCreateRootServerAndSettings();
-    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.0.10']]], 200)]);
     $action = updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(2)->toIso8601String());
 
     expect(fn () => $action->handle(manual_update: true))
@@ -414,7 +414,7 @@ it('starts an upgrade when the previous upgrade status is older than the lock ex
         'constants.ssh.mux_enabled' => false,
     ]);
     updateCoolifyTestCreateRootServerAndSettings();
-    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.0.10']]], 200)]);
     updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(16)->toIso8601String())
         ->handle(manual_update: true);
 

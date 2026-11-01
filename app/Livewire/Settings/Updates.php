@@ -73,17 +73,15 @@ class Updates extends Component
             $this->settings->update_check_frequency = $this->update_check_frequency;
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
             $this->settings->docker_registry_url = $validated['docker_registry_url'];
-            $this->settings->update_channel = $validated['update_channel'];
+            $this->settings->switchUpdateChannel($validated['update_channel']);
             $this->settings->update_custom_tag = $validated['update_custom_tag'];
             $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
             $channelChanged = $this->settings->isDirty(['update_channel', 'update_custom_tag']);
-            if ($this->settings->isDirty('update_channel')) {
-                $this->settings->previous_update_channel = $this->channelFollowedUntilRelease($this->settings->getOriginal('update_channel'), $validated['update_channel']);
-            }
             $changedFields = auditChangedFields($this->settings);
             $this->settings->save();
             if ($channelChanged) {
-                (new CheckForUpdatesJob(cdnTries: 1, channelChanged: true))->handle();
+                invalidate_versions_cache();
+                (new CheckForUpdatesJob(cdnTries: 1))->handle();
                 $this->dispatch('updateAvailable');
             }
             if ($changedFields !== []) {
@@ -100,22 +98,6 @@ class Updates extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
-    }
-
-    /**
-     * After a switch to a more stable channel, the instance keeps the updates of the channel it left until the stable release of its version is out.
-     */
-    private function channelFollowedUntilRelease(?string $from, string $to): ?string
-    {
-        $channels = ['stable', 'preview', 'nightly'];
-        $fromRank = array_search($from, $channels, true);
-        $toRank = array_search($to, $channels, true);
-        if ($fromRank === false || $toRank === false || $toRank >= $fromRank) {
-            return null;
-        }
-        $followed = $this->settings->getOriginal('previous_update_channel');
-
-        return array_search($followed, $channels, true) > $fromRank ? $followed : $from;
     }
 
     protected function syncRegistryUrlToEnv(string $registryUrl): void
