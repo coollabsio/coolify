@@ -49,6 +49,7 @@ class PrivateKey extends BaseModel
 
     protected $casts = [
         'private_key' => 'encrypted',
+        'is_git_related' => 'boolean',
     ];
 
     protected $appends = ['public_key'];
@@ -144,9 +145,6 @@ class PrivateKey extends BaseModel
         }
     }
 
-    /**
-     * Create a key from the UI, store it on disk, and record a `ui.private_key.created` audit event.
-     */
     public static function createAndStore(array $data)
     {
         return DB::transaction(function () use ($data) {
@@ -158,13 +156,6 @@ class PrivateKey extends BaseModel
             } catch (\Exception $e) {
                 throw new \Exception('Failed to store SSH key: '.$e->getMessage());
             }
-
-            auditLog('ui.private_key.created', [
-                'team_id' => $privateKey->team_id,
-                'private_key_uuid' => $privateKey->uuid,
-                'private_key_name' => $privateKey->name,
-                'fingerprint' => $privateKey->fingerprint,
-            ]);
 
             return $privateKey;
         });
@@ -327,15 +318,6 @@ class PrivateKey extends BaseModel
     public function getKeyLocation()
     {
         return Storage::disk('ssh-keys')->path("ssh_key@{$this->uuid}");
-    }
-
-    public function updatePrivateKey(array $data)
-    {
-        return DB::transaction(function () use ($data) {
-            $this->update($data);
-
-            return $this;
-        });
     }
 
     public function servers()

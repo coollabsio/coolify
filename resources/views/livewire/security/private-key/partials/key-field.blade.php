@@ -14,6 +14,7 @@
             this.askPassword = true;
             return;
         }
+        const sentPassword = this.password;
         this.revealing = true;
         $wire.revealPrivateKey(this.password).then((key) => {
             this.revealing = false;
@@ -21,6 +22,9 @@
             if (key && !this.replacing) {
                 this.revealed = key;
                 this.askPassword = false;
+            } else if (!key && !sentPassword) {
+                this.skipPassword = false;
+                this.askPassword = true;
             }
         }).catch(() => {
             this.revealing = false;
@@ -30,8 +34,10 @@
         this.revealed = '';
         this.askPassword = false;
         this.password = '';
+        if (this.$refs.revealedKey) this.$refs.revealedKey.textContent = '';
     },
-}" x-on:keydown.escape="hide()">
+}" x-init="$wire.$on('privateKeyUpdated', () => { replacing = false })" x-on:keydown.escape="hide()"
+    x-on:livewire:navigating.document="hide()">
     <div class="mb-1.5 flex items-center justify-between gap-3">
         <label class="text-[13px] font-medium">Private key</label>
         @can('update', $private_key)
@@ -48,7 +54,7 @@
             </div>
         @endcan
     </div>
-    <p class="text-xs text-neutral-500 dark:text-neutral-400" x-show="!replacing && !revealed && !askPassword">
+    <p class="text-xs text-neutral-500 dark:text-fg-dim" x-show="!replacing && !revealed && !askPassword">
         The private key is stored encrypted and is not shown. Use the public key and the fingerprint to identify it.
     </p>
     @can('update', $private_key)
@@ -63,7 +69,7 @@
             </x-forms.button>
         </div>
         <div x-cloak x-show="revealed">
-            <pre class="input h-auto overflow-x-auto whitespace-pre font-mono text-xs" x-text="revealed"></pre>
+            <pre x-ref="revealedKey" class="input h-auto! overflow-x-auto whitespace-pre font-mono text-xs" x-text="revealed"></pre>
         </div>
         <div x-cloak x-show="replacing" class="mt-2">
             <x-forms.textarea rows="10" id="newPrivateKey" monospace

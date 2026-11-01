@@ -12,6 +12,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class Show extends Component
@@ -77,7 +78,7 @@ class Show extends Component
         if ($toModel) {
             // Sync TO model (before save)
             $this->private_key->name = $this->name;
-            $this->private_key->description = $this->description;
+            $this->private_key->description = filled($this->description) ? $this->description : null;
             if (filled(trim($this->newPrivateKey))) {
                 $this->private_key->private_key = $this->newPrivateKey;
             }
@@ -129,12 +130,6 @@ class Show extends Component
             }
 
             $this->private_key->delete();
-            auditLog('ui.private_key.deleted', [
-                'team_id' => $this->private_key->team_id,
-                'private_key_uuid' => $this->private_key->uuid,
-                'private_key_name' => $this->private_key->name,
-            ]);
-            currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
             $this->dispatch('privateKeyDeleted');
         } catch (\Exception $e) {
@@ -152,16 +147,7 @@ class Show extends Component
             $this->validate();
 
             $this->syncData(true);
-            $changedFields = array_keys($this->private_key->getDirty());
             $this->private_key->save();
-            if ($changedFields !== []) {
-                auditLog('ui.private_key.updated', [
-                    'team_id' => $this->private_key->team_id,
-                    'private_key_uuid' => $this->private_key->uuid,
-                    'private_key_name' => $this->private_key->name,
-                    'changed_fields' => $changedFields,
-                ]);
-            }
             $this->syncData(false);
             $this->dispatch('success', 'Private key updated.');
             $this->dispatch('privateKeyUpdated');
@@ -169,6 +155,9 @@ class Show extends Component
             return handleError($e, $this);
         }
     }
+
+    /** Reveal attempts per user and minute, so a session cannot guess the password without limit. */
+    private const REVEAL_ATTEMPTS_PER_MINUTE = 5;
 
     /**
      * Return the stored private key once, after a password confirmation.
@@ -179,18 +168,29 @@ class Show extends Component
         try {
             $this->authorize('update', $this->private_key);
 
+            $rateLimitKey = 'private-key-reveal:'.auth()->id();
+            if (RateLimiter::tooManyAttempts($rateLimitKey, self::REVEAL_ATTEMPTS_PER_MINUTE)) {
+                $this->dispatch('error', 'Too many attempts. Try again in '.RateLimiter::availableIn($rateLimitKey).' seconds.');
+
+                return null;
+            }
+            RateLimiter::hit($rateLimitKey);
+
+            $auditContext = [
+                'team_id' => $this->private_key->team_id,
+                'private_key_uuid' => $this->private_key->uuid,
+                'private_key_name' => $this->private_key->name,
+            ];
+
             if (! verifyPasswordConfirmation($password, $this)) {
+                auditLog('ui.private_key.reveal_failed', $auditContext, 'warning');
                 $this->dispatch('error', 'The provided password is incorrect.');
 
                 return null;
             }
 
             $this->resetErrorBag('password');
-            auditLog('ui.private_key.revealed', [
-                'team_id' => $this->private_key->team_id,
-                'private_key_uuid' => $this->private_key->uuid,
-                'private_key_name' => $this->private_key->name,
-            ]);
+            auditLog('ui.private_key.revealed', $auditContext);
 
             return $this->private_key->private_key;
         } catch (\Throwable $e) {
