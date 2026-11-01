@@ -42,6 +42,9 @@
 
 - MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
 
+## Add dependencies through the trust gate
+- `composer require` stops until `vendor/bin/vet` records the new packages in `vet.json`. Read the package source first, then record it with `vendor/bin/vet` in a terminal (it needs a TTY). Prefer the existing dependencies (Guzzle, curl, Flysystem) over a package with a large dependency tree.
+
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
 - Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.

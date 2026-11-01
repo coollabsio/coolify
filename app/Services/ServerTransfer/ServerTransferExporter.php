@@ -324,12 +324,20 @@ class ServerTransferExporter
             $cloudTokens->push($this->findTeamRecord(CloudProviderToken::class, $server->cloud_provider_token_id, $teamId, 'cloud provider token'));
         }
 
+        $s3Storages = $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId);
+        // An SFTP storage that logs in with a private key needs that key on the target.
+        foreach ($s3Storages as $storage) {
+            if ($storage->private_key_id !== null) {
+                $privateKeys->push($this->findTeamRecord(PrivateKey::class, $storage->private_key_id, $teamId, 'private key'));
+            }
+        }
+
         return [
             'private_keys' => $privateKeys->unique('id')->values(),
             'github_apps' => $githubApps->unique('id')->values(),
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
             'gitea_apps' => $giteaApps->unique('id')->values(),
-            's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
+            's3_storages' => $s3Storages,
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
     }
@@ -1482,6 +1490,7 @@ class ServerTransferExporter
     {
         return [
             'uuid' => $storage->uuid,
+            'type' => $storage->type->value,
             'name' => $storage->name,
             'description' => $storage->description,
             'region' => $storage->region,
@@ -1490,6 +1499,7 @@ class ServerTransferExporter
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
+            'private_key_uuid' => $storage->privateKey?->uuid,
             'is_usable' => (bool) $storage->is_usable,
         ];
     }

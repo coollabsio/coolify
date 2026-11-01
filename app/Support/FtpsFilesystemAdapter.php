@@ -1,0 +1,308 @@
+<?php
+
+namespace App\Support;
+
+use League\Flysystem\Config;
+use League\Flysystem\FileAttributes;
+use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\UnableToCheckExistence;
+use League\Flysystem\UnableToCopyFile;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
+use League\Flysystem\UnableToDeleteFile;
+use League\Flysystem\UnableToListContents;
+use League\Flysystem\UnableToMoveFile;
+use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToRetrieveMetadata;
+use League\Flysystem\UnableToSetVisibility;
+use League\Flysystem\UnableToWriteFile;
+use RuntimeException;
+use Throwable;
+
+/**
+ * A small FTPS (explicit TLS) adapter for backup storages, on the curl extension. The PHP ftp extension cannot reuse
+ * the TLS session on data connections, which most FTPS servers require. curl verifies the server certificate, connects
+ * to the pinned IP, and ignores the address in the passive mode reply.
+ */
+class FtpsFilesystemAdapter implements FilesystemAdapter
+{
+    private const CONNECTION_TIMEOUT_SECONDS = 15;
+
+    /**
+     * @param  string  $root  The base directory: absolute with a leading slash, else relative to the login directory.
+     * @param  string|null  $pinnedIp  The IP to connect to when the host is a name.
+     */
+    public function __construct(
+        private string $host,
+        private int $port,
+        private string $username,
+        private string $password,
+        private string $root = '',
+        private ?string $pinnedIp = null,
+    ) {}
+
+    public function fileExists(string $path): bool
+    {
+        try {
+            $this->request($path, [CURLOPT_NOBODY => true]);
+
+            return true;
+        } catch (FtpsRequestFailed $exception) {
+            if ($exception->isNotFound()) {
+                return false;
+            }
+
+            throw UnableToCheckExistence::forLocation($path, $exception);
+        }
+    }
+
+    public function directoryExists(string $path): bool
+    {
+        try {
+            $this->request($path, [CURLOPT_NOBODY => true], directory: true);
+
+            return true;
+        } catch (FtpsRequestFailed $exception) {
+            if ($exception->isNotFound()) {
+                return false;
+            }
+
+            throw UnableToCheckExistence::forLocation($path, $exception);
+        }
+    }
+
+    public function write(string $path, string $contents, Config $config): void
+    {
+        $stream = fopen('php://temp', 'w+b');
+        fwrite($stream, $contents);
+        rewind($stream);
+
+        try {
+            $this->writeStream($path, $stream, $config);
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    public function writeStream(string $path, $contents, Config $config): void
+    {
+        try {
+            $this->request($path, [
+                CURLOPT_UPLOAD => true,
+                CURLOPT_INFILE => $contents,
+                CURLOPT_FTP_CREATE_MISSING_DIRS => CURLFTP_CREATE_DIR,
+            ]);
+        } catch (Throwable $exception) {
+            throw UnableToWriteFile::atLocation($path, $exception->getMessage(), $exception);
+        }
+    }
+
+    public function read(string $path): string
+    {
+        $stream = $this->readStream($path);
+
+        try {
+            return (string) stream_get_contents($stream);
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    /**
+     * Downloads the file to a temporary stream first, as the SFTP adapter does.
+     */
+    public function readStream(string $path)
+    {
+        $stream = fopen('php://temp', 'w+b');
+
+        try {
+            $this->request($path, [CURLOPT_FILE => $stream]);
+        } catch (Throwable $exception) {
+            fclose($stream);
+
+            throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
+        }
+        rewind($stream);
+
+        return $stream;
+    }
+
+    public function delete(string $path): void
+    {
+        try {
+            $this->command($path, 'DELE');
+        } catch (Throwable $exception) {
+            throw UnableToDeleteFile::atLocation($path, $exception->getMessage(), $exception);
+        }
+    }
+
+    public function deleteDirectory(string $path): void
+    {
+        try {
+            $this->command($path, 'RMD');
+        } catch (Throwable $exception) {
+            throw UnableToDeleteDirectory::atLocation($path, $exception->getMessage(), $exception);
+        }
+    }
+
+    public function createDirectory(string $path, Config $config): void
+    {
+        try {
+            $this->request($path, [CURLOPT_NOBODY => true, CURLOPT_FTP_CREATE_MISSING_DIRS => CURLFTP_CREATE_DIR], directory: true);
+        } catch (Throwable $exception) {
+            throw UnableToCreateDirectory::atLocation($path, $exception->getMessage(), $exception);
+        }
+    }
+
+    public function setVisibility(string $path, string $visibility): void
+    {
+        throw UnableToSetVisibility::atLocation($path, 'FTPS storages do not support visibility.');
+    }
+
+    public function visibility(string $path): FileAttributes
+    {
+        throw UnableToRetrieveMetadata::visibility($path, 'FTPS storages do not support visibility.');
+    }
+
+    public function mimeType(string $path): FileAttributes
+    {
+        throw UnableToRetrieveMetadata::mimeType($path, 'FTPS storages do not return MIME types.');
+    }
+
+    public function lastModified(string $path): FileAttributes
+    {
+        $modified = $this->fileInfo($path, 'lastModified')[CURLINFO_FILETIME_T];
+        if ($modified < 0) {
+            throw UnableToRetrieveMetadata::lastModified($path, 'The server does not return the modification time.');
+        }
+
+        return new FileAttributes($path, lastModified: $modified);
+    }
+
+    public function fileSize(string $path): FileAttributes
+    {
+        $size = $this->fileInfo($path, 'fileSize')[CURLINFO_CONTENT_LENGTH_DOWNLOAD_T];
+        if ($size < 0) {
+            throw UnableToRetrieveMetadata::fileSize($path, 'The server does not return the file size.');
+        }
+
+        return new FileAttributes($path, fileSize: $size);
+    }
+
+    /**
+     * Lists the names in a directory (NLST). Backups only need the names, and NLST works on every FTP server.
+     */
+    public function listContents(string $path, bool $deep): iterable
+    {
+        $stream = fopen('php://temp', 'w+b');
+
+        try {
+            $this->request($path, [CURLOPT_DIRLISTONLY => true, CURLOPT_FILE => $stream], directory: true);
+            rewind($stream);
+            $names = preg_split('/\r?\n/', (string) stream_get_contents($stream), flags: PREG_SPLIT_NO_EMPTY);
+        } catch (Throwable $exception) {
+            throw UnableToListContents::atLocation($path, $deep, $exception);
+        } finally {
+            fclose($stream);
+        }
+
+        $prefix = trim($path, '/');
+        foreach ($names as $name) {
+            $name = basename($name);
+            if ($name !== '.' && $name !== '..') {
+                yield new FileAttributes(ltrim($prefix.'/'.$name, '/'));
+            }
+        }
+    }
+
+    public function move(string $source, string $destination, Config $config): void
+    {
+        try {
+            $this->request('', [CURLOPT_NOBODY => true, CURLOPT_QUOTE => [
+                'RNFR '.$this->fullPath($source),
+                'RNTO '.$this->fullPath($destination),
+            ]], directory: true);
+        } catch (Throwable $exception) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination, $exception);
+        }
+    }
+
+    public function copy(string $source, string $destination, Config $config): void
+    {
+        throw UnableToCopyFile::fromLocationTo($source, $destination, new RuntimeException('FTPS storages do not support copies.'));
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function fileInfo(string $path, string $type): array
+    {
+        try {
+            return $this->request($path, [CURLOPT_NOBODY => true, CURLOPT_FILETIME => true]);
+        } catch (Throwable $exception) {
+            throw UnableToRetrieveMetadata::create($path, $type, $exception->getMessage(), $exception);
+        }
+    }
+
+    /**
+     * Sends a command that takes a path (DELE, RMD) after the login.
+     */
+    private function command(string $path, string $command): void
+    {
+        $this->request('', [CURLOPT_NOBODY => true, CURLOPT_QUOTE => [$command.' '.$this->fullPath($path)]], directory: true);
+    }
+
+    /**
+     * @param  array<int, mixed>  $options
+     * @return array<int, int> The size and the modification time of the response.
+     */
+    private function request(string $path, array $options, bool $directory = false): array
+    {
+        $handle = curl_init($this->url($path, $directory));
+        $host = str_contains($this->host, ':') ? '['.$this->host.']' : $this->host;
+        // array_replace() keeps the integer keys of the curl options, which the spread operator renumbers.
+        curl_setopt_array($handle, array_replace([
+            CURLOPT_USERPWD => $this->username.':'.$this->password,
+            CURLOPT_USE_SSL => CURLUSESSL_ALL,
+            CURLOPT_PROTOCOLS_STR => 'ftp',
+            CURLOPT_CONNECTTIMEOUT => self::CONNECTION_TIMEOUT_SECONDS,
+            CURLOPT_FTP_SKIP_PASV_IP => true,
+            CURLOPT_RETURNTRANSFER => true,
+        ], $this->pinnedIp !== null ? [CURLOPT_RESOLVE => [$host.':'.$this->port.':'.$this->pinnedIp]] : [], $options));
+
+        $result = curl_exec($handle);
+        $error = curl_errno($handle);
+        $info = [
+            CURLINFO_CONTENT_LENGTH_DOWNLOAD_T => (int) curl_getinfo($handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T),
+            CURLINFO_FILETIME_T => (int) curl_getinfo($handle, CURLINFO_FILETIME_T),
+        ];
+        if ($result === false || $error !== 0) {
+            throw new FtpsRequestFailed($error, curl_error($handle));
+        }
+
+        return $info;
+    }
+
+    private function url(string $path, bool $directory): string
+    {
+        $host = str_contains($this->host, ':') ? '['.$this->host.']' : $this->host;
+        $fullPath = $this->fullPath($path);
+        // curl reads a URL path as relative to the login directory; %2F at the start makes it absolute.
+        $encoded = implode('/', array_map('rawurlencode', array_filter(explode('/', $fullPath), fn (string $segment): bool => $segment !== '')));
+        $urlPath = str_starts_with($fullPath, '/') ? '%2F'.$encoded : $encoded;
+
+        return 'ftp://'.$host.':'.$this->port.'/'.$urlPath.($directory && $urlPath !== '' ? '/' : '');
+    }
+
+    private function fullPath(string $path): string
+    {
+        $path = trim($path, '/');
+        $root = rtrim($this->root, '/');
+
+        if ($path === '') {
+            return $root === '' && str_starts_with($this->root, '/') ? '/' : $root;
+        }
+
+        return $root === '' ? $path : $root.'/'.$path;
+    }
+}

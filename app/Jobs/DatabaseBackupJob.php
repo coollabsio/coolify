@@ -21,6 +21,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
+use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -931,6 +932,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $network = $this->database->destination->network;
             }
+            if (! $s3->isS3()) {
+                $this->uploadWithRclone($s3, $network);
+
+                return;
+            }
             $safeNetwork = escapeshellarg($network);
 
             $fullImageName = $this->getFullImageName();
@@ -961,6 +967,19 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $command = dockerRemoveCommand("backup-of-{$this->backup_log_uuid}");
             instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
+    }
+
+    /**
+     * Uploads the backup file to an SFTP, FTPS, or WebDAV storage. The caller removes the container.
+     */
+    private function uploadWithRclone(S3Storage $storage, string $network): void
+    {
+        $transfer = new RcloneTransfer($storage, $this->server, "backup-of-{$this->backup_log_uuid}");
+        $transfer->start([$this->backupMountSource().':'.$this->backup_location.':ro'], $network, $this->commandTimeout());
+        instant_remote_process(
+            [$transfer->uploadCommand($this->backup_location, $this->backup_location)],
+            $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
+        );
     }
 
     /**

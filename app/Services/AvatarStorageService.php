@@ -74,7 +74,7 @@ class AvatarStorageService
             return Storage::disk('images');
         }
 
-        $storage = S3Storage::query()->whereKey($s3StorageId)->where('is_usable', true)->first();
+        $storage = S3Storage::query()->s3Only()->whereKey($s3StorageId)->where('is_usable', true)->first();
         if (! $storage) {
             throw new RuntimeException('The configured S3 storage is not available.');
         }

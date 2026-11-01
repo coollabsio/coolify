@@ -14,6 +14,7 @@ use App\Models\VolumeBackupS3Replica;
 use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
 use App\Rules\SafeWebhookUrl;
+use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -88,8 +89,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $filename = str($this->backup->targetType())->lower().'-'.str($this->backup->targetName())->slug().'-'.Carbon::now()->timestamp.'.tar.gz';
         $backupLocation = $backupDirectory.'/'.$filename;
         $this->execution->update(['filename' => $backupLocation]);
-        // Streaming writes no local archive, so it can upload to one destination only.
-        $streamToS3 = $this->backup->disable_local_backup && $destinations->count() === 1;
+        // Streaming writes no local archive, so it can upload to one destination only. Only S3 storages stream.
+        $streamToS3 = $this->backup->disable_local_backup && $destinations->count() === 1 && $destinations->first()->isS3();
 
         try {
             $source = $this->backup->sourcePath();
@@ -439,6 +440,17 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
+        if (! $s3->isS3()) {
+            $transfer = new RcloneTransfer($s3, $server, $containerName);
+            try {
+                $transfer->start([$backupLocation.':'.$backupLocation.':ro'], timeout: $this->timeout);
+                instant_remote_process([$transfer->uploadCommand($backupLocation, $backupLocation)], $server, timeout: $this->timeout, disableMultiplexing: true);
+            } finally {
+                instant_remote_process([$transfer->removeCommand()], $server, throwError: false, disableMultiplexing: true);
+            }
+
+            return;
+        }
         $image = coolifyHelperImage().':'.getHelperVersion();
         $resolveOptions = $this->minioClientResolveOptions($s3);
 

@@ -216,7 +216,7 @@ final class ServerTransferCoverage
         ],
         GitlabApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         GiteaApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
-        S3Storage::class => ['team_id' => self::TEAM, 'unusable_email_sent' => self::RUNTIME],
+        S3Storage::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED, 'unusable_email_sent' => self::RUNTIME],
         Project::class => [
             'team_id' => self::TEAM,
             'icon_path' => 'The icon file is exported as `icon` (base64 content). The target stores it in its own icon storage and sets the path.',

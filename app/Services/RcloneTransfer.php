@@ -1,0 +1,90 @@
+<?php
+
+namespace App\Services;
+
+use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
+use App\Models\S3Storage;
+use App\Models\Server;
+
+/**
+ * Copies backup files between a server and an SFTP, FTPS, or WebDAV storage with rclone, in a container on the
+ * server. S3 storages use the MinIO client in the helper image instead.
+ */
+class RcloneTransfer
+{
+    private const CONFIG_PATH = '/tmp/rclone.conf';
+
+    public function __construct(
+        private S3Storage $storage,
+        private Server $server,
+        private string $container,
+    ) {}
+
+    /**
+     * Starts the rclone container and writes the storage config to it.
+     *
+     * @param  array<int, string>  $volumes  `docker run -v` values, for example "/host/path:/path:ro".
+     */
+    public function start(array $volumes = [], ?string $network = null, ?int $timeout = null): void
+    {
+        $options = collect($volumes)->map(fn (string $volume): string => ' -v '.escapeshellarg($volume))->implode('');
+        if ($network !== null) {
+            $options .= ' --network '.escapeshellarg($network);
+        }
+
+        // Remove a leftover container in the same batch, so a replayed batch does not fail with a name conflict.
+        instant_remote_process([
+            $this->removeCommand(),
+            'docker run -d --rm --name '.escapeshellarg($this->container).$options
+                .' --entrypoint sleep '.escapeshellarg((string) config('constants.coolify.rclone_image')).' 86400 >/dev/null',
+        ], $this->server, true, false, $timeout, disableMultiplexing: true);
+
+        $this->writeConfig();
+    }
+
+    public function uploadCommand(string $localPath, string $remoteFile): string
+    {
+        return $this->rcloneCommand('copyto', $localPath, $this->storage->rcloneRemotePath($remoteFile));
+    }
+
+    public function downloadCommand(string $remoteFile, string $localPath): string
+    {
+        return $this->rcloneCommand('copyto', $this->storage->rcloneRemotePath($remoteFile), $localPath);
+    }
+
+    public function removeCommand(): string
+    {
+        return 'docker rm -f '.escapeshellarg($this->container).' >/dev/null 2>&1 || true';
+    }
+
+    private function rcloneCommand(string ...$arguments): string
+    {
+        return 'docker exec '.escapeshellarg($this->container).' rclone --config '.self::CONFIG_PATH.' --contimeout 15s'
+            .collect($arguments)->map(fn (string $argument): string => ' '.escapeshellarg($argument))->implode('');
+    }
+
+    /**
+     * The config goes to the container through the stdin of the SSH process, so the password is not in the arguments
+     * of any process on Coolify or on the server.
+     */
+    private function writeConfig(): void
+    {
+        $remoteCommand = ($this->server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($this->container)
+            .' sh -c '.escapeshellarg('umask 077 && cat > '.self::CONFIG_PATH);
+        $timeout = (int) config('constants.ssh.command_timeout');
+        $config = $this->storage->rcloneConfig();
+
+        SshRetryHandler::retry(
+            function () use ($remoteCommand, $timeout, $config) {
+                $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($this->server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+                $process = runSshProcess($sshCommand, $timeout, $config);
+
+                if ($process->exitCode() !== 0) {
+                    excludeCertainErrors($process->errorOutput(), $process->exitCode());
+                }
+            },
+            ['server' => $this->server->ip, 'function' => 'writeRcloneConfig'],
+        );
+    }
+}

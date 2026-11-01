@@ -2,18 +2,26 @@
 
 namespace App\Models;
 
+use App\Enums\BackupStorageType;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
+use App\Support\FtpsFilesystemAdapter;
+use App\Support\WebdavFilesystemAdapter;
 use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
+use GuzzleHttp\Client;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemAdapter as FlysystemAdapter;
 
 class S3Storage extends BaseModel
 {
@@ -44,8 +52,20 @@ class S3Storage extends BaseModel
      */
     private const REMOTE_COMMAND_TIMEOUT_EXIT_CODE = 124;
 
+    /**
+     * The name of the rclone remote in rcloneConfig().
+     */
+    public const RCLONE_REMOTE = 'storage';
+
+    /**
+     * The key of the rclone password obscuring (fs/config/obscure in rclone). It only hides the password from a casual
+     * look at the config file; it is not encryption.
+     */
+    private const RCLONE_OBSCURE_KEY = '9c935b48730a554d6bfd7c63c886a92bd390198eb8128afbf4de162b8b95f638';
+
     protected $fillable = [
         'team_id',
+        'type',
         'name',
         'description',
         'region',
@@ -54,6 +74,7 @@ class S3Storage extends BaseModel
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'private_key_id',
         'is_usable',
         'unusable_email_sent',
     ];
@@ -63,7 +84,12 @@ class S3Storage extends BaseModel
         'secret',
     ];
 
+    protected $attributes = [
+        'type' => 's3',
+    ];
+
     protected $casts = [
+        'type' => BackupStorageType::class,
         'is_usable' => 'boolean',
         'use_path_style_endpoint' => 'boolean',
         'key' => 'encrypted',
@@ -86,9 +112,8 @@ class S3Storage extends BaseModel
             if ($storage->key !== null) {
                 $storage->key = trim($storage->key);
             }
-            if ($storage->secret !== null) {
-                $storage->secret = trim($storage->secret);
-            }
+            // An SFTP storage that logs in with a private key has no password. The column is not nullable.
+            $storage->secret = trim((string) $storage->secret);
         });
 
         static::deleting(function (S3Storage $storage) {
@@ -156,9 +181,186 @@ class S3Storage extends BaseModel
         return $this->is_usable;
     }
 
+    /**
+     * Storages that serve presigned URLs: file downloads and avatars need them, so they only use S3 storages.
+     */
+    public function scopeS3Only(Builder $query): Builder
+    {
+        return $query->where('type', BackupStorageType::S3->value);
+    }
+
+    public function isS3(): bool
+    {
+        return $this->type === BackupStorageType::S3;
+    }
+
+    /**
+     * Validation rules for the connection fields of a storage of this type. `$partial` makes every field optional, for
+     * updates that only send some fields.
+     *
+     * @param  array<int, string>  $trustedInternalHosts
+     * @return array<string, array<int, mixed>>
+     */
+    public static function connectionRules(BackupStorageType $type, bool $partial = false, array $trustedInternalHosts = [], ?int $teamId = null): array
+    {
+        $required = $partial ? 'sometimes' : 'required';
+        $endpoint = [$required, 'string', 'max:255', new SafeWebhookUrl(trustedInternalHosts: $trustedInternalHosts, schemes: $type->endpointSchemes())];
+
+        if ($type === BackupStorageType::S3) {
+            return [
+                'endpoint' => $endpoint,
+                'bucket' => [$required, new ValidS3BucketName],
+                'region' => [$required, 'string', 'max:255'],
+                'key' => [$required, 'string', 'max:255'],
+                'secret' => [$required, 'string', 'max:255'],
+            ];
+        }
+
+        $rules = [
+            'endpoint' => $endpoint,
+            // rclone reads the user from a config file line, so it must not contain line breaks or quotes.
+            'key' => [$required, 'string', 'max:255', 'regex:/^[^\x00-\x1f\x7f"]+$/'],
+            'secret' => [$required, 'string', 'max:255'],
+        ];
+
+        if ($type === BackupStorageType::Sftp) {
+            // SFTP logs in with a private key of the storage team or with a password.
+            $rules['private_key_id'] = ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', $teamId ?? -1)];
+            $rules['secret'] = [$partial ? 'sometimes' : 'required_without:private_key_id', 'nullable', 'string', 'max:255'];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * The endpoint URL of an SFTP or FTPS storage, from the form fields.
+     */
+    public static function serverEndpoint(BackupStorageType $type, string $host, ?string $port = '', string $path = ''): string
+    {
+        $host = trim($host);
+        if (str_contains($host, ':') && ! str_starts_with($host, '[')) {
+            $host = '['.$host.']';
+        }
+        $port = trim((string) $port);
+        $path = implode('/', array_map('rawurlencode', array_filter(explode('/', trim($path)), fn (string $segment): bool => $segment !== '')));
+
+        return $type->endpointSchemes()[0].'://'.$host.($port !== '' ? ':'.$port : '').($path !== '' ? '/'.$path : '');
+    }
+
+    /**
+     * The form fields of an SFTP or FTPS endpoint URL.
+     *
+     * @return array{host: string, port: string, path: string}
+     */
+    public static function splitServerEndpoint(?string $endpoint): array
+    {
+        $parts = parse_url((string) $endpoint) ?: [];
+
+        return [
+            'host' => trim((string) ($parts['host'] ?? ''), '[]'),
+            'port' => isset($parts['port']) ? (string) $parts['port'] : '',
+            'path' => trim(rawurldecode((string) ($parts['path'] ?? '')), '/'),
+        ];
+    }
+
+    /**
+     * The directory on an SFTP or FTPS server that holds the backups: the path of the endpoint URL. Empty means the
+     * login directory of the user.
+     */
+    public function basePath(): string
+    {
+        return rtrim(rawurldecode((string) parse_url((string) $this->endpoint, PHP_URL_PATH)), '/');
+    }
+
+    public function endpointPort(): int
+    {
+        return (int) (parse_url((string) $this->endpoint, PHP_URL_PORT) ?: $this->type->defaultPort());
+    }
+
+    /**
+     * The path of a backup file in the storage, as rclone reads it. The file keeps its full local path, as the S3 object
+     * key does, below the base path (SFTP, FTPS) or the base URL (WebDAV).
+     */
+    public function rcloneRemotePath(string $file): string
+    {
+        $file = ltrim($file, '/');
+        $base = $this->type === BackupStorageType::Webdav ? '' : $this->basePath();
+
+        return self::RCLONE_REMOTE.':'.($base === '' ? $file : $base.'/'.$file);
+    }
+
+    /**
+     * The rclone config of this storage. The server gets it through stdin, so the password is never on a command line.
+     */
+    public function rcloneConfig(): string
+    {
+        $host = (string) parse_url((string) $this->endpoint, PHP_URL_HOST);
+        $options = match ($this->type) {
+            BackupStorageType::Sftp => ['type' => 'sftp', 'host' => $host, 'port' => $this->endpointPort(), 'shell_type' => 'none'],
+            BackupStorageType::Ftps => ['type' => 'ftp', 'host' => $host, 'port' => $this->endpointPort(), 'explicit_tls' => 'true'],
+            BackupStorageType::Webdav => ['type' => 'webdav', 'url' => $this->endpoint, 'vendor' => 'other'],
+            BackupStorageType::S3 => throw new \LogicException('S3 storages use the MinIO client.'),
+        };
+        $options['user'] = $this->key;
+        $privateKey = $this->sftpPrivateKey();
+        if ($privateKey) {
+            // rclone reads key_pem from one line, with \n for each line break.
+            $options['key_pem'] = str_replace("\n", '\n', trim(str_replace("\r\n", "\n", (string) $privateKey->private_key)));
+        } else {
+            $options['pass'] = self::rcloneObscure((string) $this->secret);
+        }
+
+        $lines = ['['.self::RCLONE_REMOTE.']'];
+        foreach ($options as $name => $value) {
+            if (preg_match('/[\x00-\x1f\x7f]/', (string) $value)) {
+                throw new \RuntimeException("The storage {$name} must not contain control characters.");
+            }
+            $lines[] = "{$name} = {$value}";
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    /**
+     * Obscures a password as `rclone obscure` does: AES-CTR with the fixed rclone key and a random IV, in URL-safe
+     * base64 without padding.
+     */
+    public static function rcloneObscure(string $value): string
+    {
+        $iv = random_bytes(16);
+        $ciphertext = openssl_encrypt($value, 'aes-256-ctr', hex2bin(self::RCLONE_OBSCURE_KEY), OPENSSL_RAW_DATA, $iv);
+
+        return rtrim(strtr(base64_encode($iv.$ciphertext), '+/', '-_'), '=');
+    }
+
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * The private key that an SFTP storage logs in with. Null: it logs in with the password.
+     */
+    public function privateKey(): BelongsTo
+    {
+        return $this->belongsTo(PrivateKey::class);
+    }
+
+    /**
+     * The private key of an SFTP storage, only when it belongs to the team of the storage.
+     */
+    public function sftpPrivateKey(): ?PrivateKey
+    {
+        if ($this->type !== BackupStorageType::Sftp || $this->private_key_id === null) {
+            return null;
+        }
+
+        $privateKey = $this->privateKey;
+        if (! $privateKey || (int) $privateKey->team_id !== (int) $this->team_id) {
+            throw new \RuntimeException('The private key of this storage does not exist or belongs to another team.');
+        }
+
+        return $privateKey;
     }
 
     public function scheduledBackups()
@@ -222,25 +424,37 @@ class S3Storage extends BaseModel
     public function testConnection(bool $shouldSave = false)
     {
         try {
-            $validator = Validator::make(
-                [
-                    'endpoint' => $this['endpoint'],
-                    'bucket' => $this['bucket'],
-                ],
-                [
-                    'endpoint' => ['required', new SafeWebhookUrl(trustedInternalHosts: $this->trustedInternalHosts())],
-                    'bucket' => ['required', new ValidS3BucketName],
-                ],
-            );
-            $validator->fails();
-            if ($validator->errors()->has('endpoint')) {
-                throw new \RuntimeException('S3 endpoint is not allowed: '.$validator->errors()->first('endpoint'));
-            }
-            if ($validator->errors()->has('bucket')) {
-                throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
-            }
+            if ($this->isS3()) {
+                $validator = Validator::make(
+                    [
+                        'endpoint' => $this['endpoint'],
+                        'bucket' => $this['bucket'],
+                    ],
+                    [
+                        'endpoint' => ['required', new SafeWebhookUrl(trustedInternalHosts: $this->trustedInternalHosts())],
+                        'bucket' => ['required', new ValidS3BucketName],
+                    ],
+                );
+                $validator->fails();
+                if ($validator->errors()->has('endpoint')) {
+                    throw new \RuntimeException('S3 endpoint is not allowed: '.$validator->errors()->first('endpoint'));
+                }
+                if ($validator->errors()->has('bucket')) {
+                    throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
+                }
 
-            $this->listFilesWithAddressingStyleFallback();
+                $this->listFilesWithAddressingStyleFallback();
+            } else {
+                $validator = Validator::make(
+                    $this->only(['endpoint', 'key', 'secret', 'private_key_id']),
+                    self::connectionRules($this->type, trustedInternalHosts: $this->trustedInternalHosts(), teamId: $this->team_id),
+                );
+                if ($validator->fails()) {
+                    throw new \RuntimeException('Storage settings are not allowed: '.$validator->errors()->first());
+                }
+
+                $this->filesystem()->files();
+            }
 
             $this->unusable_email_sent = false;
             $this->is_usable = true;
@@ -277,7 +491,61 @@ class S3Storage extends BaseModel
         }
     }
 
+    /**
+     * The files of the storage, as Coolify reads them (connection tests, restores, downloads, retention). SFTP and FTPS
+     * connect to the validated IP of the host, and WebDAV pins it, so a DNS change cannot send them to another address.
+     */
     public function filesystem(): FilesystemAdapter
+    {
+        return match ($this->type) {
+            BackupStorageType::S3 => $this->s3Filesystem(),
+            BackupStorageType::Sftp => Storage::build([
+                'driver' => 'sftp',
+                'host' => $this->pinnedHost(),
+                'port' => $this->endpointPort(),
+                'username' => $this->key,
+                ...($this->sftpPrivateKey()
+                    ? ['privateKey' => $this->sftpPrivateKey()->private_key]
+                    : ['password' => $this->secret]),
+                'root' => $this->basePath(),
+                'timeout' => self::CONNECTION_TIMEOUT_SECONDS,
+            ]),
+            BackupStorageType::Ftps => $this->adapterFilesystem(new FtpsFilesystemAdapter(
+                host: (string) parse_url((string) $this->endpoint, PHP_URL_HOST),
+                port: $this->endpointPort(),
+                username: (string) $this->key,
+                password: (string) $this->secret,
+                root: $this->basePath(),
+                pinnedIp: $this->pinnedHost(),
+            )),
+            BackupStorageType::Webdav => $this->webdavFilesystem(),
+        };
+    }
+
+    private function pinnedHost(): string
+    {
+        return SafeWebhookUrl::pinnedAddress((string) $this->endpoint, $this->type->endpointSchemes(), $this->trustedInternalHosts());
+    }
+
+    private function adapterFilesystem(FlysystemAdapter $adapter): FilesystemAdapter
+    {
+        return new FilesystemAdapter(new Filesystem($adapter), $adapter);
+    }
+
+    private function webdavFilesystem(): FilesystemAdapter
+    {
+        $baseUrl = rtrim((string) $this->endpoint, '/').'/';
+        $client = new Client(array_merge(SafeWebhookUrl::httpClientOptions($baseUrl, $this->trustedInternalHosts()), [
+            'base_uri' => $baseUrl,
+            'auth' => [$this->key, $this->secret],
+            'http_errors' => false,
+            'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
+        ]));
+
+        return $this->adapterFilesystem(new WebdavFilesystemAdapter($client, $baseUrl));
+    }
+
+    private function s3Filesystem(): FilesystemAdapter
     {
         return Storage::build([
             'driver' => 's3',
@@ -400,7 +668,9 @@ class S3Storage extends BaseModel
 
         if ($message->contains(['timed out', 'timeout', 'connection refused', 'could not resolve', 'curl error 28'])) {
             return new \RuntimeException(
-                'Could not connect to the S3 endpoint within 15 seconds. Please verify the endpoint, bucket, credentials, region, and network/firewall settings.',
+                $this->isS3()
+                    ? 'Could not connect to the S3 endpoint within 15 seconds. Please verify the endpoint, bucket, credentials, region, and network/firewall settings.'
+                    : 'Could not connect to the '.$this->type->label().' server within 15 seconds. Please verify the host, port, credentials, and network/firewall settings.',
                 previous: $exception,
             );
         }

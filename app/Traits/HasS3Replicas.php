@@ -5,6 +5,7 @@ namespace App\Traits;
 use App\Services\FileDownloadStorageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * S3 copies of a backup execution, one per destination. The `s3_uploaded` and `s3_storage_deleted` columns of the
@@ -55,10 +56,10 @@ trait HasS3Replicas
     }
 
     /**
-     * A short-lived presigned download URL for the first live copy in a usable S3 storage of the given team, the
-     * primary storage first. Null when no such copy exists.
+     * A download of the first live copy in a usable storage of the given team, the primary storage first: a redirect
+     * to a short-lived presigned URL for S3, else a stream through Coolify. Null when no such copy exists.
      */
-    public function s3DownloadUrl(int $teamId, ?int $primaryStorageId): ?string
+    public function s3Download(int $teamId, ?int $primaryStorageId): ?Response
     {
         if (blank($this->filename)) {
             return null;
@@ -78,12 +79,25 @@ trait HasS3Replicas
             return null;
         }
 
+        $disk = $replica->s3->filesystem();
+        if (! $replica->s3->isS3()) {
+            $stream = $disk->readStream($this->filename);
+            if (! is_resource($stream)) {
+                return null;
+            }
+
+            return response()->streamDownload(function () use ($stream): void {
+                fpassthru($stream);
+                fclose($stream);
+            }, basename($this->filename), ['Content-Type' => 'application/octet-stream']);
+        }
+
         // The upload copies the file to "<bucket><backup directory>/", so the object key is the local file path.
-        return $replica->s3->filesystem()->temporaryUrl(
+        return redirect()->away($disk->temporaryUrl(
             $this->filename,
             now()->addMinutes(FileDownloadStorageService::LINK_TTL_MINUTES),
             ['ResponseContentDisposition' => FileDownloadStorageService::contentDisposition(basename($this->filename))],
-        );
+        ));
     }
 
     /**

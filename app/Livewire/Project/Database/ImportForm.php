@@ -12,7 +12,6 @@ use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
-use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
@@ -643,7 +642,7 @@ class ImportForm extends Component
             $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
 
             // Validate bucket name early
-            if (! $this->validateBucketName($s3Storage->bucket)) {
+            if ($s3Storage->isS3() && ! $this->validateBucketName($s3Storage->bucket)) {
                 $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return;
@@ -652,17 +651,7 @@ class ImportForm extends Component
             // Test connection
             $s3Storage->testConnection();
 
-            // Build S3 disk configuration
-            $disk = Storage::build([
-                'driver' => 's3',
-                'region' => $s3Storage->region,
-                'key' => $s3Storage->key,
-                'secret' => $s3Storage->secret,
-                'bucket' => $s3Storage->bucket,
-                'endpoint' => $s3Storage->endpoint,
-                'use_path_style_endpoint' => $s3Storage->usesPathStyleEndpoint(),
-                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
-            ]);
+            $disk = $s3Storage->filesystem();
 
             // Check if file exists
             if (! $disk->exists($cleanPath)) {

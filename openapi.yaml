@@ -9042,6 +9042,8 @@ paths:
           description: 'Not an admin or owner of the team.'
         '422':
           $ref: '#/components/responses/422'
+        '502':
+          description: 'Coolify could not connect to the provider API.'
       security:
         -
           bearerAuth: []
@@ -9165,6 +9167,8 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+        '502':
+          description: 'Coolify could not connect to the provider API.'
       security:
         -
           bearerAuth: []
@@ -9202,6 +9206,8 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           description: 'The token is not a Cloudflare token.'
+        '502':
+          description: 'Coolify could not connect to the Cloudflare API.'
       security:
         -
           bearerAuth: []
@@ -9992,7 +9998,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, description: { type: string, nullable: true }, endpoint: { type: string }, bucket: { type: string }, region: { type: string }, use_path_style_endpoint: { type: boolean }, is_usable: { type: boolean }, team_id: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, type: { type: string, enum: [s3, sftp, ftps, webdav] }, name: { type: string }, description: { type: string, nullable: true }, endpoint: { type: string }, bucket: { type: string }, region: { type: string }, use_path_style_endpoint: { type: boolean }, is_usable: { type: boolean }, team_id: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -10016,11 +10022,14 @@ paths:
               required:
                 - name
                 - endpoint
-                - bucket
-                - region
                 - key
                 - secret
               properties:
+                type:
+                  type: string
+                  enum: [s3, sftp, ftps, webdav]
+                  default: s3
+                  description: 'The storage protocol. It cannot change later.'
                 name:
                   type: string
                   example: 'My S3 Storage'
@@ -10032,24 +10041,28 @@ paths:
                 endpoint:
                   type: string
                   example: 'https://s3.us-east-1.amazonaws.com'
-                  description: 'S3-compatible endpoint URL.'
+                  description: 'S3: the S3-compatible endpoint URL. SFTP and FTPS: sftp://host:port/directory or ftps://host:port/directory (explicit TLS); the directory is an absolute path, and without one the login directory is used. WebDAV: the https URL of the backup directory.'
                 bucket:
                   type: string
                   example: my-bucket
-                  description: 'S3 bucket name.'
+                  description: 'S3 bucket name. Required for S3, not allowed for the other types.'
                 region:
                   type: string
                   example: us-east-1
-                  description: 'S3 region.'
+                  description: 'S3 region. Required for S3, not allowed for the other types.'
                 use_path_style_endpoint:
                   type: boolean
                   description: 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints.'
                 key:
                   type: string
-                  description: 'Access key.'
+                  description: 'S3: the access key. Other types: the username.'
                 secret:
                   type: string
-                  description: 'Secret key.'
+                  description: 'S3: the secret key. Other types: the password. SFTP: not needed with private_key_uuid.'
+                private_key_uuid:
+                  type: string
+                  nullable: true
+                  description: 'SFTP only: the UUID of a private key of your team to log in with instead of a password.'
                 is_usable:
                   type: boolean
                   description: 'Whether the storage is marked usable.'
@@ -10173,22 +10186,26 @@ paths:
                   description: 'Optional description.'
                 endpoint:
                   type: string
-                  description: 'S3-compatible endpoint URL.'
+                  description: 'The endpoint URL, in the format of the storage type (see Create S3 Storage).'
                 bucket:
                   type: string
-                  description: 'S3 bucket name.'
+                  description: 'S3 bucket name. Only for S3 storages.'
                 region:
                   type: string
-                  description: 'S3 region.'
+                  description: 'S3 region. Only for S3 storages.'
                 use_path_style_endpoint:
                   type: boolean
                   description: 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS.'
                 key:
                   type: string
-                  description: 'Access key.'
+                  description: 'S3: the access key. Other types: the username.'
                 secret:
                   type: string
-                  description: 'Secret key.'
+                  description: 'S3: the secret key. Other types: the password. SFTP: sending a password switches the login to the password.'
+                private_key_uuid:
+                  type: string
+                  nullable: true
+                  description: 'SFTP only: the UUID of a private key of your team to log in with. Null switches the login to the saved password.'
                 is_usable:
                   type: boolean
                   description: 'Whether the storage is marked usable.'

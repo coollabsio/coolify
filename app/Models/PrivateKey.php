@@ -329,9 +329,15 @@ class PrivateKey extends BaseModel
         return $this->hasMany(GiteaApp::class);
     }
 
+    public function s3Storages()
+    {
+        return $this->hasMany(S3Storage::class);
+    }
+
     public function isInUse()
     {
         return $this->servers()->exists()
+            || $this->s3Storages()->exists()
             || $this->applications()->exists()
             || $this->githubApps()->exists()
             || $this->gitlabApps()->exists()

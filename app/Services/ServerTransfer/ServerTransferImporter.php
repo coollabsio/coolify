@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\BackupStorageType;
 use App\Enums\GithubRunnerDockerMode;
 use App\Enums\ServerRole;
 use App\Jobs\ValidateAndInstallServerJob;
@@ -2000,6 +2001,8 @@ class ServerTransferImporter
         $storage = new S3Storage;
         $storage->forceFill([
             'team_id' => $teamId,
+            // Bundles of older instances have no type: they only had S3 storages.
+            'type' => BackupStorageType::tryFrom((string) data_get($payload, 'type')) ?? BackupStorageType::S3,
             'name' => data_get($payload, 'name') ?: 'Imported S3',
             'description' => data_get($payload, 'description'),
             'region' => data_get($payload, 'region'),
@@ -2008,6 +2011,9 @@ class ServerTransferImporter
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
             'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
+            'private_key_id' => isset($this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')])
+                ? $this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')]->id
+                : null,
             'is_usable' => (bool) data_get($payload, 'is_usable', true),
         ]);
         $storage->uuid = $uuid;
