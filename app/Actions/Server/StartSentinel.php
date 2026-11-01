@@ -178,14 +178,18 @@ class StartSentinel
             'docker rm -f coolify-sentinel || true',
             "mkdir -p $mountDir",
             ...self::trafficLogPreparationCommands($server),
-            // The mode is set before the token is written, so it does not depend on the umask of the server.
-            "rm -f $envFile",
-            "touch $envFile",
-            "chmod 600 $envFile",
-            "echo '".base64_encode($envFileContent)."' | base64 -d | tee $envFile > /dev/null",
-            $dockerCommand,
-            // Docker keeps the environment in the container configuration, so restarts do not read the file again.
-            "rm -f $envFile",
+            'sh -ec '.escapeshellarg(implode("\n", [
+                'trap '.escapeshellarg("rm -f $envFile").' EXIT',
+                // The mode is set before the token is written, so it does not depend on the umask of the server.
+                "rm -f $envFile",
+                "touch $envFile",
+                "chmod 600 $envFile",
+                "echo '".base64_encode($envFileContent)."' | base64 -d | tee $envFile > /dev/null",
+                $dockerCommand,
+                // Docker keeps the environment in the container configuration, so restarts do not read the file again.
+                "rm -f $envFile",
+                'trap - EXIT',
+            ])),
             "chown -R 9999:root $mountDir",
             "chmod -R 700 $mountDir",
         ], $server);
