@@ -53,17 +53,23 @@ class PrivateKey extends BaseModel
         'private_key' => 'encrypted',
     ];
 
+    /**
+     * Accept any key that can be loaded. A server transfer sets it, because the key already works on the source.
+     */
+    public bool $allowLegacyKey = false;
+
     protected $appends = ['public_key'];
 
     protected static function booted()
     {
         static::saving(function ($key) {
             $storedPrivateKey = $key->exists ? $key->getOriginal('private_key') : null;
-            $submittedPrivateKey = $key->private_key;
-            $key->private_key = formatPrivateKey($submittedPrivateKey);
+            $key->private_key = formatPrivateKey($key->private_key);
 
             // Check only new or changed keys, so older keys can still be renamed.
-            $error = $submittedPrivateKey !== $storedPrivateKey ? self::validationError($key->private_key) : null;
+            $normalize = fn (string $privateKey): string => str_replace("\r\n", "\n", formatPrivateKey($privateKey));
+            $isChanged = $storedPrivateKey === null || $normalize($key->private_key) !== $normalize($storedPrivateKey);
+            $error = $isChanged ? self::validationError($key->private_key, ! $key->allowLegacyKey) : null;
             if ($error) {
                 throw ValidationException::withMessages([
                     'private_key' => [$error],
@@ -139,20 +145,24 @@ class PrivateKey extends BaseModel
             ->select($selectArray->all());
     }
 
-    public static function validatePrivateKey($privateKey)
-    {
-        return self::validationError($privateKey) === null;
-    }
-
     /**
      * Returns why a private key cannot be used, or null when it is valid.
+     * Without $strict, only checks that the key can be loaded.
      */
-    public static function validationError(?string $privateKey): ?string
+    public static function validationError(?string $privateKey, bool $strict = true): ?string
     {
         try {
             $key = PublicKeyLoader::loadPrivateKey((string) $privateKey);
         } catch (\Throwable $e) {
             return 'The private key is invalid. Paste an unencrypted private key, not a public key or a certificate.';
+        }
+
+        if (! $strict) {
+            return null;
+        }
+
+        if (! str_starts_with(trim((string) $privateKey), '-----BEGIN ')) {
+            return 'PuTTY and other key formats are not supported. Paste the key in OpenSSH or PEM format. It starts with "-----BEGIN".';
         }
 
         if ($key instanceof DSA) {
@@ -161,6 +171,12 @@ class PrivateKey extends BaseModel
 
         if ($key instanceof RSA && $key->getLength() < 2048) {
             return 'RSA keys must have at least 2048 bits.';
+        }
+
+        try {
+            $key->getPublicKey()->toString('OpenSSH');
+        } catch (\Throwable $e) {
+            return 'This key type is not supported. Use an Ed25519, ECDSA (nistp256, nistp384, or nistp521), or RSA key.';
         }
 
         return null;
@@ -235,17 +251,6 @@ class PrivateKey extends BaseModel
         $instance = substr(hash('sha256', (string) (config('app.id') ?: config('app.url'))), 0, 12);
 
         return "{$this->publicKeyBody()} cpk:{$instance}:{$this->uuid}";
-    }
-
-    public static function validateAndExtractPublicKey($privateKey)
-    {
-        $isValid = self::validatePrivateKey($privateKey);
-        $publicKey = $isValid ? self::extractPublicKeyFromPrivate($privateKey) : '';
-
-        return [
-            'isValid' => $isValid,
-            'publicKey' => $publicKey,
-        ];
     }
 
     public function storeInFileSystem()

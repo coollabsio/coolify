@@ -1,13 +1,17 @@
 <?php
 
+use App\Livewire\Security\PrivateKey\Show;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 
 uses(RefreshDatabase::class);
@@ -154,3 +158,35 @@ test('unchanged legacy keys can be renamed before normalization', function (bool
     $key->private_key = (string) RSA::createKey(1024)->toString('PKCS8');
     expect(fn () => $key->save())->toThrow(ValidationException::class);
 })->with([false, true]);
+
+test('a legacy key with unnormalized stored text can be renamed in the key editor', function (string $lineEnding) {
+    Storage::fake('ssh-keys');
+    $user = User::factory()->create();
+    $this->teamA->members()->attach($user->id, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->teamA]);
+
+    $material = str_replace("\r\n", "\n", trim((string) RSA::createKey(1024)->toString('PKCS1')));
+    $key = new PrivateKey(['name' => 'legacy', 'private_key' => str_replace("\n", $lineEnding, $material), 'team_id' => $this->teamA->id]);
+    $key->uuid = (string) Str::uuid();
+    $key->saveQuietly();
+
+    // The browser sends the textarea text with LF line endings.
+    Livewire::test(Show::class, ['private_key_uuid' => $key->uuid])
+        ->set('name', 'renamed')
+        ->set('privateKeyValue', $material)
+        ->call('changePrivateKey')
+        ->assertDispatched('success');
+
+    expect($key->fresh()->name)->toBe('renamed');
+})->with(['no final newline' => "\n", 'CRLF' => "\r\n"]);
+
+test('keys that OpenSSH cannot read are rejected', function (string $material, ?string $error) {
+    expect(PrivateKey::validationError($material))->toBe($error);
+})->with([
+    'OpenSSH Ed25519' => [fn () => EC::createKey('Ed25519')->toString('OpenSSH'), null],
+    'PEM ECDSA P-256' => [fn () => EC::createKey('nistp256')->toString('PKCS8'), null],
+    'PKCS1 RSA 2048' => [fn () => RSA::createKey(2048)->toString('PKCS1'), null],
+    'PuTTY Ed25519' => [fn () => EC::createKey('Ed25519')->toString('PuTTY'), 'PuTTY and other key formats are not supported. Paste the key in OpenSSH or PEM format. It starts with "-----BEGIN".'],
+    'secp256k1' => [fn () => EC::createKey('secp256k1')->toString('PKCS8'), 'This key type is not supported. Use an Ed25519, ECDSA (nistp256, nistp384, or nistp521), or RSA key.'],
+]);
