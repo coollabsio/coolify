@@ -21,7 +21,12 @@ class Show extends Component
 
     public ?string $description = null;
 
-    public string $privateKeyValue;
+    /**
+     * A new private key that replaces the stored key. The stored key is never sent to the browser.
+     */
+    public string $newPrivateKey = '';
+
+    public ?string $fingerprint = null;
 
     public bool $isGitRelated = false;
 
@@ -36,7 +41,7 @@ class Show extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'privateKeyValue' => 'required|string',
+            'newPrivateKey' => 'nullable|string',
             'isGitRelated' => 'nullable|boolean',
         ];
     }
@@ -47,8 +52,7 @@ class Show extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'privateKeyValue.required' => 'The Private Key field is required.',
-                'privateKeyValue.string' => 'The Private Key must be a valid string.',
+                'newPrivateKey.string' => 'The Private Key must be a valid string.',
             ]
         );
     }
@@ -56,7 +60,7 @@ class Show extends Component
     protected $validationAttributes = [
         'name' => 'name',
         'description' => 'description',
-        'privateKeyValue' => 'private key',
+        'newPrivateKey' => 'private key',
     ];
 
     /**
@@ -70,16 +74,18 @@ class Show extends Component
             // Sync TO model (before save)
             $this->private_key->name = $this->name;
             $this->private_key->description = $this->description;
-            $this->private_key->private_key = $this->privateKeyValue;
+            if (filled(trim($this->newPrivateKey))) {
+                $this->private_key->private_key = $this->newPrivateKey;
+            }
             $this->private_key->is_git_related = $this->isGitRelated;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->private_key->name;
             $this->description = $this->private_key->description;
-            $this->privateKeyValue = auth()->user()->can('update', $this->private_key)
-                ? $this->private_key->private_key
-                : '';
+            $this->newPrivateKey = '';
+            $this->fingerprint = $this->private_key->fingerprint;
             $this->isGitRelated = $this->private_key->is_git_related;
+            $this->public_key = $this->private_key->getPublicKey();
         }
     }
 
@@ -87,14 +93,13 @@ class Show extends Component
     {
         $this->modalMode = $modalMode;
         try {
-            $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id'])->whereUuid($private_key_uuid ?? request()->private_key_uuid)->firstOrFail();
+            $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id', 'fingerprint'])->whereUuid($private_key_uuid ?? request()->private_key_uuid)->firstOrFail();
 
             // Explicit authorization check - will throw 403 if not authorized
             $this->authorize('view', $this->private_key);
 
             $this->syncData(false);
             $this->isInUse = $this->private_key->isInUse();
-            $this->public_key = $this->private_key->getPublicKey();
         } catch (AuthorizationException $e) {
             abort(403, 'You do not have permission to view this private key.');
         } catch (\Throwable) {
@@ -115,6 +120,11 @@ class Show extends Component
             }
 
             $this->private_key->delete();
+            auditLog('ui.private_key.deleted', [
+                'team_id' => $this->private_key->team_id,
+                'private_key_uuid' => $this->private_key->uuid,
+                'private_key_name' => $this->private_key->name,
+            ]);
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
             if ($this->modalMode) {
@@ -139,9 +149,17 @@ class Show extends Component
             $this->validate();
 
             $this->syncData(true);
-            $this->private_key->updatePrivateKey([
-                'private_key' => formatPrivateKey($this->private_key->private_key),
-            ]);
+            $changedFields = array_keys($this->private_key->getDirty());
+            $this->private_key->save();
+            if ($changedFields !== []) {
+                auditLog('ui.private_key.updated', [
+                    'team_id' => $this->private_key->team_id,
+                    'private_key_uuid' => $this->private_key->uuid,
+                    'private_key_name' => $this->private_key->name,
+                    'changed_fields' => $changedFields,
+                ]);
+            }
+            $this->syncData(false);
             $this->dispatch('success', 'Private key updated.');
             if ($this->modalMode) {
                 $this->dispatch('privateKeyUpdated');
@@ -151,6 +169,36 @@ class Show extends Component
             $this->dispatch('securityResourceChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Return the stored private key once, after a password confirmation.
+     * The value goes back to the browser only as the action result, not as component state.
+     */
+    public function revealPrivateKey(mixed $password): ?string
+    {
+        try {
+            $this->authorize('update', $this->private_key);
+
+            if (! verifyPasswordConfirmation($password, $this)) {
+                $this->dispatch('error', 'The provided password is incorrect.');
+
+                return null;
+            }
+
+            $this->resetErrorBag('password');
+            auditLog('ui.private_key.revealed', [
+                'team_id' => $this->private_key->team_id,
+                'private_key_uuid' => $this->private_key->uuid,
+                'private_key_name' => $this->private_key->name,
+            ]);
+
+            return $this->private_key->private_key;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return null;
         }
     }
 }

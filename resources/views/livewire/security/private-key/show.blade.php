@@ -1,7 +1,7 @@
 <div>
     @if ($modalMode)
         <div class="relative">
-        <form wire:submit="changePrivateKey" class="flex flex-col gap-4" x-data="{ showPrivateKey: false }"
+        <form wire:submit="changePrivateKey" class="flex flex-col gap-4"
             wire:loading.class="pointer-events-none opacity-50" wire:target="delete">
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input canGate="update" :canResource="$private_key" id="name" label="Name" required />
@@ -10,21 +10,7 @@
                     <x-forms.input canGate="update" :canResource="$private_key" readonly id="public_key"
                         label="Public key" helper="Copy this value to ~/.ssh/authorized_keys on the target server." />
                 </div>
-                <div class="lg:col-span-2">
-                    <div class="mb-1.5 flex items-center justify-between gap-3">
-                        <label class="text-[13px] font-medium">Private key <span class="text-helper">*</span></label>
-                        <button type="button" class="text-[11px] font-medium text-coollabs hover:underline dark:text-brand-light"
-                            x-on:click="showPrivateKey = !showPrivateKey" x-text="showPrivateKey ? 'Hide editor' : 'Edit key'"></button>
-                    </div>
-                    <div x-show="!showPrivateKey">
-                        <x-forms.input canGate="update" :canResource="$private_key" allowToPeak="false"
-                            type="password" id="privateKeyValue" required disabled />
-                    </div>
-                    <div x-cloak x-show="showPrivateKey">
-                        <x-forms.textarea canGate="update" :canResource="$private_key" rows="10"
-                            id="privateKeyValue" required monospace />
-                    </div>
-                </div>
+                @include('livewire.security.private-key.partials.key-field')
             </div>
             <div class="flex items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                 @can('delete', $private_key)
@@ -68,7 +54,7 @@
         </x-slot:actions>
 
 
-    <form wire:submit="changePrivateKey" class="application-settings-form" x-data="{ showPrivateKey: false }">
+    <form wire:submit="changePrivateKey" class="application-settings-form">
         <x-unsaved-bar action="changePrivateKey" />
         <x-application.settings-section title="General">
             <div class="grid gap-4 lg:grid-cols-2">
@@ -80,23 +66,7 @@
                         label="Public key"
                         helper="Copy this value to ~/.ssh/authorized_keys on the target server." />
                 </div>
-                <div class="lg:col-span-2">
-                    <div class="mb-1.5 flex items-center justify-between gap-3">
-                        <label class="text-[13px] font-medium">Private key <span class="text-helper">*</span></label>
-                        <button type="button"
-                            class="text-[11px] font-medium text-coollabs hover:underline dark:text-brand-light"
-                            x-on:click="showPrivateKey = !showPrivateKey"
-                            x-text="showPrivateKey ? 'Hide editor' : 'Edit key'"></button>
-                    </div>
-                    <div x-show="!showPrivateKey">
-                        <x-forms.input canGate="update" :canResource="$private_key" allowToPeak="false"
-                            type="password" id="privateKeyValue" required disabled />
-                    </div>
-                    <div x-cloak x-show="showPrivateKey">
-                        <x-forms.textarea canGate="update" :canResource="$private_key" rows="12"
-                            id="privateKeyValue" required monospace />
-                    </div>
-                </div>
+                @include('livewire.security.private-key.partials.key-field')
             </div>
         </x-application.settings-section>
     </form>
