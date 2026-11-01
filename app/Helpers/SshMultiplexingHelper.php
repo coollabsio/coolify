@@ -325,6 +325,7 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
+        $healthCommand .= self::getCommonSshOptions($server, $sshConfig['sshKeyLocation'], self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
         $healthCommand .= '-- '.self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
         // The health check goes over the network, so a slow link gets at least the server's connection timeout.
@@ -495,7 +496,7 @@ class SshMultiplexingHelper
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
             ."-o ServerAliveInterval=$serverInterval "
-            .'-F /dev/null -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey '
+            .'-F /dev/null -o IdentitiesOnly=yes '
             .'-o ClearAllForwardings=yes -o ForwardAgent=no '
             .'-o RequestTTY=no '
             .'-o LogLevel=ERROR ';

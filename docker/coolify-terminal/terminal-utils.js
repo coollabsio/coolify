@@ -252,13 +252,8 @@ export function extractSshArgs(commandString) {
     }
 
     sshArgs = sshArgs.map((arg) => normalizeShellArgument(arg));
-    sshArgs = sshArgs.map(arg => arg === 'RequestTTY=no' ? 'RequestTTY=yes' : arg);
 
-    if (!sshArgs.includes('RequestTTY=yes') && !sshArgs.some(arg => arg.includes('RequestTTY='))) {
-        sshArgs.push('-o', 'RequestTTY=yes');
-    }
-
-    return sshArgs;
+    return sshArgs.map(arg => arg === 'RequestTTY=no' ? 'RequestTTY=yes' : arg);
 }
 
 export function extractHereDocContent(commandString) {
@@ -331,8 +326,6 @@ const REQUIRED_SSH_OPTIONS = new Set([
     'UserKnownHostsFile',
     'PasswordAuthentication',
     'IdentitiesOnly',
-    'BatchMode',
-    'PreferredAuthentications',
     'ClearAllForwardings',
     'ForwardAgent',
     'ConnectTimeout',
@@ -347,8 +340,6 @@ function isAllowedSshOption(name, value) {
         UserKnownHostsFile: '/dev/null',
         PasswordAuthentication: 'no',
         IdentitiesOnly: 'yes',
-        BatchMode: 'yes',
-        PreferredAuthentications: 'publickey',
         ClearAllForwardings: 'yes',
         ForwardAgent: 'no',
         LogLevel: 'ERROR',

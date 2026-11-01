@@ -9,6 +9,7 @@ it('provides shared validation rules for SSH usernames', function () {
 
     expect(preg_match(ValidationPatterns::SERVER_USERNAME_PATTERN, 'deploy.user'))->toBe(1);
     expect(preg_match(ValidationPatterns::SERVER_USERNAME_PATTERN, 'deploy$user'))->toBe(0);
+    expect(preg_match(ValidationPatterns::SERVER_USERNAME_PATTERN, '-oProxyCommand=id'))->toBe(0);
 });
 
 it('preserves dots when sanitizing server SSH usernames', function () {
