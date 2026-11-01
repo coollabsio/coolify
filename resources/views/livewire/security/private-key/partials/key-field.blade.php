@@ -9,6 +9,7 @@
     revealing: false,
     skipPassword: @js(shouldSkipPasswordConfirmation()),
     reveal() {
+        if (this.replacing) return;
         if (!this.skipPassword && !this.password) {
             this.askPassword = true;
             return;
@@ -17,7 +18,7 @@
         $wire.revealPrivateKey(this.password).then((key) => {
             this.revealing = false;
             this.password = '';
-            if (key) {
+            if (key && !this.replacing) {
                 this.revealed = key;
                 this.askPassword = false;
             }
@@ -38,10 +39,11 @@
                 <button type="button"
                     class="text-[11px] font-medium text-coollabs hover:underline dark:text-brand-light"
                     x-on:click="revealed || askPassword ? hide() : reveal()"
+                    x-bind:disabled="replacing"
                     x-text="revealed || askPassword ? 'Hide key' : 'Reveal key'"></button>
                 <button type="button"
                     class="text-[11px] font-medium text-coollabs hover:underline dark:text-brand-light"
-                    x-on:click="replacing = !replacing; if (!replacing) { $wire.set('newPrivateKey', '', false) }"
+                    x-on:click="replacing = !replacing; if (replacing) { hide() } else { $wire.set('newPrivateKey', '', false) }"
                     x-text="replacing ? 'Cancel replace' : 'Replace key'"></button>
             </div>
         @endcan
