@@ -36,6 +36,9 @@ workflows:
     '.github/workflows/request-docs-update.yaml': []
     '.github/workflows/stale.yaml':
         - 'actions/stale@v11.0.0'
+    '.github/workflows/tmp-remove-arch-tags.yaml':
+        - 'actions/checkout@v7.0.1'
+        - 'actions/upload-artifact@v7.0.2'
 dependencies:
     'actions/checkout@v7.0.1':
         ref: 'v7.0.1'
