@@ -4,13 +4,14 @@ namespace App\Traits;
 
 use App\Models\Server;
 use App\Services\SentinelMetricsClient;
+use App\Support\ValidationPatterns;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Log;
 
 trait HasMetrics
 {
     /**
-     * Raw Sentinel responses from prefetchMetrics(), keyed by "type:mins"; each is read once.
+     * Raw Sentinel responses from prefetchMetrics(), keyed by "type:mins:container"; each is read once.
      *
      * @var array<string, string>
      */
@@ -22,8 +23,9 @@ trait HasMetrics
      * so each getter fetches on its own as before.
      *
      * @param  array<int, string>  $types
+     * @param  string|null  $container  Sentinel container name to read, defaults to the resource UUID. Not used for server metrics.
      */
-    public function prefetchMetrics(array $types, int $mins): void
+    public function prefetchMetrics(array $types, int $mins, ?string $container = null): void
     {
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
@@ -36,7 +38,7 @@ trait HasMetrics
         // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
         // cannot end the heredoc. Responses are separated by a 0x1E record separator.
         $script = implode("\nprintf '\\036'\n", array_map(
-            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from, $mins, $container)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
             $types
         ));
 
@@ -56,22 +58,22 @@ trait HasMetrics
         }
 
         foreach ($types as $index => $type) {
-            $this->prefetchedMetricResponses["{$type}:{$mins}"] = trim($responses[$index]);
+            $this->prefetchedMetricResponses["{$type}:{$mins}:{$container}"] = trim($responses[$index]);
         }
     }
 
-    public function getCpuMetrics(int $mins = 5): ?array
+    public function getCpuMetrics(int $mins = 5, ?string $container = null): ?array
     {
-        return $this->getMetrics('cpu', $mins, 'percent');
+        return $this->getMetrics('cpu', $mins, 'percent', $container);
     }
 
-    public function getMemoryMetrics(int $mins = 5): ?array
+    public function getMemoryMetrics(int $mins = 5, ?string $container = null): ?array
     {
         if ($this->isServerMetrics()) {
             return $this->getMetrics('memory', $mins, 'usedPercent');
         }
 
-        $metrics = $this->getMetrics('memory', $mins, 'used');
+        $metrics = $this->getMetrics('memory', $mins, 'used', $container);
         if ($metrics === null) {
             return null;
         }
@@ -124,9 +126,9 @@ trait HasMetrics
         ];
     }
 
-    private function getMetrics(string $type, int $mins, string $valueField): ?array
+    private function getMetrics(string $type, int $mins, string $valueField, ?string $container = null): ?array
     {
-        return $this->mapRows($this->fetchMetricRows($type, $mins), $valueField, $mins);
+        return $this->mapRows($this->fetchMetricRows($type, $mins, $container), $valueField, $mins);
     }
 
     /**
@@ -136,20 +138,20 @@ trait HasMetrics
      *
      * @return array<int, array<string, mixed>>|null
      */
-    protected function fetchMetricRows(string $type, int $mins): ?array
+    protected function fetchMetricRows(string $type, int $mins, ?string $container = null): ?array
     {
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
             return null;
         }
 
-        $key = "{$type}:{$mins}";
+        $key = "{$type}:{$mins}:{$container}";
         if (array_key_exists($key, $this->prefetchedMetricResponses)) {
             $response = $this->prefetchedMetricResponses[$key];
             unset($this->prefetchedMetricResponses[$key]);
         } else {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $endpoint = $this->getMetricsEndpoint($type, $from, $mins);
+            $endpoint = $this->getMetricsEndpoint($type, $from, $mins, $container);
             $token = $this->metricsToken($server);
 
             $response = instant_remote_process(
@@ -255,7 +257,7 @@ trait HasMetrics
      * 1000 per range, so it sends far fewer rows. Older Sentinels ignore `bucket_ms`;
      * mapRows() still downsamples their raw rows.
      */
-    private function getMetricsEndpoint(string $type, string $from, int $mins): string
+    private function getMetricsEndpoint(string $type, string $from, int $mins, ?string $container = null): string
     {
         $base = 'http://localhost:8888/api';
         $query = "from={$from}";
@@ -267,6 +269,11 @@ trait HasMetrics
             return "{$base}/{$type}/history?{$query}";
         }
 
-        return "{$base}/container/{$this->uuid}/{$type}/history?{$query}";
+        $container ??= $this->uuid;
+        if (! ValidationPatterns::isValidContainerName($container)) {
+            throw new \InvalidArgumentException('Invalid container name.');
+        }
+
+        return "{$base}/container/{$container}/{$type}/history?{$query}";
     }
 }
