@@ -54,12 +54,12 @@
                 @elseif (! $isRunning && ! $hasServers)
                     <p class="text-xs text-neutral-500 dark:text-fg-dim">Nothing uses this key now. You can delete it.</p>
                 @endif
+                <div class="flex items-center justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                    <x-forms.button isHighlighted wire:click="rotate" :disabled="$isRunning || ! $hasServers">
+                        {{ $isRunning ? 'Rotating...' : ($state ? 'Rotate again' : 'Rotate key') }}
+                    </x-forms.button>
+                </div>
             </div>
-            <x-slot:footer>
-                <x-forms.button isHighlighted wire:click="rotate" :disabled="$isRunning || ! $hasServers">
-                    {{ $isRunning ? 'Rotating...' : ($state ? 'Rotate again' : 'Rotate key') }}
-                </x-forms.button>
-            </x-slot:footer>
         </x-modal-input>
     @endif
 </div>
