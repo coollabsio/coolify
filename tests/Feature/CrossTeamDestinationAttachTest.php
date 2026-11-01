@@ -64,6 +64,10 @@ beforeEach(function () {
         'network' => 'coolify-b-'.fake()->unique()->word(),
     ]);
 
+    foreach ([$this->serverA, $this->serverA2, $this->serverB] as $server) {
+        $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    }
+
     // Act as attacker (Team A)
     $this->actingAs($this->userA);
     session(['currentTeam' => $this->teamA]);

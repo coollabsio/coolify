@@ -3,6 +3,7 @@
 namespace App\Rules;
 
 use App\Models\InstanceSettings;
+use App\Services\Dns\DnsResolver;
 use Closure;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Psr7\UriComparator;
@@ -11,7 +12,6 @@ use Illuminate\Support\Facades\Log;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
-use PurplePixie\PhpDns\DNSTypes;
 use Throwable;
 
 class SafeWebhookUrl implements ValidationRule
@@ -370,7 +370,7 @@ class SafeWebhookUrl implements ValidationRule
         $ips = [];
 
         foreach ($dnsServers as $dnsServer) {
-            foreach ([DNSTypes::NAME_A, DNSTypes::NAME_AAAA] as $type) {
+            foreach ([DnsResolver::TYPE_A, DnsResolver::TYPE_AAAA] as $type) {
                 try {
                     $records = queryDnsServer($dnsServer, $host, $type);
 

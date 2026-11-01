@@ -875,6 +875,7 @@ class Github extends Controller
         $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
             ->where('team_id', $team_id)
             ->firstOrFail();
+        abort_unless($request->user()->can('update', $github_app), 403);
 
         if ($request->user()->currentTeam()?->id !== $team_id) {
             refreshSession($github_app->team);

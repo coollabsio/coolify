@@ -9,6 +9,7 @@ import {
 import {
     TERMINAL_CONNECT_TIMEOUT_MS,
     TERMINAL_CONNECTION_ERRORS,
+    isTerminalSessionEndedNotice,
     isTerminalStartupRejection,
     resolveTerminalCloseOutcome,
     terminalSessionStartMethods,
@@ -1107,6 +1108,9 @@ export function initializeTerminalComponent() {
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
+                } else if (isTerminalSessionEndedNotice(event.data)) {
+                    // The server ends the PTY next; 'pty-exited' then resets the terminal.
+                    this.$wire.dispatch('error', event.data);
                 } else if (isTerminalStartupRejection(event.data)) {
                     logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
                     this.pendingCommand = null;

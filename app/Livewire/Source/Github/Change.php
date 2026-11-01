@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Change extends Component
@@ -79,6 +80,7 @@ class Change extends Component
 
     public $privateKeys;
 
+    #[Locked]
     public string $manifestState = '';
 
     public string $activeTab = 'general';
@@ -198,7 +200,7 @@ class Change extends Component
     public function checkPermissions()
     {
         try {
-            $this->authorize('view', $this->github_app);
+            $this->authorize('update', $this->github_app);
 
             // Validate required fields before attempting to fetch permissions
             $missingFields = [];
@@ -251,7 +253,7 @@ class Change extends Component
     public function testConnection()
     {
         try {
-            $this->authorize('view', $this->github_app);
+            $this->authorize('update', $this->github_app);
 
             if (! $this->github_app->isConnected()) {
                 $this->dispatch('error', 'GitHub App is not fully set up. Please complete installation first.');
@@ -319,7 +321,9 @@ class Change extends Component
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
             $this->fqdn = $settings->fqdn;
-            $this->manifestState = $this->createGithubAppSetupState('manifest');
+            if (auth()->user()->can('update', $this->github_app)) {
+                $this->manifestState = $this->createGithubAppSetupState('manifest');
+            }
 
             // On cloud, the instance IPs are the addresses of the Coolify hosts. Do not send them to the browser.
             if (! isCloud()) {

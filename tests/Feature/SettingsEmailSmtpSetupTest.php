@@ -73,6 +73,7 @@ test('team smtp settings save their own ehlo domain', function () {
 
     Livewire::test(NotificationEmail::class)
         ->fill(smtpSetupPayload())
+        ->set('smtpHost', '1.1.1.1')
         ->set('smtpEnabled', true)
         ->call('submitSmtp')
         ->assertHasNoErrors()

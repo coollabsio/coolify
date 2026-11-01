@@ -78,8 +78,8 @@
                 @can('view', $key)
                     <div wire:key="private-key-{{ $key->id }}"
                         class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                    <div
-                        class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:hover:bg-white/[0.025]"
+                    <div @click="if (!$event.target.closest('button')) $el.querySelector('button').click()"
+                        class="grid min-h-14 w-full cursor-pointer grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:hover:bg-white/[0.025]"
                     >
                         <div class="flex min-w-0 items-center gap-3">
                             <div
@@ -165,7 +165,7 @@
         </div>
         @if ($selectedPrivateKeyUuid)
             <div wire:loading.remove wire:target="openEditor">
-                <livewire:security.private-key.show :private_key_uuid="$selectedPrivateKeyUuid" :modalMode="true"
+                <livewire:security.private-key.show :private_key_uuid="$selectedPrivateKeyUuid"
                     :key="'private-key-editor-'.$selectedPrivateKeyUuid" />
             </div>
         @endif
