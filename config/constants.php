@@ -19,8 +19,8 @@ return [
         'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
-        // https://hub.docker.com/r/rclone/rclone/tags: copies backups to SFTP, FTPS, and WebDAV storages on the servers.
-        'rclone_image' => env('RCLONE_IMAGE', 'rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5'),
+        // https://hub.docker.com/r/rclone/rclone/tags (also on ghcr.io with the same digest): copies backups to SFTP, FTPS, and WebDAV storages on the servers.
+        'rclone_image' => env('RCLONE_IMAGE', env('REGISTRY_URL', 'docker.io').'/rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
