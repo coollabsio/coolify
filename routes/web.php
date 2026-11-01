@@ -574,27 +574,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            $user = auth()->user();
-            $team = $user->currentTeam();
-            if (is_null($team)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
-            }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
             $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
-            if ($team->id !== 0) {
-                if (is_null($execution_team_id)) {
-                    return response()->json(['message' => 'Team not found.'], 404);
-                }
-                if ($team->id !== $execution_team_id) {
-                    return response()->json(['message' => 'Permission denied.'], 403);
-                }
-                if (is_null($execution)) {
-                    return response()->json(['message' => 'Backup not found.'], 404);
-                }
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             $filename = data_get($execution, 'filename');
             if (! $execution->local_storage_deleted && filled($filename)) {
@@ -631,20 +618,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/download/volume-backup/{executionId}', function () {
         try {
-            $user = auth()->user();
-            $team = $user->currentTeam();
-            if (is_null($team)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
-            }
-
             $execution = ScheduledVolumeBackupExecution::query()
                 ->with('scheduledVolumeBackup.backupable.resource')
                 ->findOrFail(request()->route('executionId'));
-            if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
-                return response()->json(['message' => 'Permission denied.'], 403);
+            $execution_team_id = $execution->scheduledVolumeBackup->team_id;
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);

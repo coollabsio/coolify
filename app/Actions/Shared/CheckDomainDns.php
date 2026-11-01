@@ -3,9 +3,9 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Services\Dns\DnsResolver;
 use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
-use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 
 class CheckDomainDns
@@ -65,7 +65,7 @@ class CheckDomainDns
             return $this->result('ok', 'DNS looks correct.', $expectedIp);
         }
 
-        $type = dnsRecordTypeForIp($expectedIp) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
+        $type = dnsRecordTypeForIp($expectedIp) === 'AAAA' ? DnsResolver::TYPE_AAAA : DnsResolver::TYPE_A;
         $receivedAddressRecord = false;
 
         foreach ($dnsServers as $dnsServer) {
@@ -112,8 +112,8 @@ class CheckDomainDns
      */
     protected function resolveWithSystemDns(string $host, string $type): array
     {
-        $recordType = $type === DNSTypes::NAME_AAAA ? DNS_AAAA : DNS_A;
-        $addressKey = $type === DNSTypes::NAME_AAAA ? 'ipv6' : 'ip';
+        $recordType = $type === DnsResolver::TYPE_AAAA ? DNS_AAAA : DNS_A;
+        $addressKey = $type === DnsResolver::TYPE_AAAA ? 'ipv6' : 'ip';
 
         try {
             $records = @dns_get_record($host, $recordType);

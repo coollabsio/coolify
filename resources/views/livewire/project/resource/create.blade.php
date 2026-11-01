@@ -2,7 +2,9 @@
     <x-slot:title>
         {{ data_get_str($project, 'name')->limit(10) }} > New | Coolify
     </x-slot>
-    @if ($type === 'public')
+    @if ($pendingType)
+        <div wire:init="createResource">Creating resource...</div>
+    @elseif ($type === 'public')
         <livewire:project.new.public-git-repository :type="$type" />
     @elseif ($type === 'private-gh-app')
         <livewire:project.new.github-private-repository :type="$type" />

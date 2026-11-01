@@ -51,7 +51,7 @@
         class="listbox-panel top-8! right-auto! left-0! z-[90]! w-64! min-w-64!" role="menu">
         <div class="flex items-center gap-1 px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">
             <span>System status</span>
-            @if ($server->proxySet())
+            @if ($server->proxySet() && auth()->user()?->can('manageProxy', $server))
                 <button type="button" wire:click="checkProxyStatus" wire:loading.attr="disabled"
                     wire:target="checkProxyStatus" aria-label="Refresh status" title="Refresh status"
                     class="inline-flex size-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 disabled:cursor-wait dark:text-fg-faint dark:hover:bg-white/10 dark:hover:text-fg">
