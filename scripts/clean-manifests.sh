@@ -5,7 +5,7 @@ OPTION="$*"
 LIMIT="${2:-}"
 IMAGE=coollabsio/coolify
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
-KEEP_TAG_EXCEPTIONS='v3 4.0.0-beta.420.1 4.0.0-beta.420.2 4.0.0-beta.420.3 4.0.0-beta.420.4 4.0.0-beta.420.5 4.0.0-beta.420.6 4.0.0-beta.420.7 4.0.0-beta.420.8 4.0.0-beta.420.9 4.0.0-beta.420.10'
+KEEP_TAG_EXCEPTIONS=v3,4.0.0-beta.420.1,4.0.0-beta.420.2,4.0.0-beta.420.3,4.0.0-beta.420.4,4.0.0-beta.420.5,4.0.0-beta.420.6,4.0.0-beta.420.7,4.0.0-beta.420.8,4.0.0-beta.420.9,4.0.0-beta.420.10
 KEEP_NIGHTLY_DAYS=14
 MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
@@ -78,7 +78,7 @@ select_kept_tags() {
 		|| die "could not list the git tags of github.com/$IMAGE"
 	gh pr list --repo "$IMAGE" --state open --limit 1000 --json number --jq '.[] | "pr-\(.number)"' >> "$WORK_DIR/keep.txt" \
 		|| die "gh could not list the open pull requests of $IMAGE"
-	tr ' ' '\n' <<< "$KEEP_TAG_EXCEPTIONS" >> "$WORK_DIR/keep.txt"
+	tr ',' '\n' <<< "$KEEP_TAG_EXCEPTIONS" >> "$WORK_DIR/keep.txt"
 	cutoff="$(jq -nr --argjson days "$KEEP_NIGHTLY_DAYS" 'now - $days * 86400 | strftime("%Y%m%d")')"
 	{
 		grep -E "$KEEP_TAG_PATTERN" "$WORK_DIR/tags.txt" || true
