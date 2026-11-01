@@ -15,6 +15,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -138,6 +139,23 @@ describe('Terminal::sendTerminalCommand', function () {
             ->call('sendTerminalCommand', true, 'app-container', $this->server->uuid)
             ->assertDispatched('send-terminal-token')
             ->assertNotDispatched(Terminal::SESSION_FAILED_EVENT);
+    });
+
+    it('records the socket peer instead of a forwarded IP in the terminal token', function () {
+        $component = Livewire::test(Terminal::class);
+        $request = Request::create('/', server: [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_X_FORWARDED_FOR' => '203.0.113.42',
+        ]);
+        $request->setTrustedProxies(['127.0.0.1'], Request::HEADER_X_FORWARDED_FOR);
+        app()->instance('request', $request);
+
+        $component->instance()->sendTerminalCommand(false, $this->server->name, $this->server->uuid);
+        $events = \Livewire\store($component->instance())->get('dispatched');
+        $token = $events[0]->serialize()['params'][0];
+
+        expect(Cache::get('terminal-session:'.$token)['client_ip'])->toBe('127.0.0.1');
+
     });
 
     it('reports a stopped container instead of leaving the terminal connecting', function () {
