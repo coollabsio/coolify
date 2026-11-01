@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Middleware\VerifyCsrfToken;
+use App\Models\AuditEvent;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\TerminalSessionService;
+use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
@@ -13,6 +16,9 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    fakeRemoteProcesses(['*' => Process::result()]);
+    $this->withoutDefer();
+    Server::flushIdentityMap();
     Cache::clear();
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -154,4 +160,85 @@ it('does not accept ssh arguments or identity paths from the client', function (
         'identityFile' => '../../other-team-key',
         'target' => '-oProxyCommand=id',
     ])->assertForbidden();
+});
+
+function activeTerminalSecuritySession(User $user, Team $team): array
+{
+    $key = PrivateKey::factory()->create(['team_id' => $team->id]);
+    /** @var Server $server */
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $key->id]);
+    $service = app(TerminalSessionService::class);
+
+    return [$server, $service->redeem($user, $service->issue($user, $server))['session_id']];
+}
+
+it('rejects an active session after administrative access is lost', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $service = app(TerminalSessionService::class);
+    $service->check($this->user, $id);
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+    expect(fn () => $service->check($this->user->fresh(), $id))->toThrow(AccessDeniedHttpException::class);
+});
+
+it('rejects an active session after server terminal access is disabled', function (string $setting, bool $value) {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $server->settings->forceFill([$setting => $value])->saveQuietly();
+    expect(fn () => app(TerminalSessionService::class)->check($this->user, $id))->toThrow(AccessDeniedHttpException::class);
+})->with(['disabled' => ['is_terminal_enabled', false], 'force disabled' => ['force_disabled', true]]);
+
+it('rejects another users active session', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $other = User::factory()->create();
+    $other->teams()->attach($this->team, ['role' => 'owner']);
+    expect(fn () => app(TerminalSessionService::class)->check($other, $id))->toThrow(AccessDeniedHttpException::class);
+});
+
+it('audits the end reason and duration only once', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $this->travel(42)->seconds();
+    $service = app(TerminalSessionService::class);
+    $service->end($id, 'revoked');
+    $service->end($id, 'exited');
+    $events = AuditEvent::where('event', 'terminal.session.ended')->get();
+    expect($events)->toHaveCount(1);
+    expect($events->first()->metadata)->toMatchArray(['reason' => 'revoked', 'duration_seconds' => 42]);
+    expect(fn () => $service->check($this->user, $id))->toThrow(AccessDeniedHttpException::class);
+});
+
+function enforceTerminalSecurityCsrf(): void
+{
+    app()->bind(VerifyCsrfToken::class, fn ($app) => new class($app, $app['encrypter']) extends VerifyCsrfToken
+    {
+        protected function runningUnitTests(): bool
+        {
+            return false;
+        }
+    });
+}
+
+it('ends a session without authentication or a csrf token', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    enforceTerminalSecurityCsrf();
+    auth()->logout();
+    $this->postJson('/terminal/session/end', ['session_id' => $id, 'reason' => 'disconnected'])->assertNoContent();
+    expect(fn () => app(TerminalSessionService::class)->check($this->user, $id))->toThrow(AccessDeniedHttpException::class);
+});
+
+it('rejects an unknown end reason without ending the session', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    enforceTerminalSecurityCsrf();
+    $this->postJson('/terminal/session/end', ['session_id' => $id, 'reason' => 'unknown'])->assertUnprocessable()->assertJsonValidationErrors('reason');
+    app(TerminalSessionService::class)->check($this->user, $id);
+});
+
+it('checks a session with the terminal servers csrf setup', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    enforceTerminalSecurityCsrf();
+    $this->withSession(['_token' => 'terminal-csrf'])->postJson('/terminal/session/check', ['session_id' => $id], ['X-XSRF-TOKEN' => encrypt(CookieValuePrefix::create('XSRF-TOKEN', app('encrypter')->getKey()).'terminal-csrf', false)])->assertOk()->assertJson(['active' => true]);
+});
+
+it('rejects a session check without a csrf token', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    enforceTerminalSecurityCsrf();
+    $this->postJson('/terminal/session/check', ['session_id' => $id])->assertStatus(419);
 });

@@ -58,6 +58,9 @@ async function postToCoolify(path, headers, body = null) {
             });
         });
 
+        request.setTimeout(10_000, () => {
+            request.destroy(new Error('Request to Coolify timed out'));
+        });
         request.on('error', reject);
         request.end(requestBody);
     });
@@ -360,7 +363,7 @@ function parseMessage(message) {
  *
  * @returns {Promise<boolean>} false when the command was rejected and no PTY started
  */
-async function handleCommand(ws, command, userId, terminalSessionId) {
+async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) {
     const userSession = userSessions.get(userId);
     if (userSession && userSession.isActive) {
         userSession.endReason = 'replaced';
@@ -475,11 +478,11 @@ async function handleCommand(ws, command, userId, terminalSessionId) {
         // switch) after its replacement is already spawned. Only mutate the shared session
         // state when this exit belongs to the session's current PTY.
         if (userSession.ptyProcess !== ptyProcess) {
-            reportTerminalSessionEnd(terminalSessionId, 'replaced');
+            reportEnd('replaced');
             return;
         }
 
-        reportTerminalSessionEnd(terminalSessionId, userSession.endReason ?? 'exited');
+        reportEnd(userSession.endReason ?? 'exited');
 
         ws.send('pty-exited');
         userSession.isActive = false;
@@ -507,12 +510,16 @@ function watchTerminalSession(userSession, ptyProcess, terminalSessionId) {
     let checking = false;
 
     return setInterval(async () => {
-        if (checking || userSession.ptyProcess !== ptyProcess) {
+        if (userSession.ptyProcess !== ptyProcess) {
             return;
         }
 
         if (Date.now() - userSession.lastInputAt >= TERMINAL_IDLE_TIMEOUT_SECONDS * 1000) {
             await endTerminalSession(userSession, ptyProcess, 'idle', `no input for ${TERMINAL_IDLE_TIMEOUT_SECONDS / 60} minutes.`);
+            return;
+        }
+
+        if (checking) {
             return;
         }
 
@@ -594,19 +601,28 @@ async function handleTerminalToken(userSession, token) {
         return;
     }
 
+    let terminalSessionId;
+    let endReported = false;
+    const reportEnd = (reason) => {
+        if (typeof terminalSessionId !== 'string' || endReported) return;
+        endReported = true;
+        reportTerminalSessionEnd(terminalSessionId, reason);
+    };
+
     try {
         const response = await postToCoolify('/terminal/session', userSession.authHeaders, { token });
-        const terminalSessionId = response.data?.session_id;
+        terminalSessionId = response.data?.session_id;
         if (response.status !== 200 || typeof response.data?.command !== 'string' || typeof terminalSessionId !== 'string') {
             rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
             return;
         }
 
-        const started = await handleCommand(userSession.ws, [response.data.command], userSession.userId, terminalSessionId);
+        const started = await handleCommand(userSession.ws, [response.data.command], userSession.userId, terminalSessionId, reportEnd);
         if (!started) {
-            reportTerminalSessionEnd(terminalSessionId, 'rejected');
+            reportEnd('rejected');
         }
     } catch (error) {
+        reportEnd('rejected');
         logTerminal('error', 'Failed to redeem terminal token.', {
             userId: userSession.userId,
             error: error.message,
