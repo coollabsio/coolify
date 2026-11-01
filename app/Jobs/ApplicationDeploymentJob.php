@@ -3617,10 +3617,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $knownHosts = implode("\n", [...$savedLines, ...$newLines]);
-        Application::query()->whereKey($this->application->id)->update(['git_ssh_known_hosts' => $knownHosts]);
-        $this->application->git_ssh_known_hosts = $knownHosts;
-        foreach ($newLines as $line) {
+        $addedLines = [];
+        $knownHosts = $this->application->getConnection()->transaction(function () use ($newLines, &$addedLines): string {
+            $currentLines = gitKnownHostsLines(
+                Application::query()->withoutGlobalScope('withRelations')->whereKey($this->application->id)->lockForUpdate()->value('git_ssh_known_hosts')
+            );
+            $addedLines = array_values(array_diff($newLines, $currentLines));
+            $merged = implode("\n", [...$currentLines, ...$addedLines]);
+            if ($addedLines !== []) {
+                Application::query()->whereKey($this->application->id)->update(['git_ssh_known_hosts' => $merged]);
+            }
+
+            return $merged;
+        });
+        $this->application->forceFill(['git_ssh_known_hosts' => $knownHosts])->syncOriginalAttribute('git_ssh_known_hosts');
+        foreach ($addedLines as $line) {
             [$host, $keyType] = explode(' ', $line);
             $this->application_deployment_queue->addLogEntry("Saved the SSH host key of {$host} ({$keyType}). Later deployments accept only this key. You can see or remove it under Source.");
         }

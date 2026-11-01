@@ -287,3 +287,15 @@ test('changeSource rejects a GiteaApp owned by another team', function () {
     expect($this->applicationA->source_type)->not->toBe(GiteaApp::class);
     Http::assertNothingSent();
 });
+
+test('submit reports invalid SSH known hosts as a field error without saving', function () {
+    $originalKnownHosts = $this->applicationA->git_ssh_known_hosts;
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitSshKnownHosts', 'invalid-host-key')
+        ->call('submit')
+        ->assertHasErrors(['gitSshKnownHosts'])
+        ->assertNotDispatched('configurationChanged');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($originalKnownHosts);
+});

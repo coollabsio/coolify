@@ -9,6 +9,7 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Rules\ValidGitBranch;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;

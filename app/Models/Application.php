@@ -1912,6 +1912,7 @@ class Application extends BaseModel
 
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
+        $commit = $commit ?: ($this->git_commit_sha ?: 'HEAD');
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $baseDir = $custom_base_dir ?? $this->generateBaseDir($deployment_uuid);
@@ -2558,7 +2559,7 @@ class Application extends BaseModel
         );
     }
 
-    protected function buildGitCheckoutCommand($target, string $gitSshCommand, ?string $gitConfigOptions = null): string
+    protected function buildGitCheckoutCommand(string $target, string $gitSshCommand, ?string $gitConfigOptions = null): string
     {
         $escapedTarget = escapeshellarg($target);
         $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
