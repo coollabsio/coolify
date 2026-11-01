@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+
+- Refuse to update, force-push or delete the git tag of a release, with a tag protection rule on GitHub
+- Refuse to delete or force-push `main`, `next`, release and maintenance branches, with branch protection rules on GitHub
+- Protect archive branches from updates, deletions and force-pushing, with branch protection rules on GitHub
+- Harden the CI workflows
+  - Require every action to be pinned to a full-length commit SHA
+  - Grant every job the least permissions it needs and state the reason for every write permission
+  - Keep the Docker Hub credentials and the CDN token in the `release` environment, which only the branches that release can use
+  - Keep the tokens that delete images in the `cleanup` environment, which only `main` can use
+  - Lock every action and the actions it calls to a commit in `.github/workflows/actions.lock`, together with the IDs of its owner and repository, which a commit SHA alone does not check
+  - Run without the GitHub Actions cache, layer caches and cached tool binaries, so no run restores what another run wrote
+  - Fix every finding of jactionlint pedantic
+
 ### Added
 
 - Choose the update channel of an instance on the update page: stable, preview with betas and release candidates, nightly with a warning that breaking changes are possible, or a custom image such as `pr-1234`
@@ -48,6 +62,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
+- Remove the workflow that deleted every untagged image on ghcr.io, one run would delete the platform images and attestations of every release
+- Remove the workflow that moved pull requests to `main` or `next` by their category, for now
 - Remove the Windows support with Docker Desktop, `docker-compose.windows.yml` and `.env.windows-docker-desktop.example`, and the testing host image on Docker Hub, which only it used
 - Remove the Claude workflow and the temporary workflow and image of the PHP base image
 - Remove the git-cliff workflow that generated `CHANGELOG.md`, it is written by hand
@@ -60,4 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Maintenance
 
+- Add `scripts/clean-manifests.sh` and a workflow that delete the unused manifests from ghcr.io and docker.io, such as the leftovers of the old workflows and the images of closed pull requests, and keep every release, every moving tag, the nightlies of the last 14 days and the images of open pull requests
+- Give every job a name, a timeout, a fixed runner image and a concurrency group
+- Bump `actions/stale` to v11, GitHub Actions removed the Node.js 20 it ran on
 - Describe the new release process in `AGENTS.md`

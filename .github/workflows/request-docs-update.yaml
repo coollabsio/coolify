@@ -1,15 +1,30 @@
-name: Add comment based on label
-on:
-  pull_request_target:
-    types:
-      - labeled
+name: Request docs update
 
-permissions:
-  pull-requests: write
+on:
+  # Comments on pull requests from forks too, it checks out and runs no code of the pull request
+  # jactionlint ignore=dangerous-triggers
+  pull_request_target:
+    types: [labeled]
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: request-docs-update-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  add-comment:
-    runs-on: ubuntu-latest
+  comment:
+    name: Request docs update (${{ matrix.label }})
+    permissions:
+      pull-requests: write # comment on the pull request
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -33,20 +48,15 @@ jobs:
 
               Coolify Docs Repository: https://github.com/coollabsio/coolify-docs
               How to Contribute to the Docs: https://coolify.io/docs/get-started/contribute/documentation
-          # - label: "✨ Enhancement"
-          #  body: |
-          #    It appears to us that you are making an enhancement to Coolify.
-          #    We kindly ask you to also review and update the Coolify Documentation to include information about this enhancement if applicable.
-          #    This will help ensure that our documentation remains accurate and up-to-date for all users.
     steps:
-      - name: Add comment
+      - name: Comment on the pull request
         if: >-
-          (github.event.label.name == matrix.label || github.event.label.name == '📑 Waiting for Docs PR')
+          ${{ (github.event.label.name == matrix.label || github.event.label.name == '📑 Waiting for Docs PR')
           && contains(github.event.pull_request.labels.*.name, matrix.label)
-          && contains(github.event.pull_request.labels.*.name, '📑 Waiting for Docs PR')
-        run: gh pr comment "$NUMBER" --body "$BODY"
+          && contains(github.event.pull_request.labels.*.name, '📑 Waiting for Docs PR') }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
           BODY: ${{ matrix.body }}
+        run: gh pr comment "$NUMBER" --body "$BODY"

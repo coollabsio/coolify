@@ -29,7 +29,7 @@ jobs:
       nightly: ${{ steps.plan.outputs.nightly }}
     steps:
       - name: Check out next
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           ref: next
           fetch-depth: 0
@@ -73,20 +73,20 @@ jobs:
         line: ${{ fromJSON(needs.plan.outputs.nightly).lines }}
     steps:
       - name: Download the built images
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # https://github.com/actions/download-artifact/releases/tag/v8.0.2
+        uses: actions/download-artifact@v8.0.2
         with:
           pattern: image-*
           path: ${{ runner.temp }}/images
 
       - name: Log in to ghcr.io
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to docker.io
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # https://github.com/docker/login-action/releases/tag/v4.7.0
+        uses: docker/login-action@v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out the nightly
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # https://github.com/actions/checkout/releases/tag/v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ fromJSON(needs.plan.outputs.nightly).revision }}
           persist-credentials: false
