@@ -10023,7 +10023,6 @@ paths:
                 - name
                 - endpoint
                 - key
-                - secret
               properties:
                 type:
                   type: string

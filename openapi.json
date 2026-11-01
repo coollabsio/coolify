@@ -15732,8 +15732,7 @@
                                 "required": [
                                     "name",
                                     "endpoint",
-                                    "key",
-                                    "secret"
+                                    "key"
                                 ],
                                 "properties": {
                                     "type": {

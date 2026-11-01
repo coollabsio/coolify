@@ -7,6 +7,7 @@ use App\Livewire\Storage\Concerns\SelectsSftpLogin;
 use App\Models\S3Storage;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Uri;
 use Illuminate\Validation\Rule;
@@ -148,7 +149,7 @@ class Create extends Component
         }
     }
 
-    public function render()
+    public function render(): View
     {
         $teamId = currentTeam()->id;
 

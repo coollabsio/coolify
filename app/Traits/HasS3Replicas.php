@@ -81,15 +81,20 @@ trait HasS3Replicas
 
         $disk = $replica->s3->filesystem();
         if (! $replica->s3->isS3()) {
-            $stream = $disk->readStream($this->filename);
-            if (! is_resource($stream)) {
-                return null;
-            }
+            $filename = $this->filename;
 
-            return response()->streamDownload(function () use ($stream): void {
-                fpassthru($stream);
-                fclose($stream);
-            }, basename($this->filename), ['Content-Type' => 'application/octet-stream']);
+            return response()->streamDownload(function () use ($disk, $filename): void {
+                $stream = $disk->readStream($filename);
+                if (! is_resource($stream)) {
+                    return;
+                }
+
+                try {
+                    fpassthru($stream);
+                } finally {
+                    fclose($stream);
+                }
+            }, basename($filename), ['Content-Type' => 'application/octet-stream']);
         }
 
         // The upload copies the file to "<bucket><backup directory>/", so the object key is the local file path.

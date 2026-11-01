@@ -1985,3 +1985,60 @@ test('an application with a system-wide GitHub App that the target lacks is list
         ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
 });
+
+test('import keeps distinct storage UUIDs separate at the same endpoint', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $payload = [
+        'uuid' => 'storage-one',
+        'region' => 'us-east-1',
+        'bucket' => '/backups',
+        'type' => 'sftp',
+        'endpoint' => 'sftp://backup.example.test',
+        'key' => 'first-user',
+        'secret' => 'first-password',
+    ];
+
+    $first = $method->invoke($this->importer, $payload, $this->team->id, true);
+    $second = $method->invoke($this->importer, array_replace($payload, [
+        'uuid' => 'storage-two',
+        'key' => 'second-user',
+        'secret' => 'second-password',
+    ]), $this->team->id, true);
+    $repeated = $method->invoke($this->importer, $payload, $this->team->id, true);
+
+    expect($second->id)->not->toBe($first->id);
+    expect($second->key)->toBe('second-user');
+    expect($second->secret)->toBe('second-password');
+    expect($repeated->id)->toBe($first->id);
+});
+
+it('rejects backup storage with an unresolved private key', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $importer = new ServerTransferImporter;
+
+    expect(fn () => $method->invoke($importer, [
+        'private_key_uuid' => 'missing-key',
+        'key' => 'user',
+        'secret' => 'password',
+        'region' => 'us-east-1',
+        'endpoint' => 'sftp://backup.test',
+        'bucket' => '/backups',
+    ], $this->team->id, false))->toThrow(RuntimeException::class, 'Backup storage private key is missing.');
+    expect(S3Storage::where('endpoint', 'sftp://backup.test')->exists())->toBeFalse();
+});
+
+it('imports password authenticated backup storage without a private key', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $storage = $method->invoke(new ServerTransferImporter, [
+        'type' => 'sftp',
+        'region' => 'us-east-1',
+        'endpoint' => 'sftp://backup.test',
+        'bucket' => '/backups',
+        'key' => 'backup-user',
+        'secret' => 'backup-password',
+    ], $this->team->id, false);
+
+    expect($storage->private_key_id)->toBeNull()
+        ->and((bool) $storage->is_usable)->toBeTrue()
+        ->and($storage->secret)->toBe('backup-password');
+});

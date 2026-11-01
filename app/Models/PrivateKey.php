@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -329,7 +330,7 @@ class PrivateKey extends BaseModel
         return $this->hasMany(GiteaApp::class);
     }
 
-    public function s3Storages()
+    public function s3Storages(): HasMany
     {
         return $this->hasMany(S3Storage::class);
     }

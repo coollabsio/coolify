@@ -288,7 +288,7 @@ class S3StoragesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['name', 'endpoint', 'key', 'secret'],
+                    required: ['name', 'endpoint', 'key'],
                     properties: [
                         'type' => ['type' => 'string', 'enum' => ['s3', 'sftp', 'ftps', 'webdav'], 'default' => 's3', 'description' => 'The storage protocol. It cannot change later.'],
                         'name' => ['type' => 'string', 'example' => 'My S3 Storage', 'description' => 'A friendly name for the storage.'],
@@ -349,7 +349,8 @@ class S3StoragesController extends Controller
         }
 
         $body = $request->json()->all();
-        $type = BackupStorageType::tryFrom((string) ($body['type'] ?? 's3'));
+        $rawType = $body['type'] ?? 's3';
+        $type = is_string($rawType) ? BackupStorageType::tryFrom($rawType) : null;
         $isS3 = $type === BackupStorageType::S3;
         $connectionFields = $this->connectionFields($type ?? BackupStorageType::S3);
 
@@ -496,6 +497,9 @@ class S3StoragesController extends Controller
 
         $attributes = array_intersect_key($body, array_flip($allowedFields));
         unset($attributes['private_key_uuid']);
+        if ($storage->type === BackupStorageType::Sftp && blank($attributes['secret'] ?? null)) {
+            unset($attributes['secret']);
+        }
         $storage->update([...$attributes, ...$login]);
 
         auditLog('api.s3_storage.updated', [

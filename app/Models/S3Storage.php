@@ -294,7 +294,7 @@ class S3Storage extends BaseModel
      */
     public function rcloneConfig(): string
     {
-        $host = (string) parse_url((string) $this->endpoint, PHP_URL_HOST);
+        $host = trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]');
         $options = match ($this->type) {
             BackupStorageType::Sftp => ['type' => 'sftp', 'host' => $host, 'port' => $this->endpointPort(), 'shell_type' => 'none'],
             BackupStorageType::Ftps => ['type' => 'ftp', 'host' => $host, 'port' => $this->endpointPort(), 'explicit_tls' => 'true'],
@@ -511,7 +511,7 @@ class S3Storage extends BaseModel
                 'timeout' => self::CONNECTION_TIMEOUT_SECONDS,
             ]),
             BackupStorageType::Ftps => $this->adapterFilesystem(new FtpsFilesystemAdapter(
-                host: (string) parse_url((string) $this->endpoint, PHP_URL_HOST),
+                host: trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]'),
                 port: $this->endpointPort(),
                 username: (string) $this->key,
                 password: (string) $this->secret,

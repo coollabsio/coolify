@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BackupStorageType;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\Team;
@@ -574,3 +575,25 @@ describe('POST /api/v1/s3-storages/{uuid}/validate', function () {
             ->assertOk();
     });
 });
+
+test('rejects an array storage type with 422', function () {
+    $response = $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/s3-storages', validS3StoragePayload(['type' => ['sftp']]));
+
+    $response->assertStatus(422);
+    $this->assertDatabaseCount('s3_storages', 0);
+});
+
+test('SFTP updates preserve the saved password for blank secrets', function ($secret) {
+    $storage = createS3StorageForTeam($this->team, [
+        'type' => BackupStorageType::Sftp,
+        'endpoint' => 'sftp://backup.example.com/backups',
+        'secret' => 'saved-password',
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->patchJson('/api/v1/s3-storages/'.$storage->uuid, ['secret' => $secret])
+        ->assertOk();
+
+    expect($storage->fresh()->secret)->toBe('saved-password');
+})->with([null, '', '   ']);

@@ -1977,6 +1977,11 @@ class ServerTransferImporter
      */
     private function importS3Storage(array $payload, int $teamId, bool $preserveUuids): S3Storage
     {
+        $privateKeyUuid = (string) data_get($payload, 'private_key_uuid');
+        if ($privateKeyUuid !== '' && ! isset($this->privateKeyMap[$privateKeyUuid])) {
+            throw new RuntimeException('Backup storage private key is missing.');
+        }
+
         $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
@@ -1984,15 +1989,6 @@ class ServerTransferImporter
         $existing = S3Storage::where('uuid', $uuid)->where('team_id', $teamId)->first();
         if ($existing) {
             return $existing;
-        }
-        // Reuse by endpoint+bucket+key if already present for team
-        $byIdentity = S3Storage::query()
-            ->where('team_id', $teamId)
-            ->where('endpoint', data_get($payload, 'endpoint'))
-            ->where('bucket', data_get($payload, 'bucket'))
-            ->first();
-        if ($byIdentity) {
-            return $byIdentity;
         }
         if (S3Storage::where('uuid', $uuid)->exists()) {
             $uuid = new_public_id();

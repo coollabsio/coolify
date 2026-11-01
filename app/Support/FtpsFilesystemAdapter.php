@@ -259,7 +259,7 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
     private function request(string $path, array $options, bool $directory = false): array
     {
         $handle = curl_init($this->url($path, $directory));
-        $host = str_contains($this->host, ':') ? '['.$this->host.']' : $this->host;
+        $host = $this->bracketed($this->host);
         // array_replace() keeps the integer keys of the curl options, which the spread operator renumbers.
         curl_setopt_array($handle, array_replace([
             CURLOPT_USERPWD => $this->username.':'.$this->password,
@@ -268,7 +268,7 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
             CURLOPT_CONNECTTIMEOUT => self::CONNECTION_TIMEOUT_SECONDS,
             CURLOPT_FTP_SKIP_PASV_IP => true,
             CURLOPT_RETURNTRANSFER => true,
-        ], $this->pinnedIp !== null ? [CURLOPT_RESOLVE => [$host.':'.$this->port.':'.$this->pinnedIp]] : [], $options));
+        ], $this->pinnedIp !== null ? [CURLOPT_RESOLVE => [$host.':'.$this->port.':'.$this->bracketed($this->pinnedIp)]] : [], $options));
 
         $result = curl_exec($handle);
         $error = curl_errno($handle);
@@ -285,13 +285,20 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
 
     private function url(string $path, bool $directory): string
     {
-        $host = str_contains($this->host, ':') ? '['.$this->host.']' : $this->host;
+        $host = $this->bracketed($this->host);
         $fullPath = $this->fullPath($path);
         // curl reads a URL path as relative to the login directory; %2F at the start makes it absolute.
         $encoded = implode('/', array_map('rawurlencode', array_filter(explode('/', $fullPath), fn (string $segment): bool => $segment !== '')));
         $urlPath = str_starts_with($fullPath, '/') ? '%2F'.$encoded : $encoded;
 
         return 'ftp://'.$host.':'.$this->port.'/'.$urlPath.($directory && $urlPath !== '' ? '/' : '');
+    }
+
+    private function bracketed(string $host): string
+    {
+        $host = trim($host, '[]');
+
+        return str_contains($host, ':') ? '['.$host.']' : $host;
     }
 
     private function fullPath(string $path): string
