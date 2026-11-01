@@ -2,6 +2,15 @@ import { parseCookie } from 'cookie';
 
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
+/** A PTY with no input for this long is ended. */
+export const TERMINAL_IDLE_TIMEOUT_SECONDS = 30 * 60;
+
+/** How often each live PTY checks with Coolify that the user may still use it. */
+export const TERMINAL_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+
+/** Consecutive failed checks (Coolify unreachable or 5xx) that end a PTY. */
+export const TERMINAL_SESSION_CHECK_MAX_FAILURES = 3;
+
 /**
  * WebSocket close codes sent to the browser. Browsers cannot read the HTTP
  * status of a rejected WebSocket handshake, so rejections are reported with

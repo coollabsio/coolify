@@ -22,6 +22,7 @@ use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\UseSessionTeamApiToken;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -374,10 +375,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
         $request->validate(['token' => ['required', 'string', 'size:64']]);
 
-        return response()->json([
-            'command' => $terminalSessionService->redeem($request->user(), $request->string('token')->toString()),
-        ]);
+        return response()->json($terminalSessionService->redeem($request->user(), $request->string('token')->toString()));
     })->name('terminal.session')->middleware('can.access.terminal');
+
+    // No session-team gate: the check uses the team of the server, and the user can switch teams in another tab.
+    Route::post('/terminal/session/check', function (Request $request, TerminalSessionService $terminalSessionService) {
+        $request->validate(['session_id' => ['required', 'string', 'size:64']]);
+        $terminalSessionService->check($request->user(), $request->string('session_id')->toString());
+
+        return response()->json(['active' => true]);
+    })->name('terminal.session.check');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
@@ -555,6 +562,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/select-team', SelectTeam::class)->name('team.select');
+});
+
+// Called by the terminal server when a PTY ends, also after a logout. The secret session id authenticates it.
+Route::post('/terminal/session/end', function (Request $request, TerminalSessionService $terminalSessionService) {
+    $request->validate([
+        'session_id' => ['required', 'string', 'size:64'],
+        'reason' => ['required', 'string', 'in:exited,disconnected,replaced,rejected,idle,max_duration,revoked'],
+    ]);
+    $terminalSessionService->end($request->string('session_id')->toString(), $request->string('reason')->toString());
+
+    return response()->noContent();
+})->name('terminal.session.end')->withoutMiddleware(VerifyCsrfToken::class);
+
+Route::middleware(['auth'])->group(function () {
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
 

@@ -198,10 +198,12 @@ class AuditEvent extends Model
             'resource_name' => $resourceName,
             'description' => data_get($context, 'audit_description')
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
-            'metadata' => self::redact(Arr::except($context, ['audit_changes'])),
+            'metadata' => self::redact(Arr::except($context, ['audit_changes', 'actor_ip', 'actor_user_agent'])),
             'changes' => $changes,
-            'ip_address' => app()->bound('request') ? (client_ip(request()) ?: null) : null,
-            'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
+            'ip_address' => data_get($context, 'actor_ip')
+                ?? (app()->bound('request') ? (client_ip(request()) ?: null) : null),
+            'user_agent' => Str::limit((string) (data_get($context, 'actor_user_agent')
+                ?? (app()->bound('request') ? request()->userAgent() : null)), 200, '') ?: null,
         ];
     }
 
