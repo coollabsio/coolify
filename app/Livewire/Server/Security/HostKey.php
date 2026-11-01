@@ -19,7 +19,7 @@ class HostKey extends Component
 
     public array $parameters = [];
 
-    public function mount(string $server_uuid): mixed
+    public function mount(string $server_uuid)
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
@@ -30,11 +30,17 @@ class HostKey extends Component
         }
     }
 
-    public function trustPendingKey(?string $password): bool|string|Event
+    /**
+     * @param  string  $pendingKeyHash  SHA-256 of the pending key that the page showed, so that a key that changed later is not trusted.
+     */
+    public function trustPendingKey(string $pendingKeyHash, ?string $password): bool|string|Event
     {
-        return $this->changeHostKey($password, 'trusted', function (ServerSetting $settings) {
+        return $this->changeHostKey($password, 'trusted', function (ServerSetting $settings) use ($pendingKeyHash) {
             if (blank($settings->ssh_host_key_pending)) {
                 throw new \RuntimeException('There is no new host key to trust.');
+            }
+            if (! hash_equals(hash('sha256', $settings->ssh_host_key_pending), $pendingKeyHash)) {
+                throw new \RuntimeException('The server sent another new host key. Reload the page and compare the key again.');
             }
             $settings->forceFill([
                 'ssh_host_key' => $settings->ssh_host_key_pending,
@@ -71,6 +77,9 @@ class HostKey extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if (! $this->server->refresh()->canBeValidated()) {
+                throw new \RuntimeException('This server was transferred to another Coolify instance.');
+            }
             if (! verifyPasswordConfirmation($password, $this)) {
                 return 'The provided password is incorrect.';
             }

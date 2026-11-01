@@ -193,6 +193,9 @@ class Server extends BaseModel
             $server->fill($payload);
         });
         static::saved(function ($server) {
+            if ($server->wasChanged(['ip', 'port'])) {
+                $server->settings?->forgetSshHostKey('address_changed');
+            }
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             } elseif ($server->wasChanged(['user', 'ip', 'port'])) {

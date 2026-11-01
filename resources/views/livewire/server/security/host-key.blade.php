@@ -74,10 +74,12 @@
 
                     @can('update', $server)
                         <div class="flex flex-wrap gap-2"
-                            wire:key="host-key-actions-{{ $server->settings->ssh_host_key_pending ? 'pending' : 'none' }}-{{ $server->settings->is_ssh_host_key_check_disabled ? 'off' : 'on' }}">
+                            wire:key="host-key-actions-{{ $server->settings->ssh_host_key_pending ? hash('sha256', $server->settings->ssh_host_key_pending) : 'none' }}-{{ $server->settings->is_ssh_host_key_check_disabled ? 'off' : 'on' }}">
                             @if (count($pendingFingerprints) > 0)
                                 <x-modal-confirmation title="Trust the new host key?" temporaryDisableTwoStepConfirmation
-                                    buttonTitle="Trust new key" submitAction="trustPendingKey" :actions="[
+                                    buttonTitle="Trust new key"
+                                    submitAction="trustPendingKey('{{ hash('sha256', $server->settings->ssh_host_key_pending) }}')"
+                                    :actions="[
                                         'Coolify trusts the new host key and stops trusting the old key.',
                                         'Only do this after you compared the new key with the key on the server.',
                                     ]" confirmationText="{{ $server->name }}"

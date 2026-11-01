@@ -260,6 +260,10 @@ class ServerSetting extends Model
             }
         });
         static::updated(function ($settings) {
+            // A save that sets the key too (a transfer import) already has the key of the new address.
+            if ($settings->wasChanged('is_cloudflare_tunnel') && ! $settings->wasChanged('ssh_host_key')) {
+                $settings->forgetSshHostKey('cloudflare_tunnel_changed');
+            }
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
@@ -511,6 +515,34 @@ class ServerSetting extends Model
             'error' => filled($this->patch_check_error) ? $this->patch_check_error : null,
             'checked_at' => $this->patch_checked_at,
         ];
+    }
+
+    /**
+     * Remove the pinned and the pending host key after the address of the server changed, so that the next
+     * connection trusts the key of the new address. Only an admin can change the address.
+     */
+    public function forgetSshHostKey(string $reason): void
+    {
+        if (blank($this->ssh_host_key) && blank($this->ssh_host_key_pending)) {
+            return;
+        }
+        $previousFingerprints = self::sshHostKeyFingerprints($this->ssh_host_key);
+        $cleared = [
+            'ssh_host_key' => null,
+            'ssh_host_key_source' => null,
+            'ssh_host_key_trusted_at' => null,
+            'ssh_host_key_pending' => null,
+        ];
+        // A query update, so that other unsaved changes stay unsaved and the model events do not run again.
+        self::query()->whereKey($this->getKey())->update($cleared);
+        $this->forceFill($cleared)->syncOriginalAttributes(array_keys($cleared));
+
+        auditLog('server.ssh_host_key.forgotten', [
+            'team_id' => $this->server?->team_id,
+            'server_uuid' => $this->server?->uuid,
+            'reason' => $reason,
+            'previous_fingerprints' => $previousFingerprints,
+        ]);
     }
 
     /**

@@ -1998,3 +1998,29 @@ test('import clears trust metadata when the host key normalizes to null', functi
         ->ssh_host_key_source->toBeNull()
         ->ssh_host_key_trusted_at->toBeNull();
 })->with([null, '', '# comment only', 'invalid key']);
+
+test('the pinned host key moves with the server', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I';
+    $this->server->settings->forceFill([
+        'ssh_host_key' => $hostKey,
+        'ssh_host_key_source' => 'tofu',
+        'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        'ssh_host_key_pending' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjaL3Lqt0tZl4iVZw8x1v2b9fM8r6Yq0nH0bUq3dQ0h',
+        'is_ssh_host_key_check_disabled' => true,
+    ])->save();
+    $bundle = json_decode(json_encode($this->exporter->export($this->server->fresh())), true);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->firstOrFail()->settings;
+    expect($settings)
+        ->ssh_host_key->toBe($hostKey)
+        ->ssh_host_key_source->toBe('transfer')
+        ->ssh_host_key_pending->toBeNull()
+        ->is_ssh_host_key_check_disabled->toBeTrue()
+        ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
+});
