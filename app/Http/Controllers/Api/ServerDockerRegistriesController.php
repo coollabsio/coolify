@@ -231,7 +231,7 @@ class ServerDockerRegistriesController extends Controller
 
     #[OA\Post(
         summary: 'Check a registry login on a server',
-        description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server.',
+        description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server. Needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/registries/{registry}/check',
         operationId: 'check-server-registry-login',
         security: [['bearerAuth' => []]],
