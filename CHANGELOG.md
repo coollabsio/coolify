@@ -48,6 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
+- Remove the Windows support with Docker Desktop, `docker-compose.windows.yml` and `.env.windows-docker-desktop.example`, and the testing host image on Docker Hub, which only it used
+- Remove the Claude workflow and the temporary workflow and image of the PHP base image
 - Remove the git-cliff workflow that generated `CHANGELOG.md`, it is written by hand
 - Remove the temporary hotfix release workflow, patch branches release hotfixes
 - Remove the `next`, `sha-<commit>` and `<version>-rc.N.<commit>` image tags, prereleases and nightlies take their place, and the `main` tag on docker.io, it moves on ghcr.io alone
