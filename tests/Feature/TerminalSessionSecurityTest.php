@@ -115,8 +115,8 @@ it('carries the console mode in the token and attaches instead of exec on redeem
         '*' => Process::result(),
     ]);
 
-    $attachCommand = $service->redeem($this->user, $service->issue($this->user, $server, 'minecraft-abc123', 'attach'));
-    $shellCommand = $service->redeem($this->user, $service->issue($this->user, $server, 'minecraft-abc123'));
+    $attachCommand = $service->redeem($this->user, $service->issue($this->user, $server, 'minecraft-abc123', 'attach'))['command'];
+    $shellCommand = $service->redeem($this->user, $service->issue($this->user, $server, 'minecraft-abc123'))['command'];
 
     expect($attachCommand)
         ->toContain('docker attach --detach-keys="ctrl-p,ctrl-q" --sig-proxy=false')

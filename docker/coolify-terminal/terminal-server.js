@@ -4,6 +4,9 @@ import pty from 'node-pty';
 import 'dotenv/config';
 import {
     TERMINAL_CLOSE_CODES,
+    TERMINAL_IDLE_TIMEOUT_SECONDS,
+    TERMINAL_SESSION_CHECK_INTERVAL_MS,
+    TERMINAL_SESSION_CHECK_MAX_FAILURES,
     authenticateTerminalUpgrade,
     createTerminalUpgradeHandler,
     extractHereDocContent,
@@ -262,6 +265,7 @@ const messageHandlers = {
         if (typeof data !== 'string') {
             return;
         }
+        session.lastInputAt = Date.now();
         session.ptyProcess.write(data);
     },
     resize: (session, size) => {
@@ -274,6 +278,7 @@ const messageHandlers = {
     ping: (session) => session.ws.send('pong'),
     checkActive: (session, data) => {
         if (data === 'force' && session.isActive) {
+            session.endReason = 'replaced';
             killPtyProcess(session.userId);
         } else {
             session.ws.send(session.isActive);
@@ -350,9 +355,15 @@ function parseMessage(message) {
     }
 }
 
-async function handleCommand(ws, command, userId) {
+/**
+ * Starts the PTY for a redeemed terminal session.
+ *
+ * @returns {Promise<boolean>} false when the command was rejected and no PTY started
+ */
+async function handleCommand(ws, command, userId, terminalSessionId) {
     const userSession = userSessions.get(userId);
     if (userSession && userSession.isActive) {
+        userSession.endReason = 'replaced';
         const result = await killPtyProcess(userId);
         if (!result) {
             logTerminal('warn', 'Rejecting new terminal command because the previous PTY could not be terminated.', {
@@ -360,7 +371,7 @@ async function handleCommand(ws, command, userId) {
             });
             // if terminal is still active, even after we tried to kill it, dont continue and show error
             ws.send('unprocessable');
-            return;
+            return false;
         }
     }
 
@@ -392,7 +403,7 @@ async function handleCommand(ws, command, userId) {
             sshArgs,
         });
         ws.send('Invalid SSH command: No target host found');
-        return;
+        return false;
     }
 
     // Validate target host against authorized IPs
@@ -403,7 +414,7 @@ async function handleCommand(ws, command, userId) {
             authorizedIPs: userSession.authorizedIPs,
         });
         ws.send(`Unauthorized: Target host ${targetHost} not in authorized list`);
-        return;
+        return false;
     }
 
     if (!validateSshArgs(sshArgs, userSession.authorizedIPs)) {
@@ -412,7 +423,7 @@ async function handleCommand(ws, command, userId) {
             targetHost,
         });
         ws.send('Invalid SSH command: Unsupported SSH arguments');
-        return;
+        return false;
     }
     const sanitizedSshArgs = sanitizeSshArgs(sshArgs);
 
@@ -437,6 +448,9 @@ async function handleCommand(ws, command, userId) {
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
+    userSession.endReason = null;
+    userSession.lastInputAt = Date.now();
+    const sessionWatch = watchTerminalSession(userSession, ptyProcess, terminalSessionId);
     // Attach sessions share the container's main process, so they must be detached, not killed.
     userSession.isAttach = isAttachCommand(hereDocContent);
 
@@ -455,12 +469,17 @@ async function handleCommand(ws, command, userId) {
             signal,
         });
 
+        clearInterval(sessionWatch);
+
         // A previous PTY can exit late (e.g. an attach session detaching during a mode
         // switch) after its replacement is already spawned. Only mutate the shared session
         // state when this exit belongs to the session's current PTY.
         if (userSession.ptyProcess !== ptyProcess) {
+            reportTerminalSessionEnd(terminalSessionId, 'replaced');
             return;
         }
+
+        reportTerminalSessionEnd(terminalSessionId, userSession.endReason ?? 'exited');
 
         ws.send('pty-exited');
         userSession.isActive = false;
@@ -472,8 +491,93 @@ async function handleCommand(ws, command, userId) {
     });
 
     userSession.terminalSessionTimer = setTimeout(async () => {
-        await killPtyProcess(userId);
+        await endTerminalSession(userSession, ptyProcess, 'max_duration', `it reached the maximum duration of ${terminalSessionTimeout / 3600} hours.`);
     }, terminalSessionTimeout * 1000);
+
+    return true;
+}
+
+/**
+ * Ends the PTY when it has no input for too long, or when Coolify no longer allows it:
+ * after a logout, a lost admin role, a removal from the team, or when terminal access
+ * was turned off on the server.
+ */
+function watchTerminalSession(userSession, ptyProcess, terminalSessionId) {
+    let failedChecks = 0;
+    let checking = false;
+
+    return setInterval(async () => {
+        if (checking || userSession.ptyProcess !== ptyProcess) {
+            return;
+        }
+
+        if (Date.now() - userSession.lastInputAt >= TERMINAL_IDLE_TIMEOUT_SECONDS * 1000) {
+            await endTerminalSession(userSession, ptyProcess, 'idle', `no input for ${TERMINAL_IDLE_TIMEOUT_SECONDS / 60} minutes.`);
+            return;
+        }
+
+        checking = true;
+        let status = null;
+        try {
+            const response = await postToCoolify('/terminal/session/check', userSession.authHeaders, { session_id: terminalSessionId });
+            status = response.status;
+        } catch (error) {
+            logTerminal('error', 'Failed to check terminal session.', {
+                userId: userSession.userId,
+                error: error.message,
+            });
+        }
+        checking = false;
+
+        if (status === 200) {
+            failedChecks = 0;
+            return;
+        }
+
+        // Coolify answered and did not allow the session (also a redirect to the login page).
+        if (status !== null && status < 500) {
+            await endTerminalSession(userSession, ptyProcess, 'revoked', 'access to this terminal was revoked.');
+            return;
+        }
+
+        // Coolify is unavailable, for example during an upgrade. Fail closed after a few minutes.
+        failedChecks++;
+        if (failedChecks >= TERMINAL_SESSION_CHECK_MAX_FAILURES) {
+            await endTerminalSession(userSession, ptyProcess, 'revoked', 'Coolify could not verify access to this terminal.');
+        }
+    }, TERMINAL_SESSION_CHECK_INTERVAL_MS);
+}
+
+async function endTerminalSession(userSession, ptyProcess, reason, notice) {
+    if (!userSession.isActive || userSession.ptyProcess !== ptyProcess) {
+        return;
+    }
+
+    logTerminal('log', 'Ending terminal session.', {
+        userId: userSession.userId,
+        reason,
+    });
+    userSession.endReason = reason;
+    if (userSession.ws.readyState === userSession.ws.OPEN) {
+        userSession.ws.send(`Terminal session ended: ${notice}`);
+    }
+    await killPtyProcess(userSession.userId);
+}
+
+// Sent without the browser cookie: the session id authenticates it, and the user may have logged out.
+function reportTerminalSessionEnd(terminalSessionId, reason) {
+    postToCoolify('/terminal/session/end', {}, { session_id: terminalSessionId, reason })
+        .then((response) => {
+            if (response.status !== 204) {
+                throw createHttpError(response);
+            }
+        })
+        .catch((error) => {
+            logTerminal('error', 'Failed to report the end of a terminal session.', {
+                reason,
+                error: error.message,
+            });
+        });
 }
 
 function rejectTerminalToken(userSession, message) {
@@ -492,12 +596,16 @@ async function handleTerminalToken(userSession, token) {
 
     try {
         const response = await postToCoolify('/terminal/session', userSession.authHeaders, { token });
-        if (response.status !== 200 || typeof response.data?.command !== 'string') {
+        const terminalSessionId = response.data?.session_id;
+        if (response.status !== 200 || typeof response.data?.command !== 'string' || typeof terminalSessionId !== 'string') {
             rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
             return;
         }
 
-        await handleCommand(userSession.ws, [response.data.command], userSession.userId);
+        const started = await handleCommand(userSession.ws, [response.data.command], userSession.userId, terminalSessionId);
+        if (!started) {
+            reportTerminalSessionEnd(terminalSessionId, 'rejected');
+        }
     } catch (error) {
         logTerminal('error', 'Failed to redeem terminal token.', {
             userId: userSession.userId,
@@ -512,6 +620,7 @@ async function handleError(err, userId) {
         userId,
         error: err?.message ?? err,
     });
+    markDisconnected(userId);
     await killPtyProcess(userId);
 }
 
@@ -519,8 +628,16 @@ async function handleClose(userId) {
     logTerminal('log', 'Cleaning up terminal websocket session.', {
         userId,
     });
+    markDisconnected(userId);
     await killPtyProcess(userId);
     userSessions.delete(userId);
+}
+
+function markDisconnected(userId) {
+    const session = userSessions.get(userId);
+    if (session?.isActive) {
+        session.endReason = 'disconnected';
+    }
 }
 
 async function killPtyProcess(userId) {

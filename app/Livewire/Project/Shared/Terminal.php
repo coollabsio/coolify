@@ -159,7 +159,7 @@ class Terminal extends Component
             $mode = $this->terminalMode = 'shell';
         }
 
-        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode);
+        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode, client_ip(request()), request()->userAgent());
         $this->dispatch('send-terminal-token', $token);
     }
 
