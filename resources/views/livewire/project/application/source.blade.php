@@ -42,6 +42,21 @@
                     :canResource="$application" />
             </div>
         </x-application.settings-section>
+
+        <x-application.settings-section title="SSH host keys"
+            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. Compare the fingerprints with your Git host. Remove a line to accept a new key on the next deployment. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys.">
+            <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"
+                placeholder="[git.example.com]:2222 ssh-ed25519 AAAA..." canGate="update"
+                :canResource="$application" />
+            @if ($fingerprints = $this->knownHostFingerprints())
+                <ul class="mt-3 flex flex-col gap-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                    @foreach ($fingerprints as $fingerprint)
+                        <li class="break-all"><span class="font-medium text-neutral-900 dark:text-fg">{{ $fingerprint['host'] }}</span>
+                            {{ $fingerprint['type'] }} <span class="font-mono">{{ $fingerprint['fingerprint'] }}</span></li>
+                    @endforeach
+                </ul>
+            @endif
+        </x-application.settings-section>
     </form>
 
     @if (filled($privateKeyId))

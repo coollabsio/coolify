@@ -40,6 +40,9 @@ class Source extends Component
     #[Locked]
     public $sources;
 
+    #[Validate(['nullable', 'string', 'max:65535'])]
+    public ?string $gitSshKnownHosts = null;
+
     public function mount()
     {
         try {
@@ -75,6 +78,7 @@ class Source extends Component
                 'git_branch' => $this->gitBranch,
                 'git_commit_sha' => $this->gitCommitSha,
                 'private_key_id' => $this->privateKeyId,
+                'git_ssh_known_hosts' => implode("\n", gitKnownHostsLines($this->gitSshKnownHosts)) ?: null,
             ]);
             // Refresh to get the trimmed values from the model
             $this->application->refresh();
@@ -85,7 +89,28 @@ class Source extends Component
             $this->gitCommitSha = $this->application->git_commit_sha;
             $this->privateKeyId = $this->application->private_key_id;
             $this->privateKeyName = data_get($this->application, 'private_key.name');
+            $this->gitSshKnownHosts = $this->application->git_ssh_known_hosts;
         }
+    }
+
+    /**
+     * The SHA256 fingerprints of the saved host keys, in the format that `ssh-keygen -lf` shows.
+     *
+     * @return list<array{host: string, type: string, fingerprint: string}>
+     */
+    public function knownHostFingerprints(): array
+    {
+        return collect(gitKnownHostsLines($this->application->git_ssh_known_hosts))
+            ->map(function (string $line) {
+                [$host, $type, $key] = explode(' ', $line);
+
+                return [
+                    'host' => $host,
+                    'type' => $type,
+                    'fingerprint' => 'SHA256:'.rtrim(base64_encode(hash('sha256', (string) base64_decode($key), true)), '='),
+                ];
+            })
+            ->all();
     }
 
     private function getPrivateKeys()
@@ -137,6 +162,12 @@ class Source extends Component
             $this->authorize('update', $this->application);
             if (str($this->gitCommitSha)->isEmpty()) {
                 $this->gitCommitSha = 'HEAD';
+            }
+            $invalidKnownHostsLine = collect(preg_split('/\R/', (string) $this->gitSshKnownHosts))
+                ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
+                ->first(fn (string $line) => $line !== '' && ! isValidGitKnownHostsLine($line));
+            if ($invalidKnownHostsLine !== null) {
+                throw ValidationException::withMessages(['gitSshKnownHosts' => 'Each line must be "host key-type key" (for example "[git.example.com]:2222 ssh-ed25519 AAAA..."). Hashed hosts and comments are not supported.']);
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');

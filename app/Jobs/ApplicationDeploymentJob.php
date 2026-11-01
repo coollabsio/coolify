@@ -3237,6 +3237,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [
                 'command' => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}"),
             ],
+            [
+                'command' => executeInDocker($this->deployment_uuid, gitSshSetupCommand($this->deployment_uuid, $this->application->git_ssh_known_hosts)),
+                'hidden' => true,
+            ],
         );
         $this->run_pre_deployment_command();
     }
@@ -3406,7 +3410,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function gitLsRemoteCommand(string $lsRemoteRef, ?string $identityFile = null): string
     {
-        $sshCommand = gitSshCommand($this->customPort, $identityFile);
+        $sshCommand = gitSshCommand($this->deployment_uuid, $this->customPort, $identityFile);
 
         return 'GIT_SSH_COMMAND="'.$sshCommand.'" git ls-remote '.escapeshellarg($this->fullRepoUrl).' '.escapeshellarg($lsRemoteRef);
     }
@@ -3577,6 +3581,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
         $this->import_repository();
+        $this->save_git_ssh_known_hosts();
         $this->create_workdir();
         $this->execute_remote_command(
             [
@@ -3591,6 +3596,33 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
             );
+        }
+    }
+
+    /**
+     * Saves the host keys that SSH accepted on first use, so later deployments reject a changed key.
+     */
+    private function save_git_ssh_known_hosts(): void
+    {
+        $this->saved_outputs->forget('git_ssh_known_hosts');
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, 'cat '.gitKnownHostsFile($this->deployment_uuid)),
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => 'git_ssh_known_hosts',
+        ]);
+        $savedLines = gitKnownHostsLines($this->application->git_ssh_known_hosts);
+        $newLines = array_values(array_diff(gitKnownHostsLines((string) $this->saved_outputs->get('git_ssh_known_hosts')), $savedLines));
+        if ($newLines === []) {
+            return;
+        }
+
+        $knownHosts = implode("\n", [...$savedLines, ...$newLines]);
+        Application::query()->whereKey($this->application->id)->update(['git_ssh_known_hosts' => $knownHosts]);
+        $this->application->git_ssh_known_hosts = $knownHosts;
+        foreach ($newLines as $line) {
+            [$host, $keyType] = explode(' ', $line);
+            $this->application_deployment_queue->addLogEntry("Saved the SSH host key of {$host} ({$keyType}). Later deployments accept only this key. You can see or remove it under Source.");
         }
     }
 
