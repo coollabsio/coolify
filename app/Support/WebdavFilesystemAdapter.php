@@ -6,7 +6,9 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\FnStream;
 use GuzzleHttp\Psr7\Utils;
+use InvalidArgumentException;
 use League\Flysystem\Config;
 use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
@@ -23,6 +25,7 @@ use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToSetVisibility;
 use League\Flysystem\UnableToWriteFile;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 use Throwable;
 
@@ -30,9 +33,14 @@ use Throwable;
  * A small WebDAV adapter for backup storages. All paths are relative to the base URL. The Guzzle client comes from
  * the caller, so it has the DNS pinning and the timeouts of the storage.
  */
-class WebdavFilesystemAdapter implements FilesystemAdapter
+class WebdavFilesystemAdapter implements FilesystemAdapter, StreamsDownloads
 {
     private const METADATA_TIMEOUT_SECONDS = 15;
+
+    /**
+     * A file transfer fails when it moves no data for this long.
+     */
+    protected const STALL_SECONDS = 60;
 
     private const PROPFIND_BODY = '<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/><d:getcontenttype/></d:prop></d:propfind>';
 
@@ -74,7 +82,7 @@ class WebdavFilesystemAdapter implements FilesystemAdapter
     {
         try {
             $this->createParentDirectories($path);
-            $this->expectSuccess($this->client->request('PUT', $this->uri($path), ['body' => $contents]));
+            $this->expectSuccess($this->client->request('PUT', $this->uri($path), ['body' => $contents, 'curl' => $this->transferCurlOptions()]));
         } catch (Throwable $exception) {
             throw UnableToWriteFile::atLocation($path, $exception->getMessage(), $exception);
         }
@@ -91,20 +99,47 @@ class WebdavFilesystemAdapter implements FilesystemAdapter
         }
     }
 
+    /**
+     * Downloads the file to a temporary stream first, as the SFTP adapter does.
+     */
     public function readStream(string $path)
     {
-        try {
-            $response = $this->expectSuccess($this->client->request('GET', $this->uri($path), ['stream' => true]));
-            $stream = $response->getBody()->detach();
-        } catch (Throwable $exception) {
-            throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
-        }
+        $stream = fopen('php://temp', 'w+b');
 
-        if (! is_resource($stream)) {
-            throw UnableToReadFile::fromLocation($path, 'The response has no body.');
+        try {
+            $this->download($path, $stream);
+        } catch (Throwable $exception) {
+            fclose($stream);
+
+            throw $exception;
         }
+        rewind($stream);
 
         return $stream;
+    }
+
+    /**
+     * The `sink` option keeps the request on the curl handler, which has the DNS pin. The `stream` option would use the
+     * PHP stream handler, which ignores the curl options and resolves the host again.
+     *
+     * @param  resource  $destination
+     */
+    public function download(string $path, $destination, ?int $maxBytes = null): void
+    {
+        $sink = Utils::streamFor($destination);
+
+        try {
+            $this->client->request('GET', $this->uri($path), [
+                'curl' => $this->transferCurlOptions(),
+                'on_headers' => fn (ResponseInterface $response) => $this->expectSuccess($response),
+                'sink' => $this->limitedSink($sink, $maxBytes),
+            ]);
+        } catch (Throwable $exception) {
+            throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
+        } finally {
+            // The stream object closes its resource when it is destroyed.
+            $sink->detach();
+        }
     }
 
     public function delete(string $path): void
@@ -280,7 +315,8 @@ class WebdavFilesystemAdapter implements FilesystemAdapter
                 continue;
             }
             $href = rawurldecode((string) parse_url(trim((string) $xpath->evaluate('string(d:href)', $node)), PHP_URL_PATH));
-            $relative = str_starts_with($href, $this->basePath) ? substr($href, strlen($this->basePath)) : ltrim($href, '/');
+            $basePath = rawurldecode($this->basePath);
+            $relative = str_starts_with($href, $basePath) ? substr($href, strlen($basePath)) : ltrim($href, '/');
             $relative = trim($relative, '/');
             $prop = 'd:propstat[contains(d:status, " 200 ")]/d:prop/';
 
@@ -305,6 +341,37 @@ class WebdavFilesystemAdapter implements FilesystemAdapter
         return $entries;
     }
 
+    /**
+     * A request option replaces the client option of the same name, so the DNS pin of the client is kept here.
+     *
+     * @return array<int, mixed>
+     */
+    private function transferCurlOptions(): array
+    {
+        return array_replace($this->client->getConfig('curl') ?? [], [
+            CURLOPT_LOW_SPEED_LIMIT => 1,
+            CURLOPT_LOW_SPEED_TIME => static::STALL_SECONDS,
+        ]);
+    }
+
+    /**
+     * A sink that leaves the destination of the caller open and refuses the data past the limit, which makes curl
+     * stop the transfer.
+     */
+    private function limitedSink(StreamInterface $stream, ?int $maxBytes): StreamInterface
+    {
+        $written = 0;
+
+        return FnStream::decorate($stream, [
+            'close' => fn () => null,
+            'write' => function (string $data) use ($stream, $maxBytes, &$written): int {
+                $written += strlen($data);
+
+                return $maxBytes !== null && $written > $maxBytes ? 0 : $stream->write($data);
+            },
+        ]);
+    }
+
     private function createParentDirectories(string $path): void
     {
         $parent = dirname(trim($path, '/'));
@@ -325,6 +392,9 @@ class WebdavFilesystemAdapter implements FilesystemAdapter
 
     private function uri(string $path, bool $directory = false): string
     {
+        if (preg_match('/[\x00-\x1F\x7F]/', $path)) {
+            throw new InvalidArgumentException('The path contains control characters.');
+        }
         $encoded = implode('/', array_map('rawurlencode', array_filter(explode('/', $path), fn (string $segment): bool => $segment !== '')));
 
         return $encoded === '' ? '' : $encoded.($directory ? '/' : '');

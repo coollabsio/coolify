@@ -2042,3 +2042,26 @@ it('imports password authenticated backup storage without a private key', functi
         ->and((bool) $storage->is_usable)->toBeTrue()
         ->and($storage->secret)->toBe('backup-password');
 });
+
+it('moves the saved SFTP host key with the backup storage', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILhw/KsYTF9TQOwQX1EAM3gI5oxDS9Daz5nNuCixSRXT';
+    $storage = S3Storage::create([
+        'type' => 'sftp',
+        'name' => 'SFTP backups',
+        'region' => 'us-east-1',
+        'key' => 'backup',
+        'secret' => 'password',
+        'endpoint' => 'sftp://93.184.216.34:2222/backups',
+        'team_id' => $this->team->id,
+    ]);
+    $storage->forceFill(['sftp_host_key' => $hostKey])->save();
+    $this->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+
+    $bundle = $this->exporter->export($this->server);
+    removeTransferSourceResources($this);
+    $storage->forceDelete();
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(S3Storage::where('endpoint', 'sftp://93.184.216.34:2222/backups')->sole()->sftp_host_key)->toBe($hostKey);
+});

@@ -55,12 +55,12 @@ class S3StoragesController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function connectionRules(BackupStorageType $type, int $teamId, bool $partial = false, array $trustedInternalHosts = []): array
+    private function connectionRules(BackupStorageType $type, int $teamId, bool $partial = false, array $trustedInternalHosts = [], ?string $savedEndpoint = null): array
     {
-        $rules = S3Storage::connectionRules($type, $partial, $trustedInternalHosts, $teamId);
+        $rules = S3Storage::connectionRules($type, $partial, $trustedInternalHosts, $teamId, $savedEndpoint);
         if (array_key_exists('private_key_id', $rules)) {
             unset($rules['private_key_id']);
-            $rules['private_key_uuid'] = ['nullable', 'string', Rule::exists('private_keys', 'uuid')->where('team_id', $teamId)];
+            $rules['private_key_uuid'] = ['nullable', 'string', Rule::exists('private_keys', 'uuid')->where('team_id', $teamId)->where('is_git_related', false)];
             if (! $partial) {
                 $rules['secret'] = ['required_without:private_key_uuid', 'nullable', 'string', 'max:255'];
             }
@@ -80,7 +80,7 @@ class S3StoragesController extends Controller
     {
         if (filled($body['private_key_uuid'] ?? null)) {
             return [
-                'private_key_id' => PrivateKey::query()->where('team_id', $teamId)->where('uuid', $body['private_key_uuid'])->value('id'),
+                'private_key_id' => PrivateKey::query()->where('team_id', $teamId)->where('is_git_related', false)->where('uuid', $body['private_key_uuid'])->value('id'),
                 'secret' => '',
             ];
         }
@@ -198,6 +198,7 @@ class S3StoragesController extends Controller
         }
 
         $storages = S3Storage::ownedByCurrentTeamAPI($teamId)
+            ->with('privateKey:id,uuid')
             ->get()
             ->map(function ($storage) {
                 return $this->removeSensitiveData($storage);
@@ -483,7 +484,7 @@ class S3StoragesController extends Controller
         $validationError = $this->validateBody($body, $allowedFields, [
             'name' => ValidationPatterns::nameRules(required: false),
             'description' => ValidationPatterns::descriptionRules(),
-            ...$this->connectionRules($storage->type, $teamId, partial: true, trustedInternalHosts: $storage->trustedInternalHosts()),
+            ...$this->connectionRules($storage->type, $teamId, partial: true, trustedInternalHosts: $storage->trustedInternalHosts(), savedEndpoint: $storage->endpoint),
             'use_path_style_endpoint' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
         ]);

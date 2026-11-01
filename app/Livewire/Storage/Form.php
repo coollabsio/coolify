@@ -61,7 +61,7 @@ class Form extends Component
 
     protected function rules(): array
     {
-        $connectionRules = $this->withSftpLoginRules(S3Storage::connectionRules($this->storage->type, trustedInternalHosts: $this->storage->trustedInternalHosts(), teamId: $this->storage->team_id));
+        $connectionRules = $this->withSftpLoginRules(S3Storage::connectionRules($this->storage->type, trustedInternalHosts: $this->storage->trustedInternalHosts(), teamId: $this->storage->team_id, savedEndpoint: $this->storage->getOriginal('endpoint')));
         if ($this->hasSavedSecret) {
             $connectionRules['secret'] = ['nullable', 'string', 'max:255'];
         }
@@ -212,6 +212,9 @@ class Form extends Component
             $testedStorage->unusable_email_sent = $this->storage->unusable_email_sent;
             $testedStorage->name = $this->name;
             $testedStorage->description = $this->description;
+            // The saved host key applies while the host and the port stay the same; the endpoint setter removes it otherwise.
+            $testedStorage->endpoint = $this->storage->endpoint;
+            $testedStorage->sftp_host_key = $this->storage->sftp_host_key;
             $testedStorage->endpoint = $this->endpoint;
             $testedStorage->bucket = $this->bucket;
             $testedStorage->region = $this->region;
@@ -228,6 +231,9 @@ class Form extends Component
             $this->isUsable = $testedStorage->is_usable;
             $this->storage->is_usable = $testedStorage->is_usable;
             $this->storage->unusable_email_sent = $testedStorage->unusable_email_sent;
+            if ($testedStorage->endpoint === $this->storage->endpoint) {
+                $this->storage->sftp_host_key = $testedStorage->sftp_host_key;
+            }
             $this->storage->save();
             $this->dispatch('storage-status-changed', isUsable: $this->isUsable);
 
@@ -287,6 +293,18 @@ class Form extends Component
 
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Removes the saved SFTP host key, for a server whose key changed on purpose. The next connection test saves the
+     * key that the server presents then.
+     */
+    public function resetHostKey(): void
+    {
+        $this->authorize('update', $this->storage);
+
+        $this->storage->forceFill(['sftp_host_key' => null])->save();
+        $this->dispatch('success', 'Host key removed.', 'Validate the connection to save the current host key of the server.');
     }
 
     public function updatedEndpointParts(): void

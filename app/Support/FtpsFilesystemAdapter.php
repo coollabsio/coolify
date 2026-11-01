@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use InvalidArgumentException;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
@@ -24,9 +25,19 @@ use Throwable;
  * the TLS session on data connections, which most FTPS servers require. curl verifies the server certificate, connects
  * to the pinned IP, and ignores the address in the passive mode reply.
  */
-class FtpsFilesystemAdapter implements FilesystemAdapter
+class FtpsFilesystemAdapter implements DeletesEmptyDirectories, FilesystemAdapter, StreamsDownloads
 {
     private const CONNECTION_TIMEOUT_SECONDS = 15;
+
+    /**
+     * The limit of a request that transfers no file (metadata, listing, delete, move).
+     */
+    protected const REQUEST_TIMEOUT_SECONDS = 30;
+
+    /**
+     * A file transfer fails when it moves no data for this long.
+     */
+    protected const STALL_SECONDS = 60;
 
     /**
      * @param  string  $root  The base directory: absolute with a leading slash, else relative to the login directory.
@@ -91,7 +102,7 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
                 CURLOPT_UPLOAD => true,
                 CURLOPT_INFILE => $contents,
                 CURLOPT_FTP_CREATE_MISSING_DIRS => CURLFTP_CREATE_DIR,
-            ]);
+            ], transfer: true);
         } catch (Throwable $exception) {
             throw UnableToWriteFile::atLocation($path, $exception->getMessage(), $exception);
         }
@@ -116,15 +127,38 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
         $stream = fopen('php://temp', 'w+b');
 
         try {
-            $this->request($path, [CURLOPT_FILE => $stream]);
+            $this->download($path, $stream);
         } catch (Throwable $exception) {
             fclose($stream);
 
-            throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
+            throw $exception;
         }
         rewind($stream);
 
         return $stream;
+    }
+
+    /**
+     * @param  resource  $destination
+     */
+    public function download(string $path, $destination, ?int $maxBytes = null): void
+    {
+        $received = 0;
+
+        try {
+            $this->request($path, [
+                // Writing less than the chunk makes curl stop the transfer.
+                CURLOPT_WRITEFUNCTION => function ($handle, string $data) use ($destination, $maxBytes, &$received): int {
+                    $received += strlen($data);
+
+                    return $maxBytes !== null && $received > $maxBytes ? 0 : (int) fwrite($destination, $data);
+                },
+            ], transfer: true);
+        } catch (Throwable $exception) {
+            $message = $maxBytes !== null && $received > $maxBytes ? 'The server sent more data than the file size.' : $exception->getMessage();
+
+            throw UnableToReadFile::fromLocation($path, $message, $exception);
+        }
     }
 
     public function delete(string $path): void
@@ -142,6 +176,20 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
             $this->command($path, 'RMD');
         } catch (Throwable $exception) {
             throw UnableToDeleteDirectory::atLocation($path, $exception->getMessage(), $exception);
+        }
+    }
+
+    /**
+     * RMD, which the server refuses for a directory that is not empty.
+     */
+    public function deleteEmptyDirectory(string $path): bool
+    {
+        try {
+            $this->command($path, 'RMD');
+
+            return true;
+        } catch (FtpsRequestFailed) {
+            return false;
         }
     }
 
@@ -254,9 +302,10 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
 
     /**
      * @param  array<int, mixed>  $options
+     * @param  bool  $transfer  Whether the request uploads or downloads a file: it has no total time limit then.
      * @return array<int, int> The size and the modification time of the response.
      */
-    private function request(string $path, array $options, bool $directory = false): array
+    private function request(string $path, array $options, bool $directory = false, bool $transfer = false): array
     {
         $handle = curl_init($this->url($path, $directory));
         $host = $this->bracketed($this->host);
@@ -268,7 +317,9 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
             CURLOPT_CONNECTTIMEOUT => self::CONNECTION_TIMEOUT_SECONDS,
             CURLOPT_FTP_SKIP_PASV_IP => true,
             CURLOPT_RETURNTRANSFER => true,
-        ], $this->pinnedIp !== null ? [CURLOPT_RESOLVE => [$host.':'.$this->port.':'.$this->bracketed($this->pinnedIp)]] : [], $options));
+        ], $transfer
+            ? [CURLOPT_LOW_SPEED_LIMIT => 1, CURLOPT_LOW_SPEED_TIME => static::STALL_SECONDS, CURLOPT_FTP_RESPONSE_TIMEOUT => static::STALL_SECONDS]
+            : [CURLOPT_TIMEOUT => static::REQUEST_TIMEOUT_SECONDS], $this->pinnedIp !== null ? [CURLOPT_RESOLVE => [$host.':'.$this->port.':'.$this->bracketed($this->pinnedIp)]] : [], $options));
 
         $result = curl_exec($handle);
         $error = curl_errno($handle);
@@ -301,8 +352,14 @@ class FtpsFilesystemAdapter implements FilesystemAdapter
         return str_contains($host, ':') ? '['.$host.']' : $host;
     }
 
+    /**
+     * Control characters are refused, as a line break would end the FTP command and start another one.
+     */
     private function fullPath(string $path): string
     {
+        if (preg_match('/[\x00-\x1F\x7F]/', $path.$this->root)) {
+            throw new InvalidArgumentException('The path contains control characters.');
+        }
         $path = trim($path, '/');
         $root = rtrim($this->root, '/');
 

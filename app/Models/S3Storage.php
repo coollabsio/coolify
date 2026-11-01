@@ -6,6 +6,8 @@ use App\Enums\BackupStorageType;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
 use App\Support\FtpsFilesystemAdapter;
+use App\Support\PinnedSftpConnectionProvider;
+use App\Support\SftpFilesystemAdapter;
 use App\Support\WebdavFilesystemAdapter;
 use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
@@ -191,20 +193,46 @@ class S3Storage extends BaseModel
 
     public function isS3(): bool
     {
-        return $this->type === BackupStorageType::S3;
+        return $this->storageType() === BackupStorageType::S3;
+    }
+
+    /**
+     * The type of the storage. A model without the `type` attribute (a partial select, or raw attributes) is an S3
+     * storage, as every storage was before other types existed.
+     */
+    public function storageType(): BackupStorageType
+    {
+        return $this->type ?? BackupStorageType::S3;
     }
 
     /**
      * Validation rules for the connection fields of a storage of this type. `$partial` makes every field optional, for
      * updates that only send some fields.
      *
+     * `$savedEndpoint` is the endpoint that is saved now: it may keep a username or password from before this check.
+     *
      * @param  array<int, string>  $trustedInternalHosts
      * @return array<string, array<int, mixed>>
      */
-    public static function connectionRules(BackupStorageType $type, bool $partial = false, array $trustedInternalHosts = [], ?int $teamId = null): array
+    public static function connectionRules(BackupStorageType $type, bool $partial = false, array $trustedInternalHosts = [], ?int $teamId = null, ?string $savedEndpoint = null): array
     {
         $required = $partial ? 'sometimes' : 'required';
-        $endpoint = [$required, 'string', 'max:255', new SafeWebhookUrl(trustedInternalHosts: $trustedInternalHosts, schemes: $type->endpointSchemes())];
+        $endpoint = [
+            $required,
+            'string',
+            'max:255',
+            // Team members and read-only API tokens see the endpoint, so it must not hold credentials.
+            function (string $attribute, mixed $value, \Closure $fail) use ($savedEndpoint): void {
+                $parts = is_string($value) ? (parse_url(trim($value)) ?: []) : [];
+                if ((isset($parts['user']) || isset($parts['pass'])) && trim((string) $value) !== trim((string) $savedEndpoint)) {
+                    $fail('The :attribute must not contain a username or password. Enter the credentials in their own fields.');
+                }
+                if (self::hasControlCharacters(rawurldecode((string) ($parts['path'] ?? '')))) {
+                    $fail('The :attribute path must not contain control characters.');
+                }
+            },
+            new SafeWebhookUrl(trustedInternalHosts: $trustedInternalHosts, schemes: $type->endpointSchemes()),
+        ];
 
         if ($type === BackupStorageType::S3) {
             return [
@@ -225,7 +253,7 @@ class S3Storage extends BaseModel
 
         if ($type === BackupStorageType::Sftp) {
             // SFTP logs in with a private key of the storage team or with a password.
-            $rules['private_key_id'] = ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', $teamId ?? -1)];
+            $rules['private_key_id'] = ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', $teamId ?? -1)->where('is_git_related', false)];
             $rules['secret'] = [$partial ? 'sometimes' : 'required_without:private_key_id', 'nullable', 'string', 'max:255'];
         }
 
@@ -269,12 +297,22 @@ class S3Storage extends BaseModel
      */
     public function basePath(): string
     {
-        return rtrim(rawurldecode((string) parse_url((string) $this->endpoint, PHP_URL_PATH)), '/');
+        $path = rtrim(rawurldecode((string) parse_url((string) $this->endpoint, PHP_URL_PATH)), '/');
+        if (self::hasControlCharacters($path)) {
+            throw new \RuntimeException('The storage path must not contain control characters.');
+        }
+
+        return $path;
+    }
+
+    private static function hasControlCharacters(string $value): bool
+    {
+        return preg_match('/[\x00-\x1f\x7f]/', $value) === 1;
     }
 
     public function endpointPort(): int
     {
-        return (int) (parse_url((string) $this->endpoint, PHP_URL_PORT) ?: $this->type->defaultPort());
+        return (int) (parse_url((string) $this->endpoint, PHP_URL_PORT) ?: $this->storageType()->defaultPort());
     }
 
     /**
@@ -284,7 +322,7 @@ class S3Storage extends BaseModel
     public function rcloneRemotePath(string $file): string
     {
         $file = ltrim($file, '/');
-        $base = $this->type === BackupStorageType::Webdav ? '' : $this->basePath();
+        $base = $this->storageType() === BackupStorageType::Webdav ? '' : $this->basePath();
 
         return self::RCLONE_REMOTE.':'.($base === '' ? $file : $base.'/'.$file);
     }
@@ -295,8 +333,9 @@ class S3Storage extends BaseModel
     public function rcloneConfig(): string
     {
         $host = trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]');
-        $options = match ($this->type) {
-            BackupStorageType::Sftp => ['type' => 'sftp', 'host' => $host, 'port' => $this->endpointPort(), 'shell_type' => 'none'],
+        $options = match ($this->storageType()) {
+            // host_keys makes rclone refuse another host key, and offer only the algorithm of the saved key.
+            BackupStorageType::Sftp => ['type' => 'sftp', 'host' => $host, 'port' => $this->endpointPort(), 'shell_type' => 'none', ...($this->sftp_host_key ? ['host_keys' => $this->sftp_host_key] : [])],
             BackupStorageType::Ftps => ['type' => 'ftp', 'host' => $host, 'port' => $this->endpointPort(), 'explicit_tls' => 'true'],
             BackupStorageType::Webdav => ['type' => 'webdav', 'url' => $this->endpoint, 'vendor' => 'other'],
             BackupStorageType::S3 => throw new \LogicException('S3 storages use the MinIO client.'),
@@ -351,13 +390,13 @@ class S3Storage extends BaseModel
      */
     public function sftpPrivateKey(): ?PrivateKey
     {
-        if ($this->type !== BackupStorageType::Sftp || $this->private_key_id === null) {
+        if ($this->storageType() !== BackupStorageType::Sftp || $this->private_key_id === null) {
             return null;
         }
 
         $privateKey = $this->privateKey;
-        if (! $privateKey || (int) $privateKey->team_id !== (int) $this->team_id) {
-            throw new \RuntimeException('The private key of this storage does not exist or belongs to another team.');
+        if (! $privateKey || (int) $privateKey->team_id !== (int) $this->team_id || $privateKey->is_git_related) {
+            throw new \RuntimeException('The private key of this storage does not exist, belongs to another team, or is a Git deploy key.');
         }
 
         return $privateKey;
@@ -392,13 +431,30 @@ class S3Storage extends BaseModel
     }
 
     /**
-     * Trim whitespace from endpoint to prevent malformed URLs.
+     * Trim whitespace from endpoint to prevent malformed URLs. Another host or port is another server, so the saved SFTP
+     * host key no longer applies.
      */
     protected function endpoint(): Attribute
     {
         return Attribute::make(
-            set: fn (?string $value) => $value ? trim($value) : null,
+            set: function (?string $value, array $attributes): array {
+                $value = $value ? trim($value) : null;
+                $previous = $attributes['endpoint'] ?? null;
+                $server = fn (?string $endpoint): array => [strtolower(trim((string) parse_url((string) $endpoint, PHP_URL_HOST), '[]')), parse_url((string) $endpoint, PHP_URL_PORT)];
+
+                return $previous !== null && $server($previous) !== $server($value)
+                    ? ['endpoint' => $value, 'sftp_host_key' => null]
+                    : ['endpoint' => $value];
+            },
         );
+    }
+
+    /**
+     * The SHA256 fingerprint of the saved SFTP host key, as `ssh-keygen -l` prints it.
+     */
+    public function sftpHostKeyFingerprint(): ?string
+    {
+        return $this->sftp_host_key ? PinnedSftpConnectionProvider::fingerprint($this->sftp_host_key) : null;
     }
 
     /**
@@ -447,13 +503,18 @@ class S3Storage extends BaseModel
             } else {
                 $validator = Validator::make(
                     $this->only(['endpoint', 'key', 'secret', 'private_key_id']),
-                    self::connectionRules($this->type, trustedInternalHosts: $this->trustedInternalHosts(), teamId: $this->team_id),
+                    self::connectionRules($this->storageType(), trustedInternalHosts: $this->trustedInternalHosts(), teamId: $this->team_id, savedEndpoint: $this->endpoint),
                 );
                 if ($validator->fails()) {
                     throw new \RuntimeException('Storage settings are not allowed: '.$validator->errors()->first());
                 }
 
-                $this->filesystem()->files();
+                $disk = $this->filesystem();
+                $disk->files();
+                $adapter = $disk->getAdapter();
+                if ($adapter instanceof SftpFilesystemAdapter && $this->sftp_host_key === null) {
+                    $this->sftp_host_key = $adapter->presentedHostKey();
+                }
             }
 
             $this->unusable_email_sent = false;
@@ -494,22 +555,22 @@ class S3Storage extends BaseModel
     /**
      * The files of the storage, as Coolify reads them (connection tests, restores, downloads, retention). SFTP and FTPS
      * connect to the validated IP of the host, and WebDAV pins it, so a DNS change cannot send them to another address.
+     * SFTP also checks the saved host key.
      */
     public function filesystem(): FilesystemAdapter
     {
-        return match ($this->type) {
+        return match ($this->storageType()) {
             BackupStorageType::S3 => $this->s3Filesystem(),
-            BackupStorageType::Sftp => Storage::build([
-                'driver' => 'sftp',
-                'host' => $this->pinnedHost(),
-                'port' => $this->endpointPort(),
-                'username' => $this->key,
-                ...($this->sftpPrivateKey()
-                    ? ['privateKey' => $this->sftpPrivateKey()->private_key]
-                    : ['password' => $this->secret]),
-                'root' => $this->basePath(),
-                'timeout' => self::CONNECTION_TIMEOUT_SECONDS,
-            ]),
+            BackupStorageType::Sftp => $this->adapterFilesystem(new SftpFilesystemAdapter(PinnedSftpConnectionProvider::create(
+                host: trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]'),
+                address: $this->pinnedHost(),
+                port: $this->endpointPort(),
+                username: (string) $this->key,
+                password: $this->sftpPrivateKey() ? null : (string) $this->secret,
+                privateKey: $this->sftpPrivateKey()?->private_key,
+                pinnedHostKey: $this->sftp_host_key,
+                timeout: self::CONNECTION_TIMEOUT_SECONDS,
+            ), $this->basePath())),
             BackupStorageType::Ftps => $this->adapterFilesystem(new FtpsFilesystemAdapter(
                 host: trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]'),
                 port: $this->endpointPort(),
@@ -524,7 +585,7 @@ class S3Storage extends BaseModel
 
     private function pinnedHost(): string
     {
-        return SafeWebhookUrl::pinnedAddress((string) $this->endpoint, $this->type->endpointSchemes(), $this->trustedInternalHosts());
+        return SafeWebhookUrl::pinnedAddress((string) $this->endpoint, $this->storageType()->endpointSchemes(), $this->trustedInternalHosts());
     }
 
     private function adapterFilesystem(FlysystemAdapter $adapter): FilesystemAdapter
@@ -670,7 +731,7 @@ class S3Storage extends BaseModel
             return new \RuntimeException(
                 $this->isS3()
                     ? 'Could not connect to the S3 endpoint within 15 seconds. Please verify the endpoint, bucket, credentials, region, and network/firewall settings.'
-                    : 'Could not connect to the '.$this->type->label().' server within 15 seconds. Please verify the host, port, credentials, and network/firewall settings.',
+                    : 'Could not connect to the '.$this->storageType()->label().' server within 15 seconds. Please verify the host, port, credentials, and network/firewall settings.',
                 previous: $exception,
             );
         }

@@ -2,10 +2,15 @@
 
 namespace App\Traits;
 
+use App\Models\S3Storage;
 use App\Services\FileDownloadStorageService;
+use App\Support\StreamsDownloads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use League\Flysystem\WhitespacePathNormalizer;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
  * S3 copies of a backup execution, one per destination. The `s3_uploaded` and `s3_storage_deleted` columns of the
@@ -65,44 +70,64 @@ trait HasS3Replicas
             return null;
         }
 
-        $replica = $this->s3Replicas()
+        $replicas = $this->s3Replicas()
             ->with('s3')
             ->where('s3_uploaded', true)
             ->where('s3_storage_deleted', false)
             ->whereHas('s3', fn (Builder $query) => $query->where('team_id', $teamId)->where('is_usable', true))
             ->orderBy('id')
             ->get()
-            ->sortByDesc(fn ($replica): bool => $replica->s3_storage_id === $primaryStorageId)
-            ->first();
+            ->sortByDesc(fn ($replica): bool => $replica->s3_storage_id === $primaryStorageId);
 
-        if (! $replica) {
+        foreach ($replicas as $replica) {
+            if (! $replica->s3->isS3()) {
+                $download = $this->streamedDownload($replica->s3);
+                if ($download) {
+                    return $download;
+                }
+
+                continue;
+            }
+
+            // The upload copies the file to "<bucket><backup directory>/", so the object key is the local file path.
+            return redirect()->away($replica->s3->filesystem()->temporaryUrl(
+                $this->filename,
+                now()->addMinutes(FileDownloadStorageService::LINK_TTL_MINUTES),
+                ['ResponseContentDisposition' => FileDownloadStorageService::contentDisposition(basename($this->filename))],
+            ));
+        }
+
+        return null;
+    }
+
+    /**
+     * A download through Coolify, or null when the storage is unreachable or has no such file. The response sends
+     * only the size that the storage reported, so the browser sees a cut-off download as failed.
+     */
+    private function streamedDownload(S3Storage $storage): ?StreamedResponse
+    {
+        $path = (new WhitespacePathNormalizer)->normalizePath($this->filename);
+
+        try {
+            $disk = $storage->filesystem();
+            $adapter = $disk->getAdapter();
+            if (! $adapter instanceof StreamsDownloads) {
+                return null;
+            }
+            $size = $disk->size($path);
+        } catch (Throwable) {
             return null;
         }
 
-        $disk = $replica->s3->filesystem();
-        if (! $replica->s3->isS3()) {
-            $filename = $this->filename;
+        return response()->streamDownload(function () use ($adapter, $path, $size): void {
+            $output = fopen('php://output', 'wb');
 
-            return response()->streamDownload(function () use ($disk, $filename): void {
-                $stream = $disk->readStream($filename);
-                if (! is_resource($stream)) {
-                    return;
-                }
-
-                try {
-                    fpassthru($stream);
-                } finally {
-                    fclose($stream);
-                }
-            }, basename($filename), ['Content-Type' => 'application/octet-stream']);
-        }
-
-        // The upload copies the file to "<bucket><backup directory>/", so the object key is the local file path.
-        return redirect()->away($disk->temporaryUrl(
-            $this->filename,
-            now()->addMinutes(FileDownloadStorageService::LINK_TTL_MINUTES),
-            ['ResponseContentDisposition' => FileDownloadStorageService::contentDisposition(basename($this->filename))],
-        ));
+            try {
+                $adapter->download($path, $output, $size);
+            } finally {
+                fclose($output);
+            }
+        }, basename($path), ['Content-Type' => 'application/octet-stream', 'Content-Length' => (string) $size]);
     }
 
     /**

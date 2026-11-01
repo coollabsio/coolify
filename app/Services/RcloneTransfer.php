@@ -6,6 +6,7 @@ use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SshRetryHandler;
 use App\Models\S3Storage;
 use App\Models\Server;
+use Throwable;
 
 /**
  * Copies backup files between a server and an SFTP, FTPS, or WebDAV storage with rclone, in a container on the
@@ -43,7 +44,31 @@ class RcloneTransfer
         $this->writeConfig();
     }
 
-    public function uploadCommand(string $localPath, string $remoteFile): string
+    /**
+     * Uploads a local file. rclone writes "<name>.<8 hex digits>.partial" and renames it at the end, so after a failed
+     * upload this deletes the partial files of this file, and no other file.
+     */
+    public function upload(string $localPath, string $remoteFile, ?int $timeout = null): void
+    {
+        try {
+            instant_remote_process([$this->uploadCommand($localPath, $remoteFile)], $this->server, true, false, $timeout, disableMultiplexing: true);
+        } catch (Throwable $exception) {
+            $remotePath = $this->storage->rcloneRemotePath($remoteFile);
+            $separator = strrpos($remotePath, '/');
+            $directory = $separator === false ? S3Storage::RCLONE_REMOTE.':' : substr($remotePath, 0, $separator);
+            $name = $separator === false ? substr($remotePath, strlen(S3Storage::RCLONE_REMOTE) + 1) : substr($remotePath, $separator + 1);
+
+            instant_remote_process([
+                // An upload that timed out can still run in the container; stop it before its partial file is deleted.
+                'docker exec '.escapeshellarg($this->container).' pkill -x rclone >/dev/null 2>&1 || true',
+                $this->rcloneCommand('delete', $directory, '--max-depth', '1', '--include', '/'.addcslashes($name, '\\*?[]{}').'.'.str_repeat('[0-9a-f]', 8).'.partial'),
+            ], $this->server, throwError: false, disableMultiplexing: true);
+
+            throw $exception;
+        }
+    }
+
+    private function uploadCommand(string $localPath, string $remoteFile): string
     {
         return $this->rcloneCommand('copyto', $localPath, $this->storage->rcloneRemotePath($remoteFile));
     }

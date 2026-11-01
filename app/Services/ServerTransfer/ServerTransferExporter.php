@@ -1500,6 +1500,7 @@ class ServerTransferExporter
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'private_key_uuid' => $storage->privateKey?->uuid,
+            'sftp_host_key' => $storage->sftp_host_key,
             'is_usable' => (bool) $storage->is_usable,
         ];
     }

@@ -444,7 +444,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $transfer = new RcloneTransfer($s3, $server, $containerName);
             try {
                 $transfer->start([$backupLocation.':'.$backupLocation.':ro'], timeout: $this->timeout);
-                instant_remote_process([$transfer->uploadCommand($backupLocation, $backupLocation)], $server, timeout: $this->timeout, disableMultiplexing: true);
+                $transfer->upload($backupLocation, $backupLocation, $this->timeout);
             } finally {
                 instant_remote_process([$transfer->removeCommand()], $server, throwError: false, disableMultiplexing: true);
             }

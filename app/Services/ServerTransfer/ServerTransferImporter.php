@@ -2006,6 +2006,8 @@ class ServerTransferImporter
             'secret' => data_get($payload, 'secret'),
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
+            // After the endpoint: a new endpoint removes the host key.
+            'sftp_host_key' => data_get($payload, 'sftp_host_key'),
             'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
             'private_key_id' => isset($this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')])
                 ? $this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')]->id

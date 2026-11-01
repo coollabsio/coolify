@@ -976,10 +976,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         $transfer = new RcloneTransfer($storage, $this->server, "backup-of-{$this->backup_log_uuid}");
         $transfer->start([$this->backupMountSource().':'.$this->backup_location.':ro'], $network, $this->commandTimeout());
-        instant_remote_process(
-            [$transfer->uploadCommand($this->backup_location, $this->backup_location)],
-            $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
-        );
+        $transfer->upload($this->backup_location, $this->backup_location, $this->commandTimeout());
     }
 
     /**
