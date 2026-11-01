@@ -142,7 +142,7 @@ Print what the next run publishes with `scripts/plan-version.sh --nightly`.
 
 The main workflow builds `main` twice a day when it changed since the last build and moves `ghcr.io/coollabsio/coolify:main` to it, to test fixes before their patch release. A main build is versioned `<stable version>.<YYYYMMDD>.<N>`, `4.5.0.20261028.1`, which sorts after `4.5.0` and before `4.5.1`.
 
-- ghcr.io only, no version tag, no git tag, no GitHub release and no channel of the CDN
+- ghcr.io only, no version tag, no git tag, no GitHub release and no channel of the CDN, an instance installs it through the custom channel with the tag `main`
 
 Print what the next run builds with `scripts/plan-version.sh --main`.
 
@@ -172,6 +172,7 @@ The pull request workflow builds every pull request and publishes the image of a
 - `CDN_TOKEN` in the environment `release` is a fine-grained token for `coollabsio/coollabs-cdn` alone, with read and write access to contents and pull requests
 - `versions.json` of a channel names its Coolify version and the helper, Sentinel and Traefik versions of `upstream.json`
 - `/coolify/release.json` lists the Coolify version of every channel, each sync sets the version of its channel
+- An instance on the preview or nightly channel takes the newest version of its channel and the more stable ones from `/coolify/release.json`
 
 Cloudflare keeps a file of the CDN for up to 10 minutes. To clear the cache sooner, for example once the pull request of the stable channel is merged and deployed, set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` in `.env` or the environment, with a token that can purge the cache of the zone:
 

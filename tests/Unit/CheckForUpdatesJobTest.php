@@ -37,16 +37,16 @@ it('uses max of CDN and cache versions', function () {
 
     // Cache has newer version
     File::shouldReceive('exists')
-        ->with(base_path('versions.json'))
+        ->with(storage_path('app/versions.json'))
         ->andReturn(true);
 
     File::shouldReceive('get')
-        ->with(base_path('versions.json'))
+        ->with(storage_path('app/versions.json'))
         ->andReturn(json_encode(['coolify' => ['v4' => ['version' => '4.0.10']]]));
 
-    File::shouldReceive('put')
+    File::shouldReceive('replace')
         ->once()
-        ->with(base_path('versions.json'), Mockery::on(function ($json) {
+        ->with(storage_path('app/versions.json'), Mockery::on(function ($json) {
             $data = json_decode($json, true);
 
             // Should use cached version (4.0.10), not CDN version (4.0.0)
@@ -77,16 +77,16 @@ it('never downgrades from current running version', function () {
 
     // Cache also has older version
     File::shouldReceive('exists')
-        ->with(base_path('versions.json'))
+        ->with(storage_path('app/versions.json'))
         ->andReturn(true);
 
     File::shouldReceive('get')
-        ->with(base_path('versions.json'))
+        ->with(storage_path('app/versions.json'))
         ->andReturn(json_encode(['coolify' => ['v4' => ['version' => '4.0.5']]]));
 
-    File::shouldReceive('put')
+    File::shouldReceive('replace')
         ->once()
-        ->with(base_path('versions.json'), Mockery::on(function ($json) {
+        ->with(storage_path('app/versions.json'), Mockery::on(function ($json) {
             $data = json_decode($json, true);
 
             // Should use running version (4.0.10), not CDN (4.0.0) or cache (4.0.5)
@@ -131,9 +131,9 @@ it('preserves other component versions when preventing Coolify downgrade', funct
             'traefik' => ['v3.5' => '3.5.6'],
         ]));
 
-    File::shouldReceive('put')
+    File::shouldReceive('replace')
         ->once()
-        ->with(base_path('versions.json'), Mockery::on(function ($json) {
+        ->with(storage_path('app/versions.json'), Mockery::on(function ($json) {
             $data = json_decode($json, true);
             // Coolify should use running version
             expect($data['coolify']['v4']['version'])->toBe('4.0.10');
@@ -167,7 +167,7 @@ it('preserves other component versions when preventing Coolify downgrade', funct
 
 it('keeps the local versions.json when the CDN fetch fails', function () {
     Http::fake(['*' => Http::response('', 500)]);
-    File::shouldReceive('put')->never();
+    File::shouldReceive('replace')->never();
     Cache::shouldReceive('forget')->never();
 
     expect(refresh_versions_file())->toBeNull();

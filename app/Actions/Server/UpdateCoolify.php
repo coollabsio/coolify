@@ -20,6 +20,8 @@ class UpdateCoolify
 
     public ?string $currentVersion = null;
 
+    public ?string $upgradeScriptUrl = null;
+
     public function handle($manual_update = false)
     {
         if (isDev()) {
@@ -34,15 +36,24 @@ class UpdateCoolify
             return;
         }
 
+        if ($settings->update_channel === 'custom') {
+            if ($manual_update && filled($settings->update_custom_tag)) {
+                $this->latestVersion = $settings->update_custom_tag;
+                $this->backupDatabase();
+                $this->update(registryUrl: 'ghcr.io');
+            }
+
+            return;
+        }
+
         // Fetch fresh version from CDN instead of using cache
         try {
             // A manual update runs in the web request, so it does not wait for a retry; it falls back to the cache.
-            $response = cdn_http(tries: $manual_update ? 1 : 3)
-                ->get(config('constants.coolify.versions_url'));
+            $latest = fetch_latest_versions(tries: $manual_update ? 1 : 3);
 
-            if ($response->successful()) {
-                $versions = $response->json();
-                $this->latestVersion = data_get($versions, 'coolify.v4.version');
+            if ($latest !== null) {
+                $this->latestVersion = data_get($latest, 'versions.coolify.v4.version');
+                $this->upgradeScriptUrl = $latest['upgrade_script_url'];
             } else {
                 // Fallback to cache if CDN unavailable
                 $cacheVersion = get_latest_version_of_coolify();
@@ -135,13 +146,13 @@ class UpdateCoolify
         }
     }
 
-    private function update()
+    private function update(?string $registryUrl = null)
     {
         $this->ensureNoUpgradeIsRunning();
 
         $latestHelperImageVersion = getHelperVersion();
-        $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
-        $registryUrl = coolifyRegistryUrl();
+        $upgradeScriptUrl = $this->upgradeScriptUrl ?? config('constants.coolify.upgrade_script_url');
+        $registryUrl ??= coolifyRegistryUrl();
 
         remote_process([
             "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",

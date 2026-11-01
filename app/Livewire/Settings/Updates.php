@@ -31,6 +31,12 @@ class Updates extends Component
     #[Validate('required|string|in:docker.io,ghcr.io')]
     public string $docker_registry_url;
 
+    #[Validate('required|string|in:stable,preview,nightly,custom')]
+    public string $update_channel = 'stable';
+
+    #[Validate('nullable|required_if:update_channel,custom|string|max:128|regex:/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/')]
+    public ?string $update_custom_tag = null;
+
     public function mount()
     {
         if (! isInstanceAdmin()) {
@@ -45,6 +51,8 @@ class Updates extends Component
         $this->update_check_frequency = $this->settings->update_check_frequency;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->docker_registry_url = $this->settings->docker_registry_url ?: 'docker.io';
+        $this->update_channel = $this->settings->update_channel;
+        $this->update_custom_tag = $this->settings->update_custom_tag;
     }
 
     public function instantSave()
@@ -58,14 +66,26 @@ class Updates extends Component
             }
             $validated = $this->validate([
                 'docker_registry_url' => ['required', 'string', 'in:docker.io,ghcr.io'],
+                'update_channel' => ['required', 'string', 'in:stable,preview,nightly,custom'],
+                'update_custom_tag' => ['nullable', 'required_if:update_channel,custom', 'string', 'max:128', 'regex:/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/'],
             ]);
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
             $this->settings->docker_registry_url = $validated['docker_registry_url'];
+            $this->settings->update_channel = $validated['update_channel'];
+            $this->settings->update_custom_tag = $validated['update_custom_tag'];
             $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
+            $channelChanged = $this->settings->isDirty(['update_channel', 'update_custom_tag']);
+            if ($this->settings->isDirty('update_channel')) {
+                $this->settings->previous_update_channel = $this->channelFollowedUntilRelease($this->settings->getOriginal('update_channel'), $validated['update_channel']);
+            }
             $changedFields = auditChangedFields($this->settings);
             $this->settings->save();
+            if ($channelChanged) {
+                (new CheckForUpdatesJob(cdnTries: 1, channelChanged: true))->handle();
+                $this->dispatch('updateAvailable');
+            }
             if ($changedFields !== []) {
                 auditLog('ui.instance.settings.updated', [
                     'team_id' => null,
@@ -80,6 +100,22 @@ class Updates extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * After a switch to a more stable channel, the instance keeps the updates of the channel it left until the stable release of its version is out.
+     */
+    private function channelFollowedUntilRelease(?string $from, string $to): ?string
+    {
+        $channels = ['stable', 'preview', 'nightly'];
+        $fromRank = array_search($from, $channels, true);
+        $toRank = array_search($to, $channels, true);
+        if ($fromRank === false || $toRank === false || $toRank >= $fromRank) {
+            return null;
+        }
+        $followed = $this->settings->getOriginal('previous_update_channel');
+
+        return array_search($followed, $channels, true) > $fromRank ? $followed : $from;
     }
 
     protected function syncRegistryUrlToEnv(string $registryUrl): void

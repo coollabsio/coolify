@@ -19,7 +19,7 @@ it('checks installed Traefik versions after refreshing available versions', func
         ]),
     ]);
     File::shouldReceive('exists')->andReturn(false);
-    File::shouldReceive('put')->once();
+    File::shouldReceive('replace')->once();
 
     InstanceSettings::forceCreate(['id' => 0]);
 
