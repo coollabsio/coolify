@@ -16,11 +16,52 @@ class AuthorizedKeys
         return ! $server->isTransferredAway() && ! $server->skipServer();
     }
 
-    public static function add(Server $server, PrivateKey $privateKey): void
+    public static function add(Server $server, PrivateKey $privateKey, ?PrivateKey $oldKey = null): void
     {
         self::assertCanRunOn($server);
         $body = escapeshellarg($privateKey->publicKeyBody());
         $line = escapeshellarg($privateKey->authorizedKeysLine());
+
+        if ($oldKey) {
+            $oldBody = escapeshellarg($oldKey->publicKeyBody());
+            // Tokenize outside quoted options; never interpret options as shell commands.
+            $script = <<<'AWK'
+function token(    start,c,quoted,escaped) {
+    while (substr($0,pos,1) ~ /[ \t]/ && pos <= length($0)) pos++
+    start=pos; quoted=0; escaped=0
+    while (pos <= length($0)) {
+        c=substr($0,pos,1)
+        if (escaped) escaped=0
+        else if (c == "\\" && quoted) escaped=1
+        else if (c == "\"") quoted=!quoted
+        else if (!quoted && c ~ /[ \t]/) break
+        pos++
+    }
+    return substr($0,start,pos-start)
+}
+{
+    pos=1
+    first=token()
+    if (first == "" || substr(first,1,1) == "#") next
+    prefix=""
+    if (first != type) { prefix=first " "; first=token() }
+    data=token()
+    if (first == type && data == key) { print prefix replacement; found=1 }
+}
+END { if (!found) exit 1 }
+AWK;
+            self::runLocked($server, [
+                'f="$HOME/.ssh/authorized_keys"',
+                'tmp=$(mktemp "$f.cpk-XXXXXX")',
+                "old={$oldBody}",
+                'type=${old%% *}; key=${old#* }',
+                "awk -v type=\"\$type\" -v key=\"\$key\" -v replacement={$line} ".escapeshellarg($script).' "$f" > "$tmp" || { echo "Cannot locate the old authorized key; rotation stopped." >&2; exit 1; }',
+                // Do not add an unrestricted fallback, including on retry.
+                'while IFS= read -r entry; do grep -qxF -- "$entry" "$f" || printf \'%s\\n\' "$entry" >> "$f"; done < "$tmp"',
+            ]);
+
+            return;
+        }
 
         self::runLocked($server, [
             'f="$HOME/.ssh/authorized_keys"',

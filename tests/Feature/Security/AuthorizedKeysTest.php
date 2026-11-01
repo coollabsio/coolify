@@ -169,3 +169,19 @@ it('does not retain an unrelated key used by another record on the same host', f
 
     expect(AuthorizedKeys::remove($this->server, $this->key))->toBeTrue();
 });
+
+it('preserves quoted restrictions and duplicate entries when rotating a key', function () {
+    $newKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id, 'private_key' => generateSSHKey('ed25519')['private'],
+    ]);
+    $options = 'from="192.0.2.0/24",command="echo hello world",restrict';
+    $file = $this->home.'/.ssh/authorized_keys';
+    file_put_contents($file, $options.' '.$this->key->publicKeyBody()." old\n".'restrict '.$this->key->publicKeyBody()." second\n");
+    AuthorizedKeys::add($this->server, $newKey, $this->key);
+    $process = new ShellProcess(['sh', '-se'], null, ['HOME' => $this->home], end($this->scripts));
+    $process->run();
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+    expect(file_get_contents($file))
+        ->toContain($options.' '.$newKey->authorizedKeysLine())
+        ->toContain('restrict '.$newKey->authorizedKeysLine());
+});

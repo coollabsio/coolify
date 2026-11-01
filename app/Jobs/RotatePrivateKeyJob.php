@@ -106,7 +106,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
-            AuthorizedKeys::add($server, $newKey);
+            AuthorizedKeys::add($server, $newKey, $oldKey);
         } catch (Throwable $e) {
             return ['status' => 'unreachable', 'message' => 'Could not connect: '.$this->errorWithoutHost($server, $e)];
         }
