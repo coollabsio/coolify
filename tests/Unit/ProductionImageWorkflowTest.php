@@ -19,6 +19,17 @@ it('reads the Coolify and helper versions of its channel from versions.json in i
     'nightly' => ['nightly', '4.6.0-beta.1.20261027.1'],
 ]);
 
+it('selects the channel from the --preview or --nightly flag in install.sh', function (array $arguments, string $selection) {
+    preg_match('/^CDN=.*?^esac$/ms', file_get_contents(dirname(__DIR__, 2).'/scripts/install.sh'), $channelSelection);
+    $output = shell_exec('bash -c '.escapeshellarg($channelSelection[0]."\necho \"\$CHANNEL \$CDN \$1\"").' install.sh '.implode(' ', array_map('escapeshellarg', $arguments)));
+
+    expect(trim($output))->toBe($selection);
+})->with([
+    'stable' => [[], 'stable https://cdn.coollabs.io/coolify'],
+    'preview' => [['--preview'], 'preview https://cdn.coollabs.io/coolify/preview'],
+    'nightly with a version' => [['--nightly', '4.6.0-beta.1.20261027.1'], 'nightly https://cdn.coollabs.io/coolify/nightly 4.6.0-beta.1.20261027.1'],
+]);
+
 it('builds the development helper image from the coolify-helper repository', function (string $file) {
     expect(file_get_contents(dirname(__DIR__, 2)."/{$file}"))->toContain('https://github.com/coollabsio/coolify-helper.git#main:src');
 })->with(['scripts/dev-helper', 'docker-compose.dev.yml', 'docker-compose.dev-multi.yml']);

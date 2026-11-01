@@ -202,3 +202,23 @@ it('follows the channel it left after a switch to a more stable channel', functi
     'stable to nightly' => ['stable', 'nightly', null],
     'nightly to a custom image' => ['nightly', 'custom', null],
 ]);
+
+it('switches the update channel with app:update-channel like the update page does', function (string $from, string $to, ?string $followed) {
+    InstanceSettings::findOrFail(0)->update(['update_channel' => $from]);
+    Once::flush();
+
+    $this->artisan('app:update-channel', ['channel' => $to])->assertSuccessful();
+
+    expect(InstanceSettings::findOrFail(0))
+        ->update_channel->toBe($to)
+        ->previous_update_channel->toBe($followed);
+})->with([
+    'stable to nightly' => ['stable', 'nightly', null],
+    'nightly to preview' => ['nightly', 'preview', 'nightly'],
+]);
+
+it('refuses an update channel that does not exist', function () {
+    $this->artisan('app:update-channel', ['channel' => 'custom'])->assertFailed();
+
+    expect(InstanceSettings::findOrFail(0)->update_channel)->toBe('stable');
+});

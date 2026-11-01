@@ -11,12 +11,22 @@
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 ## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
 
+## Arguments that can be passed:
+## --preview or --nightly - Install the newest version of the preview or nightly channel and switch the instance to that update channel
+
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 CDN="https://cdn.coollabs.io/coolify"
 CHANNEL="stable"
+case "$1" in
+--preview | --nightly)
+    CHANNEL="${1#--}"
+    CDN="https://cdn.coollabs.io/coolify/$CHANNEL"
+    shift
+    ;;
+esac
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
@@ -1130,6 +1140,11 @@ if [ "$HEALTH" != "healthy" ]; then
     exit 1
 fi
 step_done
+
+if [ "$CHANNEL" != "stable" ]; then
+    docker exec coolify php artisan app:update-channel "$CHANNEL" || warn "Could not switch the instance to the $CHANNEL update channel, switch it on the update page"
+    ui_flush_warnings
+fi
 
 if [ "$UI_TTY" = true ]; then
     printf '%s\n' "$(ui_bar 100 "done")" >&3
