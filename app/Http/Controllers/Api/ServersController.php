@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
@@ -960,6 +961,13 @@ class ServersController extends Controller
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false)
             ),
+            new OA\Parameter(
+                name: 'remove_ssh_key',
+                in: 'query',
+                description: 'Remove the public key of the server\'s SSH key from ~/.ssh/authorized_keys on the server before the server is deleted. The server must have no resources. If the key cannot be removed, the server is not deleted.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
         ],
         responses: [
             new OA\Response(response: 403, description: 'The token needs the deploy permission to delete the resources or the cloud server.'),
@@ -1017,11 +1025,15 @@ class ServersController extends Controller
         if (is_null($deleteFromProvider)) {
             return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
         }
+        $removeSshKey = filter_var($request->query('remove_ssh_key', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($removeSshKey)) {
+            return response()->json(['message' => 'remove_ssh_key must be a boolean.'], 422);
+        }
         // Another Coolify instance manages a transferred server. This instance deletes only its own records:
         // never the cloud server, the containers, or the DNS records that the other instance uses.
         if ($server->isTransferredAway()) {
-            if ($deleteFromProvider) {
-                return response()->json(['message' => 'This server is managed by another Coolify instance. Delete its cloud server from that instance.'], 422);
+            if ($deleteFromProvider || $removeSshKey) {
+                return response()->json(['message' => 'This server is managed by another Coolify instance. Delete its cloud server or SSH key from that instance.'], 422);
             }
             app(ServerTransferClaimer::class)->deleteArchive($server);
             auditLog('api.server.deleted', ['team_id' => $teamId, 'server_uuid' => $server->uuid, 'server_name' => $server->name, 'ip' => $server->ip, 'archive' => true]);
@@ -1056,6 +1068,22 @@ class ServersController extends Controller
             return $response;
         }
 
+        // The key is removed before the server record, while the connection still works.
+        if ($removeSshKey && ! $deleteFromProvider) {
+            if ($server->definedResources()->count() > 0) {
+                return response()->json(['message' => 'Delete the resources of the server first, then delete the server with remove_ssh_key.'], 422);
+            }
+            $context = ['team_id' => $teamId, 'server_uuid' => $server->uuid, 'server_name' => $server->name, 'private_key_uuid' => $server->privateKey?->uuid];
+            try {
+                $removed = AuthorizedKeys::remove($server, $server->privateKey);
+            } catch (\Throwable $e) {
+                auditLog('api.server.ssh_key_removed', [...$context, 'result' => 'failed'], 'warning');
+
+                return response()->json(['message' => 'The SSH key was not removed from the server, so the server was not deleted: '.remove_iip($e->getMessage())], 422);
+            }
+            auditLog('api.server.ssh_key_removed', [...$context, 'result' => $removed ? 'removed' : 'kept_for_other_server']);
+        }
+
         if ($force) {
             foreach ($server->definedResources() as $resource) {
                 DeleteResourceJob::dispatch($resource);
@@ -1085,6 +1113,7 @@ class ServersController extends Controller
             'ip' => $deletedIp,
             'force' => $force,
             'delete_from_provider' => $deleteFromProvider,
+            'remove_ssh_key' => $removeSshKey,
         ]);
 
         return response()->json(['message' => 'Server deleted.']);

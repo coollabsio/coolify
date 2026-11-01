@@ -2597,6 +2597,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function ensureRegistryImageIsNotShared(): void
     {
+        if ($this->restart_only || $this->is_this_additional_server) {
+            return;
+        }
+
         $otherApplication = $this->application->otherApplicationBuildingSameImage();
         if ($otherApplication) {
             throw new DeploymentException($this->application->sharedImageNameMessage($otherApplication));
