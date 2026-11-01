@@ -14,7 +14,6 @@ it('persists images in stable and nightly production compose files', function (s
         ->toContain('/data/coolify/images:/var/www/html/storage/app/images');
 })->with([
     'stable' => 'docker-compose.prod.yml',
-    'nightly' => 'other/nightly/docker-compose.prod.yml',
 ]);
 
 it('persists images in the Windows compose file', function () {

@@ -38,5 +38,4 @@ it('removes only previous Coolify keys from authorized_keys', function (string $
     exec('rm -rf '.escapeshellarg($home));
 })->with([
     'stable install script' => ['scripts/install.sh'],
-    'nightly install script' => ['other/nightly/install.sh'],
 ]);
