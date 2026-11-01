@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Install the newest preview or nightly version with `install.sh --preview` or `install.sh --nightly`, which also switches the update channel of the instance
+- Switch the update channel from the command line with `php artisan app:update-channel`
 - Attach an SBOM attestation to every image, which lists every package of the image
 - Copy the labels of the image to the annotations of its index, ghcr.io reads the description and the license of an image of several platforms from there
 - Choose the update channel of an instance on the update page: stable, preview with betas and release candidates, nightly with a warning that breaking changes are possible, or a custom image such as `pr-1234`
@@ -38,7 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Move the helper image to [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper), which releases it
 - Replace the release process, `RELEASE.md` describes it
   - Keep the Coolify versions in `release.json`, `stable.coolify` for `main` and the maintenance branches and `preview.coolify` for `next` and the release branches
-  - Pin the helper, Sentinel and Traefik versions in `upstream.json` instead of `versions.json`, the CDN and the image write `versions.json` from it
+  - Pin the helper, Sentinel and Traefik versions in `upstream.json` instead of `versions.json`, the CDN writes `versions.json` from it
   - Release from `main`, `next`, release branches such as `release/v4.6` and maintenance branches such as `v4.x` and `v4.4.x`
   - Select the stage and the version with `scripts/release.sh`, which offers the versions the branch allows and preselects the bump the commits need
   - Take the release commit back before the push with `scripts/undo-release.sh`
@@ -60,7 +62,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Add a preview channel for the betas and release candidates
   - Sync every channel with the install and upgrade scripts and the compose files of the commit it releases, instead of the copies in `other/nightly`
   - Clear the Cloudflare cache of the CDN with `scripts/sync-cdn.sh --purge`
-  - List the Coolify version of every channel in `/coolify/release.json`
+  - List the Coolify, helper, Sentinel and Traefik versions of every channel in `/coolify/versions.json`, older instances keep reading its `coolify` and `traefik` keys
 - Take the Coolify version from the image alone, the upgrade script removes `COOLIFY_VERSION` from `.env`
 
 ### Removed
