@@ -11699,6 +11699,14 @@ paths:
           schema:
             type: boolean
             default: false
+        -
+          name: remove_ssh_key
+          in: query
+          description: 'Remove the public key of the server''s SSH key from ~/.ssh/authorized_keys on the server before the server is deleted. The server must have no resources. If the key cannot be removed, the server is not deleted.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '403':
           description: 'The token needs the deploy permission to delete the resources or the cloud server.'

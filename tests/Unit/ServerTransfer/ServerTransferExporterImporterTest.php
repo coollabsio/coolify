@@ -1865,7 +1865,7 @@ test('the GitHub runner config moves disabled with its GitHub App and the bundle
             'On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to {target_url}/webhooks/source/github/events, the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.',
             'In GitLab, open Settings > Webhooks of every project that uses GitLab App Team GitLab, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.',
             'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. Enabling them stops runners that another Coolify instance started on this server.',
-            'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, then remove the old public key from ~/.ssh/authorized_keys on the server.',
+            'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.',
         ])
         ->and(implode(' ', $bundle['warnings']))->not->toContain('webhook URL')
         ->and(implode(' ', $bundle['warnings']))->not->toContain('runner');

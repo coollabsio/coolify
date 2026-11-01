@@ -5,6 +5,7 @@ namespace App\Livewire\Team;
 use App\Enums\Role;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Crypt;
@@ -54,6 +55,39 @@ class InviteLink extends Component
         return route($routeName, $parameters);
     }
 
+    private function pendingInvitationPassword(User $user): ?string
+    {
+        foreach (TeamInvitation::whereEmail($user->email)->get() as $invitation) {
+            if ($invitation->hasExpired() || parse_url($invitation->link, PHP_URL_PATH) !== parse_url(route('auth.link'), PHP_URL_PATH)) {
+                continue;
+            }
+            parse_str((string) parse_url($invitation->link, PHP_URL_QUERY), $query);
+            if (! is_string($query['token'] ?? null)) {
+                continue;
+            }
+            try {
+                $payload = explode('@@@', Crypt::decryptString($query['token']), 3);
+            } catch (DecryptException) {
+                continue;
+            }
+            if (count($payload) === 3) {
+                [$email, $uuid, $password] = $payload;
+                if ($uuid !== $invitation->uuid) {
+                    continue;
+                }
+            } elseif (count($payload) === 2) {
+                [$email, $password] = $payload;
+            } else {
+                continue;
+            }
+            if (strtolower($email) === $user->email && Hash::check($password, $user->password)) {
+                return $password;
+            }
+        }
+
+        return null;
+    }
+
     private function generateInviteLink(bool $sendEmail = false)
     {
         try {
@@ -90,9 +124,11 @@ class InviteLink extends Component
             $link = $this->invitationUrl('team.invitation.show', ['uuid' => $uuid]);
             $user = User::whereEmail($this->email)->first();
 
-            // A user who never set a password cannot log in, so they get a magic link with a new temporary password.
-            if (is_null($user) || $user->isUnusedInvitedAccount()) {
-                $password = Str::password();
+            // A user who never set a password cannot log in, so they get a magic link with a temporary password.
+            if (is_null($user) || $user->needsInitialInvitationLogin()) {
+                $password = $user ? $this->pendingInvitationPassword($user) : null;
+                $hasPendingPassword = $password !== null;
+                $password ??= Str::password();
                 if (is_null($user)) {
                     $user = User::create([
                         'name' => str($this->email)->before('@'),
@@ -100,7 +136,7 @@ class InviteLink extends Component
                         'password' => Hash::make($password),
                         'force_password_reset' => true,
                     ]);
-                } else {
+                } elseif (! $hasPendingPassword) {
                     $user->forceFill(['password' => Hash::make($password)])->save();
                 }
                 $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");

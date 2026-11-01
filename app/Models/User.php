@@ -227,9 +227,14 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
      */
     public function isUnusedInvitedAccount(): bool
     {
+        return $this->needsInitialInvitationLogin()
+            && ! TeamInvitation::whereEmail($this->email)->exists();
+    }
+
+    public function needsInitialInvitationLogin(): bool
+    {
         return ! $this->hasVerifiedEmail()
             && $this->force_password_reset === true
-            && ! TeamInvitation::whereEmail($this->email)->exists()
             && ! $this->belongsToNonPersonalTeam();
     }
 

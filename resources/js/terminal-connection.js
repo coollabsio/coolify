@@ -34,6 +34,14 @@ export function isTerminalStartupRejection(data) {
 }
 
 /**
+ * Whether a plain-text message from the terminal server says why it ended the
+ * running session (revoked access, idle timeout, maximum duration).
+ */
+export function isTerminalSessionEndedNotice(data) {
+    return typeof data === 'string' && data.startsWith('Terminal session ended:');
+}
+
+/**
  * Decides how the terminal reacts to a WebSocket close event.
  *
  * - Auth rejections never reconnect: a new socket would be rejected again.
