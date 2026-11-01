@@ -66,7 +66,7 @@ class Show extends Component
         $this->application_deployment_queue = $application_deployment_queue;
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
-        $this->is_debug_enabled = auth()->user()->isMember()
+        $this->is_debug_enabled = ! auth()->user()->can('update', $this->application)
             ? false
             : $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
