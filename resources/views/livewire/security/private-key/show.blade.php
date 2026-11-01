@@ -51,6 +51,9 @@
             @if ($isGitRelated)
                 <x-status-badge label="Used by GitHub App" type="neutral" />
             @endif
+            @can('update', $private_key)
+                <livewire:security.private-key.rotate :privateKeyId="$private_key->id" wire:key="rotate-{{ $private_key->id }}" />
+            @endcan
             @if (data_get($private_key, 'id') > 0)
                 @can('delete', $private_key)
                     <x-modal-confirmation title="Confirm Private Key Deletion?" isErrorButton buttonTitle="Delete"
@@ -58,6 +61,7 @@
                         :disabledTooltip="$deleteDisabledReason" :actions="[
                             'This private key will be permanently deleted.',
                             'Servers and Git sources using it will stop working.',
+                            'Coolify does not remove its public key from servers. To remove it, rotate the key before you delete it.',
                         ]"
                         confirmationText="{{ $private_key->name }}"
                         confirmationLabel="Enter the private key name to confirm deletion"
@@ -78,7 +82,7 @@
                 <div class="lg:col-span-2">
                     <x-forms.input canGate="update" :canResource="$private_key" readonly id="public_key"
                         label="Public key"
-                        helper="Copy this value to ~/.ssh/authorized_keys on the target server." />
+                        helper="Copy this value to ~/.ssh/authorized_keys on the target server. To replace this key on its servers, use Rotate key." />
                 </div>
                 <div class="lg:col-span-2">
                     <div class="mb-1.5 flex items-center justify-between gap-3">
