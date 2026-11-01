@@ -321,6 +321,11 @@ const REQUIRED_SSH_OPTIONS = new Set([
     'StrictHostKeyChecking',
     'UserKnownHostsFile',
     'PasswordAuthentication',
+    'IdentitiesOnly',
+    'BatchMode',
+    'PreferredAuthentications',
+    'ClearAllForwardings',
+    'ForwardAgent',
     'ConnectTimeout',
     'ServerAliveInterval',
     'RequestTTY',
@@ -332,6 +337,11 @@ function isAllowedSshOption(name, value) {
         StrictHostKeyChecking: 'no',
         UserKnownHostsFile: '/dev/null',
         PasswordAuthentication: 'no',
+        IdentitiesOnly: 'yes',
+        BatchMode: 'yes',
+        PreferredAuthentications: 'publickey',
+        ClearAllForwardings: 'yes',
+        ForwardAgent: 'no',
         LogLevel: 'ERROR',
         ControlMaster: 'auto',
         ProxyCommand: 'cloudflared access ssh --hostname %h',
@@ -364,6 +374,8 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
     const seenOptions = new Set();
     let hasIdentityFile = false;
     let hasPort = false;
+    let hasConfigFile = false;
+    let hasEndOfOptions = false;
     let targetHost = null;
 
     for (let index = 0; index < sshArgs.length; index++) {
@@ -371,6 +383,18 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
 
         if (typeof argument !== 'string' || /[\0\r\n]/.test(argument)) {
             return false;
+        }
+
+        // ssh reads every argument after `--` as the destination or the remote command.
+        if (hasEndOfOptions) {
+            if (targetHost !== null || !/^[a-zA-Z0-9_][a-zA-Z0-9._-]*@[^@]+$/.test(argument)) {
+                return false;
+            }
+            targetHost = extractTargetHost([argument]);
+            if (!/^(?:[a-zA-Z0-9]|\[)/.test(targetHost ?? '')) {
+                return false;
+            }
+            continue;
         }
 
         if (argument === '-i') {
@@ -391,6 +415,19 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
             continue;
         }
 
+        if (argument === '-F') {
+            if (hasConfigFile || sshArgs[++index] !== '/dev/null') {
+                return false;
+            }
+            hasConfigFile = true;
+            continue;
+        }
+
+        if (argument === '--') {
+            hasEndOfOptions = true;
+            continue;
+        }
+
         if (argument === '-o') {
             const option = sshArgs[++index];
             const separator = option?.indexOf('=') ?? -1;
@@ -407,14 +444,6 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
             continue;
         }
 
-        if (/^[a-zA-Z0-9_][a-zA-Z0-9._-]*@[^@]+$/.test(argument) && targetHost === null) {
-            targetHost = extractTargetHost([argument]);
-            if (!/^(?:[a-zA-Z0-9]|\[)/.test(targetHost ?? '')) {
-                return false;
-            }
-            continue;
-        }
-
         return false;
     }
 
@@ -425,6 +454,7 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
 
     return hasIdentityFile
         && hasPort
+        && hasConfigFile
         && targetHost !== null
         && hasRequiredOptions
         && hasCompleteMultiplexingOptions

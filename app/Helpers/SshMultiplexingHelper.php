@@ -105,7 +105,7 @@ class SshMultiplexingHelper
         }
 
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
-        $establishCommand .= self::escapedUserAtHost($server).' true';
+        $establishCommand .= '-- '.self::escapedUserAtHost($server).' true';
 
         $establishProcess = Process::run($establishCommand);
         if ($establishProcess->exitCode() !== 0) {
@@ -196,10 +196,10 @@ class SshMultiplexingHelper
 
         // Upload: local source -> remote dest
         if ($server->isIpv6()) {
-            return $scpCommand.escapeshellarg($source).' '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($dest);
+            return $scpCommand.'-- '.escapeshellarg($source).' '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($dest);
         }
 
-        return $scpCommand.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
+        return $scpCommand.'-- '.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
     }
 
     /**
@@ -237,10 +237,10 @@ class SshMultiplexingHelper
 
         // Download: remote source -> local dest
         if ($server->isIpv6()) {
-            return $scpCommand.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
+            return $scpCommand.'-- '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
         }
 
-        return $scpCommand.self::escapedUserAtHost($server).':'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
+        return $scpCommand.'-- '.self::escapedUserAtHost($server).':'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
     }
 
     public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
@@ -251,7 +251,7 @@ class SshMultiplexingHelper
         $command = str_replace($delimiter, '', $command);
         $remoteShellCommand = self::remoteShellCommand();
 
-        return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
+        return $sshCommand.'-- '.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
             .$delimiter;
     }
@@ -264,7 +264,7 @@ class SshMultiplexingHelper
     public static function generateSshStdinCommand(Server $server, string $remoteCommand, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
     {
         return self::sshCommandPrefix($server, $disableMultiplexing, $commandTimeout)
-            .self::escapedUserAtHost($server).' '.escapeshellarg($remoteCommand);
+            .'-- '.self::escapedUserAtHost($server).' '.escapeshellarg($remoteCommand);
     }
 
     private static function sshCommandPrefix(Server $server, bool $disableMultiplexing, ?int $commandTimeout): string
@@ -325,7 +325,7 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
-        $healthCommand .= self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
+        $healthCommand .= '-- '.self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
         // The health check goes over the network, so a slow link gets at least the server's connection timeout.
         $timeout = max((int) config('constants.ssh.mux_health_check_timeout'), self::getConnectionTimeout($server));
@@ -422,7 +422,7 @@ class SshMultiplexingHelper
             $command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
-        return $command.self::escapedUserAtHost($server);
+        return $command.'-- '.self::escapedUserAtHost($server);
     }
 
     private static function multiplexingOptions(Server $server): string
@@ -495,6 +495,8 @@ class SshMultiplexingHelper
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
             ."-o ServerAliveInterval=$serverInterval "
+            .'-F /dev/null -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey '
+            .'-o ClearAllForwardings=yes -o ForwardAgent=no '
             .'-o RequestTTY=no '
             .'-o LogLevel=ERROR ';
 
