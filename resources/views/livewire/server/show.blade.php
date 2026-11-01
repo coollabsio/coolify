@@ -205,6 +205,14 @@
                             </x-callout>
                         @endif
 
+                        @if (filled($server->settings->ssh_host_key_pending))
+                            <x-callout type="danger" title="The SSH host key of this server changed" class="mb-4">
+                                The server sent a host key that does not match the key that Coolify trusts. Check it on the
+                                <a href="{{ route('server.security.host-key', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                                    class="underline">Host Key</a> page.
+                            </x-callout>
+                        @endif
+
                         @if ($server->isForceDisabled() && isCloud())
                             <x-callout type="danger" title="Server disabled" class="mb-4">
                                 This server is disabled because the current plan server limit was exceeded.

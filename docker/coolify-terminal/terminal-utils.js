@@ -329,8 +329,6 @@ const REQUIRED_SSH_OPTIONS = new Set([
 
 function isAllowedSshOption(name, value) {
     const fixedOptions = {
-        StrictHostKeyChecking: 'no',
-        UserKnownHostsFile: '/dev/null',
         PasswordAuthentication: 'no',
         LogLevel: 'ERROR',
         ControlMaster: 'auto',
@@ -339,6 +337,18 @@ function isAllowedSshOption(name, value) {
 
     if (Object.hasOwn(fixedOptions, name)) {
         return value === fixedOptions[name];
+    }
+
+    if (name === 'StrictHostKeyChecking') {
+        return value === 'yes' || value === 'no';
+    }
+
+    if (name === 'UserKnownHostsFile') {
+        return value === '/dev/null' || /^\/var\/www\/html\/storage\/app\/ssh\/known_hosts\/known_hosts_[a-zA-Z0-9_-]+$/.test(value);
+    }
+
+    if (name === 'HostKeyAlias') {
+        return /^coolify-[a-zA-Z0-9_-]+$/.test(value);
     }
 
     if (name === 'RequestTTY') {

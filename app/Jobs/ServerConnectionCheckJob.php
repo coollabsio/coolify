@@ -48,6 +48,9 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     /** Owner marker that the SSH probe read from the host; empty when the host has none. */
     private ?string $ownerMarker = null;
 
+    /** The server sent a host key that does not match the pinned key. */
+    private bool $hostKeyChanged = false;
+
     public function __construct(
         public Server $server,
         public bool $disableMux = true
@@ -86,6 +89,21 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             // Check basic connectivity first
             $isReachable = $this->checkConnection();
+
+            if ($this->hostKeyChanged) {
+                $this->server->recordHostKeyMismatch();
+            }
+
+            if (! $isReachable && $this->hostKeyChanged) {
+                // A changed host key is not a short network problem: stop at once, without the retry threshold.
+                $this->server->settings->update([
+                    'is_reachable' => false,
+                    'is_usable' => false,
+                ]);
+                $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, 'ssh_host_key_changed');
+
+                return;
+            }
 
             if (! $isReachable) {
                 $this->server->increment('unreachable_count');
@@ -217,6 +235,9 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->attemptConnection()) {
                 return true;
             }
+            if ($this->hostKeyChanged) {
+                return false;
+            }
         }
 
         return false;
@@ -227,6 +248,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $process = Process::timeout(self::SSH_TIMEOUT_SECONDS)
                 ->run($this->sshCommand(self::probeCommand(), disableMultiplexing: true));
+            $this->hostKeyChanged = SshMultiplexingHelper::isHostKeyMismatch($process->errorOutput());
             if ($process->exitCode() !== 0) {
                 $this->connectionError = 'ssh exit '.$process->exitCode().': '.Str::limit(trim($process->errorOutput()), 300);
             } else {

@@ -7,15 +7,18 @@ use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
+use App\Helpers\SshMultiplexingHelper;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\ServerConnectionCheckJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
+use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
 use App\Services\ServerTransfer\ServerTransferClaimer;
@@ -50,7 +53,9 @@ class ServersController extends Controller
         }
 
         return serializeApiResponse($settings)
-            ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD);
+            ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD)
+            ->put('ssh_host_key_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key))
+            ->put('ssh_host_key_pending_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));
     }
 
     /**
@@ -499,6 +504,7 @@ class ServersController extends Controller
                         'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false sets it to both. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'example' => 'traefik', 'description' => 'The proxy type.'],
+                        'ssh_host_key' => ['type' => 'string', 'example' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...', 'description' => 'The SSH host key(s) of the server, as public key lines (for example the content of /etc/ssh/ssh_host_ed25519_key.pub) or known_hosts lines. Without it, Coolify trusts the key that the server sends on the first connection.'],
                     ],
                 ),
             ),
@@ -538,7 +544,7 @@ class ServersController extends Controller
     )]
     public function create_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'ssh_host_key'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -561,14 +567,19 @@ class ServersController extends Controller
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
+            'ssh_host_key' => 'string|nullable|max:16384',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
             'name.not_regex' => 'The name must not contain control characters such as new lines.',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        $sshHostKey = ServerSetting::normalizeSshHostKeys($request->input('ssh_host_key'));
+        if ($validator->fails() || ! empty($extraFields) || ($request->filled('ssh_host_key') && $sshHostKey === null)) {
             $errors = $validator->errors();
+            if ($request->filled('ssh_host_key') && $sshHostKey === null && ! $errors->has('ssh_host_key')) {
+                $errors->add('ssh_host_key', 'The SSH host key must contain public key lines ("type base64") or known_hosts lines.');
+            }
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
                     $errors->add($field, 'This field is not allowed.');
@@ -651,6 +662,13 @@ class ServersController extends Controller
             'server_role' => $serverRole,
             'is_build_server' => $serverRole === ServerRole::BUILD,
         ]);
+        if ($sshHostKey !== null) {
+            $server->settings->refresh()->forceFill([
+                'ssh_host_key' => $sshHostKey,
+                'ssh_host_key_source' => 'manual',
+                'ssh_host_key_trusted_at' => now(),
+            ])->save();
+        }
         if ($request->instant_validate) {
             ValidateServer::dispatch($server);
         }
@@ -1200,6 +1218,122 @@ class ServersController extends Controller
         $message = $install ? 'Validation and installation started.' : 'Validation started.';
 
         return response()->json(['message' => $message], 201);
+    }
+
+    #[OA\Post(
+        summary: 'Reset host key',
+        description: 'Remove the trusted SSH host key of the server, or trust the given key. Without ssh_host_key, Coolify trusts the key that the server sends on the next connection.',
+        path: '/servers/{uuid}/host-key/reset',
+        operationId: 'reset-server-host-key-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(
+                        property: 'ssh_host_key',
+                        description: 'The SSH host key(s) to trust, as public key lines or known_hosts lines.',
+                        type: 'string',
+                    ),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Host key reset.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Host key reset.'],
+                                'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function reset_host_key(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $this->authorize('update', $server);
+        if (! $server->canBeValidated()) {
+            return response()->json([
+                'message' => 'This server was transferred to another Coolify instance.',
+            ], 422);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'ssh_host_key' => 'string|nullable|max:16384',
+        ]);
+        $sshHostKey = ServerSetting::normalizeSshHostKeys($request->input('ssh_host_key'));
+        if ($validator->fails() || ($request->filled('ssh_host_key') && $sshHostKey === null)) {
+            $errors = $validator->errors();
+            if (! $errors->has('ssh_host_key')) {
+                $errors->add('ssh_host_key', 'The SSH host key must contain public key lines ("type base64") or known_hosts lines.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $settings = $server->settings;
+        $previousFingerprints = ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key);
+        $settings->forceFill([
+            'ssh_host_key' => $sshHostKey,
+            'ssh_host_key_source' => $sshHostKey ? 'manual' : null,
+            'ssh_host_key_trusted_at' => $sshHostKey ? now() : null,
+            'ssh_host_key_pending' => null,
+        ])->save();
+        SshMultiplexingHelper::removeMuxFile($server);
+        ServerConnectionCheckJob::dispatch($server);
+
+        auditLog('api.server.ssh_host_key.reset', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'previous_fingerprints' => $previousFingerprints,
+            'fingerprints' => ServerSetting::sshHostKeyFingerprints($sshHostKey),
+        ]);
+
+        return response()->json([
+            'message' => 'Host key reset.',
+            'ssh_host_key_fingerprints' => ServerSetting::sshHostKeyFingerprints($sshHostKey),
+        ]);
     }
 
     /**

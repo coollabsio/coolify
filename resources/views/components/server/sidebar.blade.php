@@ -187,15 +187,17 @@
         ],
         [
             'label' => 'Security',
-            'route' => 'server.security.patches',
+            // The host key page must open when a changed host key stops the connection.
+            'route' => $server->isFunctional() ? 'server.security.patches' : 'server.security.host-key',
             'active' => $activeMenu === 'security',
             'icon' => 'shield-alert',
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
-            'disabled' => ! $server->isFunctional(),
+            'warning' => filled($server->settings->ssh_host_key_pending),
             'children' => [
                 ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage', 'beta' => true],
                 ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
+                ['label' => 'Host Key', 'route' => 'server.security.host-key', 'active' => $activeSubMenu === 'host-key', 'icon' => 'keys'],
             ],
         ],
         [

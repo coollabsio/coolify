@@ -101,6 +101,7 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Registries as ServerRegistries;
 use App\Livewire\Server\Resources as ResourcesShow;
+use App\Livewire\Server\Security\HostKey;
 use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
 use App\Livewire\Server\Sentinel\Logs as SentinelLogs;
@@ -534,6 +535,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
         Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
         Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
+        Route::get('/security/host-key', HostKey::class)->name('server.security.host-key')->middleware('can.update.resource');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');

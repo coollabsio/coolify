@@ -262,6 +262,9 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
     if (empty($errorMessage)) {
         $errorMessage = "SSH command failed with exit code: $exitCode";
     }
+    if ($exitCode === 255 && str_contains($errorMessage, 'Host key verification failed')) {
+        $errorMessage = SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE;
+    }
 
     throw new RuntimeException($errorMessage, $exitCode);
 }
