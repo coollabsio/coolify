@@ -1593,6 +1593,53 @@ class Application extends BaseModel
         return convertGitUrl($this->git_repository, $this->deploymentType(), $this->source);
     }
 
+    /**
+     * The host and port that git connects to over SSH, or null when the repository does not use SSH.
+     *
+     * @return array{host: string, port: int}|null
+     */
+    public function gitSshHost(): ?array
+    {
+        ['repository' => $repository, 'port' => $port] = $this->customRepository();
+        if (str_contains($repository, '://')) {
+            $url = parse_url($repository) ?: [];
+            if (($url['scheme'] ?? null) !== 'ssh') {
+                return null;
+            }
+            $host = $url['host'] ?? null;
+        } else {
+            $host = parseScpStyleGitUrl($repository)['host'] ?? null;
+        }
+        if ($this->deploymentType() === 'source' && filled($this->source?->custom_port)) {
+            $port = $this->source->custom_port;
+        }
+        $host = trim((string) $host, '[]');
+        if (preg_match('/\A[A-Za-z0-9.:-]+\z/', $host) !== 1 || ! is_numeric($port)) {
+            return null;
+        }
+
+        return ['host' => $host, 'port' => (int) $port];
+    }
+
+    /**
+     * Reads the SSH host keys that the Git host sends now, from the server of the application.
+     *
+     * @return list<string> known_hosts lines
+     */
+    public function fetchGitSshHostKeys(): array
+    {
+        $sshHost = $this->gitSshHost();
+        if ($sshHost === null) {
+            return [];
+        }
+        $image = coolifyHelperImage().':'.getHelperVersion();
+        $output = instant_remote_process([
+            'docker run --rm --entrypoint ssh-keyscan '.escapeshellarg($image).' -T 10 -p '.$sshHost['port'].' '.escapeshellarg($sshHost['host']).' 2>/dev/null || true',
+        ], $this->destination->server, false);
+
+        return gitKnownHostsLines($output);
+    }
+
     public function generateBaseDir(string $uuid)
     {
         return "/artifacts/{$uuid}";

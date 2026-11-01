@@ -6571,6 +6571,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
         }
+        if (str_contains($errorMessage, 'Host key verification failed')) {
+            $this->application_deployment_queue->addLogEntry('The Git host sent an SSH host key that is not the saved key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. GitHub, GitLab.com, and Bitbucket Cloud use their published keys; if one of them changed its key, update Coolify.', 'stderr');
+        }
         $this->application_deployment_queue->addLogEntry("Error type: {$errorClass}", 'stderr', hidden: true);
         $this->application_deployment_queue->addLogEntry("Error code: {$errorCode}", 'stderr', hidden: true);
 

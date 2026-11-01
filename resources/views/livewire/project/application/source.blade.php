@@ -43,19 +43,82 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="SSH host keys"
-            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. Compare the fingerprints with your Git host. Remove a line to accept a new key on the next deployment. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys.">
-            <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"
-                placeholder="[git.example.com]:2222 ssh-ed25519 AAAA..." canGate="update"
-                :canResource="$application" />
-            @if ($fingerprints = $this->knownHostFingerprints())
-                <ul class="mt-3 flex flex-col gap-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+        <x-application.settings-section id="ssh-host-keys" title="SSH host keys"
+            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key, click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys.">
+            @can('update', $application)
+                <x-slot:actions>
+                    <x-forms.button type="button" wire:click="fetchHostKeys" wire:loading.attr="disabled"
+                        wire:target="fetchHostKeys">
+                        Fetch current host key
+                    </x-forms.button>
+                </x-slot:actions>
+            @endcan
+            @if ($fetchedHostKeys !== [])
+                <x-callout type="warning" title="Compare these fingerprints before you accept them" class="mb-4">
+                    <p>These are the keys that the Git host sends now. Accept them only if the fingerprint is the same
+                        as the fingerprint from the administrator of the Git host.</p>
+                    <ul class="my-2 flex flex-col gap-1">
+                        @foreach ($this->fetchedHostKeyFingerprints() as $fingerprint)
+                            <li class="break-all"><span class="font-medium">{{ $fingerprint['host'] }}</span>
+                                {{ $fingerprint['type'] }} <span class="font-mono">{{ $fingerprint['fingerprint'] }}</span></li>
+                        @endforeach
+                    </ul>
+                    <div class="flex flex-wrap gap-2">
+                        <x-forms.button type="button" wire:click="acceptFetchedHostKeys">Accept</x-forms.button>
+                        <x-forms.button type="button" wire:click="declineFetchedHostKeys">Decline</x-forms.button>
+                    </div>
+                </x-callout>
+            @endif
+            @php
+                $fingerprints = $this->knownHostFingerprints();
+            @endphp
+            @if ($fingerprints === [])
+                <p class="text-[12px] text-neutral-500 dark:text-fg-dim">No saved host keys. The next deployment
+                    saves the key that the Git host sends, or click Fetch current host key.</p>
+            @else
+                <ul class="flex flex-col divide-y divide-neutral-200 rounded-lg ring-1 ring-neutral-200 dark:divide-white/[0.07] dark:ring-white/[0.07]">
                     @foreach ($fingerprints as $fingerprint)
-                        <li class="break-all"><span class="font-medium text-neutral-900 dark:text-fg">{{ $fingerprint['host'] }}</span>
-                            {{ $fingerprint['type'] }} <span class="font-mono">{{ $fingerprint['fingerprint'] }}</span></li>
+                        <li wire:key="host-key-{{ $fingerprint['fingerprint'] }}"
+                            class="flex items-center justify-between gap-3 px-3 py-2 text-[12px]">
+                            <span class="min-w-0 break-all text-neutral-500 dark:text-fg-dim">
+                                <span class="font-medium text-neutral-900 dark:text-fg">{{ $fingerprint['host'] }}</span>
+                                {{ $fingerprint['type'] }}
+                                <span class="font-mono">{{ $fingerprint['fingerprint'] }}</span>
+                            </span>
+                            @can('update', $application)
+                            <x-modal-confirmation class="!w-auto shrink-0" title="Remove host key?" buttonTitle="Remove"
+                                isErrorButton canGate="update" :canResource="$application"
+                                submitAction="removeHostKey('{{ $fingerprint['fingerprint'] }}')" :actions="[
+                                    'The host key ' . $fingerprint['fingerprint'] . ' of ' . $fingerprint['host'] . ' will be removed.',
+                                    'The next deployment saves the key that the Git host sends then, without a check.',
+                                ]" :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Remove host key">
+                                <x-slot:trigger>
+                                    <button type="button"
+                                        class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                        title="Remove host key" aria-label="Remove host key of {{ $fingerprint['host'] }}">
+                                        <x-reicon name="trash" class="size-3.5" />
+                                    </button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                            @endcan
+                        </li>
                     @endforeach
                 </ul>
             @endif
+            @can('update', $application)
+                <div x-data="{ editManually: false }" class="mt-3">
+                    <button type="button" x-show="!editManually" @click="editManually = true"
+                        class="text-[12px] font-medium text-coollabs underline-offset-2 hover:underline dark:text-brand-light">
+                        Edit manually
+                    </button>
+                    <div x-show="editManually" x-cloak>
+                        <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"
+                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. Click Save to apply."
+                            placeholder="[git.example.com]:2222 ssh-ed25519 AAAA..." canGate="update"
+                            :canResource="$application" />
+                    </div>
+                </div>
+            @endcan
         </x-application.settings-section>
     </form>
 

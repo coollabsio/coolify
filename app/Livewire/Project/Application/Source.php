@@ -44,6 +44,14 @@ class Source extends Component
     #[Validate(['nullable', 'string', 'max:65535'])]
     public ?string $gitSshKnownHosts = null;
 
+    /**
+     * Host keys that the Git host sends now, which the user can accept or decline.
+     *
+     * @var list<string>
+     */
+    #[Locked]
+    public array $fetchedHostKeys = [];
+
     public function mount()
     {
         try {
@@ -101,17 +109,85 @@ class Source extends Component
      */
     public function knownHostFingerprints(): array
     {
-        return collect(gitKnownHostsLines($this->application->git_ssh_known_hosts))
-            ->map(function (string $line) {
-                [$host, $type, $key] = explode(' ', $line);
+        return array_map(gitKnownHostFingerprint(...), gitKnownHostsLines($this->application->git_ssh_known_hosts));
+    }
 
-                return [
-                    'host' => $host,
-                    'type' => $type,
-                    'fingerprint' => 'SHA256:'.rtrim(base64_encode(hash('sha256', (string) base64_decode($key), true)), '='),
-                ];
-            })
-            ->all();
+    /**
+     * Removes the saved key with this fingerprint. The next deployment saves the key that the host sends then.
+     */
+    public function removeHostKey(string $fingerprint): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $lines = array_filter(
+                gitKnownHostsLines($this->application->git_ssh_known_hosts),
+                fn (string $line) => gitKnownHostFingerprint($line)['fingerprint'] !== $fingerprint,
+            );
+            $this->application->update(['git_ssh_known_hosts' => implode("\n", $lines) ?: null]);
+            $this->gitSshKnownHosts = $this->application->git_ssh_known_hosts;
+            $this->dispatch('success', 'Host key removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * @return list<array{host: string, type: string, fingerprint: string}>
+     */
+    public function fetchedHostKeyFingerprints(): array
+    {
+        return array_map(gitKnownHostFingerprint(...), $this->fetchedHostKeys);
+    }
+
+    public function fetchHostKeys(): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->fetchedHostKeys = [];
+            $sshHost = $this->application->gitSshHost();
+            if ($sshHost === null) {
+                $this->dispatch('error', 'The repository does not use SSH.');
+
+                return;
+            }
+            if (collect(GIT_PINNED_HOST_KEYS)->contains(fn (string $line) => strtok($line, ' ') === $sshHost['host'])) {
+                $this->dispatch('info', "Coolify always uses the published host keys of {$sshHost['host']}.");
+
+                return;
+            }
+            $this->fetchedHostKeys = $this->application->fetchGitSshHostKeys();
+            if ($this->fetchedHostKeys === []) {
+                $this->dispatch('error', "Could not read the host keys of {$sshHost['host']} on port {$sshHost['port']}.");
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Replaces the saved keys of the fetched host with the fetched keys.
+     */
+    public function acceptFetchedHostKeys(): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $hosts = array_map(fn (string $line) => strtok($line, ' '), $this->fetchedHostKeys);
+            $otherHosts = array_filter(
+                gitKnownHostsLines($this->application->git_ssh_known_hosts),
+                fn (string $line) => ! in_array(strtok($line, ' '), $hosts, true),
+            );
+            $this->application->update(['git_ssh_known_hosts' => implode("\n", [...$otherHosts, ...$this->fetchedHostKeys]) ?: null]);
+            $this->fetchedHostKeys = [];
+            $this->gitSshKnownHosts = $this->application->git_ssh_known_hosts;
+            $this->dispatch('success', 'Host keys saved. Later deployments accept only these keys.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function declineFetchedHostKeys(): void
+    {
+        $this->fetchedHostKeys = [];
     }
 
     private function getPrivateKeys()

@@ -140,6 +140,22 @@ class Show extends Component
         }
     }
 
+    /**
+     * The Source page URL when the deployment failed because the Git host sent another SSH host key.
+     */
+    public function getHostKeyChangedSourceUrlProperty(): ?string
+    {
+        if (! str_contains((string) $this->application_deployment_queue->logs, 'Host key verification failed')) {
+            return null;
+        }
+
+        return route('project.application.source', [
+            'project_uuid' => $this->application->environment->project->uuid,
+            'environment_uuid' => $this->application->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ]);
+    }
+
     public function getLogLinesProperty()
     {
         return decode_remote_command_output($this->application_deployment_queue);

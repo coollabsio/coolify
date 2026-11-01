@@ -604,6 +604,22 @@ function gitKnownHostsLines(?string $text): array
 }
 
 /**
+ * The host, key type, and SHA256 fingerprint of a known_hosts line, in the format that `ssh-keygen -lf` shows.
+ *
+ * @return array{host: string, type: string, fingerprint: string}
+ */
+function gitKnownHostFingerprint(string $line): array
+{
+    [$host, $type, $key] = explode(' ', $line);
+
+    return [
+        'host' => $host,
+        'type' => $type,
+        'fingerprint' => 'SHA256:'.rtrim(base64_encode(hash('sha256', (string) base64_decode($key), true)), '='),
+    ];
+}
+
+/**
  * A shell command that writes the SSH config and known_hosts file that gitSshCommand() uses.
  * Run it in the place where git runs (the helper container or the server) before git uses SSH.
  *
