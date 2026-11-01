@@ -86,6 +86,8 @@ class Terminal extends Component
 
     /**
      * Resolve the effective terminal mode. Falls back to shell whenever attach is not available.
+     *
+     * @return 'shell'|'attach'
      */
     public function resolveMode(?string $requestedMode): string
     {
@@ -159,7 +161,7 @@ class Terminal extends Component
             $mode = $this->terminalMode = 'shell';
         }
 
-        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode);
+        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode, (string) request()->server('REMOTE_ADDR'), request()->userAgent());
         $this->dispatch('send-terminal-token', $token);
     }
 

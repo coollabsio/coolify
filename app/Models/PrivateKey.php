@@ -201,6 +201,30 @@ class PrivateKey extends BaseModel
         }
     }
 
+    /**
+     * The key type and key data, without a comment. Lines in authorized_keys are found by this value.
+     */
+    public function publicKeyBody(): string
+    {
+        $publicKey = self::extractPublicKeyFromPrivate($this->private_key);
+        if (is_null($publicKey)) {
+            throw new \RuntimeException('The private key is invalid.');
+        }
+
+        return implode(' ', array_slice(preg_split('/\s+/', trim($publicKey)), 0, 2));
+    }
+
+    /**
+     * The authorized_keys line that Coolify adds. The comment names the instance and the key,
+     * and does not contain the word "coolify", which old install scripts remove.
+     */
+    public function authorizedKeysLine(): string
+    {
+        $instance = substr(hash('sha256', (string) (config('app.id') ?: config('app.url'))), 0, 12);
+
+        return "{$this->publicKeyBody()} cpk:{$instance}:{$this->uuid}";
+    }
+
     public static function validateAndExtractPublicKey($privateKey)
     {
         $isValid = self::validatePrivateKey($privateKey);
