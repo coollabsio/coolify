@@ -902,7 +902,7 @@ class Show extends Component
 
     public function loadHostingerTokens(): void
     {
-        $this->availableHostingerTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableHostingerTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'hostinger')
             ->get();
     }
@@ -1292,7 +1292,7 @@ class Show extends Component
             }
 
             $updates = [
-                'cloud_provider_token_id' => $this->selectedHostingerTokenId,
+                'cloud_provider_token_id' => $token->id,
                 'hostinger_virtual_machine_id' => $virtualMachine['id'],
                 'hostinger_virtual_machine_status' => $virtualMachine['state'] ?? null,
             ];

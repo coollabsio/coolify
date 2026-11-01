@@ -57,7 +57,6 @@ it('keeps the remaining private key editor populated after deleting multiple key
     foreach ($privateKeys->take(2) as $privateKey) {
         Livewire::test(PrivateKeyShow::class, [
             'private_key_uuid' => $privateKey->uuid,
-            'modalMode' => true,
         ])->call('delete')
             ->assertDispatched('privateKeyDeleted')
             ->assertNoRedirect();
@@ -72,7 +71,6 @@ it('keeps the remaining private key editor populated after deleting multiple key
 
     Livewire::test(PrivateKeyShow::class, [
         'private_key_uuid' => $remainingPrivateKey->uuid,
-        'modalMode' => true,
     ])->assertSet('name', $remainingPrivateKey->name)
         ->assertSee($remainingPrivateKey->name);
 });
@@ -98,6 +96,5 @@ it('loads the public key with the editor instead of making a follow-up request',
 
     Livewire::test(PrivateKeyShow::class, [
         'private_key_uuid' => $privateKey->uuid,
-        'modalMode' => true,
     ])->assertSet('public_key', $privateKey->getPublicKey());
 });

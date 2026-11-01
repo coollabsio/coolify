@@ -564,8 +564,8 @@ class ServerTransferExporter
             $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
                 .'Enabling them stops runners that another Coolify instance started on this server.';
         }
-        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, '
-            .'then remove the old public key from ~/.ssh/authorized_keys on the server.';
+        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys '
+            .'and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.';
 
         return $steps;
     }

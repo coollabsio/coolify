@@ -80,7 +80,7 @@ class SentinelController extends Controller
             return response()->json(['message' => 'Server is not functional'], 401);
         }
 
-        if ($server->settings->sentinel_token !== $naked_token) {
+        if (! hash_equals((string) $server->settings->sentinel_token, (string) $naked_token)) {
             auditLogWebhookFailure('sentinel', 'token_mismatch', [
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,

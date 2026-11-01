@@ -22,6 +22,7 @@ use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\UseSessionTeamApiToken;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -76,7 +77,6 @@ use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenS
 use App\Livewire\Security\CloudTokens;
 use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
-use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\Analytics\Show as ServerAnalytics;
@@ -374,10 +374,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
         $request->validate(['token' => ['required', 'string', 'size:64']]);
 
-        return response()->json([
-            'command' => $terminalSessionService->redeem($request->user(), $request->string('token')->toString()),
-        ]);
+        return response()->json($terminalSessionService->redeem($request->user(), $request->string('token')->toString()));
     })->name('terminal.session')->middleware('can.access.terminal');
+
+    // No session-team gate: the check uses the team of the server, and the user can switch teams in another tab.
+    Route::post('/terminal/session/check', function (Request $request, TerminalSessionService $terminalSessionService) {
+        $request->validate(['session_id' => ['required', 'string', 'size:64']]);
+        $terminalSessionService->check($request->user(), $request->string('session_id')->toString());
+
+        return response()->json(['active' => true]);
+    })->name('terminal.session.check');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
@@ -543,7 +549,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
-    Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
     Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
@@ -555,6 +560,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/select-team', SelectTeam::class)->name('team.select');
+});
+
+// Called by the terminal server when a PTY ends, also after a logout. The secret session id authenticates it.
+Route::post('/terminal/session/end', function (Request $request, TerminalSessionService $terminalSessionService) {
+    $request->validate([
+        'session_id' => ['required', 'string', 'size:64'],
+        'reason' => ['required', 'string', 'in:exited,disconnected,replaced,rejected,idle,max_duration,revoked'],
+    ]);
+    $terminalSessionService->end($request->string('session_id')->toString(), $request->string('reason')->toString());
+
+    return response()->noContent();
+})->name('terminal.session.end')->withoutMiddleware(VerifyCsrfToken::class);
+
+Route::middleware(['auth'])->group(function () {
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
 
@@ -574,27 +593,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            $user = auth()->user();
-            $team = $user->currentTeam();
-            if (is_null($team)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
-            }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
             $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
-            if ($team->id !== 0) {
-                if (is_null($execution_team_id)) {
-                    return response()->json(['message' => 'Team not found.'], 404);
-                }
-                if ($team->id !== $execution_team_id) {
-                    return response()->json(['message' => 'Permission denied.'], 403);
-                }
-                if (is_null($execution)) {
-                    return response()->json(['message' => 'Backup not found.'], 404);
-                }
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             $filename = data_get($execution, 'filename');
             if (! $execution->local_storage_deleted && filled($filename)) {
@@ -631,20 +637,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/download/volume-backup/{executionId}', function () {
         try {
-            $user = auth()->user();
-            $team = $user->currentTeam();
-            if (is_null($team)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
-            }
-
             $execution = ScheduledVolumeBackupExecution::query()
                 ->with('scheduledVolumeBackup.backupable.resource')
                 ->findOrFail(request()->route('executionId'));
-            if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
-                return response()->json(['message' => 'Permission denied.'], 403);
+            $execution_team_id = $execution->scheduledVolumeBackup->team_id;
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);
