@@ -26,6 +26,7 @@ workflows:
     '.github/workflows/pr-quality.yaml':
         - 'peakoss/anti-slop@v0.3.0'
     '.github/workflows/pull-request.yaml':
+        - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
         - 'docker/login-action@v4.7.0'
     '.github/workflows/release.yaml':
