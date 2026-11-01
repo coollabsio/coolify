@@ -218,10 +218,10 @@ class SecurityController extends Controller
                 ], 422);
             }
         }
-        $isPrivateKeyValid = PrivateKey::validatePrivateKey($request->private_key);
-        if (! $isPrivateKeyValid) {
+        $privateKeyError = PrivateKey::validationError($request->private_key);
+        if ($privateKeyError) {
             return response()->json([
-                'message' => 'Invalid private key.',
+                'message' => $privateKeyError,
             ], 422);
         }
         $fingerPrint = PrivateKey::generateFingerprint($request->private_key);

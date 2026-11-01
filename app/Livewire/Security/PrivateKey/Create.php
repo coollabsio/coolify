@@ -79,11 +79,11 @@ class Create extends Component
 
     private function validatePrivateKey()
     {
-        $validationResult = PrivateKey::validateAndExtractPublicKey($this->value);
-        $this->publicKey = $validationResult['publicKey'];
+        $error = PrivateKey::validationError($this->value);
+        $this->publicKey = $error ? '' : PrivateKey::extractPublicKeyFromPrivate($this->value);
 
-        if (! $validationResult['isValid']) {
-            $this->addError('value', 'Invalid private key');
+        if ($error) {
+            $this->addError('value', $error);
         }
     }
 

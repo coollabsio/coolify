@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use phpseclib3\Crypt\DSA;
 use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -58,9 +60,11 @@ class PrivateKey extends BaseModel
         static::saving(function ($key) {
             $key->private_key = formatPrivateKey($key->private_key);
 
-            if (! self::validatePrivateKey($key->private_key)) {
+            // Check only new or changed keys, so older keys can still be renamed.
+            $error = $key->isDirty('private_key') ? self::validationError($key->private_key) : null;
+            if ($error) {
                 throw ValidationException::withMessages([
-                    'private_key' => ['The private key is invalid.'],
+                    'private_key' => [$error],
                 ]);
             }
 
@@ -135,13 +139,29 @@ class PrivateKey extends BaseModel
 
     public static function validatePrivateKey($privateKey)
     {
-        try {
-            PublicKeyLoader::load($privateKey);
+        return self::validationError($privateKey) === null;
+    }
 
-            return true;
+    /**
+     * Returns why a private key cannot be used, or null when it is valid.
+     */
+    public static function validationError(?string $privateKey): ?string
+    {
+        try {
+            $key = PublicKeyLoader::loadPrivateKey((string) $privateKey);
         } catch (\Throwable $e) {
-            return false;
+            return 'The private key is invalid. Paste an unencrypted private key, not a public key or a certificate.';
         }
+
+        if ($key instanceof DSA) {
+            return 'DSA keys are not supported. Use an Ed25519 or RSA key.';
+        }
+
+        if ($key instanceof RSA && $key->getLength() < 2048) {
+            return 'RSA keys must have at least 2048 bits.';
+        }
+
+        return null;
     }
 
     public static function createAndStore(array $data)
@@ -160,14 +180,14 @@ class PrivateKey extends BaseModel
         });
     }
 
-    public static function generateNewKeyPair($type = 'rsa')
+    public static function generateNewKeyPair($type = 'ed25519')
     {
         try {
             $instance = new self;
             $instance->rateLimit(10);
             $name = generate_random_name();
             $description = 'Created by Coolify';
-            $keyPair = generateSSHKey($type === 'ed25519' ? 'ed25519' : 'rsa');
+            $keyPair = generateSSHKey($type === 'rsa' ? 'rsa' : 'ed25519');
 
             return [
                 'name' => $name,
@@ -189,17 +209,6 @@ class PrivateKey extends BaseModel
         } catch (\Throwable $e) {
             return null;
         }
-    }
-
-    public static function validateAndExtractPublicKey($privateKey)
-    {
-        $isValid = self::validatePrivateKey($privateKey);
-        $publicKey = $isValid ? self::extractPublicKeyFromPrivate($privateKey) : '';
-
-        return [
-            'isValid' => $isValid,
-            'publicKey' => $publicKey,
-        ];
     }
 
     public function storeInFileSystem()
