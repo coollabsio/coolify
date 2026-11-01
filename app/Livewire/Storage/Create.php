@@ -151,11 +151,12 @@ class Create extends Component
 
     public function render(): View
     {
-        $teamId = currentTeam()->id;
+        $teamId = currentTeam()?->id;
+        $listsPrivateKeys = $teamId !== null && $this->type === BackupStorageType::Sftp->value;
 
         return view('livewire.storage.create', [
-            'privateKeys' => $this->type === BackupStorageType::Sftp->value ? $this->privateKeyOptions($teamId) : [],
-            'publicKey' => $this->type === BackupStorageType::Sftp->value ? $this->selectedPublicKey($teamId) : null,
+            'privateKeys' => $listsPrivateKeys ? $this->privateKeyOptions($teamId) : [],
+            'publicKey' => $listsPrivateKeys ? $this->selectedPublicKey($teamId) : null,
         ]);
     }
 

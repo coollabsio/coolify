@@ -56,6 +56,7 @@ test('S3Storage model fillable attributes are configured correctly', function ()
 
     expect($s3Storage->getFillable())->toBe([
         'team_id',
+        'type',
         'name',
         'description',
         'region',
@@ -64,9 +65,10 @@ test('S3Storage model fillable attributes are configured correctly', function ()
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'private_key_id',
         'is_usable',
         'unusable_email_sent',
-    ]);
+    ])->not->toContain('sftp_host_key');
 });
 
 test('S3Storage connection validation uses short s3 client timeouts', function () {
