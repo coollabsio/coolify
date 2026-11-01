@@ -311,7 +311,9 @@ class FtpsFilesystemAdapter implements DeletesEmptyDirectories, FilesystemAdapte
         $host = $this->bracketed($this->host);
         // array_replace() keeps the integer keys of the curl options, which the spread operator renumbers.
         curl_setopt_array($handle, array_replace([
-            CURLOPT_USERPWD => $this->username.':'.$this->password,
+            // Not CURLOPT_USERPWD: it splits "user:password" at the first colon, so a username with a colon fails.
+            CURLOPT_USERNAME => $this->username,
+            CURLOPT_PASSWORD => $this->password,
             CURLOPT_USE_SSL => CURLUSESSL_ALL,
             CURLOPT_PROTOCOLS_STR => 'ftp',
             CURLOPT_CONNECTTIMEOUT => self::CONNECTION_TIMEOUT_SECONDS,

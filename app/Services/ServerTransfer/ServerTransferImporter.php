@@ -1990,6 +1990,22 @@ class ServerTransferImporter
         if ($existing) {
             return $existing;
         }
+        // Bundles of older instances have no type: they only had S3 storages.
+        $type = BackupStorageType::tryFrom((string) data_get($payload, 'type')) ?? BackupStorageType::S3;
+        // An S3 storage of the team with the same bucket and access key is the same storage. Other types match by UUID
+        // only: several logins can use one host, and the key column is encrypted, so it is compared after loading.
+        if ($type === BackupStorageType::S3) {
+            $sameS3Storage = S3Storage::query()
+                ->s3Only()
+                ->where('team_id', $teamId)
+                ->where('endpoint', data_get($payload, 'endpoint'))
+                ->where('bucket', data_get($payload, 'bucket'))
+                ->get()
+                ->first(fn (S3Storage $storage): bool => $storage->key === data_get($payload, 'key'));
+            if ($sameS3Storage) {
+                return $sameS3Storage;
+            }
+        }
         if (S3Storage::where('uuid', $uuid)->exists()) {
             $uuid = new_public_id();
         }
@@ -1997,8 +2013,7 @@ class ServerTransferImporter
         $storage = new S3Storage;
         $storage->forceFill([
             'team_id' => $teamId,
-            // Bundles of older instances have no type: they only had S3 storages.
-            'type' => BackupStorageType::tryFrom((string) data_get($payload, 'type')) ?? BackupStorageType::S3,
+            'type' => $type,
             'name' => data_get($payload, 'name') ?: 'Imported S3',
             'description' => data_get($payload, 'description'),
             'region' => data_get($payload, 'region'),

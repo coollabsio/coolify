@@ -23,11 +23,16 @@ class SftpFilesystemAdapter extends SftpAdapter implements DeletesEmptyDirectori
 
     /**
      * Writes at most `$maxBytes` bytes, so a file that grew since its size was read cannot overrun the response.
+     * phpseclib calls fstat() on a resource destination, which php://output does not support, so it gets a callable.
      */
     public function download(string $path, $destination, int $maxBytes): void
     {
+        $write = function (string $chunk) use ($destination): void {
+            fwrite($destination, $chunk);
+        };
+
         try {
-            $downloaded = $this->connections->provideConnection()->get($this->pathPrefixer->prefixPath($path), $destination, 0, $maxBytes);
+            $downloaded = $this->connections->provideConnection()->get($this->pathPrefixer->prefixPath($path), $write, 0, $maxBytes);
         } catch (Throwable $exception) {
             throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
         }

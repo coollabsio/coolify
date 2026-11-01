@@ -129,9 +129,15 @@ it('streams an SFTP replica to the response without a temporary copy, at most th
     $connection = Mockery::mock(SFTP::class);
     $connection->allows('getServerPublicHostKey')->andReturn(false);
     $connection->allows('stat')->with('/backups/backup.sql')->andReturn(['size' => 15, 'mode' => 0100644, 'type' => NET_SFTP_TYPE_REGULAR]);
-    $connection->expects('get')->with('/backups/backup.sql', Mockery::type('resource'), 0, 15)
+    // Like phpseclib: a resource destination must support fstat(), which php://output does not; a callable gets each chunk.
+    $connection->expects('get')->with('/backups/backup.sql', Mockery::any(), 0, 15)
         ->andReturnUsing(function (string $path, $destination): bool {
-            fwrite($destination, 'backup contents');
+            if (is_resource($destination)) {
+                $offset = fstat($destination)['size'];
+                fwrite($destination, substr('backup contents', $offset));
+            } else {
+                $destination('backup contents');
+            }
 
             return true;
         });

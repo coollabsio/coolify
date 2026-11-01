@@ -60,7 +60,7 @@ class S3StoragesController extends Controller
         $rules = S3Storage::connectionRules($type, $partial, $trustedInternalHosts, $teamId, $savedEndpoint);
         if (array_key_exists('private_key_id', $rules)) {
             unset($rules['private_key_id']);
-            $rules['private_key_uuid'] = ['nullable', 'string', Rule::exists('private_keys', 'uuid')->where('team_id', $teamId)->where('is_git_related', false)];
+            $rules['private_key_uuid'] = ['nullable', 'string', Rule::exists('private_keys', 'uuid')->where('team_id', $teamId)->where(fn ($query) => $query->where('is_git_related', false))];
             if (! $partial) {
                 $rules['secret'] = ['required_without:private_key_uuid', 'nullable', 'string', 'max:255'];
             }
@@ -144,7 +144,7 @@ class S3StoragesController extends Controller
 
     #[OA\Get(
         summary: 'List S3 Storages',
-        description: 'List all S3 storages for the authenticated team.',
+        description: 'List all backup storages (S3, SFTP, FTPS, and WebDAV) for the authenticated team.',
         path: '/s3-storages',
         operationId: 'list-s3-storages',
         security: [
@@ -168,9 +168,11 @@ class S3StoragesController extends Controller
                                     'name' => ['type' => 'string'],
                                     'description' => ['type' => 'string', 'nullable' => true],
                                     'endpoint' => ['type' => 'string'],
-                                    'bucket' => ['type' => 'string'],
-                                    'region' => ['type' => 'string'],
+                                    'bucket' => ['type' => 'string', 'nullable' => true, 'description' => 'S3 only. Null for the other types.'],
+                                    'region' => ['type' => 'string', 'description' => 'S3 only. The other types have a placeholder value.'],
                                     'use_path_style_endpoint' => ['type' => 'boolean'],
+                                    'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of the private key used to log in. Null with a password login.'],
+                                    'sftp_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the pinned host key of the server, as "<key type> <base64>". Saved by the first successful connection test.'],
                                     'is_usable' => ['type' => 'boolean'],
                                     'team_id' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -230,12 +232,15 @@ class S3StoragesController extends Controller
                             type: 'object',
                             properties: [
                                 'uuid' => ['type' => 'string'],
+                                'type' => ['type' => 'string', 'enum' => ['s3', 'sftp', 'ftps', 'webdav']],
                                 'name' => ['type' => 'string'],
                                 'description' => ['type' => 'string', 'nullable' => true],
                                 'endpoint' => ['type' => 'string'],
-                                'bucket' => ['type' => 'string'],
-                                'region' => ['type' => 'string'],
+                                'bucket' => ['type' => 'string', 'nullable' => true, 'description' => 'S3 only. Null for the other types.'],
+                                'region' => ['type' => 'string', 'description' => 'S3 only. The other types have a placeholder value.'],
                                 'use_path_style_endpoint' => ['type' => 'boolean'],
+                                'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of the private key used to log in. Null with a password login.'],
+                                'sftp_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the pinned host key of the server, as "<key type> <base64>". Saved by the first successful connection test.'],
                                 'is_usable' => ['type' => 'boolean'],
                                 'team_id' => ['type' => 'integer'],
                                 'created_at' => ['type' => 'string'],
@@ -399,7 +404,7 @@ class S3StoragesController extends Controller
 
     #[OA\Patch(
         summary: 'Update S3 Storage',
-        description: 'Update S3 storage by UUID.',
+        description: 'Update S3 storage by UUID. The type cannot change, and only the fields of the storage type are accepted.',
         path: '/s3-storages/{uuid}',
         operationId: 'update-s3-storage-by-uuid',
         security: [
@@ -593,7 +598,7 @@ class S3StoragesController extends Controller
 
     #[OA\Post(
         summary: 'Validate S3 Storage',
-        description: 'Validate an S3 storage connection using ListObjectsV2.',
+        description: 'Validate a storage connection. S3: lists the bucket (ListObjectsV2). SFTP, FTPS, and WebDAV: lists the backup directory; for SFTP, the first successful validation pins the host key of the server.',
         path: '/s3-storages/{uuid}/validate',
         operationId: 'validate-s3-storage-by-uuid',
         security: [
@@ -654,7 +659,7 @@ class S3StoragesController extends Controller
 
         return response()->json([
             'valid' => $validation['valid'],
-            'message' => $validation['valid'] ? 'S3 storage connection is valid.' : $validation['error'],
+            'message' => $validation['valid'] ? $storage->storageType()->label().' storage connection is valid.' : $validation['error'],
         ]);
     }
 }

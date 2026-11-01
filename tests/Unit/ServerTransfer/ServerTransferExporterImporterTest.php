@@ -2065,3 +2065,59 @@ it('moves the saved SFTP host key with the backup storage', function () {
 
     expect(S3Storage::where('endpoint', 'sftp://93.184.216.34:2222/backups')->sole()->sftp_host_key)->toBe($hostKey);
 });
+
+/**
+ * Exports the server with a database backup to a storage, then imports it with new UUIDs into a team that already
+ * has `$existing`. Returns the storage of the imported backup and the number of storages of the target team.
+ *
+ * @param  array<string, mixed>  $source
+ * @param  array<string, mixed>  $existing
+ * @return array{0: S3Storage, 1: S3Storage, 2: int}
+ */
+function transferBackupStorageIntoTeamWith(object $test, array $source, array $existing): array
+{
+    $defaults = ['name' => 'Backups', 'region' => 'us-east-1', 'secret' => 'secret', 'team_id' => $test->team->id];
+    $storage = S3Storage::create([...$defaults, ...$source]);
+    $test->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+    $bundle = $test->exporter->export($test->server);
+    removeTransferSourceResources($test);
+    $storage->forceDelete();
+
+    $target = Team::factory()->create();
+    $existingStorage = S3Storage::create([...$defaults, ...$existing, 'name' => 'Existing', 'team_id' => $target->id]);
+    $result = $test->importer->import($bundle, teamId: $target->id, preserveUuids: false, adoptMode: false);
+    $importedStorage = Server::where('uuid', $result['server_uuid'])->firstOrFail()
+        ->databases()->sole()->scheduledBackups()->sole()->s3;
+
+    return [$importedStorage, $existingStorage, S3Storage::where('team_id', $target->id)->count()];
+}
+
+test('a transfer with new UUIDs reuses the S3 storage of the target team with the same endpoint, bucket and key', function () {
+    $s3 = ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIASAME'];
+
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this, $s3, $s3);
+
+    expect($imported->id)->toBe($existing->id)->and($count)->toBe(1);
+});
+
+test('a transfer does not reuse an S3 storage with another key', function () {
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this,
+        ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIASOURCE'],
+        ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIATARGET'],
+    );
+
+    expect($imported->id)->not->toBe($existing->id)
+        ->and($imported->key)->toBe('AKIASOURCE')
+        ->and($count)->toBe(2);
+});
+
+test('a transfer does not merge SFTP storages on the same host', function (string $existingKey) {
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this,
+        ['type' => 'sftp', 'endpoint' => 'sftp://93.184.216.34/backups', 'key' => 'source-user'],
+        ['type' => 'sftp', 'endpoint' => 'sftp://93.184.216.34/backups', 'key' => $existingKey],
+    );
+
+    expect($imported->id)->not->toBe($existing->id)
+        ->and($imported->key)->toBe('source-user')
+        ->and($count)->toBe(2);
+})->with(['another login' => ['target-user'], 'the same login' => ['source-user']]);

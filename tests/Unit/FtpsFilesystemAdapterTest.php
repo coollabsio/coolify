@@ -35,18 +35,18 @@ function fakeFtpsTestCertificate(): string
  *
  * @return array{error: string|null, seconds: float, bytes: int}
  */
-function runFakeFtpsTestCall(string $scenario, string $call, int $maxBytes = 0): array
+function runFakeFtpsTestCall(string $scenario, string $call, int $maxBytes = 0, string $username = 'user', ?string $commandLog = null): array
 {
     $probe = stream_socket_server('tcp://127.0.0.1:0');
     $port = (int) substr(strrchr(stream_socket_get_name($probe, false), ':'), 1);
     fclose($probe);
-    $server = new Process([PHP_BINARY, dirname(__DIR__).'/Fixtures/storage/fake-ftps-server.php', (string) $port, fakeFtpsTestCertificate(), $scenario]);
+    $server = new Process([PHP_BINARY, dirname(__DIR__).'/Fixtures/storage/fake-ftps-server.php', (string) $port, fakeFtpsTestCertificate(), $scenario, ...($commandLog === null ? [] : [$commandLog])]);
     $server->start();
     usleep(300_000);
 
     $code = <<<'PHP'
         require $argv[1].'/vendor/autoload.php';
-        $adapter = new class('localhost', (int) $argv[2], 'user', 'secret', '', '127.0.0.1') extends App\Support\FtpsFilesystemAdapter
+        $adapter = new class('localhost', (int) $argv[2], $argv[5], 'secret', '', '127.0.0.1') extends App\Support\FtpsFilesystemAdapter
         {
             protected const REQUEST_TIMEOUT_SECONDS = 1;
 
@@ -70,7 +70,7 @@ function runFakeFtpsTestCall(string $scenario, string $call, int $maxBytes = 0):
         PHP;
 
     try {
-        $client = new Process([PHP_BINARY, '-d', 'curl.cainfo='.fakeFtpsTestCertificate(), '-r', $code, dirname(__DIR__, 2), (string) $port, $call, (string) $maxBytes]);
+        $client = new Process([PHP_BINARY, '-d', 'curl.cainfo='.fakeFtpsTestCertificate(), '-r', $code, dirname(__DIR__, 2), (string) $port, $call, (string) $maxBytes, $username]);
         $client->setTimeout(180)->mustRun();
 
         return json_decode($client->getOutput(), true);
@@ -94,6 +94,17 @@ it('formats FTPS URL hosts exactly once', function (string $host, string $expect
 
 it('downloads a file through the pinned IP', function () {
     expect(runFakeFtpsTestCall('serve', 'download', 100))->toMatchArray(['error' => null, 'bytes' => 100]);
+});
+
+it('logs in with a username that contains a colon', function () {
+    $commandLog = tempnam(sys_get_temp_dir(), 'fake-ftps-log');
+
+    try {
+        expect(runFakeFtpsTestCall('serve', 'download', 100, 'backup:user', $commandLog))->toMatchArray(['error' => null, 'bytes' => 100])
+            ->and(array_values(preg_grep('/^(USER|PASS) /', file($commandLog, FILE_IGNORE_NEW_LINES))))->toBe(['USER backup:user', 'PASS secret']);
+    } finally {
+        unlink($commandLog);
+    }
 });
 
 it('stops a download at the expected size', function () {

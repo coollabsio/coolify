@@ -4,9 +4,10 @@
  * A minimal explicit-TLS FTP server for tests/Unit/FtpsFilesystemAdapterTest.php. It serves every file with 100
  * bytes, or stops answering at a given point.
  *
- * Usage: php fake-ftps-server.php <port> <certificate pem with key> <serve|stall-size|stall-data>
+ * Usage: php fake-ftps-server.php <port> <certificate pem with key> <serve|stall-size|stall-data> [command log file]
  */
 [, $port, $certificate, $scenario] = $argv;
+$log = $argv[4] ?? null;
 
 $context = stream_context_create(['ssl' => ['local_cert' => $certificate, 'verify_peer' => false]]);
 $server = stream_socket_server('tcp://127.0.0.1:'.$port, $errorCode, $errorMessage, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN, $context);
@@ -17,6 +18,9 @@ while ($control = stream_socket_accept($server, -1)) {
 
     while (($line = fgets($control)) !== false) {
         [$command] = explode(' ', trim($line), 2);
+        if ($log !== null) {
+            file_put_contents($log, trim($line)."\n", FILE_APPEND);
+        }
         $reply = match (strtoupper($command)) {
             'AUTH' => '234 TLS',
             'USER' => '331 Password',

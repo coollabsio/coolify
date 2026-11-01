@@ -169,7 +169,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->execution->refreshS3Summary();
                 $this->execution->update(['s3_cleanup_pending' => false]);
             } elseif ($this->backup->save_s3 && $destinations->isEmpty()) {
-                $warning = 'S3 upload failed: The selected S3 storage no longer exists.';
+                $warning = 'Storage upload failed: The selected backup storage no longer exists.';
             } elseif ($this->backup->save_s3) {
                 $s3CleanupPending = true;
                 $this->execution->update(['s3_cleanup_pending' => true]);
@@ -179,14 +179,14 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 if ($s3Uploaded) {
                     $s3CleanupPending = false;
                 } else {
-                    $warning = 'S3 upload failed: '.implode(' ', $uploadErrors);
+                    $warning = 'Storage upload failed: '.implode(' ', $uploadErrors);
 
                     try {
                         VolumeBackupRecoveryJob::cleanupS3Upload($this->execution);
                         $s3CleanupPending = false;
                     } catch (Throwable $cleanupException) {
                         VolumeBackupRecoveryJob::dispatch($this->execution);
-                        $warning .= ' Partial S3 upload cleanup failed: '.$cleanupException->getMessage();
+                        $warning .= ' Partial storage upload cleanup failed: '.$cleanupException->getMessage();
                     }
                 }
 
@@ -195,7 +195,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                         deleteBackupsLocally($backupLocation, $server, throwError: true);
                         $localStorageDeleted = true;
                     } catch (Throwable $exception) {
-                        $warning = 'S3 upload succeeded, but the local archive could not be deleted: '.$exception->getMessage();
+                        $warning = 'Storage upload succeeded, but the local archive could not be deleted: '.$exception->getMessage();
                     }
                 }
             }
@@ -419,7 +419,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             /** @var VolumeBackupS3Replica $replica */
             try {
                 if (! $replica->s3) {
-                    throw new \RuntimeException('The selected S3 storage no longer exists.');
+                    throw new \RuntimeException('The selected backup storage no longer exists.');
                 }
 
                 $this->uploadToS3($replica->s3, $backupLocation, $backupDirectory, $server);

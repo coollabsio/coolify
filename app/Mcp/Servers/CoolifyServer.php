@@ -128,7 +128,7 @@ Changes (requires token ability **write**, or **delete** for delete actions): ma
 Prompts: troubleshoot_application, explain_failed_deploy.
 Resources: coolify://overview, coolify://application/{uuid}.
 
-Responses: `{ data, _actions?, _pagination? }`. Private keys, S3 secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
+Responses: `{ data, _actions?, _pagination? }`. Private keys, storage secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
 MD;
 
     /**
