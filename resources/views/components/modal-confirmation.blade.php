@@ -48,7 +48,7 @@
     $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
-<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
+<div {{ $attributes }} {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},

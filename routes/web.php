@@ -77,7 +77,6 @@ use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenS
 use App\Livewire\Security\CloudTokens;
 use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
-use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\Analytics\Show as ServerAnalytics;
@@ -550,7 +549,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
-    Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
     Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
