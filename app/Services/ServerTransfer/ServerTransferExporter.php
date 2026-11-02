@@ -391,6 +391,17 @@ class ServerTransferExporter
     {
         $warnings = [];
 
+        foreach ($dependencies['private_keys'] as $key) {
+            try {
+                $error = PrivateKey::validationError($key->private_key);
+            } catch (Throwable) {
+                continue; // exportPrivateKey() reports a key that cannot be decrypted.
+            }
+            if ($error) {
+                $warnings[] = "SSH key {$key->name}: {$error} The key moves unchanged. Rotate it to an Ed25519 key after the transfer.";
+            }
+        }
+
         $usesSystemWideGithub = $applications->contains(function (Application $app) {
             if ($app->source_type !== GithubApp::class || $app->source_id === null) {
                 return false;
