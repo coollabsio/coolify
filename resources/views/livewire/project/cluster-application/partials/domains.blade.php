@@ -1,16 +1,31 @@
 @php
     $domainList = $workload->domains ?? [];
-    $hasRows = $domainList !== [];
-    $gridClass = 'grid-cols-[minmax(0,1fr)_6.5rem_5rem]';
+    // The www redirect hosts need DNS records too.
+    $dnsHosts = [...$domainList, ...array_keys(\App\Actions\Node\BuildNodeClusterIngressRoutes::wwwRedirects($domainList, $workload->www_redirect))];
+    $domainRoutes = $workload->domain_routes ?? [];
+    $hasRows = $domainRoutes !== [];
+    $hasHttpsDomains = collect($domainRoutes)->contains('scheme', 'https');
+    $domainRedirect = match ($workload->www_redirect) {
+        'www' => 'non-www → www',
+        'non-www' => 'www → non-www',
+        default => null,
+    };
 @endphp
 
-<div class="flex flex-col gap-6" x-data="{
+<div class="domains-overview-container flex flex-col gap-6" x-data="{
     domainSearch: '',
     matchesDomainSearch(value) {
         const query = this.domainSearch.trim().toLowerCase();
         return query === '' || value.toLowerCase().includes(query);
     },
 }">
+    @unless ($ingressRoutesV2)
+        <x-callout type="warning" title="Some domain settings are not applied yet">
+            Paths, the http protocol, www redirects, search indexing, and redirect settings need the latest
+            Sentinel on every server of the cluster. Until then, ingress serves each domain on all paths and
+            uses HTTPS when it has a certificate.
+        </x-callout>
+    @endunless
     <x-application.settings-section id="cluster-application-domains" title="Domains" :flush="$hasRows">
         <x-slot:actions>
             @if ($hasRows)
@@ -51,12 +66,8 @@
                         </button>
                     </x-slot:content>
                     <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
-                        <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
-                            <x-forms.input id="newDomain" label="Domain" :placeholder="$suggestedDomain ?? 'app.example.com'" required
-                                helper="The hostname only, without http://, a path, or a port." />
-                            <x-forms.input id="newDomainPort" type="number" min="1" max="65535" label="Internal port"
-                                required helper="The port inside the container that receives HTTP traffic. It applies to every domain of this application." />
-                        </div>
+                        <x-forms.domain-input id="newDomainParts" :hostPlaceholder="$suggestedDomain ?? 'app.example.com'"
+                    pathHelper="Optional path prefix, like /api. Ingress removes it before the request reaches the application." />
                         <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
                             <x-forms.button type="button" wire:click="generateDomain">Generate domain</x-forms.button>
                             <x-forms.button type="submit" isHighlighted>Save</x-forms.button>
@@ -67,57 +78,102 @@
         </x-slot:actions>
 
         @if ($hasRows)
-            <div class="data-table-header {{ $gridClass }}">
+            <div class="data-table-header service-domains-overview-grid">
                 <span>Domain</span>
-                <span class="text-center">Internal port</span>
+                <span>Protocol redirect</span>
+                <span>Domain redirect</span>
+                <span>Internal port</span>
+                <span>Search indexing</span>
+                <span>HTTPS</span>
                 <span class="text-right">Actions</span>
             </div>
             <div class="data-table w-full">
-                @foreach ($domainList as $domain)
-                    <div wire:key="cluster-application-domain-{{ $domain }}" class="env-table-item"
-                        x-show="matchesDomainSearch(@js($domain))">
-                        @php
-                            $certificate = $domainCertificates[$domain] ?? null;
-                            $domainUrl = (\App\Models\NodeWorkload::servesHttps($certificate) ? 'https://' : 'http://').$domain;
-                        @endphp
-                        <div class="data-table-row {{ $gridClass }} py-2!">
+                @foreach ($domainRoutes as $route)
+                    @php
+                        $displayUrl = \App\Actions\Node\UpdateNodeWorkloadDomains::url($route);
+                        $certificate = $domainCertificates[$route['host']] ?? null;
+                        $servedScheme = $route['scheme'] === 'https' && \App\Models\NodeWorkload::servesHttps($certificate) ? 'https' : 'http';
+                        $domainUrl = $servedScheme.'://'.$route['host'].$route['path'];
+                        $redirectsToHttps = $route['scheme'] === 'https' && $forceHttps;
+                        $isNoindexed = (bool) ($route['noindex'] ?? false);
+                    @endphp
+                    <div wire:key="cluster-application-domain-{{ md5($route['host'].'|'.$route['path']) }}" class="env-table-item"
+                        x-show="matchesDomainSearch(@js($displayUrl))">
+                        <div class="data-table-row service-domains-overview-grid">
                             <div class="flex min-w-0 items-center gap-2">
                                 <a href="{{ $domainUrl }}" target="_blank" rel="noopener noreferrer"
-                                    class="min-w-0 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
-                                    title="{{ $domainUrl }}">{{ $domainUrl }}</a>
-                                @if ($ingressTls)
+                                    class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
+                                    title="{{ $displayUrl }}">{{ $displayUrl }}</a>
+                            </div>
+                            <div class="service-domain-detail" title="Protocol redirect">
+                                <span class="service-domain-detail-label">Protocol redirect</span>
+                                <span>{{ $redirectsToHttps ? 'HTTP → HTTPS' : 'Disabled' }}</span>
+                            </div>
+                            <div class="service-domain-detail" title="Domain redirect">
+                                <span class="service-domain-detail-label">Domain redirect</span>
+                                <span>{{ $domainRedirect ?? 'Disabled' }}</span>
+                            </div>
+                            <div class="service-domain-detail" title="Container port that receives the traffic of this domain">
+                                <span class="service-domain-detail-label">Internal port</span>
+                                <span aria-label="Internal port {{ $route['port'] }}">{{ $route['port'] }}</span>
+                            </div>
+                            <div class="service-domain-detail">
+                                <span class="service-domain-detail-label">Search indexing</span>
+                                <span role="img" aria-label="{{ $isNoindexed ? 'Search indexing blocked' : 'Search indexing allowed' }}"
+                                    title="{{ $isNoindexed ? 'Search indexing blocked' : 'Search indexing allowed' }}">
+                                    <x-reicon :name="$isNoindexed ? 'x' : 'check'" class="size-4" />
+                                </span>
+                            </div>
+                            <div class="service-domain-mobile-summary" aria-label="Domain routing summary">
+                                @if ($redirectsToHttps)
+                                    <span>HTTP → HTTPS</span>
+                                @endif
+                                @if ($domainRedirect)
+                                    <span>{{ $domainRedirect }}</span>
+                                @elseif (! $redirectsToHttps)
+                                    <span>No redirects</span>
+                                @endif
+                                <span>Port {{ $route['port'] }}</span>
+                                <span>{{ $isNoindexed ? 'Noindex' : 'Indexable' }}</span>
+                            </div>
+                            <div class="service-domain-dns flex min-w-0 items-center justify-center">
+                                @if ($route['scheme'] === 'http')
+                                    <span class="text-[12px] text-neutral-500 dark:text-fg-dim" title="Served over HTTP only, without a certificate">HTTP only</span>
+                                @elseif ($ingressTls)
                                     <x-cluster-applications.https-badge :certificate="$certificate" />
+                                @else
+                                    <span class="text-[12px] text-neutral-500 dark:text-fg-dim"
+                                        title="HTTPS needs the latest Sentinel on every server of the cluster and an ACME directory on this instance.">Unavailable</span>
                                 @endif
                             </div>
-                            <span class="text-center text-[12px]">{{ $httpPort }}</span>
-                            <div class="flex items-center justify-end gap-1">
+                            <div class="service-domain-actions flex items-center justify-end gap-1">
                                 @can('update', $workload)
-                                    <button type="button" wire:click="editDomain(@js($domain))" class="icon-button shrink-0"
-                                        title="Domain settings" aria-label="Settings for {{ $domain }}">
-                                        <x-reicon name="settings" class="size-3.5" />
-                                    </button>
-                                    <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?" buttonTitle="Remove"
-                                        isErrorButton canGate="update" :canResource="$workload"
-                                        submitAction="removeDomain('{{ $domain }}')" :actions="[
-                                            'This domain will be removed from the application.',
-                                            'Ingress servers stop routing it without a redeploy.',
-                                        ]" :confirmWithPassword="false" :confirmWithText="false"
-                                        step2ButtonText="Remove domain">
-                                        <x-slot:trigger>
-                                            <button type="button"
-                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                                title="Remove domain" aria-label="Remove {{ $domain }}">
-                                                <x-reicon name="trash" class="size-3.5" />
-                                            </button>
-                                        </x-slot:trigger>
-                                    </x-modal-confirmation>
+                                    <x-table.row-actions label="Domain actions">
+                                        <x-table.row-action wire:click="editDomain({{ \Illuminate\Support\Js::from($route['host']) }}, {{ \Illuminate\Support\Js::from($route['path']) }})"
+                                            aria-label="Edit {{ $displayUrl }}">
+                                            Edit
+                                        </x-table.row-action>
+                                        <x-slot:danger>
+                                            <x-modal-confirmation buttonFullWidth title="Remove domain?" buttonTitle="Remove"
+                                                isErrorButton canGate="update" :canResource="$workload"
+                                                submitAction="removeDomain('{{ $route['host'] }}', '{{ $route['path'] }}')" :actions="[
+                                                    'This domain will be removed from the application.',
+                                                    'Ingress servers stop routing it without a redeploy.',
+                                                ]" :confirmWithPassword="false" :confirmWithText="false"
+                                                step2ButtonText="Remove domain">
+                                                <x-slot:trigger>
+                                                    <x-table.row-action>Delete</x-table.row-action>
+                                                </x-slot:trigger>
+                                            </x-modal-confirmation>
+                                        </x-slot:danger>
+                                    </x-table.row-actions>
                                 @endcan
                             </div>
                         </div>
                     </div>
                 @endforeach
             </div>
-            <div x-cloak x-show="domainSearch.trim() && !@js($domainList).some((domain) => matchesDomainSearch(domain))"
+            <div x-cloak x-show="domainSearch.trim() && !@js(collect($domainRoutes)->map(fn ($route) => \App\Actions\Node\UpdateNodeWorkloadDomains::url($route))->values()).some((domain) => matchesDomainSearch(domain))"
                 class="px-4 py-8">
                 <x-empty size="sm" title="No domains found" description="No domain matches your search." icon-name="search" />
             </div>
@@ -127,18 +183,54 @@
         @endif
     </x-application.settings-section>
 
+    @if ($hasRows)
+        <x-application.settings-section id="cluster-application-domain-redirects" title="Redirects"
+            helper="Applies to all domains of this application.">
+            <div class="grid gap-4 lg:grid-cols-2">
+                @if ($hasHttpsDomains)
+                    <x-forms.listbox canGate="update" :canResource="$workload" id="forceHttps"
+                        label="Redirect HTTP to HTTPS" onChange="updateForceHttps"
+                        helper="Disable only when Cloudflare Tunnel or another proxy connects to the ingress servers over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                @endif
+                <x-forms.listbox canGate="update" :canResource="$workload" id="permanentRedirect"
+                    label="Redirect type" onChange="updatePermanentRedirect"
+                    helper="Applies to the HTTP to HTTPS and www redirects. Permanent (308) is better for SEO, but browsers cache it. Use Temporary (307) while you test a redirect."
+                    :options="[
+                        ['value' => false, 'label' => 'Temporary'],
+                        ['value' => true, 'label' => 'Permanent'],
+                    ]" />
+            </div>
+        </x-application.settings-section>
+    @endif
+
     @can('update', $workload)
         <x-modal-input title="Domain settings" :closeOutside="false" :wireIgnore="false" wireOpen="showEditDomainModal">
             <x-slot:content><span class="hidden"></span></x-slot:content>
             <form wire:submit="updateDomain" class="application-settings-form flex flex-col gap-4">
-                <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
-                    <x-forms.input id="editingDomain" label="Domain" :placeholder="$suggestedDomain ?? 'app.example.com'" required
-                        helper="The hostname only, without http://, a path, or a port." />
-                    <x-forms.input id="editingPort" type="number" min="1" max="65535" label="Internal port" required
-                        helper="The port inside the container that receives HTTP traffic. It applies to every domain of this application." />
+                <x-forms.domain-input id="editingDomainParts" :hostPlaceholder="$suggestedDomain ?? 'app.example.com'"
+                    pathHelper="Optional path prefix, like /api. Ingress removes it before the request reaches the application." />
+                <div class="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
+                    <x-forms.listbox id="editingIndexing" htmlId="cluster-application-domain-indexing"
+                        label="Search engine indexing" portal :options="[
+                            ['value' => 'index', 'label' => 'Indexable'],
+                            ['value' => 'noindex', 'label' => 'Noindex'],
+                        ]" />
+                    <x-forms.listbox id="editingRedirect" htmlId="cluster-application-domain-direction"
+                        label="www redirect" helper="Applies to all domains of this application." portal :options="[
+                            ['value' => 'both', 'label' => 'No redirect'],
+                            ['value' => 'www', 'label' => 'Redirect to www'],
+                            ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                        ]" />
                 </div>
-                <div class="flex justify-end pt-2">
-                    <x-forms.button type="submit" isHighlighted>Save</x-forms.button>
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/10">
+                    <x-forms.button type="button" wire:click="generateDomain(true)" wire:target="generateDomain">
+                        Generate domain
+                    </x-forms.button>
+                    <x-forms.button type="submit" wire:target="updateDomain" isHighlighted>Save</x-forms.button>
                 </div>
             </form>
         </x-modal-input>
@@ -203,7 +295,7 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-neutral-200 dark:divide-coolgray-300">
-                                            @foreach ($domainList as $domain)
+                                            @foreach ($dnsHosts as $domain)
                                                 @foreach ($ingressAddresses as $ingressAddress)
                                                     <tr wire:key="cluster-application-dns-{{ $domain }}-{{ $ingressAddress }}"
                                                         class="text-[13px] text-black dark:text-fg">

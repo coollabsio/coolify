@@ -4,6 +4,7 @@
     'hostLabel' => 'Domain',
     'hostPlaceholder' => 'app.example.com',
     'inheritedPortExpression' => null,
+    'pathHelper' => 'Optional path, query, or fragment appended after the domain and port.',
 ])
 
 <div class="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)_8rem]">
@@ -65,7 +66,7 @@
         <input id="{{ $id }}-path" type="text" class="input" wire:model="{{ $id }}.path"
             placeholder="/api/v3" autocomplete="off" />
         <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
-            Optional path, query, or fragment appended after the domain and port.
+            {{ $pathHelper }}
         </p>
     </div>
 </div>

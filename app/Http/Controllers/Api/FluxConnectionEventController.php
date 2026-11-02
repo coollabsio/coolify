@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\QueueNodeNetworkConvergence;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Actions\Sentinel\ResolveFluxTrustBundle;
@@ -10,6 +11,7 @@ use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\RefreshNodeContainersJob;
 use App\Models\FluxCaRotation;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -99,7 +101,12 @@ class FluxConnectionEventController extends Controller
             $node->update(['sentinel_version' => $data['sentinel_version']]);
         }
         if (isset($data['capabilities']) && $node->sentinel_capabilities !== $data['capabilities']) {
+            $hadRoutesV2 = in_array(NodeCluster::INGRESS_ROUTES_CAPABILITY, $node->sentinel_capabilities ?? [], true);
             $node->update(['sentinel_capabilities' => $data['capabilities']]);
+            // The route table shape depends on this capability on every Node, so a converged cluster must resend it.
+            if ($node->cluster !== null && $hadRoutesV2 !== in_array(NodeCluster::INGRESS_ROUTES_CAPABILITY, $data['capabilities'], true)) {
+                rescue(fn () => QueueNodeClusterNetworkRevision::run($node->cluster));
+            }
         }
         if ($data['event'] === 'connected' && isset($data['trust_bundle_version'])) {
             $this->recordTrustBundle($node, (int) $data['trust_bundle_version']);

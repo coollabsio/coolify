@@ -357,7 +357,7 @@ class ReconcileNodeClusterNetwork
      *
      * HTTPS is sent only to Nodes that support it: an older Sentinel or Flux would drop the fields.
      *
-     * @param  list<array{host: string, workload_id: string, namespace: string, port: int}>  $routes
+     * @param  list<array<string, mixed>>  $routes  See BuildNodeClusterIngressRoutes::handle().
      * @param  list<array{name: string, workload_id: string, namespace: string}>  $names
      * @param  array{key: string, issuer_id: ?int, public_ips: list<string>, acme_ca_pem: ?string}|null  $tls
      */
@@ -527,7 +527,7 @@ class ReconcileNodeClusterNetwork
     }
 
     /**
-     * One allow for each container that an ingress route reaches,
+     * One allow for each container and domain port that an ingress route reaches,
      * so Caddy on any ingress Node can connect to it.
      *
      * @return list<array{destination_ip: string, protocol: string, port: int}>
@@ -538,10 +538,11 @@ class ReconcileNodeClusterNetwork
             ->flatMap(fn (NodeWorkload $workload) => $workload->nodes
                 ->pluck('pivot.container_ip')
                 ->filter()
-                ->map(fn (string $destinationIp): array => [
-                    'destination_ip' => $destinationIp,
+                ->crossJoin($workload->domainPorts())
+                ->map(fn (array $destination): array => [
+                    'destination_ip' => $destination[0],
                     'protocol' => 'tcp',
-                    'port' => $workload->http_port,
+                    'port' => $destination[1],
                 ]))
             ->unique(fn (array $rule): string => "{$rule['destination_ip']}|{$rule['protocol']}|{$rule['port']}")
             ->values()

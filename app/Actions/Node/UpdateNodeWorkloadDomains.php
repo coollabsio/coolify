@@ -15,8 +15,8 @@ use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 /**
- * Saves the public HTTP domains and container port of a cluster workload. Routing intent lives on
- * the workload, so a change reaches the ingress Nodes without a redeploy.
+ * Saves the public HTTP domains of a cluster workload and its redirect settings. Routing intent
+ * lives on the workload, so a change reaches the ingress Nodes without a redeploy.
  */
 class UpdateNodeWorkloadDomains
 {
@@ -24,33 +24,53 @@ class UpdateNodeWorkloadDomains
 
     public const MAX_DOMAINS = 20;
 
+    public const WWW_REDIRECTS = ['both', 'www', 'non-www'];
+
     /**
-     * @param  string|list<string>  $domains  Comma, space, or newline separated domains.
+     * @param  list<array{scheme?: string, host?: string, port?: int|string|null, path?: string|null, noindex?: bool}>  $routes
+     * @param  array{www_redirect?: string, force_https?: bool, permanent_redirect?: bool}  $redirects  Changed settings only.
      *
-     * @throws ValidationException with `domains` and `http_port` keys.
+     * @throws ValidationException with `routes` and redirect setting keys.
      */
-    public function handle(NodeWorkload $workload, string|array $domains, mixed $httpPort, User $user): NodeWorkload
+    public function handle(NodeWorkload $workload, array $routes, User $user, array $redirects = []): NodeWorkload
     {
         Gate::forUser($user)->authorize('update', $workload);
-        $domains = self::normalizeDomains($domains);
-        $httpPort = blank($httpPort) ? null : $httpPort;
+        $routes = array_map(self::normalizeRoute(...), array_values($routes));
 
-        $validated = Validator::make(['domains' => $domains, 'http_port' => $httpPort], [
-            'domains' => ['array', 'max:'.self::MAX_DOMAINS],
-            'domains.*' => ['string', $this->domainRule()],
-            'http_port' => [$domains === [] ? 'nullable' : 'required', 'integer', 'between:1,65535'],
+        $validator = Validator::make(['routes' => $routes, ...$redirects], [
+            'routes' => ['array', 'max:'.self::MAX_DOMAINS],
+            'routes.*.scheme' => ['required', 'in:http,https'],
+            'routes.*.host' => ['required', 'string', $this->domainRule()],
+            'routes.*.port' => ['required', 'integer', 'between:1,65535'],
+            'routes.*.path' => ['present', 'string', 'max:255', $this->pathRule()],
+            'www_redirect' => ['sometimes', 'in:'.implode(',', self::WWW_REDIRECTS)],
+            'force_https' => ['sometimes', 'boolean'],
+            'permanent_redirect' => ['sometimes', 'boolean'],
         ], [
-            'domains.max' => 'Use at most '.self::MAX_DOMAINS.' domains.',
-            'http_port.required' => 'Set the container port that receives HTTP traffic.',
-        ], ['http_port' => 'port'])->validate();
-        $duplicates = collect($domains)->duplicates()->unique()->values();
-        if ($duplicates->isNotEmpty()) {
-            throw ValidationException::withMessages(['domains' => "{$duplicates->first()} is listed more than once."]);
-        }
-        $httpPort = $validated['http_port'] === null ? null : (int) $validated['http_port'];
+            'routes.max' => 'Use at most '.self::MAX_DOMAINS.' domains.',
+            'routes.*.host.required' => 'Enter a domain.',
+            'routes.*.port.required' => 'Set the container port that receives HTTP traffic.',
+            'routes.*.port.integer' => 'The port must be a number between 1 and 65535.',
+            'routes.*.port.between' => 'The port must be a number between 1 and 65535.',
+        ]);
+        $validator->after(function ($validator) use ($routes): void {
+            $duplicate = collect($routes)->duplicates(fn (array $route): string => $route['host'].$route['path'])->keys()->first();
+            if ($duplicate !== null) {
+                $validator->errors()->add('routes', self::url($routes[$duplicate]).' is listed more than once.');
+            }
+            $mixed = collect($routes)->groupBy('host')->first(fn ($hostRoutes) => $hostRoutes->pluck('scheme')->unique()->count() > 1);
+            if ($mixed !== null) {
+                $validator->errors()->add('routes', "All paths of {$mixed->first()['host']} must use the same protocol.");
+            }
+        });
+        $validator->validate();
+        $redirects = collect($redirects)->only(['www_redirect', 'force_https', 'permanent_redirect'])
+            ->map(fn ($value, string $key) => $key === 'www_redirect' ? $value : (bool) $value)
+            ->all();
+        $domains = collect($routes)->pluck('host')->unique()->values()->all();
 
         // One writer at a time, so two applications cannot claim the same domain concurrently.
-        $changed = Cache::lock('node-workload-domains', 30)->block(10, fn (): bool => DB::transaction(function () use ($workload, $domains, $httpPort, $user): bool {
+        $changed = Cache::lock('node-workload-domains', 30)->block(10, fn (): bool => DB::transaction(function () use ($workload, $routes, $domains, $redirects, $user): bool {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             if ($domains !== []) {
                 // Each cluster serves only its own team's routes, so a domain is unique per team.
@@ -68,20 +88,25 @@ class UpdateNodeWorkloadDomains
                     ->intersect($domains)
                     ->first();
                 if ($taken !== null) {
-                    throw ValidationException::withMessages(['domains' => "{$taken} is already used by another application."]);
+                    throw ValidationException::withMessages(['routes' => "{$taken} is already used by another application."]);
                 }
                 // v4 applications and services of the team route through another proxy, so the same host cannot serve both.
                 $legacyConflict = legacyResourceDomainConflict($domains, $workload->team_id, $user);
                 if ($legacyConflict !== null) {
-                    throw ValidationException::withMessages(['domains' => $legacyConflict]);
+                    throw ValidationException::withMessages(['routes' => $legacyConflict]);
                 }
             }
 
             $wasRouted = $workload->hasIngressRoutes();
-            $previous = [$workload->domains ?? [], $workload->http_port];
-            $workload->update(['domains' => $domains === [] ? null : $domains, 'http_port' => $httpPort]);
+            $workload->fill([
+                'domains' => $domains === [] ? null : $domains,
+                'domain_routes' => $routes === [] ? null : $routes,
+                ...$redirects,
+            ]);
+            $dirty = $workload->isDirty();
+            $workload->save();
 
-            return $previous !== [$domains, $httpPort] && ($wasRouted || $workload->hasIngressRoutes());
+            return $dirty && ($wasRouted || $workload->hasIngressRoutes());
         }));
 
         $workload->refresh();
@@ -95,19 +120,43 @@ class UpdateNodeWorkloadDomains
         return $workload;
     }
 
-    /**
-     * @param  string|list<string>  $domains
-     * @return list<string>
-     */
-    public static function normalizeDomains(string|array $domains): array
+    /** @return array{scheme: string, host: string, port: int|string|null, path: string, noindex: bool} */
+    public static function normalizeRoute(array $route): array
     {
-        $values = is_array($domains) ? $domains : preg_split('/[\s,]+/', $domains);
+        $port = trim((string) ($route['port'] ?? ''));
+        $path = trim((string) ($route['path'] ?? ''));
+        if ($path !== '' && ! str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
 
-        return collect($values)
-            ->map(fn ($domain): string => strtolower(trim((string) $domain)))
-            ->filter(fn (string $domain): bool => $domain !== '')
-            ->values()
-            ->all();
+        return [
+            'scheme' => strtolower(trim((string) ($route['scheme'] ?? 'https'))),
+            'host' => strtolower(trim((string) ($route['host'] ?? ''))),
+            'port' => ctype_digit($port) ? (int) $port : ($port === '' ? null : $port),
+            'path' => rtrim($path, '/'),
+            'noindex' => (bool) ($route['noindex'] ?? false),
+        ];
+    }
+
+    /** @param  array{scheme: string, host: string, path: string}  $route */
+    public static function url(array $route): string
+    {
+        return $route['scheme'].'://'.$route['host'].$route['path'];
+    }
+
+    private function pathRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            $path = (string) $value;
+            if ($path === '') {
+                return;
+            }
+            if (str_contains($path, '?') || str_contains($path, '#')) {
+                $fail("Enter the path {$path} without a query or fragment.");
+            } elseif (! BuildNodeClusterIngressRoutes::validPath($path)) {
+                $fail("{$path} is not a valid path, like /api.");
+            }
+        };
     }
 
     private function domainRule(): Closure

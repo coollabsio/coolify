@@ -55,9 +55,10 @@
         @php
             $domainCertificates = $workload->domainCertificates();
         @endphp
-        @forelse ($workload->domains ?? [] as $domain)
+        @forelse ($workload->domain_routes ?? [] as $route)
             @php
-                $domainUrl = (\App\Models\NodeWorkload::servesHttps($domainCertificates[$domain] ?? null) ? 'https://' : 'http://').$domain;
+                $servesHttps = $route['scheme'] === 'https' && \App\Models\NodeWorkload::servesHttps($domainCertificates[$route['host']] ?? null);
+                $domainUrl = ($servesHttps ? 'https://' : 'http://').$route['host'].$route['path'];
             @endphp
             <a class="{{ $linkItemClasses }}" target="_blank" rel="noopener noreferrer" href="{{ $domainUrl }}">
                 <span class="shrink-0 rounded-md bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success ring-1 ring-success/20">

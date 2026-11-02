@@ -155,7 +155,7 @@ class NodeEndToEndCommand extends Command
                 'node_uuids' => $workload->nodes()->pluck('nodes.uuid')->all(),
                 'container_ips' => $workload->nodes()->get()->pluck('pivot.container_ip')->filter()->values()->all(),
                 'domains' => $workload->domains ?? [],
-                'http_port' => $workload->http_port,
+                'domain_routes' => $workload->domain_routes ?? [],
                 'active_operations' => NodeOperation::query()
                     ->where('node_workload_id', $workload->id)
                     ->whereIn('status', [NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED, NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING, NodeOperationStatus::UNCERTAIN])
@@ -304,13 +304,18 @@ class NodeEndToEndCommand extends Command
         return ['node' => $node->uuid, 'is_ingress' => $node->is_ingress, 'desired_revision' => $this->cluster()->desired_revision];
     }
 
-    /** Saves the domains and HTTP port of the end-to-end workload the way the application page does. */
+    /** Saves the domains of the end-to-end workload, all on one HTTP port, the way the application page does. */
     private function setDomains(): array
     {
         $workload = $this->workload() ?? throw new RuntimeException('The cluster has no workload.');
-        $workload = UpdateNodeWorkloadDomains::run($workload, (string) $this->argument('argument'), $this->option('http-port'), $this->user());
+        $routes = collect(preg_split('/[\s,]+/', (string) $this->argument('argument')))
+            ->filter()
+            ->map(fn (string $host): array => ['scheme' => 'https', 'host' => $host, 'port' => $this->option('http-port'), 'path' => ''])
+            ->values()
+            ->all();
+        $workload = UpdateNodeWorkloadDomains::run($workload, $routes, $this->user());
 
-        return ['domains' => $workload->domains ?? [], 'http_port' => $workload->http_port, 'desired_revision' => $this->cluster()->desired_revision];
+        return ['domains' => $workload->domains ?? [], 'domain_routes' => $workload->domain_routes ?? [], 'desired_revision' => $this->cluster()->desired_revision];
     }
 
     /** @param \Closure(RotateFluxCertificateAuthority): mixed $step */

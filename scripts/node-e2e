@@ -415,7 +415,7 @@ scenario_ingress() {
   status="$(status_json)"
   # The original state, restored also after a failure.
   domains="$(jq -r '.workload.domains | join(",")' <<<"$status")"
-  port="$(jq -r '.workload.http_port // ""' <<<"$status")"
+  port="$(jq -r '.workload.domain_routes[0].port // ""' <<<"$status")"
   ingress_a="$(jq -r 'if .nodes.a.is_ingress then "on" else "off" end' <<<"$status")"
   ingress_b="$(jq -r 'if .nodes.b.is_ingress then "on" else "off" end' <<<"$status")"
   on_exit "restore_ingress '$domains' '$port' $ingress_a $ingress_b"

@@ -37,6 +37,7 @@ use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Services\DockerImageParser;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -116,20 +117,25 @@ class Show extends Component
 
     public string $dockerfileLocation = '';
 
-    public string $httpPort = '';
-
-    public string $newDomain = '';
-
-    public string $newDomainPort = '';
+    /** @var array{scheme: string, host: string, port: string, path: string} */
+    public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
     public bool $showEditDomainModal = false;
 
+    /** Host and path of the domain that the settings modal edits. */
     #[Locked]
-    public ?string $editingDomainOriginal = null;
+    public ?array $editingRoute = null;
 
-    public string $editingDomain = '';
+    /** @var array{scheme: string, host: string, port: string, path: string} */
+    public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
-    public string $editingPort = '';
+    public string $editingIndexing = 'index';
+
+    public string $editingRedirect = 'both';
+
+    public bool $forceHttps = true;
+
+    public bool $permanentRedirect = true;
 
     public string $newVolumeName = '';
 
@@ -162,6 +168,7 @@ class Show extends Component
         $this->loadResourceSettings();
         $this->loadConfiguration();
         $this->loadDomains();
+        $this->resetNewDomain();
     }
 
     /**
@@ -297,78 +304,126 @@ class Show extends Component
     public function addDomain(): void
     {
         $this->authorize('update', $this->workload);
-        if (blank($this->newDomain)) {
-            $this->addError('newDomain', 'Enter a domain.');
-
-            return;
-        }
-        if ($this->persistDomains([...($this->workload->domains ?? []), $this->newDomain], $this->newDomainPort, 'newDomain', 'newDomainPort')) {
+        $routes = [...($this->workload->domain_routes ?? []), $this->routeFromParts($this->newDomainParts, false)];
+        if ($this->persistDomains($routes, 'newDomainParts.host')) {
+            $this->resetNewDomain();
             $this->dispatch('close-modal');
             $this->dispatch('success', 'Domain added. Ingress servers apply it without a redeploy.');
         }
     }
 
-    public function generateDomain(): void
+    /** Fills the domain field of the add form, or of the edit form when $forEdit is true. */
+    public function generateDomain(bool $forEdit = false): void
     {
         $this->authorize('update', $this->workload);
+        $field = $forEdit ? 'editingDomainParts' : 'newDomainParts';
         $suggestedDomain = $this->suggestedDomain($this->ingressAddresses());
         if ($suggestedDomain === null) {
-            $this->addError('newDomain', 'Turn on ingress for a server of the cluster to generate a domain.');
+            $this->addError("{$field}.host", 'Turn on ingress for a server of the cluster to generate a domain.');
 
             return;
         }
-        $this->newDomain = $suggestedDomain;
+        $this->{$field}['host'] = $suggestedDomain;
     }
 
-    public function editDomain(string $domain): void
+    public function editDomain(string $host, string $path = ''): void
     {
         $this->authorize('update', $this->workload);
+        $route = collect($this->workload->domain_routes ?? [])->first(fn (array $route): bool => $route['host'] === $host && $route['path'] === $path);
+        if ($route === null) {
+            return;
+        }
         $this->resetErrorBag();
-        $this->editingDomainOriginal = $domain;
-        $this->editingDomain = $domain;
-        $this->editingPort = $this->httpPort;
+        $this->editingRoute = ['host' => $host, 'path' => $path];
+        $this->editingDomainParts = ['scheme' => $route['scheme'], 'host' => $host, 'port' => (string) $route['port'], 'path' => $path];
+        $this->editingIndexing = ($route['noindex'] ?? false) ? 'noindex' : 'index';
+        $this->editingRedirect = $this->workload->www_redirect;
         $this->showEditDomainModal = true;
     }
 
     public function updateDomain(): void
     {
         $this->authorize('update', $this->workload);
-        if (blank($this->editingDomain)) {
-            $this->addError('editingDomain', 'Enter a domain.');
-
-            return;
-        }
-        $domains = collect($this->workload->domains ?? [])
-            ->map(fn (string $domain): string => $domain === $this->editingDomainOriginal ? $this->editingDomain : $domain)
+        $routes = collect($this->workload->domain_routes ?? [])
+            ->map(fn (array $route): array => $route['host'] === ($this->editingRoute['host'] ?? null) && $route['path'] === ($this->editingRoute['path'] ?? null)
+                ? $this->routeFromParts($this->editingDomainParts, $this->editingIndexing === 'noindex')
+                : $route)
             ->all();
-        if ($this->persistDomains($domains, $this->editingPort, 'editingDomain', 'editingPort')) {
+        if ($this->persistDomains($routes, 'editingDomainParts.host', ['www_redirect' => $this->editingRedirect])) {
             $this->showEditDomainModal = false;
             $this->dispatch('success', 'Domain saved. Ingress servers apply it without a redeploy.');
         }
     }
 
-    public function removeDomain(string $domain): void
+    public function removeDomain(string $host, string $path = ''): void
     {
         $this->authorize('update', $this->workload);
-        $domains = array_values(array_diff($this->workload->domains ?? [], [$domain]));
-        if ($this->persistDomains($domains, $this->httpPort, 'newDomain', 'newDomainPort')) {
+        $routes = collect($this->workload->domain_routes ?? [])
+            ->reject(fn (array $route): bool => $route['host'] === $host && $route['path'] === $path)
+            ->values()
+            ->all();
+        if ($this->persistDomains($routes, 'newDomainParts.host')) {
             $this->dispatch('success', 'Domain removed.');
         }
     }
 
+    public function updateForceHttps(): void
+    {
+        $this->authorize('update', $this->workload);
+        if ($this->persistDomains($this->workload->domain_routes ?? [], 'forceHttps', ['force_https' => $this->forceHttps])) {
+            $this->dispatch('success', 'Redirect saved. Ingress servers apply it without a redeploy.');
+        }
+    }
+
+    public function updatePermanentRedirect(): void
+    {
+        $this->authorize('update', $this->workload);
+        if ($this->persistDomains($this->workload->domain_routes ?? [], 'permanentRedirect', ['permanent_redirect' => $this->permanentRedirect])) {
+            $this->dispatch('success', 'Redirect saved. Ingress servers apply it without a redeploy.');
+        }
+    }
+
     /**
-     * Saves the full domain list with one port. Validation errors go to the given form fields.
+     * A full URL pasted into the domain field fills the other fields, like in v4.
      *
-     * @param  list<string>  $domains
+     * @param  array{scheme?: string, host?: string, port?: string, path?: string}  $parts
+     * @return array{scheme: string, host: string, port: string, path: string, noindex: bool}
      */
-    private function persistDomains(array $domains, string $port, string $domainField, string $portField): bool
+    private function routeFromParts(array $parts, bool $noindex): array
+    {
+        $host = trim((string) ($parts['host'] ?? ''));
+        if (str_contains($host, '://')) {
+            $url = DomainUrlParts::split($host);
+            $parts = [
+                'scheme' => $url['scheme'],
+                'host' => $url['host'],
+                'port' => $url['port'] !== '' ? $url['port'] : ($parts['port'] ?? ''),
+                'path' => $url['path'] !== '' ? $url['path'] : ($parts['path'] ?? ''),
+            ];
+        }
+
+        return [
+            'scheme' => (string) ($parts['scheme'] ?? 'https'),
+            'host' => (string) ($parts['host'] ?? ''),
+            'port' => (string) ($parts['port'] ?? ''),
+            'path' => (string) ($parts['path'] ?? ''),
+            'noindex' => $noindex,
+        ];
+    }
+
+    /**
+     * Saves the full domain list and changed redirect settings. Validation errors go to the given field.
+     *
+     * @param  list<array<string, mixed>>  $routes
+     * @param  array{www_redirect?: string, force_https?: bool, permanent_redirect?: bool}  $redirects
+     */
+    private function persistDomains(array $routes, string $errorField, array $redirects = []): bool
     {
         try {
-            $this->workload = UpdateNodeWorkloadDomains::run($this->workload, $domains, $port, auth()->user());
+            $this->workload = UpdateNodeWorkloadDomains::run($this->workload, $routes, auth()->user(), $redirects);
         } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $key => $messages) {
-                $this->addError($key === 'http_port' ? $portField : $domainField, $messages[0]);
-            }
+            $this->addError($errorField, collect($exception->errors())->flatten()->first());
+            $this->loadDomains();
 
             return false;
         }
@@ -747,7 +802,7 @@ class Show extends Component
         ]);
     }
 
-    /** @return array{ingressAddresses: list<string>, ingressCluster: ?NodeCluster, ingressTls: bool, domainCertificates: array<string, array<string, mixed>>, suggestedDomain: ?string} */
+    /** @return array{ingressAddresses: list<string>, ingressCluster: ?NodeCluster, ingressTls: bool, ingressRoutesV2: bool, domainCertificates: array<string, array<string, mixed>>, suggestedDomain: ?string} */
     private function ingressData(): array
     {
         $ingressAddresses = $this->ingressAddresses();
@@ -756,6 +811,7 @@ class Show extends Component
             'ingressAddresses' => $ingressAddresses,
             'ingressCluster' => $this->node?->cluster,
             'ingressTls' => (bool) $this->node?->cluster?->supportsIngressTls(),
+            'ingressRoutesV2' => $this->node?->cluster === null || $this->node->cluster->supportsIngressRoutesV2(),
             'domainCertificates' => $this->workload->domainCertificates(),
             'suggestedDomain' => $this->suggestedDomain($ingressAddresses),
         ];
@@ -1117,9 +1173,18 @@ class Show extends Component
 
     private function loadDomains(): void
     {
-        $this->httpPort = $this->workload->http_port === null ? '' : (string) $this->workload->http_port;
-        $this->newDomain = '';
-        $this->newDomainPort = $this->httpPort ?: '80';
+        $this->forceHttps = $this->workload->force_https;
+        $this->permanentRedirect = $this->workload->permanent_redirect;
+    }
+
+    private function resetNewDomain(): void
+    {
+        $this->newDomainParts = [
+            'scheme' => 'https',
+            'host' => '',
+            'port' => (string) ($this->workload->domain_routes[0]['port'] ?? 80),
+            'path' => '',
+        ];
     }
 
     private function loadResourceSettings(): void

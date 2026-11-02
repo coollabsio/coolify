@@ -24,7 +24,7 @@ class ClusterMap extends Component
 
     /**
      * @var array{
-     *     clusters: list<array{uuid: string, name: string, href: string, firewallHref: string, status: string, statusType: string, servers: list<array{uuid: string, name: string, href: string, status: string, statusType: string, ingress: string, ingressType: string, apps: list<array{uuid: string, name: string, href: ?string, status: string, statusType: string}>}>, rules: list<array{uuid: string, sourceType: string, sourceUuid: string, destinationUuid: string, protocol: string, port: int}>, ingress: list<array{appUuid: string, domains: list<string>, port: int}>}>,
+     *     clusters: list<array{uuid: string, name: string, href: string, firewallHref: string, status: string, statusType: string, servers: list<array{uuid: string, name: string, href: string, status: string, statusType: string, ingress: string, ingressType: string, apps: list<array{uuid: string, name: string, href: ?string, status: string, statusType: string}>}>, rules: list<array{uuid: string, sourceType: string, sourceUuid: string, destinationUuid: string, protocol: string, port: int}>, ingress: list<array{appUuid: string, domains: list<string>, ports: list<int>}>}>,
      *     dockerServers: list<array{uuid: string, name: string, href: string, status: string, statusType: string}>,
      *     dockerServersTotal: int,
      *     serversHref: string,
@@ -180,7 +180,7 @@ class ClusterMap extends Component
                 ->map(fn (NodeWorkload $workload): array => [
                     'appUuid' => $workload->uuid,
                     'domains' => array_values($workload->domains),
-                    'port' => $workload->http_port,
+                    'ports' => $workload->domainPorts(),
                 ])
                 ->values()
                 ->all(),

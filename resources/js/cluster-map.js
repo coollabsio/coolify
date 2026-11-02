@@ -721,7 +721,7 @@ function layoutLayeredFrame(cluster) {
             directions: [{
                 from: 'Internet',
                 to: names.get(`workload:${ingress.appUuid}`) ?? ingress.appUuid,
-                rules: [{ uuid: 'ingress', text: `HTTP and HTTPS to port ${ingress.port}` }],
+                rules: [{ uuid: 'ingress', text: `HTTP and HTTPS to port${ingress.ports.length === 1 ? '' : 's'} ${ingress.ports.join(', ')}` }],
             }],
             label: { ...label, text: labelText(domains) },
             commands,

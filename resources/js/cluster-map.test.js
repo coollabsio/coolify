@@ -50,8 +50,8 @@ const mapData = {
                 { uuid: 'r5', sourceType: 'workload', sourceUuid: 'gone', destinationUuid: 'api', protocol: 'tcp', port: 1 },
             ],
             ingress: [
-                { appUuid: 'web', domains: ['web.example.com', 'www.example.com'], port: 80 },
-                { appUuid: 'api', domains: ['api.example.com'], port: 3000 },
+                { appUuid: 'web', domains: ['web.example.com', 'www.example.com'], ports: [80] },
+                { appUuid: 'api', domains: ['api.example.com'], ports: [3000] },
             ],
         }),
         cluster('empty', []),

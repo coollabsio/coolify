@@ -22,6 +22,12 @@ class NodeWorkload extends BaseModel
 
     protected $guarded = [];
 
+    protected $attributes = [
+        'www_redirect' => 'both',
+        'force_https' => true,
+        'permanent_redirect' => true,
+    ];
+
     /** @var list<int> Clusters that routed this workload before it was deleted. */
     private array $ingressClusterIdsBeforeDelete = [];
 
@@ -31,7 +37,9 @@ class NodeWorkload extends BaseModel
             'desired_state' => NodeWorkloadDesiredState::class,
             'source_type' => NodeWorkloadSourceType::class,
             'domains' => 'array',
-            'http_port' => 'integer',
+            'domain_routes' => 'array',
+            'force_https' => 'boolean',
+            'permanent_redirect' => 'boolean',
             'is_env_sorting_enabled' => 'boolean',
             'include_coolify_default_variables' => 'boolean',
             'redact_all_env_values_in_logs' => 'boolean',
@@ -52,7 +60,6 @@ class NodeWorkload extends BaseModel
         });
     }
 
-    /** Whether ingress Nodes route public HTTP traffic to this workload. */
     /**
      * The certificate report of each domain, from the clusters of this workload that serve HTTPS.
      *
@@ -84,9 +91,16 @@ class NodeWorkload extends BaseModel
         return (int) ($certificate['not_after'] ?? 0) > now()->timestamp;
     }
 
+    /** Whether ingress Nodes route public HTTP traffic to this workload. */
     public function hasIngressRoutes(): bool
     {
-        return is_array($this->domains) && $this->domains !== [] && $this->http_port !== null;
+        return is_array($this->domain_routes) && $this->domain_routes !== [];
+    }
+
+    /** @return list<int> The distinct container ports that the domains of this workload route to. */
+    public function domainPorts(): array
+    {
+        return collect($this->domain_routes ?? [])->pluck('port')->map(fn ($port): int => (int) $port)->unique()->values()->all();
     }
 
     /** @return list<int> The clusters of the Nodes that run this workload. */

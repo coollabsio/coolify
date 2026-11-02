@@ -9,10 +9,10 @@ use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
 /**
- * Builds the HTTP routes that every ingress Node of a cluster serves: one route per domain of each
- * workload that has a port and runs on a Node of the cluster. Routes reference the workload UUID:
- * Sentinel resolves the healthy containers of a route from the `workload_endpoints` it reads from
- * Corrosion, keyed by the `coolify.workload` container label.
+ * Builds the HTTP routes that every ingress Node of a cluster serves: one route per domain and path
+ * of each workload that runs on a Node of the cluster, plus its www redirects. Routes reference the
+ * workload UUID: Sentinel resolves the healthy containers of a route from the `workload_endpoints`
+ * it reads from Corrosion, keyed by the `coolify.workload` container label.
  */
 class BuildNodeClusterIngressRoutes
 {
@@ -24,30 +24,117 @@ class BuildNodeClusterIngressRoutes
 
     public const NAMESPACE = 'default';
 
-    /** @return list<array{host: string, workload_id: string, namespace: string, port: int}> */
+    /**
+     * Without `ingress.routes.v2` on every Node, each host gets one route with the old fields only.
+     *
+     * @return list<array{host: string, workload_id: string, namespace: string, port: int, path?: string, redirect_host?: string, http_only?: bool, allow_http?: bool, temporary_redirect?: bool, noindex?: bool, strip_path?: bool}>
+     */
     public function handle(NodeCluster $cluster): array
     {
         $routes = [];
+        $hostOwners = [];
+        $redirects = [];
         foreach (self::routedWorkloads($cluster) as $workload) {
-            foreach ($workload->domains as $host) {
-                // Sentinel rejects the whole route table for one invalid host, so skip it here.
-                if (! is_string($host) || ! self::validHost($host)) {
+            $flags = ['allow_http' => ! $workload->force_https, 'temporary_redirect' => ! $workload->permanent_redirect];
+            $schemes = [];
+            foreach ($workload->domain_routes as $route) {
+                $host = (string) ($route['host'] ?? '');
+                $path = (string) ($route['path'] ?? '');
+                // Sentinel rejects the whole route table for one invalid route, so skip it here.
+                if (! self::validHost($host) || ! self::validPath($path)) {
                     continue;
                 }
-                // Domains are unique across workloads. Keep the first route if old data disagrees.
-                $routes[$host] ??= [
+                // Domains are unique across workloads. Keep the first workload of a host if old data disagrees.
+                if (($hostOwners[$host] ??= $workload->id) !== $workload->id) {
+                    continue;
+                }
+                $schemes[$host] = $route['scheme'] ?? 'https';
+                $routes["{$host}|{$path}"] ??= [
                     'host' => $host,
                     'workload_id' => $workload->uuid,
                     'namespace' => self::NAMESPACE,
-                    'port' => $workload->http_port,
+                    'port' => (int) $route['port'],
+                    'path' => $path,
+                    'redirect_host' => '',
+                    'http_only' => $schemes[$host] === 'http',
+                    ...$flags,
+                    'noindex' => (bool) ($route['noindex'] ?? false),
+                    'strip_path' => $path !== '',
+                ];
+            }
+            foreach (self::wwwRedirects(array_keys($schemes), $workload->www_redirect) as $from => $to) {
+                $redirects[$from] ??= [
+                    'host' => $from,
+                    'workload_id' => '',
+                    'namespace' => '',
+                    'port' => 0,
+                    'path' => '',
+                    'redirect_host' => $to,
+                    'http_only' => $schemes[$to] === 'http',
+                    ...$flags,
+                    'noindex' => false,
+                    'strip_path' => false,
                 ];
             }
         }
+        // A redirect host must have no other route, so a host that serves an application wins.
+        $redirects = array_filter($redirects, fn (array $redirect): bool => ! isset($hostOwners[$redirect['host']]));
+        $routes = $cluster->supportsIngressRoutesV2()
+            ? [...array_values($routes), ...array_values($redirects)]
+            : self::legacyRoutes($routes);
         if (count($routes) > self::MAX_ROUTES) {
             throw new RuntimeException('The cluster has more than '.number_format(self::MAX_ROUTES).' domains. Remove domains to apply ingress.');
         }
 
-        return array_values($routes);
+        return $routes;
+    }
+
+    /**
+     * `www` redirects `X` to a configured `www.X`, `non-www` redirects `www.X` to a configured `X`,
+     * when the source host is not configured itself.
+     *
+     * @param  list<string>  $hosts
+     * @return array<string, string> Source host => target host.
+     */
+    public static function wwwRedirects(array $hosts, ?string $mode): array
+    {
+        $redirects = [];
+        foreach ($hosts as $host) {
+            $isWww = str_starts_with($host, 'www.');
+            $from = match (true) {
+                $mode === 'www' && $isWww => substr($host, 4),
+                $mode === 'non-www' && ! $isWww => 'www.'.$host,
+                default => null,
+            };
+            if ($from !== null && ! in_array($from, $hosts, true) && self::validHost($from)) {
+                $redirects[$from] = $host;
+            }
+        }
+
+        return $redirects;
+    }
+
+    /**
+     * One route per host with the fields that every Sentinel accepts, from the route with the
+     * shortest path.
+     *
+     * @param  array<string, array{host: string, workload_id: string, namespace: string, port: int, path: string}>  $routes
+     * @return list<array{host: string, workload_id: string, namespace: string, port: int}>
+     */
+    private static function legacyRoutes(array $routes): array
+    {
+        return collect($routes)
+            ->sortBy(fn (array $route): int => strlen($route['path']))
+            ->unique('host')
+            ->map(fn (array $route): array => collect($route)->only(['host', 'workload_id', 'namespace', 'port'])->all())
+            ->values()
+            ->all();
+    }
+
+    /** `''` or `/segment...` without a trailing slash, as Sentinel accepts it. */
+    public static function validPath(string $path): bool
+    {
+        return $path === '' || (strlen($path) <= 255 && preg_match('#\A(/[A-Za-z0-9._~!$&()+,;=:@%-]+)+\z#', $path) === 1);
     }
 
     /**
@@ -101,7 +188,7 @@ class BuildNodeClusterIngressRoutes
     }
 
     /**
-     * Workloads with domains and a port that run on a Node of the cluster. Their `nodes` relation
+     * Workloads with domains that run on a Node of the cluster. Their `nodes` relation
      * only contains the Nodes of this cluster.
      *
      * @return Collection<int, NodeWorkload>
@@ -110,8 +197,7 @@ class BuildNodeClusterIngressRoutes
     {
         return NodeWorkload::query()
             ->where('team_id', $cluster->team_id)
-            ->whereNotNull('domains')
-            ->whereNotNull('http_port')
+            ->whereNotNull('domain_routes')
             ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id))
             ->with(['nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id)])
             ->orderBy('id')

@@ -29,6 +29,8 @@ class NodeCluster extends BaseModel
     /** Sentinel serves HTTPS and can be the certificate issuer. */
     public const INGRESS_TLS_CAPABILITY = 'ingress.tls.v1';
 
+    public const INGRESS_ROUTES_CAPABILITY = 'ingress.routes.v2';
+
     protected function casts(): array
     {
         return [
@@ -215,6 +217,16 @@ class NodeCluster extends BaseModel
 
         return $nodes->contains('is_ingress', true)
             && $nodes->every(fn (Node $node): bool => $node->supportsCapability(self::INGRESS_TLS_CAPABILITY) === true);
+    }
+
+    /**
+     * Paths, redirects, per-domain protocol, and indexing need `ingress.routes.v2` on every member
+     * Node. Without it, ingress gets one plain route per host, because an older Sentinel rejects
+     * duplicate hosts and the new fields.
+     */
+    public function supportsIngressRoutesV2(): bool
+    {
+        return $this->nodes()->get()->every(fn (Node $node): bool => $node->supportsCapability(self::INGRESS_ROUTES_CAPABILITY) === true);
     }
 
     /** The ingress Node that orders certificates: the oldest ingress Node that can take commands now. */
