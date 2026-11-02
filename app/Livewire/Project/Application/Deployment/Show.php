@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\Application\Deployment;
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
@@ -141,11 +143,13 @@ class Show extends Component
     }
 
     /**
-     * The Source page URL when the deployment failed because the Git host sent another SSH host key.
+     * The Source page URL when a git command of Coolify failed because the Git host sent another SSH host key.
+     * Only failed deployments are checked, so the logs are not searched on each poll of a running deployment.
      */
     public function getHostKeyChangedSourceUrlProperty(): ?string
     {
-        if (! str_contains((string) $this->application_deployment_queue->logs, 'Host key verification failed')) {
+        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+            || ! str_contains((string) $this->application_deployment_queue->logs, ApplicationDeploymentJob::GIT_HOST_KEY_CHANGED_HINT)) {
             return null;
         }
 

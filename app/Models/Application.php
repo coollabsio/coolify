@@ -1614,7 +1614,7 @@ class Application extends BaseModel
             $port = $this->source->custom_port;
         }
         $host = trim((string) $host, '[]');
-        if (preg_match('/\A[A-Za-z0-9.:-]+\z/', $host) !== 1 || ! is_numeric($port)) {
+        if (preg_match('/\A[A-Za-z0-9._:][A-Za-z0-9._:-]*\z/', $host) !== 1 || ! is_numeric($port)) {
             return null;
         }
 
@@ -1622,7 +1622,8 @@ class Application extends BaseModel
     }
 
     /**
-     * Reads the SSH host keys that the Git host sends now, from the server of the application.
+     * Reads the SSH host keys that the Git host sends now, from the server of the application, on the
+     * Docker network of the destination, where the deployment helper container runs.
      *
      * @return list<string> known_hosts lines
      */
@@ -1634,7 +1635,7 @@ class Application extends BaseModel
         }
         $image = coolifyHelperImage().':'.getHelperVersion();
         $output = instant_remote_process([
-            'docker run --rm --entrypoint ssh-keyscan '.escapeshellarg($image).' -T 10 -p '.$sshHost['port'].' '.escapeshellarg($sshHost['host']).' 2>/dev/null || true',
+            'docker run --rm --network '.escapeshellarg($this->destination->network).' --entrypoint ssh-keyscan '.escapeshellarg($image).' -T 10 -p '.$sshHost['port'].' -- '.escapeshellarg($sshHost['host']).' 2>/dev/null || true',
         ], $this->destination->server, false);
 
         return gitKnownHostsLines($output);
@@ -2352,7 +2353,8 @@ class Application extends BaseModel
     }
 
     /**
-     * Logs a failed git command on the server and returns its last error line for the user.
+     * Logs a failed git command on the server and returns its last error line for the user, or a hint
+     * to review the SSH host key when the host key check failed.
      * Credentials in URLs (such as GitHub App or GitLab tokens) are removed from both, and the
      * line is HTML-escaped because error toasts render HTML.
      */
@@ -2364,6 +2366,10 @@ class Application extends BaseModel
             'server_uuid' => $this->destination?->server?->uuid,
             'error' => $errorOutput,
         ]);
+
+        if (str_contains($errorOutput, 'Host key verification failed')) {
+            return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
+        }
 
         $reason = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->last();
 

@@ -54,6 +54,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public const BUILD_TIME_ENV_PATH = '/artifacts/build-time.env';
 
+    /**
+     * Logged when a git command of Coolify fails because of the SSH host key. The deployment page looks for this text.
+     */
+    public const GIT_HOST_KEY_CHANGED_HINT = 'The Git host sent an SSH host key that is not the saved key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. GitHub, GitLab.com, and Bitbucket Cloud use their published keys; if one of them changed its key, update Coolify.';
+
     private const BUILD_FINGERPRINT_LABEL = 'coolify.build-fingerprint';
 
     public const BUILD_TIME_SHELL_ENV_PATH = '/artifacts/build-time-shell.env';
@@ -3455,36 +3460,39 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $private_key = data_get($this->application, 'private_key.private_key');
-        if ($private_key) {
-            $private_key = base64_encode($private_key);
-            $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$this->deployment_uuid}";
-            $this->execute_remote_command(
-                [
-                    executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
-                    'hidden' => true,
-                    'skip_command_log' => true,
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, $this->gitLsRemoteCommand($lsRemoteRef, $customSshKeyLocation)),
-                    'hidden' => true,
-                    'save' => 'git_commit_sha',
-                ]
-            );
-        } else {
-            $this->execute_remote_command(
-                [
-                    executeInDocker($this->deployment_uuid, $this->gitLsRemoteCommand($lsRemoteRef)),
-                    'hidden' => true,
-                    'save' => 'git_commit_sha',
-                ],
-            );
-        }
+        $this->withGitHostKeyHint(function () use ($private_key, $lsRemoteRef): void {
+            if ($private_key) {
+                $private_key = base64_encode($private_key);
+                $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$this->deployment_uuid}";
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, 'mkdir -p /root/.ssh'),
+                    ],
+                    [
+                        executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d | tee {$customSshKeyLocation} > /dev/null"),
+                        'hidden' => true,
+                        'skip_command_log' => true,
+                    ],
+                    [
+                        executeInDocker($this->deployment_uuid, "chmod 600 {$customSshKeyLocation}"),
+                    ],
+                    [
+                        executeInDocker($this->deployment_uuid, $this->gitLsRemoteCommand($lsRemoteRef, $customSshKeyLocation)),
+                        'hidden' => true,
+                        'save' => 'git_commit_sha',
+                    ]
+                );
+            } else {
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, $this->gitLsRemoteCommand($lsRemoteRef)),
+                        'hidden' => true,
+                        'save' => 'git_commit_sha',
+                    ],
+                );
+            }
+        });
+        $this->save_git_ssh_known_hosts();
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback && $this->shouldResolveBranchHeadCommit()) {
             // Extract commit SHA from git ls-remote output, handling multi-line output (e.g., redirect warnings)
             // Expected format: "commit_sha\trefs/heads/branch" possibly preceded by warning lines
@@ -3584,7 +3592,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        $this->import_repository();
+        $this->withGitHostKeyHint(fn () => $this->import_repository());
         $this->save_git_ssh_known_hosts();
         $this->create_workdir();
         $this->execute_remote_command(
@@ -3604,6 +3612,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * Logs the host key hint when a git command of Coolify fails because of the SSH host key. The hint is logged
+     * here and not in failed(), because a git command in the build (for example a Dockerfile RUN step) can fail the same way.
+     */
+    private function withGitHostKeyHint(callable $runGitCommands): void
+    {
+        try {
+            $runGitCommands();
+        } catch (Throwable $e) {
+            if (str_contains($e->getMessage(), 'Host key verification failed')) {
+                $this->application_deployment_queue->addLogEntry(self::GIT_HOST_KEY_CHANGED_HINT, 'stderr');
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
      * Saves the host keys that SSH accepted on first use, so later deployments reject a changed key.
      */
     private function save_git_ssh_known_hosts(): void
@@ -3615,18 +3640,31 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'ignore_errors' => true,
             'save' => 'git_ssh_known_hosts',
         ]);
-        $savedLines = gitKnownHostsLines($this->application->git_ssh_known_hosts);
-        $newLines = array_values(array_diff(gitKnownHostsLines((string) $this->saved_outputs->get('git_ssh_known_hosts')), $savedLines));
+        // Two first deployments can accept different keys at the same time; keep the key that was saved first.
+        $hostAndKeyType = fn (string $line): string => implode(' ', array_slice(explode(' ', $line), 0, 2));
+        $savedHostsAndKeyTypes = array_map($hostAndKeyType, gitKnownHostsLines($this->application->git_ssh_known_hosts));
+        $newLines = array_values(array_filter(
+            gitKnownHostsLines((string) $this->saved_outputs->get('git_ssh_known_hosts')),
+            fn (string $line) => ! in_array($hostAndKeyType($line), $savedHostsAndKeyTypes, true),
+        ));
         if ($newLines === []) {
             return;
         }
 
         $addedLines = [];
-        $knownHosts = $this->application->getConnection()->transaction(function () use ($newLines, &$addedLines): string {
+        $conflictingLines = [];
+        $knownHosts = $this->application->getConnection()->transaction(function () use ($newLines, $hostAndKeyType, &$addedLines, &$conflictingLines): string {
             $currentLines = gitKnownHostsLines(
                 Application::query()->withoutGlobalScope('withRelations')->whereKey($this->application->id)->lockForUpdate()->value('git_ssh_known_hosts')
             );
-            $addedLines = array_values(array_diff($newLines, $currentLines));
+            $savedHostsAndKeyTypes = array_map($hostAndKeyType, $currentLines);
+            foreach (array_diff($newLines, $currentLines) as $line) {
+                if (in_array($hostAndKeyType($line), $savedHostsAndKeyTypes, true)) {
+                    $conflictingLines[] = $line;
+                } else {
+                    $addedLines[] = $line;
+                }
+            }
             $merged = implode("\n", [...$currentLines, ...$addedLines]);
             if ($addedLines !== []) {
                 Application::query()->whereKey($this->application->id)->update(['git_ssh_known_hosts' => $merged]);
@@ -3638,6 +3676,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         foreach ($addedLines as $line) {
             [$host, $keyType] = explode(' ', $line);
             $this->application_deployment_queue->addLogEntry("Saved the SSH host key of {$host} ({$keyType}). Later deployments accept only this key. You can see or remove it under Source.");
+        }
+        foreach ($conflictingLines as $line) {
+            [$host, $keyType] = explode(' ', $line);
+            $this->application_deployment_queue->addLogEntry("Coolify did not save the SSH host key of {$host} ({$keyType}). Another deployment saved a different key of this type at the same time. Later deployments accept only the saved key.", 'stderr');
         }
     }
 
@@ -6574,9 +6616,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('Deployment failed.', 'stderr');
         } else {
             $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
-        }
-        if (str_contains($errorMessage, 'Host key verification failed')) {
-            $this->application_deployment_queue->addLogEntry('The Git host sent an SSH host key that is not the saved key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. GitHub, GitLab.com, and Bitbucket Cloud use their published keys; if one of them changed its key, update Coolify.', 'stderr');
         }
         $this->application_deployment_queue->addLogEntry("Error type: {$errorClass}", 'stderr', hidden: true);
         $this->application_deployment_queue->addLogEntry("Error code: {$errorCode}", 'stderr', hidden: true);

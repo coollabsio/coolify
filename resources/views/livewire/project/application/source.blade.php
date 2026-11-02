@@ -87,7 +87,7 @@
                     </div>
                     <ul class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
                     @foreach ($fingerprints as $fingerprint)
-                        <li wire:key="host-key-{{ $fingerprint['fingerprint'] }}"
+                        <li wire:key="host-key-{{ $fingerprint['id'] }}"
                             class="grid min-h-14 grid-cols-[minmax(0,1fr)_7rem_minmax(0,2fr)_1.75rem] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim"><x-reicon name="keys" class="size-4" /></div>
@@ -98,7 +98,7 @@
                             @can('update', $application)
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove host key?" buttonTitle="Remove"
                                 isErrorButton canGate="update" :canResource="$application"
-                                submitAction="removeHostKey('{{ $fingerprint['fingerprint'] }}')" :actions="[
+                                submitAction="removeHostKey('{{ $fingerprint['id'] }}')" :actions="[
                                     'The host key ' . $fingerprint['fingerprint'] . ' of ' . $fingerprint['host'] . ' will be removed.',
                                     'The next deployment saves the key that the Git host sends then, without a check.',
                                 ]" :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Remove host key">
@@ -118,6 +118,9 @@
                 </div>
             @endif
             @can('update', $application)
+                @error('gitSshKnownHosts')
+                    <div x-init="editManually = true"></div>
+                @enderror
                 <div id="manual-host-keys" x-show="editManually" x-cloak class="p-4">
                     <div>
                         <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"

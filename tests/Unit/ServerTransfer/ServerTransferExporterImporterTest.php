@@ -83,6 +83,7 @@ beforeEach(function () {
         'git_branch' => 'main',
         'build_pack' => 'nixpacks',
         'ports_exposes' => '3000',
+        'git_ssh_known_hosts' => '[git.example.com]:2222 ssh-ed25519 AAAA',
         'fqdn' => 'https://app.example.com',
         'status' => 'running:healthy',
     ]);
@@ -307,6 +308,7 @@ test('round trip import preserves uuids secrets and related resources after sour
     expect($app)->not->toBeNull()
         ->and($app->name)->toBe('my-app')
         ->and($app->fqdn)->toBe('https://app.example.com')
+        ->and($app->git_ssh_known_hosts)->toBe('[git.example.com]:2222 ssh-ed25519 AAAA')
         ->and($app->environment_variables()->where('key', 'APP_SECRET')->first()?->value)->toBe('super-secret-value')
         ->and($app->persistentStorages)->toHaveCount(1)
         ->and($app->scheduled_tasks)->toHaveCount(1)

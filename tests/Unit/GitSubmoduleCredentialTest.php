@@ -43,7 +43,8 @@ describe('Git submodule credential propagation', function () {
         );
 
         expect($result)
-            ->toContain('GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive');
+            ->toContain('GIT_SSH_COMMAND="ssh -F /root/.ssh/coolify_git_test-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o LogLevel=ERROR" git submodule update --init --recursive')
+            ->not->toContain('StrictHostKeyChecking=no');
     });
 
     test('setGitImportSettings uses provided gitSshCommand for fetch and checkout', function () {
@@ -103,19 +104,20 @@ describe('Git submodule credential propagation', function () {
             ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git submodule update --init --recursive');
     });
 
-    test('buildGitCheckoutCommand uses default ssh command for submodule update when none provided', function () {
+    test('buildGitCheckoutCommand uses the host key checking ssh config for submodule update', function () {
         $method = new ReflectionMethod($this->application, 'buildGitCheckoutCommand');
-        $result = $method->invoke($this->application, 'main');
+        $result = $method->invoke($this->application, 'main', gitSshCommand('test-uuid'));
 
         expect($result)
-            ->toContain('GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive');
+            ->toContain('GIT_SSH_COMMAND="ssh -F /root/.ssh/coolify_git_test-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o LogLevel=ERROR" git submodule update --init --recursive')
+            ->not->toContain('StrictHostKeyChecking=no');
     });
 
     test('buildGitCheckoutCommand omits submodule update when submodules disabled', function () {
         $this->application->settings->is_git_submodules_enabled = false;
 
         $method = new ReflectionMethod($this->application, 'buildGitCheckoutCommand');
-        $result = $method->invoke($this->application, 'main');
+        $result = $method->invoke($this->application, 'main', gitSshCommand('test-uuid'));
 
         expect($result)
             ->toContain("git checkout 'main'")
@@ -156,7 +158,7 @@ describe('Git submodule credential propagation', function () {
             exec_in_docker: false,
         );
 
-        $sshCommand = 'ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa_coolify_test-uuid -o IdentitiesOnly=yes';
+        $sshCommand = 'ssh -F /root/.ssh/coolify_git_test-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -i /root/.ssh/id_rsa_coolify_test-uuid -o IdentitiesOnly=yes';
 
         // Commands are a list of ['command' => ..., 'hidden' => ...] entries; assert on the joined shell script
         $commands = collect($result['commands'])
@@ -167,7 +169,7 @@ describe('Git submodule credential propagation', function () {
             ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git fetch origin merge-requests/123/head:pr-123-coolify')
             ->toContain("git checkout 'pr-123-coolify'")
             ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git submodule update --init --recursive')
-            ->not->toContain('GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive');
+            ->not->toContain('StrictHostKeyChecking=no');
     });
 
 });

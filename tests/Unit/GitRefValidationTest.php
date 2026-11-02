@@ -131,10 +131,10 @@ describe('buildGitCheckoutCommand escaping', function () {
 
         $method = new ReflectionMethod($app, 'buildGitCheckoutCommand');
 
-        $result = $method->invoke($app, 'abc123');
+        $result = $method->invoke($app, 'abc123', gitSshCommand('test-uuid'));
         expect($result)->toContain("git checkout 'abc123'");
 
-        $result = $method->invoke($app, "abc'; id; #");
+        $result = $method->invoke($app, "abc'; id; #", gitSshCommand('test-uuid'));
         expect(gitRefShellWords($result))->toBe(['git', 'checkout', "abc'; id; #"]);
     });
 });

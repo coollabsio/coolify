@@ -24992,6 +24992,11 @@
                         "nullable": true,
                         "description": "Git full URL."
                     },
+                    "git_ssh_known_hosts": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "SSH host keys (known_hosts lines) of self-hosted Git hosts that git over SSH accepts. Saved on the first deployment."
+                    },
                     "docker_registry_image_name": {
                         "type": "string",
                         "nullable": true,
