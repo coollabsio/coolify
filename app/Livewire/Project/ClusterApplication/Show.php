@@ -41,7 +41,6 @@ use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Number;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -910,11 +909,22 @@ class Show extends Component
             $add($operation->started_at, 'Sentinel started the deployment.');
         }
         if ($operation->command_type === 'workload.move.v1' && data_get($operation->result, 'stateful')) {
-            $transfer = data_get($operation->result, 'transfer');
-            if (is_array($transfer)) {
-                $add($operation->updated_at, 'Volume copy, '.data_get($transfer, 'pass', 'warm').' pass: '
-                    .Number::fileSize((int) data_get($transfer, 'bytes_done', 0)).' of '.Number::fileSize((int) data_get($transfer, 'bytes_total', 0))
-                    .' ('.data_get($transfer, 'state', 'running').').');
+            // Moves before per-pass progress stored only the last pass under `transfer`.
+            $legacy = data_get($operation->result, 'transfer');
+            $transfers = data_get($operation->result, 'transfers')
+                ?? (is_array($legacy) ? [data_get($legacy, 'pass', 'warm') => $legacy] : []);
+            foreach (['warm', 'final'] as $pass) {
+                $transfer = $transfers[$pass] ?? null;
+                if (! is_array($transfer)) {
+                    continue;
+                }
+                $done = (int) data_get($transfer, 'bytes_done', 0);
+                $state = (string) data_get($transfer, 'state', 'running');
+                $add($operation->updated_at, match (true) {
+                    $state === 'succeeded' && $done === 0 => "Volume copy, {$pass} pass: no changes to copy.",
+                    $state === 'succeeded' => "Volume copy, {$pass} pass: ".formatBytes($done).' copied.',
+                    default => "Volume copy, {$pass} pass: ".formatBytes($done).' of '.formatBytes((int) data_get($transfer, 'bytes_total', 0))." ({$state}).",
+                });
             }
             if (data_get($operation->result, 'source_stopped')) {
                 $add($operation->updated_at, 'The source container was stopped for the final copy.');

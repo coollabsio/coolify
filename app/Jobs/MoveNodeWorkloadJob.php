@@ -31,7 +31,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Number;
 use Illuminate\Support\Sleep;
 use RuntimeException;
 use Throwable;
@@ -232,8 +231,8 @@ class MoveNodeWorkloadJob implements ShouldQueue
         $available = data_get($target->fresh()?->metadata, 'disk_available_bytes');
         // 10% headroom: the reported free disk is from the last inventory, and the copy adds metadata.
         if (is_numeric($available) && (int) $available < (int) ceil($required * 1.1)) {
-            throw new RuntimeException("Server {$target->name} has ".Number::fileSize((int) $available).' of free disk, but the volumes use '
-                .Number::fileSize($required).'. The source remains active.');
+            throw new RuntimeException("Server {$target->name} has ".formatBytes((int) $available).' of free disk, but the volumes use '
+                .formatBytes($required).'. The source remains active.');
         }
 
         // Recorded before the first pass writes to the target, so cleanup deletes the partial data.
@@ -315,12 +314,15 @@ class MoveNodeWorkloadJob implements ShouldQueue
             }
             $operation->touch();
             if ($state['state'] !== 'running' || $progressWrittenAt === null || $progressWrittenAt->lte(now()->subSeconds(self::TRANSFER_PROGRESS_SECONDS))) {
-                self::checkpoint($operation, ['transfer' => [
-                    'pass' => $pass,
-                    'state' => $state['state'],
-                    'bytes_done' => $state['bytes_done'],
-                    'bytes_total' => $state['bytes_total'],
-                    'attempt' => $attempt,
+                // One entry per pass, so the final pass does not hide the size of the warm copy.
+                self::checkpoint($operation, ['transfers' => [
+                    ...(data_get($operation->result, 'transfers') ?? []),
+                    $pass => [
+                        'state' => $state['state'],
+                        'bytes_done' => $state['bytes_done'],
+                        'bytes_total' => $state['bytes_total'],
+                        'attempt' => $attempt,
+                    ],
                 ]]);
                 $progressWrittenAt = now();
             }
