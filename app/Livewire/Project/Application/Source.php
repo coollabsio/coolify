@@ -9,6 +9,7 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Rules\ValidGitBranch;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -40,6 +41,24 @@ class Source extends Component
     #[Locked]
     public $sources;
 
+    #[Validate(['nullable', 'string', 'max:65535'])]
+    public ?string $gitSshKnownHosts = null;
+
+    /**
+     * The saved host keys when the form was loaded. Save writes the host keys only when the user changed
+     * them, so it does not remove keys that a deployment saved after the page opened.
+     */
+    #[Locked]
+    public ?string $loadedGitSshKnownHosts = null;
+
+    /**
+     * Host keys that the Git host sends now, which the user can accept or decline.
+     *
+     * @var list<string>
+     */
+    #[Locked]
+    public array $fetchedHostKeys = [];
+
     public function mount()
     {
         try {
@@ -70,12 +89,16 @@ class Source extends Component
     {
         if ($toModel) {
             $this->validate();
-            $this->application->update([
+            $attributes = [
                 'git_repository' => $this->gitRepository,
                 'git_branch' => $this->gitBranch,
                 'git_commit_sha' => $this->gitCommitSha,
                 'private_key_id' => $this->privateKeyId,
-            ]);
+            ];
+            if (gitKnownHostsLines($this->gitSshKnownHosts) !== gitKnownHostsLines($this->loadedGitSshKnownHosts)) {
+                $attributes['git_ssh_known_hosts'] = implode("\n", gitKnownHostsLines($this->gitSshKnownHosts)) ?: null;
+            }
+            $this->application->update($attributes);
             // Refresh to get the trimmed values from the model
             $this->application->refresh();
             $this->syncData(false);
@@ -85,7 +108,102 @@ class Source extends Component
             $this->gitCommitSha = $this->application->git_commit_sha;
             $this->privateKeyId = $this->application->private_key_id;
             $this->privateKeyName = data_get($this->application, 'private_key.name');
+            $this->syncKnownHostsFromModel();
         }
+    }
+
+    private function syncKnownHostsFromModel(): void
+    {
+        $this->gitSshKnownHosts = $this->application->git_ssh_known_hosts;
+        $this->loadedGitSshKnownHosts = $this->application->git_ssh_known_hosts;
+    }
+
+    /**
+     * The SHA256 fingerprints of the saved host keys, in the format that `ssh-keygen -lf` shows.
+     * The id identifies the line, because two hosts can have the same key.
+     *
+     * @return list<array{id: string, host: string, type: string, fingerprint: string}>
+     */
+    public function knownHostFingerprints(): array
+    {
+        return array_map(
+            fn (string $line) => ['id' => sha1($line), ...gitKnownHostFingerprint($line)],
+            gitKnownHostsLines($this->application->git_ssh_known_hosts),
+        );
+    }
+
+    /**
+     * Removes the saved host key line with this id. The next deployment saves the key that the host sends then.
+     */
+    public function removeHostKey(string $id): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $lines = array_filter(
+                gitKnownHostsLines($this->application->git_ssh_known_hosts),
+                fn (string $line) => sha1($line) !== $id,
+            );
+            $this->application->update(['git_ssh_known_hosts' => implode("\n", $lines) ?: null]);
+            $this->syncKnownHostsFromModel();
+            $this->dispatch('success', 'Host key removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * @return list<array{host: string, type: string, fingerprint: string}>
+     */
+    public function fetchedHostKeyFingerprints(): array
+    {
+        return array_map(gitKnownHostFingerprint(...), $this->fetchedHostKeys);
+    }
+
+    public function fetchHostKeys(): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->fetchedHostKeys = [];
+            $sshHost = $this->application->gitSshHost();
+            if ($sshHost === null) {
+                $this->dispatch('error', 'The repository does not use SSH.');
+
+                return;
+            }
+            if (in_array(strtolower($sshHost['host']), gitPinnedHosts(), true)) {
+                $this->dispatch('info', "Coolify always uses the published host keys of {$sshHost['host']}.");
+
+                return;
+            }
+            $this->fetchedHostKeys = $this->application->fetchGitSshHostKeys();
+            if ($this->fetchedHostKeys === []) {
+                $this->dispatch('error', "Could not read the host keys of {$sshHost['host']} on port {$sshHost['port']}.");
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Replaces the saved keys of the fetched host with the fetched keys.
+     */
+    public function acceptFetchedHostKeys(): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $lines = gitKnownHostsReplaceHostKeys($this->application->git_ssh_known_hosts, $this->fetchedHostKeys);
+            $this->application->update(['git_ssh_known_hosts' => implode("\n", $lines) ?: null]);
+            $this->fetchedHostKeys = [];
+            $this->syncKnownHostsFromModel();
+            $this->dispatch('success', 'Host keys saved. Later deployments accept only these keys.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function declineFetchedHostKeys(): void
+    {
+        $this->fetchedHostKeys = [];
     }
 
     private function getPrivateKeys()
@@ -138,9 +256,21 @@ class Source extends Component
             if (str($this->gitCommitSha)->isEmpty()) {
                 $this->gitCommitSha = 'HEAD';
             }
+            $invalidKnownHostsLine = collect(preg_split('/\R/', (string) $this->gitSshKnownHosts))
+                ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
+                ->first(fn (string $line) => $line !== '' && ! isValidGitKnownHostsLine($line));
+            if ($invalidKnownHostsLine !== null) {
+                throw ValidationException::withMessages(['gitSshKnownHosts' => 'Each line must be "host key-type key" (for example "[git.example.com]:2222 ssh-ed25519 AAAA..."). Hashed hosts and comments are not supported.']);
+            }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
             $this->dispatch('configurationChanged');
+        } catch (ValidationException $e) {
+            if (array_key_exists('gitSshKnownHosts', $e->errors())) {
+                $this->dispatch('known-hosts-invalid');
+            }
+
+            throw $e;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

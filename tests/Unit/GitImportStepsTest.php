@@ -76,11 +76,11 @@ test('each network step after the clone prints a log line before it runs', funct
 });
 
 test('git ssh command stops a stalled connection instead of waiting for the deployment timeout', function () {
-    expect(gitSshCommand(2222, '/root/.ssh/key'))->toBe(
-        'ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 2222 -o Port=2222 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/key -o IdentitiesOnly=yes'
+    expect(gitSshCommand('test-uuid', 2222, '/root/.ssh/key'))->toBe(
+        'ssh -F /root/.ssh/coolify_git_test-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 2222 -o Port=2222 -o LogLevel=ERROR -i /root/.ssh/key -o IdentitiesOnly=yes'
     )
-        ->and(gitSshCommand(22))->not->toContain(' -i ')
-        ->and(gitSshCommand(22, '/root/.ssh/id_rsa', identitiesOnly: false))->toEndWith('-i /root/.ssh/id_rsa');
+        ->and(gitSshCommand('test-uuid', 22))->not->toContain(' -i ')
+        ->and(gitSshCommand('test-uuid', 22, '/root/.ssh/id_rsa', identitiesOnly: false))->toEndWith('-i /root/.ssh/id_rsa');
 });
 
 test('a shallow clone checks out a short commit sha', function (string $commitName) {
