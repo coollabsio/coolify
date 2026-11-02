@@ -44,7 +44,8 @@ class TransitionOperation
                 $attributes['error'] = null;
             }
             if ($error !== null) {
-                $attributes['error'] = $error;
+                // Podman, Flux, and Sentinel errors can quote a runtime value of the workload.
+                $attributes['error'] = $operation->workload?->redactLogText($error) ?? $error;
             }
 
             $operation->update($attributes);

@@ -30,6 +30,7 @@ class PublishBuiltRevision
                 NodeRegistry::HOST.'/'.$workload->uuid.'@'.$digest,
                 $current?->configuration ?? ['restart_policy' => 'unless-stopped'],
                 $current?->environment ?? [],
+                $current?->secrets ?? [],
             );
 
             return $workload;

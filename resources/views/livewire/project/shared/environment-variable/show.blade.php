@@ -7,6 +7,7 @@
     $showInterpolation = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showBuildtime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showRuntime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
+    $showFileSecret = $showRuntime && data_get($env, 'resourceable_type') === \App\Models\NodeWorkload::class;
 @endphp
 <div class="env-table-item" data-env-key="{{ $env->key }}"
     @if ($isSharedVariable) :style="`order: ${sharedSort === 'alphabetical' ? {{ $tableAlphabeticalOrder }} : {{ $tableCreationOrder }}}`" @endif
@@ -250,6 +251,14 @@
                                     ['value' => true, 'label' => 'Available in the container'],
                                     ['value' => false, 'label' => 'Not available in the container'],
                                 ]" helper="Make this variable available in the running container at runtime."
+                                    :disabled="! $canUpdate" />
+                            @endif
+                            @if ($showFileSecret)
+                                <x-forms.listbox id="is_file_secret" label="Delivery" :options="[
+                                    ['value' => false, 'label' => 'Environment variable'],
+                                    ['value' => true, 'label' => 'File in /run/secrets'],
+                                ]"
+                                    helper="A file is safer for passwords and keys: the value is not in the environment of the container, so child processes, crash reports, and container details do not show it. The application reads /run/secrets/NAME. Takes effect after the next deploy."
                                     :disabled="! $canUpdate" />
                             @endif
                         </div>

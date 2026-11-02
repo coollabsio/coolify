@@ -13,13 +13,14 @@ class NodeWorkloadRevision extends BaseModel
 
     protected $guarded = [];
 
-    protected $hidden = ['environment'];
+    protected $hidden = ['environment', 'secrets'];
 
     protected function casts(): array
     {
         return [
             'configuration' => 'array',
             'environment' => 'encrypted:array',
+            'secrets' => 'encrypted:array',
         ];
     }
 

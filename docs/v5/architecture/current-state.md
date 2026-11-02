@@ -419,7 +419,7 @@ cross-instance command routing are not implemented yet.
 - complete application deployment orchestration, volumes, secrets, networks,
   proxy configuration, health gates, rollback, and placement;
 - HTTPS for ingress Nodes;
-- the remaining Podman secret, network, and builder
+- the remaining Podman network and builder
   capabilities that will move from the earlier coold design into Sentinel;
 - retirement of the existing Sentinel container.
 

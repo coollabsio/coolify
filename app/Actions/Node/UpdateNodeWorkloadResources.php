@@ -31,7 +31,7 @@ class UpdateNodeWorkloadResources
                 $configuration['resources'] = $resources;
             }
 
-            return $workload->createRevision($current->image, $configuration, $current->environment ?? []);
+            return $workload->createRevision($current->image, $configuration, $current->environment ?? [], $current->secrets ?? []);
         });
     }
 }

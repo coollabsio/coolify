@@ -101,6 +101,7 @@ class EnvironmentVariable extends BaseModel
         'is_shown_once',
         'is_shared',
         'is_required',
+        'is_file_secret',
 
         // Metadata
         'version',
@@ -116,6 +117,7 @@ class EnvironmentVariable extends BaseModel
         'is_preview' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
+        'is_file_secret' => 'boolean',
         'uses_legacy_escaping' => 'boolean',
         'version' => 'string',
         'resourceable_type' => 'string',
@@ -548,7 +550,8 @@ class EnvironmentVariable extends BaseModel
                     self::remoteSecretLogRedactionValuesFor($resource, $variable, $sharedVariables, $remoteSecretFailure, $unresolvedKeys),
                 );
             }
-            if ($variable->isLockedForLogs($sharedVariables)) {
+            // A secret file of a cluster application is always hidden, like a locked variable.
+            if ($variable->isLockedForLogs($sharedVariables) || $variable->is_file_secret) {
                 $secrets['locked'] = array_merge($secrets['locked'], $variable->logRedactionValues($sharedVariables));
             } elseif ($redactAllValues) {
                 $secrets['known'] = array_merge($secrets['known'], $variable->logRedactionValues($sharedVariables));

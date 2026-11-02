@@ -263,7 +263,11 @@ final class ServerTransferCoverage
             'restart_count' => self::RUNTIME, 'restart_limit_reached' => self::RUNTIME, 'last_restart_at' => self::RUNTIME,
             'last_restart_type' => self::RUNTIME,
         ],
-        EnvironmentVariable::class => ['resourceable_type' => self::LINKED, 'resourceable_id' => self::LINKED],
+        EnvironmentVariable::class => [
+            'resourceable_type' => self::LINKED,
+            'resourceable_id' => self::LINKED,
+            'is_file_secret' => 'Only cluster applications use it, and a transfer does not move them.',
+        ],
         LocalPersistentVolume::class => [
             'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'standalone_sqlite_id' => self::LINKED,
             'container_id' => 'Not used: only listed in $fillable.',

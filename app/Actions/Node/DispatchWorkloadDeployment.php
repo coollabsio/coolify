@@ -40,6 +40,11 @@ class DispatchWorkloadDeployment
         $resources = $configuration['resources'] ?? [];
         $mounts = $this->pinVolumes($operation, $configuration['volumes'] ?? []);
         $healthCheck = $configuration['health_check'] ?? null;
+        $secrets = $operation->revision->secrets ?? [];
+        if ($secrets !== []) {
+            // An older Sentinel ignores unknown fields and would start the container without its secret files.
+            $operation->node->ensureReportedCapability('workload.secrets.v1');
+        }
         if ($healthCheck !== null) {
             // An older Sentinel ignores unknown fields and would start the container without the check.
             $operation->node->ensureReportedCapability('workload.healthcheck.v1');
@@ -83,6 +88,7 @@ class DispatchWorkloadDeployment
                 'memory_limit_bytes' => $resources['memory_limit_bytes'] ?? null,
                 'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
                 ...($mounts === [] ? [] : ['mounts' => $mounts]),
+                ...($secrets === [] ? [] : ['secrets' => $secrets]),
                 ...($healthCheck === null ? [] : ['health_check' => [
                     'command' => $healthCheck['command'],
                     'interval_seconds' => $healthCheck['interval_seconds'],

@@ -69,6 +69,10 @@ class CreateDeploymentOperation
                 $node->ensureReportedCapability('volume.mounts.v1');
             }
 
+            if (filled($revision->secrets)) {
+                $node->ensureReportedCapability('workload.secrets.v1');
+            }
+
             if (filled(data_get($revision->configuration, 'health_check'))) {
                 $node->ensureReportedCapability('workload.healthcheck.v1');
             }

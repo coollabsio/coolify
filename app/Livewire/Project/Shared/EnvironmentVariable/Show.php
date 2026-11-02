@@ -6,6 +6,7 @@ use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -76,6 +77,9 @@ class Show extends Component
 
     public bool $is_buildtime = true;
 
+    /** A cluster application reads the value from /run/secrets/<key> instead of its environment. */
+    public bool $is_file_secret = false;
+
     public bool $is_required = false;
 
     public bool $is_really_required = false;
@@ -119,6 +123,7 @@ class Show extends Component
             'is_shown_once' => 'required|boolean',
             'is_runtime' => 'required|boolean',
             'is_buildtime' => 'required|boolean',
+            'is_file_secret' => 'required|boolean',
             'real_value' => 'nullable',
             'is_required' => 'required|boolean',
         ];
@@ -229,6 +234,10 @@ class Show extends Component
                 $this->env->is_runtime = $this->is_runtime;
                 $this->env->is_buildtime = $this->is_buildtime;
                 $this->env->is_shared = $this->is_shared;
+                // Only cluster applications can deliver a variable as a file.
+                if ($this->env->resourceable_type === NodeWorkload::class) {
+                    $this->env->is_file_secret = $this->is_file_secret;
+                }
             }
             $this->env->key = $this->key;
             // The form never holds a locked value, so keep the stored one and keep the lock.
@@ -252,6 +261,7 @@ class Show extends Component
             $this->is_runtime = (bool) ($this->env->is_runtime ?? true);
             $this->is_buildtime = (bool) ($this->env->is_buildtime ?? true);
             $this->is_required = (bool) ($this->env->is_required ?? false);
+            $this->is_file_secret = (bool) ($this->env->getAttributes()['is_file_secret'] ?? false);
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
             $this->isValueHidden = $this->valuesHiddenForUser();

@@ -19,6 +19,7 @@ current v5 architecture.
 | [0005: Serve public HTTP through ingress Nodes](0005-node-ingress.md) | Accepted (HTTP) | Run Caddy on each ingress Node, configured by its Sentinel from Corrosion; Coolify writes intent only, and HTTPS follows with certificates in Corrosion. |
 | [0006: Build images on builder Nodes and store them in a cluster registry](0006-node-image-builds.md) | Accepted | Build Git sources with rootless BuildKit in one-shot Podman containers on builder Nodes (all Nodes by default), push to a per-cluster zot registry with its own CA, and create a revision only from a built digest. |
 | [0007: Keep each volume on one Node and copy it on a move](0007-node-volumes.md) | Accepted | Pin each workload volume to one Node; a move with volumes stops the source and copies the data Node-to-Node with two rsync passes over WireGuard, and keeps the source volume for 7 days as a rollback. |
+| [0008: Keep runtime variables in the environment and add opt-in secret files](0008-node-workload-secrets.md) | Accepted | Runtime variables stay `--env`; a variable can be a file at `/run/secrets/<key>`, stored as a Podman secret per revision and deleted on remove; gate on `workload.secrets.v1`; journal a digest of each request, not the request. |
 
 ## Adding a decision
 

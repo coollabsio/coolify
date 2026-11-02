@@ -6,6 +6,7 @@ use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\HealthCheckCommand;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Collection;
 use RuntimeException;
 
 class NodeWorkload extends BaseModel
@@ -172,33 +174,51 @@ class NodeWorkload extends BaseModel
     /**
      * @param  array<string, mixed>  $configuration
      * @param  array<string, string>  $environment
+     * @param  array<string, string>  $secrets  Files in /run/secrets, keyed by file name.
      */
-    public function createRevision(string $image, array $configuration, array $environment = []): NodeWorkloadRevision
+    public function createRevision(string $image, array $configuration, array $environment = [], array $secrets = []): NodeWorkloadRevision
     {
         return $this->revisions()->create([
             'image' => $image,
             'configuration' => $configuration,
             'environment' => $environment,
-            'configuration_hash' => self::configurationHash($image, $configuration, $environment),
+            'secrets' => $secrets === [] ? null : $secrets,
+            'configuration_hash' => self::configurationHash($image, $configuration, $environment, $secrets),
         ]);
     }
 
     /**
+     * Without secrets the key is absent, so the hash of a revision without secrets stays the same.
+     *
      * @param  array<string, mixed>  $configuration
      * @param  array<string, string>  $environment
+     * @param  array<string, string>  $secrets
      */
-    public static function configurationHash(string $image, array $configuration, array $environment): string
+    public static function configurationHash(string $image, array $configuration, array $environment, array $secrets = []): string
     {
         return hash_hmac('sha256', json_encode([
             'image' => $image,
             'configuration' => $configuration,
             'environment' => $environment,
+            ...($secrets === [] ? [] : ['secrets' => $secrets]),
         ], JSON_THROW_ON_ERROR), (string) config('app.key'));
     }
 
     public function environment_variables(): MorphMany
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', false);
+    }
+
+    /** The text with the runtime values of this workload hidden, like a deployment log. */
+    public function redactLogText(string $text): string
+    {
+        try {
+            $secrets = EnvironmentVariable::logRedactionSecretsFor($this);
+        } catch (\Throwable) {
+            return REDACTED;
+        }
+
+        return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'], $secrets['locked']);
     }
 
     /** Whether logs hide every environment value, or only locked values. */
@@ -220,12 +240,7 @@ class NodeWorkload extends BaseModel
     public function runtimeEnvironment(): array
     {
         $variables = $this->environment_variables()->get();
-        $environment = $variables
-            ->where('is_runtime', true)
-            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [
-                $variable->key => (string) $variable->get_real_environment_variables_with_server($variable->value, $this),
-            ])
-            ->all();
+        $environment = $this->resolvedRuntimeValues($variables->where('is_file_secret', false));
         // A model created in this request has no column default loaded yet (null), which means on.
         if ($this->include_coolify_default_variables !== false) {
             $defaults = collect([
@@ -238,6 +253,34 @@ class NodeWorkload extends BaseModel
         ksort($environment);
 
         return $environment;
+    }
+
+    /**
+     * Runtime variables that the container reads as files at /run/secrets/<key> instead of
+     * from its environment (decision 0008), resolved like runtimeEnvironment().
+     *
+     * @return array<string, string>
+     */
+    public function runtimeSecrets(): array
+    {
+        $secrets = $this->resolvedRuntimeValues($this->environment_variables()->where('is_file_secret', true)->get());
+        ksort($secrets);
+
+        return $secrets;
+    }
+
+    /**
+     * @param  Collection<int, EnvironmentVariable>  $variables
+     * @return array<string, string>
+     */
+    private function resolvedRuntimeValues(Collection $variables): array
+    {
+        return $variables
+            ->where('is_runtime', true)
+            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [
+                $variable->key => (string) $variable->get_real_environment_variables_with_server($variable->value, $this),
+            ])
+            ->all();
     }
 
     public function deployedRevision(): ?NodeWorkloadRevision
@@ -262,7 +305,7 @@ class NodeWorkload extends BaseModel
                 return null;
             }
 
-            return self::configurationHash($latest->image, $this->withWorkloadSettings($latest->configuration ?? []), $this->runtimeEnvironment());
+            return self::configurationHash($latest->image, $this->withWorkloadSettings($latest->configuration ?? []), $this->runtimeEnvironment(), $this->runtimeSecrets());
         });
     }
 

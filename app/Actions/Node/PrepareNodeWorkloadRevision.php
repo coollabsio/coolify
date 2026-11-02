@@ -33,12 +33,26 @@ class PrepareNodeWorkloadRevision
                 }
             }
 
+            $secrets = $workload->runtimeSecrets();
+            // Sentinel mounts each secret as /run/secrets/<key>, and Podman stores 1 byte to 512 kB.
+            foreach ($secrets as $key => $value) {
+                if (preg_match('/\A(?!\.{1,2}\z)[A-Za-z0-9_.-]{1,255}\z/', (string) $key) !== 1) {
+                    throw new RuntimeException("The secret file {$key} cannot be used. A file name has 1 to 255 letters, digits, _, . or -.");
+                }
+                if ($value === '' || strlen($value) > 512000 || str_contains($value, "\0")) {
+                    throw new RuntimeException("The secret file {$key} must have a value of 1 byte to 512 kB without null bytes.");
+                }
+            }
+            if (count($secrets) > 128) {
+                throw new RuntimeException('A cluster application can have at most 128 secret files.');
+            }
+
             $configuration = $workload->withWorkloadSettings($current->configuration ?? []);
-            if ($environment === ($current->environment ?? []) && $configuration === ($current->configuration ?? [])) {
+            if ($environment === ($current->environment ?? []) && $secrets === ($current->secrets ?? []) && $configuration === ($current->configuration ?? [])) {
                 return $current;
             }
 
-            return $workload->createRevision($current->image, $configuration, $environment);
+            return $workload->createRevision($current->image, $configuration, $environment, $secrets);
         });
     }
 }

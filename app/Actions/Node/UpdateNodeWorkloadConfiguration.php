@@ -32,7 +32,7 @@ class UpdateNodeWorkloadConfiguration
                 return $current;
             }
 
-            return $workload->createRevision($image, $configuration, $environment);
+            return $workload->createRevision($image, $configuration, $environment, $current->secrets ?? []);
         });
     }
 }
