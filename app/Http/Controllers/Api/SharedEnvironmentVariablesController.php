@@ -12,6 +12,32 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    schema: 'SharedEnvironmentVariableCreateRequest',
+    type: 'object',
+    required: ['key'],
+    properties: [
+        new OA\Property(property: 'key', type: 'string'),
+        new OA\Property(property: 'value', type: 'string', nullable: true),
+        new OA\Property(property: 'is_literal', type: 'boolean'),
+        new OA\Property(property: 'is_multiline', type: 'boolean'),
+        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
+        new OA\Property(property: 'comment', type: 'string', maxLength: 256, nullable: true),
+    ],
+)]
+#[OA\Schema(
+    schema: 'SharedEnvironmentVariableUpdateRequest',
+    description: 'Send at least one field.',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'key', type: 'string'),
+        new OA\Property(property: 'value', type: 'string', nullable: true),
+        new OA\Property(property: 'is_literal', type: 'boolean'),
+        new OA\Property(property: 'is_multiline', type: 'boolean'),
+        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
+        new OA\Property(property: 'comment', type: 'string', maxLength: 256, nullable: true),
+    ],
+)]
 class SharedEnvironmentVariablesController extends Controller
 {
     private const ALLOWED_FIELDS = ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment'];
@@ -347,20 +373,7 @@ class SharedEnvironmentVariablesController extends Controller
         operationId: 'create-team-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['key'],
-                properties: [
-                    new OA\Property(property: 'key', type: 'string'),
-                    new OA\Property(property: 'value', type: 'string', nullable: true),
-                    new OA\Property(property: 'is_literal', type: 'boolean'),
-                    new OA\Property(property: 'is_multiline', type: 'boolean'),
-                    new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
-                    new OA\Property(property: 'comment', type: 'string', nullable: true),
-                ],
-            ),
-        ),
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -388,6 +401,7 @@ class SharedEnvironmentVariablesController extends Controller
         parameters: [
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -476,6 +490,7 @@ class SharedEnvironmentVariablesController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -512,6 +527,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -633,6 +649,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'environment_name_or_uuid', in: 'path', required: true, description: 'Environment name or UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -675,6 +692,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'environment_name_or_uuid', in: 'path', required: true, description: 'Environment name or UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -800,6 +818,7 @@ class SharedEnvironmentVariablesController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -836,6 +855,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
