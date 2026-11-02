@@ -408,13 +408,28 @@ class TransferFinishChecklist
     }
 
     /**
+     * The IPv4 and IPv6 addresses of a host name, in the normalized form of normalizeIpAddress().
+     *
+     * @return array<int, string>
+     */
+    private function resolveIps(string $host): array
+    {
+        $records = @dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
+
+        return array_values(array_filter(array_map(
+            fn (array $record): ?string => isset($record['ip']) || isset($record['ipv6']) ? normalizeIpAddress($record['ip'] ?? $record['ipv6']) : null,
+            $records,
+        )));
+    }
+
+    /**
      * @return array{0: string, 1: string, 2: string|null}
      */
     private function checkDomain(Server $server, string $host): array
     {
-        $serverIps = filter_var($server->ip, FILTER_VALIDATE_IP) ? [$server->ip] : (gethostbynamel($server->ip) ?: []);
-        $records = @dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
-        $ips = array_values(array_filter(array_map(fn (array $record) => $record['ip'] ?? $record['ipv6'] ?? null, $records)));
+        $serverIp = normalizeIpAddress($server->ip);
+        $serverIps = filter_var($serverIp, FILTER_VALIDATE_IP) ? [$serverIp] : $this->resolveIps($serverIp);
+        $ips = $this->resolveIps($host);
         if ($ips === []) {
             return ['action', 'The domain does not resolve.', null];
         }
