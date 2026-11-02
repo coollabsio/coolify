@@ -41,11 +41,13 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CLEANUP_TOKEN }}
         run: scripts/clean-manifests.sh --delete 200
 
-      - name: Upload the list of deleted manifests
+      - name: Upload the lists of manifests
         if: ${{ always() }}
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: deleted-manifests
-          path: scripts/deleted-manifests.tsv
+          name: manifests
+          path: |
+            scripts/manifests-to-delete.tsv
+            scripts/deleted-manifests.tsv
           if-no-files-found: ignore
           retention-days: 90
