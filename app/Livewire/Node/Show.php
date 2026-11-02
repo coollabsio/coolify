@@ -28,6 +28,7 @@ use App\Jobs\UpgradeNodeSentinelJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
+use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Rules\ValidServerIp;
@@ -315,7 +316,9 @@ class Show extends Component
             $operation = CreateMoveOperation::run($this->node, $target, $revision, auth()->user());
             MoveNodeWorkloadJob::dispatch($operation->id);
             $this->dispatch('close-modal');
-            $this->dispatch('success', 'Workload move queued. The source stays active until the target is ready.');
+            $this->dispatch('success', data_get($operation->result, 'stateful') || NodeVolume::query()->where('node_workload_id', $operation->node_workload_id)->whereNotNull('node_id')->exists()
+                ? 'Workload move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
+                : 'Workload move queued. The source stays active until the target is ready.');
             $this->loadNodeData();
         } catch (ValidationException $exception) {
             throw $exception;
@@ -400,7 +403,38 @@ class Show extends Component
 
     public function render(): View
     {
-        return view('livewire.node.show', $this->section === 'workloads' ? $this->workloadsViewData() : []);
+        return view('livewire.node.show', match ($this->section) {
+            'workloads' => $this->workloadsViewData(),
+            'containers' => ['orphanVolumes' => $this->orphanVolumes()],
+            default => [],
+        });
+    }
+
+    /**
+     * Coolify volumes on this server that no volume or retained copy of this team owns here, for
+     * example after an application was deleted without its volumes. Coolify never deletes them.
+     *
+     * @return list<string>
+     */
+    private function orphanVolumes(): array
+    {
+        $names = collect($this->node->volume_inventory ?? [])
+            ->filter(fn ($name): bool => is_string($name) && str_starts_with($name, NodeVolume::PODMAN_PREFIX));
+        if ($names->isEmpty()) {
+            return [];
+        }
+        $uuids = $names->map(fn (string $name): string => substr($name, strlen(NodeVolume::PODMAN_PREFIX)))->values()->all();
+        $known = NodeVolume::query()
+            ->where('team_id', $this->node->team_id)
+            ->whereIn('uuid', $uuids)
+            ->where(fn ($query) => $query
+                ->where('node_id', $this->node->id)
+                ->orWhereHas('copies', fn ($copies) => $copies->where('node_id', $this->node->id)))
+            ->pluck('uuid')
+            ->map(fn (string $uuid): string => NodeVolume::PODMAN_PREFIX.$uuid)
+            ->all();
+
+        return $names->diff($known)->sort()->values()->all();
     }
 
     /**

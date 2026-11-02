@@ -194,6 +194,32 @@ target placement that the move attached, unless the target became ready.
   Sentinel must not kill the Podman `conmon` processes that supervise running
   workloads.
 
+### Node volumes
+
+[Decision 0007](../decisions/0007-node-volumes.md) defines the model.
+
+- A `NodeVolume` belongs to one cluster application and lives on one Node.
+  `node_id` is the authority for the location of the data. It is null until
+  the first deployment, which pins the volume to its Node. The Podman volume
+  name is `coolify-vol-<uuid>`.
+- The revision stores the mounts in `configuration.volumes`, so a changed mount
+  makes a new revision and a new configuration hash. `workload.deploy.v1` sends
+  the mounts only to a Node that reports `volume.mounts.v1`. A deployment or a
+  start of a volume on another Node fails.
+- `container.list.v1` also reports the Coolify volumes of the Node. Coolify
+  stores the names in `nodes.volume_inventory`, shows each volume as ready,
+  missing, or not created, and lists orphan volumes on the server page.
+- A removed volume is detached first and its data stays. The user deletes the
+  data with `volume.delete.v1`. Deleting an application deletes its volumes
+  only when the user keeps "Delete volumes" checked.
+- A move of an application with volumes is break-before-make: `volume.serve.v1`
+  on the source, a warm `volume.receive.v1` pass, a stop of the source, a final
+  pass, and the switch of `node_id` in one transaction. The source copy stays as
+  a `retained` `NodeVolumeCopy` for 7 days. A failure before the target
+  deployment rolls back to the source. The move job checkpoints each step in the
+  operation result, and one cleanup method undoes a failed move from the job,
+  its `failed()` handler, and stale operation recovery.
+
 ### Node cluster network
 
 - A team-owned Node cluster is the authority for Node membership, one private
@@ -393,13 +419,11 @@ cross-instance command routing are not implemented yet.
 - complete application deployment orchestration, volumes, secrets, networks,
   proxy configuration, health gates, rollback, and placement;
 - HTTPS for ingress Nodes;
-- the remaining Podman volume, secret, network, and builder
+- the remaining Podman secret, network, and builder
   capabilities that will move from the earlier coold design into Sentinel;
 - retirement of the existing Sentinel container.
 
 ## Next safe step
 
-Add persistent volume support to immutable workload revisions and Podman
-deployment. Volume creation and attachment must remain Node-local operations,
-while Coolify owns the desired volume configuration and identity. Keep the Node
-cluster network as the private transport and discovery foundation.
+Add volume backups to S3, with a restore to a Node. A Node that fails makes its
+volumes unavailable, so a backup is the only recovery path.

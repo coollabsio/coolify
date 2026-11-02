@@ -25,6 +25,13 @@
             'group' => 'Settings',
         ],
         [
+            'key' => 'storage',
+            'label' => 'Persistent Storage',
+            'route' => 'project.cluster-application.storage',
+            'icon' => 'storages',
+            'group' => 'Settings',
+        ],
+        [
             'key' => 'logs',
             'label' => 'Runtime Logs',
             'route' => 'project.cluster-application.logs',

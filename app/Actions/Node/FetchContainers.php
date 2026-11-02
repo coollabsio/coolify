@@ -50,6 +50,12 @@ class FetchContainers
             'containers.*.labels.*' => ['nullable', 'string', 'max:4096'],
             'containers.*.created_at_unix_ms' => ['nullable', 'integer', 'min:1'],
             'containers.*.started_at_unix_ms' => ['nullable', 'integer', 'min:1'],
+            // Only Coolify volumes (`coolify.managed=true`); an older Sentinel omits the key.
+            'volumes' => ['sometimes', 'array', 'max:10000'],
+            'volumes.*.name' => ['required', 'string', 'max:255', 'distinct'],
+            'volumes.*.labels' => ['sometimes', 'array'],
+            'volumes.*.labels.*' => ['nullable', 'string', 'max:4096'],
+            'volumes.*.created_at_unix_ms' => ['nullable', 'integer', 'min:1'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('Flux returned invalid container inventory.');
@@ -77,7 +83,10 @@ class FetchContainers
         ])->all();
 
         // The snapshot and its observed time are stored together; an older concurrent snapshot is skipped.
-        ReconcileContainers::run($node, $containers, $snapshotObservedAt);
+        $volumeNames = array_key_exists('volumes', $data)
+            ? collect($data['volumes'])->pluck('name')->sort()->values()->all()
+            : null;
+        ReconcileContainers::run($node, $containers, $snapshotObservedAt, $volumeNames);
 
         return count($containers);
     }

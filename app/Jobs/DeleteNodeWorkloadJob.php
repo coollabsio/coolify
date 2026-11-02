@@ -3,12 +3,14 @@
 namespace App\Jobs;
 
 use App\Actions\Node\CreateLifecycleOperation;
+use App\Actions\Node\DeleteNodeVolumes;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\Team;
 use App\Models\User;
@@ -43,6 +45,7 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
         public int $workloadId,
         public ?int $requestedById = null,
         public bool $deleteFromCoolifyOnly = false,
+        public bool $deleteVolumes = true,
     ) {
         $this->onQueue('high');
         $servers = NodeWorkload::query()->find($workloadId)?->nodes()->count() ?? 0;
@@ -74,6 +77,9 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
                 $this->reportFailure($workload, $failures);
 
                 throw new RuntimeException("Application {$workload->name} could not be deleted: ".implode(' ', $failures), self::REPORTED_FAILURE);
+            }
+            if ($this->deleteVolumes) {
+                $this->deleteVolumes($workload);
             }
         }
 
@@ -107,6 +113,45 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
         }
 
         return $failures;
+    }
+
+    /**
+     * Deletes the volumes and their copies after the containers are gone, like v4 deletes the
+     * volumes of a resource. A Node that cannot delete its volume keeps the data as an orphan
+     * volume, which its server page lists, and the team is notified.
+     */
+    private function deleteVolumes(NodeWorkload $workload): void
+    {
+        $names = [];
+        $workload->volumes()->with(['node', 'copies.node'])->get()->each(function (NodeVolume $volume) use (&$names): void {
+            if ($volume->node !== null) {
+                $names[$volume->node->id] ??= ['node' => $volume->node, 'names' => []];
+                $names[$volume->node->id]['names'][] = $volume->podmanName();
+            }
+            foreach ($volume->copies as $copy) {
+                $names[$copy->node->id] ??= ['node' => $copy->node, 'names' => []];
+                $names[$copy->node->id]['names'][] = $volume->podmanName();
+            }
+        });
+
+        $failures = [];
+        foreach ($names as ['node' => $node, 'names' => $nodeNames]) {
+            try {
+                DeleteNodeVolumes::run($node, array_values(array_unique($nodeNames)));
+            } catch (Throwable $exception) {
+                $failures[] = "{$node->name}: {$exception->getMessage()}";
+            }
+        }
+        if ($failures === []) {
+            return;
+        }
+
+        Log::warning('Cluster application volumes could not be deleted.', ['workload_uuid' => $workload->uuid, 'failures' => $failures]);
+        Team::query()->find($workload->team_id)?->notify(new GeneralNotification(
+            "The volumes of the deleted application '{$workload->name}' could not be deleted on every server. "
+            .'They remain as orphan volumes on the server page. Error: '.implode(' ', $failures),
+            success: false,
+        ));
     }
 
     private function deleteRecords(NodeWorkload $workload, ?User $requestedBy): void

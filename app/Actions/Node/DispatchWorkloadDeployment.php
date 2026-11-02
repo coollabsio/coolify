@@ -3,6 +3,8 @@
 namespace App\Actions\Node;
 
 use App\Models\NodeOperation;
+use App\Models\NodeVolume;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -36,6 +38,7 @@ class DispatchWorkloadDeployment
         ]);
         $environment = $configuration['environment'] ?? [];
         $resources = $configuration['resources'] ?? [];
+        $mounts = $this->pinVolumes($operation, $configuration['volumes'] ?? []);
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
             $hadAddress = filled($operation->node->workloads()->whereKey($operation->workload->id)->first()?->pivot->container_ip);
@@ -74,6 +77,7 @@ class DispatchWorkloadDeployment
                 'cpu_reservation' => $resources['cpu_reservation'] ?? null,
                 'memory_limit_bytes' => $resources['memory_limit_bytes'] ?? null,
                 'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
+                ...($mounts === [] ? [] : ['mounts' => $mounts]),
             ]);
         $response->throw();
 
@@ -92,6 +96,51 @@ class DispatchWorkloadDeployment
         return $validator->validated();
     }
 
+    /**
+     * Pins every mounted volume to the Node of this deployment: a volume without a Node gets this
+     * Node, and a volume on another Node stops the deployment. This is the lowest layer of the
+     * one-volume-one-Node rule (decision 0007), so no path can start a second writer.
+     *
+     * @param  list<array{volume_uuid: string, volume_name: string, container_path: string, read_only: bool}>  $mounts
+     * @return list<array{volume_name: string, container_path: string, read_only: bool}>
+     */
+    private function pinVolumes(NodeOperation $operation, array $mounts): array
+    {
+        if ($mounts === []) {
+            return [];
+        }
+        // An older Sentinel ignores unknown fields and would start the container without its data.
+        $operation->node->ensureReportedCapability('volume.mounts.v1');
+
+        DB::transaction(function () use ($operation, $mounts): void {
+            $volumes = NodeVolume::query()
+                ->with('node')
+                ->where('node_workload_id', $operation->workload->id)
+                ->whereIn('uuid', array_column($mounts, 'volume_uuid'))
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('uuid');
+            foreach ($mounts as $mount) {
+                $volume = $volumes->get($mount['volume_uuid']);
+                if ($volume === null || $volume->podmanName() !== $mount['volume_name'] || CreateNodeVolume::normalizeMountPath($mount['container_path']) !== $mount['container_path']) {
+                    throw new RuntimeException("The volume mounted at {$mount['container_path']} no longer exists. Deploy the application again to use its current storage.");
+                }
+                if ($volume->node_id === null) {
+                    $volume->update(['node_id' => $operation->node->id]);
+                } elseif ($volume->node_id !== $operation->node->id) {
+                    $server = $volume->node?->name ?? 'another server';
+                    throw new RuntimeException("The volume {$volume->name} is on server {$server}. Move the application instead.");
+                }
+            }
+        });
+
+        return array_map(fn (array $mount): array => [
+            'volume_name' => $mount['volume_name'],
+            'container_path' => $mount['container_path'],
+            'read_only' => (bool) $mount['read_only'],
+        ], $mounts);
+    }
+
     /** @param array<string, mixed> $configuration
      * @return array<string, mixed>
      */
@@ -108,6 +157,11 @@ class DispatchWorkloadDeployment
             'resources.cpu_reservation' => ['nullable', 'numeric', 'between:0.01,1024'],
             'resources.memory_limit_bytes' => ['nullable', 'integer', 'min:4194304'],
             'resources.memory_reservation_bytes' => ['nullable', 'integer', 'min:4194304'],
+            'volumes' => ['sometimes', 'array', 'max:'.NodeVolume::MAX_PER_WORKLOAD],
+            'volumes.*.volume_uuid' => ['required', 'string', 'max:64', 'distinct'],
+            'volumes.*.volume_name' => ['required', 'string', 'regex:/\\Acoolify-vol-[A-Za-z0-9-]+\\z/'],
+            'volumes.*.container_path' => ['required', 'string', 'max:4096', 'distinct'],
+            'volumes.*.read_only' => ['required', 'boolean'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('The workload revision configuration is invalid.');

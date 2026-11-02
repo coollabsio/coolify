@@ -38,6 +38,8 @@ use App\Models\NodeContainer;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
 use App\Models\NodeRegistry;
+use App\Models\NodeVolume;
+use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\NotificationThrottle;
@@ -375,5 +377,7 @@ final class ServerTransferCoverage
         NodeBuild::class => 'v5 cluster data. Server transfer moves Docker servers only.',
         NodeBuildLogLine::class => 'v5 cluster data. Server transfer moves Docker servers only.',
         NodeRegistry::class => 'v5 cluster data. Server transfer moves Docker servers only.',
+        NodeVolume::class => 'v5 cluster data. Server transfer moves Docker servers only.',
+        NodeVolumeCopy::class => 'v5 cluster data. Server transfer moves Docker servers only.',
     ];
 }

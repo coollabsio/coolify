@@ -120,12 +120,19 @@ class RecoverStaleOperations
         };
     }
 
-    /** A killed move worker never detached the target that it attached, so the workload would run on both servers. */
+    /** A killed move worker never detached the target that it attached, so the workload would run on both servers. A stateful move also rolls back its volumes. */
     private function recoverMove(NodeOperation $operation): bool
     {
+        if (data_get($operation->result, 'stateful')) {
+            // The rollback job fails the move when it is done; until then the move stays active.
+            $operation->touch();
+            MoveNodeWorkloadJob::cleanUp($operation, queue: true);
+
+            return true;
+        }
         $claimed = ClaimOperation::run($operation, NodeOperationStatus::FAILED, error: self::COORDINATED_ERRORS['workload.move.v1']);
         if ($claimed !== null) {
-            MoveNodeWorkloadJob::releaseTarget($claimed);
+            MoveNodeWorkloadJob::cleanUp($claimed);
         }
 
         return $claimed !== null;

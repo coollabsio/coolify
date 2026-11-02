@@ -8,12 +8,17 @@ use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\CreateMoveOperation;
+use App\Actions\Node\CreateNodeVolume;
+use App\Actions\Node\DeleteNodeVolumeCopy;
+use App\Actions\Node\DeleteNodeVolumeData;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
+use App\Actions\Node\RemoveNodeVolume;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeVolumeCopyState;
 use App\Enums\NodeWorkloadAction;
 use App\Enums\NodeWorkloadState;
 use App\Jobs\DeployNodeWorkloadJob;
@@ -27,6 +32,7 @@ use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
+use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
@@ -35,6 +41,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Number;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -45,7 +52,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -124,6 +131,10 @@ class Show extends Component
     public string $editingDomain = '';
 
     public string $editingPort = '';
+
+    public string $newVolumeName = '';
+
+    public string $newVolumeMountPath = '';
 
     /** Uuid of the server to move the application from. */
     public string $moveSource = '';
@@ -366,6 +377,111 @@ class Show extends Component
         $this->loadDomains();
 
         return true;
+    }
+
+    public function addVolume(): void
+    {
+        $this->authorize('update', $this->workload);
+        $validated = $this->validate([
+            'newVolumeName' => ['required', 'string', 'max:255', 'regex:/\A[\pL\pN ._-]+\z/u'],
+            'newVolumeMountPath' => ['required', 'string', 'max:4096'],
+        ], [
+            'newVolumeName.regex' => 'Use letters, numbers, spaces, dots, dashes, and underscores.',
+        ]);
+        try {
+            CreateNodeVolume::run($this->workload, $validated['newVolumeName'], $validated['newVolumeMountPath']);
+        } catch (ValidationException $exception) {
+            $this->addError('newVolumeMountPath', collect($exception->errors())->flatten()->first());
+
+            return;
+        }
+        $this->newVolumeName = '';
+        $this->newVolumeMountPath = '';
+        $this->dispatch('close-modal');
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Volume added. Redeploy the application to mount it.');
+    }
+
+    public function removeVolume(string $volumeUuid): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $outcome = RemoveNodeVolume::run($this->findVolume($volumeUuid));
+            $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+            $this->dispatch('success', $outcome === 'deleted'
+                ? 'Volume removed.'
+                : 'Volume removed from the configuration. Redeploy the application to unmount it. Its data stays until you delete it.');
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
+    }
+
+    public function deleteVolumeData(string $volumeUuid): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            DeleteNodeVolumeData::run($this->findVolume($volumeUuid));
+            $this->dispatch('success', 'Volume data deleted.');
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
+    }
+
+    public function deleteVolumeCopy(string $copyUuid): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $copy = NodeVolumeCopy::query()
+                ->where('uuid', $copyUuid)
+                ->where('state', NodeVolumeCopyState::RETAINED)
+                ->whereHas('volume', fn (Builder $volume) => $volume
+                    ->where('node_workload_id', $this->workload->id)
+                    ->where('team_id', $this->workload->team_id))
+                ->firstOrFail();
+            DeleteNodeVolumeCopy::run($copy);
+            $this->dispatch('success', 'Retained copy deleted.');
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
+    }
+
+    private function findVolume(string $volumeUuid): NodeVolume
+    {
+        return NodeVolume::query()
+            ->where('node_workload_id', $this->workload->id)
+            ->where('team_id', $this->workload->team_id)
+            ->where('uuid', $volumeUuid)
+            ->firstOrFail();
+    }
+
+    /**
+     * @return array{volumes: list<array<string, mixed>>, retainedCopies: list<array<string, mixed>>, multipleServers: bool}
+     */
+    private function storageData(): array
+    {
+        $volumes = $this->workload->volumes()->with(['node', 'copies.node'])->orderBy('mount_path')->orderBy('id')->get();
+
+        return [
+            'volumes' => $volumes->map(fn (NodeVolume $volume): array => [
+                'uuid' => $volume->uuid,
+                'name' => $volume->name,
+                'mountPath' => $volume->mount_path,
+                'server' => $volume->node?->name,
+                'detached' => $volume->isDetached(),
+                'status' => $volume->inventoryStatus($volume->node?->freshVolumeInventory()),
+                'receiving' => $volume->copies->contains('state', NodeVolumeCopyState::RECEIVING),
+            ])->values()->all(),
+            'retainedCopies' => $volumes->flatMap(fn (NodeVolume $volume) => $volume->copies
+                ->where('state', NodeVolumeCopyState::RETAINED)
+                ->map(fn (NodeVolumeCopy $copy): array => [
+                    'uuid' => $copy->uuid,
+                    'volume' => $volume->name,
+                    'mountPath' => $volume->mount_path,
+                    'server' => $copy->node?->name,
+                    'deleteAfter' => $copy->delete_after,
+                ]))->values()->all(),
+            'multipleServers' => $this->workload->nodes->count() > 1,
+        ];
     }
 
     public function saveDetails(): void
@@ -612,6 +728,7 @@ class Show extends Component
                 ? $this->workload->internal_dns_name.'.default.coolify.internal'
                 : null,
             ...($this->section === 'domains' ? $this->ingressData() : []),
+            ...($this->section === 'storage' ? $this->storageData() : []),
             ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
@@ -791,6 +908,22 @@ class Show extends Component
         }
         if ($operation->started_at) {
             $add($operation->started_at, 'Sentinel started the deployment.');
+        }
+        if ($operation->command_type === 'workload.move.v1' && data_get($operation->result, 'stateful')) {
+            $transfer = data_get($operation->result, 'transfer');
+            if (is_array($transfer)) {
+                $add($operation->updated_at, 'Volume copy, '.data_get($transfer, 'pass', 'warm').' pass: '
+                    .Number::fileSize((int) data_get($transfer, 'bytes_done', 0)).' of '.Number::fileSize((int) data_get($transfer, 'bytes_total', 0))
+                    .' ('.data_get($transfer, 'state', 'running').').');
+            }
+            if (data_get($operation->result, 'source_stopped')) {
+                $add($operation->updated_at, 'The source container was stopped for the final copy.');
+            }
+            if (data_get($operation->result, 'switched')) {
+                $add($operation->updated_at, data_get($operation->result, 'switched_back')
+                    ? 'The volumes were switched back to the source server.'
+                    : 'The volumes were switched to the target server.');
+            }
         }
         $verification = data_get($operation->result, 'verification');
         if (is_array($verification)) {

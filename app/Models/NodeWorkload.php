@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use RuntimeException;
 
 class NodeWorkload extends BaseModel
 {
@@ -239,7 +240,7 @@ class NodeWorkload extends BaseModel
                 return null;
             }
 
-            return self::configurationHash($latest->image, $latest->configuration ?? [], $this->runtimeEnvironment());
+            return self::configurationHash($latest->image, $this->withVolumeMounts($latest->configuration ?? []), $this->runtimeEnvironment());
         });
     }
 
@@ -268,5 +269,85 @@ class NodeWorkload extends BaseModel
     public function operations(): HasMany
     {
         return $this->hasMany(NodeOperation::class);
+    }
+
+    public function volumes(): HasMany
+    {
+        return $this->hasMany(NodeVolume::class);
+    }
+
+    /** Whether a move of this workload has not finished yet. */
+    public function hasActiveMove(): bool
+    {
+        return $this->operations()
+            ->where('command_type', 'workload.move.v1')
+            ->whereIn('status', [
+                NodeOperationStatus::QUEUED,
+                NodeOperationStatus::DISPATCHED,
+                NodeOperationStatus::RUNNING,
+                NodeOperationStatus::VERIFYING,
+                NodeOperationStatus::UNCERTAIN,
+            ])
+            ->exists();
+    }
+
+    /**
+     * Rejects a deploy or lifecycle action from outside a move while a move copies the volumes:
+     * a source container that starts during the final pass writes data the target never gets.
+     */
+    public function ensureNotMovingVolumes(): void
+    {
+        if ($this->volumes()->whereNotNull('node_id')->exists() && $this->hasActiveMove()) {
+            throw new RuntimeException('This application is moving with its volumes. Wait until the move finishes.');
+        }
+    }
+
+    /** Whether the latest revision mounts the volume, so the reconciler can still deploy it. */
+    public function latestRevisionMounts(NodeVolume $volume): bool
+    {
+        $configuration = $this->revisions()->latest('id')->first()?->configuration ?? [];
+
+        return collect($configuration['volumes'] ?? [])->contains(fn ($mount): bool => data_get($mount, 'volume_uuid') === $volume->uuid);
+    }
+
+    /**
+     * The mounts that the next revision records: every volume that is not detached, sorted by path.
+     *
+     * @return list<array{volume_uuid: string, volume_name: string, container_path: string, read_only: bool}>
+     */
+    public function volumeMounts(): array
+    {
+        return $this->volumes()
+            ->whereNull('detached_at')
+            ->orderBy('mount_path')
+            ->get()
+            ->map(fn (NodeVolume $volume): array => [
+                'volume_uuid' => $volume->uuid,
+                'volume_name' => $volume->podmanName(),
+                'container_path' => $volume->mount_path,
+                'read_only' => false,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The configuration with the current mounts. Without volumes the key is absent, so the hash of
+     * an application without volumes stays the same as before volumes existed.
+     *
+     * @param  array<string, mixed>  $configuration
+     * @return array<string, mixed>
+     */
+    public function withVolumeMounts(array $configuration): array
+    {
+        $mounts = $this->volumeMounts();
+        if ($mounts === []) {
+            unset($configuration['volumes']);
+        } else {
+            // Assigned in place: the key order is part of the hash and of the revision comparison.
+            $configuration['volumes'] = $mounts;
+        }
+
+        return $configuration;
     }
 }

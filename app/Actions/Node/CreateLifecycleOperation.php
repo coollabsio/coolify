@@ -25,10 +25,11 @@ class CreateLifecycleOperation
         NodeWorkloadAction $action,
         ?User $requestedBy = null,
         bool $updateDesiredState = true,
+        bool $partOfMove = false,
     ): NodeOperation {
         $node->ensureCapability('workload.lifecycle.v1');
 
-        return DB::transaction(function () use ($node, $revision, $action, $requestedBy, $updateDesiredState): NodeOperation {
+        return DB::transaction(function () use ($node, $revision, $action, $requestedBy, $updateDesiredState, $partOfMove): NodeOperation {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -42,6 +43,9 @@ class CreateLifecycleOperation
                 ->whereKey($revision->id)
                 ->where('node_workload_id', $workload->id)
                 ->firstOrFail();
+            if (! $partOfMove) {
+                $workload->ensureNotMovingVolumes();
+            }
             $active = NodeOperation::query()
                 ->where('node_id', $node->id)
                 ->where('node_workload_id', $workload->id)
@@ -56,6 +60,13 @@ class CreateLifecycleOperation
                 ->exists();
             if ($active) {
                 throw new RuntimeException('This workload already has an active operation.');
+            }
+            if (in_array($action, [NodeWorkloadAction::START, NodeWorkloadAction::RESTART], true)) {
+                // After a stateful move the old container must not start on the retained copy.
+                $elsewhere = $workload->volumes()->with('node')->whereNotNull('node_id')->where('node_id', '!=', $node->id)->first();
+                if ($elsewhere !== null) {
+                    throw new RuntimeException("The volume {$elsewhere->name} is on server ".($elsewhere->node?->name ?? 'another server').'. Move the application instead.');
+                }
             }
 
             if ($updateDesiredState) {

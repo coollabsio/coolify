@@ -48,3 +48,16 @@
         </div>
     @endif
 </x-application.settings-section>
+
+@if (($orphanVolumes ?? []) !== [])
+    <x-application.settings-section id="node-orphan-volumes-section" title="Orphan volumes" class="mt-6"
+        helper="Coolify volumes on this server that no application uses, for example after an application was deleted with its volumes kept. Coolify never deletes them automatically.">
+        <ul class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.07]">
+            @foreach ($orphanVolumes as $volumeName)
+                <li wire:key="node-orphan-volume-{{ $volumeName }}" class="py-2 font-mono text-[12px] text-neutral-600 first:pt-0 last:pb-0 dark:text-fg-dim">
+                    {{ $volumeName }}
+                </li>
+            @endforeach
+        </ul>
+    </x-application.settings-section>
+@endif

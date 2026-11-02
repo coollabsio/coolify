@@ -22,8 +22,9 @@ class ReconcileContainers
      * Returns false when the snapshot is older than the stored inventory and was skipped.
      *
      * @param  list<array<string, mixed>>  $observations
+     * @param  list<string>|null  $volumeNames  Coolify volume names of the same snapshot; null when Sentinel does not report volumes.
      */
-    public function handle(Node $node, array $observations, ?CarbonInterface $snapshotObservedAt = null): bool
+    public function handle(Node $node, array $observations, ?CarbonInterface $snapshotObservedAt = null, ?array $volumeNames = null): bool
     {
         $containers = Validator::make(['containers' => $observations], [
             'containers' => ['array'],
@@ -41,7 +42,7 @@ class ReconcileContainers
             'containers.*.observed_at' => ['required', 'date'],
         ])->validate()['containers'];
 
-        return DB::transaction(function () use ($node, $containers, $snapshotObservedAt): bool {
+        return DB::transaction(function () use ($node, $containers, $snapshotObservedAt, $volumeNames): bool {
             if ($snapshotObservedAt !== null) {
                 $locked = Node::query()->lockForUpdate()->findOrFail($node->id);
                 $storedObservedAt = data_get($locked->metadata, 'container_inventory_observed_at');
@@ -83,7 +84,10 @@ class ReconcileContainers
             $missing->delete();
 
             if ($snapshotObservedAt !== null) {
-                $node->mergeMetadata(['container_inventory_observed_at' => $snapshotObservedAt->toIso8601String()]);
+                $node->mergeMetadata(
+                    ['container_inventory_observed_at' => $snapshotObservedAt->toIso8601String()],
+                    ['volume_inventory' => $volumeNames],
+                );
             }
 
             return true;

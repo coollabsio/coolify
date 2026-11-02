@@ -126,7 +126,7 @@ class Danger extends Component
             $this->authorize('delete', $this->resource);
             if ($this->resource instanceof NodeWorkload) {
                 // Removing the container waits for Sentinel on every server, so it runs on the queue.
-                DeleteNodeWorkloadJob::dispatch($this->resource->id, auth()->id());
+                DeleteNodeWorkloadJob::dispatch($this->resource->id, auth()->id(), deleteVolumes: $this->delete_volumes);
 
                 return redirectRoute($this, 'project.resource.index', [
                     'project_uuid' => $this->projectUuid,
@@ -203,9 +203,11 @@ class Danger extends Component
     public function render()
     {
         if ($this->resource instanceof NodeWorkload) {
-            // A cluster application has no Docker volumes, networks, or configuration files to choose from.
+            // A cluster application has no Docker networks or configuration files to choose from.
             return view('livewire.project.shared.danger', [
-                'checkboxes' => [],
+                'checkboxes' => $this->resource->volumes()->exists()
+                    ? [['id' => 'delete_volumes', 'label' => 'Permanently delete the persistent volumes of this application and their retained copies on every server.']]
+                    : [],
                 'unreachableServers' => $this->resource->nodes()
                     ->orderBy('name')
                     ->get()

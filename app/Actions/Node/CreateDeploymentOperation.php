@@ -23,14 +23,14 @@ class CreateDeploymentOperation
      * @param  'missing'|'newer'  $pullPolicy  Use `newer` for user redeploys so mutable tags get the latest image.
      * @return array{operation: NodeOperation, created: bool}
      */
-    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing'): array
+    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing', bool $partOfMove = false): array
     {
         $node->ensureCapability('workload.deploy.v1');
         if (! in_array($pullPolicy, ['missing', 'newer'], true)) {
             throw new InvalidArgumentException('The image pull policy is invalid.');
         }
 
-        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy): array {
+        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove): array {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -41,6 +41,9 @@ class CreateDeploymentOperation
                 ->whereKey($revision->id)
                 ->where('node_workload_id', $workload->id)
                 ->firstOrFail();
+            if (! $partOfMove) {
+                $workload->ensureNotMovingVolumes();
+            }
             $active = NodeOperation::query()
                 ->where('node_id', $node->id)
                 ->where('node_workload_id', $workload->id)
@@ -60,6 +63,10 @@ class CreateDeploymentOperation
 
             if (filled(data_get($revision->configuration, 'resources')) && $node->supportsCapability('workload.resources.v1') !== true) {
                 throw new RuntimeException('This server does not support workload resource settings. Upgrade Sentinel and try again.');
+            }
+
+            if (filled(data_get($revision->configuration, 'volumes'))) {
+                $node->ensureReportedCapability('volume.mounts.v1');
             }
 
             EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $revision);

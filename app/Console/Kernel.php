@@ -11,6 +11,7 @@ use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\DeleteExpiredNodeVolumeCopiesJob;
 use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\InspectNodeClusterNetworksJob;
 use App\Jobs\NotifyNodeHealthJob;
@@ -79,6 +80,10 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new RecoverStaleNodeOperationsJob)
             ->everyFiveMinutes()
             ->onOneServer();
+        $this->scheduleInstance->job(new DeleteExpiredNodeVolumeCopiesJob)
+            ->hourly()
+            ->onOneServer()
+            ->when(fn () => nodesEnabled());
         $this->scheduleInstance->job(new InspectNodeClusterNetworksJob)
             ->everyMinute()
             ->onOneServer()

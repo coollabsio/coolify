@@ -5,9 +5,11 @@ namespace App\Actions\Node;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeOperation;
+use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -57,6 +59,7 @@ class CreateMoveOperation
             if ($hasActiveMove) {
                 throw new RuntimeException('This workload already has an active move.');
             }
+            self::volumesToTransfer($workload, $source, $target);
 
             return CreateOperation::run(
                 $source,
@@ -68,5 +71,34 @@ class CreateMoveOperation
                 $requestedBy,
             );
         });
+    }
+
+    /**
+     * The volumes that a stateful move copies from the source: every volume with data on the
+     * source. Throws when a volume is on another Node or a Node cannot take part in the copy.
+     *
+     * @return Collection<int, NodeVolume>
+     */
+    public static function volumesToTransfer(NodeWorkload $workload, Node $source, Node $target): Collection
+    {
+        $volumes = $workload->volumes()->with('node')->whereNotNull('node_id')->orderBy('id')->get();
+        $elsewhere = $volumes->first(fn (NodeVolume $volume): bool => $volume->node_id !== $source->id);
+        if ($elsewhere !== null) {
+            throw new RuntimeException("The volume {$elsewhere->name} is on server ".($elsewhere->node?->name ?? 'another server').", not on {$source->name}.");
+        }
+        if ($volumes->isEmpty()) {
+            return $volumes;
+        }
+        foreach (['volume.serve.v1', 'volume.delete.v1', 'volume.transfer.v1'] as $capability) {
+            $source->ensureReportedCapability($capability);
+        }
+        foreach (['volume.receive.v1', 'volume.mounts.v1', 'volume.delete.v1', 'volume.transfer.v1'] as $capability) {
+            $target->ensureReportedCapability($capability);
+        }
+        if (blank($target->wireguard_ip)) {
+            throw new RuntimeException("Server {$target->name} has no mesh address yet. Wait until the cluster network is ready.");
+        }
+
+        return $volumes;
     }
 }

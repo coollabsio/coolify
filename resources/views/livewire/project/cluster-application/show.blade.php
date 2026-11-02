@@ -4,6 +4,7 @@
             'general' => 'General',
             'domains' => 'Domains',
             'environment-variables' => 'Environment Variables',
+            'storage' => 'Persistent Storage',
             'resource-limits' => 'Resource Limits',
             'deployments' => 'Deployments',
             'deployment' => 'Deployment',

@@ -57,6 +57,7 @@ class Node extends BaseModel
             'network_pending_leave' => 'array',
             'is_ingress' => 'boolean',
             'is_builder' => 'boolean',
+            'volume_inventory' => 'array',
         ];
     }
 
@@ -105,6 +106,37 @@ class Node extends BaseModel
     public function operations(): HasMany
     {
         return $this->hasMany(NodeOperation::class);
+    }
+
+    /** Volumes whose data lives on this Node. */
+    public function volumes(): HasMany
+    {
+        return $this->hasMany(NodeVolume::class);
+    }
+
+    public function volumeCopies(): HasMany
+    {
+        return $this->hasMany(NodeVolumeCopy::class);
+    }
+
+    /**
+     * The Coolify volume names of the last complete inventory, or null when Sentinel does not
+     * report volumes or the inventory is older than five minutes.
+     *
+     * @return list<string>|null
+     */
+    public function freshVolumeInventory(): ?array
+    {
+        $observedAt = data_get($this->metadata, 'container_inventory_observed_at');
+        if (! is_array($this->volume_inventory) || ! is_string($observedAt)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($observedAt)->isAfter(now()->subMinutes(5)) ? array_values($this->volume_inventory) : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function isNonRoot(): bool
@@ -279,6 +311,17 @@ class Node extends BaseModel
     {
         if ($this->supportsCapability($capability) === false) {
             throw new RuntimeException("This server does not support {$capability}. Upgrade Sentinel and try again.");
+        }
+    }
+
+    /**
+     * Unlike ensureCapability(), an unknown capability list also fails. Volume commands need
+     * this: an older Sentinel ignores unknown fields and would run a container without its data.
+     */
+    public function ensureReportedCapability(string $capability): void
+    {
+        if ($this->supportsCapability($capability) !== true) {
+            throw new RuntimeException("Server {$this->name} does not support {$capability}. Upgrade Sentinel and try again.");
         }
     }
 
