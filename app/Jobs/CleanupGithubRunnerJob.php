@@ -36,6 +36,14 @@ class CleanupGithubRunnerJob implements ShouldQueue
             return;
         }
 
+        // Another Coolify instance manages a transferred server and its runners: never touch them from here.
+        if ($execution->server?->isTransferredAway()) {
+            Log::info('Skipped GitHub runner cleanup: the server was transferred to another instance', ['execution' => $execution->uuid]);
+            ProvisionGithubRunnerJob::dispatchQueued($execution->github_app_id);
+
+            return;
+        }
+
         if ($execution->server) {
             instant_remote_process(GithubRunnerContainer::cleanupCommands($execution->uuid), $execution->server, false);
         }

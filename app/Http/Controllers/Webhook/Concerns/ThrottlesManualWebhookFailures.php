@@ -51,7 +51,7 @@ trait ThrottlesManualWebhookFailures
     /**
      * The connection address of the client. X-Forwarded-For is ignored, since
      * any client can set it and rotate it to get a new bucket. On cloud, a
-     * valid CF-Connecting-IP is used, as in auth_rate_limit_ip().
+     * valid CF-Connecting-IP is used.
      */
     protected function manualWebhookFailureClientAddress(Request $request): string
     {

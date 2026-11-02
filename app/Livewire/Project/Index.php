@@ -2,16 +2,25 @@
 
 namespace App\Livewire\Project;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Project;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use RemembersCanvasView;
+
     public $projects;
 
     public function mount(): void
     {
+        if ($this->prefersCanvasView('projects')) {
+            $this->redirectRoute('project.canvas.index', navigate: true);
+
+            return;
+        }
+
         // Only load what the page renders. Servers/private keys were previously
         // hydrated into public Livewire state but never used by the view.
         $this->projects = Project::ownedByCurrentTeam()

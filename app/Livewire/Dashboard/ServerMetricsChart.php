@@ -22,6 +22,7 @@ class ServerMetricsChart extends Component
         }
 
         try {
+            $this->server->prefetchMetrics(['cpu', 'memory'], 10);
             $this->dispatch("dashboard-server-metrics-{$this->server->uuid}", [
                 'cpu' => $this->server->getCpuMetrics(10),
                 'memory' => $this->server->getMemoryMetrics(10),

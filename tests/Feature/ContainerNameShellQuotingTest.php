@@ -85,12 +85,12 @@ function quotingUseNonRootUser(): void
 
 function quotingAssertCommandRan(string $command): void
 {
-    Process::assertRan(fn ($process) => str_contains($process->command, $command));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $command));
 }
 
 function quotingAssertNoUnquotedName(): void
 {
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, ' app;touch'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), ' app;touch'));
 }
 
 test('stopping a service application quotes its container name', function (bool $nonRoot, string $sudo) {
@@ -155,7 +155,7 @@ test('a scheduled task in a service quotes the container name', function (bool $
 function quotingFakeApplicationContainer(string $name): void
 {
     Process::fake(function ($process) use ($name) {
-        if (str_contains($process->command, 'docker ps -a --filter')) {
+        if (str_contains(remoteProcessScript($process), 'docker ps -a --filter')) {
             return Process::result(output: json_encode(['Names' => $name, 'Labels' => 'coolify.applicationId=1', 'State' => 'running']));
         }
 
@@ -183,7 +183,7 @@ test('stopping an application quotes the container names from docker ps', functi
     StopApplication::run($application, dockerCleanup: false);
 
     quotingAssertCommandRan("{$sudo}docker stop --timeout=");
-    Process::assertRan(fn ($process) => preg_match('/docker stop --timeout=\d+ '.preg_quote($quoted, '/').'\n/', $process->command) === 1);
+    Process::assertRan(fn ($process) => preg_match('/docker stop --timeout=\d+ '.preg_quote($quoted, '/').'\n/', remoteProcessScript($process)) === 1);
     quotingAssertCommandRan("\n{$sudo}docker rm -f {$quoted}\n");
     quotingAssertNoUnquotedName();
 })->with(['root' => [false, ''], 'non-root' => [true, 'sudo ']]);
@@ -196,7 +196,7 @@ test('stopping an application preview quotes the container names from docker ps'
         'pull_request_html_url' => 'https://example.com/pull/1',
     ]);
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'docker ps -a --filter')) {
+        if (str_contains(remoteProcessScript($process), 'docker ps -a --filter')) {
             return Process::result(output: json_encode(['Names' => QUOTING_HOSTILE_NAME, 'Labels' => 'coolify.applicationId=1,coolify.pullRequestId=1']));
         }
 
@@ -206,7 +206,7 @@ test('stopping an application preview quotes the container names from docker ps'
 
     StopApplicationPreview::run($preview);
 
-    Process::assertRan(fn ($process) => preg_match('/docker stop --timeout=\d+ '.preg_quote($quoted, '/').'\n/', $process->command) === 1);
+    Process::assertRan(fn ($process) => preg_match('/docker stop --timeout=\d+ '.preg_quote($quoted, '/').'\n/', remoteProcessScript($process)) === 1);
     quotingAssertCommandRan("\ndocker rm -f {$quoted}\n");
     quotingAssertNoUnquotedName();
 });
@@ -218,7 +218,7 @@ test('stopping an application on one server quotes the container names from dock
 
     StopApplicationOneServer::run($application, $this->server);
 
-    Process::assertRan(fn ($process) => preg_match('/docker stop --timeout=\d+ '.preg_quote($quoted, '/').'\n/', $process->command) === 1);
+    Process::assertRan(fn ($process) => preg_match('/docker stop --timeout=\d+ '.preg_quote($quoted, '/').'\n/', remoteProcessScript($process)) === 1);
     quotingAssertNoUnquotedName();
 });
 

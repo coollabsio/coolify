@@ -9,7 +9,7 @@
     $statusClasses = match ($status) {
         'success' => 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
         'error' => 'border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400',
-        'running' => 'border-coollabs/25 bg-coollabs/10 text-coollabs dark:border-warning/25 dark:bg-warning/15 dark:text-warning',
+        'running' => 'border-coollabs/25 bg-coollabs/10 text-coollabs dark:border-brand-light/25 dark:bg-brand/15 dark:text-brand-light',
         'pending' => 'border-neutral-200 text-neutral-400 dark:border-white/[0.1] dark:text-fg-faint',
         default => 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim',
     };

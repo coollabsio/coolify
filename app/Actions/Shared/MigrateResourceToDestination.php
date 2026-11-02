@@ -86,6 +86,12 @@ class MigrateResourceToDestination
             ]);
         }
 
+        if ($this->hasDomains($resource) && $targetServer->isProxyShouldRun() && $targetServer->proxy->get('status') !== 'running') {
+            throw ValidationException::withMessages([
+                'destination_id' => 'The proxy of the target server is not running. Start it on the server page before you migrate a resource with domains.',
+            ]);
+        }
+
         $crossServer = $sourceServer && (int) $sourceServer->id !== (int) $targetServer->id;
 
         if (! $crossServer) {
@@ -167,6 +173,20 @@ class MigrateResourceToDestination
         }
 
         $this->resaveFileStorages($resource->fresh());
+    }
+
+    protected function hasDomains(
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+    ): bool {
+        if ($resource instanceof Application) {
+            return $resource->maintenanceDomains()->isNotEmpty();
+        }
+
+        if ($resource instanceof Service) {
+            return $resource->applications()->get()->contains(fn ($application) => filled($application->fqdn));
+        }
+
+        return false;
     }
 
     protected function stopResource(

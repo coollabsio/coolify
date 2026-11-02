@@ -223,7 +223,7 @@ class GithubRunnerContainer
     {
         $image = escapeshellarg($image);
 
-        return "docker pull {$image} || docker image inspect {$image} > /dev/null";
+        return serverDockerConfigPrefix($this->config->server)."docker pull {$image} || docker image inspect {$image} > /dev/null";
     }
 
     private function pullIfMissing(string $image): string

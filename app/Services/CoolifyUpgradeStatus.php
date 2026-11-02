@@ -93,7 +93,7 @@ class CoolifyUpgradeStatus
         }
 
         [$step, , $timestamp] = $parts;
-        if (! in_array($step, ['1', '2', '3', '4', '5'], true)) {
+        if (! in_array($step, ['1', '2', '3', '4', '5'], true) || trim($timestamp) === '') {
             return false;
         }
 

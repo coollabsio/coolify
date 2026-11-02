@@ -83,10 +83,12 @@ test('get_logs returns structured next_tools when not running', function () {
 });
 
 test('coolify_help returns essentials catalog', function () {
-    $response = mcpImproveCall('coolify_help', ['intent' => 'essentials']);
+    $response = mcpImproveCall('coolify_help');
     $response->assertOk();
     $body = mcpImproveJson($response);
-    expect($body['data']['catalog']['essentials']['tools'])->toContain('coolify_help', 'control', 'search_resources');
+    expect($body['data']['start_here'])->toContain('search_resources')
+        ->and($body['data']['read_tools'])->toHaveKey('list_applications')
+        ->and($body['data']['change_tools'])->not->toHaveKey('control');
 });
 
 test('list_unhealthy_resources sample_only returns summary', function () {
@@ -107,9 +109,9 @@ test('control requires deploy ability and stop requires confirm', function () {
         'action' => 'start',
         'uuid' => $this->application->uuid,
     ]);
-    expect($denied->json('result.isError'))->toBeTrue();
-    expect($denied->json('result.content.0.text'))->toContain('Missing required permissions');
+    expect($denied->json('error.message'))->toBe('Tool [control] not found.');
 
+    app('auth')->forgetGuards();
     $deployToken = $this->user->createToken('mcp-deploy-stop', ['read', 'deploy'])->plainTextToken;
     $stop = mcpImproveCall('control', [
         'resource' => 'application',
@@ -135,5 +137,6 @@ test('tools list includes coolify_help and control', function () {
     ]);
     $response->assertOk();
     $names = collect($response->json('result.tools'))->pluck('name')->all();
-    expect($names)->toContain('coolify_help', 'control', 'deploy', 'cancel_deployment');
+    expect($names)->toContain('coolify_help')
+        ->and($names)->not->toContain('control', 'deploy', 'cancel_deployment');
 });

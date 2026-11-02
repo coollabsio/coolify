@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -162,4 +163,22 @@ it('preserves other component versions when preventing Coolify downgrade', funct
 
     $job = new CheckForUpdatesJob;
     $job->handle();
+});
+
+it('keeps the local versions.json when the CDN fetch fails', function () {
+    Http::fake(['*' => Http::response('', 500)]);
+    File::shouldReceive('put')->never();
+    Cache::shouldReceive('forget')->never();
+
+    expect(refresh_versions_file())->toBeNull();
+});
+
+it('makes only one CDN request for a manual check, so the web request does not wait for retries', function () {
+    Sleep::fake();
+    Http::fake(['*' => Http::response('error code: 1200', 503, ['Retry-After' => '60'])]);
+
+    (new CheckForUpdatesJob(cdnTries: 1))->handle();
+
+    Http::assertSentCount(1);
+    Sleep::assertNeverSlept();
 });

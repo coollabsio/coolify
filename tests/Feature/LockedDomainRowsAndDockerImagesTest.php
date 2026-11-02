@@ -71,7 +71,7 @@ it('rejects a client update of the service domain state', function (string $prop
 
 it('rejects a client update of the docker image list', function () {
     $imageId = 'sha256:'.str_repeat('a', 64);
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker image ls*' => Process::result(output: json_encode(['Repository' => 'nginx', 'Tag' => '1.27', 'ID' => $imageId, 'Size' => '52.5MB', 'CreatedSince' => '3 weeks ago'])),
         '*docker ps -a*' => Process::result(output: "{$imageId}#/web\n"),
         '*docker system df*' => Process::result(output: ''),

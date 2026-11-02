@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -7,12 +8,16 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     InstanceSettings::query()->whereKey(0)->delete();
     $settings = new InstanceSettings(['is_api_enabled' => true]);
     $settings->id = 0;
@@ -183,6 +188,43 @@ describe('POST /api/v1/servers/digitalocean', function () {
         ]);
     });
 
+    test('explains a DigitalOcean permission error without leaking the DigitalOcean message', function () {
+        Http::fake([
+            'https://api.digitalocean.com/v2/account/keys' => Http::response([
+                'ssh_key' => ['id' => 123, 'fingerprint' => 'aa:bb:cc:dd'],
+            ], 201),
+            'https://api.digitalocean.com/v2/account/keys*' => Http::response([
+                'ssh_keys' => [],
+                'links' => ['pages' => []],
+            ], 200),
+            'https://api.digitalocean.com/v2/droplets' => Http::response([
+                'id' => 'forbidden',
+                'message' => 'INTERNAL_LEAK_TOKEN_abc',
+            ], 403),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/servers/digitalocean', [
+            'cloud_provider_token_id' => $this->digitalOceanToken->uuid,
+            'region' => 'nyc1',
+            'size' => 's-1vcpu-1gb',
+            'image' => 'ubuntu-24-04-x64',
+            'name' => 'read-only-token',
+            'private_key_uuid' => $this->privateKey->uuid,
+        ]);
+
+        $response->assertStatus(502);
+        $response->assertExactJson([
+            'message' => 'Failed to create DigitalOcean server. The DigitalOcean API token does not have permission for this request. Use a token with read and write access.',
+            'provider_status' => 403,
+            'provider_error_code' => 'forbidden',
+        ]);
+        expect($response->getContent())->not->toContain('INTERNAL_LEAK_TOKEN_abc');
+        $this->assertDatabaseMissing('servers', ['name' => 'read-only-token']);
+    });
+
     test('deletes the droplet when local server persistence fails', function () {
         Http::fake([
             'https://api.digitalocean.com/v2/account/keys' => Http::response([
@@ -207,6 +249,7 @@ describe('POST /api/v1/servers/digitalocean', function () {
             'https://api.digitalocean.com/v2/droplets/987' => Http::response(null, 204),
         ]);
 
+        Exceptions::fake();
         $eventDispatcher = Server::getEventDispatcher();
         Server::setEventDispatcher(clone $eventDispatcher);
         Server::created(function (): void {
@@ -233,6 +276,7 @@ describe('POST /api/v1/servers/digitalocean', function () {
         $this->assertDatabaseMissing('servers', [
             'digitalocean_droplet_id' => 987,
         ]);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'local persistence failed');
         Http::assertSent(fn ($request) => $request->method() === 'DELETE'
             && $request->url() === 'https://api.digitalocean.com/v2/droplets/987');
     });

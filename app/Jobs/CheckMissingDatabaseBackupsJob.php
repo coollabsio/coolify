@@ -58,6 +58,11 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
             return;
         }
 
+        // Another Coolify instance backs up the databases of a transferred server.
+        if ($backup->server()?->isTransferredAway()) {
+            return;
+        }
+
         // Send once for each period without backup activity.
         NotificationThrottle::sendOnce(
             $backup,

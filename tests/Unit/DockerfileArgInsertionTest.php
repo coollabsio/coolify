@@ -80,6 +80,54 @@ it('returns empty array when no FROM instructions found', function () {
     expect($result)->toBe([]);
 });
 
+it('ignores FROM text inside heredoc bodies', function () {
+    $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
+
+    $dockerfile = collect([
+        'FROM python:3.13 AS build',
+        'RUN <<EOF',
+        'from app import create_app',
+        'EOF',
+        "COPY <<-'SQL' /init.sql",
+        "\tSELECT *",
+        "\tFROM users;",
+        "\tSQL",
+        'RUN cat <<<"from here-string"',
+        'FROM nginx:alpine',
+    ]);
+
+    expect($job->findFromInstructionLines($dockerfile))->toBe([0, 9]);
+});
+
+it('returns the last line of a FROM instruction that continues on the next line', function () {
+    $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
+
+    $dockerfile = collect([
+        'FROM --platform=linux/amd64 \\',
+        '    # base image',
+        '    node:22',
+        'RUN echo \\',
+        '    FROM not-an-instruction',
+        'FROM nginx:alpine',
+    ]);
+
+    expect($job->findFromInstructionLines($dockerfile))->toBe([2, 5]);
+});
+
+it('uses the escape parser directive for continuation lines', function () {
+    $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
+
+    $dockerfile = collect([
+        '# escape=`',
+        'FROM mcr.microsoft.com/windows/servercore:ltsc2022',
+        'RUN dir `',
+        '    FROM c:\\',
+        'FROM nginx:alpine',
+    ]);
+
+    expect($job->findFromInstructionLines($dockerfile))->toBe([1, 4]);
+});
+
 it('inserts ARGs after FROM in simple dockerfile', function () {
     $dockerfile = collect([
         'FROM node:16',

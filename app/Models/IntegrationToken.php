@@ -71,6 +71,45 @@ class IntegrationToken extends BaseModel
         return self::PROVIDER_NAMES[$this->provider] ?? ucfirst($this->provider);
     }
 
+    /**
+     * Capabilities a token of the provider can have. Cloudflare Tunnel setup also writes DNS records, so `tunnel` needs `dns`.
+     *
+     * @return array<int, string>
+     */
+    public static function allowedCapabilities(string $provider): array
+    {
+        return $provider === 'cloudflare' ? ['dns', 'tunnel'] : ['secrets'];
+    }
+
+    /**
+     * Cloudflare dashboard link that pre-fills a user API token with the permissions the capabilities need.
+     *
+     * @param  array<int, string>  $capabilities
+     */
+    public static function cloudflareTokenTemplateUrl(array $capabilities): string
+    {
+        $permissions = [
+            ['key' => 'dns', 'type' => 'edit'],
+            ['key' => 'zone', 'type' => 'read'],
+        ];
+        if (in_array('tunnel', $capabilities, true)) {
+            // `argotunnel` is Cloudflare's internal key for the "Cloudflare Tunnel" permission group.
+            $permissions[] = ['key' => 'argotunnel', 'type' => 'edit'];
+        }
+
+        return 'https://dash.cloudflare.com/profile/api-tokens?'.http_build_query([
+            'permissionGroupKeys' => json_encode($permissions),
+            'accountId' => '*',
+            'zoneId' => 'all',
+            'name' => in_array('tunnel', $capabilities, true) ? 'Coolify DNS and Tunnel Management' : 'Coolify DNS Management',
+        ], '', '&', PHP_QUERY_RFC3986);
+    }
+
+    public function hasCapability(string $capability): bool
+    {
+        return in_array($capability, $this->capabilities ?? [], true);
+    }
+
     public function automaticDnsEnabled(): bool
     {
         return $this->provider === 'cloudflare' && data_get($this->metadata, 'automatic_dns', true) !== false;
@@ -80,6 +119,16 @@ class IntegrationToken extends BaseModel
     public function proxiedDnsEnabled(): bool
     {
         return $this->provider === 'cloudflare' && data_get($this->metadata, 'proxied_dns') === true;
+    }
+
+    /**
+     * Optional request timeout in seconds for self-hosted secret managers.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public static function requestTimeout(array $metadata): ?int
+    {
+        return filled($metadata['timeout'] ?? null) ? (int) $metadata['timeout'] : null;
     }
 
     public function dopplerTokenType(): ?string

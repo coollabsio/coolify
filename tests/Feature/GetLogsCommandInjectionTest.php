@@ -81,7 +81,7 @@ describe('GetLogs Livewire action validation', function () {
         ])->save();
         $server = Server::with('settings')->findOrFail($this->server->id);
 
-        Process::fake(['*' => Process::result(output: 'all logs')]);
+        fakeRemoteProcesses(['*' => Process::result(output: 'all logs')]);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,
@@ -94,7 +94,7 @@ describe('GetLogs Livewire action validation', function () {
             ->assertSet('numberOfLines', -1)
             ->assertReturned('all logs');
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n all -t test-container'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n all -t test-container'));
     });
 
     test('getLogs marks ANSI-colored output truncated based on raw bytes', function () {
@@ -108,7 +108,7 @@ describe('GetLogs Livewire action validation', function () {
 
         expect(strlen($output))->toBe(GetLogs::MAX_DISPLAY_SIZE_BYTES + 1);
 
-        Process::fake(['*' => Process::result(output: $output)]);
+        fakeRemoteProcesses(['*' => Process::result(output: $output)]);
 
         $component = new GetLogs;
         $component->server = $server;
@@ -195,7 +195,7 @@ describe('GetLogs browser-rendered output', function () {
     });
 
     test('getLogs returns timestamped output without storing it in component state', function () {
-        Process::fake(['*' => Process::result(output: "2026-09-28T10:00:02Z second\n2026-09-28T10:00:01Z first")]);
+        fakeRemoteProcesses(['*' => Process::result(output: "2026-09-28T10:00:02Z second\n2026-09-28T10:00:01Z first")]);
 
         $component = Livewire::test(GetLogs::class, [
             'server' => $this->functionalServer,
@@ -207,11 +207,11 @@ describe('GetLogs browser-rendered output', function () {
             ->assertReturned("2026-09-28T10:00:01Z first\n2026-09-28T10:00:02Z second");
 
         expect($component->instance())->not->toHaveProperty('outputs');
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n 100 -t test-container'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n 100 -t test-container'));
     });
 
     test('getLogs only requests new lines when streaming from a timestamp', function () {
-        Process::fake(['*' => Process::result(output: '2026-09-28T10:00:03Z new')]);
+        fakeRemoteProcesses(['*' => Process::result(output: '2026-09-28T10:00:03Z new')]);
 
         Livewire::test(GetLogs::class, [
             'server' => $this->functionalServer,
@@ -221,12 +221,12 @@ describe('GetLogs browser-rendered output', function () {
             ->call('getLogs', '2026-09-28T10:00:02.123456789Z')
             ->assertReturned('2026-09-28T10:00:03Z new');
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs --since 2026-09-28T10:00:02.123456789Z -t test-container'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs --since 2026-09-28T10:00:02.123456789Z -t test-container'));
     });
 
     test('getLogs prefixes the streaming command with sudo for non-root servers', function () {
         $this->functionalServer->update(['user' => 'ubuntu']);
-        Process::fake(['*' => Process::result(output: '')]);
+        fakeRemoteProcesses(['*' => Process::result(output: '')]);
 
         Livewire::test(GetLogs::class, [
             'server' => $this->functionalServer->fresh(['settings']),
@@ -234,11 +234,11 @@ describe('GetLogs browser-rendered output', function () {
             'container' => 'test-container',
         ])->call('getLogs', '2026-09-28T10:00:02Z');
 
-        Process::assertRan(fn ($process) => str_contains($process->command, '(sudo docker logs --since 2026-09-28T10:00:02Z -t test-container) 2>&1 | head -c'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '(sudo docker logs --since 2026-09-28T10:00:02Z -t test-container) 2>&1 | head -c'));
     });
 
     test('getLogs ignores a since value that is not a docker timestamp', function (string $since) {
-        Process::fake(['*' => Process::result(output: 'logs')]);
+        fakeRemoteProcesses(['*' => Process::result(output: 'logs')]);
 
         Livewire::test(GetLogs::class, [
             'server' => $this->functionalServer,
@@ -246,8 +246,8 @@ describe('GetLogs browser-rendered output', function () {
             'container' => 'test-container',
         ])->call('getLogs', $since);
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n 100 -t test-container')
-            && ! str_contains($process->command, '--since'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n 100 -t test-container')
+            && ! str_contains(remoteProcessScript($process), '--since'));
     })->with([
         'command substitution' => ['2026-09-28T10:00:02Z$(id)'],
         'shell separator' => ['2026-09-28T10:00:02Z; id'],
@@ -255,7 +255,7 @@ describe('GetLogs browser-rendered output', function () {
     ]);
 
     test('copyLogs keeps line order and omits timestamps when timestamps are hidden', function () {
-        Process::fake(['*' => Process::result(output: "zeta\nalpha")]);
+        fakeRemoteProcesses(['*' => Process::result(output: "zeta\nalpha")]);
 
         Livewire::test(GetLogs::class, [
             'server' => $this->functionalServer,
@@ -266,7 +266,7 @@ describe('GetLogs browser-rendered output', function () {
             ->call('copyLogs')
             ->assertReturned("zeta\nalpha");
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n 100 test-container'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n 100 test-container'));
     });
 
     test('copyLogs returns empty for unauthorized server', function () {
@@ -282,7 +282,7 @@ describe('GetLogs browser-rendered output', function () {
     });
 
     test('streaming does not render log lines or poll through Livewire', function () {
-        Process::fake(['*' => Process::result(output: '2026-09-28T10:00:01Z secret-looking line')]);
+        fakeRemoteProcesses(['*' => Process::result(output: '2026-09-28T10:00:01Z secret-looking line')]);
 
         Livewire::test(GetLogs::class, [
             'server' => $this->functionalServer,

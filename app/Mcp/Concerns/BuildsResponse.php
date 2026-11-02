@@ -2,8 +2,11 @@
 
 namespace App\Mcp\Concerns;
 
+use App\Mcp\Servers\CoolifyServer;
+use App\Services\Security\SensitiveDataRedactor;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
 
 trait BuildsResponse
 {
@@ -24,7 +27,7 @@ trait BuildsResponse
         // raw IDs / morph types (uuid is the public identifier)
         'id', 'team_id', 'tokenable_id', 'tokenable_type',
         'server_id', 'private_key_id', 'cloud_provider_token_id',
-        'hetzner_server_id', 'digitalocean_droplet_id', 'environment_id', 'destination_id',
+        'hetzner_server_id', 'digitalocean_droplet_id', 'hostinger_virtual_machine_id', 'environment_id', 'destination_id',
         'source_id', 'repository_project_id', 'application_id',
         'service_id', 'project_id', 'parent_id',
         'resourceable', 'resourceable_id', 'resourceable_type',
@@ -81,11 +84,12 @@ trait BuildsResponse
      * Recursively remove sensitive keys from any nested array structure.
      *
      * @param  array<array-key, mixed>  $data
+     * @param  array<int, string>  $publicKeys  Identifiers required by management actions.
      * @return array<array-key, mixed>
      */
-    protected function scrubSensitive(array $data): array
+    protected function scrubSensitive(array $data, array $publicKeys = []): array
     {
-        $deny = array_flip($this->sensitiveKeys);
+        $deny = array_flip(array_diff($this->sensitiveKeys, $publicKeys));
 
         $walk = function ($value) use (&$walk, $deny) {
             if (! is_array($value)) {
@@ -108,27 +112,13 @@ trait BuildsResponse
 
     /**
      * Best-effort redaction for free-form log text shown to MCP clients.
-     * Uses remove_iip plus common KEY=value / JSON secret patterns; not a guarantee.
+     * Uses SensitiveDataRedactor patterns plus the given resource values; not a guarantee.
+     *
+     * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Values from EnvironmentVariable::logRedactionSecretsFor().
      */
-    protected function redactLogText(string $text): string
+    protected function redactLogText(string $text, array $secrets = []): string
     {
-        $text = remove_iip($text);
-
-        // password= / secret= / token= / "token":"..." style (shell or JSON; quoted or bare)
-        $text = preg_replace(
-            '/(?<![\w])["\']?(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token)["\']?\s*[=:]\s*["\']?[^\s"\']{3,}["\']?/i',
-            '$1='.REDACTED,
-            $text
-        ) ?? $text;
-
-        // export FOO=bar / "API_KEY":"..." style for sensitive-looking names
-        $text = preg_replace(
-            '/(?<![\w])(export\s+)?["\']?([A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)["\']?\s*[=:]\s*["\']?[^\s"\']{3,}["\']?/i',
-            '$1$2='.REDACTED,
-            $text
-        ) ?? $text;
-
-        return $text;
+        return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
     }
 
     /**
@@ -140,6 +130,7 @@ trait BuildsResponse
     {
         $payload = ['data' => $data];
 
+        $actions = $this->onlyVisibleTools($actions);
         if ($actions !== []) {
             $payload['_actions'] = $actions;
         }
@@ -149,6 +140,28 @@ trait BuildsResponse
         }
 
         return Response::json($payload);
+    }
+
+    /**
+     * Removes suggestions for tools that the current token cannot see, so agents do not call hidden tools.
+     *
+     * @param  array<int, array<string, mixed>>  $suggestions
+     * @return array<int, array<string, mixed>>
+     */
+    protected function onlyVisibleTools(array $suggestions): array
+    {
+        $names = array_column($suggestions, 'tool');
+        if ($names === []) {
+            return $suggestions;
+        }
+
+        $visible = collect(CoolifyServer::TOOLS)
+            ->map(fn (string $class): Tool => app($class))
+            ->filter(fn (Tool $tool): bool => in_array($tool->name(), $names, true) && $tool->eligibleForRegistration())
+            ->map(fn (Tool $tool): string => $tool->name())
+            ->all();
+
+        return array_values(array_filter($suggestions, fn (array $suggestion): bool => in_array($suggestion['tool'] ?? null, $visible, true)));
     }
 
     /**

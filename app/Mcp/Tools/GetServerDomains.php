@@ -13,7 +13,9 @@ use Illuminate\Support\Stringable;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetServerDomains extends Tool
 {
     protected string $name = 'get_server_domains';

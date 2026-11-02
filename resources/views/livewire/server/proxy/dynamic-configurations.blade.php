@@ -11,15 +11,7 @@
 
         <div class="application-settings-form flex w-full flex-col gap-6">
             @if ($server->isFunctional())
-                <div class="flex flex-wrap items-start justify-between gap-3 px-1">
-                    <div>
-                        <h2 class="text-sm! font-medium text-neutral-950 dark:text-fg">
-                            Dynamic configurations
-                        </h2>
-                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
-                            Manage additional proxy routes, middleware, and services loaded at runtime.
-                        </p>
-                    </div>
+                <div class="flex flex-wrap items-center justify-end gap-3 px-1">
                     <div class="flex items-center gap-2">
                         <x-forms.button wire:click="loadDynamicConfigurations">
                             <x-reicon name="refresh" class="size-3.5" />

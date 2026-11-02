@@ -1,15 +1,22 @@
 <div class="flex flex-col gap-6" x-init="$wire.loadImages">
-    <form wire:submit="saveSettings" class="application-settings-form flex flex-col">
-        <x-unsaved-bar action="saveSettings" />
-        <x-application.settings-section id="rollback-retention-section" title="Image retention"
-            helper="Keep previously built Docker images available for fast rollbacks.">
+    <x-application.settings-section title="Rollback images"
+        helper="Keep previously built Docker images available for fast rollbacks. Rollback uses an existing image without rebuilding the application. Images in the Docker registry are pulled to the server first." flush>
+        <x-slot:actions>
+            @can('view', $application)
+                <x-forms.button wire:click="loadImages(true)">
+                    Reload images
+                </x-forms.button>
+            @endcan
+        </x-slot:actions>
+
+        <form wire:submit="saveSettings"
+            class="flex flex-col gap-4 border-b border-neutral-200 px-4 py-3.5 dark:border-white/[0.07]">
+            <x-unsaved-bar action="saveSettings" />
             @if ($serverRetentionDisabled)
-                <div class="mb-4">
-                    <x-callout type="warning" title="Disabled by the server">
-                        Image retention is disabled at the server level. This setting has no effect until a server
-                        administrator enables it.
-                    </x-callout>
-                </div>
+                <x-callout type="warning" title="Disabled by the server">
+                    Image retention is disabled at the server level. This setting has no effect until a server
+                    administrator enables it.
+                </x-callout>
             @endif
 
             <div class="max-w-sm">
@@ -18,18 +25,7 @@
                     helper="Set to 0 to keep only the running image. Pull request images are always removed during cleanup."
                     canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
             </div>
-        </x-application.settings-section>
-    </form>
-
-    <x-application.settings-section id="rollback-images-section" title="Available images"
-        helper="Rollback uses an existing local image without rebuilding the application." flush>
-        <x-slot:actions>
-            @can('view', $application)
-                <x-forms.button wire:click="loadImages(true)">
-                    Reload images
-                </x-forms.button>
-            @endcan
-        </x-slot:actions>
+        </form>
 
         <div wire:target="loadImages" wire:loading.remove>
             @forelse ($images as $image)
@@ -41,6 +37,7 @@
                     $isPrTag = preg_match('/^pr-\d+$/', $tag);
                     $isRollbackable = $isCommitSha || $isPrTag;
                     $isCurrent = data_get($image, 'is_current');
+                    $isRegistryImage = data_get($image, 'source') === 'registry';
                 @endphp
                 <div
                     class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center dark:border-white/[0.07]">
@@ -58,9 +55,12 @@
                             @elseif (!$isRollbackable)
                                 <x-status-badge status="Rollback unavailable" type="neutral" />
                             @endif
+                            @if ($isRegistryImage)
+                                <x-status-badge status="In registry" type="neutral" />
+                            @endif
                         </div>
                         <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
-                            Built {{ $createdAt->diffForHumans() }}
+                            {{ $isRegistryImage ? 'Deployed' : 'Built' }} {{ $createdAt->diffForHumans() }}
                             <span class="mx-1 text-neutral-300 dark:text-fg-faint">·</span>
                             {{ $date }}
                         </p>
@@ -84,7 +84,7 @@
                 </div>
             @empty
                 <x-empty title="No rollback images"
-                    description="No previous application images are currently stored on this server."
+                    description="No previous application images are stored on this server or in the Docker registry."
                     icon-name="layers" />
             @endforelse
         </div>

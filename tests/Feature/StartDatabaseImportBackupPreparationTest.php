@@ -62,7 +62,7 @@ beforeEach(function () {
 
 function importServerBackup(object $test, string $path, string $magicHex): string
 {
-    Process::fake([
+    fakeRemoteProcesses([
         '*stat -c %s*' => Process::result('2048'),
         '*od -An -tx1*' => Process::result(' '.implode(' ', str_split($magicHex, 2))),
         '*' => Process::result(''),
@@ -149,7 +149,7 @@ test('bz2, xz, and zip server backups are prepared in the helper image', functio
         ->toContain("docker rm -f 'backup-decompress-")
         ->not->toContain("docker cp '{$path}' '{$this->database->uuid}:");
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker run -d --network none --name 'backup-decompress-"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker run -d --network none --name 'backup-decompress-"));
     Queue::assertPushed(CoolifyTask::class, fn (CoolifyTask $job) => str_starts_with((string) ($job->call_event_data['containerName'] ?? ''), 'backup-decompress-'));
 })->with([
     'bz2' => ['/srv/backups/app.sql.bz2', '425a68393141'],

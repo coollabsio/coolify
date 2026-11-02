@@ -5,7 +5,18 @@
     <div x-data="projectEnvironments()" class="w-full">
         <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
-                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $project->name }}</h1>
+                <div class="flex min-w-0 items-center gap-1.5">
+                    <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $project->name }}</h1>
+                    @can('update', $project)
+                        <a href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}"
+                            {{ wireNavigate() }}
+                            class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                            title="Project settings"
+                            aria-label="Open settings for {{ $project->name }}">
+                            <x-reicon name="settings" class="size-4" />
+                        </a>
+                    @endcan
+                </div>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
                     <span
                         x-text="`${environments.length} ${environments.length === 1 ? 'environment' : 'environments'}`"></span>
@@ -15,15 +26,6 @@
 
             @can('update', $project)
                 <div class="flex w-fit shrink-0 items-center gap-2">
-                    <a href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}"
-                        {{ wireNavigate() }}
-                        class="button"
-                        title="Project settings"
-                        aria-label="Open settings for {{ $project->name }}">
-                        <x-reicon name="settings" class="size-3.5" />
-                        Settings
-                    </a>
-
                     <x-modal-input title="New Environment">
                         <x-slot:content>
                             <button type="button"
@@ -33,17 +35,7 @@
                             </button>
                         </x-slot:content>
 
-                        <form class="space-y-4" wire:submit="submit">
-                            <x-forms.input placeholder="staging" id="name" label="Name" required />
-
-                            <footer
-                                class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="submit"
-                                    defaultClass="button button-highlighted">
-                                    Create environment
-                                </x-forms.button>
-                            </footer>
-                        </form>
+                        @include('livewire.project.partials.new-environment-form')
                     </x-modal-input>
                 </div>
             @endcan
@@ -68,7 +60,7 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <x-table.dropdown panel-class="w-48!">
                         <x-slot:trigger>
                             <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
@@ -95,27 +87,9 @@
                             </template>
                     </x-table.dropdown>
 
-                    <div
-                        class="view-toggle">
-                        <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'table'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Table view" title="Table view">
-                            <x-reicon name="unordered-list" class="size-3.5" />
-                        </button>
-                        <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-                            :class="viewMode === 'grid'
-                                ?
-                                'control-selected' :
-                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-                            aria-label="Grid view" title="Grid view">
-                            <x-reicon name="grid" class="size-3.5" />
-                        </button>
-                    </div>
+                    <x-canvas-view-toggle
+                        :list-url="route('project.show', ['project_uuid' => $project->uuid])"
+                        :canvas-url="route('project.canvas', ['project_uuid' => $project->uuid])" />
                 </div>
             </div>
 
@@ -165,7 +139,7 @@
                         </article>
                     </template>
                 </div>
-                <x-client-pagination x-show="filteredEnvironments.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
+                <x-client-pagination total="filteredEnvironments.length" x-show="filteredEnvironments.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredEnvironments.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.project-environments" :options="[12, 24, 48, 96]" />
             </div>
@@ -174,9 +148,11 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="environments-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Environment</div>
-                    <div class="environment-resource-count">Resources</div>
-                    <div class="environment-description">Description</div>
+                    <x-table.sort-header label="Environment" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Resources" asc="resources-asc" desc="resources-desc" first="desc" then="page = 1"
+                        class="environment-resource-count" />
+                    <x-table.sort-header label="Description" asc="description-asc" desc="description-desc" then="page = 1"
+                        class="environment-description" />
                     <div></div>
                 </div>
 
@@ -216,7 +192,7 @@
                         </div>
                     </div>
                 </template>
-                <x-client-pagination x-show="filteredEnvironments.length > 0"
+                <x-client-pagination total="filteredEnvironments.length" x-show="filteredEnvironments.length > 0"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredEnvironments.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.project-environments" :options="[12, 24, 48, 96]" />
             </div>
@@ -237,13 +213,17 @@
     function projectEnvironments() {
         return {
             search: '',
-            sortBy: 'name-asc',
+            sortBy: 'default',
             sortOpen: false,
-            viewMode: localStorage.getItem('project-environments-view') || 'grid',
+            viewMode: @js($this->listView('project', 'grid')),
             page: 1,
             pageSize: 12,
             environments: @js($environmentsJs),
             sortOptions: [{
+                    value: 'default',
+                    label: 'Default'
+                },
+                {
                     value: 'name-asc',
                     label: 'Name A–Z'
                 },
@@ -252,7 +232,7 @@
                     label: 'Name Z–A'
                 },
                 {
-                    value: 'resources',
+                    value: 'resources-desc',
                     label: 'Most resources'
                 },
             ],
@@ -267,17 +247,27 @@
                     return !query || searchable.includes(query);
                 });
 
-                return environments.sort((first, second) => {
-                    if (this.sortBy === 'name-desc') {
-                        return second.name.localeCompare(first.name);
-                    }
-                    if (this.sortBy === 'resources') {
-                        return second.resourceCount - first.resourceCount ||
-                            first.name.localeCompare(second.name);
-                    }
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (environment) => environment.name,
+                    resources: (environment) => Number(environment.resourceCount),
+                    description: (environment) => environment.description || '',
+                };
+                const sortValue = sortValues[column];
 
-                    return first.name.localeCompare(second.name);
-                });
+                // Default: the server order (production, staging, development, then by name).
+                if (!sortValue) {
+                    return environments;
+                }
+
+                const order = direction === 'desc' ? -1 : 1;
+                const compare = (first, second) => typeof first === 'number' ?
+                    first - second :
+                    first.localeCompare(second);
+
+                return environments.sort((first, second) =>
+                    order * compare(sortValue(first), sortValue(second)) ||
+                    first.name.localeCompare(second.name));
             },
             get totalPages() {
                 return Math.max(1, Math.ceil(this.filteredEnvironments.length / this.pageSize));
@@ -299,7 +289,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 this.page = 1;
-                localStorage.setItem('project-environments-view', mode);
+                this.$wire.saveListView('project', mode);
             },
             previousPage() {
                 this.page = Math.max(1, this.page - 1);

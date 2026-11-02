@@ -34,6 +34,8 @@ class SettingsBackup extends Component
     #[Validate(['nullable'])]
     public ?string $description = null;
 
+    public bool $is_backup_before_update_enabled;
+
     public function mount()
     {
         if (! isInstanceAdmin()) {
@@ -59,6 +61,7 @@ class SettingsBackup extends Component
             $this->executions = $this->backup?->executions ?? [];
         }
         $this->settings = $settings;
+        $this->is_backup_before_update_enabled = $settings->is_backup_before_update_enabled;
         $this->s3s = $s3s;
     }
 
@@ -112,6 +115,27 @@ class SettingsBackup extends Component
             $this->executions = $this->backup->executions;
 
         } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->settings->is_backup_before_update_enabled = $this->is_backup_before_update_enabled;
+            $changedFields = auditChangedFields($this->settings);
+            $this->settings->save();
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'backup',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
+            $this->dispatch('success', 'Backup updated.');
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

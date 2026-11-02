@@ -2,12 +2,23 @@
 
 namespace App\Livewire\Project\Database\Backup;
 
+use App\Livewire\Concerns\ManagesDatabaseBackup;
+use App\Livewire\Project\Database\BackupEdit;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
+use Livewire\Features\SupportRedirects\Redirector;
 
 class Execution extends Component
 {
+    use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use ManagesDatabaseBackup;
+
     public $database;
 
     public ?ScheduledDatabaseBackup $backup;
@@ -19,6 +30,28 @@ class Execution extends Component
     public array $parameters = [];
 
     public string $section = 'general';
+
+    public function getListeners(): array
+    {
+        // Keep the header backup actions in sync when the database starts/stops.
+        $listeners = [
+            'databaseUpdated' => '$refresh',
+            'backupEnabledChanged' => 'syncBackupEnabled',
+        ];
+
+        $user = Auth::user();
+        if ($user) {
+            $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = '$refresh';
+        }
+
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners([
+                'ServiceChecked' => '$refresh',
+                'ServiceStatusChanged' => '$refresh',
+            ]),
+        ];
+    }
 
     public function mount()
     {
@@ -50,12 +83,36 @@ class Execution extends Component
             ->get();
         $this->parameters = get_route_parameters();
         $this->section = match (request()->route()?->getName()) {
-            'project.database.backup.s3' => 's3',
-            'project.database.backup.retention' => 'retention',
             'project.database.backup.executions' => 'executions',
             'project.database.backup.danger' => 'danger',
             default => 'general',
         };
+    }
+
+    public function backupNow(): Redirector|RedirectResponse|null
+    {
+        try {
+            return $this->queueDatabaseBackup($this->backup);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return null;
+        }
+    }
+
+    public function toggleEnabled(): void
+    {
+        try {
+            $this->toggleDatabaseBackup($this->backup);
+            $this->dispatch('backupEnabledChanged')->to(BackupEdit::class);
+        } catch (\Throwable $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    public function syncBackupEnabled(): void
+    {
+        $this->backup->refresh();
     }
 
     public function render()

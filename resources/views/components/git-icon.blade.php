@@ -15,6 +15,16 @@
         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
         <path d="M21 14l-9 7l-9 -7l3 -11l3 7h6l3 -7z" />
     </svg>
+@elseif($git === 'App\Models\GiteaApp')
+    <svg xmlns="http://www.w3.org/2000/svg" {{ $attributes->merge(['class' => 'w-6 h-6']) }} viewBox="0 0 24 24"
+        stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M3 7h14v5a5 5 0 0 1 -5 5h-4a5 5 0 0 1 -5 -5z" />
+        <path d="M17 9h1.5a2.5 2.5 0 0 1 0 5h-1.5" />
+        <path d="M9 9.5v4" />
+        <path d="M9 11.5l2.5 -1.5" />
+        <path d="M5 20h10" />
+    </svg>
 @else
     <svg xmlns="http://www.w3.org/2000/svg" {{ $attributes->merge(['class' => 'w-6 h-6']) }} viewBox="0 0 24 24"
         stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">

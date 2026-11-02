@@ -5,8 +5,11 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Rules\ValidFluentBitConfig;
+use App\Rules\ValidHostname;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -37,11 +40,26 @@ class LogDrains extends Component
     #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9_\-\.]+$/'])]
     public ?string $logDrainAxiomApiKey = null;
 
+    #[Validate(['string', 'nullable', new ValidHostname])]
+    public ?string $logDrainAxiomDomain = null;
+
     #[Validate(['string', 'nullable'])]
     public ?string $logDrainCustomConfig = null;
 
     #[Validate(['string', 'nullable'])]
     public ?string $logDrainCustomConfigParser = null;
+
+    #[Validate(['boolean'])]
+    public bool $isLogDrainCloudwatchEnabled = false;
+
+    #[Validate(['string', 'nullable', 'max:64', 'regex:/^[a-z]{2}(-[a-z]+)+-\d+$/'])]
+    public ?string $logDrainCloudwatchRegion = null;
+
+    #[Validate(['string', 'nullable', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'])]
+    public ?string $logDrainCloudwatchGroup = null;
+
+    #[Validate(['string', 'nullable', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'])]
+    public ?string $logDrainCloudwatchStreamPrefix = null;
 
     public function mount(string $server_uuid)
     {
@@ -74,9 +92,11 @@ class LogDrains extends Component
             $this->server->settings->is_logdrain_axiom_enabled = $this->isLogDrainAxiomEnabled;
             $this->server->settings->logdrain_axiom_dataset_name = $this->logDrainAxiomDatasetName;
             $this->server->settings->logdrain_axiom_api_key = $this->logDrainAxiomApiKey;
+            $this->server->settings->logdrain_axiom_domain = $this->logDrainAxiomDomain;
         } else {
             $this->isLogDrainAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
             $this->logDrainAxiomDatasetName = $this->server->settings->logdrain_axiom_dataset_name;
+            $this->logDrainAxiomDomain = $this->server->settings->logdrain_axiom_domain ?: ServerSetting::DEFAULT_AXIOM_DOMAIN;
             $this->logDrainAxiomApiKey = auth()->user()->can('update', $this->server)
                 ? $this->server->settings->logdrain_axiom_api_key
                 : null;
@@ -100,6 +120,21 @@ class LogDrains extends Component
         }
     }
 
+    private function syncDataCloudwatch(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->server->settings->is_logdrain_cloudwatch_enabled = $this->isLogDrainCloudwatchEnabled;
+            $this->server->settings->logdrain_cloudwatch_region = $this->logDrainCloudwatchRegion;
+            $this->server->settings->logdrain_cloudwatch_group = $this->logDrainCloudwatchGroup;
+            $this->server->settings->logdrain_cloudwatch_stream_prefix = $this->logDrainCloudwatchStreamPrefix;
+        } else {
+            $this->isLogDrainCloudwatchEnabled = $this->server->settings->is_logdrain_cloudwatch_enabled;
+            $this->logDrainCloudwatchRegion = $this->server->settings->logdrain_cloudwatch_region;
+            $this->logDrainCloudwatchGroup = $this->server->settings->logdrain_cloudwatch_group;
+            $this->logDrainCloudwatchStreamPrefix = $this->server->settings->logdrain_cloudwatch_stream_prefix;
+        }
+    }
+
     private function syncData(bool $toModel = false, ?string $type = null): void
     {
         if ($toModel) {
@@ -110,10 +145,13 @@ class LogDrains extends Component
                 $this->syncDataAxiom($toModel);
             } elseif ($type === 'custom') {
                 $this->syncDataCustom($toModel);
+            } elseif ($type === 'cloudwatch') {
+                $this->syncDataCloudwatch($toModel);
             } else {
                 $this->syncDataNewRelic($toModel);
                 $this->syncDataAxiom($toModel);
                 $this->syncDataCustom($toModel);
+                $this->syncDataCloudwatch($toModel);
             }
             $this->auditLogDrain('updated');
             $this->server->settings->save();
@@ -124,16 +162,27 @@ class LogDrains extends Component
                 $this->syncDataAxiom($toModel);
             } elseif ($type === 'custom') {
                 $this->syncDataCustom($toModel);
+            } elseif ($type === 'cloudwatch') {
+                $this->syncDataCloudwatch($toModel);
             } else {
                 $this->syncDataNewRelic($toModel);
                 $this->syncDataAxiom($toModel);
                 $this->syncDataCustom($toModel);
+                $this->syncDataCloudwatch($toModel);
             }
         }
     }
 
     public function customValidation()
     {
+        if ($this->enabledLogDrainCount() > 1) {
+            $this->syncData();
+
+            throw ValidationException::withMessages([
+                'logDrain' => 'Only one log drain can be enabled at a time. Disable the current log drain first.',
+            ]);
+        }
+
         if ($this->isLogDrainNewRelicEnabled) {
             try {
                 $this->validate([
@@ -150,6 +199,7 @@ class LogDrains extends Component
                 $this->validate([
                     'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                     'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                    'logDrainAxiomDomain' => ['required', new ValidHostname],
                 ]);
             } catch (\Throwable $e) {
                 $this->isLogDrainAxiomEnabled = false;
@@ -164,6 +214,18 @@ class LogDrains extends Component
                 ]);
             } catch (\Throwable $e) {
                 $this->isLogDrainCustomEnabled = false;
+
+                throw $e;
+            }
+        } elseif ($this->isLogDrainCloudwatchEnabled) {
+            try {
+                $this->validate([
+                    'logDrainCloudwatchRegion' => ['required', 'max:64', 'regex:/^[a-z]{2}(-[a-z]+)+-\d+$/'],
+                    'logDrainCloudwatchGroup' => ['required', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'],
+                    'logDrainCloudwatchStreamPrefix' => ['string', 'nullable', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'],
+                ]);
+            } catch (\Throwable $e) {
+                $this->isLogDrainCloudwatchEnabled = false;
 
                 throw $e;
             }
@@ -183,6 +245,8 @@ class LogDrains extends Component
                 StopLogDrain::run($this->server);
                 $this->dispatch('success', 'Log drain service stopped.');
             }
+        } catch (ValidationException $e) {
+            return $this->handleValidationError($e);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -193,6 +257,7 @@ class LogDrains extends Component
         $previousNewRelicEnabled = $this->server->settings->is_logdrain_newrelic_enabled;
         $previousAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
         $previousCustomEnabled = $this->server->settings->is_logdrain_custom_enabled;
+        $previousCloudwatchEnabled = $this->server->settings->is_logdrain_cloudwatch_enabled;
 
         try {
             $this->authorize('update', $this->server);
@@ -207,6 +272,7 @@ class LogDrains extends Component
                 $this->isLogDrainNewRelicEnabled = $type === 'newrelic';
                 $this->isLogDrainAxiomEnabled = $type === 'axiom';
                 $this->isLogDrainCustomEnabled = $type === 'custom';
+                $this->isLogDrainCloudwatchEnabled = $type === 'cloudwatch';
             }
 
             $this->syncData(true);
@@ -219,12 +285,16 @@ class LogDrains extends Component
                 StopLogDrain::run($this->server);
                 $this->dispatch('success', 'Log drain service stopped.');
             }
+        } catch (ValidationException $e) {
+            // Validation runs before anything is saved, so keep the typed values and show the errors under the fields.
+            $this->handleValidationError($e);
         } catch (\Throwable $e) {
             // Restore the previously persisted enabled flags so the UI/DB never
             // claim a runtime state that the Start/StopLogDrain action failed to apply.
             $this->server->settings->is_logdrain_newrelic_enabled = $previousNewRelicEnabled;
             $this->server->settings->is_logdrain_axiom_enabled = $previousAxiomEnabled;
             $this->server->settings->is_logdrain_custom_enabled = $previousCustomEnabled;
+            $this->server->settings->is_logdrain_cloudwatch_enabled = $previousCloudwatchEnabled;
             $this->server->settings->save();
             $this->syncData();
 
@@ -248,12 +318,30 @@ class LogDrains extends Component
         return view('livewire.server.log-drains');
     }
 
+    private function handleValidationError(ValidationException $e): mixed
+    {
+        $this->setErrorBag($e->validator->errors());
+
+        return handleError($e, $this);
+    }
+
+    private function enabledLogDrainCount(): int
+    {
+        return count(array_filter([
+            $this->isLogDrainNewRelicEnabled,
+            $this->isLogDrainAxiomEnabled,
+            $this->isLogDrainCustomEnabled,
+            $this->isLogDrainCloudwatchEnabled,
+        ]));
+    }
+
     private function enabledProperty(string $type): string
     {
         return match ($type) {
             'newrelic' => 'isLogDrainNewRelicEnabled',
             'axiom' => 'isLogDrainAxiomEnabled',
             'custom' => 'isLogDrainCustomEnabled',
+            'cloudwatch' => 'isLogDrainCloudwatchEnabled',
             default => throw new \InvalidArgumentException('Unknown log drain type.'),
         };
     }
@@ -278,10 +366,16 @@ class LogDrains extends Component
             'axiom' => $this->validate([
                 'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                 'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                'logDrainAxiomDomain' => ['required', new ValidHostname],
             ]),
             'custom' => $this->validate([
                 'logDrainCustomConfig' => ['required', new ValidFluentBitConfig],
                 'logDrainCustomConfigParser' => ['string', 'nullable', new ValidFluentBitConfig(parsersOnly: true)],
+            ]),
+            'cloudwatch' => $this->validate([
+                'logDrainCloudwatchRegion' => ['required', 'max:64', 'regex:/^[a-z]{2}(-[a-z]+)+-\d+$/'],
+                'logDrainCloudwatchGroup' => ['required', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'],
+                'logDrainCloudwatchStreamPrefix' => ['string', 'nullable', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'],
             ]),
             default => throw new \InvalidArgumentException('Unknown log drain type.'),
         };

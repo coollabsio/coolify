@@ -205,7 +205,7 @@ test('cloudflare dns scope guidance and token creation link are shown', function
         ->set('capabilities', ['dns'])
         ->assertSee('Zone - DNS - Edit')
         ->assertSee('Zone - Zone - Read')
-        ->assertSeeHtml('https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management');
+        ->assertSeeHtml(e(IntegrationToken::cloudflareTokenTemplateUrl(['dns'])));
 });
 
 test('saved integration token rows render modal editors with a gear button', function () {
@@ -468,4 +468,102 @@ test('saving a vault token with unchanged connection settings and a blank token 
     expect($savedToken->name)->toBe('Renamed Vault')
         ->and($savedToken->token)->toBe('hvs.stored-secret')
         ->and($savedToken->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
+
+test('changing the vault request timeout keeps the stored token and validates with the new timeout', function () {
+    $timeouts = [];
+    Http::fake(function ($request, array $options) use (&$timeouts) {
+        $timeouts[] = $options['timeout'];
+
+        return Http::response(['data' => []]);
+    });
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.timeout', '45')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $savedToken->refresh();
+    expect($timeouts)->toBe([45])
+        ->and($savedToken->token)->toBe('hvs.stored-secret')
+        ->and(IntegrationToken::requestTimeout($savedToken->metadata))->toBe(45);
+});
+
+test('a request timeout outside 1 to 300 seconds is rejected', function (string $timeout) {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.timeout', $timeout)
+        ->call('save')
+        ->assertHasErrors(['metadata.timeout']);
+
+    Http::assertNothingSent();
+})->with(['0', '301', 'abc']);
+
+test('the token list shows its empty state after the editor deletes the last token', function () {
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'secret',
+        'capabilities' => ['dns'],
+    ]);
+    $list = Livewire::test(IntegrationTokens::class)->assertDontSee('No integration tokens');
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->call('delete')
+        ->assertDispatched('integration-token-deleted', uuid: $token->uuid);
+
+    $list->dispatch('integration-token-deleted', uuid: $token->uuid)
+        ->assertSee('No integration tokens');
+});
+
+test('a cloudflare token is saved when one validation request has a connection failure', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::sequence()
+            ->pushFailedConnection('cURL error 28: Connection timed out after 5001 milliseconds')
+            ->push(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('success');
+
+    $this->assertDatabaseHas('integration_tokens', ['team_id' => $this->team->id, 'name' => 'Production DNS']);
+});
+
+test('a clear error is shown when the provider api cannot be reached', function () {
+    Http::fake(['*' => Http::failedConnection('cURL error 28: Connection timed out after 10001 milliseconds')]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('error', 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.');
+
+    $token = IntegrationToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'cloudflare', 'capabilities' => ['dns']]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->set('newToken', 'new-cloudflare-token')
+        ->call('save')
+        ->assertDispatched('error', 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.');
+
+    $this->assertDatabaseMissing('integration_tokens', ['name' => 'Production DNS']);
+    expect($token->refresh()->token)->not->toBe('new-cloudflare-token');
 });

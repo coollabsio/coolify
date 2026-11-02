@@ -6,6 +6,9 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Queue\TimeoutExceededException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 /**
  * Test to verify that deployment errors are properly logged with comprehensive details.
@@ -17,7 +20,8 @@ use Illuminate\Queue\TimeoutExceededException;
  * - The exception code (if present)
  * - The file and line where the error occurred
  * - Previous exception details (if chained)
- * - Stack trace (first 5 lines)
+ *
+ * Stack traces are not written, because their truncated arguments can hold secrets.
  */
 it('logs comprehensive error details when failed() is called', function () {
     // Create a mock exception with all properties
@@ -90,6 +94,7 @@ it('logs comprehensive error details when failed() is called', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     // Mock the failDeployment method to prevent errors
     $job->shouldReceive('failDeployment')->andReturn();
@@ -111,7 +116,7 @@ it('logs comprehensive error details when failed() is called', function () {
     expect($errorMessageString)->toContain('Location:');
     expect($errorMessageString)->toContain('Caused by:');
     expect($errorMessageString)->toContain('RuntimeException: Connection refused');
-    expect($errorMessageString)->toContain('Stack trace');
+    expect($errorMessageString)->not->toContain('Stack trace');
 
     // Verify stderr type is used for error logging
     $stderrEntries = array_filter($logEntries, fn ($entry) => $entry['type'] === 'stderr');
@@ -130,9 +135,6 @@ it('logs comprehensive error details when failed() is called', function () {
 
     $locationEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Location:'));
     expect($locationEntry['hidden'])->toBeTrue();
-
-    $stackTraceEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Stack trace'));
-    expect($stackTraceEntry['hidden'])->toBeTrue();
 
     $causedByEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Caused by:'));
     expect($causedByEntry['hidden'])->toBeTrue();
@@ -199,6 +201,7 @@ it('handles exceptions with no message gracefully', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();
@@ -290,6 +293,7 @@ it('logs error code 0 correctly', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();
@@ -395,6 +399,7 @@ it('logs the configured timeout when the deployment times out', function () {
 
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();

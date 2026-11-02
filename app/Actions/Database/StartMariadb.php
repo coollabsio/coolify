@@ -123,7 +123,7 @@ class StartMariadb
         }
 
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
 
         if (count($this->database->ports_mappings_array) > 0) {
@@ -202,7 +202,7 @@ class StartMariadb
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        $this->commands[] = serverDockerConfigPrefix($this->database->destination->server)."docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mysql:mysql /etc/mysql/certs/server.key /etc/mysql/certs/server.crt < /dev/null";
         }

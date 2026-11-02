@@ -2,10 +2,15 @@
 
 namespace App\Traits;
 
+use App\Rules\SafeWebhookUrl;
+use Closure;
+use GuzzleHttp\Exception\TransferException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * Shared response handling for the notification jobs. The job must have a
@@ -14,6 +19,28 @@ use RuntimeException;
  */
 trait HandlesNotificationResponse
 {
+    /**
+     * Send the request and replace HTTP client exceptions, whose messages contain
+     * the full URL (bot token, secret webhook path), with one that only names the
+     * scheme and host. The original exception is not kept as `previous`, so the
+     * URL never reaches failed_jobs or the logs.
+     *
+     * @param  Closure(): Response  $send
+     */
+    protected function sendNotificationRequest(string $channel, string $url, Closure $send): Response
+    {
+        try {
+            return $send();
+        } catch (ConnectionException|RequestException|TransferException $e) {
+            throw new RuntimeException(sprintf(
+                '%s notification request to %s failed (%s).',
+                $channel,
+                SafeWebhookUrl::redactedUrlForLog($url),
+                class_basename($e),
+            ));
+        }
+    }
+
     /**
      * Rate limits and server errors are retried by the queue. A configuration
      * error (invalid token, deleted webhook) counts as a delivery failure and
@@ -32,7 +59,8 @@ trait HandlesNotificationResponse
             throw new RuntimeException("{$channel} notification failed with {$response->status()} status code.");
         }
 
-        $reason = "{$channel} returned HTTP {$response->status()}: ".Str::limit($response->body(), 200);
+        // The response body is never part of the reason: it can echo tokens or webhook secrets.
+        $reason = "{$channel} returned HTTP {$response->status()} (".(HttpResponse::$statusTexts[$response->status()] ?? 'Client Error').').';
 
         if ($isConfigurationError) {
             $this->settings?->recordDeliveryFailure($reason);

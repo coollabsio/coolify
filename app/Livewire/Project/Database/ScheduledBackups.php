@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -10,6 +11,7 @@ use Livewire\Component;
 class ScheduledBackups extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $database;
 
@@ -19,7 +21,13 @@ class ScheduledBackups extends Component
 
     public string $custom_type = 'mysql';
 
-    protected $listeners = ['refreshScheduledBackups'];
+    public function getListeners(): array
+    {
+        return [
+            'refreshScheduledBackups',
+            ...$this->teamChannelListeners(['BackupCreated' => '$refresh']),
+        ];
+    }
 
     public function mount(): void
     {
@@ -73,7 +81,7 @@ class ScheduledBackups extends Component
 
     public function render(): View
     {
-        $this->database->loadMissing('scheduledBackups.s3');
+        $this->database->loadMissing(['scheduledBackups.s3', 'scheduledBackups.s3Storages']);
 
         return view('livewire.project.database.scheduled-backups');
     }

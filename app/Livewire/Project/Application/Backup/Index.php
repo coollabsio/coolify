@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application\Backup;
 
 use App\Models\Application;
 use App\Models\ScheduledVolumeBackup;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -11,6 +12,7 @@ use Livewire\Component;
 class Index extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Application $application;
 
@@ -18,7 +20,13 @@ class Index extends Component
 
     public string $search = '';
 
-    protected $listeners = ['refreshVolumeBackups' => '$refresh'];
+    public function getListeners(): array
+    {
+        return [
+            'refreshVolumeBackups' => '$refresh',
+            ...$this->teamChannelListeners(['BackupCreated' => '$refresh']),
+        ];
+    }
 
     public function mount(): void
     {
@@ -31,7 +39,7 @@ class Index extends Component
     public function render(): View
     {
         $backups = ScheduledVolumeBackup::query()
-            ->with(['backupable', 'latestExecution', 's3'])
+            ->with(['backupable', 'latestExecution', 's3', 's3Storages'])
             ->withCount('executions')
             ->forApplication($this->application)
             ->latest()

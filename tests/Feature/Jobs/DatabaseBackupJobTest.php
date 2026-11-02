@@ -52,7 +52,7 @@ test('scheduled database backup casts full dump selection to boolean', function 
         ->and((new ScheduledDatabaseBackup(['dump_all' => '1']))->dump_all)->toBeTrue();
 });
 
-test('upload_to_s3 throws exception and disables s3 when storage is null', function () {
+test('s3 upload throws exception and disables s3 when no destination exists', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
@@ -64,11 +64,7 @@ test('upload_to_s3 throws exception and disables s3 when storage is null', funct
 
     $job = new DatabaseBackupJob($backup);
 
-    $reflection = new ReflectionClass($job);
-    $s3Property = $reflection->getProperty('s3');
-    $s3Property->setValue($job, null);
-
-    $method = $reflection->getMethod('upload_to_s3');
+    $method = (new ReflectionClass($job))->getMethod('uploadToS3Destinations');
 
     expect(fn () => $method->invoke($job))
         ->toThrow(Exception::class, 'S3 storage configuration is missing or has been deleted');
@@ -78,7 +74,7 @@ test('upload_to_s3 throws exception and disables s3 when storage is null', funct
     expect($backup->s3_storage_id)->toBeNull();
 });
 
-test('upload_to_s3 exception message reports the previous s3 storage id', function () {
+test('s3 upload exception message reports the previous s3 storage id', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
@@ -90,10 +86,7 @@ test('upload_to_s3 exception message reports the previous s3 storage id', functi
 
     $job = new DatabaseBackupJob($backup);
 
-    $reflection = new ReflectionClass($job);
-    $reflection->getProperty('s3')->setValue($job, null);
-
-    expect(fn () => $reflection->getMethod('upload_to_s3')->invoke($job))
+    expect(fn () => (new ReflectionClass($job))->getMethod('uploadToS3Destinations')->invoke($job))
         ->toThrow(Exception::class, 'S3 storage ID: 12345');
 
     $backup->refresh();
@@ -101,7 +94,7 @@ test('upload_to_s3 exception message reports the previous s3 storage id', functi
     expect($backup->s3_storage_id)->toBeNull();
 });
 
-test('upload_to_s3 exception message reports null when no previous s3 storage id exists', function () {
+test('s3 upload exception message reports null when no previous s3 storage id exists', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
         'save_s3' => true,
@@ -113,10 +106,7 @@ test('upload_to_s3 exception message reports null when no previous s3 storage id
 
     $job = new DatabaseBackupJob($backup);
 
-    $reflection = new ReflectionClass($job);
-    $reflection->getProperty('s3')->setValue($job, null);
-
-    expect(fn () => $reflection->getMethod('upload_to_s3')->invoke($job))
+    expect(fn () => (new ReflectionClass($job))->getMethod('uploadToS3Destinations')->invoke($job))
         ->toThrow(Exception::class, 'S3 storage ID: null');
 });
 
@@ -281,7 +271,7 @@ test('retention cleanup failure does not fail a successful database backup', fun
         'local_storage_deleted' => true,
         'created_at' => now()->subDay(),
     ]);
-    ScheduledDatabaseBackupExecution::create([
+    $newExecution = ScheduledDatabaseBackupExecution::create([
         'uuid' => 'new-backup',
         'database_name' => 'database',
         'filename' => '/backup/new.dmp',
@@ -290,6 +280,8 @@ test('retention cleanup failure does not fail a successful database backup', fun
         's3_uploaded' => true,
         'local_storage_deleted' => true,
     ]);
+    $oldExecution->s3Replicas()->create(['s3_storage_id' => $s3->id, 's3_uploaded' => true]);
+    $newExecution->s3Replicas()->create(['s3_storage_id' => $s3->id, 's3_uploaded' => true]);
     $disk = Mockery::mock();
     $disk->shouldReceive('delete')->once()->with(['/backup/old.dmp'])->andReturnFalse();
     Storage::shouldReceive('build')->once()->andReturn($disk);

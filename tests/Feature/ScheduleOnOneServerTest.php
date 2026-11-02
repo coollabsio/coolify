@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Kernel as ConsoleKernel;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\PullChangelog;
@@ -41,6 +42,20 @@ it('schedules ssh mux cleanup locally on every scheduler host', function () {
     expect($event->getSummaryForDisplay())->toBe('cleanup:ssh-mux');
 });
 
+it('refreshes the local versions.json hourly on every cloud node', function (bool $cloud) {
+    config(['constants.coolify.self_hosted' => ! $cloud]);
+    $schedule = app(Schedule::class);
+
+    $event = collect($schedule->events())->first(
+        fn ($e) => (string) $e->description === 'versions:refresh-local'
+    );
+
+    expect($event)->not->toBeNull();
+    expect($event->onOneServer)->toBeFalse();
+    expect($event->expression)->toBe('0 * * * *');
+    expect($event->filtersPass(app()))->toBe($cloud);
+})->with(['cloud' => true, 'self-hosted' => false]);
+
 it('schedules every production job with onOneServer', function () {
     $schedule = app(Schedule::class);
 
@@ -57,20 +72,45 @@ it('schedules every production job with onOneServer', function () {
     });
 });
 
-it('dispatches CDN fetching jobs with a random delay so instances do not hit the CDN at the same second', function () {
+it('delays CDN fetching jobs by a stable offset per instance inside the hourly interval', function () {
     InstanceSettings::query()->whereKey(0)->update(['is_auto_update_enabled' => true]);
+    config(['app.id' => 'instance-a']);
     Queue::fake();
 
-    $jobs = [CheckHelperImageJob::class, CheckForUpdatesJob::class, PullTemplatesFromCDN::class, PullChangelog::class, UpdateCoolifyJob::class];
+    $jobs = [CheckForUpdatesJob::class, PullTemplatesFromCDN::class, PullChangelog::class, UpdateCoolifyJob::class];
     $schedule = app(Schedule::class);
+    $expectedDelay = ConsoleKernel::cdnDelaySeconds('0 * * * *');
 
     foreach ($jobs as $job) {
         $event = collect($schedule->events())->first(fn ($e) => $e->description === $job);
         expect($event)->not->toBeNull("[{$job}] is not scheduled");
         $event->run(app());
 
-        Queue::assertPushed($job, fn ($pushed) => is_int($pushed->delay) && $pushed->delay >= 0 && $pushed->delay <= 600);
+        Queue::assertPushed($job, fn ($pushed) => $pushed->delay === $expectedDelay);
     }
+
+    expect(collect($schedule->events())->first(fn ($e) => $e->description === CheckHelperImageJob::class))->toBeNull();
+});
+
+it('spreads the CDN delay of many instances over the full hour', function () {
+    $delays = collect(range(1, 2000))->map(function (int $i) {
+        config(['app.id' => bin2hex(random_bytes(16))]);
+
+        return ConsoleKernel::cdnDelaySeconds('0 * * * *');
+    });
+
+    expect($delays->min())->toBeGreaterThanOrEqual(0)
+        ->and($delays->max())->toBeLessThan(3600);
+    // Each 10-minute window of the hour gets about one sixth of the instances.
+    $delays->groupBy(fn (int $delay) => intdiv($delay, 600))
+        ->each(fn (Collection $window) => expect($window->count())->toBeGreaterThan(250)->toBeLessThan(420));
+});
+
+it('keeps the CDN delay inside a cron interval shorter than one hour', function () {
+    config(['app.id' => 'instance-b']);
+
+    expect(ConsoleKernel::cdnDelaySeconds('*/15 * * * *'))->toBeLessThan(900)
+        ->and(ConsoleKernel::cdnDelaySeconds('0 0 * * *'))->toBeLessThan(3600);
 });
 
 it('does not schedule Stripe subscription reconciliation automatically', function () {

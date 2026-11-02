@@ -3,7 +3,7 @@
     backups: @js($database->scheduledBackups->map(fn ($backup) => [
         'name' => strtolower($database->name),
         'frequency' => strtolower($backup->frequency),
-        's3_storage' => strtolower($backup->s3?->name ?? ''),
+        's3_storage' => strtolower(($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name')->join(', ')),
     ])->values()),
     hasMatches() {
         const query = this.search.toLowerCase();
@@ -67,6 +67,7 @@
                 @foreach ($database->scheduledBackups as $backup)
                     @php
                         $latestStatus = data_get($backup->latest_log, 'status');
+                        $s3StorageNames = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name')->join(', ');
                         [$statusLabel, $statusType] = match ($latestStatus) {
                             'success' => ['Success', 'success'],
                             'running' => ['In progress', 'warning'],
@@ -83,7 +84,7 @@
                     <div x-show="search === ''
                         || @js(strtolower($database->name)).includes(search.toLowerCase())
                         || @js(strtolower($backup->frequency)).includes(search.toLowerCase())
-                        || @js(strtolower($backup->s3?->name ?? '')).includes(search.toLowerCase())"
+                        || @js(strtolower($s3StorageNames)).includes(search.toLowerCase())"
                         class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
                         <div class="min-w-0">
                             <span class="block truncate text-[12px] font-semibold text-black dark:text-fg">
@@ -96,8 +97,8 @@
                                 <x-loading />
                             @endif
                         </div>
-                        <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
-                            {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
+                        <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim" title="{{ $backup->save_s3 ? $s3StorageNames : '' }}">
+                            {{ $backup->save_s3 ? ($s3StorageNames ?: 'Unavailable') : 'Local only' }}
                         </div>
                         <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
                             <a {{ wireNavigate() }} href="{{ $backupExecutionsRoute }}"

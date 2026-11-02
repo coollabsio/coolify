@@ -162,15 +162,18 @@ class GitlabPrivateRepository extends Component
     {
         try {
             $this->authorize('create', Application::class);
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 
             $validator = validator([
                 'selected_repository_path' => $this->selected_repository_path,
                 'selected_branch_name' => $this->selected_branch_name,
                 'docker_compose_location' => $this->docker_compose_location,
+                'base_directory' => $this->base_directory,
             ], [
                 'selected_repository_path' => 'required|string',
                 'selected_branch_name' => ['required', 'string', new ValidGitBranch],
                 'docker_compose_location' => ValidationPatterns::filePathRules(),
+                'base_directory' => ValidationPatterns::directoryPathRules(),
             ]);
 
             if ($validator->fails()) {
@@ -178,7 +181,7 @@ class GitlabPrivateRepository extends Component
             }
 
             $destination_uuid = $this->query['destination'] ?? null;
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }

@@ -57,7 +57,7 @@ it('does not put the command into the error when a remote command times out', fu
     Process::fake(function ($process) use (&$attempts) {
         $attempts++;
 
-        throw backupRedactionTimeoutException($process->command, 7200);
+        throw backupRedactionTimeoutException(remoteProcessScript($process), 7200);
     });
 
     try {
@@ -94,8 +94,8 @@ it('does not put database credentials into the backup execution or the failure n
         'timeout' => 600,
     ]);
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'mysqldump')) {
-            throw backupRedactionTimeoutException($process->command, 600);
+        if (str_contains(remoteProcessScript($process), 'mysqldump')) {
+            throw backupRedactionTimeoutException(remoteProcessScript($process), 600);
         }
 
         return Process::result(output: '');

@@ -135,4 +135,13 @@ describe('after the user switches the session team', function () {
 
         expect($this->server->fresh()->private_key_id)->toBe($this->sameTeamKey->id);
     });
+
+    test('lists the active key first', function () {
+        expect($this->component->get('privateKeys')->first()->id)->toBe($this->currentPrivateKey->id);
+
+        $keys = $this->component->call('setPrivateKey', $this->sameTeamKey->id)->get('privateKeys');
+
+        expect($keys->first()->id)->toBe($this->sameTeamKey->id)
+            ->and($keys->pluck('id'))->toContain($this->currentPrivateKey->id);
+    });
 });

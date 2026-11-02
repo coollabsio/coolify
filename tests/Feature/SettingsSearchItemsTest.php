@@ -21,11 +21,12 @@ function serverSettingsSearchGroups(): array
         ],
         'General' => [
             ['label' => 'Proxy', 'route' => 'server.proxy'],
+            ['label' => 'Metrics', 'route' => 'server.metrics', 'disabled' => true],
         ],
     ];
 }
 
-it('lists pages, visible child pages and in-page sections with their breadcrumbs', function () {
+it('lists enabled pages, visible child pages and in-page sections with their breadcrumbs', function () {
     InstanceSettings::forceCreate(['id' => 0]);
 
     $items = settingsSearchItems(

@@ -19,8 +19,9 @@ class RefreshServiceStatusAfterStart
 
     public function handle(ServiceStartFinished $event): void
     {
-        $service = Service::query()->find($event->serviceId);
-        if (! $service) {
+        $service = Service::query()->find($event->data['service_id'] ?? null);
+        $teamId = $event->data['team_id'] ?? null;
+        if (! $service || is_null($teamId) || $service->team()?->id !== $teamId) {
             return;
         }
 

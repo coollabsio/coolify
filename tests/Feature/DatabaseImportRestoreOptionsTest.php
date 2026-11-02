@@ -70,7 +70,7 @@ beforeEach(function () {
  */
 function importRestoreScript(Model $database, DatabaseImportSource $source): string
 {
-    Process::fake([
+    fakeRemoteProcesses([
         '*stat -c %s*' => Process::result('2048'),
         '*od -An -tx1*' => Process::result(' 1f 8b 08 00 00 00'),
         '*' => Process::result(''),

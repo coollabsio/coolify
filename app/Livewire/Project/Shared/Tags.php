@@ -88,11 +88,10 @@ class Tags extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            // The tag stays, also without resources. Delete it on the Tags page.
             $this->resource->tags()->detach($id);
-            $found_more_tags = $this->resourceTags()->find($id);
-            $found_more_tags?->deleteIfOrphaned();
             $this->refresh();
-            $this->dispatch('success', 'Tag deleted.');
+            $this->dispatch('success', 'Tag removed.');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

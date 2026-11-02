@@ -431,6 +431,62 @@ test('ConvertGpusCount', function () {
     ]);
 });
 
+test('ConvertInteractiveShortFlag', function () {
+    // -i keeps STDIN open so `docker attach` can send input (e.g. game server consoles).
+    expect(convertDockerRunToCompose('-i'))->toBe([
+        'stdin_open' => true,
+    ]);
+});
+
+test('ConvertTtyShortFlag', function () {
+    expect(convertDockerRunToCompose('-t'))->toBe([
+        'tty' => true,
+    ]);
+});
+
+test('ConvertInteractiveTtyCombinedShortFlag', function () {
+    expect(convertDockerRunToCompose('-it'))->toBe([
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('ConvertTtyInteractiveCombinedShortFlag', function () {
+    expect(convertDockerRunToCompose('-ti'))->toBe([
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('ConvertInteractiveTtyLongFlags', function () {
+    expect(convertDockerRunToCompose('--interactive --tty'))->toBe([
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('ConvertInteractiveTtyWithOtherOptions', function () {
+    expect(convertDockerRunToCompose('-it --cap-add SYS_ADMIN'))->toBe([
+        'cap_add' => ['SYS_ADMIN'],
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('DoesNotSetInteractiveTtyForUnrelatedShortFlags', function () {
+    // -d (detach) and other short flags without i/t must not enable stdin/tty.
+    expect(convertDockerRunToCompose('-d'))->toBe([]);
+});
+
+it('does not read interactive flags inside entrypoint arguments', function () {
+    expect(convertDockerRunToCompose('--entrypoint "python -i -t script.py"'))
+        ->toBe(['entrypoint' => 'python -i -t script.py']);
+});
+
+it('does not treat arbitrary short words as interactive flags', function () {
+    expect(convertDockerRunToCompose('-invalid'))->toBe([]);
+});
+
 test('ConvertRuntimeHardeningOptions', function () {
     $input = '--add-host host.docker.internal:host-gateway --add-host=db:10.0.0.5 --pids-limit 100 --runtime runc --read-only --tmpfs /run:rw,size=64m --tmpfs /tmp';
     $output = convertDockerRunToCompose($input);
@@ -460,6 +516,10 @@ test('UnsupportedDockerRunOptions', function () {
 test('UnsupportedDockerRunOptionsIsEmptyForSupportedOptions', function () {
     expect(unsupportedDockerRunOptions('--cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp'))->toBe([])
         ->and(unsupportedDockerRunOptions(null))->toBe([]);
+});
+
+test('UnsupportedDockerRunOptionsSkipsInteractiveAndTtyFlags', function () {
+    expect(unsupportedDockerRunOptions('-it -t --interactive --tty --cap-add NET_ADMIN'))->toBe([]);
 });
 
 test('SeccompProfileMountFlags', function () {

@@ -487,6 +487,38 @@ describe('GitHub App Webhook HMAC', function () {
         $response->assertOk();
         expect($response->getContent())->toContain('Invalid signature');
     });
+
+    test('rejects push with forged hash when APP_ENV is local', function () {
+        config()->set('app.env', 'local');
+
+        $team = Team::factory()->create();
+        GithubApp::create([
+            'uuid' => (string) str()->uuid(),
+            'name' => 'github-app-webhook-local-test',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 1234567890,
+            'webhook_secret' => 'app-secret',
+            'team_id' => $team->id,
+        ]);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['id' => 987654321],
+            'after' => 'abc1234',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-GitHub-Hook-Installation-Target-Id' => '1234567890',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, 'wrong-secret'),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Invalid signature');
+    });
 });
 
 describe('GitLab Manual Webhook HMAC', function () {
@@ -932,18 +964,23 @@ describe('Manual Webhook Repository Matching', function () {
         'scp-style with custom user and port' => 'custom-user@git.example.com:2222/test-org/test-repo.git',
         'ssh scheme with custom port' => 'ssh://git@10.0.0.80:2222/test-org/test-repo.git',
         'https with different case' => 'https://github.com/Test-Org/Test-Repo.git',
+        'https under a sub-path' => 'https://git.example.com/gitea/test-org/test-repo.git',
+        'ssh scheme under a sub-path' => 'ssh://gitea@git.example.com:12345/gitea/test-org/test-repo.git',
     ]);
 
-    test('signed pushes do not deploy applications for another repository', function (string $provider) {
+    test('signed pushes do not deploy applications for another repository', function (string $provider, string $gitRepository) {
         Queue::fake();
         $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: [
-            'git_repository' => 'git@10.0.0.80:2222/other-org/test-repo.git',
+            'git_repository' => $gitRepository,
         ]));
 
         sendManualWebhookPush($this, $provider, $application)->assertOk();
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
-    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea'])->with([
+        'other owner' => 'git@10.0.0.80:2222/other-org/test-repo.git',
+        'owner that ends with the pushed owner' => 'https://git.example.com/other-test-org/test-repo.git',
+    ]);
 });
 
 describe('Webhook Secret Auto-Generation', function () {

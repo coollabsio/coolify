@@ -82,7 +82,7 @@ it('deletes a service part from Coolify when the server stops responding while s
         ->assertNotDispatched('error');
 
     expect($model::find($this->{$part}->id))->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker rm -f $container_ids'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker rm -f $container_ids'));
     Log::shouldHaveReceived('warning')->withArgs(fn (string $message) => str_contains($message, 'service part'))->atLeast()->once();
 })->with('service parts');
 
@@ -107,5 +107,5 @@ it('removes the container of a service part and reports success when the server 
         ->assertNotDispatched('warning');
 
     expect($model::find($this->{$part}->id))->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, "coolify.service.subUuid={$this->{$part}->uuid}"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "coolify.service.subUuid={$this->{$part}->uuid}"));
 })->with('service parts');

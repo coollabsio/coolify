@@ -3,8 +3,6 @@
 namespace App\Notifications\VolumeBackup;
 
 use App\Models\ScheduledVolumeBackup;
-use App\Models\ServiceApplication;
-use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
@@ -27,10 +25,7 @@ class BackupMissing extends CustomEmailNotification
         $this->resourceName = $resource?->name ?? 'Unknown resource';
         $this->target = $backup->targetType().' '.$backup->targetName();
 
-        $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
-        if ($linkable && method_exists($linkable, 'link')) {
-            $this->url = $linkable->link();
-        }
+        $this->url = $backup->resourceUrl();
     }
 
     public function via(object $notifiable): array

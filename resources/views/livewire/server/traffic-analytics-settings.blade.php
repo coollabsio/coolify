@@ -10,8 +10,6 @@
             <x-slot:actions>
                 @if ($isTrafficAnalyticsEnabled)
                     <div class="flex items-center gap-3">
-                        <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
-                            text="Restarting Sentinel and proxy..." compact />
                         <x-modal-confirmation title="Disable traffic analytics?"
                             buttonTitle="Disable traffic analytics" submitAction="toggleTrafficAnalytics"
                             :actions="[
@@ -61,7 +59,7 @@
                             ['value' => 'anonymized', 'label' => 'Anonymized (/24 IPv4, /48 IPv6)'],
                             ['value' => 'off', 'label' => 'Disabled'],
                         ]"
-                        helper="How Sentinel stores visitor IPs for the Top IPs list. Anonymized keeps only the network. Disabled does not store IPs. When you change this setting, Sentinel deletes the stored IPs that the new setting does not allow." />
+                        helper="How Sentinel stores visitor IPs for the Top IPs list. Anonymized keeps only the network. Disabled does not store IPs or visitor cities. When you change this setting, Sentinel deletes the stored IPs that the new setting does not allow." />
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="geoipRefreshDays" label="GeoIP refresh interval" required
                         helper="Days between GeoIP database update checks." />
@@ -80,8 +78,6 @@
                                     Enable traffic analytics
                                 </x-forms.button>
                             @else
-                            <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
-                                text="Restarting Sentinel and proxy..." compact />
                             <x-modal-confirmation title="Enable traffic analytics?"
                                 buttonTitle="Enable traffic analytics" submitAction="toggleTrafficAnalytics"
                                 :actions="[

@@ -97,6 +97,7 @@ SH);
         'install.sh',
         'upgrade.sh',
         'upgrade-postgres.sh',
+        ...($environment === 'production' ? ['patch.sh'] : []),
         'service-templates-latest.json',
     ];
     $allTargets = array_map(fn (string $file) => "$targetDirectory/$file", $allBasenames);
@@ -179,6 +180,7 @@ it('purges the CDN files from the Cloudflare cache', function (string $environme
             'install.sh',
             'upgrade.sh',
             'upgrade-postgres.sh',
+            ...($environment === 'production' ? ['patch.sh'] : []),
             'service-templates-latest.json',
         ]))->all());
 })->with([

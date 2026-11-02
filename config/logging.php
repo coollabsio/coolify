@@ -1,5 +1,7 @@
 <?php
 
+use App\Logging\RedactSensitiveAuditData;
+use App\Logging\RedactSensitiveData;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -50,6 +52,19 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Log Redaction
+    |--------------------------------------------------------------------------
+    |
+    | Secrets are removed from every log channel before a line is written.
+    | Self-hosted instances can set LOG_REDACTION_ENABLED=false to write the
+    | raw text, for example while debugging. Coolify Cloud always redacts.
+    |
+    */
+
+    'redaction_enabled' => (bool) env('LOG_REDACTION_ENABLED', true),
+
     'channels' => [
         'stack' => [
             'driver' => 'stack',
@@ -61,6 +76,7 @@ return [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [RedactSensitiveData::class],
         ],
 
         'daily' => [
@@ -68,6 +84,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => 14,
+            'tap' => [RedactSensitiveData::class],
         ],
 
         'slack' => [
@@ -76,11 +93,13 @@ return [
             'username' => 'Laravel Log',
             'emoji' => ':boom:',
             'level' => env('LOG_LEVEL', 'critical'),
+            'tap' => [RedactSensitiveData::class],
         ],
 
         'papertrail' => [
             'driver' => 'monolog',
             'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [RedactSensitiveData::class],
             'handler' => env('LOG_PAPERTRAIL_HANDLER', SyslogUdpHandler::class),
             'handler_with' => [
                 'host' => env('PAPERTRAIL_URL'),
@@ -92,6 +111,7 @@ return [
         'stderr' => [
             'driver' => 'monolog',
             'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [RedactSensitiveData::class],
             'handler' => StreamHandler::class,
             'formatter' => env('LOG_STDERR_FORMATTER'),
             'with' => [
@@ -102,12 +122,14 @@ return [
         'syslog' => [
             'driver' => 'syslog',
             'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [RedactSensitiveData::class],
             'facility' => LOG_USER,
         ],
 
         'errorlog' => [
             'driver' => 'errorlog',
             'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [RedactSensitiveData::class],
         ],
 
         'null' => [
@@ -124,6 +146,7 @@ return [
             'path' => storage_path('logs/scheduled.log'),
             'level' => 'debug',
             'days' => 7,
+            'tap' => [RedactSensitiveData::class],
         ],
 
         'scheduled-errors' => [
@@ -131,6 +154,7 @@ return [
             'path' => storage_path('logs/scheduled-errors.log'),
             'level' => 'warning',
             'days' => 14,
+            'tap' => [RedactSensitiveData::class],
         ],
 
         'audit' => [
@@ -139,6 +163,7 @@ return [
             'level' => env('LOG_AUDIT_LEVEL', 'info'),
             'days' => env('LOG_AUDIT_DAYS', 90),
             'replace_placeholders' => true,
+            'tap' => [RedactSensitiveAuditData::class],
         ],
 
     ],

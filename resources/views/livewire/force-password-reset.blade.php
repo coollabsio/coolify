@@ -2,9 +2,9 @@
     description="Your password must be updated before you can continue to the dashboard.">
     <form class="flex flex-col gap-4" wire:submit="submit">
         <x-forms.input id="email" type="email" readonly label="Email" />
-        <x-forms.input id="password" type="password" autocomplete="new-password" autofocus label="New password"
+        <x-forms.input id="password" type="password" :copyable="false" autocomplete="new-password" autofocus label="New password"
             required />
-        <x-forms.input id="password_confirmation" type="password" autocomplete="new-password"
+        <x-forms.input id="password_confirmation" type="password" :copyable="false" autocomplete="new-password"
             label="Confirm new password" required />
 
         <div class="auth-guidance">

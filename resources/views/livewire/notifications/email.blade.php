@@ -176,6 +176,12 @@
                             ['property' => 'traefikOutdatedEmailNotifications', 'label' => 'Traefik proxy outdated', 'enabled' => $traefikOutdatedEmailNotifications],
                         ]" />
                 </div>
+                <div class="mt-4">
+                    <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDeploymentCommitDetails"
+                        id="deploymentCommitDetailsEmailNotifications"
+                        label="Include commit details in deployment emails"
+                        helper="Adds the commit SHA, branch, and commit message to deployment success and failure emails." />
+                </div>
             </x-application.settings-section>
         </div>
     </div>

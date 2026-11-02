@@ -6,6 +6,7 @@ use App\Enums\BuildPackTypes;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use Illuminate\Http\JsonResponse;
@@ -214,7 +215,7 @@ class ApplicationPreviewsController extends Controller
         if (! $isDockerImage && $gitType === null) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['git_type' => ['The git type field is required for applications without a GitHub or GitLab App source.']],
+                'errors' => ['git_type' => ['The git type field is required for applications without a GitHub, GitLab, or Gitea App source.']],
             ], 422);
         }
         if ($isDockerImage && $dockerTag === null && blank($preview?->docker_registry_image_tag)) {
@@ -303,6 +304,7 @@ class ApplicationPreviewsController extends Controller
         return match ($application->source?->getMorphClass()) {
             GithubApp::class => 'github',
             GitlabApp::class => 'gitlab',
+            GiteaApp::class => 'gitea',
             default => null,
         };
     }

@@ -3,8 +3,11 @@
 namespace App\Livewire\Tags;
 
 use App\Http\Controllers\Api\DeployController;
+use App\Livewire\Concerns\CreatesTags;
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
+use App\Services\TagCanvas;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -15,6 +18,8 @@ use Livewire\Component;
 class Show extends Component
 {
     use AuthorizesRequests;
+    use CreatesTags;
+    use RemembersCanvasView;
 
     #[Locked]
     public ?string $tagName = null;
@@ -37,8 +42,19 @@ class Show extends Component
     #[Locked]
     public ?array $deploymentsPerTagPerServer = null;
 
+    /** Sort of the active deployments table, such as `resource-asc`; null keeps them grouped by server. */
+    #[Locked]
+    public ?string $deploymentSort = null;
+
+    /** The "Connect to resources" modal on small screens, where the tags canvas is not shown. */
+    public bool $connectResourcesOpen = false;
+
     public function mount()
     {
+        if (str($this->tagName)->isEmpty() && $this->prefersCanvasView('tags')) {
+            return $this->redirectRoute('tags.canvas', navigate: true);
+        }
+
         try {
             $this->tags = Tag::ownedByCurrentTeam()
                 ->withCount(['applications', 'services'])
@@ -91,6 +107,37 @@ class Show extends Component
         }
     }
 
+    public function setDeploymentSort(string $sort): void
+    {
+        if (! in_array($sort, ['resource-asc', 'resource-desc', 'server-asc', 'server-desc', 'status-asc', 'status-desc'], true)) {
+            return;
+        }
+
+        $this->deploymentSort = $sort;
+    }
+
+    /**
+     * The active deployments as one list, in the order of the chosen table sort.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function activeDeployments(): Collection
+    {
+        $deployments = collect($this->deploymentsPerTagPerServer ?? [])->flatten(1);
+        if ($this->deploymentSort === null) {
+            return $deployments->values();
+        }
+
+        [$column, $direction] = explode('-', $this->deploymentSort, 2);
+        $field = ['resource' => 'application_name', 'server' => 'server_name', 'status' => 'status'][$column];
+        $order = $direction === 'desc' ? -1 : 1;
+
+        return $deployments
+            ->sort(fn (array $left, array $right): int => ($order * strcasecmp((string) $left[$field], (string) $right[$field]))
+                ?: $left['id'] <=> $right['id'])
+            ->values();
+    }
+
     public function redeployAll()
     {
         try {
@@ -115,6 +162,55 @@ class Show extends Component
         }
     }
 
+    public function openConnectResources(): void
+    {
+        $this->connectResourcesOpen = true;
+    }
+
+    /**
+     * Adds the tag to a resource of the tag's team, or removes it when the resource already has it.
+     */
+    public function toggleResource(string $uuid): void
+    {
+        try {
+            $resource = app(TagCanvas::class)->resources($this->tag->team_id)->get($uuid);
+            if (! $resource) {
+                $this->dispatch('error', 'Resource not found.');
+
+                return;
+            }
+            $this->authorize('update', $resource);
+
+            if ($resource->tags->contains('id', $this->tag->id)) {
+                $resource->tags()->detach($this->tag->id);
+            } else {
+                $resource->tags()->attach($this->tag->id);
+            }
+
+            $this->applications = $this->tag->applications()->get();
+            $this->services = $this->tag->services()->get();
+            $this->getDeployments();
+        } catch (\Exception $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Deletes the tag and removes it from every resource.
+     */
+    public function deleteTag()
+    {
+        try {
+            $this->authorize('delete', $this->tag);
+            // taggables rows cascade-delete via FK on tag_id
+            $this->tag->delete();
+
+            return $this->redirectRoute('tags.show', navigate: true);
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function render()
     {
         return view('livewire.tags.show', [
@@ -131,6 +227,31 @@ class Show extends Component
                     'resourceCount' => $applicationsCount + $servicesCount,
                 ];
             })->values()->toArray(),
+            'connectableResources' => $this->connectableResources(),
+            'activeDeployments' => $this->activeDeployments(),
         ]);
+    }
+
+    /**
+     * Resources of the tag's team for the "Connect to resources" modal, by "Project / Environment".
+     * Loaded only while the modal is open.
+     *
+     * @return Collection<string, Collection<int, array{uuid: string, name: string, tagged: bool, can_update: bool}>>
+     */
+    private function connectableResources(): Collection
+    {
+        if (! $this->connectResourcesOpen || ! $this->tag) {
+            return collect();
+        }
+
+        return app(TagCanvas::class)->resources($this->tag->team_id)
+            ->groupBy(fn ($resource) => $resource->environment->project->name.' / '.$resource->environment->name)
+            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)
+            ->map(fn (Collection $resources) => $resources->map(fn ($resource) => [
+                'uuid' => $resource->uuid,
+                'name' => $resource->name,
+                'tagged' => $resource->tags->contains('id', $this->tag->id),
+                'can_update' => auth()->user()->can('update', $resource),
+            ])->values());
     }
 }

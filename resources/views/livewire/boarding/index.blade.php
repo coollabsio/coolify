@@ -42,14 +42,14 @@
                         <div
                             class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
                             <button type="button" wire:click="skipBoarding"
-                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                                 <x-reicon name="arrow-right" class="size-3.5 shrink-0" />
                                 Skip setup
                             </button>
                             <x-modal-input title="Need Help?">
                                 <x-slot:content>
                                     <button type="button"
-                                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                                         <x-reicon name="feedback" class="size-3.5 shrink-0" />
                                         Contact support
                                     </button>
@@ -106,7 +106,7 @@
                                 <span role="button" tabindex="0" aria-label="About this machine"
                                     data-tooltip="The machine running Coolify. Not recommended for production workloads due to resource contention."
                                     @click.stop @keydown.enter.stop @keydown.space.prevent.stop
-                                    class="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border border-neutral-200 text-[11px] font-semibold text-neutral-500 hover:border-coollabs/35 hover:text-coollabs dark:border-white/[0.1] dark:text-fg-dim dark:hover:border-warning/30 dark:hover:text-warning">i</span>
+                                    class="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border border-neutral-200 text-[11px] font-semibold text-neutral-500 hover:border-coollabs/35 hover:text-coollabs dark:border-white/[0.1] dark:text-fg-dim dark:hover:border-brand-light/30 dark:hover:text-brand-light">i</span>
                                 <div class="flex flex-col gap-4 text-left">
                                     <svg class="size-10" xmlns="http://www.w3.org/2000/svg" fill="none"
                                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -130,7 +130,7 @@
                                 <span role="button" tabindex="0" aria-label="About remote servers"
                                     data-tooltip="Any SSH-accessible server, including cloud VPS, bare metal, and self-hosted infrastructure."
                                     @click.stop @keydown.enter.stop @keydown.space.prevent.stop
-                                    class="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border border-neutral-200 text-[11px] font-semibold text-neutral-500 hover:border-coollabs/35 hover:text-coollabs dark:border-white/[0.1] dark:text-fg-dim dark:hover:border-warning/30 dark:hover:text-warning">i</span>
+                                    class="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border border-neutral-200 text-[11px] font-semibold text-neutral-500 hover:border-coollabs/35 hover:text-coollabs dark:border-white/[0.1] dark:text-fg-dim dark:hover:border-brand-light/30 dark:hover:text-brand-light">i</span>
                                 <div class="flex flex-col gap-4 text-left">
                                     <svg class="size-10" xmlns="http://www.w3.org/2000/svg" fill="none"
                                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -206,6 +206,23 @@
                                             </div>
                                         </x-slot:content>
                                         <livewire:server.new.by-digital-ocean :limit_reached="false" :from_onboarding="true" />
+                                    </x-modal-input>
+                                    <x-modal-input title="Connect a Hostinger Server" isFullWidth>
+                                        <x-slot:content>
+                                            <div
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                                <div class="flex h-full flex-col gap-4 text-left">
+                                                    <x-hostinger-icon class="size-10 shrink-0 text-[#673de6]" />
+                                                    <div class="min-h-0 flex-1">
+                                                        <h3 class="mb-1 text-[14px] font-semibold">Hostinger</h3>
+                                                        <p class="text-sm dark:text-neutral-400">
+                                                            Deploy servers directly from your Hostinger account.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </x-slot:content>
+                                        <livewire:server.new.by-hostinger :limit_reached="false" :from_onboarding="true" />
                                     </x-modal-input>
                                 @endif
                                     </div>
@@ -599,14 +616,14 @@
                         <div
                             class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
                             <button type="button" wire:click="skipBoarding"
-                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                                 <x-reicon name="arrow-right" class="size-3.5 shrink-0" />
                                 Go to dashboard
                             </button>
                             <x-modal-input title="Need Help?">
                                 <x-slot:content>
                                     <button type="button"
-                                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                                         <x-reicon name="feedback" class="size-3.5 shrink-0" />
                                         Contact support
                                     </button>
@@ -624,19 +641,19 @@
                 <div
                     class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <button type="button" wire:click="skipBoarding"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                         <x-reicon name="arrow-right" class="size-3.5 shrink-0" />
                         Skip setup
                     </button>
                     <button type="button" wire:click="restartBoarding"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                         <x-reicon name="restart" class="size-3.5 shrink-0" />
                         Restart
                     </button>
                     <x-modal-input title="Need Help?">
                         <x-slot:content>
                             <button type="button"
-                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-warning">
+                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-white hover:text-coollabs dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-brand-light">
                                 <x-reicon name="feedback" class="size-3.5 shrink-0" />
                                 Contact support
                             </button>

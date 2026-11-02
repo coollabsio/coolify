@@ -19,6 +19,7 @@ use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
 use App\Services\GithubRunner\GithubRunnerApi;
 use App\Services\GithubRunner\GithubRunnerContainer;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
@@ -135,6 +136,7 @@ class Github extends Controller
 
                         continue;
                     }
+                    TransferFinishChecklist::recordWebhook('application', $application->uuid);
                     $isFunctional = $application->destination->server->isFunctional();
                     if (! $isFunctional) {
                         $return_payloads->push([
@@ -419,18 +421,17 @@ class Github extends Controller
                 return response('Invalid signature.');
             }
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-            if (config('app.env') !== 'local') {
-                if (! hash_equals($x_hub_signature_256, $hmac)) {
-                    auditLogWebhookFailure('github', 'invalid_signature', [
-                        'mode' => 'app',
-                        'github_app_id' => $github_app->id,
-                        'github_app_name' => $github_app->name,
-                        'installation_target_id' => $x_github_hook_installation_target_id,
-                    ]);
+            if (! hash_equals($x_hub_signature_256, $hmac)) {
+                auditLogWebhookFailure('github', 'invalid_signature', [
+                    'mode' => 'app',
+                    'github_app_id' => $github_app->id,
+                    'github_app_name' => $github_app->name,
+                    'installation_target_id' => $x_github_hook_installation_target_id,
+                ]);
 
-                    return response('Invalid signature.');
-                }
+                return response('Invalid signature.');
             }
+            TransferFinishChecklist::recordWebhook('github_app', $github_app->uuid);
             if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
                 // Installation handled by setup redirect url. Repositories queried on-demand.
                 $action = data_get($payload, 'action');
@@ -480,6 +481,7 @@ class Github extends Controller
             }
             $applications = Application::where('repository_project_id', $id)
                 ->where('source_id', $github_app->id)
+                ->where('source_type', GithubApp::class)
                 ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
@@ -733,7 +735,6 @@ class Github extends Controller
         $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
-            ->connectTimeout(5)
             ->post("$api_url/app-manifests/$code/conversions")
             ->throw()
             ->json();
@@ -839,7 +840,6 @@ class Github extends Controller
                 'Accept' => 'application/vnd.github+json',
             ])
                 ->timeout(10)
-                ->connectTimeout(5)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
         } catch (\Throwable $e) {
             return strip_tags(str_replace('<br>', ' ', $e->getMessage()));

@@ -71,8 +71,6 @@ Thank you so much!
 
 ### Huge Sponsors
 
-* [CubePath](https://cubepath.com/coolify) - Premium dedicated servers and cloud VPS hosting
-* [Context.dev](https://www.context.dev/) - Web scraping API for AI agents
 * [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
 * [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
 * [MVPS](https://www.mvps.net) - Cheap VPS servers at the highest possible quality
@@ -116,7 +114,6 @@ Thank you so much!
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
-* [QuickSrv](https://quicksrv.io/) - Fast and reliable server hosting
 * [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
 
 ### Small Sponsors
@@ -139,7 +136,6 @@ Thank you so much!
 <a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://cdn.coollabs.io/sponsors/piloterr.svg"/></a>
 <a href="https://yoxel.com/?utm_source=coolify.io"><img width="60px" alt="Alexey Panteleev" src="https://github.com/aspantel.png"/></a>
 <a href="https://summyt.app?utm_source=coolify.io"><img width="60px" alt="SummYT - YouTube Summarizer" src="https://summyt.app/logo.svg"/></a>
-<a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
 <a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="Xaman" src="https://github.com/XamanApp.png"/></a>
 <a href="https://monadical.com/?utm_source=coolify.io"><img width="60px" alt="Monadical" src="https://github.com/Monadical-SAS.png"/></a>
 <a href="https://maas.engineering/?utm_source=coolify.io"><img width="60px" alt="Magic as a Service" src="https://github.com/magicasaservice.png"/></a>
@@ -159,7 +155,6 @@ Thank you so much!
 <a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://cdn.coollabs.io/sponsors/web3jobs.png"/></a>
 <a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://cdn.coollabs.io/sponsors/linkdr.svg"/></a>
 <a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://cdn.coollabs.io/sponsors/arvensis.png"/></a>
-<a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://cdn.coollabs.io/sponsors/reshotai.png"/></a>
 <a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://cdn.coollabs.io/sponsors/runpod.svg"/></a>
 <a href="http://gravitywiz.com/?utm_source=coolify.io"><img width="60px" alt="Gravity Wiz" src="https://github.com/gravitywiz.png"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
@@ -167,6 +162,7 @@ Thank you so much!
 <a href="https://interviewpal.com"><img width="60px" alt="InterviewPal" src="https://cdn.coollabs.io/sponsors/interviewpal.svg"/></a>
 <a href="https://decidable.no?utm_source=coolify.io"><img width="60px" alt="Decidable" src="https://github.com/Decidable-AS.png"/></a>
 <a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
+<a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 

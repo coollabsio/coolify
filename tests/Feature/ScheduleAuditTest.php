@@ -300,12 +300,12 @@ test('disabling or moving S3 storage for backups records audit events', function
     $volumeEvent = scheduleAuditEvent('ui.volume_backup.schedule_set');
 
     expect($databaseEvent->resource_uuid)->toBe($database->uuid)
-        ->and($databaseEvent->metadata['changed_fields'])->toEqualCanonicalizing(['save_s3', 's3_storage_id'])
+        ->and($databaseEvent->metadata['changed_fields'])->toEqualCanonicalizing(['save_s3', 's3_storage_id', 's3_storages'])
         ->and($volumeEvent->metadata['resource_type'])->toBe('application')
         ->and($volumeEvent->metadata['resource_uuid'])->toBe($this->application->uuid)
         ->and($volumeEvent->metadata['storage_uuid'])->toBe($volume->uuid)
         ->and($volumeEvent->metadata['backup_uuid'])->toBe($volumeBackup->uuid)
-        ->and($volumeEvent->metadata['changed_fields'])->toBe(['s3_storage_id']);
+        ->and($volumeEvent->metadata['changed_fields'])->toEqualCanonicalizing(['s3_storage_id', 's3_storages']);
 });
 
 test('configuring the instance database backup records an audit event', function () {
@@ -421,4 +421,28 @@ test('updating, toggling, and deleting a storage backup schedule record audit ev
         ->and($deleteEvent->metadata['backup_uuid'])->toBe($backup->uuid)
         ->and($deleteEvent->metadata['storage_uuid'])->toBe($volume->uuid)
         ->and($backup->fresh())->toBeNull();
+});
+
+test('a request that reaches the danger section after the backup schedule is deleted does not render it', function () {
+    $database = createScheduleAuditPostgres($this->environment, $this->destination);
+    $backup = createScheduleAuditDatabaseBackup($this->team, $database);
+
+    Event::listen(RouteMatched::class, function (RouteMatched $event) use ($database): void {
+        $event->route->setParameter('project_uuid', $this->project->uuid);
+        $event->route->setParameter('environment_uuid', $this->environment->uuid);
+        $event->route->setParameter('database_uuid', $database->uuid);
+    });
+
+    Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+        'section' => 'danger',
+    ])
+        ->call('delete', 'password', ['delete_associated_backups_locally'])
+        ->assertRedirect()
+        ->call('refreshStatus')
+        ->assertOk();
+
+    expect($backup->fresh())->toBeNull()
+        ->and(scheduleAuditEvent('ui.database.backup_schedule_deleted')->metadata['backup_uuid'])->toBe($backup->uuid);
 });

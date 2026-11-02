@@ -71,6 +71,7 @@ case "$mode" in
     cp -r "$repo/templates/compose" "$base/templates/compose"
     mkdir -p "$base/tests/Fixtures/parser"
     cp "$repo"/tests/Fixtures/parser/*.yaml "$base/tests/Fixtures/parser/"
+    cp -r "$repo/tests/Fixtures/parser/expected" "$base/tests/Fixtures/parser/expected"
     cp "$repo/tests/Feature/ServiceParserReferenceTest.php" "$base/tests/Feature/"
     parse_into "$base" "$work/base-expected" "$mode"
     ;;

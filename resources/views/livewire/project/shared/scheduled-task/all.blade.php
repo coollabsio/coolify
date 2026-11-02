@@ -1,4 +1,13 @@
 <div>
+    @if ($selectedTask)
+        <x-modal-input title="Edit scheduled task" :subtitle="$selectedTask->name" wireOpen="taskModalOpen" :wireIgnore="false" isLarge fixedHeight>
+            <x-slot:content><span></span></x-slot:content>
+
+            <livewire:project.shared.scheduled-task.show :resource="$resource" :task="$selectedTask"
+                wire:key="scheduled-task-modal-{{ $selectedTask->uuid }}" />
+        </x-modal-input>
+    @endif
+
     <x-application.settings-section id="scheduled-tasks-section" title="Scheduled tasks"
         helper="Run commands inside this resource automatically using a cron schedule." flush>
         <x-slot:actions>
@@ -32,13 +41,10 @@
                     'running' => 'Running',
                     default => 'Not run yet',
                 };
-                $taskRoute = $resource->type() === 'application'
-                    ? 'project.application.scheduled-tasks'
-                    : 'project.service.scheduled-tasks';
             @endphp
-            <a class="group flex items-center gap-3 border-b border-neutral-200 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]"
-                {{ wireNavigate() }}
-                href="{{ route($taskRoute, [...$parameters, 'task_uuid' => $task->uuid]) }}">
+            <div wire:key="scheduled-task-{{ $task->uuid }}" wire:click="openTask('{{ $task->uuid }}')"
+                wire:keydown.enter="openTask('{{ $task->uuid }}')" role="button" tabindex="0"
+                class="group flex cursor-pointer items-center gap-3 border-b border-neutral-200 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                 <div
                     class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
                     <x-reicon name="browser-terminal" class="size-[18px]" />
@@ -58,7 +64,7 @@
                     </p>
                 </div>
                 <x-status-badge :status="$statusLabel" :type="$statusType" />
-            </a>
+            </div>
         @empty
             <x-empty title="No scheduled tasks"
                 description="Create a task to run maintenance commands, scripts, or recurring jobs automatically."

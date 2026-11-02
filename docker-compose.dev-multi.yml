@@ -181,7 +181,10 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - coolify
+      coolify:
+        # The seeded "Local MinIO" storage (S3StorageSeeder) uses http://coolify-minio:9000.
+        aliases:
+          - coolify-minio
 
   minio-init:
     profiles: ["minio"]

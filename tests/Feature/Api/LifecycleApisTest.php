@@ -332,14 +332,14 @@ describe('DELETE resource endpoints', function () {
             ->assertOk();
 
         $response->assertJson([
-            'message' => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
+            'message' => 'Service deletion request queued.',
         ]);
 
         expect(Service::find($service->id))->toBeNull()
             ->and(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
         Queue::assertPushed(
             DeleteResourceJob::class,
-            fn (DeleteResourceJob $job): bool => $job->deleteFromCoolifyOnly
+            fn (DeleteResourceJob $job): bool => $job->resource->is($service) && ! $job->deleteFromCoolifyOnly
         );
     });
 

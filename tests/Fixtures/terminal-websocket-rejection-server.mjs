@@ -5,6 +5,7 @@
 // Usage: node terminal-websocket-rejection-server.mjs <mode>
 //   close-on-upgrade: complete the handshake, then close with 4401 (session rejected)
 //   reject-token:     on the first client frame, send the legacy text message and close with 4403
+//   ready:            on the first client frame, signal that the PTY is ready
 //
 // Prints the listening port on stdout. GET /stats returns {"upgrades": n}.
 import { createHash } from 'node:crypto';
@@ -57,6 +58,11 @@ server.on('upgrade', (req, socket) => {
     }
 
     socket.once('data', () => {
+        if (mode === 'ready') {
+            socket.write(frame(0x1, Buffer.from('pty-ready')));
+            return;
+        }
+
         const message = 'Unauthorized: Terminal token was rejected';
         socket.write(frame(0x1, Buffer.from(message)));
         socket.end(closeFrame(4403, message));

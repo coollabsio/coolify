@@ -1,0 +1,49 @@
+name: Clean manifests
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: clean-manifests
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  clean:
+    name: Clean
+    if: ${{ github.repository == 'coollabsio/coolify' }}
+    permissions:
+      contents: read
+    environment:
+      name: cleanup
+      deployment: false
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: List the manifests to delete
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CLEANUP_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CLEANUP_TOKEN }}
+        run: scripts/clean-manifests.sh
+
+      - name: Upload the list of manifests to delete
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: manifests-to-delete
+          path: scripts/manifests-to-delete.tsv
+          if-no-files-found: ignore
+          retention-days: 90

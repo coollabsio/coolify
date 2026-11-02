@@ -5,6 +5,7 @@ namespace App\Notifications\Channels;
 use App\Exceptions\NonReportableException;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\SmtpTransportFactory;
 use Exception;
 use Illuminate\Notifications\Notification;
@@ -151,9 +152,9 @@ class EmailChannel
             send_internal_notification(sprintf(
                 "Resend Error\nStatus Code: %s\nMessage: %s\nNotification: %s\nEmail Settings:\n%s",
                 $statusCode,
-                $e->getErrorMessage(),
+                remove_iip($e->getErrorMessage()),
                 get_class($notification),
-                json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                json_encode(app(SensitiveDataRedactor::class)->redactValue($emailSettings), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             ));
 
             // Don't report expected errors (invalid keys, validation) to error tracking
@@ -172,7 +173,7 @@ class EmailChannel
 
             throw $e;
         } catch (TransporterException $e) {
-            send_internal_notification("Resend Transport Error: {$e->getMessage()}");
+            send_internal_notification('Resend Transport Error: '.remove_iip($e->getMessage()));
             throw new Exception('Unable to connect to Resend API. Please check your internet connection and try again.');
         } catch (\Throwable $e) {
             // Check if this is a Resend domain verification error on cloud instances

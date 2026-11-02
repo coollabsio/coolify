@@ -35,6 +35,7 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -168,6 +169,17 @@ test('audit log persists a structured event for the current team', function () {
         ->and($event->resource_uuid)->toBe('app-123')
         ->and($event->resource_name)->toBe('Website')
         ->and($event->metadata['changed'])->toBe(['name']);
+});
+
+test('audit log records the Cloudflare client ip when the request comes from Cloudflare', function () {
+    app()->instance('request', Request::create('/', server: [
+        'REMOTE_ADDR' => '162.158.79.140',
+        'HTTP_CF_CONNECTING_IP' => '160.79.104.10',
+    ]));
+
+    auditLog('api.application.updated', ['application_uuid' => 'app-123']);
+
+    expect(AuditEvent::query()->sole()->ip_address)->toBe('160.79.104.10');
 });
 
 test('auditable models record authenticated create update and delete actions', function () {
@@ -858,6 +870,45 @@ test('audit log page only shows events for the current team', function () {
     Livewire::test(AuditLog::class)
         ->assertSee('Website created')
         ->assertDontSee('Private app deleted');
+});
+
+test('audit log sorts by the chosen column and ignores unknown sort values', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Zoe',
+        'description' => 'Older event by Zoe',
+        'created_at' => now()->subHour(),
+    ]);
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Adam',
+        'description' => 'Newer event by Adam',
+        'created_at' => now(),
+    ]);
+
+    Livewire::test(AuditLog::class)
+        ->assertSeeInOrder(['Newer event by Adam', 'Older event by Zoe'])
+        ->call('setSort', 'time-asc')
+        ->assertSet('sort', 'time-asc')
+        ->assertSeeInOrder(['Older event by Zoe', 'Newer event by Adam'])
+        ->call('setSort', 'actor-desc')
+        ->assertSeeInOrder(['Older event by Zoe', 'Newer event by Adam'])
+        ->call('setSort', 'activity-asc')
+        ->assertSeeInOrder(['Newer event by Adam', 'Older event by Zoe'])
+        ->call('setSort', 'resource_uuid-asc')
+        ->assertSet('sort', 'activity-asc')
+        ->call('setSort', 'time-sideways')
+        ->assertSet('sort', 'activity-asc');
+});
+
+test('changing the audit log sort returns to the first page', function () {
+    AuditEvent::factory()->count(11)->create(['team_id' => $this->team->id]);
+
+    Livewire::test(AuditLog::class)
+        ->set('perPage', 10)
+        ->call('setPage', 2)
+        ->call('setSort', 'time-asc')
+        ->assertSet('paginators.page', 1);
 });
 
 test('audit log expands encrypted model changes for team admins and owners', function () {

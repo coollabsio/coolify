@@ -28,41 +28,21 @@
             'label' => 'Danger Zone',
             'route' => 'team.danger-zone',
             'active' => request()->routeIs('team.danger-zone'),
-            'icon' => 'shield-alert',
+            'icon' => 'danger',
             'sectionStart' => true,
         ] : null,
     ])->filter();
 @endphp
 
-<section class="application-settings-workspace w-full max-w-none">
+{{-- The team pages are in the Team submenu of the main sidebar (components/navbar.blade.php). --}}
+<section class="w-full max-w-none">
     <header class="settings-mobile-header xl:hidden">
         <h1 class="settings-mobile-title">Team</h1>
         <p class="settings-mobile-description">Manage your team, members, and access settings.</p>
     </header>
-    <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        <aside class="application-settings-navigation min-w-0 xl:self-start"
-            data-settings-search-items="{{ json_encode(settingsSearchItems(['Team' => $teamMenuItems], [])) }}">
-            <nav aria-label="Team settings"
-                class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                <div class="nav-section hidden xl:block">Team</div>
-                @foreach ($teamMenuItems as $menuItem)
-                    @if ($menuItem['sectionStart'] ?? false)
-                        <div class="col-span-full my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
-                            aria-hidden="true"></div>
-                    @endif
-                    <a wire:key="team-settings-{{ str($menuItem['label'])->slug() }}"
-                        @class(['menu-item', 'menu-item-active' => $menuItem['active']])
-                        {{ wireNavigate() }} href="{{ route($menuItem['route']) }}">
-                        <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                        <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                    </a>
-                @endforeach
-
-            </nav>
-        </aside>
-
-        <div class="min-w-0">
-            {{ $slot }}
-        </div>
+    {{-- Feeds the page search with the team pages. --}}
+    <div hidden data-settings-search-items="{{ json_encode(settingsSearchItems(['Team' => $teamMenuItems], [])) }}"></div>
+    <div class="min-w-0">
+        {{ $slot }}
     </div>
 </section>

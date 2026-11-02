@@ -312,6 +312,7 @@ class SyncCdn extends Command
         $install_script_location = "$parent_dir/scripts/install.sh";
         $upgrade_script_location = "$parent_dir/scripts/upgrade.sh";
         $upgrade_postgres_script_location = "$parent_dir/scripts/upgrade-postgres.sh";
+        $patch_script_location = "$parent_dir/scripts/patch.sh";
         $production_env_location = "$parent_dir/.env.production";
         $service_template_location = "$parent_dir/templates/$service_template";
         $versions_location = "$parent_dir/$versions";
@@ -346,6 +347,7 @@ class SyncCdn extends Command
                     $install_script_location => 'json/coolify/install.sh',
                     $upgrade_script_location => 'json/coolify/upgrade.sh',
                     $upgrade_postgres_script_location => 'json/coolify/upgrade-postgres.sh',
+                    $patch_script_location => 'json/coolify/patch.sh',
                     $service_template_location => 'json/coolify/service-templates-latest.json',
                 ];
             }

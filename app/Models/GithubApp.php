@@ -90,7 +90,7 @@ class GithubApp extends BaseModel
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {
-            $applications_count = Application::where('source_id', $github_app->id)->count();
+            $applications_count = $github_app->applications()->count();
             if ($applications_count > 0) {
                 throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
             }
@@ -110,7 +110,8 @@ class GithubApp extends BaseModel
                 $isUsedElsewhere = $privateKey->servers()->exists()
                     || $privateKey->applications()->exists()
                     || $privateKey->githubApps()->where('id', '!=', $github_app->id)->exists()
-                    || $privateKey->gitlabApps()->exists();
+                    || $privateKey->gitlabApps()->exists()
+                    || $privateKey->giteaApps()->exists();
 
                 if (! $isUsedElsewhere) {
                     $privateKey->delete();
@@ -194,5 +195,20 @@ class GithubApp extends BaseModel
         }
 
         return filled($this->app_id) && filled($this->installation_id);
+    }
+
+    /**
+     * The settings page of this App at GitHub.
+     */
+    public function settingsUrl(): string
+    {
+        $name = encodeGithubPathSegment($this->name);
+        $organization = normalizeGithubOrganization($this->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
+        }
+
+        return rtrim($this->html_url, '/')."/settings/apps/{$name}";
     }
 }

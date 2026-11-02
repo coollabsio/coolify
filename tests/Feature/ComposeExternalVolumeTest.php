@@ -261,7 +261,7 @@ function loginExternalVolumeOwner(): void
 function fakeExternalVolumeServer(array &$commands): void
 {
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });

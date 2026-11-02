@@ -88,6 +88,12 @@
             @endforeach
         @endif
         <div class="flex items-center gap-0.5 justify-self-end">
+            @if ($this->connectLink)
+                <a href="{{ $this->connectLink }}" class="icon-button shrink-0"
+                    title="Connect {{ $key }} to resources" aria-label="Connect {{ $key }} to resources">
+                    <x-reicon name="link" class="size-3.5" />
+                </a>
+            @endif
             @if (! $isLocked && ! $isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endif
@@ -178,7 +184,7 @@
                             <div x-cloak x-show="!isMultiline" wire:key="env-show-value-tip-{{ $env->id }}"
                                 class="mt-1.5 text-xs text-neutral-500 dark:text-fg-faint">
                                 Tip: Type <span
-                                    class="font-mono text-coollabs dark:text-warning">{{ '{{' }}</span> to reference
+                                    class="font-mono text-coollabs dark:text-brand-light">{{ '{{' }}</span> to reference
                                 a shared environment variable
                             </div>
                         @endif
@@ -270,6 +276,12 @@
                                 @endcan
                             </div>
                             <div class="ml-auto flex flex-wrap gap-2" data-environment-variable-update-actions>
+                                @if ($this->connectLink)
+                                    <a href="{{ $this->connectLink }}" class="button" title="Add this variable to resources, and see which resources use it">
+                                        <x-reicon name="link" class="size-3.5" />
+                                        Connect to resources
+                                    </a>
+                                @endif
                                 @if ($canUpdate && !$isLocked && !$isMagicVariable)
                                     <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
                                 @endif

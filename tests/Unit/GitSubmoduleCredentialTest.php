@@ -156,7 +156,7 @@ describe('Git submodule credential propagation', function () {
             exec_in_docker: false,
         );
 
-        $sshCommand = 'ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa_coolify_test-uuid -o IdentitiesOnly=yes';
+        $sshCommand = 'ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa_coolify_test-uuid -o IdentitiesOnly=yes';
 
         // Commands are a list of ['command' => ..., 'hidden' => ...] entries; assert on the joined shell script
         $commands = collect($result['commands'])

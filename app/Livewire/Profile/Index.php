@@ -151,7 +151,7 @@ class Index extends Component
                 }
 
                 // Additional rate limit by IP address (5 requests per hour)
-                $ipKey = 'email-change:ip:'.request()->ip();
+                $ipKey = 'email-change:ip:'.client_ip(request());
                 if (! RateLimiter::attempt($ipKey, 5, function () {}, 3600)) {
                     $this->dispatch('error', 'Too many requests from your IP address. Please try again later.');
 

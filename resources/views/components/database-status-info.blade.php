@@ -15,6 +15,7 @@
 ])
 
 @php
+    $isCredentialLocked = ! $isPasswordHiddenForMember && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked();
     $urlHelper = 'If you change the user/password/port, this could be different. This is with the default values.';
 @endphp
 
@@ -22,6 +23,9 @@
     @if ($isPasswordHiddenForMember)
         <x-forms.input :label="$label . ' URL (internal)'" disabled value="Hidden (only admins can view)" />
         <x-forms.input :label="$label . ' URL (public)'" disabled value="Hidden (only admins can view)" />
+    @elseif ($isCredentialLocked)
+        <x-forms.input :label="$label . ' URL (internal)'" disabled value="Locked (shown once)"
+            helper="The password variable is locked, so the URL that contains it is not shown." />
     @else
         <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly copyable
             wire:model="dbUrl" canGate="update" :canResource="$database" />

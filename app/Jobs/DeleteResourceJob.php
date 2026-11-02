@@ -56,7 +56,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if ($this->deleteFromCoolifyOnly && $this->resource instanceof Service) {
+        if ($this->deleteFromCoolifyOnly) {
             // No remote calls on this path: remove only the schedule records, so the scheduler does
             // not keep running backups of volumes that no longer exist in Coolify.
             $this->volumeBackupSchedules()->each->delete();
@@ -115,7 +115,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $server = data_get($this->resource, 'destination.server');
             if ($server) {
                 $this->resource->team()?->notify(new GeneralNotification(
-                    "'{$this->resource->name}' was removed from Coolify, but its Docker resources could not be removed from server '{$server->name}' and may still exist there. Error: {$e->getMessage()}",
+                    "'{$this->resource->name}' was removed from Coolify, but its Docker resources could not be removed from server '{$server->name}' and may still exist there. Error: ".remove_iip($e->getMessage()),
                     success: false,
                 ));
             }
@@ -131,8 +131,21 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
+        $maintenanceServers = data_get($this->resource, 'is_maintenance_enabled') ? $this->resource->maintenanceServers() : null;
+
         $this->deleteLocalResource();
 
+        if ($maintenanceServers) {
+            try {
+                // Removes the maintenance route of the deleted resource.
+                $this->resource->syncMaintenancePage($maintenanceServers);
+            } catch (\Throwable $e) {
+                Log::warning('Maintenance page cleanup failed while deleting resource.', [
+                    'resource_id' => $this->resource->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     private function deleteLocalResource(): void

@@ -54,12 +54,11 @@ class EditCompose extends Component
     {
         if ($toModel) {
             $this->service->docker_compose_raw = $this->dockerComposeRaw;
-            $this->service->docker_compose = $this->dockerCompose;
             $this->service->is_container_label_escape_enabled = $this->isContainerLabelEscapeEnabled;
         } else {
             $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
             $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
-            $this->dockerCompose = $canViewCompose ? $this->service->docker_compose : null;
+            $this->dockerCompose = $canViewCompose ? redactLockedValuesInGeneratedCompose($this->service->docker_compose, $this->service) : null;
             $this->isContainerLabelEscapeEnabled = $this->service->is_container_label_escape_enabled ?? false;
         }
     }

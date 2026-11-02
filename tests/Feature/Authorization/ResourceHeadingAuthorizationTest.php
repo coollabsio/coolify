@@ -110,7 +110,7 @@ test('admin sees deploy controls for application', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApplicationHeading::class, ['application' => $this->application])
-        ->assertSee('Deploy')
+        ->assertSee('Redeploy')
         ->assertSee('Restart')
         ->assertSee('Stop');
 });

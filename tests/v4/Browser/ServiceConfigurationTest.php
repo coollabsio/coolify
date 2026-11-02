@@ -205,7 +205,9 @@ it('keeps domain settings out of the overview and supports editing and removal',
     $url = serviceConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->service).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertVisible('[aria-label="Internal port 8080"]')
         ->assertDontSee('Search engine indexing')
         ->assertDontSee('Remove domain')
@@ -258,7 +260,7 @@ it('keeps domain settings out of the overview and supports editing and removal',
         ->screenshot(filename: 'service-domain-removal-confirmation')
         ->click('button:has([x-text="step2ButtonText"]):visible')
         ->assertDontSee('https://long-public-domain-for-the-service.example.com')
-        ->assertSee('1 domain across 1 service')
+        ->assertSee('https://second.example.com')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertSee('www redirect')
         ->assertValue('#editingDomainParts-host', 'second.example.com')

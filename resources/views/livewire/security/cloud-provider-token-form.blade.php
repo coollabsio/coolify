@@ -9,6 +9,7 @@
             get providerConsoleUrl() {
                 if (this.selectedProvider === 'hetzner') return 'https://console.hetzner.com/projects';
                 if (this.selectedProvider === 'vultr') return 'https://console.vultr.com/user/apiaccess/';
+                if (this.selectedProvider === 'hostinger') return 'https://hpanel.hostinger.com/profile/api';
                 return 'https://cloud.digitalocean.com/account/api/tokens';
             }
         }">
@@ -18,6 +19,7 @@
                 ['value' => 'hetzner', 'label' => 'Hetzner'],
                 ['value' => 'digitalocean', 'label' => 'DigitalOcean'],
                 ['value' => 'vultr', 'label' => 'Vultr'],
+                ['value' => 'hostinger', 'label' => 'Hostinger'],
             ]" />
         @else
             <input type="hidden" wire:model="provider" />
@@ -27,7 +29,7 @@
             class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
             Create the token in the
             <a :href="providerConsoleUrl"
-                target="_blank" class="font-medium text-coollabs hover:underline dark:text-warning">
+                target="_blank" class="font-medium text-coollabs hover:underline dark:text-brand-light">
                 <span x-text="providerName + ' console'"></span>
             </a>.
         </div>

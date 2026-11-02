@@ -74,11 +74,14 @@
                 $currentSourceMorph = $currentSource?->getMorphClass();
                 $currentSourceIsGithub = $currentSourceMorph === \App\Models\GithubApp::class;
                 $currentSourceIsGitlab = $currentSourceMorph === \App\Models\GitlabApp::class;
+                $currentSourceIsGitea = $currentSourceMorph === \App\Models\GiteaApp::class;
                 $currentSourceSubtitle = match (true) {
                     $currentSourceIsGithub && filled(data_get($currentSource, 'organization')) => 'GitHub · '.$currentSource->organization,
                     $currentSourceIsGithub => data_get($currentSource, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
                     $currentSourceIsGitlab && filled(data_get($currentSource, 'group_name')) => 'GitLab · '.$currentSource->group_name,
                     $currentSourceIsGitlab => 'GitLab · Personal account',
+                    $currentSourceIsGitea && filled(data_get($currentSource, 'organization')) => 'Gitea · '.$currentSource->organization,
+                    $currentSourceIsGitea => 'Gitea · Personal account',
                     default => 'Connected source',
                 };
             @endphp
@@ -87,10 +90,10 @@
                 <div class="grid gap-2 sm:grid-cols-2">
                     @if ($currentSource)
                         <div
-                            class="relative flex min-h-16 items-center gap-3 rounded-xl border border-coollabs/30 bg-coollabs/[0.06] p-3 ring-1 ring-coollabs/20 dark:border-warning/30 dark:bg-warning/[0.08] dark:ring-warning/15"
+                            class="relative flex min-h-16 items-center gap-3 rounded-xl border border-coollabs/30 bg-coollabs/[0.06] p-3 ring-1 ring-coollabs/20 dark:border-brand-light/30 dark:bg-brand/[0.12] dark:ring-brand-light/15"
                             aria-current="true">
                             <div
-                                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-coollabs/20 bg-white text-coollabs dark:border-warning/20 dark:bg-white/[0.04] dark:text-warning">
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-coollabs/20 bg-white text-coollabs dark:border-brand-light/20 dark:bg-white/[0.04] dark:text-brand-light">
                                 <x-git-icon class="size-4" :git="$currentSourceMorph" />
                             </div>
                             <div class="min-w-0 flex-1">
@@ -113,11 +116,14 @@
                             $sourceMorph = $source->getMorphClass();
                             $sourceIsGithub = $sourceMorph === \App\Models\GithubApp::class;
                             $sourceIsGitlab = $sourceMorph === \App\Models\GitlabApp::class;
+                            $sourceIsGitea = $sourceMorph === \App\Models\GiteaApp::class;
                             $sourceSubtitle = match (true) {
                                 $sourceIsGithub && filled($source->organization) => 'GitHub · '.$source->organization,
                                 $sourceIsGithub => data_get($source, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
                                 $sourceIsGitlab && filled($source->group_name) => 'GitLab · '.$source->group_name,
                                 $sourceIsGitlab => 'GitLab · Personal account',
+                                $sourceIsGitea && filled($source->organization) => 'Gitea · '.$source->organization,
+                                $sourceIsGitea => 'Gitea · Personal account',
                                 default => 'Git source',
                             };
                         @endphp
@@ -165,7 +171,7 @@
                     <p class="mt-3 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                         No other sources available.
                         <a href="{{ route('source.all') }}" {{ wireNavigate() }}
-                            class="font-medium text-coollabs underline-offset-2 hover:underline dark:text-warning">Connect
+                            class="font-medium text-coollabs underline-offset-2 hover:underline dark:text-brand-light">Connect
                             another source</a>
                         to switch providers.
                     </p>

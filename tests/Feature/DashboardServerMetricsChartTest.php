@@ -102,5 +102,5 @@ it('loads dashboard metrics over SSH for a reachable server', function () {
             ],
         );
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'coolify-sentinel'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-sentinel'));
 });

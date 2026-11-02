@@ -950,3 +950,16 @@ function getTraefikVersionFromDockerCompose(Server $server): ?string
         return null;
     }
 }
+
+/**
+ * Validation rule for an HTML page that Coolify sends to the proxy in one shell command
+ * (see Server::PROXY_ERROR_PAGE_MAX_BYTES).
+ */
+function proxyPageSizeRule(string $name): Closure
+{
+    return function (string $attribute, mixed $value, Closure $fail) use ($name): void {
+        if (strlen((string) $value) > Server::PROXY_ERROR_PAGE_MAX_BYTES) {
+            $fail("The {$name} must not be larger than ".(Server::PROXY_ERROR_PAGE_MAX_BYTES / 1024).' KB.');
+        }
+    };
+}

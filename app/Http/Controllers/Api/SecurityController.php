@@ -269,7 +269,6 @@ class SecurityController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['private_key'],
                         properties: [
                             'name' => ['type' => 'string'],
                             'description' => ['type' => 'string'],
@@ -328,7 +327,7 @@ class SecurityController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|max:255',
-            'private_key' => 'required|string',
+            'private_key' => 'string',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);

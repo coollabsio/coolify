@@ -60,7 +60,7 @@
                         'sm:h-[40rem]' => $fixedHeight,
                     ])
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                    <header class="flex-wrap! sm:flex-nowrap!">
+                    <header class="shrink-0 flex-wrap! sm:flex-nowrap!">
                         <div class="min-w-0 flex-1 py-0.5">
                             <h3 class="truncate">{{ $title }}</h3>
                             @if ($subtitle)

@@ -65,6 +65,10 @@ function assertBackupSortOrders(mixed $page, string $screenshot): void
         ->click('Sort')
         ->click('Newest first')
         ->assertScript(visibleBackupOrderScript(), 'charlie-data,alpha-data,bravo-data')
+        ->click('[aria-label^="Sort by target"]')
+        ->assertScript(visibleBackupOrderScript(), 'alpha-data,bravo-data,charlie-data')
+        ->click('[aria-label^="Sort by target"]')
+        ->assertScript(visibleBackupOrderScript(), 'charlie-data,bravo-data,alpha-data')
         ->screenshot(filename: $screenshot);
 }
 

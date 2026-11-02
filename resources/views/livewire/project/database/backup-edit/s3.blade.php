@@ -10,32 +10,29 @@
         </x-empty>
     </x-application.settings-section>
 @else
-    <form wire:submit="submit">
-        <x-unsaved-bar action="submit" />
-
-        <x-application.settings-section title="S3 storage"
-            description="Choose where remote backups are stored and whether local copies are retained.">
-            <x-slot:actions>
-                @if (! $saveS3)
-                    <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                        wire:target="toggleS3" isHighlighted>Enable S3</x-forms.button>
-                @else
-                    <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                        wire:target="toggleS3">Disable S3</x-forms.button>
-                @endif
-            </x-slot:actions>
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="s3StorageId" label="S3 storage" portal :required="$saveS3"
-                    :options="$availableS3Storages->map(fn ($s3) => [
-                        'value' => $s3->id,
-                        'label' => $s3->name,
-                    ])->values()->all()" />
-                <x-forms.listbox id="disableLocalBackup" label="Local copy" portal :disabled="! $saveS3"
-                    :options="[
-                        ['value' => false, 'label' => 'Keep local backup'],
-                        ['value' => true, 'label' => 'Delete after S3 upload'],
-                    ]" />
-            </div>
-        </x-application.settings-section>
-    </form>
+    <x-application.settings-section title="S3 storage"
+        description="Choose where remote backups are stored and whether local copies are retained.">
+        <x-slot:actions>
+            @if (! $saveS3)
+                <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
+                    wire:target="toggleS3" isHighlighted>Enable S3</x-forms.button>
+            @else
+                <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
+                    wire:target="toggleS3">Disable S3</x-forms.button>
+            @endif
+        </x-slot:actions>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <x-forms.listbox id="s3StorageIds" label="S3 storages" multiple live portal
+                helper="Each backup is uploaded to every selected storage." placeholder="Select S3 storages"
+                :options="$availableS3Storages->map(fn ($storage) => [
+                    'value' => $storage->id,
+                    'label' => $storage->name.($storage->is_usable ? '' : ' (unavailable)'),
+                ])->all()" />
+            <x-forms.listbox id="disableLocalBackup" label="Local copy" portal :disabled="! $saveS3"
+                :options="[
+                    ['value' => false, 'label' => 'Keep local backup'],
+                    ['value' => true, 'label' => 'Delete after S3 upload'],
+                ]" />
+        </div>
+    </x-application.settings-section>
 @endif

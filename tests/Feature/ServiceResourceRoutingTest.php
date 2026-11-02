@@ -195,8 +195,8 @@ test('legacy service database backup detail urls redirect to unified backup view
     ];
 
     $this->get($generalUrl)->assertRedirect(route('project.service.volume-backups.index', $parameters));
-    $this->get($generalUrl.'/s3')->assertRedirect(route('project.service.volume-backups.index', $parameters));
-    $this->get($generalUrl.'/retention')->assertRedirect(route('project.service.volume-backups.index', $parameters));
+    $this->get($generalUrl.'/s3')->assertRedirect($generalUrl);
+    $this->get($generalUrl.'/retention')->assertRedirect($generalUrl);
     $this->get($generalUrl.'/danger')->assertRedirect(route('project.service.volume-backups.index', $parameters));
     $this->get($generalUrl.'/executions')->assertRedirect(route('project.service.volume-backups.index', $parameters));
 });

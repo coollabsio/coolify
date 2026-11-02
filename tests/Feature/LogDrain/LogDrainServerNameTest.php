@@ -31,7 +31,7 @@ test('a server name with a line break cannot add a section to the fluent-bit con
 
     $commands = new Collection;
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
         return Process::result();
     });
@@ -60,7 +60,7 @@ test('a server name with spaces is written as a single fluent-bit value', functi
 
     $commands = new Collection;
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
         return Process::result();
     });

@@ -8,7 +8,7 @@
     // Persistent affordance shown while a deploy/start is running. Either re-opens
     // the in-page live-log dialog (services/databases, via $wire) or links to the
     // running deployment's log page (applications, via href) so the log is never lost.
-    $deployingIndicatorClasses = 'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ring-1 transition-colors bg-coollabs/10 text-coollabs ring-coollabs/25 hover:bg-coollabs/15 hover:no-underline dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20';
+    $deployingIndicatorClasses = 'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ring-1 transition-colors bg-coollabs/10 text-coollabs ring-coollabs/25 hover:bg-coollabs/15 hover:no-underline dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25 dark:hover:bg-brand/20';
 @endphp
 
 @if ($href)

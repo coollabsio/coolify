@@ -91,3 +91,20 @@ it('does not leak admin-only pages to a member through the team search cache', f
     expect(globalSearchNavigationLinks($team))->toContain(...adminOnlyNavigationLinks());
     expect(globalSearchNavigationLinks($team, 'member'))->not->toContain(...adminOnlyNavigationLinks());
 });
+
+it('opens the deploy canvas from the new canvas quick action', function () {
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+    $user->teams()->attach($team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    $component = Livewire::test(GlobalSearch::class)->call('openSearchModal');
+
+    expect(collect($component->get('creatableItems'))->firstWhere('type', 'canvas'))
+        ->toMatchArray(['name' => 'Canvas', 'category' => 'Quick Actions', 'route' => 'deploy-canvas']);
+
+    $component->call('navigateToResource', 'canvas')
+        ->assertDispatched('closeSearchModal')
+        ->assertRedirect(route('deploy-canvas'));
+});

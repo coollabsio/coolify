@@ -1,5 +1,6 @@
 <?php
 
+use App\Data\Traffic\TrafficBreakdownData;
 use App\Data\Traffic\TrafficOverviewData;
 use App\Services\TrafficAnalyticsAggregator;
 
@@ -23,4 +24,26 @@ it('returns a zeroed, non-approximate result for a single server', function () {
     $result = TrafficAnalyticsAggregator::sumOverviews([$a]);
     expect($result['latencyApproximate'])->toBeFalse();
     expect($result['uniquesApproximate'])->toBeFalse();
+});
+
+it('sums one city from two servers and keeps the first coordinates', function () {
+    $aggregator = new TrafficAnalyticsAggregator(['city']);
+    $aggregator->addBreakdown('city', [new TrafficBreakdownData('DE|BE|Berlin', 5, 500)]);
+    $aggregator->addBreakdown('city', [new TrafficBreakdownData('DE|BE|Berlin', 4, 400, 52.52, 13.405)]);
+    $aggregator->addBreakdown('city', [new TrafficBreakdownData('DE|BE|Berlin', 1, 100, 1.0, 2.0)]);
+
+    expect($aggregator->breakdowns()['city'])->toBe([
+        ['value' => 'DE|BE|Berlin', 'requests' => 10, 'bytesOut' => 1000, 'lat' => 52.52, 'lon' => 13.405],
+    ]);
+});
+
+it('adds no coordinate keys to rows that have none', function () {
+    $aggregator = new TrafficAnalyticsAggregator(['country', 'city']);
+    $aggregator->addBreakdown('country', [new TrafficBreakdownData('DE', 5, 500)]);
+    $aggregator->addBreakdown('city', [new TrafficBreakdownData('DE||', 5, 500)]);
+
+    expect($aggregator->breakdowns())->toBe([
+        'country' => [['value' => 'DE', 'requests' => 5, 'bytesOut' => 500]],
+        'city' => [['value' => 'DE||', 'requests' => 5, 'bytesOut' => 500]],
+    ]);
 });

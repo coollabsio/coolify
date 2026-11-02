@@ -14,8 +14,6 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Routing\Events\RouteMatched;
-use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -37,22 +35,6 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 });
 
-afterEach(function () {
-    Event::forget(RouteMatched::class);
-});
-
-/**
- * @param  array<string, string>  $parameters
- */
-function bindScheduledTaskDeleteRoute(array $parameters): void
-{
-    Event::listen(RouteMatched::class, function (RouteMatched $event) use ($parameters): void {
-        foreach ($parameters as $name => $value) {
-            $event->route->setParameter($name, $value);
-        }
-    });
-}
-
 test('deleting a service scheduled task returns true so the confirmation modal does not refresh the deleted task', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
@@ -66,22 +48,17 @@ test('deleting a service scheduled task returns true so the confirmation modal d
         'command' => 'echo nightly',
         'frequency' => 'daily',
     ]);
-    $parameters = [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'service_uuid' => $service->uuid,
-    ];
-    bindScheduledTaskDeleteRoute([...$parameters, 'task_uuid' => $task->uuid]);
 
-    Livewire::test(Show::class)
+    Livewire::test(Show::class, ['resource' => $service, 'task' => $task])
         ->call('delete')
         ->assertReturned(true)
-        ->assertRedirect(route('project.service.scheduled-tasks.show', $parameters));
+        ->assertDispatched('scheduledTaskDeleted')
+        ->assertNoRedirect();
 
     expect($task->fresh())->toBeNull();
 });
 
-test('deleting an application scheduled task returns true and redirects to the task list', function () {
+test('deleting an application scheduled task returns true and closes the task modal', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
@@ -94,17 +71,12 @@ test('deleting an application scheduled task returns true and redirects to the t
         'command' => 'echo nightly',
         'frequency' => 'daily',
     ]);
-    $parameters = [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'application_uuid' => $application->uuid,
-    ];
-    bindScheduledTaskDeleteRoute([...$parameters, 'task_uuid' => $task->uuid]);
 
-    Livewire::test(Show::class)
+    Livewire::test(Show::class, ['resource' => $application, 'task' => $task])
         ->call('delete')
         ->assertReturned(true)
-        ->assertRedirect(route('project.application.scheduled-tasks.show', $parameters));
+        ->assertDispatched('scheduledTaskDeleted')
+        ->assertNoRedirect();
 
     expect($task->fresh())->toBeNull();
 });

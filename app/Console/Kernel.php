@@ -20,12 +20,13 @@ use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
 use App\Services\ScheduledJobDeliveryService;
+use Cron\CronExpression;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
-    private const CDN_JITTER_SECONDS = 600;
+    private const MAX_CDN_DELAY_SECONDS = 3600;
 
     private Schedule $scheduleInstance;
 
@@ -51,6 +52,11 @@ class Kernel extends ConsoleKernel
             ->name('cleanup:ssh-mux')
             ->hourly()
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
+        // Every cloud node reads its own versions.json, so each node refreshes it (no onOneServer).
+        $this->scheduleInstance->call(fn () => refresh_versions_file())
+            ->name('versions:refresh-local')
+            ->hourly()
+            ->when(fn () => isCloud());
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->call(fn () => app(ScheduledJobDeliveryService::class)->deleteOldOccurrences())
             ->name('cleanup:scheduled-job-occurrences')
@@ -93,16 +99,14 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->command('horizon:snapshot')->everyFiveMinutes();
             $this->scheduleInstance->command('cleanup:unreachable-servers')->daily()->onOneServer();
 
-            $this->scheduleInstance->job($this->withCdnJitter(new PullTemplatesFromCDN))->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
-            $this->scheduleInstance->job($this->withCdnJitter(new PullChangelog))->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job($this->withCdnDelay(new PullTemplatesFromCDN, $this->updateCheckFrequency))->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job($this->withCdnDelay(new PullChangelog, $this->updateCheckFrequency))->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->scheduleUpdates();
 
             // Server Jobs
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
-
-            $this->pullImages();
 
             // Scheduled Jobs (Backups & Tasks)
             $this->scheduleScheduledJobManager();
@@ -115,14 +119,6 @@ class Kernel extends ConsoleKernel
             // Cleanup orphaned PR preview containers daily
             $this->scheduleInstance->job(new CleanupOrphanedPreviewContainersJob)->daily()->onOneServer();
         }
-    }
-
-    private function pullImages(): void
-    {
-        $this->scheduleInstance->job($this->withCdnJitter(new CheckHelperImageJob))
-            ->cron($this->updateCheckFrequency)
-            ->timezone($this->instanceTimezone)
-            ->onOneServer();
     }
 
     /**
@@ -164,14 +160,14 @@ class Kernel extends ConsoleKernel
 
     private function scheduleUpdates(): void
     {
-        $this->scheduleInstance->job($this->withCdnJitter(new CheckForUpdatesJob))
+        $this->scheduleInstance->job($this->withCdnDelay(new CheckForUpdatesJob, $this->updateCheckFrequency))
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
 
         if ($this->settings->is_auto_update_enabled) {
             $autoUpdateFrequency = $this->settings->auto_update_frequency;
-            $this->scheduleInstance->job($this->withCdnJitter(new UpdateCoolifyJob))
+            $this->scheduleInstance->job($this->withCdnDelay(new UpdateCoolifyJob, $autoUpdateFrequency))
                 ->cron($autoUpdateFrequency)
                 ->timezone($this->instanceTimezone)
                 ->onOneServer();
@@ -179,12 +175,29 @@ class Kernel extends ConsoleKernel
     }
 
     /**
-     * All instances share the same default cron, so without a random delay they all request the CDN
-     * at the same second and Cloudflare rejects the burst (error 1200).
+     * All instances share the same default cron, so without a delay they all request the CDN at the
+     * same second and Cloudflare rejects the burst (error 1200). Each instance gets a stable offset
+     * inside the cron interval (at most one hour), so the requests spread evenly and each instance
+     * still runs at a regular interval.
      */
-    private function withCdnJitter(object $job): object
+    private function withCdnDelay(object $job, string $cron): object
     {
-        return $job->delay(random_int(0, self::CDN_JITTER_SECONDS));
+        return $job->delay(self::cdnDelaySeconds($cron));
+    }
+
+    public static function cdnDelaySeconds(string $cron): int
+    {
+        try {
+            $expression = new CronExpression($cron);
+            $nextRun = $expression->getNextRunDate();
+            $interval = $expression->getNextRunDate($nextRun)->getTimestamp() - $nextRun->getTimestamp();
+        } catch (\Throwable) {
+            $interval = self::MAX_CDN_DELAY_SECONDS;
+        }
+        $window = max(1, min($interval, self::MAX_CDN_DELAY_SECONDS));
+        $instanceId = (string) (config('app.id') ?: config('app.key'));
+
+        return crc32('cdn-delay:'.$instanceId) % $window;
     }
 
     protected function commands(): void

@@ -5,8 +5,8 @@ import {
     TERMINAL_CONNECT_TIMEOUT_MS,
     TERMINAL_CONNECTION_ERRORS,
     TERMINAL_SESSION_START_TIMEOUT_MS,
-    classifyTerminalServerMessage,
     isTerminalAuthRejectionCode,
+    isTerminalStartupRejection,
     resolveTerminalCloseOutcome,
 } from './terminal-connection.js';
 
@@ -70,15 +70,12 @@ test('an idle close reconnects silently until the retry limit, then reports an e
     });
 });
 
-test('server text messages are classified for backward compatible rejection handling', () => {
-    assert.equal(classifyTerminalServerMessage('Unauthorized: Invalid terminal token'), 'auth-rejected');
-    assert.equal(classifyTerminalServerMessage('Unauthorized: Terminal token was rejected'), 'auth-rejected');
-    assert.equal(classifyTerminalServerMessage('Unauthorized: Missing required tokens'), 'auth-rejected');
-    assert.equal(classifyTerminalServerMessage('Unauthorized: Target host 10.0.0.5 not in authorized list'), 'startup-rejected');
-    assert.equal(classifyTerminalServerMessage('Invalid SSH command: No target host found'), 'startup-rejected');
-    assert.equal(classifyTerminalServerMessage('pty-ready'), null);
-    assert.equal(classifyTerminalServerMessage('root@host:~# '), null);
-    assert.equal(classifyTerminalServerMessage(new Blob([])), null);
+test('session start rejections from the terminal server are detected', () => {
+    assert.equal(isTerminalStartupRejection('Unauthorized: Target host 10.0.0.5 not in authorized list'), true);
+    assert.equal(isTerminalStartupRejection('Invalid SSH command: No target host found'), true);
+    assert.equal(isTerminalStartupRejection('pty-ready'), false);
+    assert.equal(isTerminalStartupRejection('root@host:~# '), false);
+    assert.equal(isTerminalStartupRejection(new Blob([])), false);
 });
 
 test('connection timeouts stay within a bounded window', () => {

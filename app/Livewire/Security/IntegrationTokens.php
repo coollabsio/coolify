@@ -20,6 +20,7 @@ class IntegrationTokens extends Component
     }
 
     #[On('integrationTokenAdded')]
+    #[On('integration-token-deleted')]
     public function loadTokens(): void
     {
         $this->tokens = IntegrationToken::ownedByCurrentTeam()->withCount('dnsZones')->latest()->get();

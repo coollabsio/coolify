@@ -40,6 +40,16 @@ class ServerPolicy
     }
 
     /**
+     * Determine whether the user can transfer the server to another Coolify instance.
+     *
+     * A transfer sends every secret of the server, also locked environment variables, to the target, so only owners may start it.
+     */
+    public function transfer(User $user, Server $server): bool
+    {
+        return $user->roleInTeam($server->team_id) === 'owner';
+    }
+
+    /**
      * Determine whether the user can delete the model.
      */
     public function delete(User $user, Server $server): bool

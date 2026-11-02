@@ -9,6 +9,7 @@ use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Traits\ListensToTeamChannel;
+use App\Traits\PreparesBackupDownloads;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -20,6 +21,7 @@ class BackupExecutions extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use PreparesBackupDownloads;
     use WithPagination;
 
     public Service $service;
@@ -62,6 +64,29 @@ class BackupExecutions extends Component
         $this->executionModalOpen = true;
     }
 
+    public function downloadExecution(string $executionUuid): void
+    {
+        $this->authorize('update', $this->service);
+        $row = $this->executionQuery($executionUuid)->first();
+        abort_unless($row, 404);
+
+        try {
+            if ($row->type === 'database') {
+                $execution = ScheduledDatabaseBackupExecution::query()->with('scheduledDatabaseBackup')->findOrFail($row->id);
+                $server = $execution->scheduledDatabaseBackup->server();
+                $streamUrl = route('download.backup', $execution->id);
+            } else {
+                $execution = ScheduledVolumeBackupExecution::query()->with('scheduledVolumeBackup')->findOrFail($row->id);
+                $server = $execution->scheduledVolumeBackup->server();
+                $streamUrl = route('download.volume-backup', $execution->id);
+            }
+
+            $this->prepareBackupDownload($execution->local_storage_deleted ? null : $server, $execution->filename, $streamUrl);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function closeExecutionModal(): void
     {
         $this->executionModalOpen = false;
@@ -80,6 +105,7 @@ class BackupExecutions extends Component
 
         return view('livewire.project.service.backup-executions', [
             'executions' => $executions,
+            's3Downloads' => $this->s3BackupDownloadsEnabled(),
         ]);
     }
 
@@ -114,11 +140,11 @@ class BackupExecutions extends Component
     private function formatExecutions(Collection $rows): Collection
     {
         $databaseExecutions = ScheduledDatabaseBackupExecution::query()
-            ->with(['scheduledDatabaseBackup.database', 'scheduledDatabaseBackup.s3'])
+            ->with(['scheduledDatabaseBackup.database', 'scheduledDatabaseBackup.s3', 'scheduledDatabaseBackup.s3Storages', 's3Replicas'])
             ->whereIn('id', $rows->where('type', 'database')->pluck('id'))
             ->get()->keyBy('id');
         $volumeExecutions = ScheduledVolumeBackupExecution::query()
-            ->with(['scheduledVolumeBackup.backupable.resource', 's3'])
+            ->with(['scheduledVolumeBackup.backupable.resource', 's3', 's3Replicas'])
             ->whereIn('id', $rows->where('type', 'storage')->pluck('id'))
             ->get()->keyBy('id');
 
@@ -128,11 +154,16 @@ class BackupExecutions extends Component
             $isDatabase = $row->type === 'database';
             $execution = $isDatabase ? $databaseExecutions->get($row->id) : $volumeExecutions->get($row->id);
             $schedule = $isDatabase ? $execution->scheduledDatabaseBackup : $execution->scheduledVolumeBackup;
-            $storage = $isDatabase ? ($schedule->save_s3 ? $schedule->s3 : null) : $execution->s3;
-            if ($storage?->team_id !== $serviceTeamId) {
-                $storage = null;
-            }
-            $storageLabel = $storage ? $storage->name.' (bucket: '.$storage->bucket.')' : 'Unavailable';
+            $storages = match (true) {
+                ! $isDatabase => collect([$execution->s3]),
+                ! $schedule->save_s3 => collect(),
+                $schedule->s3Storages->isNotEmpty() => $schedule->s3Storages,
+                default => collect([$schedule->s3]),
+            };
+            $storageLabel = $storages
+                ->filter(fn ($storage) => $storage?->team_id === $serviceTeamId)
+                ->map(fn ($storage) => $storage->name.' (bucket: '.$storage->bucket.')')
+                ->implode(', ') ?: 'Unavailable';
             if ($isDatabase && ! $schedule->save_s3) {
                 $storageLabel = 'Not configured';
             } elseif (! $isDatabase && ! $execution->s3_storage_id && ! $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
@@ -151,7 +182,7 @@ class BackupExecutions extends Component
                 'size' => $execution->size,
                 'message' => $execution->message,
                 'filename' => $execution->filename,
-                'download_url' => $execution->status === 'success' && ! $execution->local_storage_deleted
+                'download_url' => $execution->status === 'success' && $execution->isDownloadable()
                     ? route($isDatabase ? 'download.backup' : 'download.volume-backup', $execution->id)
                     : null,
             ];

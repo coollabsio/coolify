@@ -8,25 +8,26 @@
             {{-- Exclude is_auto_update_enabled (instantSave) so the bar does not flash. --}}
             <x-unsaved-bar action="submit" targets="update_check_frequency,auto_update_frequency" />
 
-            <x-application.settings-section title="Update Coolify"
+            <x-application.settings-section title="Updates"
                 helper="Install the latest Coolify version manually when an update is available.">
-                <livewire:upgrade :full-button="true" key="settings-upgrade" />
-            </x-application.settings-section>
-
-            <x-application.settings-section title="Update checks">
                 <x-slot:actions>
+                    <livewire:upgrade :full-button="true" key="settings-upgrade" />
                     <x-forms.button type="button" wire:click="checkManually">
                         <x-reicon name="refresh" class="size-3.5" />
                         Check now
                     </x-forms.button>
                 </x-slot:actions>
-                <x-forms.input required id="update_check_frequency" label="Check frequency"
-                    placeholder="0 * * * *"
-                    helper="A cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
-            </x-application.settings-section>
-
-            <x-application.settings-section title="Automatic updates">
                 <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input required id="update_check_frequency" label="Check frequency"
+                        placeholder="0 * * * *"
+                        helper="A cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
+
+                    <x-forms.listbox id="docker_registry_url" label="Docker registry" :options="[
+                        ['value' => 'docker.io', 'label' => 'Docker Hub'],
+                        ['value' => 'ghcr.io', 'label' => 'GitHub Container Registry'],
+                    ]"
+                        helper="Switch registries if the current source is rate limited." />
+
                     @if (!is_null(config('constants.coolify.autoupdate', null)))
                         <x-forms.listbox disabled id="is_auto_update_enabled" label="Automatic updates"
                             helper="Controlled by the AUTOUPDATE environment variable." :options="[
@@ -48,16 +49,6 @@
                     @else
                         <x-forms.input label="Update frequency" disabled placeholder="Disabled" />
                     @endif
-                </div>
-            </x-application.settings-section>
-
-            <x-application.settings-section title="Image registry">
-                <div class="max-w-md">
-                    <x-forms.listbox id="docker_registry_url" label="Docker registry" :options="[
-                        ['value' => 'docker.io', 'label' => 'Docker Hub'],
-                        ['value' => 'ghcr.io', 'label' => 'GitHub Container Registry'],
-                    ]"
-                        helper="Switch registries if the current source is rate limited." />
                 </div>
             </x-application.settings-section>
         </form>

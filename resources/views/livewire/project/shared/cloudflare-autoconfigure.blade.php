@@ -1,4 +1,4 @@
-{{-- DNS entries: Domain Connect (Cloud only + key) and/or generic Type/Name/Value records. --}}
+{{-- DNS menu: check all DNS, Domain Connect (Cloud only + key) and/or generic Type/Name/Value records. --}}
 @php
     $domainConnectAvailable = $this->domainConnectAvailable();
     $dnsAuthResource = property_exists($this, 'application') ? $this->application : $this->service;
@@ -6,9 +6,9 @@
 
 <div x-data="{ dnsEntriesOpen: false }" class="relative" @click.outside="dnsEntriesOpen = false">
     <button type="button" class="button" @click="dnsEntriesOpen = !dnsEntriesOpen" aria-haspopup="menu"
-        x-bind:aria-expanded="dnsEntriesOpen" title="DNS entries for this server">
+        x-bind:aria-expanded="dnsEntriesOpen" title="DNS checks and records for this server">
         <x-reicon name="globe" class="size-3.5" />
-        DNS entries
+        DNS
         <span class="inline-flex transition-transform" :class="dnsEntriesOpen && 'rotate-180'">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
                 stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
@@ -18,6 +18,14 @@
     </button>
     <div x-show="dnsEntriesOpen" x-cloak role="menu" x-transition.origin.top.right
         class="listbox-panel left-auto! right-0! z-[90]! w-56! min-w-56!">
+        @if ($showCheckAllDns ?? false)
+            <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                wire:click="checkAllDns" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns"
+                @click="dnsEntriesOpen = false">
+                <x-reicon name="refresh" class="size-3.5 shrink-0 opacity-70" />
+                Check all DNS
+            </button>
+        @endif
         @if ($domainConnectAvailable)
             <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
                 wire:click="openCloudflareAutoconfigureModal" @click="dnsEntriesOpen = false">

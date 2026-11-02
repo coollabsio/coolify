@@ -28,7 +28,7 @@ if (! function_exists('auditLog')) {
             $token = $user?->currentAccessToken();
             $payload = AuditEvent::redactContext(array_merge([
                 'event' => $event,
-                'ip' => $request?->ip(),
+                'ip' => $request ? (client_ip($request) ?: null) : null,
                 'ua' => substr((string) $request?->userAgent(), 0, 200),
                 'user_id' => $user?->id,
                 'user_email' => $user?->email,
@@ -102,7 +102,7 @@ if (! function_exists('shouldRecordAuditEvent')) {
             $request = app()->bound('request') ? request() : null;
             $fingerprint = hash('sha256', json_encode([
                 $event,
-                $request?->ip(),
+                $request ? client_ip($request) : null,
                 data_get($context, 'reason'),
                 data_get($context, 'server_uuid'),
                 Str::lower(trim((string) data_get($context, 'attempted_email'))),

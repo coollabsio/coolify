@@ -27,8 +27,8 @@ class SshRetryHandler
     /**
      * Convenience static method for retry execution
      */
-    public static function retry(callable $callback, array $context = [], bool $throwError = true)
+    public static function retry(callable $callback, array $context = [], bool $throwError = true, ?int $maxAttempts = null)
     {
-        return self::instance()->executeWithSshRetry($callback, $context, $throwError);
+        return self::instance()->executeWithSshRetry($callback, $context, $throwError, $maxAttempts);
     }
 }

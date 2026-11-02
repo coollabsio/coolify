@@ -11,6 +11,7 @@ Route::middleware(['web', 'auth', 'throttle:60,1'])->group(function () {
     Route::get('/source/github/redirect', [Github::class, 'redirect']);
     Route::get('/source/github/install', [Github::class, 'install']);
     Route::get('/source/gitlab/redirect', [Gitlab::class, 'redirect']);
+    Route::get('/source/gitea/redirect', [Gitea::class, 'redirect']);
 });
 
 Route::post('/source/github/events', [Github::class, 'normal']);
@@ -21,6 +22,7 @@ Route::post('/source/gitlab/events/manual', [Gitlab::class, 'manual']);
 
 Route::post('/source/bitbucket/events/manual', [Bitbucket::class, 'manual']);
 
+Route::post('/source/gitea/events', [Gitea::class, 'normal']);
 Route::post('/source/gitea/events/manual', [Gitea::class, 'manual']);
 
 Route::post('/payments/stripe/events', [Stripe::class, 'events']);

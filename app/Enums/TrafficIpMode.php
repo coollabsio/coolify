@@ -44,7 +44,8 @@ enum TrafficIpMode: string
     }
 
     /**
-     * Drop the `ip` dimension when Sentinel does not record it.
+     * Drop the `ip` and `city` dimensions when Sentinel does not record them
+     * (Sentinel finds the city from the client IP, so `off` stores no cities).
      *
      * @param  array<int, string>  $dimensions
      * @return array<int, string>
@@ -55,7 +56,7 @@ enum TrafficIpMode: string
             return $dimensions;
         }
 
-        return array_values(array_filter($dimensions, fn (string $dimension): bool => $dimension !== 'ip'));
+        return array_values(array_filter($dimensions, fn (string $dimension): bool => ! in_array($dimension, ['ip', 'city'], true)));
     }
 
     public function breakdownLabel(): string

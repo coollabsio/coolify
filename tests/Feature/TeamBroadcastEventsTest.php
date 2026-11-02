@@ -11,7 +11,6 @@ use App\Events\ProxyStatusChangedUI;
 use App\Events\ScheduledTaskDone;
 use App\Events\SentinelRestarted;
 use App\Events\SentinelSynchronized;
-use App\Events\ServerPackageUpdated;
 use App\Events\ServerValidated;
 use App\Events\ServiceChecked;
 use App\Events\ServiceStatusChanged;
@@ -54,7 +53,6 @@ dataset('team broadcast events', [
     FileStorageChanged::class,
     ProxyStatusChangedUI::class,
     ScheduledTaskDone::class,
-    ServerPackageUpdated::class,
     ServerValidated::class,
     ServiceChecked::class,
     ServiceStatusChanged::class,

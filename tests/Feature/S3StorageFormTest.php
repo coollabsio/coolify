@@ -55,6 +55,7 @@ it('tests the S3 connection with the values currently entered in the form', func
     $form->region = 'eu-central-1';
     $form->key = 'new-key';
     $form->secret = 'new-secret';
+    $form->usePathStyleEndpoint = false;
     $form->isUsable = false;
 
     $form->testConnection();
@@ -67,6 +68,7 @@ it('tests the S3 connection with the values currently entered in the form', func
             'region' => 'eu-central-1',
             'key' => 'new-key',
             'secret' => 'new-secret',
+            'use_path_style_endpoint' => false,
         ])
         ->and($form->isUsable)->toBeTrue();
 });

@@ -50,8 +50,6 @@ class DopplerService
     private function client(): PendingRequest
     {
         return Http::withToken($this->token)
-            ->acceptJson()
-            ->connectTimeout(5)
-            ->timeout(10);
+            ->acceptJson();
     }
 }

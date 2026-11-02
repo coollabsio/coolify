@@ -318,7 +318,9 @@ class Telegram extends Component
             ))->sendMessage();
 
             if ($response->failed()) {
-                $reason = $response->json('description') ?? "HTTP {$response->status()}";
+                $reason = in_array($response->status(), [401, 404], true)
+                    ? 'The Bot API token is not valid. Copy it again from @BotFather.'
+                    : ($response->json('description') ?? "HTTP {$response->status()}");
                 $this->dispatch('error', 'Telegram rejected the test notification.', e($reason));
 
                 return;

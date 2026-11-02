@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Actions\Application\CleanupCancelledDeployment;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ChecksTokenAbilities;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
@@ -12,7 +13,13 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly(false)]
+#[IsDestructive]
+#[IsIdempotent]
 class CancelDeployment extends Tool
 {
     protected string $name = 'cancel_deployment';
@@ -20,7 +27,13 @@ class CancelDeployment extends Tool
     protected string $description = 'Cancel a queued or in-progress deployment by deployment UUID for the authenticated team. Requires deploy ability.';
 
     use BuildsResponse;
+    use ChecksTokenAbilities;
     use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return $this->currentTokenCan('deploy');
+    }
 
     public function handle(Request $request): Response
     {

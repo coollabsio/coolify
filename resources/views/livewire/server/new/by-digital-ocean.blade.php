@@ -8,7 +8,7 @@
             <p class="text-[11px] text-neutral-500 dark:text-fg-faint">
                 New to DigitalOcean?
                 <a href="https://coolify.io/digitalocean" target="_blank"
-                    class="font-medium text-coollabs hover:underline dark:text-warning">Create an account</a>
+                    class="font-medium text-coollabs hover:underline dark:text-brand-light">Create an account</a>
                 through Coolify's referral link.
             </p>
         </div>

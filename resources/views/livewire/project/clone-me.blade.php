@@ -20,6 +20,10 @@
                 <div class="max-w-md">
                     <x-forms.input required id="newName" label="New name" />
                 </div>
+                <div class="mt-4 max-w-md">
+                    <x-forms.checkbox id="cloneVolumeData" live label="Clone volume data"
+                        helper="Copies the data of the persistent volumes to the clones. Running source resources are stopped while the data is copied and started again afterwards." />
+                </div>
             </div>
         </section>
 
@@ -48,11 +52,11 @@
                                 wire:click="selectServer('{{ $server->id }}', '{{ $destination->uuid }}')"
                                 @class([
                                     'data-table-row clone-destinations-table-grid w-full border-b border-neutral-200 text-left last:border-b-0 dark:border-white/[0.06]',
-                                    'bg-coollabs/5 dark:bg-warning/[0.06]' => $selectedDestination === $destination->uuid,
+                                    'bg-coollabs/5 dark:bg-brand/[0.08]' => $selectedDestination === $destination->uuid,
                                 ])>
                                 <span @class([
                                     'flex size-4 items-center justify-center rounded-full border',
-                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selectedDestination === $destination->uuid,
+                                    'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $selectedDestination === $destination->uuid,
                                     'border-neutral-300 dark:border-white/[0.15]' => $selectedDestination !== $destination->uuid,
                                 ])>
                                     @if ($selectedDestination === $destination->uuid)
@@ -138,14 +142,35 @@
                 </div>
                 <div
                     class="flex flex-col gap-2 border-t border-neutral-200 p-4 sm:flex-row sm:justify-end dark:border-white/[0.06]">
-                    <x-forms.button isHighlighted wire:click="clone('environment')"
-                        :disabled="! filled($selectedDestination)">
-                        Clone to environment
-                    </x-forms.button>
-                    <x-forms.button isHighlighted wire:click="clone('project')"
-                        :disabled="! filled($selectedDestination)">
-                        Clone to project
-                    </x-forms.button>
+                    @if ($cloneVolumeData)
+                        @foreach (['environment' => 'Clone to environment', 'project' => 'Clone to project'] as $cloneType => $cloneLabel)
+                            <div wire:key="clone-with-volume-data-{{ $cloneType }}">
+                                <x-modal-confirmation title="Clone with volume data?" submitAction="clone('{{ $cloneType }}')"
+                                    :ignoreWire="false" :confirmWithText="false" :confirmWithPassword="false"
+                                    :step2ButtonText="$cloneLabel"
+                                    warningMessage="Running source resources are unavailable while their volume data is copied."
+                                    :actions="[
+                                        'Running source resources are stopped while their volume data is copied.',
+                                        'They are started again after the copy, also when the copy fails.',
+                                    ]">
+                                    <x-slot:trigger>
+                                        <x-forms.button isHighlighted :disabled="! filled($selectedDestination)">
+                                            {{ $cloneLabel }}
+                                        </x-forms.button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
+                            </div>
+                        @endforeach
+                    @else
+                        <x-forms.button isHighlighted wire:click="clone('environment')"
+                            :disabled="! filled($selectedDestination)">
+                            Clone to environment
+                        </x-forms.button>
+                        <x-forms.button isHighlighted wire:click="clone('project')"
+                            :disabled="! filled($selectedDestination)">
+                            Clone to project
+                        </x-forms.button>
+                    @endif
                 </div>
             </div>
         </section>

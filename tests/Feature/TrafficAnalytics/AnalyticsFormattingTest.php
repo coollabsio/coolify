@@ -73,3 +73,25 @@ it('distinguishes a missing response status from numeric values in other dimensi
     'overflow status' => ['status', '__other__', 'Other'],
     'zero in another dimension' => ['path', '0', '0'],
 ]);
+
+it('detects container tooling user agents', function (?string $userAgent, bool $expected) {
+    expect(isContainerToolingUserAgent($userAgent))->toBe($expected);
+})->with([
+    'buildkit' => ['buildkit/v0.33', true],
+    'docker with compose upstream' => ['docker/29.6.2 go/go1.26.5 git-commit/3d80467 kernel/6.1.0-51-amd64 os/linux arch/amd64 UpstreamClient(compose/v5.3.1)', true],
+    'docker-client' => ['docker-client/1.0', true],
+    'containerd' => ['containerd/2.3.3+unknown', true],
+    'podman' => ['podman/5.4.0', true],
+    'skopeo' => ['skopeo/1.18.0', true],
+    'cri-o' => ['cri-o/1.32.1', true],
+    'mixed case' => ['Docker/29.6.2', true],
+    'leading whitespace' => ['  buildkit/v0.33', true],
+    'docker without slash' => ['docker', false],
+    'docker as a later token' => ['curl/8.5.0 docker/29.6.2', false],
+    'docker prefix of another name' => ['dockerd/29.6.2', false],
+    'firefox' => ['Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:156.0) Gecko/20100101 Firefox/156.0', false],
+    'curl' => ['curl/8.5.0', false],
+    'overflow bucket' => ['__other__', false],
+    'empty' => ['', false],
+    'null' => [null, false],
+]);

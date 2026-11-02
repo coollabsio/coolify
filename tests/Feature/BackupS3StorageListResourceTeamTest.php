@@ -112,7 +112,7 @@ test('database backup page offers only usable S3 storages of the database team',
         'database_id' => $this->postgres->id,
         'database_type' => $this->postgres->getMorphClass(),
     ]);
-    $url = route('project.database.backup.s3', [
+    $url = route('project.database.backup.execution', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'database_uuid' => $this->postgres->uuid,

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -674,4 +675,41 @@ function putComposeServiceDomain(
     $domains[$storageKey] = $merged;
 
     return $domains;
+}
+
+/**
+ * Set the stored SERVICE_URL_ and SERVICE_FQDN_ variables of a compose service from its domain.
+ * Port variables (SERVICE_URL_API_8000) get the same URL or host with their port appended.
+ * A null URL and host clear the variables.
+ */
+function syncComposeServiceUrlVariables(Application $application, string $serviceEnvKey, ?string $url, ?string $host): void
+{
+    if ($url !== null) {
+        foreach (['URL' => $url, 'FQDN' => $host] as $type => $value) {
+            $application->environment_variables()->updateOrCreate([
+                'resourceable_type' => Application::class,
+                'resourceable_id' => $application->id,
+                'key' => "SERVICE_{$type}_{$serviceEnvKey}",
+            ], [
+                'value' => $value,
+                'is_preview' => false,
+            ]);
+        }
+    }
+
+    $pattern = '/^SERVICE_(URL|FQDN)_'.preg_quote($serviceEnvKey, '/').'(?:_(\d+))?$/';
+    $application->environment_variables()
+        ->where(fn ($query) => $query->where('key', 'LIKE', "SERVICE_URL_{$serviceEnvKey}%")
+            ->orWhere('key', 'LIKE', "SERVICE_FQDN_{$serviceEnvKey}%"))
+        ->get()
+        ->each(function (EnvironmentVariable $variable) use ($pattern, $url, $host) {
+            if (! preg_match($pattern, $variable->key, $matches)) {
+                return;
+            }
+            $value = $matches[1] === 'URL' ? $url : $host;
+            if ($value !== null && isset($matches[2])) {
+                $value = "{$value}:{$matches[2]}";
+            }
+            $variable->update(['value' => $value]);
+        });
 }

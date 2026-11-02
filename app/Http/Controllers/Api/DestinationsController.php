@@ -284,6 +284,10 @@ class DestinationsController extends Controller
 
     private function existingServerNetworkResponse(Server $server, string $network): ?JsonResponse
     {
+        if (! $server->isFunctional()) {
+            return response()->json(['message' => 'Server is not functional.'], 400);
+        }
+
         try {
             $output = instant_remote_process(["docker network ls --format '{{.Name}}'"], $server);
         } catch (\Throwable) {

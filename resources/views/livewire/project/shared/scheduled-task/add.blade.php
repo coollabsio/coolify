@@ -2,7 +2,7 @@
     <div class="grid gap-4 sm:grid-cols-2">
         <x-forms.input placeholder="Database cleanup" id="name" label="Name" />
         <x-forms.input placeholder="0 0 * * * or daily"
-            helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression."
+            helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression. Runs in the server timezone ({{ $serverTimezone }}). Change it in the server settings."
             id="frequency" label="Schedule" />
     </div>
 

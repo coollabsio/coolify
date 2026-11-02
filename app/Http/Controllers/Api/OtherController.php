@@ -51,62 +51,6 @@ class OtherController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Enable API',
-        description: 'Enable API (only with root permissions).',
-        path: '/enable',
-        operationId: 'enable-api',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Enable API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'API enabled.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 403,
-                description: 'You are not allowed to enable the API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to enable the API.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-        ]
-    )]
-    public function enable_api(Request $request)
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        if ($teamId !== '0') {
-            auditLog('api.instance.enable_denied', ['team_id' => $teamId], 'warning');
-
-            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
-        }
-        $settings = instanceSettings();
-        $settings->update(['is_api_enabled' => true]);
-
-        auditLog('api.instance.enabled', ['team_id' => $teamId]);
-
-        return response()->json(['message' => 'API enabled.'], 200);
-    }
-
-    #[OA\Post(
         summary: 'Disable API',
         description: 'Disable API (only with root permissions).',
         path: '/disable',

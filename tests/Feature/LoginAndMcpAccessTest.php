@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Middleware\ApiAllowed;
-use App\Http\Middleware\ApiIpAllowed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -25,9 +24,9 @@ it('keeps MCP independent from the REST API switch but applies the IP allow-list
     $disable = Route::getRoutes()->match(Request::create('/api/v1/mcp/disable', 'POST'));
 
     expect($mcp->gatherMiddleware())->not->toContain(ApiAllowed::class)
-        ->and($mcp->gatherMiddleware())->toContain(ApiIpAllowed::class)
+        ->and($mcp->gatherMiddleware())->toContain('api.ip.allowed')
         ->and($enable->gatherMiddleware())->not->toContain(ApiAllowed::class)
         ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class)
-        ->and($enable->gatherMiddleware())->toContain('auth:sanctum', 'api.token.team', ApiIpAllowed::class, 'api.ability:write')
-        ->and($disable->gatherMiddleware())->toContain('auth:sanctum', 'api.token.team', ApiIpAllowed::class, 'api.ability:write');
+        ->and($enable->gatherMiddleware())->toContain('auth:sanctum', 'api.token.team', 'api.ip.allowed', 'api.ability:write')
+        ->and($disable->gatherMiddleware())->toContain('auth:sanctum', 'api.token.team', 'api.ip.allowed', 'api.ability:write');
 });

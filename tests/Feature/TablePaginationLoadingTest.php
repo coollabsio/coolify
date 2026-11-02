@@ -68,3 +68,23 @@ it('omits livewire loading markup when no wire target is provided', function () 
         ->not->toContain('wire:target')
         ->not->toContain('Loading page…');
 });
+
+it('keeps the footer on one page while a larger page size is selected', function (int $total, bool $hidden) {
+    $html = Blade::render(
+        '<x-table-pagination :from="1" :to="$total" :total="$total" :current-page="1" :last-page="1">
+            <x-slot:pageSize><x-page-size-select model="perPage" livewire /></x-slot:pageSize>
+        </x-table-pagination>',
+        ['total' => $total]
+    );
+
+    expect((bool) preg_match('/<footer[^>]*\shidden[\s>]/', $html))->toBe($hidden);
+})->with([
+    'more rows than the smallest page size' => [15, false],
+    'all rows fit in the smallest page size' => [10, true],
+]);
+
+it('hides the footer on one page when there is no page size control', function () {
+    $html = Blade::render('<x-table-pagination :from="1" :to="15" :total="15" :current-page="1" :last-page="1" />');
+
+    expect($html)->toMatch('/<footer[^>]*\shidden[\s>]/');
+});

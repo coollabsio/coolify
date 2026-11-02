@@ -1,10 +1,12 @@
-<div wire:init="refreshBackupExecutions">
+<div wire:init="refreshBackupExecutions" x-on:open-backup-download.window="window.location.href = $event.detail.url">
+    @if (count($pendingDownloads) > 0)
+        <div wire:poll.3s="checkDownloads" class="hidden"></div>
+    @endif
     @isset($backup)
         <section class="application-settings-section overflow-hidden">
             <div class="application-settings-section-header">
                 <div>
                     <h2>Executions</h2>
-                    <p>Review generated archives, storage availability, and backup output.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <x-forms.button wire:click="cleanupFailed">Clean failed backups</x-forms.button>
@@ -37,9 +39,8 @@
                             class="data-table-header backup-executions-table-grid h-auto rounded-none px-4 py-2.5 text-[11px]">
                             <span>Status</span>
                             <span>Database</span>
-                            <span>Backup path</span>
-                            <span>Finished</span>
-                            <span>Duration</span>
+                            <span>Archive</span>
+                            <span>Time</span>
                             <span>Size</span>
                             <span>Availability</span>
                             <span class="text-right">Actions</span>
@@ -58,6 +59,11 @@
                                     'failed' => ['Failed', 'error'],
                                     default => [str($executionStatus)->headline(), 'neutral'],
                                 };
+                                $finishedAt = \Carbon\Carbon::parse(data_get($execution, 'finished_at') ?? data_get($execution, 'updated_at'));
+                                $s3Replicas = $execution->s3Replicas;
+                                $hasLiveS3Copies = $s3Replicas->isNotEmpty()
+                                    ? $s3Replicas->contains(fn ($replica) => $replica->s3_uploaded === true && ! $replica->s3_storage_deleted)
+                                    : data_get($execution, 's3_uploaded') === true && ! data_get($execution, 's3_storage_deleted', false);
                                 $executionCheckboxes = [];
                                 $deleteActions = [];
 
@@ -65,11 +71,10 @@
                                     $deleteActions[] = 'This backup will be permanently deleted from local storage.';
                                 }
 
-                                if (data_get($execution, 's3_uploaded') === true
-                                    && ! data_get($execution, 's3_storage_deleted', false)) {
+                                if ($hasLiveS3Copies) {
                                     $executionCheckboxes[] = [
                                         'id' => 'delete_backup_s3',
-                                        'label' => 'Delete the selected backup permanently from S3 Storage',
+                                        'label' => 'Delete the selected backup permanently from every S3 storage',
                                     ];
                                 }
 
@@ -82,48 +87,52 @@
                                 <div class="data-table-row backup-executions-table-grid min-h-14 border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.06]">
                                     <div class="flex items-center gap-2">
                                         <x-status-badge :status="$executionStatusLabel"
-                                            :type="$executionStatusType" />
-                                        @if ($executionStatus === 'running')
-                                            <x-loading />
-                                        @endif
+                                            :type="$executionStatusType" :pulse="$executionStatus === 'running'" />
                                     </div>
                                     <div class="truncate text-[12px] font-medium text-black dark:text-fg">
                                         {{ data_get($execution, 'database_name', 'N/A') }}
                                     </div>
-                                    <div class="flex min-w-0 items-center gap-1">
-                                        <code class="select-all truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim"
-                                            title="Backup path: {{ data_get($execution, 'filename', 'N/A') }}">{{ data_get($execution, 'filename', 'N/A') }}</code>
-                                        <x-copy-button :value="data_get($execution, 'filename', '')" label="Copy backup path" />
+                                    <div class="min-w-0">
+                                        <x-forms.copy-input :text="data_get($execution, 'filename') ?? 'No archive name'" />
                                     </div>
-                                    <div class="text-[11px] text-neutral-600 dark:text-fg-dim"
+                                    <div class="text-[11px] text-neutral-500 dark:text-fg-faint"
                                         title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $server) }}@if ($executionStatus !== 'running')&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}@endif">
                                         @if ($executionStatus === 'running')
-                                            Running now
+                                            Running for {{ calculateDuration(data_get($execution, 'created_at'), now()) }}
                                         @else
                                             <div class="text-black dark:text-fg">
-                                                {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}
+                                                {{ formatDateInServerTimezone($finishedAt, $server) }}
                                             </div>
-                                            <div>{{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}</div>
+                                            <div>{{ $finishedAt->diffForHumans() }} · {{ calculateDuration(data_get($execution, 'created_at'), $finishedAt) }}</div>
                                         @endif
                                     </div>
-                                    <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                                        {{ calculateDuration(
-                                            data_get($execution, 'created_at'),
-                                            $executionStatus === 'running' ? now() : data_get($execution, 'finished_at'),
-                                        ) }}
-                                    </div>
-                                    <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
+                                    <div class="tabular-nums text-neutral-500 dark:text-fg-dim">
                                         {{ data_get($execution, 'size') ? formatBytes(data_get($execution, 'size')) : '-' }}
                                     </div>
                                     <div class="flex flex-wrap items-center gap-1.5">
-                                        <x-status-badge label="Local"
-                                            :status="data_get($execution, 'local_storage_deleted', false) ? 'Deleted' : 'Available'"
+                                        <x-status-badge
+                                            :status="data_get($execution, 'local_storage_deleted', false) ? 'Local deleted' : 'Local'"
                                             :type="data_get($execution, 'local_storage_deleted', false) ? 'neutral' : 'success'" />
-                                        @if (data_get($execution, 's3_uploaded') !== null)
-                                            <x-status-badge label="S3"
+                                        @foreach ($s3Replicas as $replica)
+                                            <x-status-badge wire:key="database-backup-replica-{{ $replica->id }}"
+                                                :label="$replica->s3?->name ?? 'Removed S3 storage'"
+                                                :status="$replica->s3_storage_deleted
+                                                    ? 'deleted'
+                                                    : match ($replica->s3_uploaded) {
+                                                        true => null,
+                                                        false => 'failed',
+                                                        default => $executionStatus === 'running' ? 'pending' : 'not uploaded',
+                                                    }"
+                                                :type="$replica->s3_storage_deleted || $replica->s3_uploaded === null
+                                                    ? 'neutral'
+                                                    : ($replica->s3_uploaded ? 'success' : 'error')"
+                                                :title="$replica->message" />
+                                        @endforeach
+                                        @if ($s3Replicas->isEmpty() && data_get($execution, 's3_uploaded') !== null)
+                                            <x-status-badge
                                                 :status="data_get($execution, 's3_storage_deleted', false)
-                                                    ? 'Deleted'
-                                                    : (data_get($execution, 's3_uploaded') ? 'Available' : 'Failed')"
+                                                    ? 'S3 deleted'
+                                                    : (data_get($execution, 's3_uploaded') ? 'S3' : 'S3 failed')"
                                                 :type="data_get($execution, 's3_storage_deleted', false)
                                                     ? 'neutral'
                                                     : (data_get($execution, 's3_uploaded') ? 'success' : 'error')" />
@@ -189,7 +198,11 @@
 @script
     <script>
         window.download_file = function(executionId) {
-            window.open('/download/backup/' + executionId, '_blank');
+            @if ($s3Downloads)
+                $wire.download_file(executionId);
+            @else
+                window.open('/download/backup/' + executionId, '_blank');
+            @endif
         }
     </script>
 @endscript

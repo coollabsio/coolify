@@ -44,6 +44,7 @@ beforeEach(function () {
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id,
     ]);
     $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
 function destinationsApiHeaders(string $bearerToken): array
@@ -128,6 +129,18 @@ describe('POST /api/v1/servers/{server_uuid}/destinations', function () {
         expect(StandaloneDocker::where('server_id', $this->server->id)
             ->where('network', 'api-standalone-network')
             ->exists())->toBeTrue();
+    });
+
+    test('does not connect to a server that is not validated', function () {
+        $this->server->settings->update(['is_reachable' => false, 'is_usable' => false]);
+
+        $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/destinations", ['network' => 'api-standalone-network'])
+            ->assertStatus(400)
+            ->assertJsonPath('message', 'Server is not functional.');
+
+        Process::assertNothingRan();
+        expect(StandaloneDocker::where('network', 'api-standalone-network')->exists())->toBeFalse();
     });
 
     test('requires a write token', function () {

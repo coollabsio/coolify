@@ -8,6 +8,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use Illuminate\Http\JsonResponse;
@@ -404,14 +405,17 @@ class ServiceDatabasesController extends Controller
 
         [$serviceDatabase, $server] = $resolved;
         $containerName = $serviceDatabase->name.'-'.$serviceDatabase->service->uuid;
-        if (getContainerStatus($server, $containerName) !== 'running') {
+        if (! is_array(getContainerStatus($server, $containerName, all_data: true))) {
             return response()->json(['message' => 'Service database container is not running.'], 400);
         }
 
         $lines = normalizeLogLines($request->query('lines'));
 
         return response()->json([
-            'logs' => getContainerLogs($server, $containerName, $lines),
+            'logs' => sanitizeLogsForExport(
+                getContainerLogs($server, $containerName, $lines),
+                EnvironmentVariable::logRedactionSecretsFor($serviceDatabase->service),
+            ),
         ]);
     }
 

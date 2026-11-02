@@ -44,6 +44,8 @@
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
     // Prefer a rich HTML button title when callers pass <x-slot:button-title> (ComponentSlot).
     $resolvedButtonTitle = $buttonTitle instanceof ComponentSlot ? $buttonTitle : $buttonTitle;
+    // Show a loading state on the trigger button while the submit action runs (needs Livewire updates, so not with wire:ignore).
+    $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -66,6 +68,7 @@
     dispatchAction: @js($dispatchAction),
     submitting: false,
     passwordError: '',
+    checkboxIds: @js(collect($checkboxes)->pluck('id')->values()->all()),
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
     dispatchEventType: @js($dispatchEventType),
@@ -101,6 +104,9 @@
                 return Promise.resolve(this.passwordError);
             }
         }
+        // The checkboxes are not bound with wire:model, so send their state with the call.
+        // Methods that read the properties (for example stop() with $docker_cleanup) get what the user saw.
+        this.checkboxIds.forEach(id => $wire.$set(id, this.selectedActions.includes(id), false));
         if (this.dispatchAction) {
             $wire.dispatch(this.submitAction);
             return Promise.resolve(true);
@@ -125,11 +131,9 @@
                 }
             });
     },
-    toggleAction(id) {
-        const index = this.selectedActions.indexOf(id);
-        if (index > -1) {
-            this.selectedActions.splice(index, 1);
-        } else {
+    setAction(id, checked) {
+        this.selectedActions = this.selectedActions.filter(selectedId => selectedId !== id);
+        if (checked) {
             this.selectedActions.push(id);
         }
     }
@@ -179,31 +183,31 @@
                 @endif
             @elseif ($isErrorButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError @click="modalOpen=true">
+                    <x-forms.button class="w-full" isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError @click="modalOpen=true">
+                    <x-forms.button isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif($isHighlightedButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @else
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
@@ -243,7 +247,8 @@
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
-                                        x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}"
+                                        :domValue="$checkbox['id']" autocomplete="off"
+                                        x-on:change="setAction('{{ $checkbox['id'] }}', $event.target.checked)" :checked="$this->{$checkbox['id']}"
                                         x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
                             @endforeach
@@ -364,13 +369,17 @@
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Your Password
                                 </label>
-                                <form @submit.prevent="false" @keydown.enter.prevent>
-                                    <input type="text" name="username" autocomplete="username"
-                                        value="{{ auth()->user()->email }}" style="display: none;">
-                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}"
-                                        x-model="password" class="w-full input" placeholder="Enter your password"
-                                        autocomplete="current-password">
-                                </form>
+                                {{-- Add the field when this step shows: password managers do not detect a hidden field that becomes visible. --}}
+                                <template x-if="step === 3">
+                                    <form @submit.prevent="false" @keydown.enter.prevent>
+                                        <input type="text" name="username" autocomplete="username"
+                                            value="{{ auth()->user()->email }}" style="display: none;">
+                                        <input type="password" id="password-confirm-{{ $passwordConfirm }}"
+                                            x-model="password" x-init="$nextTick(() => $el.focus())"
+                                            class="w-full input" placeholder="Enter your password"
+                                            autocomplete="current-password">
+                                    </form>
+                                </template>
                                 <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
                                 </p>
                                 @error('password')

@@ -3,8 +3,6 @@
 namespace App\Notifications\VolumeBackup;
 
 use App\Models\ScheduledVolumeBackup;
-use App\Models\ServiceApplication;
-use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
@@ -29,10 +27,7 @@ class BackupSuccess extends CustomEmailNotification
         $this->target = $backup->targetType().' '.$backup->targetName();
         $this->frequency = $backup->frequency;
 
-        $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
-        if ($linkable && method_exists($linkable, 'link')) {
-            $this->url = $linkable->link();
-        }
+        $this->url = $backup->resourceUrl();
     }
 
     public function via(object $notifiable): array

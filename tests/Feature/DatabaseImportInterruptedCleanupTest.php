@@ -205,9 +205,9 @@ test('the cleanup runs at most once per import', function () {
     $listener->handle(new DatabaseImportFinished($cleanup));
     $listener->handle(new DatabaseImportFinished([...$cleanup, 'stopRestore' => true]));
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, "s3-restore-{$operation}"), 1);
-    Process::assertRan(fn ($process) => str_contains($process->command, "/tmp/restore_{$operation}")
-        && str_contains($process->command, 'Stopping the database import processes'));
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), "s3-restore-{$operation}"), 1);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "/tmp/restore_{$operation}")
+        && str_contains(remoteProcessScript($process), 'Stopping the database import processes'));
 });
 
 test('the cleanup of an import without an operation id still runs every time', function () {
@@ -218,7 +218,7 @@ test('the cleanup of an import without an operation id still runs every time', f
     $listener->handle(new DatabaseImportFinished($cleanup));
     $listener->handle(new DatabaseImportFinished($cleanup));
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, $cleanup['containerName']), 2);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), $cleanup['containerName']), 2);
 });
 
 it('keeps the stop message when the stopped import process ends afterwards', function () {
@@ -277,7 +277,7 @@ it('keeps the stop message when the stopped import job fails', function () {
 test('an import task may run longer than the SSH command timeout while other remote tasks keep the default timeout', function (int $commandTimeout) {
     config()->set('constants.ssh.command_timeout', $commandTimeout);
     Process::swap(new ProcessFactory);
-    Process::fake([
+    fakeRemoteProcesses([
         '*stat -c %s*' => Process::result('2048'),
         '*od -An -tx1*' => Process::result(' 2d 2d 20 50 6f 73'),
         '*' => Process::result(''),
@@ -314,8 +314,8 @@ test('a failed import task stops the remote restore and blocks the database unti
 
     (new CleanupDatabaseImport)->handle(new DatabaseImportFinished([...$cleanup, 'stopRestore' => true]));
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "/tmp/restore_{$operation}")
-        && str_contains($process->command, 'Stopping the database import processes'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "/tmp/restore_{$operation}")
+        && str_contains(remoteProcessScript($process), 'Stopping the database import processes'));
     $activity->refresh();
     expect(data_get($activity, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
         ->and(data_get($activity, 'properties.error'))->toBe('App\\Jobs\\CoolifyTask has timed out. '.ResourceStartActivity::IMPORT_STOPPED_MESSAGE)
@@ -379,7 +379,7 @@ test('an import whose SSH command ends without the restore result stops the rest
     Process::fake();
     (new CleanupDatabaseImport)->handle(new DatabaseImportFinished([...$cleanup, 'stopRestore' => true]));
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'Stopping the database import processes'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'Stopping the database import processes'));
     $activity->refresh();
     expect(data_get($activity, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
         ->and(data_get($activity, 'properties.error'))->toBe("{$reason} ".ResourceStartActivity::IMPORT_STOPPED_MESSAGE)
@@ -426,7 +426,7 @@ test('a restore that exits like a lost SSH connection or timeout reports a norma
     $this->server->update(['user' => $user]);
     Server::flushIdentityMap();
     Process::swap(new ProcessFactory);
-    Process::fake([
+    fakeRemoteProcesses([
         '*stat -c %s*' => Process::result('2048'),
         '*od -An -tx1*' => Process::result(' 2d 2d 20 50 6f 73'),
         '*' => Process::result(''),
@@ -440,12 +440,15 @@ test('a restore that exits like a lost SSH connection or timeout reports a norma
     expect($restoreLine)->toContain($scriptPath);
 
     // Fake sudo and docker: `docker exec <container> ...` runs the restore script on this machine.
+    // Database images have no sudo (#9949), so sudo fails inside the fake container.
     $dir = sys_get_temp_dir().'/coolify-restore-exit-'.Str::random(8);
-    mkdir($dir);
+    mkdir("{$dir}/container", recursive: true);
     file_put_contents("{$dir}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
-    file_put_contents("{$dir}/docker", "#!/bin/sh\n[ \"\$1\" = exec ] || exit 1\nshift 2\nexec \"\$@\"\n");
+    file_put_contents("{$dir}/container/sudo", "#!/bin/sh\necho 'sh: sudo: not found' >&2\nexit 127\n");
+    file_put_contents("{$dir}/docker", "#!/bin/sh\n[ \"\$1\" = exec ] || exit 1\nshift 2\nPATH=\"{$dir}/container:\$PATH\" exec \"\$@\"\n");
     file_put_contents($scriptPath, "echo restoring\nexit {$restoreExitCode}\n");
     chmod("{$dir}/sudo", 0755);
+    chmod("{$dir}/container/sudo", 0755);
     chmod("{$dir}/docker", 0755);
     chmod($scriptPath, 0755);
 
@@ -454,9 +457,12 @@ test('a restore that exits like a lost SSH connection or timeout reports a norma
         $restore->run();
 
         expect($restore->getExitCode())->toBe($expectedExitCode)
-            ->and($restore->getOutput())->toContain('restoring');
+            ->and($restore->getOutput())->toContain('restoring')
+            ->and($restore->getErrorOutput())->not->toContain('sudo: not found');
     } finally {
         @unlink($scriptPath);
+        @unlink("{$dir}/container/sudo");
+        rmdir("{$dir}/container");
         array_map('unlink', glob("{$dir}/*"));
         rmdir($dir);
     }

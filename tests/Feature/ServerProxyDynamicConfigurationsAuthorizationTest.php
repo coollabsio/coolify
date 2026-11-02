@@ -31,10 +31,10 @@ beforeEach(function () {
     $this->server->settings->forceFill(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false])->save();
 
     Process::fake(function ($process) {
-        if (str_contains($process->command, 'ls -1')) {
+        if (str_contains(remoteProcessScript($process), 'ls -1')) {
             return Process::result(output: "zzfix-auth.yaml\n");
         }
-        if (str_contains($process->command, 'zzfix-auth.yaml')) {
+        if (str_contains(remoteProcessScript($process), 'zzfix-auth.yaml')) {
             return Process::result(output: "http:\n  middlewares:\n    auth:\n      basicAuth:\n        users:\n          - 'zzfix:\$apr1\$zzfixsecrethash'\n");
         }
 
@@ -65,7 +65,7 @@ it('does not load dynamic configuration contents for a team member', function ()
         ->and(json_encode($component->snapshot))->not->toContain('zzfixsecrethash')
         ->and($component->html())->not->toContain('zzfixsecrethash')
         ->and($component->html())->toContain('zzfix-auth.yaml');
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'head -c'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'head -c'));
 });
 
 it('loads dynamic configuration contents for a team admin', function () {

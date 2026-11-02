@@ -25,12 +25,7 @@ class Member extends Component
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
                 throw new \Exception('You are not authorized to perform this action.');
             }
-            $teamId = currentTeam()->id;
-            DB::transaction(function () use ($teamId): void {
-                $this->member->teams()->updateExistingPivot($teamId, ['role' => Role::ADMIN->value]);
-                RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
-            });
-            $this->auditRoleUpdate($teamId, Role::ADMIN);
+            $this->updateRole(Role::ADMIN);
             $this->dispatch('reloadWindow');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
@@ -46,12 +41,7 @@ class Member extends Component
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
                 throw new \Exception('You are not authorized to perform this action.');
             }
-            $teamId = currentTeam()->id;
-            DB::transaction(function () use ($teamId): void {
-                $this->member->teams()->updateExistingPivot($teamId, ['role' => Role::OWNER->value]);
-                RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
-            });
-            $this->auditRoleUpdate($teamId, Role::OWNER);
+            $this->updateRole(Role::OWNER);
             $this->dispatch('reloadWindow');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
@@ -67,12 +57,7 @@ class Member extends Component
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
                 throw new \Exception('You are not authorized to perform this action.');
             }
-            $teamId = currentTeam()->id;
-            DB::transaction(function () use ($teamId): void {
-                $this->member->teams()->updateExistingPivot($teamId, ['role' => Role::MEMBER->value]);
-                RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
-            });
-            $this->auditRoleUpdate($teamId, Role::MEMBER);
+            $this->updateRole(Role::MEMBER);
             $this->dispatch('reloadWindow');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
@@ -114,8 +99,17 @@ class Member extends Component
         return $this->member->teams()->where('teams.id', currentTeam()->id)->first()?->pivot?->role;
     }
 
-    private function auditRoleUpdate(int $teamId, Role $role): void
+    private function updateRole(Role $role): void
     {
+        $teamId = currentTeam()->id;
+        $previousRole = Role::from($this->getMemberRole());
+        DB::transaction(function () use ($teamId, $role, $previousRole): void {
+            $this->member->teams()->updateExistingPivot($teamId, ['role' => $role->value]);
+            // A promotion keeps the tokens: the API checks the abilities against the role on each request.
+            if ($role->lt($previousRole)) {
+                RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
+            }
+        });
         auditLog('ui.team_member.role_updated', [
             'team_id' => $teamId,
             'member_id' => $this->member->id,

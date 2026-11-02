@@ -34,14 +34,33 @@ class Terminal extends Component
 
     public string $variant = 'default';
 
+    /**
+     * Whether the selected container can be attached to (its main process keeps stdin open).
+     */
+    public bool $attachAvailable = false;
+
+    /**
+     * Active terminal mode: 'shell' (docker exec) or 'attach' (docker attach).
+     */
+    public string $terminalMode = 'shell';
+
+    // Remembered target so the mode switch can reconnect without re-selecting a container.
+    public bool $currentIsContainer = false;
+
+    public ?string $currentIdentifier = null;
+
+    public ?string $currentServerUuid = null;
+
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);
+        // Non-root SSH users need sudo to reach the Docker socket.
+        $sudo = $server->isNonRoot() ? 'sudo ' : '';
         try {
             instant_remote_process([
-                "docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
-                "docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
-            ], $server);
+                "{$sudo}docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
+                "{$sudo}docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
+            ], $server, no_sudo: true);
 
             return true;
         } catch (Throwable) {
@@ -49,8 +68,40 @@ class Terminal extends Component
         }
     }
 
+    private function containerKeepsStdinOpen(Server $server, string $container): bool
+    {
+        $escapedContainer = escapeshellarg($container);
+        // Non-root SSH users need sudo to reach the Docker socket.
+        $sudo = $server->isNonRoot() ? 'sudo ' : '';
+        try {
+            $output = instant_remote_process([
+                "{$sudo}docker inspect --format '{{.Config.OpenStdin}}' {$escapedContainer} 2>/dev/null",
+            ], $server, false, no_sudo: true);
+
+            return is_string($output) && str_starts_with(trim($output), 'true');
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Resolve the effective terminal mode. Falls back to shell whenever attach is not available.
+     */
+    public function resolveMode(?string $requestedMode): string
+    {
+        if ($requestedMode === 'attach') {
+            return $this->attachAvailable ? 'attach' : 'shell';
+        }
+
+        if ($requestedMode === 'shell') {
+            return 'shell';
+        }
+
+        return $this->attachAvailable ? 'attach' : 'shell';
+    }
+
     #[On('send-terminal-command')]
-    public function sendTerminalCommand($isContainer, $identifier, $serverUuid, TerminalSessionService $terminalSessionService): void
+    public function sendTerminalCommand($isContainer, $identifier, $serverUuid, ?string $requestedMode = null): void
     {
         try {
             $this->authorize('canAccessTerminal');
@@ -69,6 +120,11 @@ class Terminal extends Component
             return;
         }
 
+        // Remember the target so the mode switch can reconnect without re-selecting.
+        $this->currentIsContainer = (bool) $isContainer;
+        $this->currentIdentifier = $identifier;
+        $this->currentServerUuid = $serverUuid;
+
         if ($isContainer) {
             // Validate container identifier format (alphanumeric, dashes, and underscores only)
             if (! is_string($identifier) || ! ValidationPatterns::isValidContainerName($identifier)) {
@@ -77,7 +133,7 @@ class Terminal extends Component
                 return;
             }
 
-            // Verify container exists and belongs to the user's team
+            // Verify the container is running on the authorized server
             $status = getContainerStatus($server, $identifier);
             if ($status !== 'running') {
                 $this->failTerminalSession('The container is not running.');
@@ -85,16 +141,25 @@ class Terminal extends Component
                 return;
             }
 
-            // Check shell availability
+            // Check shell availability and whether the container can be attached to.
             $this->hasShell = $this->checkShellAvailability($server, $identifier);
-            if (! $this->hasShell) {
+            $this->attachAvailable = $this->containerKeepsStdinOpen($server, $identifier);
+
+            $mode = $this->resolveMode($requestedMode);
+            $this->terminalMode = $mode;
+
+            // Shell mode needs a shell; console (attach) mode does not.
+            if ($mode === 'shell' && ! $this->hasShell) {
                 $this->failTerminalSession('No shell is available in this container.');
 
                 return;
             }
+        } else {
+            $this->attachAvailable = false;
+            $mode = $this->terminalMode = 'shell';
         }
 
-        $token = $terminalSessionService->issue(auth()->user(), $server, $isContainer ? $identifier : null);
+        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode);
         $this->dispatch('send-terminal-token', $token);
     }
 
@@ -118,6 +183,23 @@ class Terminal extends Component
     private function failTerminalSession(string $message): void
     {
         $this->dispatch(self::SESSION_FAILED_EVENT, message: $message)->self();
+    }
+
+    /**
+     * Switch between shell and console (attach) mode and reconnect to the current container.
+     */
+    #[On('set-terminal-mode')]
+    public function setMode(string $mode): void
+    {
+        if (! in_array($mode, ['shell', 'attach'], true)) {
+            return;
+        }
+
+        if (! $this->currentIsContainer || $this->currentIdentifier === null || $this->currentServerUuid === null) {
+            return;
+        }
+
+        $this->sendTerminalCommand(true, $this->currentIdentifier, $this->currentServerUuid, $mode);
     }
 
     #[On('terminalConnected')]

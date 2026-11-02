@@ -7,9 +7,9 @@
 
 @php
     $minHeight = match ($size) {
-        'sm' => 'min-h-44',
+        'sm' => 'min-h-32',
         'lg' => 'min-h-96',
-        default => 'min-h-80',
+        default => 'min-h-40',
     };
 
     $iconBox = match ($size) {
@@ -24,16 +24,7 @@
         default => 'size-5',
     };
 
-    $titleClass = match ($size) {
-        'sm' => 'text-[14px] font-semibold text-black dark:text-fg',
-        'lg' => 'text-base font-semibold text-black dark:text-fg',
-        default => 'text-[15px] font-semibold text-black dark:text-fg',
-    };
-
-    $descriptionClass = match ($size) {
-        'sm' => 'mt-1 max-w-sm text-[12px] leading-5 text-neutral-500 dark:text-fg-dim',
-        default => 'mt-1 max-w-sm text-[13px] leading-5 text-neutral-500 dark:text-fg-dim',
-    };
+    $descriptionClass = $size === 'sm' ? 'text-[12px]' : 'text-[13px]';
 
     $hasIconSlot = isset($icon) && $icon instanceof \Illuminate\View\ComponentSlot && ! $icon->isEmpty();
     $hasIconName = filled($iconName);
@@ -48,31 +39,30 @@
     }
 @endphp
 
-{{-- Empty state: dashed card, icon badge, title, description, optional actions. --}}
-<div
-    {{ $attributes->merge([
-        'class' => "empty-state flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 px-6 py-10 text-center dark:border-white/[0.1] {$minHeight}",
-    ]) }}>
-    @if ($hasIcon)
-        <div
-            class="{{ $iconBox }} flex items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
-            @if ($hasIconSlot)
-                {{ $icon }}
-            @else
-                <x-reicon :name="$iconName" class="{{ $iconSize }}" />
-            @endif
-        </div>
-    @endif
+{{-- Empty state: card frame around an inset well with centered text. Inside a layer card, the card is the frame. --}}
+<div {{ $attributes->merge(['class' => 'empty-state w-full']) }}>
+    <div class="empty-state-well {{ $minHeight }}">
+        @if ($hasIcon)
+            <div
+                class="{{ $iconBox }} flex items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
+                @if ($hasIconSlot)
+                    {{ $icon }}
+                @else
+                    <x-reicon :name="$iconName" class="{{ $iconSize }}" />
+                @endif
+            </div>
+        @endif
 
-    <h2 class="{{ $titleClass }}">{{ $title }}</h2>
+        <h2 class="empty-state-title">{{ $title }}</h2>
 
-    @if ($description)
-        <p class="{{ $descriptionClass }}">{{ $description }}</p>
-    @endif
+        @if ($description)
+            <p class="empty-state-description {{ $descriptionClass }}">{{ $description }}</p>
+        @endif
 
-    @if ($footer)
-        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {{ $footer }}
-        </div>
-    @endif
+        @if ($footer)
+            <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                {{ $footer }}
+            </div>
+        @endif
+    </div>
 </div>

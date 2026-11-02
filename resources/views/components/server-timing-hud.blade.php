@@ -186,10 +186,11 @@
 
         const panel = qs(root, '[data-sth-panel]');
         if (panel) {
-            // Dropdown below the pill inside the top bar.
+            // Dropdown below the pill inside the top bar. The desktop pill sits after the
+            // breadcrumb (left side), so its panel opens to the right; the mobile pill is on the right.
             panel.style.position = 'absolute';
-            panel.style.right = '0';
-            panel.style.left = 'auto';
+            panel.style.right = isMobileSlot ? '0' : 'auto';
+            panel.style.left = isMobileSlot ? 'auto' : '0';
             panel.style.top = 'calc(100% + 8px)';
             panel.style.bottom = 'auto';
             panel.style.zIndex = '2147483001';

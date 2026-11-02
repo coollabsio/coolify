@@ -77,6 +77,9 @@ class Email extends Component
     public bool $deploymentFailureEmailNotifications = true;
 
     #[Validate(['boolean'])]
+    public bool $deploymentCommitDetailsEmailNotifications = false;
+
+    #[Validate(['boolean'])]
     public bool $statusChangeEmailNotifications = false;
 
     #[Validate(['boolean'])]
@@ -156,6 +159,7 @@ class Email extends Component
 
             $this->settings->deployment_success_email_notifications = $this->deploymentSuccessEmailNotifications;
             $this->settings->deployment_failure_email_notifications = $this->deploymentFailureEmailNotifications;
+            $this->settings->deployment_commit_details_email_notifications = $this->deploymentCommitDetailsEmailNotifications;
             $this->settings->status_change_email_notifications = $this->statusChangeEmailNotifications;
             $this->settings->restart_limit_reached_email_notifications = $this->restartLimitReachedEmailNotifications;
             $this->settings->backup_success_email_notifications = $this->backupSuccessEmailNotifications;
@@ -197,6 +201,7 @@ class Email extends Component
 
             $this->deploymentSuccessEmailNotifications = $this->settings->deployment_success_email_notifications;
             $this->deploymentFailureEmailNotifications = $this->settings->deployment_failure_email_notifications;
+            $this->deploymentCommitDetailsEmailNotifications = $this->settings->deployment_commit_details_email_notifications;
             $this->statusChangeEmailNotifications = $this->settings->status_change_email_notifications;
             $this->restartLimitReachedEmailNotifications = $this->settings->restart_limit_reached_email_notifications;
             $this->backupSuccessEmailNotifications = $this->settings->backup_success_email_notifications;
@@ -229,6 +234,18 @@ class Email extends Component
 
         $this->syncData(true);
         $this->dispatch('success', 'Email notifications settings updated.');
+    }
+
+    public function instantSaveDeploymentCommitDetails()
+    {
+        try {
+            $this->resetErrorBag();
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->deploymentCommitDetailsEmailNotifications = $this->settings->deployment_commit_details_email_notifications;
+
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave(?string $type = null)

@@ -25,6 +25,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\RootSetupWindow;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -33,6 +34,8 @@ use Illuminate\Support\Str;
  */
 function seedBrowserInstanceSettings(array $attributes = []): InstanceSettings
 {
+    RootSetupWindow::openIfNoUserExists();
+
     return InstanceSettings::forceCreate(array_merge([
         'id' => 0,
         'is_sponsorship_popup_enabled' => false,

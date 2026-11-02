@@ -53,7 +53,7 @@ beforeEach(function () {
 
     $this->remoteLines = [];
     Process::fake(function ($process) {
-        $command = $process->command;
+        $command = remoteProcessScript($process);
         if (str_contains($command, ' scp ') && preg_match("~'([^']+)' \\S+:'([^']+)'$~", $command, $matches)) {
             copy($matches[1], $matches[2]);
 

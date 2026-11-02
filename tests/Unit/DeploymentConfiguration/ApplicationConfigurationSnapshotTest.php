@@ -148,6 +148,22 @@ it('detects deployment hook changes as redeploy-only changes', function (string 
     'post-deployment container' => ['post_deployment_command_container', 'Post-deployment command container', 'worker'],
 ]);
 
+it('detects HTTP basic auth hash setting changes as redeploy-only changes', function (string $field, string $label, string|int $newValue) {
+    $application = snapshotTestApplication();
+    markSnapshotTestApplicationDeployed($application);
+
+    $application->update([$field => $newValue]);
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->requiresBuild())->toBeFalse()
+        ->and(collect($diff->changes())->pluck('label'))->toContain($label);
+})->with([
+    'hash algorithm' => ['http_basic_auth_hash_algorithm', 'HTTP basic auth hash algorithm', 'argon2id'],
+    'bcrypt cost factor' => ['http_basic_auth_bcrypt_cost', 'HTTP basic auth bcrypt cost factor', 4],
+    'Argon2id memory' => ['http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', 8192],
+    'Argon2id iterations' => ['http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', 2],
+]);
+
 it('detects source integration changes as build changes', function (string $field, string $label, mixed $newValue) {
     $application = snapshotTestApplication([
         'source_id' => 1,
@@ -389,4 +405,53 @@ it('describes added unlocked environment variables with their value', function (
         ->and($change['old_display_value'])->toBe('-')
         ->and($change['new_display_value'])->toBe('new-secret')
         ->and(json_encode($diff->toArray()))->toContain('new-secret');
+});
+
+it('hides the old value of an environment variable that was locked after the deployment and then deleted', function () {
+    $application = snapshotTestApplication();
+    $variable = EnvironmentVariable::create([
+        'key' => 'API_TOKEN',
+        'value' => 'deployed-secret',
+        'is_buildtime' => false,
+        'is_runtime' => true,
+        'is_preview' => false,
+        'is_shown_once' => false,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+    markSnapshotTestApplicationDeployed($application->refresh());
+
+    $variable->update(['is_shown_once' => true]);
+    $variable->delete();
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('label', 'API_TOKEN');
+
+    expect($change)->not->toBeNull()
+        ->and($change['type'])->toBe('removed')
+        ->and($change['sensitive'])->toBeTrue()
+        ->and($change['old_display_value'])->toBe('••••••••')
+        ->and($change['new_display_value'])->toBe('-')
+        ->and(json_encode($diff->toArray()))->not->toContain('deployed-secret');
+});
+
+it('does not report Docker Compose preview volumes as pending production changes', function () {
+    $application = snapshotTestApplication(['build_pack' => 'dockercompose']);
+    $previewVolume = fn (): LocalPersistentVolume => LocalPersistentVolume::create([
+        'name' => $application->uuid.'_data-pr-42',
+        'mount_path' => '/app/data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+
+    // A preview deployment adds its volume after the production deployment.
+    markSnapshotTestApplicationDeployed($application);
+    $volume = $previewVolume();
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+
+    // An older production snapshot contains the volume, and the preview cleanup removes it.
+    $volume->delete();
+    $previewVolume();
+    markSnapshotTestApplicationDeployed($application);
+    LocalPersistentVolume::query()->where('name', $application->uuid.'_data-pr-42')->delete();
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
 });

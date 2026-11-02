@@ -2,6 +2,8 @@
 
 namespace App\Actions\Development;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use InvalidArgumentException;
@@ -50,6 +52,10 @@ class SeedDevelopmentQemuServer
             'team_id' => 0,
             'private_key_id' => $privateKey->id,
         ]);
+        if (! $server->proxyType()) {
+            $server->proxy->set('type', ProxyTypes::CADDY->value);
+            $server->proxy->set('status', ProxyStatus::EXITED->value);
+        }
         $server->deleted_at = null;
         $server->save();
 

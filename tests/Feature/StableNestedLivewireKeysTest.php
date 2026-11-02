@@ -30,7 +30,7 @@ it('keys nested Livewire status components rendered inside navigation loops', fu
     $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
 
     expect($sidebar)
-        ->toContain(':key="\'application-server-status-\'.$application->uuid"');
+        ->toContain(':key="$placement.\'-application-server-status-\'.$application->uuid"');
 });
 
 it('keys virtual log rows by stable line identity instead of list position', function () {

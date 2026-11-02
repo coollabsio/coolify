@@ -10,6 +10,7 @@ use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\Yaml\Exception\ParseException;
 
 class ServiceApplication extends BaseModel
 {
@@ -354,6 +355,33 @@ class ServiceApplication extends BaseModel
 
     public function isBackupSolutionAvailable()
     {
+        return false;
+    }
+
+    /**
+     * Whether the proxy labels of this container in the Compose file add HTTP basic auth
+     * (a Traefik `basicauth` middleware or a Caddy `basic_auth` directive).
+     */
+    public function hasProxyBasicAuth(): bool
+    {
+        try {
+            $dockerCompose = parseDockerComposeYaml((string) data_get($this->service, 'docker_compose_raw'));
+        } catch (ParseException) {
+            return false;
+        }
+
+        $labels = $dockerCompose['services'][$this->name]['labels'] ?? [];
+        if (! is_array($labels)) {
+            return false;
+        }
+
+        foreach ($labels as $key => $value) {
+            $label = is_int($key) ? (string) $value : (string) $key;
+            if (preg_match('/basic_?auth/i', $label) === 1) {
+                return true;
+            }
+        }
+
         return false;
     }
 

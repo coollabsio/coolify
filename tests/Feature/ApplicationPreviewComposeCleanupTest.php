@@ -91,7 +91,7 @@ beforeEach(function () {
 function fakePreviewCleanupServer(array &$commands, string $previewNetwork, ?array $previewNetworkContainers = [], string $dockerPs = ''): void
 {
     Process::fake(function ($process) use (&$commands, $previewNetwork, $previewNetworkContainers, $dockerPs) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands[] = $command;
 
         if (str_contains($command, 'docker network inspect') && str_contains($command, "'{$previewNetwork}'")) {
@@ -248,4 +248,18 @@ it('parses a preview with a bind mount in development mode', function () {
     $compose = $this->application->fresh()->parse(pull_request_id: 42);
 
     expect(json_encode($compose, JSON_UNESCAPED_SLASHES))->toContain('/config/app.conf-pr-42');
+});
+
+it('keeps the production service URL variables when it parses a preview', function () {
+    Process::fake();
+    $this->application->update(['docker_compose_domains' => json_encode(['web' => ['domain' => 'https://web.example.com']])]);
+    $this->application->fresh()->parse();
+    $this->preview->update(['docker_compose_domains' => json_encode(['web' => ['domain' => 'https://pr-42.example.com']])]);
+
+    $compose = $this->application->fresh()->parse(pull_request_id: 42, preview_id: $this->preview->id);
+
+    $productionVariables = $this->application->environment_variables()->pluck('value', 'key');
+    expect($productionVariables->get('SERVICE_URL_WEB'))->toBe('https://web.example.com')
+        ->and($productionVariables->get('SERVICE_FQDN_WEB'))->toBe('web.example.com')
+        ->and(json_encode($compose, JSON_UNESCAPED_SLASHES))->toContain('https://pr-42.example.com');
 });

@@ -85,7 +85,8 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->stopIfFinished($execution)) {
                 return;
             }
-            instant_remote_process($container->startCommands($runner['encoded_jit_config']), $server);
+            // stopIfFinished() reloaded the server, so a transfer that just finished stops the start command.
+            instant_remote_process($container->startCommands($runner['encoded_jit_config']), $execution->server);
 
             if ($this->stopIfFinished($execution)) {
                 return;
@@ -120,7 +121,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->where('status', GithubRunnerStatus::Provisioning)
                 ->update([
                     'status' => GithubRunnerStatus::Failed,
-                    'error_message' => "Could not start a runner after {$attempt} attempts: {$e->getMessage()}",
+                    'error_message' => remove_iip("Could not start a runner after {$attempt} attempts: {$e->getMessage()}"),
                     'completed_at' => now(),
                 ]);
             CleanupGithubRunnerJob::dispatch($execution->id);
@@ -140,7 +141,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 'runner_name' => null,
                 'runner_id' => null,
                 'ready_at' => null,
-                'error_message' => "Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}",
+                'error_message' => remove_iip("Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}"),
             ]);
         if (! $retried) {
             return;
@@ -159,11 +160,15 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             return true;
         }
 
+        // Reloads the server too: a transfer to another instance can finish while this job runs.
         $execution->refresh();
-        if ($execution->isActive()) {
+        if ($execution->isActive() && ! $execution->server?->isTransferredAway()) {
             return false;
         }
 
+        if ($execution->isActive()) {
+            $execution->finish(GithubRunnerStatus::Cancelled, 'The server was transferred to another Coolify instance.');
+        }
         CleanupGithubRunnerJob::dispatch($execution->id);
 
         return true;

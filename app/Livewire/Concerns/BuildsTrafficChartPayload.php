@@ -4,7 +4,7 @@ namespace App\Livewire\Concerns;
 
 /**
  * Shared derivations for the traffic chart payload: per-bucket sparkline series,
- * the device-donut labels/series, and the globe's per-country marker data. Consumed
+ * the device-donut labels/series, and the globe's marker data. Consumed
  * by both the global and per-application analytics components, which expose
  * `$series` (status buckets) and `$breakdowns` (dimension rows).
  */
@@ -77,22 +77,13 @@ trait BuildsTrafficChartPayload
     }
 
     /**
-     * Per-country marker data for the globe: [{code, requests}] over known ISO-A2 rows.
+     * Marker data for the globe: country markers and city markers, one set for each view.
      *
-     * @return array<int, array{code: string, requests: int}>
+     * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
      */
     protected function geoMarkers(): array
     {
-        $out = [];
-        foreach (($this->breakdowns['country'] ?? []) as $row) {
-            $code = strtoupper((string) ($row['value'] ?? ''));
-            $requests = (int) ($row['requests'] ?? 0);
-            if (preg_match('/^[A-Z]{2}$/', $code) && $requests > 0) {
-                $out[] = ['code' => $code, 'requests' => $requests];
-            }
-        }
-
-        return $out;
+        return trafficGeoMarkers($this->breakdowns['country'] ?? [], trafficCityRows($this->breakdowns['city'] ?? []));
     }
 
     /**

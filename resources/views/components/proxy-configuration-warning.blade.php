@@ -21,7 +21,7 @@
                 </p>
                 @if ($canRestart)
                     <button type="button"
-                        class="mt-0.5 inline-flex items-center gap-0.5 text-[11px] leading-4 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80"
+                        class="mt-0.5 inline-flex items-center gap-0.5 text-[11px] leading-4 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-brand-light dark:hover:text-brand-light/80"
                         @click="open = false; document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
                         Restart proxy
                         <x-reicon name="arrow-right" class="size-2.5" />

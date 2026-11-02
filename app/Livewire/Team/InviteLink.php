@@ -70,21 +70,6 @@ class InviteLink extends Component
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');
             }
-            $uuid = new_public_id(32);
-            $link = $this->invitationUrl('team.invitation.show', ['uuid' => $uuid]);
-            $user = User::whereEmail($this->email)->first();
-
-            if (is_null($user)) {
-                $password = Str::password();
-                $user = User::create([
-                    'name' => str($this->email)->before('@'),
-                    'email' => $this->email,
-                    'password' => Hash::make($password),
-                    'force_password_reset' => true,
-                ]);
-                $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
-                $link = $this->invitationUrl('auth.link', ['token' => $token]);
-            }
             $invitation = TeamInvitation::ownedByCurrentTeam()->whereEmail($this->email)->first();
             if (! is_null($invitation)) {
                 $invitationValid = $invitation->isValid();
@@ -93,6 +78,28 @@ class InviteLink extends Component
                 } else {
                     $invitation->delete();
                 }
+            }
+
+            // Look up the user after the expired invitation is removed, because that can delete an unused account.
+            $uuid = new_public_id(32);
+            $link = $this->invitationUrl('team.invitation.show', ['uuid' => $uuid]);
+            $user = User::whereEmail($this->email)->first();
+
+            // A user who never set a password cannot log in, so they get a magic link with a new temporary password.
+            if (is_null($user) || $user->isUnusedInvitedAccount()) {
+                $password = Str::password();
+                if (is_null($user)) {
+                    $user = User::create([
+                        'name' => str($this->email)->before('@'),
+                        'email' => $this->email,
+                        'password' => Hash::make($password),
+                        'force_password_reset' => true,
+                    ]);
+                } else {
+                    $user->forceFill(['password' => Hash::make($password)])->save();
+                }
+                $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
+                $link = $this->invitationUrl('auth.link', ['token' => $token]);
             }
 
             $invitation = TeamInvitation::firstOrCreate([
