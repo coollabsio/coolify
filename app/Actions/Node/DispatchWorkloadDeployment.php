@@ -39,6 +39,11 @@ class DispatchWorkloadDeployment
         $environment = $configuration['environment'] ?? [];
         $resources = $configuration['resources'] ?? [];
         $mounts = $this->pinVolumes($operation, $configuration['volumes'] ?? []);
+        $healthCheck = $configuration['health_check'] ?? null;
+        if ($healthCheck !== null) {
+            // An older Sentinel ignores unknown fields and would start the container without the check.
+            $operation->node->ensureReportedCapability('workload.healthcheck.v1');
+        }
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
             $hadAddress = filled($operation->node->workloads()->whereKey($operation->workload->id)->first()?->pivot->container_ip);
@@ -78,6 +83,13 @@ class DispatchWorkloadDeployment
                 'memory_limit_bytes' => $resources['memory_limit_bytes'] ?? null,
                 'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
                 ...($mounts === [] ? [] : ['mounts' => $mounts]),
+                ...($healthCheck === null ? [] : ['health_check' => [
+                    'command' => $healthCheck['command'],
+                    'interval_seconds' => $healthCheck['interval_seconds'],
+                    'timeout_seconds' => $healthCheck['timeout_seconds'],
+                    'retries' => $healthCheck['retries'],
+                    'start_period_seconds' => $healthCheck['start_period_seconds'],
+                ]]),
             ]);
         $response->throw();
 
@@ -162,6 +174,13 @@ class DispatchWorkloadDeployment
             'volumes.*.volume_name' => ['required', 'string', 'regex:/\\Acoolify-vol-[A-Za-z0-9-]+\\z/'],
             'volumes.*.container_path' => ['required', 'string', 'max:4096', 'distinct'],
             'volumes.*.read_only' => ['required', 'boolean'],
+            'health_check' => ['sometimes', 'array:command,description,interval_seconds,timeout_seconds,retries,start_period_seconds'],
+            'health_check.command' => ['required_with:health_check', 'string', 'max:4096', 'not_regex:/[\\x00\\r\\n]/'],
+            'health_check.description' => ['required_with:health_check', 'string', 'max:4096'],
+            'health_check.interval_seconds' => ['required_with:health_check', 'integer', 'between:1,3600'],
+            'health_check.timeout_seconds' => ['required_with:health_check', 'integer', 'between:1,3600'],
+            'health_check.retries' => ['required_with:health_check', 'integer', 'between:1,100'],
+            'health_check.start_period_seconds' => ['required_with:health_check', 'integer', 'between:0,3600'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('The workload revision configuration is invalid.');

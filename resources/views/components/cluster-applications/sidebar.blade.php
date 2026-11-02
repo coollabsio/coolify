@@ -32,6 +32,13 @@
             'group' => 'Settings',
         ],
         [
+            'key' => 'healthcheck',
+            'label' => 'Healthcheck',
+            'route' => 'project.cluster-application.healthcheck',
+            'icon' => 'feedback',
+            'group' => 'Settings',
+        ],
+        [
             'key' => 'logs',
             'label' => 'Runtime Logs',
             'route' => 'project.cluster-application.logs',

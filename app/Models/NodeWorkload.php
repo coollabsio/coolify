@@ -6,6 +6,7 @@ use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
+use App\Support\HealthCheckCommand;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -43,6 +44,13 @@ class NodeWorkload extends BaseModel
             'is_env_sorting_enabled' => 'boolean',
             'include_coolify_default_variables' => 'boolean',
             'redact_all_env_values_in_logs' => 'boolean',
+            'health_check_enabled' => 'boolean',
+            'health_check_return_code' => 'integer',
+            'health_check_interval' => 'integer',
+            'health_check_timeout' => 'integer',
+            'health_check_retries' => 'integer',
+            'health_check_start_period' => 'integer',
+            'custom_healthcheck_found' => 'boolean',
         ];
     }
 
@@ -254,7 +262,7 @@ class NodeWorkload extends BaseModel
                 return null;
             }
 
-            return self::configurationHash($latest->image, $this->withVolumeMounts($latest->configuration ?? []), $this->runtimeEnvironment());
+            return self::configurationHash($latest->image, $this->withWorkloadSettings($latest->configuration ?? []), $this->runtimeEnvironment());
         });
     }
 
@@ -268,6 +276,43 @@ class NodeWorkload extends BaseModel
     public function isExited(): bool
     {
         return $this->desired_state !== NodeWorkloadDesiredState::RUNNING;
+    }
+
+    public function isRunning(): bool
+    {
+        return $this->desired_state === NodeWorkloadDesiredState::RUNNING;
+    }
+
+    /**
+     * The Coolify health check that replaces the HEALTHCHECK of the image, like in v4. Null when
+     * the check is off, or when an HTTP check has no port: the container then keeps the
+     * HEALTHCHECK of its image, if it has one.
+     *
+     * @return array{command: string, description: string, interval_seconds: int, timeout_seconds: int, retries: int, start_period_seconds: int}|null
+     */
+    public function healthCheck(): ?array
+    {
+        if ($this->health_check_enabled !== true) {
+            return null;
+        }
+        $command = $this->health_check_type === 'cmd' ? HealthCheckCommand::command($this->health_check_command) : null;
+        if ($command !== null) {
+            $check = ['command' => $command, 'description' => $command];
+        } else {
+            $port = (int) ($this->health_check_port ?: ($this->domainPorts()[0] ?? 0));
+            if ($port < 1 || $port > 65535) {
+                return null;
+            }
+            $check = HealthCheckCommand::http($this->health_check_method, $this->health_check_scheme, $this->health_check_host, $port, $this->health_check_path);
+        }
+
+        return [
+            ...$check,
+            'interval_seconds' => min(max((int) $this->health_check_interval, 1), 3600),
+            'timeout_seconds' => min(max((int) $this->health_check_timeout, 1), 3600),
+            'retries' => min(max((int) $this->health_check_retries, 1), 100),
+            'start_period_seconds' => min(max((int) $this->health_check_start_period, 0), 3600),
+        ];
     }
 
     public function nodes(): BelongsToMany
@@ -346,20 +391,22 @@ class NodeWorkload extends BaseModel
     }
 
     /**
-     * The configuration with the current mounts. Without volumes the key is absent, so the hash of
-     * an application without volumes stays the same as before volumes existed.
+     * The configuration with the current mounts and health check, which are edited on the
+     * workload. A key is absent when it has no value, so the hash of an application without
+     * volumes or a health check stays the same as before these settings existed.
      *
      * @param  array<string, mixed>  $configuration
      * @return array<string, mixed>
      */
-    public function withVolumeMounts(array $configuration): array
+    public function withWorkloadSettings(array $configuration): array
     {
-        $mounts = $this->volumeMounts();
-        if ($mounts === []) {
-            unset($configuration['volumes']);
-        } else {
-            // Assigned in place: the key order is part of the hash and of the revision comparison.
-            $configuration['volumes'] = $mounts;
+        // Assigned in place: the key order is part of the hash and of the revision comparison.
+        foreach (['volumes' => $this->volumeMounts(), 'health_check' => $this->healthCheck() ?? []] as $key => $value) {
+            if ($value === []) {
+                unset($configuration[$key]);
+            } else {
+                $configuration[$key] = $value;
+            }
         }
 
         return $configuration;

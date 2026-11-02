@@ -54,7 +54,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -1248,6 +1248,20 @@ class Show extends Component
             ?? NodeWorkloadState::UNKNOWN;
         $this->status = str($state->value)->title()->toString();
         $this->statusType = $state->badgeType();
+        if ($state === NodeWorkloadState::RUNNING) {
+            // Like v4: "Running (healthy)". The worst health of the running containers wins.
+            $observed = NodeContainer::query()
+                ->where('node_workload_id', $this->workload->id)
+                ->whereIn('node_id', $this->workload->nodes->modelKeys())
+                ->where('is_managed', true)
+                ->where('state', 'running')
+                ->pluck('health_status');
+            $health = collect(['unhealthy', 'starting', 'healthy'])->first(fn (string $health): bool => $observed->contains($health));
+            if ($health !== null) {
+                $this->status .= " ({$health})";
+                $this->statusType = $health === 'healthy' ? 'success' : 'warning';
+            }
+        }
         $this->containerPresent = NodeContainer::query()
             ->where('node_workload_id', $this->workload->id)
             ->whereIn('node_id', $this->workload->nodes->modelKeys())

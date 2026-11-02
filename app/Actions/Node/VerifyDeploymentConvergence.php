@@ -11,7 +11,13 @@ class VerifyDeploymentConvergence
 {
     use AsAction;
 
-    /** @return array{converged: bool, observed_at: mixed, runtime_id: ?string, state: string, image: ?string} */
+    /**
+     * Converged means: the container of this operation runs the revision image and is healthy.
+     * Pending means: it runs, but its health check did not pass yet (`starting`). A container
+     * without a health check counts as healthy while it runs.
+     *
+     * @return array{converged: bool, pending: bool, observed_at: mixed, runtime_id: ?string, state: string, image: ?string, health: ?string}
+     */
     public function handle(NodeOperation $operation): array
     {
         if ($operation->node_workload_id === null || $operation->node_workload_revision_id === null) {
@@ -27,15 +33,23 @@ class VerifyDeploymentConvergence
         $container = $containers->first(fn ($container): bool => $container->image === $operation->revision->image && $container->state === 'running')
             ?? $containers->first();
 
+        $running = $container !== null
+            && $container->image === $operation->revision->image
+            && $container->state === 'running'
+            && $this->tookEffect($operation, $container);
+        $health = $container?->health_status;
+        // With a Coolify health check, only `healthy` counts: an inventory without health is not proof.
+        $hasHealthCheck = filled(data_get($operation->revision->configuration, 'health_check'));
+        $healthy = $hasHealthCheck ? $health === 'healthy' : in_array($health, [null, 'healthy', 'unknown'], true);
+
         return [
-            'converged' => $container !== null
-                && $container->image === $operation->revision->image
-                && $container->state === 'running'
-                && $this->tookEffect($operation, $container),
+            'converged' => $running && $healthy,
+            'pending' => $running && ! $healthy && $health !== 'unhealthy',
             'observed_at' => data_get($operation->node->fresh()->metadata, 'container_inventory_observed_at'),
             'runtime_id' => $container?->runtime_id,
             'state' => $container?->state ?? 'missing',
             'image' => $container?->image,
+            'health' => $health,
         ];
     }
 

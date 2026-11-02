@@ -13,8 +13,8 @@ class PrepareNodeWorkloadRevision
     use AsAction;
 
     /**
-     * Return the revision to deploy. Environment variables and volumes are edited on the
-     * workload, so a new revision records them when they changed.
+     * Return the revision to deploy. Environment variables, volumes, and the health check are
+     * edited on the workload, so a new revision records them when they changed.
      */
     public function handle(NodeWorkload $workload): NodeWorkloadRevision
     {
@@ -33,7 +33,7 @@ class PrepareNodeWorkloadRevision
                 }
             }
 
-            $configuration = $workload->withVolumeMounts($current->configuration ?? []);
+            $configuration = $workload->withWorkloadSettings($current->configuration ?? []);
             if ($environment === ($current->environment ?? []) && $configuration === ($current->configuration ?? [])) {
                 return $current;
             }

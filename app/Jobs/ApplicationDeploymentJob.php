@@ -24,6 +24,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Support\HealthCheckCommand;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -4745,10 +4746,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         // Handle CMD type healthcheck
         if ($this->application->health_check_type === 'cmd' && ! empty($this->application->health_check_command)) {
-            $command = str_replace(["\r\n", "\r", "\n"], ' ', $this->application->health_check_command);
-
-            // Defense in depth: validate command at runtime (matches input validation regex)
-            if (! preg_match('/^[a-zA-Z0-9 \-_.\/:=@,+]+$/', $command) || strlen($command) > 1000) {
+            $command = HealthCheckCommand::command($this->application->health_check_command);
+            if ($command === null) {
                 $this->application_deployment_queue->addLogEntry('Warning: Health check command contains invalid characters or exceeds max length. Falling back to HTTP healthcheck.');
             } else {
                 $this->full_healthcheck_url = $command;
@@ -4771,38 +4770,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $health_check_port = 80;
         }
 
-        $method = $this->sanitizeHealthCheckValue($this->application->health_check_method, '/^[A-Z]+$/', 'GET');
-        $scheme = $this->sanitizeHealthCheckValue($this->application->health_check_scheme, '/^https?$/', 'http');
-        $host = ValidationPatterns::isValidHealthCheckHost($this->application->health_check_host)
-            ? formatHostForUrl($this->application->health_check_host)
-            : 'localhost';
-        $path = $this->application->health_check_path
-            ? $this->sanitizeHealthCheckValue($this->application->health_check_path, '#^[a-zA-Z0-9/\-_.~%,;]+$#', '/')
-            : null;
+        $check = HealthCheckCommand::http(
+            $this->application->health_check_method,
+            $this->application->health_check_scheme,
+            $this->application->health_check_host,
+            $health_check_port,
+            $this->application->health_check_path,
+        );
+        $this->full_healthcheck_url = $check['description'];
 
-        $url = escapeshellarg("{$scheme}://{$host}:{$health_check_port}".($path ?? '/'));
-        $escapedMethod = escapeshellarg($method);
-
-        if ($path) {
-            $this->full_healthcheck_url = "{$method}: {$scheme}://{$host}:{$health_check_port}{$path}";
-        } else {
-            $this->full_healthcheck_url = "{$method}: {$scheme}://{$host}:{$health_check_port}/";
-        }
-
-        $generated_healthchecks_commands = [
-            "curl -s -X {$escapedMethod} -f {$url} > /dev/null || wget -q -O- {$url} > /dev/null || exit 1",
-        ];
-
-        return implode(' ', $generated_healthchecks_commands);
-    }
-
-    private function sanitizeHealthCheckValue(string $value, string $pattern, string $default): string
-    {
-        if (preg_match($pattern, $value)) {
-            return $value;
-        }
-
-        return $default;
+        return $check['command'];
     }
 
     /**

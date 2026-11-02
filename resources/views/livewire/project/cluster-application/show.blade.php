@@ -5,6 +5,7 @@
             'domains' => 'Domains',
             'environment-variables' => 'Environment Variables',
             'storage' => 'Persistent Storage',
+            'healthcheck' => 'Healthcheck',
             'resource-limits' => 'Resource Limits',
             'deployments' => 'Deployments',
             'deployment' => 'Deployment',
@@ -13,7 +14,8 @@
             'servers' => 'Servers',
             'danger' => 'Danger Zone',
         ];
-        $isRunning = $status === 'Running';
+        // The status can carry the health, like "Running (healthy)".
+        $isRunning = str_starts_with($status, 'Running');
         $pollInterval = match (true) {
             in_array($section, ['deployment', 'build'], true) && $selectedDeployment['isActive'] => '2000ms',
             in_array($section, ['general', 'deployments', 'deployment', 'build'], true) => '10000ms',

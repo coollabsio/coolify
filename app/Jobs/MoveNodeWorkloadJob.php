@@ -143,28 +143,21 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
             $deployment = CreateDeploymentOperation::run($target, $operation->revision, $operation->requestedBy, partOfMove: true);
             if ($deployment['created']) {
-                (new DeployNodeWorkloadJob($deployment['operation']->id))->handle();
+                // The deployment waits until the target is healthy, so the source serves until then.
+                (new DeployNodeWorkloadJob($deployment['operation']->id, $deadline))->handle();
             }
             $deploymentOperation = $this->waitForDeployment($deployment['operation'], $deadline);
             if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
-                throw new RuntimeException('The workload did not become ready on the target server. '.($deploymentOperation->error ?? ''));
+                $verification = data_get($deploymentOperation->result, 'verification', []);
+                $targetStarted = data_get($verification, 'state') === 'running';
+                if ($volumes->isEmpty() || ! $targetStarted) {
+                    throw new RuntimeException('The workload did not become ready on the target server. The source remains active. '.($deploymentOperation->error ?? ''));
+                }
+                // The volumes are on the target and its container started: going back would lose its writes.
+                self::checkpoint($operation, ['target_health' => data_get($verification, 'health') ?? 'not healthy']);
             }
             // The target runs the workload now: cleanup keeps its placement.
             $operation->update(['result' => [...($operation->refresh()->result ?? []), 'target_ready' => true]]);
-            $targetContainer = $target->containers()
-                ->where('node_workload_id', $operation->workload->id)
-                ->where('node_workload_revision_id', $operation->revision->id)
-                ->where('is_managed', true)
-                ->where('state', 'running')
-                ->first();
-            $targetHealthy = $targetContainer !== null && in_array($targetContainer->health_status, [null, 'healthy', 'unknown'], true);
-            if (! $targetHealthy && $volumes->isEmpty()) {
-                throw new RuntimeException('The target workload is not healthy. The source remains active.');
-            }
-            if (! $targetHealthy) {
-                // The volumes are on the target and its container started: going back would lose its writes.
-                self::checkpoint($operation, ['target_health' => $targetContainer?->health_status ?? 'not running']);
-            }
 
             if ($routed) {
                 Sleep::for(self::INGRESS_SETTLE_SECONDS)->seconds();

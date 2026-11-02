@@ -425,6 +425,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/domains', ClusterApplicationShow::class)->name('project.cluster-application.domains');
             Route::get('/environment-variables', ClusterApplicationShow::class)->name('project.cluster-application.environment-variables');
             Route::get('/storage', ClusterApplicationShow::class)->name('project.cluster-application.storage');
+            Route::get('/healthcheck', ClusterApplicationShow::class)->name('project.cluster-application.healthcheck');
             Route::get('/resource-limits', ClusterApplicationShow::class)->name('project.cluster-application.resource-limits');
             Route::get('/deployments', ClusterApplicationShow::class)->name('project.cluster-application.deployments');
             Route::get('/deployments/{deployment_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.deployment.show');
