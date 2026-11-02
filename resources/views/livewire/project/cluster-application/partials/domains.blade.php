@@ -21,6 +21,27 @@
                         class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search domains" />
                 </div>
             @endif
+            <div x-data="{ dnsEntriesOpen: false }" class="relative shrink-0" @click.outside="dnsEntriesOpen = false">
+                <button type="button" class="button" @click="dnsEntriesOpen = !dnsEntriesOpen" aria-haspopup="menu"
+                    x-bind:aria-expanded="dnsEntriesOpen" title="DNS records for this application">
+                    <x-reicon name="globe" class="size-3.5" />
+                    DNS
+                    <span class="inline-flex transition-transform" :class="dnsEntriesOpen && 'rotate-180'">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
+                        </svg>
+                    </span>
+                </button>
+                <div x-show="dnsEntriesOpen" x-cloak role="menu" x-transition.origin.top.right
+                    class="listbox-panel left-auto! right-0! z-[90]! w-56! min-w-56!">
+                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                        @click="dnsEntriesOpen = false; $dispatch('open-cluster-dns-records-modal')">
+                        <x-reicon name="documentation" class="size-3.5 shrink-0 opacity-70" />
+                        Manual records
+                    </button>
+                </div>
+            </div>
             @can('update', $workload)
                 <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false">
                     <x-slot:content>
@@ -106,44 +127,6 @@
         @endif
     </x-application.settings-section>
 
-    <x-application.settings-section id="cluster-application-dns" title="DNS"
-        helper="Ingress servers of the cluster route HTTP traffic for these domains to this application.">
-        <div class="flex flex-col gap-4">
-            @if ($ingressAddresses === [])
-                <x-callout type="warning" title="No ingress server">
-                    This cluster has no ingress server, so the domains are not reachable yet.
-                    @if ($ingressCluster)
-                        <a class="font-medium underline" {{ wireNavigate() }}
-                            href="{{ route('node-cluster.nodes', ['cluster_uuid' => $ingressCluster->uuid]) }}">Turn on
-                            ingress for a server</a>.
-                    @endif
-                </x-callout>
-            @else
-                <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                    Point an A record for each domain to one or more of these addresses.
-                </p>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    @foreach ($ingressAddresses as $ingressAddress)
-                        <div wire:key="cluster-application-ingress-{{ $ingressAddress }}">
-                            <x-forms.copy-input :text="$ingressAddress" />
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                @if ($ingressTls)
-                    When a domain points to the ingress servers, they get a Let's Encrypt certificate for it and
-                    redirect HTTP to HTTPS. Until then, they serve it over HTTP on port 80. Ports 80 and 443 must be
-                    open on the ingress servers.
-                @else
-                    HTTPS is not available for this cluster: it needs the latest Sentinel on every server of the
-                    cluster and an ACME directory on this instance. Until then, ingress serves these domains over
-                    HTTP on port 80.
-                @endif
-            </p>
-        </div>
-    </x-application.settings-section>
-
     @can('update', $workload)
         <x-modal-input title="Domain settings" :closeOutside="false" :wireIgnore="false" wireOpen="showEditDomainModal">
             <x-slot:content><span class="hidden"></span></x-slot:content>
@@ -160,4 +143,112 @@
             </form>
         </x-modal-input>
     @endcan
+    <div x-data="{ modalOpen: false }" @open-cluster-dns-records-modal.window="modalOpen = true"
+        class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }"
+        @keydown.window.escape="modalOpen = false">
+        <template x-teleport="body">
+            <div x-show="modalOpen" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]" @click="modalOpen = false">
+                </div>
+                <div class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="application-settings-form application-settings-section relative flex w-full max-w-2xl flex-col overflow-hidden"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">DNS entries</h3>
+                            <button type="button" @click="modalOpen = false" class="icon-button shrink-0"
+                                aria-label="Close">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body flex flex-col gap-4">
+                            <p class="text-sm leading-6 text-neutral-600 dark:text-fg-dim">
+                                Ingress servers of the cluster route HTTP traffic for these domains to this
+                                application. Create matching Type / Name / Value records at your DNS provider.
+                            </p>
+                            @if ($ingressAddresses === [])
+                                <x-callout type="warning" title="No ingress server">
+                                    This cluster has no ingress server, so the domains are not reachable yet.
+                                    @if ($ingressCluster)
+                                        <a class="font-medium underline" {{ wireNavigate() }}
+                                            href="{{ route('node-cluster.nodes', ['cluster_uuid' => $ingressCluster->uuid]) }}">Turn
+                                            on ingress for a server</a>.
+                                    @endif
+                                </x-callout>
+                            @elseif (! $hasRows)
+                                <x-callout type="info" title="Nothing to configure">
+                                    No domains are configured yet. Point an A record for each domain to one or more
+                                    of these addresses:
+                                    {{ implode(', ', $ingressAddresses) }}
+                                </x-callout>
+                            @else
+                                <div class="overflow-x-auto rounded-md border border-neutral-200 dark:border-coolgray-300">
+                                    <table class="w-full min-w-[32rem] text-left text-sm">
+                                        <thead
+                                            class="bg-neutral-50 text-[12px] uppercase tracking-wide text-neutral-500 dark:bg-coolgray-100 dark:text-fg-dim">
+                                            <tr>
+                                                <th class="px-3 py-2 font-medium">Type</th>
+                                                <th class="px-3 py-2 font-medium">Name</th>
+                                                <th class="px-3 py-2 font-medium">Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-neutral-200 dark:divide-coolgray-300">
+                                            @foreach ($domainList as $domain)
+                                                @foreach ($ingressAddresses as $ingressAddress)
+                                                    <tr wire:key="cluster-application-dns-{{ $domain }}-{{ $ingressAddress }}"
+                                                        class="text-[13px] text-black dark:text-fg">
+                                                        <td class="px-3 py-2.5">A</td>
+                                                        <td class="px-3 py-2.5">
+                                                            @include('livewire.project.shared.partials.dns-copy-cell', [
+                                                                'text' => $domain,
+                                                                'label' => 'Copy name',
+                                                                'break' => true,
+                                                            ])
+                                                        </td>
+                                                        <td class="px-3 py-2.5">
+                                                            @include('livewire.project.shared.partials.dns-copy-cell', [
+                                                                'text' => $ingressAddress,
+                                                                'label' => 'Copy value',
+                                                                'break' => true,
+                                                            ])
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                @if ($ingressTls)
+                                    When a domain points to the ingress servers, they get a Let's Encrypt certificate
+                                    for it and redirect HTTP to HTTPS. Until then, they serve it over HTTP on port 80.
+                                    Ports 80 and 443 must be open on the ingress servers.
+                                @else
+                                    HTTPS is not available for this cluster: it needs the latest Sentinel on every server
+                                    of the cluster and an ACME directory on this instance. Until then, ingress serves
+                                    these domains over HTTP on port 80.
+                                @endif
+                            </p>
+                            <div class="flex justify-end pt-2">
+                                <x-forms.button type="button" @click="modalOpen = false" isHighlighted>
+                                    Done
+                                </x-forms.button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
 </div>
