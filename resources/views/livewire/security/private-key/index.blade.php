@@ -14,7 +14,7 @@
                     :confirmWithText="false" :confirmWithPassword="false">
                     <x-slot:trigger>
                         <button type="button"
-                            class="button whitespace-nowrap text-error! hover:text-error! dark:text-error!">
+                            class="button button-error whitespace-nowrap">
                             <span class="max-sm:hidden">Delete unused keys</span>
                             <span class="sm:hidden">Delete unused</span>
                         </button>

@@ -71,7 +71,6 @@ Thank you so much!
 
 ### Huge Sponsors
 
-* [Context.dev](https://www.context.dev/) - Web scraping API for AI agents
 * [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
 * [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
 * [MVPS](https://www.mvps.net) - Cheap VPS servers at the highest possible quality
