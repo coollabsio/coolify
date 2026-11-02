@@ -349,3 +349,15 @@ test('a member or a user of another team cannot fetch, accept, or remove host ke
 
     expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($saved);
 })->with(['member', 'other team owner']);
+
+test('the ssh host keys section shows only when git uses ssh or keys are saved', function (string $repository, ?string $saved, bool $shown) {
+    $this->applicationA->update(['git_repository' => $repository, 'git_ssh_known_hosts' => $saved]);
+
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+
+    $shown ? $component->assertSee('SSH host keys') : $component->assertDontSee('SSH host keys');
+})->with([
+    'https repository' => ['https://github.com/coollabsio/coolify-examples', null, false],
+    'ssh repository' => ['git@git.example.com:org/repo.git', null, true],
+    'https repository with saved submodule keys' => ['https://github.com/coollabsio/coolify-examples', 'git.example.com ssh-ed25519 AAAA', true],
+]);

@@ -23,16 +23,6 @@
                 </div>
             </x-slot:actions>
 
-            @if (blank($privateKeyId))
-                <div
-                    class="mb-4 flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-3 py-2.5 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:ring-white/[0.07]">
-                    <span class="text-[12px] text-neutral-500 dark:text-fg-dim">Connected source</span>
-                    <span class="text-[12px] font-medium text-neutral-900 dark:text-fg">
-                        {{ data_get($application, 'source.name', 'No source connected') }}
-                    </span>
-                </div>
-            @endif
-
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input placeholder="coollabsio/coolify-example" id="gitRepository" label="Repository"
                     canGate="update" :canResource="$application" />
@@ -43,6 +33,10 @@
             </div>
         </x-application.settings-section>
 
+        @php
+            $usesGitSsh = $application->gitSshHost() !== null;
+        @endphp
+        @if ($usesGitSsh || filled($application->git_ssh_known_hosts))
         <x-application.settings-section id="ssh-host-keys" title="SSH host keys" x-data="{ editManually: false }" x-on:known-hosts-invalid.window="editManually = true" flush
             description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key, click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys.">
             @can('update', $application)
@@ -51,10 +45,12 @@
                         <x-reicon name="edit" class="size-3.5" />
                         Edit manually
                     </button>
-                    <x-forms.button type="button" wire:click="fetchHostKeys" wire:loading.attr="disabled"
-                        wire:target="fetchHostKeys">
-                        Fetch current host key
-                    </x-forms.button>
+                    @if ($usesGitSsh)
+                        <x-forms.button type="button" wire:click="fetchHostKeys" wire:loading.attr="disabled"
+                            wire:target="fetchHostKeys">
+                            Fetch current host key
+                        </x-forms.button>
+                    @endif
                 </x-slot:actions>
             @endcan
             @if ($fetchedHostKeys !== [])
@@ -77,8 +73,8 @@
                 $fingerprints = $this->knownHostFingerprints();
             @endphp
             @if ($fingerprints === [])
-                <p class="text-[12px] text-neutral-500 dark:text-fg-dim">No saved host keys. The next deployment
-                    saves the key that the Git host sends, or click Fetch current host key.</p>
+                <x-empty size="sm" icon-name="keys" title="No saved host keys"
+                    description="The next deployment saves the key that the Git host sends. To save it now, click Fetch current host key." />
             @else
                 <div class="data-table">
                     <div class="min-w-[36rem]">
@@ -128,6 +124,7 @@
                 </div>
             @endcan
         </x-application.settings-section>
+        @endif
     </form>
 
     @if (filled($privateKeyId))
@@ -209,8 +206,6 @@
                                     {{ $currentSourceSubtitle }}
                                 </p>
                             </div>
-                            <x-reicon name="check"
-                                class="size-4 shrink-0 text-black dark:text-fg" />
                         </div>
                     @endif
 
