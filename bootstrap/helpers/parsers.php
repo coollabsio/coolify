@@ -2422,6 +2422,7 @@ function serviceParser(Service $resource): Collection
                 ->orWhere('key', 'LIKE', '%}');
         })
         ->delete();
+    $existingEnvironmentVariableKeys = $resource->environment_variables()->pluck('key');
 
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
@@ -3671,6 +3672,7 @@ function serviceParser(Service $resource): Collection
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
 
+    fillDockerComposeDefaultsForBareReferences($resource, $existingEnvironmentVariableKeys);
     syncDockerComposeEnvironmentVariableRequiredState($resource);
 
     return $topLevel;

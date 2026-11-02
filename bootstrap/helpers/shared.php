@@ -5580,6 +5580,63 @@ function dockerComposeEnvironmentVariableInfo(?string $dockerCompose, string $ke
     ];
 }
 
+/**
+ * Docker Compose gives a bare $VAR or ${VAR} reference no default, and the service parser does not store
+ * defaults. So `/$POSTGRES_DB` next to `${POSTGRES_DB:-umami}` in another service resolves to an empty value.
+ * For new variables, store the default when the Compose file has a bare reference and exactly one default.
+ *
+ * @param  Collection<int, string>  $existingKeys
+ */
+function fillDockerComposeDefaultsForBareReferences(Service $resource, Collection $existingKeys): void
+{
+    $dockerCompose = $resource->docker_compose_raw;
+    if (blank($dockerCompose)) {
+        return;
+    }
+
+    $resource->environment_variables()
+        ->whereNull('value')
+        ->whereNotIn('key', $existingKeys)
+        ->get()
+        ->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
+            $default = dockerComposeBareReferenceDefault($dockerCompose, $environmentVariable->key);
+            // A nested default (`${A:-${B}}`) must stay with Compose: stored, it would be escaped to a literal.
+            if (filled($default) && ! str_contains($default, '$')) {
+                $environmentVariable->update(['value' => $default]);
+            }
+        });
+}
+
+/** The single default of a variable that the Compose file also references without a default, otherwise null. */
+function dockerComposeBareReferenceDefault(string $dockerCompose, string $key): ?string
+{
+    $quotedKey = preg_quote($key, '/');
+    if (preg_match('/(?<!\$)\$(?:'.$quotedKey.'(?![A-Za-z0-9_])|\{'.$quotedKey.'\})/', $dockerCompose) !== 1) {
+        return null;
+    }
+
+    $defaults = [];
+    $offset = 0;
+    while (($referenceStart = strpos($dockerCompose, '${'.$key, $offset)) !== false) {
+        $offset = $referenceStart + 2;
+        if ($referenceStart > 0 && $dockerCompose[$referenceStart - 1] === '$') {
+            continue;
+        }
+
+        $reference = extractBalancedBraceContent(substr($dockerCompose, $referenceStart));
+        $split = $reference === null ? null : splitOnOperatorOutsideNested($reference['content']);
+        if ($split === null || $split['variable'] !== $key) {
+            continue;
+        }
+        if (str_contains($split['operator'], '?')) {
+            return null;
+        }
+        $defaults[$split['default']] = true;
+    }
+
+    return count($defaults) === 1 ? (string) array_key_first($defaults) : null;
+}
+
 function dockerComposeEnvironmentVariableIsRequired(?string $dockerCompose, string $key): bool
 {
     if (blank($dockerCompose)) {
