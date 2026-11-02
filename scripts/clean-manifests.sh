@@ -259,13 +259,14 @@ write_table() {
 		function amount(count, one, many) { return (count + 0) " " (count == 1 ? one : many) }
 		BEGIN { split("B kB MB GB TB", units, " "); print "ghcr", "docker_hub", "type", "platform", "tags", "created", "size", "ghcr_id", "digest" }
 		FILENAME == ARGV[1] { removed[$9]; types[$3]++; manifests++; if ($7 != "") $7 = human($7); print; next }
-		FILENAME == ARGV[2] { before += $2; if (!($1 in removed)) after += $2; next }
-		FILENAME == ARGV[3] { hub_before += $5; if (!($1 in removed)) hub_after += $5; next }
-		{ blob[$2] = $3; if (!($1 in removed)) used[$2] }
+		FILENAME == ARGV[2] { bytes[$1] = $2; before += $2; if (!($1 in removed)) after += $2; next }
+		FILENAME == ARGV[3] { if ($1 in bytes) on_hub[$1]; size = ($1 in bytes) ? bytes[$1] : $5; hub_before += size; if (!($1 in removed)) hub_after += size; next }
+		{ blob[$2] = $3; if (!($1 in removed)) used[$2]; if ($1 in on_hub) { hub_blob[$2] = $3; if (!($1 in removed)) hub_used[$2] } }
 		END {
 			for (digest in blob) { before += blob[digest]; if (digest in used) after += blob[digest] }
+			for (digest in hub_blob) { hub_before += hub_blob[digest]; if (digest in hub_used) hub_after += hub_blob[digest] }
 			print "total", "", amount(types["index"], "index", "indexes") ", " amount(types["image"], "image", "images") ", " amount(types["attestation"], "attestation", "attestations"),
-				"", "", "", human(before - after) " on ghcr.io (" human(before) " → " human(after) ") and " human(hub_before - hub_after) " on docker.io (" human(hub_before) " → " human(hub_after) ")",
+				"", "", "", human(before - after) " on ghcr.io (" human(before) " → " human(after) ") and ~" human(hub_before - hub_after) " on docker.io (~" human(hub_before) " → ~" human(hub_after) ")",
 				"", amount(manifests, "manifest", "manifests")
 		}' "$1" "$WORK_DIR/bytes.tsv" "$WORK_DIR/dockerhub-manifests.tsv" "$WORK_DIR/blobs.tsv" > "$2"
 }
