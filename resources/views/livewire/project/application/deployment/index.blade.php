@@ -279,6 +279,7 @@
                             @unless ($embedded)
                                 <span class="min-w-0">
                                     <x-status-badge as="button" :status="$statusLabel" :type="$statusType"
+                                        :spinning="$deploymentStatus === 'in_progress'"
                                         class="table-filter-value table-filter-badge" title="Filter by {{ $statusLabel }}"
                                         wire:click="toggleDeploymentFilter('status:{{ $deploymentStatus }}')" />
                                 </span>
@@ -336,6 +337,10 @@
                                     <span>{{ \Carbon\Carbon::parse(data_get($deployment, 'created_at'))->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true) }}</span>
                                     <x-loading compact x-cloak x-show="selecting === '{{ data_get($deployment, 'deployment_uuid') }}'"
                                         aria-label="Loading deployment logs..." />
+                                    @if ($deploymentStatus === 'in_progress')
+                                        <x-loading compact x-show="selecting !== '{{ data_get($deployment, 'deployment_uuid') }}'"
+                                            aria-label="Deployment in progress" />
+                                    @else
                                     <span x-show="selecting !== '{{ data_get($deployment, 'deployment_uuid') }}'" @class([
                                         'size-2 shrink-0 rounded-full',
                                         'bg-emerald-500' => $statusType === 'success',
@@ -343,6 +348,7 @@
                                         'bg-red-500' => $statusType === 'error',
                                         'bg-neutral-400 dark:bg-neutral-500' => $statusType === 'neutral',
                                     ])></span>
+                                    @endif
                                 </a>
                             @endif
                             <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!} class="deployment-row-link absolute inset-0"

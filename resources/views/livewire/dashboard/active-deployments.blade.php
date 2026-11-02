@@ -81,14 +81,14 @@
                                     {{ $deployment->server_name ?: '-' }}
                                 </p>
                                 <span class="hidden @2xl:block">
-                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
+                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                 </span>
                                 <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $deployment->created_at?->diffForHumans() ?? '-' }}
                                 </p>
 
                                 <div class="mt-3 flex min-w-0 items-center gap-3 @2xl:hidden">
-                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
+                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                     <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $environmentPath ?: '-' }}
                                         <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
@@ -141,14 +141,14 @@
                                     {{ $deployment->server_name ?: '-' }}
                                 </p>
                                 <span class="hidden @2xl:block">
-                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
+                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                 </span>
                                 <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
                                     {{ $deployment->created_at?->diffForHumans() ?? '-' }}
                                 </p>
 
                                 <div class="mt-3 flex min-w-0 items-center gap-3 @2xl:hidden">
-                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
+                                    <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                     <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $environmentPath ?: '-' }}
                                         <span class="px-1 text-neutral-300 dark:text-white/15">·</span>

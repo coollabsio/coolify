@@ -55,11 +55,6 @@ class GithubRunners extends Component
 
     public bool $allowPullRequests = false;
 
-    /** Null until checked over SSH. */
-    public ?bool $isSysboxInstalled = null;
-
-    protected $listeners = ['sysboxInstalled' => 'checkSysbox'];
-
     public function mount(string $server_uuid)
     {
         try {
@@ -178,7 +173,6 @@ class GithubRunners extends Component
         $githubApp = $this->selectedApp;
         $this->authorize('update', $githubApp);
         if ($this->dockerMode === GithubRunnerDockerMode::Sysbox->value && ! InstallSysbox::isInstalled($this->server)) {
-            $this->isSysboxInstalled = false;
             throw ValidationException::withMessages(['dockerMode' => 'Sysbox is not installed on this server. Install it, then save again.']);
         }
 
@@ -253,25 +247,6 @@ class GithubRunners extends Component
                 $this->dispatch('success', 'GitHub runners enabled.');
             }
             unset($this->config);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function checkSysbox(): void
-    {
-        $this->authorize('view', $this->server);
-        $this->isSysboxInstalled = InstallSysbox::isInstalled($this->server);
-    }
-
-    public function installSysbox()
-    {
-        $this->authorize('update', $this->server);
-
-        try {
-            $activity = InstallSysbox::run($this->server);
-            $this->dispatch('sysbox-install-started');
-            $this->dispatch('activityMonitor', $activity->id, 'sysboxInstalled');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

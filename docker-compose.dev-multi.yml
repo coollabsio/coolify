@@ -135,6 +135,15 @@ services:
     networks:
       - coolify
 
+  coolify-helper:
+    image: coollabsio/coolify-helper:dev
+    pull_policy: build
+    build:
+      context: https://github.com/coollabsio/coolify-helper.git#main:src
+      args:
+        - IMAGE_VERSION=dev
+    command: ["true"]
+
   testing-host:
     profiles: ["testing-host"]
     image: coolify-testing-host:dev

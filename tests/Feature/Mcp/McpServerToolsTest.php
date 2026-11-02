@@ -432,7 +432,7 @@ test('manage_registry lists registry logins without passwords', function () {
 });
 
 test('manage_registry list needs read:sensitive', function () {
-    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write']), 'manage_registry', ['action' => 'list', 'uuid' => $this->server->uuid]);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), 'manage_registry', ['action' => 'list', 'uuid' => $this->server->uuid]);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('read:sensitive');

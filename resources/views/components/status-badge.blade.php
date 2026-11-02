@@ -6,6 +6,7 @@
     'dynamic' => false,
     'pulse' => false, // ping the dot for a state that is still in progress
     'size' => 'md', // sm fits inline next to 12px table text without growing the row
+    'spinning' => false, // show the loading spinner instead of the dot, e.g. for a running deployment
 ])
 
 @php
@@ -29,12 +30,19 @@
         @if ($dynamic)
             {{ $slot }}
         @else
+            @if ($spinning)
+                <svg class="loading-indicator size-3 shrink-0 animate-spin text-neutral-500 dark:text-fg-dim" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-20" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+                    <path class="opacity-80" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            @else
             <span class="relative flex size-1.5 shrink-0">
                 @if ($pulse)
                     <span class="absolute inline-flex size-full rounded-full opacity-75 motion-safe:animate-ping {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
                 @endif
                 <span class="relative inline-flex size-1.5 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
             </span>
+            @endif
             <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
         @endif
     </button>
@@ -43,12 +51,19 @@
         @if ($dynamic)
             {{ $slot }}
         @else
+            @if ($spinning)
+                <svg class="loading-indicator size-3 shrink-0 animate-spin text-neutral-500 dark:text-fg-dim" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-20" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+                    <path class="opacity-80" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            @else
             <span class="relative flex size-1.5 shrink-0">
                 @if ($pulse)
                     <span class="absolute inline-flex size-full rounded-full opacity-75 motion-safe:animate-ping {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
                 @endif
                 <span class="relative inline-flex size-1.5 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
             </span>
+            @endif
             <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
         @endif
     </a>
@@ -57,12 +72,19 @@
         @if ($dynamic)
             {{ $slot }}
         @else
+            @if ($spinning)
+                <svg class="loading-indicator size-3 shrink-0 animate-spin text-neutral-500 dark:text-fg-dim" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-20" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+                    <path class="opacity-80" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            @else
             <span class="relative flex size-1.5 shrink-0">
                 @if ($pulse)
                     <span class="absolute inline-flex size-full rounded-full opacity-75 motion-safe:animate-ping {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
                 @endif
                 <span class="relative inline-flex size-1.5 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
             </span>
+            @endif
             <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
         @endif
     </span>

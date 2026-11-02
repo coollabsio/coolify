@@ -1,12 +1,15 @@
 <?php
 
+$release = json_decode(file_get_contents(dirname(__DIR__).'/release.json'), true);
+$upstream = json_decode(file_get_contents(dirname(__DIR__).'/upstream.json'), true);
+
 // 0 or an invalid value would remove the time limit of every remote command.
 $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.5.4',
-        'helper_version' => '1.0.19',
+        'version' => env('COOLIFY_VERSION') ?: $release['stable']['coolify'],
+        'helper_version' => $upstream['helper']['version'],
         'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -21,7 +24,6 @@ return [
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
         // https://hub.docker.com/r/rclone/rclone/tags (also on ghcr.io with the same digest): copies backups to SFTP, FTPS, and WebDAV storages on the servers.
         'rclone_image' => env('RCLONE_IMAGE', env('REGISTRY_URL', 'docker.io').'/rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5'),
-        'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
@@ -139,11 +141,6 @@ return [
     'webhooks' => [
         'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
         'dev_webhook' => env('SERVEO_URL'),
-    ],
-
-    'cloudflare' => [
-        'api_token' => env('CLOUDFLARE_API_TOKEN'),
-        'zone_id' => env('CLOUDFLARE_ZONE_ID'),
     ],
 
     'server_checks' => [

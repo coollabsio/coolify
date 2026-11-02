@@ -55,8 +55,8 @@ it('notification settings have traefik_outdated fields', function () {
     expect($team->webhookNotificationSettings)->toHaveKey('traefik_outdated_webhook_notifications');
 });
 
-it('versions.json contains traefik branches with patch versions', function () {
-    $versionsPath = base_path('versions.json');
+it('upstream.json contains traefik branches with patch versions', function () {
+    $versionsPath = base_path('upstream.json');
     expect(File::exists($versionsPath))->toBeTrue();
 
     $versions = json_decode(File::get($versionsPath), true);

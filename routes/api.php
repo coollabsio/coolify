@@ -201,7 +201,7 @@ Route::group([
 
     Route::get('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'index'])->middleware(['api.ability:read:sensitive']);
     Route::post('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'login'])->middleware(['api.ability:write', 'api.ability:deploy']);
-    Route::post('/servers/{uuid}/registries/{registry}/check', [ServerDockerRegistriesController::class, 'check'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/registries/{registry}/check', [ServerDockerRegistriesController::class, 'check'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::delete('/servers/{uuid}/registries/{registry}', [ServerDockerRegistriesController::class, 'logout'])->middleware(['api.ability:delete']);
 
     Route::get('/servers/{uuid}/proxy', [ServerProxyController::class, 'show'])->middleware(['api.ability:read']);
