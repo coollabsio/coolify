@@ -1,5 +1,5 @@
 <div @if ($isRunning) wire:poll.3s @endif>
-    @if ($rows->isNotEmpty())
+    @if ($hasServers || $isRunning || $open)
         <x-modal-input title="Rotate key" buttonTitle="Rotate key" :wireIgnore="false" wireOpen="open" :closeEvent="false"
             subtitle="Move the servers to a new key. Servers that fail stay on this key.">
             <div class="flex flex-col gap-3 text-sm">

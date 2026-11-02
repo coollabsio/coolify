@@ -195,6 +195,7 @@ final class ServerTransferCoverage
             'sentinel_custom_url' => 'The target sets its own URL when it claims the server.',
             'cloudflare_tunnel_integration_token_id' => 'Exported as cloudflare_tunnel_integration_token_uuid. '.self::LINKED,
             'patch_check_result' => self::RUNTIME, 'patch_check_error' => self::RUNTIME, 'patch_checked_at' => self::RUNTIME,
+            'ssh_host_key_pending' => 'A host key that did not match; the target reads the key again over its own connection.',
         ],
         PrivateKey::class => ['team_id' => self::TEAM],
         StandaloneDocker::class => ['server_id' => self::LINKED],

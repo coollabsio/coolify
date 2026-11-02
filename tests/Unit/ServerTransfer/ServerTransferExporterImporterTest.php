@@ -37,6 +37,7 @@ use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use phpseclib3\Crypt\RSA;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -614,6 +616,28 @@ test('import into another team creates its own key when the same key exists in a
         ->and($server->privateKey->team_id)->toBe($targetTeam->id)
         ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
         ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
+});
+
+test('a server with a weak legacy key moves, and the export warns to rotate the key', function () {
+    $weakKey = (string) RSA::createKey(1024)->toString('PKCS1');
+    $this->privateKey->private_key = $weakKey;
+    $this->privateKey->saveQuietly();
+    $bundle = $this->exporter->export($this->server->refresh());
+    $targetTeam = Team::factory()->create();
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->private_key)->toBe(formatPrivateKey($weakKey))
+        ->and(implode(' ', $bundle['warnings']))->toContain('SSH key transfer-key: RSA keys must have at least 2048 bits.')
+        ->and(collect(app(TransferFinishChecklist::class)->of($server)['items'])->firstWhere('type', 'previous_ssh_key')['hint'])
+        ->toContain('The key is also weak: RSA keys must have at least 2048 bits.');
 });
 
 test('system-wide github apps are not exported and re-link on import by uuid', function () {
@@ -1980,4 +2004,47 @@ test('an application with a system-wide GitHub App that the target lacks is list
     expect(data_get($bundle, 'projects.0.environments.0.applications.0.source.system_wide'))->toBeTrue()
         ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
+});
+
+test('import clears trust metadata when the host key normalizes to null', function (?string $hostKey) {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importServer');
+    $server = $method->invoke($this->importer, [
+        'name' => 'imported-server',
+        'ip' => '10.55.0.99',
+        'settings' => [
+            'ssh_host_key' => $hostKey,
+            'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        ],
+    ], $this->privateKey, $this->team->id, false, false);
+
+    expect($server->settings->fresh())
+        ->ssh_host_key->toBeNull()
+        ->ssh_host_key_source->toBeNull()
+        ->ssh_host_key_trusted_at->toBeNull();
+})->with([null, '', '# comment only', 'invalid key']);
+
+test('the pinned host key moves with the server', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I';
+    $this->server->settings->forceFill([
+        'ssh_host_key' => $hostKey,
+        'ssh_host_key_source' => 'tofu',
+        'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        'ssh_host_key_pending' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjaL3Lqt0tZl4iVZw8x1v2b9fM8r6Yq0nH0bUq3dQ0h',
+        'is_ssh_host_key_check_disabled' => true,
+    ])->save();
+    $bundle = json_decode(json_encode($this->exporter->export($this->server->fresh())), true);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->firstOrFail()->settings;
+    expect($settings)
+        ->ssh_host_key->toBe($hostKey)
+        ->ssh_host_key_source->toBe('transfer')
+        ->ssh_host_key_pending->toBeNull()
+        ->is_ssh_host_key_check_disabled->toBeTrue()
+        ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
 });

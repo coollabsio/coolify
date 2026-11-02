@@ -741,7 +741,7 @@ function generate_random_name(?string $cuid = null): string
 
     return Str::kebab("{$generator->getName()}-$cuid");
 }
-function generateSSHKey(string $type = 'rsa')
+function generateSSHKey(string $type = 'ed25519')
 {
     if ($type === 'rsa') {
         $key = RSA::createKey();
