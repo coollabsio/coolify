@@ -20,6 +20,7 @@
     },
     visibleLogs() {
         return Array.from(this.$root.querySelectorAll('[data-log-line]:not(.hidden)'))
+            .filter(line => !line.closest('[x-show]') || line.closest('[x-show]').style.display !== 'none')
             .map(line => line.textContent.replace(/\s+/g, ' ').trim())
             .filter(Boolean)
             .join(String.fromCharCode(10));
@@ -169,6 +170,54 @@
                     <div x-show="searchQuery.trim() && matchCount === 0" class="py-2 text-neutral-500">
                         No matches found.
                     </div>
+                    @if ($build = $selectedDeployment['build'])
+                        <div wire:key="deployment-build-{{ $selectedDeployment['uuid'] }}" class="mb-2 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
+                            <button type="button" wire:click="toggleBuildLog" aria-expanded="{{ $buildLogOpen ? 'true' : 'false' }}"
+                                class="flex w-full items-center gap-2 py-1 text-left font-sans text-xs text-neutral-600 hover:text-black dark:text-fg-dim dark:hover:text-white">
+                                <x-reicon name="chevron-down" @class(['size-3.5 shrink-0 transition-transform', '-rotate-90' => ! $buildLogOpen]) />
+                                <span class="font-medium text-neutral-950 dark:text-fg">Build</span>
+                                <span @class([
+                                    'size-2 shrink-0 rounded-full',
+                                    'bg-emerald-500' => $build['statusType'] === 'success',
+                                    'bg-warning' => $build['statusType'] === 'warning',
+                                    'bg-red-500' => $build['statusType'] === 'error',
+                                    'bg-neutral-400 dark:bg-neutral-500' => ! in_array($build['statusType'], ['success', 'warning', 'error'], true),
+                                ])></span>
+                                <span>{{ $build['status'] }}</span>
+                                <span class="truncate text-neutral-500 dark:text-fg-faint">{{ $build['summary'] }}@if ($build['duration']) · {{ $build['duration'] }}@endif</span>
+                                <span wire:loading wire:target="toggleBuildLog" class="text-neutral-500 dark:text-fg-faint">Loading…</span>
+                            </button>
+                            @if ($buildLogOpen)
+                                @forelse ($build['lines'] as $line)
+                                    <div wire:key="deployment-build-log-{{ $loop->index }}"
+                                        data-log-line data-log-content="{{ $line['timestamp'].' '.$line['line'] }}"
+                                        class="log-line logs-viewer-line">
+                                        <span x-show="showTimestamps" class="logs-viewer-timestamp">{{ $line['timestamp'] }}</span>
+                                        <span class="logs-viewer-line-text">{{ $line['line'] }}</span>
+                                    </div>
+                                @empty
+                                    <span class="font-logs text-neutral-400">This build wrote no output.</span>
+                                @endforelse
+                            @endif
+                        </div>
+                    @endif
+                    <div wire:key="deployment-deploy-{{ $selectedDeployment['uuid'] }}" x-data="{ open: true }">
+                    @if ($selectedDeployment['build'])
+                        <button type="button" x-on:click="open = !open" :aria-expanded="open"
+                            class="flex w-full items-center gap-2 py-1 text-left font-sans text-xs text-neutral-600 hover:text-black dark:text-fg-dim dark:hover:text-white">
+                            <span class="flex shrink-0 transition-transform" :class="open ? '' : '-rotate-90'"><x-reicon name="chevron-down" class="size-3.5" /></span>
+                            <span class="font-medium text-neutral-950 dark:text-fg">Deploy</span>
+                            <span @class([
+                                'size-2 shrink-0 rounded-full',
+                                'bg-emerald-500' => $selectedDeployment['statusType'] === 'success',
+                                'bg-warning' => $selectedDeployment['statusType'] === 'warning',
+                                'bg-red-500' => $selectedDeployment['statusType'] === 'error',
+                                'bg-neutral-400 dark:bg-neutral-500' => ! in_array($selectedDeployment['statusType'], ['success', 'warning', 'error'], true),
+                            ])></span>
+                            <span>{{ $selectedDeployment['status'] }}</span>
+                        </button>
+                    @endif
+                    <div x-show="open" class="flex min-w-0 flex-col">
                     @forelse ($selectedDeployment['lines'] as $line)
                         <div wire:key="deployment-log-{{ $loop->index }}"
                             data-log-line data-log-content="{{ $line['timestamp'].' '.$line['line'] }}"
@@ -179,6 +228,8 @@
                     @empty
                         <span class="mb-2 font-logs text-neutral-400">No logs yet.</span>
                     @endforelse
+                    </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,5 +1,5 @@
-<x-application.settings-section id="cluster-application-deployments" title="Deployment history"
-    helper="Search, filter, and open a deployment to inspect its logs." flush>
+<x-application.settings-section id="cluster-application-deployments" title="Deployments"
+    helper="A deploy of a Git application builds the image first, then deploys it to each server. A build that deployed nothing shows as a row of its own. Open a row to see its logs." flush>
     {{-- Same toolbar as the v4 deployment history: search, Filter (status and server), Sort. --}}
     <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
         <x-slot:search>
@@ -81,22 +81,27 @@
                 </div>
 
                 @foreach ($deploymentHistory['rows'] as $deployment)
-                    <div wire:key="cluster-app-deployment-{{ $deployment['uuid'] }}" @class([
+                    @php
+                        $rowLink = $deployment['kind'] === 'build'
+                            ? new \Illuminate\View\ComponentAttributeBag(['href' => $deployment['href']])
+                            : new \Illuminate\View\ComponentAttributeBag(['href' => $deployment['href'], 'data-select-deployment' => $deployment['uuid']]);
+                    @endphp
+                    <div wire:key="cluster-app-{{ $deployment['kind'] }}-{{ $deployment['uuid'] }}" @class([
                         'data-table-row deployment-table-row deployment-table-grid group relative border-b border-neutral-200 text-[13px] text-neutral-600 hover:text-neutral-950 dark:border-white/[0.08] dark:text-fg-dim dark:hover:text-white',
                         'data-table-row-active' => ($selectedDeploymentUuid ?? null) === $deployment['uuid'],
                     ])>
                         @unless ($embedded)
-                            <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}">
+                            <a {{ $rowLink }}>
                                 <x-status-badge :status="$deployment['status']" :type="$deployment['statusType']" />
                             </a>
                         @endunless
-                        <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}">{{ $deployment['source'] }}</a>
+                        <a {{ $rowLink }}>{{ $deployment['source'] }}</a>
                         <span class="min-w-0">
                             @if ($deployment['revision'])
                                 <span class="flex min-w-0 items-center gap-2">
                                     <span class="shrink-0 font-mono text-xs text-neutral-950 dark:text-fg">{{ $deployment['revision'] }}</span>
                                     <span class="truncate text-neutral-500 group-hover:text-neutral-950 dark:text-fg-faint dark:group-hover:text-white"
-                                        title="{{ $deployment['image'] }}">{{ $deployment['image'] }}</span>
+                                        title="{{ $deployment['imageTitle'] }}">{{ $deployment['image'] }}</span>
                                 </span>
                             @else
                                 <span class="text-neutral-400 dark:text-fg-faint">-</span>
@@ -108,14 +113,14 @@
                             @endif
                         </span>
                         @unless ($embedded)
-                            <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}" title="{{ $deployment['createdAt'] }}">
+                            <a {{ $rowLink }} title="{{ $deployment['createdAt'] }}">
                                 {{ $deployment['createdAt']->diffForHumans() }}
                             </a>
                         @endunless
-                        <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}" class="tabular-nums">{{ $deployment['duration'] }}</a>
-                        <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}" class="truncate">{{ $deployment['node'] ?? '-' }}</a>
+                        <a {{ $rowLink }} class="tabular-nums">{{ $deployment['duration'] }}</a>
+                        <a {{ $rowLink }} class="truncate">{{ $deployment['node'] ?? '-' }}</a>
                         @if ($embedded)
-                            <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}"
+                            <a {{ $rowLink }}
                                 class="flex items-center justify-end gap-2 pr-1 tabular-nums"
                                 title="{{ $deployment['status'] }} · {{ $deployment['createdAt'] }}">
                                 <span>{{ $deployment['createdAt']->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true) }}</span>
@@ -128,7 +133,7 @@
                                 ])></span>
                             </a>
                         @endif
-                        <a href="{{ $deployment['href'] }}" data-select-deployment="{{ $deployment['uuid'] }}" class="deployment-row-link absolute inset-0"
+                        <a {{ $rowLink }} class="deployment-row-link absolute inset-0"
                             aria-hidden="true" tabindex="-1"></a>
                     </div>
                 @endforeach

@@ -906,7 +906,7 @@ it('renders every cluster application section as its own page', function (string
     'domains' => ['project.cluster-application.domains', 'domains', ['Domains', 'HTTPS is not available yet.']],
     'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'Developer view']],
     'resource limits' => ['project.cluster-application.resource-limits', 'resource-limits', ['CPU limit (cores)', 'Memory reservation (MiB)']],
-    'deployments' => ['project.cluster-application.deployments', 'deployments', ['Deployment history', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
+    'deployments' => ['project.cluster-application.deployments', 'deployments', ['A build that deployed nothing', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
     'logs' => ['project.cluster-application.logs', 'logs', ['Runtime Logs', 'Find in logs']],
     'servers' => ['project.cluster-application.servers', 'servers', ['Open cluster', 'Open server']],
     'danger' => ['project.cluster-application.danger', 'danger', ['Danger zone', 'Delete application']],
@@ -927,7 +927,7 @@ it('only renders the form that belongs to the current section', function () {
         ->assertSee('Start command')
         ->assertSee('wire:poll.10000ms="refresh"', false)
         ->assertDontSee('CPU limit (cores)')
-        ->assertDontSee('Deployment history');
+        ->assertDontSee('A build that deployed nothing');
 
     $this->get(route('project.cluster-application.resource-limits', $routeParameters))
         ->assertOk()
@@ -1003,7 +1003,7 @@ it('shows deployment logs built from the recorded operation', function () {
 
     $response = $this->get(route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $operation->uuid]))
         ->assertOk()
-        ->assertSee('Deployment history')
+        ->assertSee('A build that deployed nothing')
         ->assertSee('data-table-row-active', false)
         ->assertSee('Find in logs')
         ->assertSee('Deployment queued by '.$this->user->email.'.')
