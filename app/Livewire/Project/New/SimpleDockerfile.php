@@ -32,8 +32,6 @@ CMD ["nginx", "-g", "daemon off;"]
 
     public function submit()
     {
-        $this->authorize('create', Application::class);
-
         $this->validate([
             'dockerfile' => 'required',
         ]);
@@ -46,6 +44,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         $port = get_port_from_dockerfile($this->dockerfile);
         if (! $port) {

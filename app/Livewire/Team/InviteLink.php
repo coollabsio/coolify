@@ -2,9 +2,13 @@
 
 namespace App\Livewire\Team;
 
+use App\Enums\AccessScope;
 use App\Enums\Role;
+use App\Livewire\Team\Member\Access;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
+use App\Services\Access\Grant;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -12,6 +16,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class InviteLink extends Component
@@ -30,9 +35,26 @@ class InviteLink extends Component
         ];
     }
 
+    /**
+     * Grants for an invited member, set by the access editor. Checked again on invite.
+     *
+     * @var list<array{scope: string, uuid: string|null, levels: list<string>}>
+     */
+    public array $grants = [];
+
     public function mount()
     {
         $this->email = isDev() ? 'test3@example.com' : '';
+        $this->grants = Grant::listToArray(AccessResolver::defaultMemberGrants());
+    }
+
+    /**
+     * @param  list<array{scope: string, uuid: string|null, levels: list<string>}>  $access
+     */
+    #[On('invitation-access-chosen')]
+    public function setGrants(array $access): void
+    {
+        $this->grants = Grant::listToArray(Grant::listFrom($access));
     }
 
     public function viaEmail()
@@ -103,6 +125,19 @@ class InviteLink extends Component
                 throw new \Exception('Admins cannot invite owners.');
             }
 
+            $access = null;
+            if ($this->role === 'member') {
+                $grants = Grant::listFrom($this->grants);
+                $validTargets = Access::validTargets(currentTeam()->id);
+                foreach ($grants as $grant) {
+                    $target = $grant->scope === AccessScope::Team ? 'team' : "{$grant->scope->value}:{$grant->uuid}";
+                    if ($grant->levels === [] || ! in_array($target, $validTargets, true)) {
+                        throw new \Exception('Choose valid member access.');
+                    }
+                }
+                $access = Grant::listToArray($grants);
+            }
+
             $this->email = strtolower($this->email);
 
             $member_emails = currentTeam()->members()->get()->pluck('email');
@@ -150,13 +185,14 @@ class InviteLink extends Component
                 'role' => $this->role,
                 'link' => $link,
                 'via' => $sendEmail ? 'email' : 'link',
-            ]);
+            ], ['access' => $access]);
             auditLog('ui.team_invitation.created', [
                 'team_id' => currentTeam()->id,
                 'invitation_uuid' => $invitation->uuid,
                 'invitation_email' => $invitation->email,
                 'role' => $invitation->role,
                 'via' => $invitation->via,
+                'access' => $invitation->access,
             ]);
             if ($sendEmail) {
                 $mail = new MailMessage;

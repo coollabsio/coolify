@@ -1,0 +1,62 @@
+name: Request docs update
+
+on:
+  # Comments on pull requests from forks too, it checks out and runs no code of the pull request
+  # jactionlint ignore=dangerous-triggers
+  pull_request_target:
+    types: [labeled]
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: request-docs-update-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  comment:
+    name: Request docs update (${{ matrix.label }})
+    permissions:
+      pull-requests: write # comment on the pull request
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - label: "⚙️ Service"
+            body: |
+              Hi @${{ github.event.pull_request.user.login }}! 👋
+
+              It appears to us that you are either adding a new service or making changes to an existing one.
+              We kindly ask you to also review and update the **Coolify Documentation** to include this new service or it's new configuration needs.
+              This will help ensure that our documentation remains accurate and up-to-date for all users.
+
+              Coolify Docs Repository: https://github.com/coollabsio/coolify-docs
+              How to Contribute a new Service to the Docs: https://coolify.io/docs/get-started/contribute/service#adding-a-new-service-template-to-the-coolify-documentation
+          - label: "🛠️ Feature"
+            body: |
+              Hi @${{ github.event.pull_request.user.login }}! 👋
+
+              It appears to us that you are adding a new feature to Coolify.
+              We kindly ask you to also update the **Coolify Documentation** to include information about this new feature.
+              This will help ensure that our documentation remains accurate and up-to-date for all users.
+
+              Coolify Docs Repository: https://github.com/coollabsio/coolify-docs
+              How to Contribute to the Docs: https://coolify.io/docs/get-started/contribute/documentation
+    steps:
+      - name: Comment on the pull request
+        if: >-
+          ${{ (github.event.label.name == matrix.label || github.event.label.name == '📑 Waiting for Docs PR')
+          && contains(github.event.pull_request.labels.*.name, matrix.label)
+          && contains(github.event.pull_request.labels.*.name, '📑 Waiting for Docs PR') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          BODY: ${{ matrix.body }}
+        run: gh pr comment "$NUMBER" --body "$BODY"

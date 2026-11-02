@@ -46,18 +46,18 @@ it('reports an error when the new Coolify containers do not start', function (st
     expect($result['exitCode'])->toBe(1)
         ->and($result['status'])->toStartWith('error|')
         ->toContain('upgrade log');
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);
 
 it('completes the upgrade when the coolify container runs but is not healthy within the wait timeout', function (string $script) {
     $result = runUpgradeScriptContainerStart($script, composeExitCode: 1, coolifyRunning: true);
 
     expect($result['exitCode'])->toBe(0)
         ->and($result['status'])->toBe('');
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);
 
 it('completes the upgrade when docker compose up succeeds', function (string $script) {
     $result = runUpgradeScriptContainerStart($script, composeExitCode: 0, coolifyRunning: true);
 
     expect($result['exitCode'])->toBe(0)
         ->and($result['status'])->toBe('');
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);

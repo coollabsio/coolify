@@ -20,7 +20,7 @@ class ManagePrivateKey extends RestActionTool
             'get' => ['method' => 'GET', 'path' => 'security/keys/{uuid}', 'ability' => 'read', 'description' => 'one private key (no key material)'],
             'create' => ['method' => 'POST', 'path' => 'security/keys', 'ability' => 'write', 'description' => 'add a private key (data: private_key PEM or base64, name, description)'],
             'update' => ['method' => 'PATCH', 'path' => 'security/keys/{uuid}', 'ability' => 'write', 'description' => 'update a private key (data: name, description; private_key only to replace the key)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'security/keys/{uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete a private key that is not in use'],
+            'delete' => ['method' => 'DELETE', 'path' => 'security/keys/{uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a private key that is not in use'],
         ];
     }
 

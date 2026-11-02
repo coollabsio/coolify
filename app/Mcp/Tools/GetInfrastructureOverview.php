@@ -9,7 +9,6 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\Project;
-use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Collection;
@@ -40,7 +39,7 @@ class GetInfrastructureOverview extends Tool
             return $this->mcpError($request, 'Invalid token.');
         }
 
-        $servers = Server::whereTeamId($teamId)
+        $servers = $this->visibleServers($request, $teamId)
             ->select('id', 'name', 'uuid', 'ip', 'description')
             ->with('settings:id,server_id,is_reachable,is_usable')
             ->get();
@@ -56,7 +55,7 @@ class GetInfrastructureOverview extends Tool
             ->values()
             ->all();
 
-        $unreachableServers = Server::whereTeamId($teamId)
+        $unreachableServers = $this->visibleServers($request, $teamId)
             ->whereHas('settings', fn ($q) => $q->where('is_reachable', false))
             ->count();
 

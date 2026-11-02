@@ -231,9 +231,12 @@
                                     <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                     {{ $previewIsStopped ? 'Deploy' : 'Redeploy' }}
                                 </button>
+                                @if (!$previewIsStopped || auth()->user()->can('delete', $application))
+                                    <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
+                                @endif
                                 @if (!$previewIsStopped)
                                     <button type="button"
-                                        class="listbox-option justify-start! gap-2.5! text-error!"
+                                        class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                         @click="open = false; document.getElementById('preview-stop-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                         role="menuitem">
                                         <x-reicon name="stop" class="size-3.5" />
@@ -243,7 +246,7 @@
                             @endcan
                             @can('delete', $application)
                                 <button type="button"
-                                    class="listbox-option justify-start! gap-2.5! text-error!"
+                                    class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                     @click="open = false; document.getElementById('preview-delete-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                     role="menuitem">
                                     <x-reicon name="trash" class="size-3.5" />

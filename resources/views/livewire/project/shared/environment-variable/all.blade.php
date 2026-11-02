@@ -170,14 +170,17 @@
                             @endforeach
                         @endif
             </x-table.filter>
-            <x-table.sort>
-                        @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
-                            <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
-                                <span>{{ $label }}</span>
-                                @if ($tableSort === $value)<span>✓</span>@endif
-                            </button>
-                        @endforeach
-            </x-table.sort>
+            {{-- The table header, with its Name sort, is hidden on small screens (app.css, max-width: 768px). --}}
+            <div class="min-[769px]:hidden">
+                <x-table.sort>
+                            @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
+                                <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
+                                    <span>{{ $label }}</span>
+                                    @if ($tableSort === $value)<span>✓</span>@endif
+                                </button>
+                            @endforeach
+                </x-table.sort>
+            </div>
                 @can('manageEnvironment', $resource)
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
@@ -232,7 +235,7 @@
                             <span class="text-center">Multiline</span>
                             <span class="text-center">Buildtime</span>
                             <span class="text-center">Runtime</span>
-                            <span></span>
+                            <span class="text-right">Actions</span>
                         </div>
                             @php $renderedScope = null; @endphp
                             @foreach ($this->environmentVariablePageRows as $row)

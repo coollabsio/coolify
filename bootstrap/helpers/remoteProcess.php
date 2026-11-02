@@ -195,8 +195,8 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = runSshProcess($sshCommand, 30);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server);
+            $process = runSshProcess($sshCommand, 30, SshMultiplexingHelper::sshBatchInput($command_string));
             SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             $output = trim($process->output());
@@ -232,8 +232,8 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
-            $process = runSshProcess($sshCommand, (int) $effectiveTimeout);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server, $disableMultiplexing, (int) $effectiveTimeout);
+            $process = runSshProcess($sshCommand, (int) $effectiveTimeout, SshMultiplexingHelper::sshBatchInput($command_string));
             SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             $output = trim($process->output());

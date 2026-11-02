@@ -496,10 +496,11 @@ class GetLogs extends Component
      */
     private function executeLogCommand(Server $server, string $command, int $maxBytes): array
     {
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $this->boundedLogCommand($command, $maxBytes));
-
         // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
-        $output = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand)->output();
+        $output = Process::timeout(config('constants.ssh.command_timeout'))
+            ->input(SshMultiplexingHelper::sshBatchInput($this->boundedLogCommand($command, $maxBytes)))
+            ->run(SshMultiplexingHelper::generateSshBatchCommand($server))
+            ->output();
         $truncated = strlen($output) > $maxBytes;
         // Invalid UTF-8 from a container would make the JSON response fail, so the viewer would stay empty.
         $logs = rtrim(sanitize_utf8_text(removeAnsiColors($truncated ? substr($output, 0, $maxBytes) : $output)), "\n");

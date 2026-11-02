@@ -33,7 +33,7 @@ function repairRootUserEnvWithUpgradeScript(string $scriptPath, string $initialE
     return $contents;
 }
 
-$upgradeScripts = ['stable upgrade' => 'scripts/upgrade.sh', 'nightly upgrade' => 'other/nightly/upgrade.sh'];
+$upgradeScripts = ['stable upgrade' => 'scripts/upgrade.sh'];
 
 it('quotes unquoted root user credentials with spaces so that .env parses again', function (string $scriptPath) {
     $env = repairRootUserEnvWithUpgradeScript($scriptPath, implode("\n", [

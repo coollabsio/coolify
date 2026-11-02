@@ -12,6 +12,10 @@ use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
+afterEach(function () {
+    @unlink(storage_path('app/versions.json'));
+});
+
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
 
@@ -24,7 +28,7 @@ beforeEach(function () {
 
 it('uses a newer helper version from the local versions file without asking the CDN', function () {
     Http::preventStrayRequests();
-    Cache::put('coolify:versions:all', ['coolify' => ['helper' => ['version' => '1.0.18']]], 3600);
+    Cache::put('coolify:versions', ['coolify' => ['version' => '4.0.0'], 'helper' => ['version' => '1.0.18']], 3600);
 
     (new CheckHelperImageJob)->handle();
 
@@ -33,18 +37,17 @@ it('uses a newer helper version from the local versions file without asking the 
 });
 
 it('stores the helper version when the update check refreshes versions.json from the CDN', function () {
-    File::partialMock()->shouldReceive('put')->once()->with(base_path('versions.json'), Mockery::type('string'));
     config(['constants.coolify.version' => '4.0.0']);
     Http::preventStrayRequests();
     Http::fake([
         'https://cdn.example.com/coolify/versions.json' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.0'], 'helper' => ['version' => '1.0.19']],
+            'stable' => ['coolify' => ['version' => '4.0.0'], 'helper' => ['version' => '1.0.25']],
         ]),
     ]);
 
     refresh_versions_file();
 
-    expect(InstanceSettings::findOrFail(0)->helper_version)->toBe('1.0.19');
+    expect(InstanceSettings::findOrFail(0)->helper_version)->toBe('1.0.25');
 });
 
 it('does not use a stored helper version older than the bundled version', function () {
@@ -58,7 +61,7 @@ it('keeps the stored helper version and does not notify when the CDN is unavaila
     InstanceSettings::findOrFail(0)->update(['helper_version' => '1.0.17']);
     Notification::fake();
     Sleep::fake();
-    File::partialMock()->shouldNotReceive('put');
+    File::partialMock()->shouldNotReceive('replace');
     Http::preventStrayRequests();
     Http::fake([
         'https://cdn.example.com/coolify/versions.json' => Http::response('error code: 1200', 503, ['Retry-After' => '60']),

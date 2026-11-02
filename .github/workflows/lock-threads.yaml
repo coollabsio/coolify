@@ -1,0 +1,30 @@
+name: Lock threads
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: lock-threads
+  cancel-in-progress: false
+
+jobs:
+  lock:
+    name: Lock threads
+    permissions:
+      issues: write # lock the closed issues
+      discussions: write # lock the closed discussions
+      pull-requests: write # lock the closed pull requests
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    steps:
+      - name: Lock closed threads that were inactive for the last 30 days
+        uses: dessant/lock-threads@v6.0.2
+        with:
+          issue-inactive-days: 30
+          discussion-inactive-days: 30
+          pr-inactive-days: 30

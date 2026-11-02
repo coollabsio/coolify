@@ -207,11 +207,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('two-factor.required.switch-team');
 
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
-    Route::get('/analytics', Analytics::class)->name('analytics');
-    Route::get('/metrics', FleetMetrics::class)->name('metrics');
-    Route::get('/canvas', DeployCanvas::class)->name('deploy-canvas');
-    Route::get('/canvas/tags', TagsCanvas::class)->name('tags.canvas');
+    Route::middleware('access.team-wide')->group(function () {
+        Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
+        Route::get('/analytics', Analytics::class)->name('analytics');
+        Route::get('/metrics', FleetMetrics::class)->name('metrics');
+        Route::get('/canvas', DeployCanvas::class)->name('deploy-canvas');
+        Route::get('/canvas/tags', TagsCanvas::class)->name('tags.canvas');
+    });
     // The canvas calls these API controllers with the browser session (no API token).
     Route::prefix('canvas/api')->middleware([UseSessionTeamApiToken::class, 'api.token.team', 'api.sensitive'])->group(function () {
         Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
@@ -226,337 +228,341 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/links', [EnvironmentCanvasController::class, 'storeLink'])->middleware(['api.ability:write']);
         Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/links/{link_uuid}', [EnvironmentCanvasController::class, 'updateLink'])->middleware(['api.ability:write']);
         Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}/canvas/links/{link_uuid}', [EnvironmentCanvasController::class, 'destroyLink'])->middleware(['api.ability:write']);
-        Route::get('/tags/canvas', [TagCanvasController::class, 'show'])->middleware(['api.ability:read']);
-        Route::post('/tags/canvas/links', [TagCanvasController::class, 'storeLink'])->middleware(['api.ability:write']);
-        Route::delete('/tags/canvas/links/{link_id}', [TagCanvasController::class, 'destroyLink'])->middleware(['api.ability:write']);
-        Route::get('/shared-variables/team/canvas', [SharedVariableCanvasController::class, 'show'])->middleware(['api.ability:read']);
-        Route::post('/shared-variables/team/canvas/links', [SharedVariableCanvasController::class, 'storeLink'])->middleware(['api.ability:write']);
-        Route::delete('/shared-variables/team/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->middleware(['api.ability:write']);
+        Route::get('/tags/canvas', [TagCanvasController::class, 'show'])->middleware(['access.team-wide', 'api.ability:read']);
+        Route::post('/tags/canvas/links', [TagCanvasController::class, 'storeLink'])->middleware(['access.team-wide', 'api.ability:write']);
+        Route::delete('/tags/canvas/links/{link_id}', [TagCanvasController::class, 'destroyLink'])->middleware(['access.team-wide', 'api.ability:write']);
+        Route::get('/shared-variables/team/canvas', [SharedVariableCanvasController::class, 'show'])->middleware(['access.team-wide', 'api.ability:read']);
+        Route::post('/shared-variables/team/canvas/links', [SharedVariableCanvasController::class, 'storeLink'])->middleware(['access.team-wide', 'api.ability:write']);
+        Route::delete('/shared-variables/team/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->middleware(['access.team-wide', 'api.ability:write']);
         Route::get('/shared-variables/{scope}/{uuid}/canvas', [SharedVariableCanvasController::class, 'show'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:read']);
         Route::post('/shared-variables/{scope}/{uuid}/canvas/links', [SharedVariableCanvasController::class, 'storeLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
         Route::delete('/shared-variables/{scope}/{uuid}/canvas/links/{link_id}', [SharedVariableCanvasController::class, 'destroyLink'])->whereIn('scope', ['project', 'environment', 'server'])->middleware(['api.ability:write']);
-        Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
-        Route::get('/servers/canvas', [ServerCanvasController::class, 'index'])->middleware(['api.ability:read']);
-        Route::patch('/servers/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
-        Route::get('/dashboard/canvas', [ServerCanvasController::class, 'dashboard'])->middleware(['api.ability:read']);
-        Route::patch('/dashboard/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['api.ability:write']);
-        Route::get('/servers/{uuid}/canvas', [ServerCanvasController::class, 'show'])->middleware(['api.ability:read']);
-        Route::get('/servers/{uuid}/canvas/containers', [ServerCanvasController::class, 'containers'])->middleware(['api.ability:read']);
-        Route::get('/servers/{uuid}/canvas/usage', [ServerCanvasController::class, 'usage'])->middleware(['api.ability:read']);
-        Route::get('/servers/{server_uuid}/destinations', [DestinationsController::class, 'index_by_server'])->middleware(['api.ability:read']);
-        Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
-        Route::get('/github-apps/{github_app_id}/repositories', [GithubController::class, 'load_repositories'])->middleware(['api.ability:read']);
-        Route::get('/github-apps/{github_app_id}/repositories/{owner}/{repo}/branches', [GithubController::class, 'load_branches'])->middleware(['api.ability:read']);
-        Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['api.ability:read']);
-        Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware(['api.ability:write']);
-        Route::post('/applications/private-github-app', [ApplicationsController::class, 'create_private_gh_app_application'])->middleware(['api.ability:write']);
-        Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
-        Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
-        Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
-        Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
-        Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
-        Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
-        Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
-        Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
-        Route::post('/databases/postgresql', [DatabasesController::class, 'create_database_postgresql'])->middleware(['api.ability:write']);
-        Route::post('/databases/mysql', [DatabasesController::class, 'create_database_mysql'])->middleware(['api.ability:write']);
-        Route::post('/databases/mariadb', [DatabasesController::class, 'create_database_mariadb'])->middleware(['api.ability:write']);
-        Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
-        Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
-        Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
-        Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
-        Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
-        Route::post('/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:deploy']);
-        Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid'])->middleware(['api.ability:read']);
-    });
-    Route::get('/admin', AdminIndex::class)->name('admin.index');
-    Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
+        Route::middleware('access.team-wide')->group(function () {
+            Route::get('/servers', [ServersController::class, 'servers'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/servers/canvas', [ServerCanvasController::class, 'index'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::patch('/servers/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['access.team-wide', 'api.ability:write']);
+            Route::get('/dashboard/canvas', [ServerCanvasController::class, 'dashboard'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::patch('/dashboard/canvas/positions', [ServerCanvasController::class, 'updatePositions'])->middleware(['access.team-wide', 'api.ability:write']);
+            Route::get('/servers/{uuid}/canvas', [ServerCanvasController::class, 'show'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/servers/{uuid}/canvas/containers', [ServerCanvasController::class, 'containers'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/servers/{uuid}/canvas/usage', [ServerCanvasController::class, 'usage'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/servers/{server_uuid}/destinations', [DestinationsController::class, 'index_by_server'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/github-apps/{github_app_id}/repositories', [GithubController::class, 'load_repositories'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/github-apps/{github_app_id}/repositories/{owner}/{repo}/branches', [GithubController::class, 'load_branches'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['access.team-wide', 'api.ability:read']);
+            Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware(['api.ability:write']);
+            Route::post('/applications/private-github-app', [ApplicationsController::class, 'create_private_gh_app_application'])->middleware(['api.ability:write']);
+            Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
+            Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
+            Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
+            Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
+            Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
+            Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
+            Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
+            Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
+            Route::post('/databases/postgresql', [DatabasesController::class, 'create_database_postgresql'])->middleware(['api.ability:write']);
+            Route::post('/databases/mysql', [DatabasesController::class, 'create_database_mysql'])->middleware(['api.ability:write']);
+            Route::post('/databases/mariadb', [DatabasesController::class, 'create_database_mariadb'])->middleware(['api.ability:write']);
+            Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
+            Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
+            Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
+            Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
+            Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
+            Route::post('/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:deploy']);
+            Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid'])->middleware(['api.ability:read']);
+        });
+        Route::get('/admin', AdminIndex::class)->name('admin.index');
+        Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
-    Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
-    Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
+        Route::middleware('access.team-wide')->group(function () {
+            Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
+            Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
 
-    Route::get('/settings', SettingsIndex::class)->name('settings.index');
-    Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
-    Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+            Route::get('/settings', SettingsIndex::class)->name('settings.index');
+            Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
+            Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
 
-    Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
-    Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
-    Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
-    Route::get('/settings/oauth/{provider}', SettingsOauth::class)
-        ->where('provider', '[A-Za-z0-9_-]+')
-        ->name('settings.oauth.provider');
-    Route::get('/profile', ProfileIndex::class)->name('profile');
-    Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
-    Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
-    Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
-        ->middleware('password.confirm')
-        ->name('profile.passkeys.confirm');
+            Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
+            Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
+            Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+            Route::get('/settings/oauth/{provider}', SettingsOauth::class)
+                ->where('provider', '[A-Za-z0-9_-]+')
+                ->name('settings.oauth.provider');
+        });
+        Route::get('/profile', ProfileIndex::class)->name('profile');
+        Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
+        Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+        Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
+            ->middleware('password.confirm')
+            ->name('profile.passkeys.confirm');
 
-    Route::prefix('tags')->group(function () {
-        Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
-    });
+        Route::prefix('tags')->middleware('access.team-wide')->group(function () {
+            Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
+        });
 
-    Route::prefix('notifications')->group(function () {
-        Route::get('/email', NotificationEmail::class)->name('notifications.email');
-        Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
-        Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
-        Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
-        Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
-        Route::get('/webhook', NotificationWebhook::class)->name('notifications.webhook');
-    });
+        Route::prefix('notifications')->middleware('access.team-wide')->group(function () {
+            Route::get('/email', NotificationEmail::class)->name('notifications.email');
+            Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
+            Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
+            Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
+            Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
+            Route::get('/webhook', NotificationWebhook::class)->name('notifications.webhook');
+        });
 
-    Route::prefix('storages')->group(function () {
-        Route::get('/', StorageIndex::class)->name('storage.index');
-        Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
-        Route::get('/{storage_uuid}/danger', StorageShow::class)->name('storage.danger');
-        Route::get('/{storage_uuid}/resources', StorageShow::class)->name('storage.resources');
-    });
-    Route::prefix('shared-variables')->group(function () {
-        Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index');
-        Route::get('/team', TeamSharedVariablesIndex::class)->name('shared-variables.team.index');
-        Route::get('/team/canvas', SharedVariablesCanvas::class)->name('shared-variables.team.canvas');
-        Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
-        Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
-        Route::get('/project/{project_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.project.canvas');
-        Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
-        Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
-        Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.environment.canvas');
-        Route::get('/servers', ServerSharedVariablesIndex::class)->name('shared-variables.server.index');
-        Route::get('/server/{server_uuid}', ServerSharedVariablesShow::class)->name('shared-variables.server.show');
-        Route::get('/server/{server_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.server.canvas');
-    });
+        Route::prefix('storages')->middleware('access.team-wide')->group(function () {
+            Route::get('/', StorageIndex::class)->name('storage.index');
+            Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
+            Route::get('/{storage_uuid}/danger', StorageShow::class)->name('storage.danger');
+            Route::get('/{storage_uuid}/resources', StorageShow::class)->name('storage.resources');
+        });
+        Route::prefix('shared-variables')->group(function () {
+            Route::get('/', SharedVariablesIndex::class)->name('shared-variables.index')->middleware('access.team-wide');
+            Route::get('/team', TeamSharedVariablesIndex::class)->name('shared-variables.team.index')->middleware('access.team-wide');
+            Route::get('/team/canvas', SharedVariablesCanvas::class)->name('shared-variables.team.canvas')->middleware('access.team-wide');
+            Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
+            Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
+            Route::get('/project/{project_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.project.canvas');
+            Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
+            Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
+            Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.environment.canvas');
+            Route::get('/servers', ServerSharedVariablesIndex::class)->name('shared-variables.server.index')->middleware('access.team-wide');
+            Route::get('/server/{server_uuid}', ServerSharedVariablesShow::class)->name('shared-variables.server.show')->middleware('access.team-wide');
+            Route::get('/server/{server_uuid}/canvas', SharedVariablesCanvas::class)->name('shared-variables.server.canvas')->middleware('access.team-wide');
+        });
 
-    Route::prefix('team')->group(function () {
-        Route::get('/', TeamIndex::class)->name('team.index');
-        Route::get('/{team_id}/avatar', TeamAvatarController::class)->whereNumber('team_id')->name('team.avatar');
-        Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
-        Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
-        Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log');
-        Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
-        Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
-    });
+        Route::prefix('team')->group(function () {
+            Route::get('/', TeamIndex::class)->name('team.index')->middleware('access.team-wide');
+            Route::get('/{team_id}/avatar', TeamAvatarController::class)->whereNumber('team_id')->name('team.avatar');
+            Route::get('/members', TeamMemberIndex::class)->name('team.member.index')->middleware('access.team-wide');
+            Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
+            Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log')->middleware('access.team-wide');
+            Route::get('/admin', TeamAdminView::class)->name('team.admin-view')->middleware('access.team-wide');
+            Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone')->middleware('access.team-wide');
+        });
 
-    Route::get('/terminal', TerminalIndex::class)->name('terminal')->middleware('can.access.terminal');
-    Route::post('/terminal/auth', function () {
-        if (auth()->check()) {
-            return response()->json(['authenticated' => true], 200);
-        }
-
-        return response()->json(['authenticated' => false], 401);
-    })->name('terminal.auth')->middleware('can.access.terminal');
-
-    Route::post('/terminal/auth/ips', function () {
-        if (auth()->check()) {
-            $team = auth()->user()->currentTeam();
-            $ipAddresses = $team->servers
-                ->where('settings.is_terminal_enabled', true)
-                ->pluck('ip')
-                ->filter()
-                ->values();
-
-            if (isDev()) {
-                $ipAddresses = $ipAddresses->merge([
-                    'coolify-testing-host',
-                    'host.docker.internal',
-                    'localhost',
-                    '127.0.0.1',
-                    base_ip(),
-                ])->filter()->unique()->values();
+        Route::get('/terminal', TerminalIndex::class)->name('terminal')->middleware('can.access.terminal')->middleware('access.team-wide');
+        Route::post('/terminal/auth', function () {
+            if (auth()->check()) {
+                return response()->json(['authenticated' => true], 200);
             }
 
-            return response()->json(['ipAddresses' => $ipAddresses->all()], 200);
-        }
+            return response()->json(['authenticated' => false], 401);
+        })->name('terminal.auth')->middleware('can.access.terminal');
 
-        return response()->json(['ipAddresses' => []], 401);
-    })->name('terminal.auth.ips')->middleware('can.access.terminal');
+        Route::post('/terminal/auth/ips', function () {
+            if (auth()->check()) {
+                $team = auth()->user()->currentTeam();
+                $ipAddresses = $team->servers
+                    ->where('settings.is_terminal_enabled', true)
+                    ->pluck('ip')
+                    ->filter()
+                    ->values();
 
-    Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
-        $request->validate(['token' => ['required', 'string', 'size:64']]);
+                if (isDev()) {
+                    $ipAddresses = $ipAddresses->merge([
+                        'coolify-testing-host',
+                        'host.docker.internal',
+                        'localhost',
+                        '127.0.0.1',
+                        base_ip(),
+                    ])->filter()->unique()->values();
+                }
 
-        return response()->json($terminalSessionService->redeem($request->user(), $request->string('token')->toString()));
-    })->name('terminal.session')->middleware('can.access.terminal');
+                return response()->json(['ipAddresses' => $ipAddresses->all()], 200);
+            }
 
-    // No session-team gate: the check uses the team of the server, and the user can switch teams in another tab.
-    Route::post('/terminal/session/check', function (Request $request, TerminalSessionService $terminalSessionService) {
-        $request->validate(['session_id' => ['required', 'string', 'size:64']]);
-        $terminalSessionService->check($request->user(), $request->string('session_id')->toString());
+            return response()->json(['ipAddresses' => []], 401);
+        })->name('terminal.auth.ips')->middleware('can.access.terminal');
 
-        return response()->json(['active' => true]);
-    })->name('terminal.session.check');
+        Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
+            $request->validate(['token' => ['required', 'string', 'size:64']]);
 
-    Route::prefix('invitations')->group(function () {
-        Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
-        Route::post('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
+            return response()->json($terminalSessionService->redeem($request->user(), $request->string('token')->toString()));
+        })->name('terminal.session')->middleware('can.access.terminal');
+
+        // No session-team gate: the check uses the team of the server, and the user can switch teams in another tab.
+        Route::post('/terminal/session/check', function (Request $request, TerminalSessionService $terminalSessionService) {
+            $request->validate(['session_id' => ['required', 'string', 'size:64']]);
+            $terminalSessionService->check($request->user(), $request->string('session_id')->toString());
+
+            return response()->json(['active' => true]);
+        })->name('terminal.session.check');
+
+        Route::prefix('invitations')->group(function () {
+            Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
+            Route::post('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
+        });
+
+        Route::get('/projects', ProjectIndex::class)->name('project.index');
+        Route::get('/projects/canvas', ProjectsCanvas::class)->name('project.canvas.index');
+        Route::get('/project/{project_uuid}/icon', ProjectIconController::class)->name('project.icon');
+        Route::get('/files/download/{token}', FileBrowserDownloadController::class)->name('project.files.download')->middleware('can.access.terminal');
+        Route::prefix('project/{project_uuid}')->group(function () {
+            Route::get('/', ProjectShow::class)->name('project.show');
+            Route::get('/canvas', ProjectCanvas::class)->name('project.canvas');
+            Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
+        });
+        Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
+            Route::get('/', ResourceIndex::class)->name('project.resource.index');
+            Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
+            Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
+            Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
+            Route::get('/canvas', EnvironmentCanvas::class)->name('project.environment.canvas');
+        });
+        Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
+            Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
+            Route::get('/domains', ApplicationConfiguration::class)->name('project.application.domains');
+            Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
+            Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
+            Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
+            Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
+            Route::get('/backups', ApplicationBackupIndex::class)->name('project.application.backup.index');
+            Route::get('/backups/{backup_uuid}', ApplicationBackupShow::class)->name('project.application.backup.show');
+            // S3 and retention settings moved into the general page; keep old links working.
+            Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}/backups/{backup_uuid}');
+            Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}/backups/{backup_uuid}');
+            Route::get('/backups/{backup_uuid}/executions', ApplicationBackupShow::class)->name('project.application.backup.executions');
+            Route::get('/backups/{backup_uuid}/danger', ApplicationBackupShow::class)->name('project.application.backup.danger');
+            Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
+            Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
+            Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
+            Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
+            Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
+            Route::get('/healthcheck', ApplicationConfiguration::class)->name('project.application.healthcheck');
+            Route::get('/rollback', ApplicationConfiguration::class)->name('project.application.rollback');
+            Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
+            Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
+            Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+            Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
+            Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
+            Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
+
+            Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
+            Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
+            Route::get('/logs', Logs::class)->name('project.application.logs');
+            Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
+            Route::get('/files', FileBrowser::class)->name('project.application.files')->middleware('can.access.terminal');
+            // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
+            Route::get('/tasks/{task_uuid}', fn () => redirect()->route('project.application.scheduled-tasks.show', get_route_parameters()))->name('project.application.scheduled-tasks');
+        });
+        Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
+            Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
+            Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
+            Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
+            Route::get('/import-backup', DatabaseConfiguration::class)->name('project.database.import-backup')->middleware('can.update.resource');
+            Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
+            Route::get('/healthcheck', DatabaseConfiguration::class)->name('project.database.healthcheck');
+            Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
+            Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
+            Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
+            Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+            Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
+            Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
+
+            Route::get('/logs', Logs::class)->name('project.database.logs');
+            Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
+            Route::get('/files', FileBrowser::class)->name('project.database.files')->middleware('can.access.terminal');
+            Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
+            Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
+            // S3 and retention settings moved into the general page; keep old links working.
+            Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
+            Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
+            Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
+            Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
+        });
+        Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
+            Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
+            Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
+            Route::get('/logs', Logs::class)->name('project.service.logs');
+            Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
+            Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
+            Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+            Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
+            Route::get('/import-backup/{stack_service_uuid}', ServiceImportBackup::class)->name('project.service.import-backup.database')->middleware('can.update.resource');
+            Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
+            Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
+            // S3 and retention settings moved into the general page; keep old links working.
+            Route::redirect('/storage-backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups/{backup_uuid}');
+            Route::redirect('/storage-backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups/{backup_uuid}');
+            Route::get('/storage-backups/{backup_uuid}/executions', Show::class)->name('project.service.volume-backups.executions');
+            Route::get('/storage-backups/{backup_uuid}/danger', Show::class)->name('project.service.volume-backups.danger');
+            Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
+            Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
+            Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
+            Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
+            Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
+            Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
+            Route::get('/files', FileBrowser::class)->name('project.service.files')->middleware('can.access.terminal');
+            Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
+            Route::get('/{stack_service_uuid}/backups/{backup_uuid}', ServiceDatabaseBackups::class)->name('project.service.database.backup.show');
+            Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
+            Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
+            Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
+            Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
+            Route::get('/{stack_service_uuid}/import', ServiceImportBackup::class)->name('project.service.database.import')->middleware('can.update.resource');
+            Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
+            Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
+            // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
+            Route::get('/tasks/{task_uuid}', fn () => redirect()->route('project.service.scheduled-tasks.show', get_route_parameters()))->name('project.service.scheduled-tasks');
+        });
+
+        Route::get('/servers', ServerIndex::class)->name('server.index');
+        Route::get('/servers/canvas', ServerCanvas::class)->name('server.canvas.index');
+        Route::get('/registries', ServerDockerRegistries::class)->name('registries.index');
+        Route::get('/servers/new', ServerCreatePage::class)->name('server.create')->middleware('can:create,'.Server::class);
+        Route::get('/servers/new/{type}/{token_uuid}', ServerCreatePage::class)->name('server.create.token')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger']);
+        Route::get('/servers/new/{type}', ServerCreatePage::class)->name('server.create.type')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger', 'manual']);
+
+        Route::prefix('server/{server_uuid}')->group(function () {
+            Route::get('/', ServerShow::class)->name('server.show');
+            Route::get('/canvas', ServerCanvas::class)->name('server.canvas');
+            Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+            Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
+            Route::get('/sentinel', SentinelShow::class)->name('server.sentinel');
+            Route::get('/sentinel/logs', SentinelLogs::class)->name('server.sentinel.logs');
+            Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
+            Route::get('/cloud-provider-token', CloudProviderTokenShow::class)->name('server.cloud-provider-token');
+            Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');
+            Route::get('/resources', ResourcesShow::class)->name('server.resources');
+            Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
+            Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
+            Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+            Route::get('/metrics', ServerCharts::class)->name('server.metrics');
+            Route::get('/analytics', ServerAnalytics::class)->name('server.analytics');
+            Route::get('/danger', DeleteServer::class)->name('server.delete');
+            Route::get('/transfer', ServerTransfer::class)->name('server.transfer');
+            Route::get('/proxy', ProxyShow::class)->name('server.proxy');
+            Route::get('/proxy/certificates', ProxyCertificatesShow::class)->name('server.proxy.certificates');
+            Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
+            Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
+            Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');
+            Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
+            Route::get('/images', DockerImages::class)->name('server.docker-images');
+            Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
+            Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
+            Route::get('/security', ServerSecurityIndex::class)->name('server.security')->middleware('can.update.resource');
+            // Old sub pages. Links in sent notifications still use them.
+            foreach (['patches' => 'server-patching-overview-section', 'terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
+                Route::get("/security/{$page}", fn (string $server_uuid) => redirect(route('server.security', ['server_uuid' => $server_uuid]).'#'.$section))
+                    ->name("server.security.{$page}");
+            }
+        });
+        Route::get('/destinations', DestinationIndex::class)->name('destination.index');
+        Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
+        Route::get('/destination/{destination_uuid}/danger', DestinationShow::class)->name('destination.danger');
+        Route::get('/destination/{destination_uuid}/resources', DestinationResources::class)->name('destination.resources');
+
+        // Route::get('/security', fn () => view('security.index'))->name('security.index');
+        Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
+        // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
+
+        Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
+        Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
+        Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
+        Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
+        Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');
     });
-
-    Route::get('/projects', ProjectIndex::class)->name('project.index');
-    Route::get('/projects/canvas', ProjectsCanvas::class)->name('project.canvas.index');
-    Route::get('/project/{project_uuid}/icon', ProjectIconController::class)->name('project.icon');
-    Route::get('/files/download/{token}', FileBrowserDownloadController::class)->name('project.files.download')->middleware('can.access.terminal');
-    Route::prefix('project/{project_uuid}')->group(function () {
-        Route::get('/', ProjectShow::class)->name('project.show');
-        Route::get('/canvas', ProjectCanvas::class)->name('project.canvas');
-        Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
-    });
-    Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
-        Route::get('/', ResourceIndex::class)->name('project.resource.index');
-        Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
-        Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
-        Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
-        Route::get('/canvas', EnvironmentCanvas::class)->name('project.environment.canvas');
-    });
-    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
-        Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
-        Route::get('/domains', ApplicationConfiguration::class)->name('project.application.domains');
-        Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
-        Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
-        Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
-        Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
-        Route::get('/backups', ApplicationBackupIndex::class)->name('project.application.backup.index');
-        Route::get('/backups/{backup_uuid}', ApplicationBackupShow::class)->name('project.application.backup.show');
-        // S3 and retention settings moved into the general page; keep old links working.
-        Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}/backups/{backup_uuid}');
-        Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}/backups/{backup_uuid}');
-        Route::get('/backups/{backup_uuid}/executions', ApplicationBackupShow::class)->name('project.application.backup.executions');
-        Route::get('/backups/{backup_uuid}/danger', ApplicationBackupShow::class)->name('project.application.backup.danger');
-        Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
-        Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
-        Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
-        Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
-        Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
-        Route::get('/healthcheck', ApplicationConfiguration::class)->name('project.application.healthcheck');
-        Route::get('/rollback', ApplicationConfiguration::class)->name('project.application.rollback');
-        Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
-        Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
-        Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
-        Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
-        Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
-        Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
-
-        Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
-        Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
-        Route::get('/logs', Logs::class)->name('project.application.logs');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
-        Route::get('/files', FileBrowser::class)->name('project.application.files')->middleware('can.access.terminal');
-        // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
-        Route::get('/tasks/{task_uuid}', fn () => redirect()->route('project.application.scheduled-tasks.show', get_route_parameters()))->name('project.application.scheduled-tasks');
-    });
-    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
-        Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
-        Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
-        Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
-        Route::get('/import-backup', DatabaseConfiguration::class)->name('project.database.import-backup')->middleware('can.update.resource');
-        Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
-        Route::get('/healthcheck', DatabaseConfiguration::class)->name('project.database.healthcheck');
-        Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
-        Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
-        Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
-        Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
-        Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
-        Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
-
-        Route::get('/logs', Logs::class)->name('project.database.logs');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
-        Route::get('/files', FileBrowser::class)->name('project.database.files')->middleware('can.access.terminal');
-        Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
-        Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
-        // S3 and retention settings moved into the general page; keep old links working.
-        Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
-        Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
-        Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
-        Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
-    });
-    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
-        Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
-        Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
-        Route::get('/logs', Logs::class)->name('project.service.logs');
-        Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
-        Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
-        Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
-        Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
-        Route::get('/import-backup/{stack_service_uuid}', ServiceImportBackup::class)->name('project.service.import-backup.database')->middleware('can.update.resource');
-        Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
-        Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
-        // S3 and retention settings moved into the general page; keep old links working.
-        Route::redirect('/storage-backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups/{backup_uuid}');
-        Route::redirect('/storage-backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups/{backup_uuid}');
-        Route::get('/storage-backups/{backup_uuid}/executions', Show::class)->name('project.service.volume-backups.executions');
-        Route::get('/storage-backups/{backup_uuid}/danger', Show::class)->name('project.service.volume-backups.danger');
-        Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
-        Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
-        Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
-        Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
-        Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
-        Route::get('/files', FileBrowser::class)->name('project.service.files')->middleware('can.access.terminal');
-        Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
-        Route::get('/{stack_service_uuid}/backups/{backup_uuid}', ServiceDatabaseBackups::class)->name('project.service.database.backup.show');
-        Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
-        Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
-        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
-        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
-        Route::get('/{stack_service_uuid}/import', ServiceImportBackup::class)->name('project.service.database.import')->middleware('can.update.resource');
-        Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
-        Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
-        // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
-        Route::get('/tasks/{task_uuid}', fn () => redirect()->route('project.service.scheduled-tasks.show', get_route_parameters()))->name('project.service.scheduled-tasks');
-    });
-
-    Route::get('/servers', ServerIndex::class)->name('server.index');
-    Route::get('/servers/canvas', ServerCanvas::class)->name('server.canvas.index');
-    Route::get('/registries', ServerDockerRegistries::class)->name('registries.index');
-    Route::get('/servers/new', ServerCreatePage::class)->name('server.create')->middleware('can:create,'.Server::class);
-    Route::get('/servers/new/{type}/{token_uuid}', ServerCreatePage::class)->name('server.create.token')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger']);
-    Route::get('/servers/new/{type}', ServerCreatePage::class)->name('server.create.type')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'hostinger', 'manual']);
-
-    Route::prefix('server/{server_uuid}')->group(function () {
-        Route::get('/', ServerShow::class)->name('server.show');
-        Route::get('/canvas', ServerCanvas::class)->name('server.canvas');
-        Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
-        Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
-        Route::get('/sentinel', SentinelShow::class)->name('server.sentinel');
-        Route::get('/sentinel/logs', SentinelLogs::class)->name('server.sentinel.logs');
-        Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
-        Route::get('/cloud-provider-token', CloudProviderTokenShow::class)->name('server.cloud-provider-token');
-        Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');
-        Route::get('/resources', ResourcesShow::class)->name('server.resources');
-        Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
-        Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
-        Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
-        Route::get('/metrics', ServerCharts::class)->name('server.metrics');
-        Route::get('/analytics', ServerAnalytics::class)->name('server.analytics');
-        Route::get('/danger', DeleteServer::class)->name('server.delete');
-        Route::get('/transfer', ServerTransfer::class)->name('server.transfer');
-        Route::get('/proxy', ProxyShow::class)->name('server.proxy');
-        Route::get('/proxy/certificates', ProxyCertificatesShow::class)->name('server.proxy.certificates');
-        Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
-        Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');
-        Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
-        Route::get('/images', DockerImages::class)->name('server.docker-images');
-        Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
-        Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
-        Route::get('/security', ServerSecurityIndex::class)->name('server.security')->middleware('can.update.resource');
-        // Old sub pages. Links in sent notifications still use them.
-        foreach (['patches' => 'server-patching-overview-section', 'terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
-            Route::get("/security/{$page}", fn (string $server_uuid) => redirect(route('server.security', ['server_uuid' => $server_uuid]).'#'.$section))
-                ->name("server.security.{$page}");
-        }
-    });
-    Route::get('/destinations', DestinationIndex::class)->name('destination.index');
-    Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
-    Route::get('/destination/{destination_uuid}/danger', DestinationShow::class)->name('destination.danger');
-    Route::get('/destination/{destination_uuid}/resources', DestinationResources::class)->name('destination.resources');
-
-    // Route::get('/security', fn () => view('security.index'))->name('security.index');
-    Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
-    // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
-
-    Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
-    Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
-    Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
-    Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
-    Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
 });
 
@@ -575,7 +581,7 @@ Route::post('/terminal/session/end', function (Request $request, TerminalSession
     return response()->noContent();
 })->name('terminal.session.end')->withoutMiddleware(VerifyCsrfToken::class);
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'access.team-wide'])->group(function () {
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
 

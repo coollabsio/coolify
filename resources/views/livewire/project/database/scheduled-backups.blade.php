@@ -62,7 +62,7 @@
                     <span>Latest run</span>
                     <span>S3 storage</span>
                     <span>Executions</span>
-                    <span class="text-right">Action</span>
+                    <span class="text-right">Actions</span>
                 </div>
                 @foreach ($database->scheduledBackups as $backup)
                     @php
@@ -87,9 +87,10 @@
                         || @js(strtolower($s3StorageNames)).includes(search.toLowerCase())"
                         class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
                         <div class="flex min-w-0 items-center gap-2">
-                            <span class="block truncate text-[12px] font-semibold text-black dark:text-fg">
+                            <a {{ wireNavigate() }} href="{{ $backupRoute }}"
+                                class="block truncate text-[12px] font-semibold text-black hover:underline dark:text-fg">
                                 {{ $backup->frequency }}
-                            </span>
+                            </a>
                             @unless ($backup->enabled)
                                 <x-status-badge status="Disabled" />
                             @endunless
@@ -110,7 +111,10 @@
                             </a>
                         </div>
                         <div class="flex justify-end">
-                            <a class="button" {{ wireNavigate() }} href="{{ $backupRoute }}">Manage</a>
+                            <a class="icon-button" {{ wireNavigate() }} href="{{ $backupRoute }}"
+                                title="Manage backup schedule" aria-label="Manage backup schedule">
+                                <x-reicon name="settings" class="size-3.5" />
+                            </a>
                         </div>
                     </div>
                 @endforeach

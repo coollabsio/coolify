@@ -129,6 +129,7 @@ class Heading extends Component
      */
     public function stopFailed(array $event): void
     {
+        $event = $this->teamChannelPayload($event);
         if (($event['applicationUuid'] ?? null) !== $this->application->uuid || ! is_string($event['message'] ?? null)) {
             $this->skipRender();
 

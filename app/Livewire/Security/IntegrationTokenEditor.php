@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Security;
 
+use App\Actions\IntegrationToken\UpdateIntegrationToken;
 use App\Models\IntegrationToken;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class IntegrationTokenEditor extends Component
@@ -61,32 +62,14 @@ class IntegrationTokenEditor extends Component
 
     protected function rules(): array
     {
-        $rules = [
-            'name' => ['required', 'string', 'max:255'],
-            'newToken' => ['nullable', 'string'],
-            'capabilities' => ['required', 'array', 'min:1', function (string $attribute, mixed $value, \Closure $fail): void {
-                if (is_array($value) && in_array('tunnel', $value, true) && ! in_array('dns', $value, true)) {
-                    $fail('Cloudflare Tunnel also needs the DNS capability.');
-                }
-            }],
-            'capabilities.*' => ['required', 'in:'.implode(',', IntegrationToken::allowedCapabilities($this->integrationToken->provider))],
+        $rules = UpdateIntegrationToken::rules($this->integrationToken->provider);
+        $rules['newToken'] = $rules['token'];
+        unset($rules['name'], $rules['token']);
+
+        return ['name' => ['required', 'string', 'max:255']] + $rules + [
             'automaticDns' => ['boolean'],
             'proxiedDns' => ['boolean'],
         ];
-
-        if ($this->integrationToken->provider === 'infisical') {
-            $rules['metadata.base_url'] = ['required', 'url:http,https'];
-            $rules['metadata.client_id'] = ['required', 'string'];
-            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
-        }
-
-        if ($this->integrationToken->provider === 'vault') {
-            $rules['metadata.base_url'] = ['required', 'url:http,https'];
-            $rules['metadata.namespace'] = ['nullable', 'string'];
-            $rules['metadata.timeout'] = ['nullable', 'integer', 'min:1', 'max:300'];
-        }
-
-        return $rules;
     }
 
     protected function messages(): array
@@ -97,165 +80,53 @@ class IntegrationTokenEditor extends Component
         ];
     }
 
-    public function save(IntegrationTokenValidator $validator, CloudflareDnsProvider $cloudflare): void
+    public function save(IntegrationTokenValidator $validator): void
     {
         $this->authorize('update', $this->integrationToken);
         $validated = $this->validate();
-        $provider = $this->integrationToken->provider;
-        $token = filled($validated['newToken']) ? $validated['newToken'] : $this->integrationToken->token;
-        $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
-        if ($provider === 'cloudflare') {
-            if ($validated['automaticDns']) {
-                unset($metadata['automatic_dns']);
-            } else {
-                $metadata['automatic_dns'] = false;
-            }
-            if ($validated['proxiedDns']) {
-                $metadata['proxied_dns'] = true;
-            } else {
-                unset($metadata['proxied_dns']);
-            }
-        }
-        $storedMetadata = $this->integrationToken->metadata ?? [];
-        $changedConnectionFields = $this->changedConnectionFields($provider, $storedMetadata, $metadata);
-        if ($changedConnectionFields !== [] && blank($validated['newToken'])) {
-            $this->addError('newToken', $this->reenterSecretMessage($provider));
+
+        try {
+            UpdateIntegrationToken::run(
+                $this->integrationToken,
+                $validated['name'],
+                $validated['newToken'],
+                $validated['capabilities'],
+                data_get($validated, 'metadata', []),
+                $validated['automaticDns'],
+                $validated['proxiedDns'],
+                'ui',
+            );
+        } catch (ValidationException $e) {
+            $this->addError('newToken', $e->validator->errors()->first('token'));
+
+            return;
+        } catch (ConnectionException) {
+            $this->dispatch('error', $validator->connectionErrorMessage($this->integrationToken->provider));
+
+            return;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
 
             return;
         }
-        $capabilitiesChanged = collect($validated['capabilities'])->sort()->values()->all()
-            !== collect($this->integrationToken->capabilities)->sort()->values()->all();
-        $metadataChanged = $metadata != $storedMetadata;
 
-        try {
-            if ((filled($validated['newToken']) || $capabilitiesChanged || $metadataChanged)
-                && ! $validator->validate($provider, $token, $validated['capabilities'], $metadata)) {
-                $this->dispatch('error', $validator->errorMessage($provider));
-
-                return;
-            }
-
-            $updates = [
-                'name' => $validated['name'],
-                'capabilities' => $validated['capabilities'],
-                'metadata' => $metadata ?: null,
-            ];
-
-            if (filled($validated['newToken'])) {
-                $updates['token'] = $validated['newToken'];
-            }
-
-            DB::transaction(function () use ($updates, $provider, $validated, $capabilitiesChanged, $cloudflare): void {
-                $this->integrationToken->update($updates);
-                if ($provider === 'cloudflare' && (filled($validated['newToken']) || $capabilitiesChanged)) {
-                    $cloudflare->syncZones($this->integrationToken);
-                }
-            });
-            $this->newToken = '';
-            $this->loadZones();
-
-            auditLog('ui.integration_token.updated', [
-                'team_id' => $this->integrationToken->team_id,
-                'integration_token_uuid' => $this->integrationToken->uuid,
-                'integration_token_name' => $this->integrationToken->name,
-                'provider' => $this->integrationToken->provider,
-                'rotated' => array_key_exists('token', $updates),
-                'connection_changed_fields' => $changedConnectionFields,
-            ]);
-
-            if (in_array('base_url', $changedConnectionFields, true)) {
-                auditLog('ui.integration_token.base_url_changed', [
-                    'team_id' => $this->integrationToken->team_id,
-                    'integration_token_uuid' => $this->integrationToken->uuid,
-                    'integration_token_name' => $this->integrationToken->name,
-                    'provider' => $provider,
-                    'previous_base_url' => $this->baseUrlForAudit(data_get($storedMetadata, 'base_url')),
-                    'base_url' => $this->baseUrlForAudit(data_get($metadata, 'base_url')),
-                ], 'warning');
-            }
-
-            $this->dispatch(
-                'integration-token-updated',
-                uuid: $this->integrationToken->uuid,
-                name: $this->integrationToken->name,
-                capabilities: $this->integrationToken->capabilities,
-            );
-            $this->dispatch('success', 'Integration token updated successfully.');
-        } catch (ConnectionException) {
-            $this->dispatch('error', $validator->connectionErrorMessage($provider));
-        } catch (\Throwable $e) {
-            handleError($e, $this);
-        }
-    }
-
-    /**
-     * Metadata keys that decide where or how the stored secret is sent.
-     * Changing any of them must require the secret to be entered again.
-     *
-     * @return array<int, string>
-     */
-    private function connectionFields(string $provider): array
-    {
-        return match ($provider) {
-            'vault' => ['base_url', 'namespace'],
-            'infisical' => ['base_url', 'client_id'],
-            default => [],
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $storedMetadata
-     * @param  array<string, mixed>  $metadata
-     * @return array<int, string>
-     */
-    private function changedConnectionFields(string $provider, array $storedMetadata, array $metadata): array
-    {
-        return array_values(array_filter(
-            $this->connectionFields($provider),
-            fn (string $field): bool => (string) data_get($storedMetadata, $field, '') !== (string) data_get($metadata, $field, ''),
-        ));
-    }
-
-    /**
-     * Base URL without user info, query, or fragment, which can carry credentials.
-     */
-    private function baseUrlForAudit(mixed $url): ?string
-    {
-        if (! is_string($url) || $url === '') {
-            return null;
-        }
-
-        $parts = parse_url($url);
-        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
-            return '[invalid-url]';
-        }
-
-        return $parts['scheme'].'://'.$parts['host']
-            .(isset($parts['port']) ? ':'.$parts['port'] : '')
-            .($parts['path'] ?? '');
-    }
-
-    private function reenterSecretMessage(string $provider): string
-    {
-        return match ($provider) {
-            'infisical' => 'Enter the client secret again when you change the base URL or the client ID.',
-            'vault' => 'Enter the token again when you change the base URL or the namespace.',
-            default => 'Enter the token again when you change the connection settings.',
-        };
+        $this->newToken = '';
+        $this->loadZones();
+        $this->dispatch(
+            'integration-token-updated',
+            uuid: $this->integrationToken->uuid,
+            name: $this->integrationToken->name,
+            capabilities: $this->integrationToken->capabilities,
+        );
+        $this->dispatch('success', 'Integration token updated successfully.');
     }
 
     public function delete(string $password = ''): void
     {
         $this->authorize('delete', $this->integrationToken);
 
-        if ($this->integrationToken->secretManagerLinks()->exists()) {
-            $this->dispatch('error', 'This token is used by one or more resources as a secret manager source. Remove those links first.');
-
-            return;
-        }
-
-        if ($this->integrationToken->managedDnsRecords()->exists()) {
-            $this->dispatch('error', 'This token manages DNS records. Remove those domains or records first.');
+        if ($blocker = $this->integrationToken->deletionBlocker()) {
+            $this->dispatch('error', $blocker);
 
             return;
         }

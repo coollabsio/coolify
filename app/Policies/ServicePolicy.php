@@ -2,6 +2,8 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\Service;
 use App\Models\User;
 
@@ -20,17 +22,15 @@ class ServicePolicy
      */
     public function view(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        return $user->canAccess(AccessLevel::Read, $service);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models, in the environment when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        return $user->isAdmin();
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /**
@@ -38,9 +38,7 @@ class ServicePolicy
      */
     public function update(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Write, $service);
     }
 
     /**
@@ -48,9 +46,7 @@ class ServicePolicy
      */
     public function delete(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Delete, $service);
     }
 
     /**
@@ -74,9 +70,15 @@ class ServicePolicy
      */
     public function stop(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
+        return $user->canAccess(AccessLevel::Deploy, $service);
+    }
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    /**
+     * Determine whether the user can read secret values, such as environment variable values.
+     */
+    public function viewSensitive(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::ReadSensitive, $service);
     }
 
     /**
@@ -84,9 +86,7 @@ class ServicePolicy
      */
     public function manageEnvironment(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Write, $service);
     }
 
     /**
@@ -94,9 +94,7 @@ class ServicePolicy
      */
     public function uploadBackup(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Write, $service);
     }
 
     /**
@@ -104,13 +102,6 @@ class ServicePolicy
      */
     public function deploy(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
-    }
-
-    private function getTeamId(Service $service): ?int
-    {
-        return $service->team()?->id;
+        return $user->canAccess(AccessLevel::Deploy, $service);
     }
 }

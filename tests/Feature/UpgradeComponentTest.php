@@ -17,12 +17,10 @@ it('initializes latest version during mount from cached versions data', function
 
     Cache::shouldReceive('remember')
         ->once()
-        ->with('coolify:versions:all', 3600, Mockery::type(Closure::class))
+        ->with('coolify:versions', 3600, Mockery::type(Closure::class))
         ->andReturn([
             'coolify' => [
-                'v4' => [
-                    'version' => '4.0.0-beta.999',
-                ],
+                'version' => '4.0.0-beta.999',
             ],
         ]);
 
@@ -42,7 +40,7 @@ it('falls back to 0.0.0 during mount when cached versions data is unavailable', 
 
     Cache::shouldReceive('remember')
         ->once()
-        ->with('coolify:versions:all', 3600, Mockery::type(Closure::class))
+        ->with('coolify:versions', 3600, Mockery::type(Closure::class))
         ->andReturn(null);
 
     Livewire::test(Upgrade::class)
@@ -58,12 +56,10 @@ it('clears stale upgrade availability when current version already matches lates
 
     Cache::shouldReceive('remember')
         ->once()
-        ->with('coolify:versions:all', 3600, Mockery::type(Closure::class))
+        ->with('coolify:versions', 3600, Mockery::type(Closure::class))
         ->andReturn([
             'coolify' => [
-                'v4' => [
-                    'version' => '4.0.0-beta.999',
-                ],
+                'version' => '4.0.0-beta.999',
             ],
         ]);
 
@@ -83,12 +79,10 @@ it('clears stale upgrade availability when current version is newer than cached 
 
     Cache::shouldReceive('remember')
         ->once()
-        ->with('coolify:versions:all', 3600, Mockery::type(Closure::class))
+        ->with('coolify:versions', 3600, Mockery::type(Closure::class))
         ->andReturn([
             'coolify' => [
-                'v4' => [
-                    'version' => '4.0.0-beta.999',
-                ],
+                'version' => '4.0.0-beta.999',
             ],
         ]);
 

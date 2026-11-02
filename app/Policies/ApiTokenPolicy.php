@@ -2,7 +2,9 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class ApiTokenPolicy
@@ -60,7 +62,7 @@ class ApiTokenPolicy
      */
     public function useRootPermissions(User $user): bool
     {
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Root);
     }
 
     /**
@@ -68,7 +70,7 @@ class ApiTokenPolicy
      */
     public function useWritePermissions(User $user): bool
     {
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Write);
     }
 
     /**
@@ -76,7 +78,7 @@ class ApiTokenPolicy
      */
     public function useDeployPermissions(User $user): bool
     {
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Deploy);
     }
 
     /**
@@ -84,7 +86,37 @@ class ApiTokenPolicy
      */
     public function useSensitivePermissions(User $user): bool
     {
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::ReadSensitive);
+    }
+
+    /**
+     * Determine whether the user can use delete permissions for API tokens.
+     */
+    public function useDeletePermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Delete);
+    }
+
+    /**
+     * True when a grant of the member in the current team gives the level somewhere.
+     * Creating the token still checks that the member holds it on every chosen scope.
+     */
+    private function holdsSomewhere(User $user, AccessLevel $level): bool
+    {
+        $teamId = $user->currentTeam()?->id;
+        if ($teamId === null) {
+            return false;
+        }
+
+        foreach (app(AccessResolver::class)->memberGrants($user, $teamId) ?? [] as $grant) {
+            foreach ($grant->levels as $granted) {
+                if (in_array($level, $granted->includes(), true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function belongsToUserAndCurrentTeam(User $user, PersonalAccessToken $token): bool

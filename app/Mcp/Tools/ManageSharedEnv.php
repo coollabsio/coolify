@@ -33,7 +33,7 @@ class ManageSharedEnv extends RestActionTool
                 'project' => 'projects/{uuid}/envs/{env_id}',
                 'environment' => 'projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}',
                 'server' => 'servers/{uuid}/envs/{env_id}',
-            ], 'ability' => 'write', 'confirm' => true, 'description' => 'delete a shared variable'],
+            ], 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a shared variable'],
         ];
     }
 

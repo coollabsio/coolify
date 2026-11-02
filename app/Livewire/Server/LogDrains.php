@@ -377,6 +377,11 @@ class LogDrains extends Component
                 'logDrainCloudwatchGroup' => ['required', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'],
                 'logDrainCloudwatchStreamPrefix' => ['string', 'nullable', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'],
             ]),
+            'cloudwatch' => $this->validate([
+                'logDrainCloudwatchRegion' => ['required', 'max:64', 'regex:/^[a-z]{2}(-[a-z]+)+-\d+$/'],
+                'logDrainCloudwatchGroup' => ['required', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'],
+                'logDrainCloudwatchStreamPrefix' => ['string', 'nullable', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'],
+            ]),
             default => throw new \InvalidArgumentException('Unknown log drain type.'),
         };
     }

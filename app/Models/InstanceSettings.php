@@ -46,6 +46,9 @@ class InstanceSettings extends Model
         'allowed_ips',
         'auto_update_frequency',
         'update_check_frequency',
+        'update_channel',
+        'update_custom_tag',
+        'previous_update_channel',
         'new_version_available',
         'instance_timezone',
         'helper_version',
@@ -141,6 +144,28 @@ class InstanceSettings extends Model
     public static function randomAutoUpdateFrequency(): string
     {
         return random_int(0, 59).' 0 * * *';
+    }
+
+    /**
+     * After a switch to a more stable channel, the instance keeps the updates of the channel it left until the stable release of its version is out.
+     */
+    public function switchUpdateChannel(string $channel): void
+    {
+        $from = $this->getOriginal('update_channel');
+        $this->update_channel = $channel;
+        if ($channel === $from) {
+            return;
+        }
+
+        $channels = ['stable', 'preview', 'nightly'];
+        $fromRank = array_search($from, $channels, true);
+        $toRank = array_search($channel, $channels, true);
+        $followed = $this->getOriginal('previous_update_channel');
+        $this->previous_update_channel = match (true) {
+            $fromRank === false || $toRank === false || $toRank >= $fromRank => null,
+            array_search($followed, $channels, true) > $fromRank => $followed,
+            default => $from,
+        };
     }
 
     public function isPasswordRegistrationAllowed(): bool

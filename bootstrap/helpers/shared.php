@@ -714,14 +714,14 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     // Read the local versions.json, which CheckForUpdatesJob refreshes every hour. Do not ask the CDN for each server.
-    return data_get(get_versions_data(), 'coolify.sentinel.version') ?? '0.0.0';
+    return data_get(get_versions_data(), 'sentinel.version') ?? '0.0.0';
 }
 function get_latest_version_of_coolify(): string
 {
     try {
         $versions = get_versions_data();
 
-        return data_get($versions, 'coolify.v4.version', '0.0.0');
+        return data_get($versions, 'coolify.version', '0.0.0');
     } catch (Throwable $e) {
 
         return '0.0.0';

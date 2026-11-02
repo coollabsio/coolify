@@ -27,7 +27,7 @@ class ManageScheduledTask extends RestActionTool
             'delete' => ['method' => 'DELETE', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}',
-            ], 'ability' => 'write', 'confirm' => true, 'description' => 'delete a scheduled task'],
+            ], 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a scheduled task'],
             'execute' => ['method' => 'POST', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}/execute',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}/execute',

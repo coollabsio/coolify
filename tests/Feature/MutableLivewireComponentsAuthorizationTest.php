@@ -105,8 +105,8 @@ it('declares update authorization on service backup mutation controls', function
 
     expect($volumeBackupView)
         ->toMatch('/<x-modal-input(?=[^>]*:title="\'Edit backup schedule\'")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
-        ->toMatch('/<x-forms\.button\s+type="button" canGate="update" :canResource="\$service"[^\n]*\n(?:[^\n]*\n){0,3}?\s*wire:click\.stop="backupNow\(\'database\',/')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'storage\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/');
+        ->toMatch('/@can\(\'update\', \$service\)\s*<x-table\.row-actions\b(?:(?!@endcan).)*?wire:click="backupNow\(\'database\',/s')
+        ->toMatch('/@can\(\'update\', \$service\)\s*<x-table\.row-actions\b(?:(?!@endcan).)*?wire:click="backupNow\(\'storage\',/s');
 });
 
 it('declares update authorization on application port controls', function () {

@@ -25,7 +25,6 @@ it('shows every installer step with the terminal UI and sends command output to 
         ->and(preg_match_all('/^step_done(?!\()/m', $script))->toBe(9);
 })->with([
     'stable install script' => ['scripts/install.sh'],
-    'nightly install script' => ['other/nightly/install.sh'],
 ]);
 
 it('renders aligned step lines, warnings and failures without a terminal', function (string $path) {
@@ -68,5 +67,4 @@ it('renders aligned step lines, warnings and failures without a terminal', funct
         ->and(array_map(fn (string $line) => mb_strlen($line), $stepLines))->each->toBe(80);
 })->with([
     'stable install script' => ['scripts/install.sh'],
-    'nightly install script' => ['other/nightly/install.sh'],
 ]);

@@ -15,7 +15,7 @@
     <x-slot:content>
     <div x-data="{
         openSettings(event) {
-            if (event.target.closest('a, button')) {
+            if (event.target.closest('a, button, [role=menu]')) {
                 return;
             }
             modalOpen = true;
@@ -108,25 +108,27 @@
             <x-status-badge :status="$statusLabel" :type="$statusType" />
             <x-application.restart-limit-warning :application="$resource" />
         </div>
-        <div class="flex items-center justify-end gap-1">
-                @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
-                    <a class="icon-button" title="Service backups" aria-label="Service backups" {{ wireNavigate() }}
-                        href="{{ route('project.service.volume-backups.index', $parameters) }}">
-                        <x-reicon name="database" class="size-4" />
-                    </a>
-                @endif
-                @if ($isApplication && $resource->fqdn)
-                    @can('update', $service)
-                        <a class="icon-button" title="Manage domains" aria-label="Manage domains" {{ wireNavigate() }}
-                            href="{{ route('project.service.domains', $parameters) }}">
-                            <x-reicon name="globe" class="size-4" />
-                        </a>
-                    @endcan
-                @endif
+        @php
+            $hasBackupsAction = $isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated);
+            $hasDomainsAction = $isApplication && $resource->fqdn && auth()->user()?->can('update', $service);
+        @endphp
+        <div class="flex items-center justify-end">
+            @if ($hasBackupsAction || $hasDomainsAction)
+                <x-table.row-actions label="Resource actions">
+                    @if ($hasBackupsAction)
+                        <x-table.row-action :href="route('project.service.volume-backups.index', $parameters)">Backups</x-table.row-action>
+                    @endif
+                    @if ($hasDomainsAction)
+                        <x-table.row-action :href="route('project.service.domains', $parameters)">Domains</x-table.row-action>
+                    @endif
+                    <x-table.row-action @click="modalOpen = true">Settings</x-table.row-action>
+                </x-table.row-actions>
+            @else
                 <button type="button" class="icon-button" title="Resource settings" aria-label="Resource settings"
                     @click="modalOpen = true">
                     <x-reicon name="settings" class="size-4" />
                 </button>
+            @endif
         </div>
     </div>
     </div>

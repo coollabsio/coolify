@@ -62,7 +62,7 @@
                                 action="setSort" :current="$sort" />
                             <x-table.sort-header label="Used by" asc="used_asc" desc="used_desc" action="setSort"
                                 :current="$sort" />
-                            <span>Actions</span>
+                            <span class="text-right">Actions</span>
                         </div>
                         @foreach ($visibleImages as $image)
                             <div wire:key="image-{{ $image['reference'] }}"
@@ -94,7 +94,7 @@
                                         </span>
                                     @endif
                                 </div>
-                                <div>
+                                <div class="flex justify-end">
                                     @if ($image['containers'] === [])
                                         @can('update', $server)
                                             <x-modal-confirmation title="Delete Docker Image?"
@@ -109,7 +109,7 @@
                                                 <x-slot:trigger>
                                                     <button type="button"
                                                         class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                                        title="Delete image" aria-label="Delete image">
+                                                        title="Delete image" aria-label="Delete {{ $image['reference'] }}">
                                                         <x-reicon name="trash" class="size-3.5" />
                                                     </button>
                                                 </x-slot:trigger>
