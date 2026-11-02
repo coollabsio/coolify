@@ -159,10 +159,10 @@ class StartDatabaseImport
                 throw new DatabaseImportException('The S3 backup was not found or exceeds the 10 GiB limit.');
             }
             $helper = "s3-restore-{$operation}";
-            $this->startS3Helper($storage, $server, $helper, $network);
+            $resolveOptions = $this->startS3Helper($storage, $server, $helper, $network);
             $sourceArg = escapeshellarg("s3temp/{$storage->bucket}/{$key}");
             $commandList = [
-                'docker exec '.escapeshellarg($helper).' mc cp '.$sourceArg.' /tmp/restore',
+                'docker exec '.escapeshellarg($helper).' mc cp'.$resolveOptions.' '.$sourceArg.' /tmp/restore',
                 ...$this->streamFromHelper($helper, $container, $containerPath),
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
             ];
@@ -294,10 +294,12 @@ class StartDatabaseImport
      * Starts the S3 restore helper and sets its `s3temp` mc alias. The S3 keys go to mc through the
      * stdin of a separate SSH process, so they are not in the arguments of any process on Coolify or
      * on the server. The helper is removed when either step fails.
+     *
+     * @return string The mc `--resolve` option that pins the endpoint host.
      */
-    private function startS3Helper(S3Storage $storage, Server $server, string $helper, string $network): void
+    private function startS3Helper(S3Storage $storage, Server $server, string $helper, string $network): string
     {
-        $image = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+        $image = coolifyHelperImage().':'.getHelperVersion();
 
         try {
             instant_remote_process([
@@ -305,9 +307,12 @@ class StartDatabaseImport
                 'docker run -d --network '.escapeshellarg($network)
                     .' --name '.escapeshellarg($helper)
                     .' '.$storage->minioClientRegionOption()
-                    .' '.$image.' sleep 86400',
+                    .' '.escapeshellarg($image).' sleep 86400',
             ], $server);
-            $this->setMinioClientAlias($storage, $server, $helper);
+            $resolveOptions = $storage->minioClientResolveOptions($server, $image, $network);
+            $this->setMinioClientAlias($storage, $server, $helper, $resolveOptions);
+
+            return $resolveOptions;
         } catch (Throwable) {
             instant_remote_process(['docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true'], $server, throwError: false);
 
@@ -315,10 +320,10 @@ class StartDatabaseImport
         }
     }
 
-    private function setMinioClientAlias(S3Storage $storage, Server $server, string $helper): void
+    private function setMinioClientAlias(S3Storage $storage, Server $server, string $helper, string $resolveOptions): void
     {
         $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($helper)
-            .' mc alias set'.$storage->minioClientAliasOptions().' s3temp '.escapeshellarg((string) $storage->endpoint).' >/dev/null';
+            .' mc alias set'.$resolveOptions.$storage->minioClientAliasOptions().' s3temp '.escapeshellarg((string) $storage->endpoint).' >/dev/null';
         $timeout = (int) config('constants.ssh.command_timeout');
 
         SshRetryHandler::retry(

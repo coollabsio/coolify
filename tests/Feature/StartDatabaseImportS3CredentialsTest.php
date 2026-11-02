@@ -282,6 +282,43 @@ function importS3ArgvTestRunAliasProcess(array $aliasProcess): array
     }
 }
 
+it('pins the reachable IP of a dual-stack S3 host for the restore mc commands', function () {
+    InstanceSettings::query()->whereKey(0)->update([
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]);
+    $storage = S3Storage::create([
+        'name' => 'Import S3',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'http://localhost:9000',
+        'is_usable' => true,
+        'team_id' => $this->team->id,
+    ]);
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('exists')->once()->andReturn(true);
+    $disk->shouldReceive('size')->once()->andReturn(1024);
+    $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
+    $filesystem->shouldReceive('build')->once()->andReturn($disk);
+    Storage::swap($filesystem);
+    fakeRemoteProcesses(['*/dev/tcp/*' => '::1', '*' => '']);
+    Queue::fake();
+
+    $activity = app(StartDatabaseImport::class)->handle(
+        $this->database,
+        new DatabaseImportSource('s3', path: 'backups/restore.sql', s3StorageUuid: $storage->uuid),
+        $this->team->id,
+    );
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker run --rm --network 'coolify'")
+        && str_contains(remoteProcessScript($process), '/dev/tcp/$ip/9000'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mc alias set --resolve '\\''localhost:9000=::1'\\'' --api S3v4 s3temp"));
+    expect((string) RemoteProcessCommand::read($activity))
+        ->toContain("mc cp --resolve 'localhost:9000=::1' ".escapeshellarg('s3temp/test-bucket/backups/restore.sql'));
+});
+
 it('passes the S3 keys of an import to mc on stdin, not in a command line', function (string $sshUser) {
     [$processes, $activity, $error] = importS3ArgvTestRun($this, $sshUser);
 

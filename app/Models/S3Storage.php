@@ -44,6 +44,11 @@ class S3Storage extends BaseModel
      */
     private const REMOTE_COMMAND_TIMEOUT_EXIT_CODE = 124;
 
+    /**
+     * How long the helper container waits for a TCP connection to one IP of the endpoint.
+     */
+    private const RESOLVE_PROBE_TIMEOUT_SECONDS = 5;
+
     protected $fillable = [
         'team_id',
         'name',
@@ -367,6 +372,43 @@ class S3Storage extends BaseModel
     public function minioClientAliasOptions(): string
     {
         return ' --api S3v4'.($this->usesPathStyleEndpoint() ? '' : ' --path off');
+    }
+
+    /**
+     * The mc `--resolve` option that pins the endpoint host to one of its validated IPs. mc keeps one IP per host,
+     * so when the host has more than one IP, a helper container on the upload network connects to each IP, IPv4
+     * first, and the first IP that connects is used. A server without IPv4 then uses an IPv6 address of a
+     * dual-stack endpoint. When no IP connects, the first IP is used, so mc reports the real connection error.
+     */
+    public function minioClientResolveOptions(Server $server, string $image, ?string $network = null): string
+    {
+        $entries = SafeWebhookUrl::minioClientResolveOptions($this->endpoint, $this->trustedInternalHosts());
+        if ($entries === []) {
+            return '';
+        }
+
+        $entry = $entries[0];
+        if (count($entries) > 1) {
+            $ips = array_map(fn (string $entry): string => str($entry)->afterLast('=')->toString(), $entries);
+            $port = (int) str($entries[0])->beforeLast('=')->afterLast(':')->toString();
+            $probe = 'for ip in '.implode(' ', array_map('escapeshellarg', $ips)).'; do'
+                .' if timeout '.self::RESOLVE_PROBE_TIMEOUT_SECONDS.' bash -c "exec 3<>/dev/tcp/$ip/'.$port.'" 2>/dev/null; then echo "$ip"; exit 0; fi;'
+                .' done';
+            $reachableIp = trim((string) instant_remote_process(
+                ['docker run --rm'.($network === null ? '' : ' --network '.escapeshellarg($network))
+                    .' '.escapeshellarg($image).' bash -c '.escapeshellarg($probe)],
+                $server,
+                throwError: false,
+                timeout: count($ips) * self::RESOLVE_PROBE_TIMEOUT_SECONDS + 60,
+                disableMultiplexing: true,
+            ));
+            $reachableIndex = array_search($reachableIp, $ips, true);
+            if ($reachableIndex !== false) {
+                $entry = $entries[$reachableIndex];
+            }
+        }
+
+        return ' --resolve '.escapeshellarg($entry);
     }
 
     /**

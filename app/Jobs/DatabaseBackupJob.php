@@ -20,7 +20,6 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
-use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -934,10 +933,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
-            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $s3->trustedInternalHosts()))
-                ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
-                ->implode(' ');
-            $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
+            $resolveOptions = $s3->minioClientResolveOptions($this->server, $fullImageName, $network);
 
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
