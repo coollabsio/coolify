@@ -212,10 +212,6 @@
                     : null,
                 ['id' => 'preview-deployments-section', 'label' => 'Deployments'],
             ])),
-            'project.application.healthcheck' => [
-                ['id' => 'healthcheck-configuration-section', 'label' => 'Configuration'],
-                ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
-            ],
             'project.application.resource-operations' => [
                 ['id' => 'clone-resource-section', 'label' => 'Clone resource'],
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],

@@ -132,30 +132,32 @@
                             </div>
                     </x-table.dropdown>
 
-                    <x-table.dropdown panel-class="w-48!">
-                        <x-slot:trigger>
-                            <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
-                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
-                                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
-                            Sort
-                            </button>
-                        </x-slot:trigger>
-                            <template x-for="option in sortOptions" :key="option.value">
-                                <button type="button"
-                                    class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; close(); page = 1">
-                                    <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
-                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
-                                            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
+                    <div :class="viewMode === 'grid' ? '' : 'min-[769px]:hidden'">
+                        <x-table.dropdown panel-class="w-48!">
+                            <x-slot:trigger>
+                                <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                                <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
+                                        stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                Sort
                                 </button>
-                            </template>
-                    </x-table.dropdown>
+                            </x-slot:trigger>
+                                <template x-for="option in sortOptions" :key="option.value">
+                                    <button type="button"
+                                        class="listbox-option"
+                                        x-on:click="sortBy = option.value; close(); page = 1">
+                                        <span class="flex-1" x-text="option.label"></span>
+                                        <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
+                                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                                stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                </template>
+                        </x-table.dropdown>
+                    </div>
 
                     <x-canvas-view-toggle
                         :list-url="route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])"

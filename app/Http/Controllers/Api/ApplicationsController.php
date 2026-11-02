@@ -27,6 +27,7 @@ use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
@@ -3867,6 +3868,7 @@ class ApplicationsController extends Controller
             $application->parseHealthcheckFromDockerfile($application->dockerfile);
         }
         $dnsCleanup->queueReleaseOfRemovedHostnames($application, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($application, $previousDnsHostnames);
 
         auditLog('api.application.updated', [
             'team_id' => $teamId,
@@ -5769,7 +5771,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $this->authorize('update', $application);
+        $this->authorize('delete', $application);
 
         $storageUuid = $request->route('storage_uuid');
 

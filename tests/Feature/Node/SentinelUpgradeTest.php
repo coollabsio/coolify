@@ -36,12 +36,12 @@ beforeEach(function () {
         if ($release === 'http-error') {
             return Http::response('', 500);
         }
-        $coolify = ['sentinel' => ['version' => '1.0.1']];
+        $stable = ['coolify' => ['version' => '5.0.0'], 'sentinel' => ['version' => '1.0.1']];
         if ($release !== null) {
-            $coolify['sentinel-host'] = $release;
+            $stable['sentinel-host'] = $release;
         }
 
-        return Http::response(['coolify' => $coolify]);
+        return Http::response(['stable' => $stable]);
     }]);
     fakeSentinelRelease(['version' => '1.1.0', 'digest' => SENTINEL_UPGRADE_DIGEST]);
     Sleep::fake();
@@ -114,7 +114,7 @@ describe('release source', function () {
     });
 
     it('leaves the legacy sentinel version helper untouched', function () {
-        expect(get_latest_sentinel_version())->toBe(data_get(get_versions_data(), 'coolify.sentinel.version'));
+        expect(get_latest_sentinel_version())->toBe(data_get(get_versions_data(), 'sentinel.version'));
     });
 });
 

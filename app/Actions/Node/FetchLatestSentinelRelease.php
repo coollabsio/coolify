@@ -8,7 +8,7 @@ use Lorisleiva\Actions\Concerns\AsAction;
 use Throwable;
 
 /**
- * Reads the latest host Sentinel release from the `coolify.sentinel-host` entry in versions.json.
+ * Reads the latest host Sentinel release from the `sentinel-host` entry of the followed channel in versions.json.
  * Returns null when host Sentinel is disabled or the entry is missing or invalid, so no upgrade is offered.
  */
 class FetchLatestSentinelRelease
@@ -48,7 +48,10 @@ class FetchLatestSentinelRelease
     /** @return array{version: string, digest: string}|null */
     public static function parse(mixed $versions): ?array
     {
-        $release = data_get($versions, 'coolify.sentinel-host');
+        if (! is_array($versions)) {
+            return null;
+        }
+        $release = data_get($versions, newest_update_channel($versions).'.sentinel-host');
         $version = data_get($release, 'version');
         $digest = data_get($release, 'digest');
         if (! self::isStableVersion($version) || ! is_string($digest) || ! preg_match(self::DIGEST_PATTERN, $digest)) {

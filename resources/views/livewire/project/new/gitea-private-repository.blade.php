@@ -135,7 +135,7 @@
                                 file="docker_compose_location" fileLabel="Compose file"
                                 defaultFile="/docker-compose.yaml" />
                         @else
-                            <x-forms.input wire:model="base_directory" label="Base directory"
+                            <x-forms.input id="base_directory" label="Base directory" placeholder="/"
                                 helper="Repository directory used as the build root." />
                         @endif
                     </div>

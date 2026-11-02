@@ -14,14 +14,14 @@ trait HasMetrics
     /**
      * Raw Sentinel responses from prefetchMetrics(), keyed by "type:mins"; each is read once.
      *
-     * @var array<string, string>
+     * @var array<string, string|null>
      */
     protected array $prefetchedMetricResponses = [];
 
     /**
      * Fetch several metric types in one SSH round-trip instead of one per type. The
-     * get*Metrics() getters then read these responses. On a failure nothing is stored,
-     * so each getter fetches on its own as before.
+     * get*Metrics() getters then read these responses. Failed prefetches are remembered
+     * for this request so the getters do not retry the same unavailable server.
      *
      * @param  array<int, string>  $types
      */
@@ -35,27 +35,43 @@ trait HasMetrics
             return;
         }
 
+        // A failed server batch is not retried. A Node falls back to one fetch per metric.
+        if (! $server instanceof Node) {
+            foreach ($types as $type) {
+                $this->prefetchedMetricResponses["{$type}:{$mins}"] = null;
+            }
+        }
+
         $from = now()->subMinutes($mins)->toIso8601ZuluString();
         $token = $this->metricsToken($server);
         // The token reaches curl on stdin (`-H @-`), so it is not a process argument. The token
         // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
         // cannot end the heredoc. Responses are separated by a 0x1E record separator.
-        $curl = $server instanceof Node ? 'curl --fail --silent --show-error --max-time 10' : 'curl -s';
+        $curl = $server instanceof Node ? 'curl --fail --silent --show-error --max-time 10' : 'curl -sS --connect-timeout 2 --max-time 3';
         $script = implode("\nprintf '\\036'\n", array_map(
             fn (string $type) => $curl.' -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
             $types
         ));
 
-        try {
-            $output = instant_remote_process(
-                [$server instanceof Node
-                    ? InstallSentinel::hostCommand($server, "sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT")
-                    : "docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+        if ($server instanceof Node) {
+            try {
+                $output = instant_remote_process(
+                    [InstallSentinel::hostCommand($server, "sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT")],
+                    $server,
+                    timeout: 60,
+                    maxAttempts: 1
+                );
+            } catch (\Throwable) {
+                return;
+            }
+        } else {
+            $output = SentinelMetricsClient::fetchOverSsh(
                 $server,
-                timeout: $server instanceof Node ? 60 : 3600,
-                maxAttempts: 1
+                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+                static::class.':'.$this->uuid.':'.implode(',', $types).':'.$mins
             );
-        } catch (\Throwable) {
+        }
+        if ($output === null) {
             return;
         }
 
@@ -172,12 +188,17 @@ trait HasMetrics
                 $response = $this->prefetchedMetricResponses[$key];
                 unset($this->prefetchedMetricResponses[$key]);
             } else {
-                $response = instant_remote_process(
-                    ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$endpoint}\"'"],
+                $command = "curl -sS --connect-timeout 2 --max-time 3 -H @- \"{$endpoint}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH";
+                $response = SentinelMetricsClient::fetchOverSsh(
                     $server,
-                    false
+                    ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
+                    static::class.':'.$this->uuid.':'.$type.':'.$mins
                 );
             }
+        }
+
+        if ($response === null) {
+            return null;
         }
 
         if (str($response)->contains('error')) {

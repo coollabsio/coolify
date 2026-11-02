@@ -337,6 +337,9 @@ class Application extends BaseModel
             ]);
         });
         static::saving(function ($application) {
+            if ($application->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($application, $application->getOriginal('docker_compose_raw'), $application->docker_compose_raw, 'docker_compose_raw');
+            }
             $payload = [];
             if ($application->isDirty('fqdn')) {
                 if ($application->fqdn === '') {

@@ -105,6 +105,11 @@ class Service extends BaseModel
             $service->compose_parsing_version = self::$parserVersion;
             $service->save();
         });
+        static::saving(function ($service) {
+            if ($service->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($service, $service->getOriginal('docker_compose_raw'), $service->docker_compose_raw, 'docker_compose_raw');
+            }
+        });
     }
 
     public function isConfigurationChanged(bool $save = false)

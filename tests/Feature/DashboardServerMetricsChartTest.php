@@ -84,7 +84,8 @@ it('does not run SSH for an unreachable server when loading dashboard metrics', 
 });
 
 it('loads dashboard metrics over SSH for a reachable server', function () {
-    Process::fake(['*' => Process::result(output: '[{"time":1700000000000,"percent":12.5,"usedPercent":40}]')]);
+    $row = '[{"time":1700000000000,"percent":12.5,"usedPercent":40}]';
+    Process::fake(['*' => Process::result(output: $row."\x1e".$row)]);
 
     $server = Server::factory()->create([
         'team_id' => $this->team->id,

@@ -58,7 +58,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
             ->name('cleanup:ssh-mux')
             ->hourly()
-            ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
+            ->when(fn () => config('constants.ssh.mux_enabled'));
         $this->scheduleInstance->command('flux:renew-certificate')->daily()->onOneServer()->withoutOverlapping(30)
             ->when(fn () => nodesEnabled());
         // Retries trust bundle delivery to connected Nodes that missed a CA rotation step.

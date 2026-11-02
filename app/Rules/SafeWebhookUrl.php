@@ -194,7 +194,7 @@ class SafeWebhookUrl implements ValidationRule
     }
 
     /**
-     * Build mc --resolve mappings that pin the endpoint host for S3 backups.
+     * Build mc --resolve mappings, IPv4 first, that pin the endpoint host for S3 backups.
      *
      * @return array<int, string>
      */
@@ -206,17 +206,17 @@ class SafeWebhookUrl implements ValidationRule
             return [];
         }
 
-        // The MinIO client keeps one --resolve IP per host and parses it with Go's
-        // netip.ParseAddr, which rejects bracketed IPv6. Emit a single entry, preferring
-        // IPv4 for reachability, without brackets.
-        $preferredIps = array_values(array_filter(
-            $target['ips'],
-            fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false,
-        ));
+        // mc parses --resolve values with Go's netip.ParseAddr, which rejects bracketed IPv6.
+        // mc also keeps one IP per host, so S3Storage::minioClientResolveOptions() picks one entry.
+        $ips = $target['ips'];
+        usort($ips, fn (string $a, string $b): int => self::isIpv6($a) <=> self::isIpv6($b));
 
-        $ip = $preferredIps[0] ?? $target['ips'][0];
+        return array_map(fn (string $ip): string => sprintf('%s:%d=%s', $target['host'], $target['port'], $ip), $ips);
+    }
 
-        return [sprintf('%s:%d=%s', $target['host'], $target['port'], $ip)];
+    private static function isIpv6(string $ip): bool
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
     }
 
     public static function redactedUrlForLog(string $url): string

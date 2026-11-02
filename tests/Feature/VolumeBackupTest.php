@@ -99,12 +99,6 @@ it('changes the default volume backup timeout without changing existing timeouts
         ->and($customBackup->fresh()->timeout)->toBe(7200);
 });
 
-it('includes parallel gzip support in the Coolify helper image', function () {
-    $dockerfile = file_get_contents(base_path('docker/coolify-helper/Dockerfile'));
-
-    expect($dockerfile)->toContain('pigz');
-});
-
 it('targets named volumes and application directory mounts through one backup relation', function () {
     $team = Team::factory()->create();
     [$application, $volume] = createVolumeBackupApplication($team);

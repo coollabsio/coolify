@@ -223,7 +223,7 @@
                         <div class="data-table-header package-updates-table-grid">
                             <span>Package</span>
                             <span>New version</span>
-                            <span class="text-right">Action</span>
+                            <span class="text-right">Actions</span>
                         </div>
                         @foreach ($updates as $update)
                             <div wire:key="package-update-{{ data_get($update, 'package') }}-{{ data_get($update, 'architecture') }}"

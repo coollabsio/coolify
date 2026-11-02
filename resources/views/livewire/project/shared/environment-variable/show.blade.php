@@ -87,7 +87,7 @@
                 @endif
             @endforeach
         @endif
-        <div class="flex items-center gap-0.5 justify-self-end">
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
             @if ($this->connectLink)
                 <a href="{{ $this->connectLink }}" class="icon-button shrink-0"
                     title="Connect {{ $key }} to resources" aria-label="Connect {{ $key }} to resources">

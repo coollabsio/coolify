@@ -9,6 +9,7 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Rules\ValidGitBranch;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -111,8 +112,23 @@ class Source extends Component
         }
     }
 
+    /**
+     * Other keys and sources of the team. Users without write access on the whole team keep the ones the
+     * application already uses, so they only see those.
+     */
+    private function canUseTeamCredentials(): bool
+    {
+        return Gate::allows('useTeamCredentials', $this->application);
+    }
+
     private function getPrivateKeys()
     {
+        if (! $this->canUseTeamCredentials()) {
+            $this->privateKeys = collect();
+
+            return;
+        }
+
         $this->privateKeys = PrivateKey::where('team_id', $this->application->team()->id)->get()->reject(function ($key) {
             return $key->id == $this->privateKeyId;
         });
@@ -120,6 +136,12 @@ class Source extends Component
 
     private function getSources()
     {
+        if (! $this->canUseTeamCredentials()) {
+            $this->sources = collect();
+
+            return;
+        }
+
         $this->sources = $this->application->team()->sources()->filter(function ($source) {
             if ($source->id === $this->application->source_id
                 && $source->getMorphClass() === $this->application->source_type) {
@@ -140,6 +162,7 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $this->authorize('useTeamCredentials', $this->application);
             $key = PrivateKey::where('team_id', $this->application->team()->id)->findOrFail($privateKeyId);
             $this->privateKeyId = $key->id;
             $this->syncData(true);
@@ -192,6 +215,7 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $this->authorize('useTeamCredentials', $this->application);
             $allowedSourceTypes = [GithubApp::class, GitlabApp::class, GiteaApp::class];
             abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
             $teamId = $this->application->team()->id;

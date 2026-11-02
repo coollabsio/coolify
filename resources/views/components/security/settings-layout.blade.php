@@ -6,6 +6,12 @@
             'active' => request()->routeIs('security.private-key.*'),
             'icon' => 'keys',
         ],
+        [
+            'label' => 'API Tokens',
+            'route' => 'security.api-tokens',
+            'active' => request()->routeIs('security.api-tokens'),
+            'icon' => 'code',
+        ],
         auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class) ? [
             'label' => 'Cloud Tokens',
             'route' => 'security.cloud-tokens',
@@ -24,12 +30,6 @@
             'active' => request()->routeIs('security.cloud-init-scripts*'),
             'icon' => 'file-content',
         ] : null,
-        [
-            'label' => 'API Tokens',
-            'route' => 'security.api-tokens',
-            'active' => request()->routeIs('security.api-tokens'),
-            'icon' => 'code',
-        ],
     ])->filter();
 @endphp
 

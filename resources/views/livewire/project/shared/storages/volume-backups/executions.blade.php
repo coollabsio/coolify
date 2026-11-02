@@ -146,15 +146,32 @@
                                         <x-reicon name="upload" class="size-3.5 rotate-180" />
                                     </button>
                                 @endif
-                                @if ($recoveryPending)
+                                @if ($recoveryPending && $execution->status !== 'running')
+                                    <x-table.row-actions label="Backup actions">
+                                        <x-table.row-action wire:click="retryRecovery({{ $execution->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="retryRecovery({{ $execution->id }})">Retry recovery</x-table.row-action>
+                                        <x-slot:danger>
+                                            <x-modal-confirmation title="Confirm Backup Deletion?" buttonFullWidth
+                                                submitAction="deleteBackup({{ $execution->id }})"
+                                                :checkboxes="$executionCheckboxes" :actions="$deleteActions"
+                                                confirmationText="{{ $execution->filename }}"
+                                                confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
+                                                shortConfirmationLabel="Backup Filename">
+                                                <x-slot:trigger>
+                                                    <x-table.row-action>Delete</x-table.row-action>
+                                                </x-slot:trigger>
+                                            </x-modal-confirmation>
+                                        </x-slot:danger>
+                                    </x-table.row-actions>
+                                @elseif ($recoveryPending)
                                     <button type="button" class="icon-button shrink-0"
                                         wire:click="retryRecovery({{ $execution->id }})"
                                         wire:loading.attr="disabled" wire:target="retryRecovery({{ $execution->id }})"
                                         title="Retry recovery" aria-label="Retry recovery">
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </button>
-                                @endif
-                                @if ($execution->status !== 'running')
+                                @elseif ($execution->status !== 'running')
                                     <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
                                         submitAction="deleteBackup({{ $execution->id }})"
                                         :checkboxes="$executionCheckboxes" :actions="$deleteActions"

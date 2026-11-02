@@ -277,6 +277,8 @@ class PublicGitRepository extends Component
     public function submit()
     {
         try {
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
+
             $this->validate();
 
             // Additional validation for git repository and branch

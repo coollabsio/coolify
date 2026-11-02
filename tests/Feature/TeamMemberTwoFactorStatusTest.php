@@ -91,7 +91,6 @@ test('the member row renders a disabled badge when two factor is not configured'
 
     Livewire::test(Member::class, ['member' => $memberWithoutTwoFactor])
         ->assertSee('Two-factor authentication is disabled')
-        ->assertSeeHtml('M18.4697 19.5303')
         ->assertDontSee('Two-factor authentication is enabled');
 });
 

@@ -173,11 +173,11 @@
         @else
             @if ($disabled)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button class="w-full" :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
