@@ -141,10 +141,14 @@ class AuditEvent extends Model
                 try {
                     self::query()->create($attributes);
                 } catch (Throwable $exception) {
-                    Log::warning('Audit event persistence failed', [
-                        'event' => $attributes['event'],
-                        'exception' => $exception::class,
-                    ]);
+                    try {
+                        Log::warning('Audit event persistence failed', [
+                            'event' => $attributes['event'],
+                            'exception' => $exception::class,
+                        ]);
+                    } catch (Throwable) {
+                        // Audit failures must not interrupt the action.
+                    }
                 }
             });
         } catch (Throwable $exception) {

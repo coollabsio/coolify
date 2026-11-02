@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
+use Psr\Log\LoggerInterface;
 
 class FailingAuditAttributeCast implements CastsAttributes
 {
@@ -138,6 +139,22 @@ test('audit persistence failures do not fail the action', function () {
         Schema::rename('unavailable_audit_events', 'audit_events');
     }
 });
+
+test('audit logger failures do not fail the action', function (bool $inTransaction) {
+    DB::commit();
+    Schema::rename('audit_events', 'unavailable_audit_events');
+    Log::swap(Mockery::mock(LoggerInterface::class));
+    Log::shouldReceive('warning')->once()->withAnyArgs()->andThrow(new RuntimeException('logger unavailable'));
+
+    try {
+        $action = fn () => AuditEvent::record('ui.project.updated', ['team_id' => $this->team->id]);
+
+        expect(fn () => $inTransaction ? DB::transaction($action) : $action())
+            ->not->toThrow(Throwable::class);
+    } finally {
+        Schema::rename('unavailable_audit_events', 'audit_events');
+    }
+})->with([false, true]);
 
 test('audit preparation failures log sanitized diagnostics without failing the action', function () {
     $resourceName = new class
