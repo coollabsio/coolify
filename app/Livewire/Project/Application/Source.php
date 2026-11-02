@@ -266,6 +266,10 @@ class Source extends Component
             $this->dispatch('success', 'Application source updated!');
             $this->dispatch('configurationChanged');
         } catch (ValidationException $e) {
+            if (array_key_exists('gitSshKnownHosts', $e->errors())) {
+                $this->dispatch('known-hosts-invalid');
+            }
+
             throw $e;
         } catch (\Throwable $e) {
             return handleError($e, $this);

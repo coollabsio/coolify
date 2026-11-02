@@ -43,7 +43,7 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section id="ssh-host-keys" title="SSH host keys" x-data="{ editManually: false }" flush
+        <x-application.settings-section id="ssh-host-keys" title="SSH host keys" x-data="{ editManually: false }" x-on:known-hosts-invalid.window="editManually = true" flush
             description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key, click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys.">
             @can('update', $application)
                 <x-slot:actions>
@@ -118,9 +118,6 @@
                 </div>
             @endif
             @can('update', $application)
-                @error('gitSshKnownHosts')
-                    <div x-init="editManually = true"></div>
-                @enderror
                 <div id="manual-host-keys" x-show="editManually" x-cloak class="p-4">
                     <div>
                         <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"

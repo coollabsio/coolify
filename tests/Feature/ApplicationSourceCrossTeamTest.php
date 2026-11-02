@@ -295,6 +295,7 @@ test('submit reports invalid SSH known hosts as a field error without saving', f
         ->set('gitSshKnownHosts', 'invalid-host-key')
         ->call('submit')
         ->assertHasErrors(['gitSshKnownHosts'])
+        ->assertDispatched('known-hosts-invalid')
         ->assertNotDispatched('configurationChanged');
 
     expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($originalKnownHosts);

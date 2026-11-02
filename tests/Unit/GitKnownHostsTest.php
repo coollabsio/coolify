@@ -50,3 +50,9 @@ test('the ssh setup checks pinned hosts strictly and trusts other hosts on first
         ->and($knownHosts)->toContain("\ngit.example.com ssh-ed25519 SAVED\n")
         ->and($script)->toContain('tee /root/.ssh/coolify_git_test-uuid.config');
 });
+
+test('github keys are pinned for ssh.github.com on port 22, where a port 443 redirect in the ssh config can end', function () {
+    $githubEd25519 = collect(GIT_PINNED_HOST_KEYS)->first(fn (string $line) => str_starts_with($line, 'github.com') && str_contains($line, 'ssh-ed25519'));
+
+    expect(explode(',', strtok($githubEd25519, ' ')))->toContain('ssh.github.com', '[ssh.github.com]:443');
+});

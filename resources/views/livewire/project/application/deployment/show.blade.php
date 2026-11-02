@@ -288,7 +288,7 @@
             <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-0'">
                 @if ($this->hostKeyChangedSourceUrl)
                     <x-callout type="danger" title="The SSH host key of the Git host changed" class="mb-2 shrink-0">
-                        The Git host sent an SSH host key that is not the saved key. This can be an attack. Ask the
+                        The Git host sent an SSH host key that is not the saved or published key. This can be an attack. Ask the
                         administrator of the Git host if the key changed. Then fetch the current key, compare its
                         fingerprint with the fingerprint from the administrator, and accept it only if they are the same.
                         <a href="{{ $this->hostKeyChangedSourceUrl }}#ssh-host-keys" {{ wireNavigate() }}

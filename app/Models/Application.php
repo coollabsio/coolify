@@ -2368,7 +2368,7 @@ class Application extends BaseModel
         ]);
 
         if (str_contains($errorOutput, 'Host key verification failed')) {
-            return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
+            return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved or published key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
         }
 
         $reason = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->last();

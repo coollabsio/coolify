@@ -57,7 +57,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * Logged when a git command of Coolify fails because of the SSH host key. The deployment page looks for this text.
      */
-    public const GIT_HOST_KEY_CHANGED_HINT = 'The Git host sent an SSH host key that is not the saved key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. GitHub, GitLab.com, and Bitbucket Cloud use their published keys; if one of them changed its key, update Coolify.';
+    public const GIT_HOST_KEY_CHANGED_HINT = 'The Git host sent an SSH host key that is not the saved or published key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. GitHub, GitLab.com, and Bitbucket Cloud use their published keys; if one of them changed its key, update Coolify.';
 
     private const BUILD_FINGERPRINT_LABEL = 'coolify.build-fingerprint';
 
