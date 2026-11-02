@@ -25,7 +25,7 @@ class SshMultiplexingHelper
     /** After a failed scan (server offline), commands do not scan again for this time. */
     private const HOST_KEY_SCAN_RETRY_SECONDS = 60;
 
-    public const HOST_KEY_CHANGED_MESSAGE = 'The SSH host key of this server changed, so Coolify did not connect. An admin must check the new key on the Security > Host Key page of the server.';
+    public const HOST_KEY_CHANGED_MESSAGE = 'The SSH host key of this server changed, so Coolify did not connect. An admin must check the new key on the Security page of the server.';
 
     public static function serverSshConfiguration(Server $server): array
     {
