@@ -37,6 +37,7 @@ use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use phpseclib3\Crypt\RSA;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -614,6 +616,28 @@ test('import into another team creates its own key when the same key exists in a
         ->and($server->privateKey->team_id)->toBe($targetTeam->id)
         ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
         ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
+});
+
+test('a server with a weak legacy key moves, and the export warns to rotate the key', function () {
+    $weakKey = (string) RSA::createKey(1024)->toString('PKCS1');
+    $this->privateKey->private_key = $weakKey;
+    $this->privateKey->saveQuietly();
+    $bundle = $this->exporter->export($this->server->refresh());
+    $targetTeam = Team::factory()->create();
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->private_key)->toBe(formatPrivateKey($weakKey))
+        ->and(implode(' ', $bundle['warnings']))->toContain('SSH key transfer-key: RSA keys must have at least 2048 bits.')
+        ->and(collect(app(TransferFinishChecklist::class)->of($server)['items'])->firstWhere('type', 'previous_ssh_key')['hint'])
+        ->toContain('The key is also weak: RSA keys must have at least 2048 bits.');
 });
 
 test('system-wide github apps are not exported and re-link on import by uuid', function () {

@@ -8,6 +8,7 @@ use App\Jobs\ProvisionGithubRunnerJob;
 use App\Livewire\Server\GithubRunnerExecutions;
 use App\Livewire\Server\GithubRunners;
 use App\Livewire\Server\Show;
+use App\Livewire\Server\SysboxStatus;
 use App\Livewire\Source\Github\Change;
 use App\Livewire\Source\Github\Create;
 use App\Models\GithubApp;
@@ -446,8 +447,7 @@ describe('isolated Docker with Sysbox', function () {
             ->set('githubAppId', $this->githubApp->id)
             ->set('dockerMode', 'sysbox')
             ->call('submit')
-            ->assertHasErrors('dockerMode')
-            ->assertSet('isSysboxInstalled', false);
+            ->assertHasErrors('dockerMode');
 
         expect(GithubRunnerConfig::count())->toBe(0);
     });
@@ -469,29 +469,29 @@ describe('isolated Docker with Sysbox', function () {
     it('checks that Sysbox can mount its FUSE file system', function () {
         Process::fake(['*' => Process::result(output: '')]);
 
-        Livewire::actingAs($this->owner)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
-            ->call('checkSysbox');
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->owner)
+            ->test(SysboxStatus::class, ['server' => $this->server]);
 
         Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'test -x /usr/bin/fusermount3'));
     });
 
     it('shows the install button when Sysbox is missing', function () {
         Process::fake(['*' => Process::result(output: '')]);
-        GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $this->githubApp->id, 'labels' => ['coolify']]);
 
-        Livewire::actingAs($this->owner)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
-            ->call('checkSysbox')
-            ->assertSet('isSysboxInstalled', false)
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->owner)
+            ->test(SysboxStatus::class, ['server' => $this->server])
+            ->assertSet('isInstalled', false)
             ->assertSee('Install Sysbox');
     });
 
     it('stops before the installation on servers without apt', function () {
         Process::fake(['*' => Process::result(output: '')]);
 
-        Livewire::actingAs($this->owner)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->owner)
+            ->test(SysboxStatus::class, ['server' => $this->server])
             ->call('installSysbox')
             ->assertNotDispatched('activityMonitor');
 
@@ -499,14 +499,15 @@ describe('isolated Docker with Sysbox', function () {
     });
 
     it('does not let members install Sysbox', function () {
-        Process::fake();
+        Process::fake(['*' => Process::result(output: '')]);
 
-        Livewire::actingAs($this->member)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->member)
+            ->test(SysboxStatus::class, ['server' => $this->server])
             ->call('installSysbox')
             ->assertForbidden();
 
-        Process::assertNothingRan();
+        Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'apt-get'));
     });
 });
 

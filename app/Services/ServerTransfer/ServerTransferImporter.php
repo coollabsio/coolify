@@ -643,6 +643,7 @@ class ServerTransferImporter
             'is_git_related' => (bool) data_get($payload, 'is_git_related', false),
         ]);
         $key->uuid = $uuid;
+        $key->allowLegacyKey = true;
 
         try {
             $key->save();
