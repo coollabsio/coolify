@@ -470,13 +470,13 @@ class EnvironmentVariable extends BaseModel
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
-    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
+    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|NodeWorkload|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
     {
         if ($resource === null) {
             return ['known' => [], 'locked' => []];
         }
 
-        $isDatabase = ! $resource instanceof Application && ! $resource instanceof Service;
+        $isDatabase = ! $resource instanceof Application && ! $resource instanceof Service && ! $resource instanceof NodeWorkload;
         $secrets = ['known' => [], 'locked' => []];
         if ($isDatabase) {
             foreach (array_keys($resource->getAttributes()) as $attribute) {
@@ -518,7 +518,8 @@ class EnvironmentVariable extends BaseModel
         $unresolvedKeys = [];
         $remoteSecretFailure = null;
         foreach ($variables as $variable) {
-            if ($resolveRemoteSecrets) {
+            // Cluster applications do not resolve secret manager references.
+            if ($resolveRemoteSecrets && ! $resource instanceof NodeWorkload) {
                 $secrets['locked'] = array_merge(
                     $secrets['locked'],
                     self::remoteSecretLogRedactionValuesFor($resource, $variable, $sharedVariables, $remoteSecretFailure, $unresolvedKeys),

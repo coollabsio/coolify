@@ -47,10 +47,22 @@
                                 ['value' => true, 'label' => 'Docker BuildKit secrets'],
                             ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
                     </div>
+                @elseif ($resourceClass === 'App\Models\NodeWorkload')
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
+                            onChange="instantSave"
+                            helper="Controls how environment variables are ordered in the list and in the developer view."
+                            :options="[
+                                ['value' => false, 'label' => 'Creation order'],
+                                ['value' => true, 'label' => 'Alphabetical'],
+                            ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                    </div>
                 @endif
                 <x-forms.checkbox instantSave="saveCoolifyDefaultVariables" id="include_coolify_default_variables"
                     label="Include Coolify default variables"
-                    helper="Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, COOLIFY_ENVIRONMENT_NAME and COOLIFY_SERVER_IP to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy or restart."
+                    :helper="$resourceClass === 'App\Models\NodeWorkload'
+                        ? 'Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME and COOLIFY_ENVIRONMENT_NAME to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy.'
+                        : 'Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, COOLIFY_ENVIRONMENT_NAME and COOLIFY_SERVER_IP to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy or restart.'"
                     :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
                 @if ($this->hasLogRedactionSetting())
                     <div class="grid w-full items-end gap-4 sm:grid-cols-2">

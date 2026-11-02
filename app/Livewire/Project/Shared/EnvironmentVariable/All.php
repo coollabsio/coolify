@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\NodeWorkload;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
@@ -113,7 +114,9 @@ class All extends Component
 
     public function mount()
     {
-        $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
+        $this->is_env_sorting_enabled = $this->resource instanceof NodeWorkload
+            ? $this->resource->is_env_sorting_enabled === true
+            : data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $coolifyDefaultVariablesOwner = $this->resource instanceof Application ? $this->resource->settings : $this->resource;
         $this->include_coolify_default_variables = data_get($coolifyDefaultVariablesOwner, 'include_coolify_default_variables') !== false;
@@ -189,12 +192,18 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
 
             $this->page = 1;
-            $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
-            $this->resource->settings->use_build_secrets = $this->use_build_secrets;
-            if ($this->resource instanceof Application) {
-                $this->saveApplicationSettingsWithAudit($this->resource);
+            if ($this->resource instanceof NodeWorkload) {
+                // An image workload has no build, so only the order applies.
+                $this->resource->is_env_sorting_enabled = $this->is_env_sorting_enabled;
+                $this->resource->save();
             } else {
-                $this->resource->settings->save();
+                $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
+                $this->resource->settings->use_build_secrets = $this->use_build_secrets;
+                if ($this->resource instanceof Application) {
+                    $this->saveApplicationSettingsWithAudit($this->resource);
+                } else {
+                    $this->resource->settings->save();
+                }
             }
             $this->clearEnvironmentVariableCaches();
             if ($this->readyToLoad && $this->view === 'dev') {

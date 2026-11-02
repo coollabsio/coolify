@@ -207,7 +207,7 @@ class GetLogs extends Component
             );
         }
         if ($this->server instanceof Node) {
-            return $this->canReadLogs() ? sanitizeLogsForExport($this->exportClusterLogs($this->clusterLogTail(), self::MAX_DISPLAY_SIZE_BYTES)) : '';
+            return $this->canReadLogs() ? sanitizeLogsForExport($this->exportClusterLogs($this->clusterLogTail(), self::MAX_DISPLAY_SIZE_BYTES), $this->logRedactionSecrets()) : '';
         }
         if (! $this->canReadSingleContainer()) {
             return '';
@@ -224,7 +224,7 @@ class GetLogs extends Component
             return sanitizeLogsForExport($this->mergedLogs(null, self::MAX_DOWNLOAD_SIZE_BYTES, '50MB', export: true, all: true), $this->logRedactionSecrets());
         }
         if ($this->server instanceof Node) {
-            return $this->canReadLogs() ? sanitizeLogsForExport($this->exportClusterLogs(FetchContainerLogs::MAX_LINES, self::MAX_DOWNLOAD_SIZE_BYTES)) : '';
+            return $this->canReadLogs() ? sanitizeLogsForExport($this->exportClusterLogs(FetchContainerLogs::MAX_LINES, self::MAX_DOWNLOAD_SIZE_BYTES), $this->logRedactionSecrets()) : '';
         }
         if (! $this->canReadSingleContainer()) {
             return '';

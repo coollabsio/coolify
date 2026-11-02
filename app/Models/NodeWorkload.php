@@ -29,6 +29,9 @@ class NodeWorkload extends BaseModel
             'desired_state' => NodeWorkloadDesiredState::class,
             'domains' => 'array',
             'http_port' => 'integer',
+            'is_env_sorting_enabled' => 'boolean',
+            'include_coolify_default_variables' => 'boolean',
+            'redact_all_env_values_in_logs' => 'boolean',
         ];
     }
 
@@ -131,22 +134,40 @@ class NodeWorkload extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', false);
     }
 
+    /** Whether logs hide every environment value, or only locked values. */
+    public function redactsAllEnvValuesInLogs(): bool
+    {
+        return $this->redact_all_env_values_in_logs ?? true;
+    }
+
     /**
      * Runtime variables as the container receives them, with shared variable
      * references resolved and without the .env escaping used by compose files.
+     * The Coolify default variables are added when the setting is on; a variable
+     * that the user defines wins. There is no COOLIFY_SERVER_IP, because one
+     * revision runs on more than one server.
      * Keys are sorted so that reordering variables does not change the hash.
      *
      * @return array<string, string>
      */
     public function runtimeEnvironment(): array
     {
-        $environment = $this->environment_variables()
+        $variables = $this->environment_variables()->get();
+        $environment = $variables
             ->where('is_runtime', true)
-            ->get()
             ->mapWithKeys(fn (EnvironmentVariable $variable): array => [
                 $variable->key => (string) $variable->get_real_environment_variables_with_server($variable->value, $this),
             ])
             ->all();
+        // A model created in this request has no column default loaded yet (null), which means on.
+        if ($this->include_coolify_default_variables !== false) {
+            $defaults = collect([
+                'COOLIFY_APP_NAME' => $this->name,
+                'COOLIFY_PROJECT_NAME' => $this->project?->name,
+                'COOLIFY_ENVIRONMENT_NAME' => $this->environment?->name,
+            ])->whereNotNull()->map(fn ($value): string => (string) $value)->except($variables->pluck('key')->all());
+            $environment = [...$environment, ...$defaults->all()];
+        }
         ksort($environment);
 
         return $environment;
