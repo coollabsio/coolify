@@ -80,8 +80,6 @@ class Create extends Component
 
     public function createResource()
     {
-        $this->authorize('createAnyResource');
-
         if (! $this->pendingType) {
             return;
         }
@@ -89,6 +87,9 @@ class Create extends Component
         $project = $this->project;
         $environment = $this->environment;
         $destination = $this->destination;
+        $this->authorize('update', $project);
+        abort_unless((int) $environment->project_id === (int) $project->id, 403);
+        abort_unless((int) $destination->server->team_id === (int) $project->team_id, 403);
         $this->pendingType = null;
 
         if (in_array($type, DATABASE_TYPES)) {

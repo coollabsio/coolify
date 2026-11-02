@@ -68,6 +68,8 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // A host key that did not match; the target reads the key again over its own connection.
+        'ssh_host_key_pending',
     ];
 
     /**

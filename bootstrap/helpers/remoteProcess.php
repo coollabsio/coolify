@@ -91,6 +91,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
         function () use ($source, $dest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -120,6 +121,7 @@ function instant_scp_from_server(string $remoteSource, string $localDest, Server
         function () use ($remoteSource, $localDest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpDownloadCommand($server, $remoteSource, $localDest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -168,6 +170,7 @@ function instant_remote_write_file(Server $server, string $path, string $content
         function () use ($server, $remoteCommand, $content, $timeout) {
             $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
             $process = runSshProcess($sshCommand, $timeout, $content);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             if ($process->exitCode() !== 0) {
                 excludeCertainErrors($process->errorOutput(), $process->exitCode());
@@ -194,6 +197,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
         function () use ($server, $command_string) {
             $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
             $process = runSshProcess($sshCommand, 30);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -230,6 +234,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
             $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
             $process = runSshProcess($sshCommand, (int) $effectiveTimeout);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process->errorOutput());
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -261,6 +266,9 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
     $errorMessage = trim($errorOutput);
     if (empty($errorMessage)) {
         $errorMessage = "SSH command failed with exit code: $exitCode";
+    }
+    if ($exitCode === 255 && str_contains($errorMessage, 'Host key verification failed')) {
+        $errorMessage = SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE;
     }
 
     throw new RuntimeException($errorMessage, $exitCode);

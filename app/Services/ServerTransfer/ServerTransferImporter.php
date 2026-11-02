@@ -28,6 +28,7 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\SecretManagerLink;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -723,9 +724,18 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'ssh_host_key_pending',
                 ])
                 ->all();
             $server->settings->fill($safe);
+            // The pinned host key moves with the server, so the target does not trust a new key on its first connection.
+            $sshHostKey = ServerSetting::normalizeSshHostKeys(data_get($settingsPayload, 'ssh_host_key'));
+            $server->settings->forceFill([
+                'ssh_host_key' => $sshHostKey,
+                'ssh_host_key_source' => filled($sshHostKey) ? 'transfer' : null,
+                'ssh_host_key_trusted_at' => filled($sshHostKey) ? data_get($settingsPayload, 'ssh_host_key_trusted_at') : null,
+                'is_ssh_host_key_check_disabled' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_disabled', false),
+            ]);
             $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(
                 data_get($settingsPayload, 'cloudflare_tunnel_integration_token_uuid'),
                 'The Cloudflare tunnel of this server: its Cloudflare API token was not found on this instance; select it again in the Cloudflare tunnel settings.',

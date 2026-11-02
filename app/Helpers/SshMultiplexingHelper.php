@@ -2,8 +2,10 @@
 
 namespace App\Helpers;
 
+use App\Jobs\ServerConnectionCheckJob;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
@@ -13,9 +15,18 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class SshMultiplexingHelper
 {
+    /** The host key scan runs while Coolify builds an SSH command, so it must stay short also for a long connection timeout. */
+    private const HOST_KEY_SCAN_TIMEOUT_SECONDS = 10;
+
+    /** After a failed scan (server offline), commands do not scan again for this time. */
+    private const HOST_KEY_SCAN_RETRY_SECONDS = 60;
+
+    public const HOST_KEY_CHANGED_MESSAGE = 'The SSH host key of this server changed, so Coolify did not connect. An admin must check the new key on the Security > Host Key page of the server.';
+
     public static function serverSshConfiguration(Server $server): array
     {
         $privateKey = PrivateKey::where('team_id', $server->team_id)->findOrFail($server->private_key_id);
@@ -108,6 +119,7 @@ class SshMultiplexingHelper
         $establishCommand .= self::escapedUserAtHost($server).' true';
 
         $establishProcess = Process::run($establishCommand);
+        self::noticeHostKeyMismatch($server, $establishProcess->errorOutput());
         if ($establishProcess->exitCode() !== 0) {
             return false;
         }
@@ -494,7 +506,7 @@ class SshMultiplexingHelper
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
         $options = '-i '.escapeshellarg($sshKeyLocation).' '
-            .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+            .self::hostKeyOptions($server)
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
             ."-o ServerAliveInterval=$serverInterval "
@@ -506,5 +518,212 @@ class SshMultiplexingHelper
         }
 
         return $options.'-p '.escapeshellarg((string) $server->port).' ';
+    }
+
+    /**
+     * warn: connect also when the host key changed, and report it. enforce: refuse a changed host key. off: no check.
+     */
+    public static function hostKeyCheckingMode(Server $server): string
+    {
+        $mode = config('constants.ssh.host_key_checking');
+        if ($mode === 'off' || data_get($server, 'settings.is_ssh_host_key_check_disabled')) {
+            return 'off';
+        }
+
+        return $mode === 'enforce' ? 'enforce' : 'warn';
+    }
+
+    /**
+     * True when ssh reports that the server sent a host key that does not match the pinned key.
+     */
+    public static function isHostKeyMismatch(string $errorOutput): bool
+    {
+        return str_contains($errorOutput, 'REMOTE HOST IDENTIFICATION HAS CHANGED')
+            || str_contains($errorOutput, 'Host key verification failed');
+    }
+
+    /**
+     * When an SSH process reports a changed host key, check the connection once. The check saves the new key
+     * as pending and notifies the team, also for a server that the scheduled connection check skips (Sentinel).
+     */
+    public static function noticeHostKeyMismatch(Server $server, string $errorOutput): void
+    {
+        if (! self::isHostKeyMismatch($errorOutput) || ! Cache::add('ssh_host_key_mismatch_noticed_'.$server->uuid, true, 600)) {
+            return;
+        }
+        ServerConnectionCheckJob::dispatch($server);
+    }
+
+    /**
+     * Read the host key that the server sends now. The probe has every login method off, so it offers no key
+     * and runs no command: ssh saves the host key during the key exchange, then the login fails by design.
+     */
+    public static function scanHostKey(Server $server): ?string
+    {
+        return self::readHostKey($server)['key'];
+    }
+
+    /**
+     * @return array{key: ?string, error: string}
+     */
+    private static function readHostKey(Server $server): array
+    {
+        $connectTimeout = min(self::getConnectionTimeout($server), self::HOST_KEY_SCAN_TIMEOUT_SECONDS);
+        $directory = self::knownHostsDirectory();
+        File::ensureDirectoryExists($directory, 0700);
+        $scanFile = $directory.'/scan_'.$server->uuid.'_'.Str::random(8);
+
+        $command = 'ssh ';
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
+        }
+        $command .= '-o HostKeyAlias='.self::hostKeyAlias($server).' '
+            .'-o UserKnownHostsFile='.escapeshellarg($scanFile).' -o GlobalKnownHostsFile=/dev/null '
+            .'-o StrictHostKeyChecking=accept-new -o BatchMode=yes '
+            .'-o PubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no '
+            .'-o HostbasedAuthentication=no '
+            .'-o ConnectTimeout='.$connectTimeout.' -o LogLevel=ERROR '
+            .'-p '.escapeshellarg((string) $server->port).' '
+            .self::escapedUserAtHost($server).' true';
+
+        try {
+            $result = self::runWithTimeout($command, $connectTimeout + 5);
+
+            return [
+                'key' => ServerSetting::normalizeSshHostKeys(@file_get_contents($scanFile) ?: null),
+                'error' => $result === null ? 'The connection timed out.' : Str::limit(trim($result->errorOutput()), 300),
+            ];
+        } finally {
+            File::delete([$scanFile, $scanFile.'.old']);
+        }
+    }
+
+    /**
+     * Pin the host key that the server sends on the first connection (trust on first use).
+     */
+    public static function learnHostKey(Server $server): void
+    {
+        if (Cache::has(self::hostKeyScanFailedCacheKey($server))) {
+            return;
+        }
+
+        $learn = function () use ($server) {
+            if (self::loadPinnedHostKey($server)) {
+                return;
+            }
+            $scan = self::readHostKey($server);
+            if ($scan['key'] === null) {
+                Cache::put(self::hostKeyScanFailedCacheKey($server), $scan['error'], self::HOST_KEY_SCAN_RETRY_SECONDS);
+
+                return;
+            }
+            $pin = [
+                'ssh_host_key' => $scan['key'],
+                // A server that was never usable is new. A usable server learns its key after the upgrade.
+                'ssh_host_key_source' => $server->settings->is_usable ? 'upgrade' : 'tofu',
+                'ssh_host_key_trusted_at' => now(),
+                'ssh_host_key_pending' => null,
+            ];
+            // Write only the pin, so that unsaved settings changes of the caller stay unsaved.
+            $pinned = ServerSetting::query()->whereKey($server->settings->getKey())->whereNull('ssh_host_key')->update($pin);
+            if ($pinned === 0) {
+                self::loadPinnedHostKey($server);
+
+                return;
+            }
+            $server->settings->forceFill($pin)->syncOriginalAttributes(array_keys($pin));
+            // An open multiplexed connection was made without the pinned key.
+            self::removeMuxFile($server);
+        };
+
+        $lock = Cache::lock('ssh_host_key_learn_'.$server->uuid, self::HOST_KEY_SCAN_TIMEOUT_SECONDS + 20);
+        try {
+            // Enforce mode cannot connect without the key, so it waits for another process that reads it. Warn mode connects without it.
+            if (self::hostKeyCheckingMode($server) === 'enforce') {
+                $lock->block(self::HOST_KEY_SCAN_TIMEOUT_SECONDS + 5, $learn);
+            } else {
+                $lock->get($learn);
+            }
+        } catch (LockTimeoutException) {
+            self::loadPinnedHostKey($server);
+        }
+    }
+
+    /**
+     * Read the pinned host key from the database into the settings in memory, without a refresh() that drops unsaved changes.
+     */
+    private static function loadPinnedHostKey(Server $server): bool
+    {
+        $columns = ['ssh_host_key', 'ssh_host_key_source', 'ssh_host_key_trusted_at', 'ssh_host_key_pending'];
+        $stored = ServerSetting::query()->whereKey($server->settings->getKey())->first($columns);
+        if (blank($stored?->ssh_host_key)) {
+            return false;
+        }
+        $server->settings->forceFill($stored->getAttributes())->syncOriginalAttributes($columns);
+
+        return true;
+    }
+
+    private static function hostKeyScanFailedCacheKey(Server $server): string
+    {
+        return 'ssh_host_key_scan_failed_'.$server->uuid;
+    }
+
+    private static function hostKeyOptions(Server $server): string
+    {
+        $mode = self::hostKeyCheckingMode($server);
+        if ($mode !== 'off' && blank($server->settings->ssh_host_key) && $server->settings->exists) {
+            self::learnHostKey($server);
+        }
+
+        if ($mode === 'off') {
+            return '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ';
+        }
+        if (blank($server->settings->ssh_host_key)) {
+            if ($mode === 'enforce') {
+                $scanError = Cache::get(self::hostKeyScanFailedCacheKey($server));
+                throw new \RuntimeException('SSH connection failed: Coolify could not read the SSH host key of the server'.(filled($scanError) ? ": {$scanError}" : '.'), 255);
+            }
+
+            return '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ';
+        }
+
+        return '-o HostKeyAlias='.self::hostKeyAlias($server).' '
+            .'-o UserKnownHostsFile='.escapeshellarg(self::syncKnownHostsFile($server)).' '
+            .'-o StrictHostKeyChecking='.($mode === 'enforce' ? 'yes' : 'no').' ';
+    }
+
+    /**
+     * Write the known_hosts file of the server from the database, like validateSshKey() does for the key file.
+     * The file name has a hash of the content, so a process that loaded an older key cannot overwrite the file of the current key.
+     */
+    private static function syncKnownHostsFile(Server $server): string
+    {
+        $alias = self::hostKeyAlias($server);
+        $content = collect(explode("\n", $server->settings->ssh_host_key))
+            ->filter()
+            ->map(fn (string $key) => "{$alias} {$key}\n")
+            ->implode('');
+        $path = self::knownHostsDirectory().'/known_hosts_'.$server->uuid.'_'.substr(hash('sha256', $content), 0, 16);
+
+        if (@file_get_contents($path) !== $content) {
+            File::ensureDirectoryExists(self::knownHostsDirectory(), 0700);
+            $temporaryPath = $path.'.'.Str::random(8);
+            File::put($temporaryPath, $content);
+            chmod($temporaryPath, 0600);
+            rename($temporaryPath, $path);
+        }
+
+        return $path;
+    }
+
+    private static function knownHostsDirectory(): string
+    {
+        return storage_path('app/ssh/known_hosts');
+    }
+
+    private static function hostKeyAlias(Server $server): string
+    {
+        return 'coolify-'.$server->uuid;
     }
 }

@@ -50,6 +50,8 @@ function makeTimeoutTestServer(): Server
         'team_id' => $team->id,
         'private_key_id' => $privateKey->id,
     ]);
+    // These tests count ssh processes; the host key check would add a key scan.
+    $server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
 
     Storage::disk('ssh-keys')->put("ssh_key@{$server->privateKey->uuid}", $server->privateKey->private_key);
 
