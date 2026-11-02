@@ -5,6 +5,7 @@ namespace App\Livewire\Project\ClusterApplication;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
+use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
@@ -15,12 +16,14 @@ use App\Enums\NodeWorkloadAction;
 use App\Enums\NodeWorkloadState;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
+use App\Jobs\MoveNodeWorkloadJob;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
+use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Services\DockerImageParser;
@@ -108,6 +111,12 @@ class Show extends Component
     public string $editingDomain = '';
 
     public string $editingPort = '';
+
+    /** Uuid of the server to move the application from. */
+    public string $moveSource = '';
+
+    /** Uuid of the server to move the application to. */
+    public string $moveTarget = '';
 
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null): void
     {
@@ -351,6 +360,62 @@ class Show extends Component
         $this->queueLifecycle(NodeWorkloadAction::REMOVE);
     }
 
+    /** Moves the application from one of its servers to another server of the same cluster. */
+    public function moveWorkload(): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $this->validate([
+                'moveSource' => ['required', 'string'],
+                'moveTarget' => ['required', 'string'],
+            ]);
+            $source = $this->workload->nodes()->where('nodes.uuid', $this->moveSource)->firstOrFail();
+            $target = Node::query()
+                ->where('uuid', $this->moveTarget)
+                ->where('team_id', $this->workload->team_id)
+                ->where('node_cluster_id', $source->node_cluster_id)
+                ->whereDoesntHave('workloads', fn ($query) => $query->whereKey($this->workload->id))
+                ->firstOrFail();
+            $revision = $this->workload->revisions()->latest('id')->firstOrFail();
+            $operation = CreateMoveOperation::run($source, $target, $revision, auth()->user());
+            MoveNodeWorkloadJob::dispatch($operation->id);
+            $this->moveTarget = '';
+            $this->dispatch('close-modal');
+            $this->dispatch('success', data_get($operation->result, 'stateful') || NodeVolume::query()->where('node_workload_id', $this->workload->id)->whereNotNull('node_id')->exists()
+                ? 'Move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
+                : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.');
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
+        $this->loadData();
+    }
+
+    /**
+     * Servers the application can move from and to. Targets are servers of the same cluster that run workloads
+     * and do not run this application yet.
+     *
+     * @return array{moveSourceOptions: list<array{value: string, label: string}>, moveTargetOptions: list<array{value: string, label: string}>}
+     */
+    private function moveOptions(): array
+    {
+        $sources = $this->workload->nodes->sortBy('name')->values();
+        $clusterIds = $sources->pluck('node_cluster_id')->filter()->unique()->values();
+        $targets = $clusterIds->isEmpty() ? collect() : Node::query()
+            ->where('team_id', $this->workload->team_id)
+            ->whereIn('node_cluster_id', $clusterIds)
+            ->whereKeyNot($sources->modelKeys())
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Node $node): bool => $node->role->runsWorkloads());
+
+        return [
+            'moveSourceOptions' => $sources->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->all(),
+            'moveTargetOptions' => $targets->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->values()->all(),
+        ];
+    }
+
     /**
      * The deployment log of an active deployment, for the "Deploying… View log" indicator.
      */
@@ -506,6 +571,7 @@ class Show extends Component
                 ? $this->workload->internal_dns_name.'.default.coolify.internal'
                 : null,
             ...($this->section === 'domains' ? $this->ingressData() : []),
+            ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
             'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentFilterOptions() : null,
@@ -759,6 +825,9 @@ class Show extends Component
             'operations' => fn ($query) => $query->latest('id')->limit(20),
         ]);
         $this->node = $this->workload->nodes->first();
+        if ($this->workload->nodes->where('uuid', $this->moveSource)->isEmpty()) {
+            $this->moveSource = $this->node?->uuid ?? '';
+        }
         // Worst state wins across servers, like the Resources page of a cluster.
         $states = $this->workload->nodes->map(fn (Node $node): NodeWorkloadState => DetermineWorkloadState::run($node, $this->workload));
         $state = $states->first(fn (NodeWorkloadState $state): bool => $state !== NodeWorkloadState::RUNNING)

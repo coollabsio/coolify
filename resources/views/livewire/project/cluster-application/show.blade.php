@@ -43,7 +43,17 @@
         <div class="w-full xl:hidden">
             @can('update', $workload)
                 <x-cluster-applications.deployment-actions id="cluster-application-mobile-actions"
-                    :is-running="$isRunning" :container-present="$containerPresent" class="mb-3 flex w-full" />
+                    :is-running="$isRunning" :container-present="$containerPresent" class="mb-3 flex w-full">
+                    @if ($moveTargetOptions !== [])
+                        <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
+                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                            @click="open = false; document.getElementById('cluster-application-move-trigger')?.click()"
+                            role="menuitem">
+                            <x-reicon name="transfer" class="size-3.5 opacity-70" />
+                            Move to another server…
+                        </button>
+                    @endif
+                </x-cluster-applications.deployment-actions>
             @endcan
             {{-- Keyed by state: the wire:ignore confirmations must render again when the state changes. --}}
             <div class="hidden" aria-hidden="true" wire:key="cluster-application-confirmations-{{ $isRunning ? 'running' : 'exited' }}">
@@ -69,6 +79,33 @@
                         <button id="cluster-application-restart-trigger" type="button">Restart</button>
                     </x-slot:trigger>
                 </x-modal-confirmation>
+                @if ($moveTargetOptions !== [])
+                    @can('update', $workload)
+                        <x-modal-input title="Move to another server" :subtitle="$workload->name" :wireIgnore="false">
+                            <x-slot:content>
+                                <button id="cluster-application-move-trigger" type="button">Move</button>
+                            </x-slot:content>
+                            <form wire:submit="moveWorkload" class="flex flex-col gap-4">
+                                @if (count($moveSourceOptions) > 1)
+                                    <x-forms.listbox id="moveSource" htmlId="cluster-application-move-source"
+                                        label="From server" placeholder="Select a server" :options="$moveSourceOptions"
+                                        portal required />
+                                @endif
+                                <x-forms.listbox id="moveTarget" htmlId="cluster-application-move-target"
+                                    label="Target server" placeholder="Select a server" :options="$moveTargetOptions"
+                                    portal required />
+                                <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                    The application keeps running on its current server until it is ready on the target server.
+                                </p>
+                                <div class="flex justify-end">
+                                    <x-forms.button type="submit" isHighlighted wire:target="moveWorkload">
+                                        Move application
+                                    </x-forms.button>
+                                </div>
+                            </form>
+                        </x-modal-input>
+                    @endcan
+                @endif
             </div>
         </div>
         {{-- Desktop actions live in the fixed top bar so they cannot overlap page content. --}}
@@ -84,7 +121,17 @@
                         </div>
                         @can('update', $workload)
                             <x-cluster-applications.deployment-actions id="cluster-application-desktop-actions"
-                                :is-running="$isRunning" :container-present="$containerPresent" />
+                                :is-running="$isRunning" :container-present="$containerPresent">
+                                @if ($moveTargetOptions !== [])
+                                    <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @click="open = false; document.getElementById('cluster-application-move-trigger')?.click()"
+                                        role="menuitem">
+                                        <x-reicon name="transfer" class="size-3.5 opacity-70" />
+                                        Move to another server…
+                                    </button>
+                                @endif
+                            </x-cluster-applications.deployment-actions>
                         @endcan
                     </div>
                 </div>
