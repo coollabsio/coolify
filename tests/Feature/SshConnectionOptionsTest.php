@@ -135,3 +135,21 @@ it('connects with the server key, port and fixed options when the health check f
         ->toContain('identityfile '.$server->privateKey->getKeyLocation()."\n")
         ->toContain("identitiesonly yes\n");
 });
+
+it('ignores ssh config files and ends option parsing in the host key scan', function () {
+    Process::fake();
+    $server = makeSshOptionsTestServer(['ip' => '10.0.0.5']);
+
+    SshMultiplexingHelper::scanHostKey($server);
+
+    $scanCommand = null;
+    Process::assertRan(function ($process) use (&$scanCommand) {
+        $scanCommand = $process->command;
+
+        return true;
+    });
+    expect($scanCommand)
+        ->toContain('-F /dev/null ')
+        ->toEndWith(" -- 'root'@'10.0.0.5' true");
+    expect(strpos($scanCommand, '-F /dev/null'))->toBeLessThan(strpos($scanCommand, ' -- '));
+});

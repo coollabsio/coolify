@@ -501,6 +501,7 @@ class SshMultiplexingHelper
                 ]);
             }
         }
+        self::giveToSshDirectoryOwner($keyLocation, $keyLocation.'.lock');
     }
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
@@ -573,20 +574,21 @@ class SshMultiplexingHelper
         $connectTimeout = min(self::getConnectionTimeout($server), self::HOST_KEY_SCAN_TIMEOUT_SECONDS);
         $directory = self::knownHostsDirectory();
         File::ensureDirectoryExists($directory, 0700);
+        self::giveToSshDirectoryOwner($directory);
         $scanFile = $directory.'/scan_'.$server->uuid.'_'.Str::random(8);
 
         $command = 'ssh ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
-        $command .= '-o HostKeyAlias='.self::hostKeyAlias($server).' '
+        $command .= '-F /dev/null -o HostKeyAlias='.self::hostKeyAlias($server).' '
             .'-o UserKnownHostsFile='.escapeshellarg($scanFile).' -o GlobalKnownHostsFile=/dev/null '
             .'-o StrictHostKeyChecking=accept-new -o BatchMode=yes '
             .'-o PubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no '
             .'-o HostbasedAuthentication=no '
             .'-o ConnectTimeout='.$connectTimeout.' -o LogLevel=ERROR '
             .'-p '.escapeshellarg((string) $server->port).' '
-            .self::escapedUserAtHost($server).' true';
+            .'-- '.self::escapedUserAtHost($server).' true';
 
         try {
             $result = self::runWithTimeout($command, $connectTimeout + 5);
@@ -715,6 +717,7 @@ class SshMultiplexingHelper
             chmod($temporaryPath, 0600);
             rename($temporaryPath, $path);
         }
+        self::giveToSshDirectoryOwner(self::knownHostsDirectory(), $path);
 
         return $path;
     }
@@ -722,6 +725,30 @@ class SshMultiplexingHelper
     private static function knownHostsDirectory(): string
     {
         return storage_path('app/ssh/known_hosts');
+    }
+
+    /**
+     * Horizon runs as root and php-fpm runs as www-data. Files that a root process writes under storage/app/ssh
+     * get the owner of that directory, so that the web process can still read and replace them.
+     */
+    public static function giveToSshDirectoryOwner(string ...$paths): void
+    {
+        if (! function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            return;
+        }
+
+        $owner = @fileowner(storage_path('app/ssh'));
+        $group = @filegroup(storage_path('app/ssh'));
+        if ($owner === false || $owner === 0) {
+            return;
+        }
+
+        foreach ($paths as $path) {
+            if (file_exists($path) && (fileowner($path) !== $owner || filegroup($path) !== $group)) {
+                @chown($path, $owner);
+                @chgrp($path, $group);
+            }
+        }
     }
 
     private static function hostKeyAlias(Server $server): string
