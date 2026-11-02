@@ -36,14 +36,14 @@
         this.password = '';
         if (this.$refs.revealedKey) this.$refs.revealedKey.textContent = '';
     },
-}" x-init="$wire.$on('privateKeyUpdated', () => { replacing = false })" x-on:keydown.escape="hide()"
+}" x-init="$wire.$on('privateKeyUpdated', () => { replacing = false })"
     x-on:livewire:navigating.document="hide()">
     <div class="mb-1.5 flex items-center justify-between gap-3">
         <label class="text-[13px] font-medium">Private key</label>
         @can('update', $private_key)
             <div class="flex items-center gap-3">
                 <button type="button"
-                    class="text-[11px] font-medium text-coollabs hover:underline dark:text-brand-light"
+                    class="text-[11px] font-medium text-coollabs hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50 dark:text-brand-light"
                     x-on:click="revealed || askPassword ? hide() : reveal()"
                     x-bind:disabled="replacing"
                     x-text="revealed || askPassword ? 'Hide key' : 'Reveal key'"></button>
