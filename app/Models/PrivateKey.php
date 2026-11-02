@@ -49,6 +49,7 @@ class PrivateKey extends BaseModel
 
     protected $casts = [
         'private_key' => 'encrypted',
+        'is_git_related' => 'boolean',
     ];
 
     protected $appends = ['public_key'];
@@ -317,15 +318,6 @@ class PrivateKey extends BaseModel
     public function getKeyLocation()
     {
         return Storage::disk('ssh-keys')->path("ssh_key@{$this->uuid}");
-    }
-
-    public function updatePrivateKey(array $data)
-    {
-        return DB::transaction(function () use ($data) {
-            $this->update($data);
-
-            return $this;
-        });
     }
 
     public function servers()
