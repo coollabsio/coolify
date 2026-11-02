@@ -336,6 +336,9 @@
                                 </button>
                                 </div>
                                 <span class="flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-600 dark:text-fg-dim">
+                                    @if ($deploymentStatus === 'in_progress')
+                                        <x-loading compact />
+                                    @else
                                     <span @class([
                                         'size-2 shrink-0 rounded-full',
                                         'bg-emerald-500' => $deploymentStatusType === 'success',
@@ -343,6 +346,7 @@
                                         'bg-red-500' => $deploymentStatusType === 'error',
                                         'bg-neutral-400 dark:bg-neutral-500' => $deploymentStatusType === 'neutral',
                                     ])></span>
+                                    @endif
                                     {{ $deploymentStatusLabel }}
                                 </span>
                             </div>

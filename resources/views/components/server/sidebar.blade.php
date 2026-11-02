@@ -228,7 +228,7 @@
 
 @php
     // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
-    registerMainNavContext(0, 'Servers', 'Back to the main menu');
+    registerMainNavContext(0, 'Servers', 'Back to the main menu', $server->name);
 @endphp
 
 {{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.

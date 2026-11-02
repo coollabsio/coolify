@@ -43,6 +43,14 @@ test('detects log levels by keyword', () => {
     assert.equal(getLogLevel('warning: disk'), 'warning');
     assert.equal(getLogLevel('trace id=1'), 'debug');
     assert.equal(getLogLevel('ready'), 'info');
+    assert.equal(getLogLevel('time=2026-10-30t16:35:49z level=debug msg="read failed" err=eof'), 'debug');
+    assert.equal(getLogLevel('{"level":"info","msg":"conn closed","err":"eof"}'), 'info');
+    assert.equal(getLogLevel('level=error msg="db down"'), 'error');
+    assert.equal(getLogLevel('{"level":50,"msg":"failed"}'), 'error');
+    assert.equal(getLogLevel('2026-10-29t03:17:00.849341z  info logs: pruned 840 requests, 0 error events'), 'info');
+    assert.equal(getLogLevel('2026/10/30 16:35:49 [debug] read failed'), 'debug');
+    assert.equal(getLogLevel('warn: retry failed'), 'warning');
+    assert.equal(getLogLevel('connection failed'), 'error');
 });
 
 test('filters by level and case-insensitive query', () => {

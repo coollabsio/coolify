@@ -78,12 +78,7 @@ class ServicesController extends Controller
             $service->makeHidden(['value', 'real_value']);
         }
 
-        $payload = serializeApiResponse($service);
-        if ($service instanceof Service && filled(data_get($payload, 'docker_compose'))) {
-            $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $service);
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($service, serializeApiResponse($service));
     }
 
     /**

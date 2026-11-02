@@ -51,7 +51,7 @@
         ->filter(fn ($items) => $items->isNotEmpty());
 @endphp
 
-<x-main-nav-menu back-label="Dashboard" :nav-only="$navOnly"
+<x-main-nav-menu back-label="Dashboard" :name="$service->name" :nav-only="$navOnly"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
         class="grid grid-cols-1 gap-0.5">

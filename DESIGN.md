@@ -311,8 +311,11 @@ Class names below are examples. Keep the values and structure.
   and no frame around it. Only the expanded sidebar shows Search as an input.
 - A menu that replaces another menu in place starts with a back row: a
   centered label and a 12px left chevron (`‹ Dashboard`).
-- The main menu has no row above its items. Dashboard is the first item, right
-  under Search, on every page.
+- On a resource page, the main menu starts with a row that opens the resource
+  menu again. It points right and shows the name of the deepest menu (`adonisjs ›`,
+  `Backup ›`). On
+  other pages the main menu has no row above its items, and Dashboard is the
+  first item, right under Search.
 
 ### Card (outer box, title row, well)
 
@@ -800,9 +803,9 @@ state because it can disappear after polling or a Livewire morph.
 From `xl`, the resource menu replaces the main menu in the main sidebar
 (`x-main-nav-menu`, `registerMainNavContext()`, `components/navbar.blade.php`).
 Its back row (`‹ Dashboard`, `‹ Servers`, `‹ Service`) shows the menu one depth
-lower, without a page load. The main menu has no row that opens the resource
-menu again; to get back to it, open the resource again. Dashboard is always the
-first item under Search.
+lower, without a page load. On a resource page the main menu starts with a row
+(`adonisjs ›`) that opens the deepest resource menu again, also without a page
+load.
 
 The global topbar owns the current resource identity, its compact status
 badges, configuration warnings (`#configuration-warning-hud-slot`), and the

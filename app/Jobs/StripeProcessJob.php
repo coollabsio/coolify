@@ -96,6 +96,38 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         'stripe_subscription_id' => $subscription->stripe_subscription_id,
                     ]);
                     break;
+                case 'checkout.session.expired':
+                    $clientReferenceId = data_get($data, 'client_reference_id');
+                    if (! isCloud() || data_get($data, 'mode') !== 'subscription' || ! is_string($clientReferenceId)) {
+                        break;
+                    }
+                    $userId = Str::before($clientReferenceId, ':');
+                    $teamId = Str::after($clientReferenceId, ':');
+                    $team = Team::find($teamId);
+                    $user = $team?->members->where('id', $userId)->first();
+                    if (! $user?->isAdmin()) {
+                        break;
+                    }
+                    // Atomic claim: one reminder per team per 7 days, also when Stripe delivers several expired sessions at once.
+                    $claimed = Subscription::query()
+                        ->where('team_id', $team->id)
+                        ->where('stripe_invoice_paid', false)
+                        ->where(fn ($query) => $query->whereNull('stripe_checkout_reminder_sent_at')
+                            ->orWhere('stripe_checkout_reminder_sent_at', '<', now()->subDays(7)))
+                        ->update(['stripe_checkout_reminder_sent_at' => now()]);
+                    if ($claimed === 0) {
+                        break;
+                    }
+                    $recoveryUrl = data_get($data, 'after_expiration.recovery.url');
+                    SubscriptionCheckoutReminderJob::dispatch(
+                        $user,
+                        is_string($recoveryUrl) && $recoveryUrl !== '' ? $recoveryUrl : route('subscription.index'),
+                    );
+                    logger()->info('Stripe subscription checkout reminder queued.', [
+                        'team_id' => $team->id,
+                        'stripe_checkout_session_id' => data_get($data, 'id'),
+                    ]);
+                    break;
                 case 'invoice.paid':
                     $customerId = data_get($data, 'customer');
                     $invoiceAmount = data_get($data, 'amount_paid', 0);
