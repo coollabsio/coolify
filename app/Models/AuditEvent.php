@@ -135,17 +135,17 @@ class AuditEvent extends Model
         try {
             $attributes = self::attributesFor($event, $context, $changes, $level);
 
+            // Write at commit, not with defer(): PHP skips the terminate phase when it stops a
+            // request early (client abort, fatal error), and the committed change would have no row.
             DB::afterCommit(function () use ($attributes): void {
-                defer(function () use ($attributes): void {
-                    try {
-                        self::query()->create($attributes);
-                    } catch (Throwable $exception) {
-                        Log::warning('Audit event persistence failed', [
-                            'event' => $attributes['event'],
-                            'exception' => $exception::class,
-                        ]);
-                    }
-                })->always();
+                try {
+                    self::query()->create($attributes);
+                } catch (Throwable $exception) {
+                    Log::warning('Audit event persistence failed', [
+                        'event' => $attributes['event'],
+                        'exception' => $exception::class,
+                    ]);
+                }
             });
         } catch (Throwable $exception) {
             Log::warning('Audit event preparation failed', [

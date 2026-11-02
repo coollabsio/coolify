@@ -72,25 +72,39 @@ beforeEach(function () {
     Log::spy();
 });
 
-test('audit inserts are deferred until after the response', function () {
+test('audit rows survive a request that stops before the terminate phase', function () {
     $this->withDefer();
 
-    auditLog('ui.project.updated', [
+    DB::transaction(fn () => Project::factory()->create([
         'team_id' => $this->team->id,
-        'project_uuid' => 'project-123',
-        'project_name' => 'Website',
+        'name' => 'Website',
+    ]));
+    auditLog('ui.project.updated', ['team_id' => $this->team->id]);
+
+    // PHP stopped the script (client abort, fatal error), so the deferred callbacks never run.
+    app()->forgetScopedInstances();
+
+    expect(AuditEvent::query()->pluck('event')->all())->toBe([
+        'ui.project.created',
+        'ui.environment.created',
+        'ui.project.updated',
     ]);
-
-    expect(AuditEvent::query()->count())->toBe(0);
-
-    defer()->invoke();
-
-    expect(AuditEvent::query()->count())->toBe(1);
 });
 
-test('multiple audit inserts in one request are all deferred', function () {
-    $this->withDefer();
+test('audit rows of a rolled back transaction are not written', function () {
+    try {
+        DB::transaction(function () {
+            Project::factory()->create(['team_id' => $this->team->id]);
 
+            throw new RuntimeException('rollback');
+        });
+    } catch (RuntimeException) {
+    }
+
+    expect(AuditEvent::query()->count())->toBe(0);
+});
+
+test('multiple audit inserts in one request are all written in order', function () {
     auditLog('ui.application.deployed', [
         'team_id' => $this->team->id,
         'application_uuid' => 'app-123',
@@ -99,8 +113,6 @@ test('multiple audit inserts in one request are all deferred', function () {
         'team_id' => $this->team->id,
         'application_uuid' => 'app-123',
     ]);
-
-    defer()->invoke();
 
     expect(AuditEvent::query()->pluck('event')->all())->toBe([
         'ui.application.deployed',
@@ -1281,8 +1293,6 @@ test('updating an environment variable records an event without its value', func
 });
 
 test('creating an application environment variable records an audit event', function () {
-    $this->withDefer();
-
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     $application = Application::factory()->create(['environment_id' => $environment->id]);
@@ -1291,8 +1301,6 @@ test('creating an application environment variable records an audit event', func
         'key' => 'API_SECRET',
         'value' => 'secret-value',
     ]);
-
-    defer()->invoke();
 
     $event = AuditEvent::query()
         ->where('resource_type', 'environment_variable')
