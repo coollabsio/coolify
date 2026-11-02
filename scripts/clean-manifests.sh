@@ -52,6 +52,7 @@ read_ghcr_versions() {
 	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged"
 }
 
+# The manifests endpoint is undocumented, Docker Hub uses it for image management, so it can change without notice
 read_dockerhub_manifests() {
 	local hub base url page key
 	hub="$(hub_token)" || die "could not sign in to the Docker Hub API as $DOCKERHUB_USERNAME"
