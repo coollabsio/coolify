@@ -278,6 +278,7 @@ class PublicGitRepository extends Component
     {
         try {
             $this->authorize('create', Application::class);
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 
             $this->validate();
 

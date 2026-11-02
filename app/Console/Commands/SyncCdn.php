@@ -103,6 +103,13 @@ class SyncCdn extends Command
                 return false;
             }
 
+            $currentTag = 'v'.config('constants.coolify.version');
+            if (! $nightly && ! collect($response->json())->contains('tag_name', $currentTag)) {
+                $this->error("GitHub release {$currentTag} is not published yet. Publish it first, or the What's New page will not show it.");
+
+                return false;
+            }
+
             $releasesFile = tempnam(sys_get_temp_dir(), 'coolify-releases-');
             if ($releasesFile === false || file_put_contents($releasesFile, json_encode($response->json(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
                 $this->error('Failed to create temporary releases.json.');

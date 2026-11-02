@@ -232,7 +232,7 @@ class ServerTransferController extends Controller
         Server::throttleValidation($teamId, $ip);
         $probeIp = Server::normalizeIp($ip);
         if (isCloud() && ! filter_var($probeIp, FILTER_VALIDATE_IP)) {
-            $probeIp = gethostbyname($probeIp);
+            $probeIp = resolveHostToIp($probeIp);
         }
         $probeHost = filter_var($probeIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? "[{$probeIp}]" : $probeIp;
         $probeAllowed = ! isCloud() || (filter_var($probeIp, FILTER_VALIDATE_IP)

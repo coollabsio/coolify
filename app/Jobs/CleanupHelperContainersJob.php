@@ -37,56 +37,42 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
         return 'docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image|test("(^|/)coollabsio/coolify-helper(:|@)")))\'';
     }
 
+    /**
+     * Removes helper containers of finished deployments. Backups, imports, and file browsers also run in
+     * helper containers, so a container is removed only when its name is the UUID of a deployment that
+     * is not queued or in progress.
+     */
     public function handle(): void
     {
         try {
-            // Get all active deployments on this server
-            $activeDeployments = ApplicationDeploymentQueue::where('server_id', $this->server->id)
-                ->whereIn('status', [
+            $containers = instant_remote_process_with_timeout([self::helperContainersCommand()], $this->server, false);
+            $helperContainers = collect(json_decode((string) $containers, true) ?: [])
+                ->filter(fn (mixed $container): bool => is_array($container) && filled(data_get($container, 'ID')) && filled(data_get($container, 'Names')));
+
+            if ($helperContainers->isEmpty()) {
+                return;
+            }
+
+            $finishedDeploymentUuids = ApplicationDeploymentQueue::query()
+                ->whereIn('deployment_uuid', $helperContainers->pluck('Names')->all())
+                ->whereNotIn('status', [
                     ApplicationDeploymentStatus::IN_PROGRESS->value,
                     ApplicationDeploymentStatus::QUEUED->value,
                 ])
                 ->pluck('deployment_uuid')
-                ->toArray();
+                ->all();
 
-            \Log::info('CleanupHelperContainersJob - Active deployments', [
-                'server' => $this->server->name,
-                'active_deployment_uuids' => $activeDeployments,
-            ]);
-
-            $containers = instant_remote_process_with_timeout([self::helperContainersCommand()], $this->server, false);
-            $helperContainers = collect(json_decode($containers));
-
-            if ($helperContainers->count() > 0) {
-                foreach ($helperContainers as $container) {
-                    $containerId = data_get($container, 'ID');
-                    $containerName = data_get($container, 'Names');
-
-                    // Check if this container belongs to an active deployment
-                    $isActiveDeployment = false;
-                    foreach ($activeDeployments as $deploymentUuid) {
-                        if (str_contains($containerName, $deploymentUuid)) {
-                            $isActiveDeployment = true;
-                            break;
-                        }
-                    }
-
-                    if ($isActiveDeployment) {
-                        \Log::info('CleanupHelperContainersJob - Skipping active deployment container', [
-                            'container' => $containerName,
-                            'id' => $containerId,
-                        ]);
-
-                        continue;
-                    }
-
-                    \Log::info('CleanupHelperContainersJob - Removing orphaned helper container', [
-                        'container' => $containerName,
-                        'id' => $containerId,
-                    ]);
-
-                    instant_remote_process_with_timeout(['docker container rm -f '.$containerId], $this->server, false);
+            foreach ($helperContainers as $container) {
+                if (! in_array($container['Names'], $finishedDeploymentUuids, true)) {
+                    continue;
                 }
+
+                \Log::info('CleanupHelperContainersJob - Removing orphaned deployment helper container', [
+                    'container' => $container['Names'],
+                    'id' => $container['ID'],
+                ]);
+
+                instant_remote_process_with_timeout(['docker container rm -f '.escapeshellarg($container['ID'])], $this->server, false);
             }
         } catch (\Throwable $e) {
             send_internal_notification('CleanupHelperContainersJob failed with error: '.$e->getMessage());
