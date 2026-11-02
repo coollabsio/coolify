@@ -35,6 +35,15 @@ test('dragonfly healthcheck uses CMD exec-form, not a CMD-SHELL string', functio
     expect($source)->toContain("'CMD', 'redis-cli'");
 });
 
+// ─── Redis ────────────────────────────────────────────────────────────────────
+
+test('redis healthcheck uses CMD exec-form, not a CMD-SHELL string', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Actions/Database/StartRedis.php');
+
+    expect($source)->not->toContain('CMD-SHELL');
+    expect($source)->toMatch("/'CMD',\s+'redis-cli',\s+'ping'/");
+});
+
 // ─── ClickHouse ───────────────────────────────────────────────────────────────
 
 test('clickhouse healthcheck uses CMD exec-form, not a CMD-SHELL string', function () {
