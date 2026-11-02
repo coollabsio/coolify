@@ -18,6 +18,8 @@
         <livewire:project.new.docker-compose :type="$type" />
     @elseif ($type === 'docker-image')
         <livewire:project.new.docker-image :type="$type" />
+    @elseif ($type === 'cluster-git-repository')
+        <livewire:project.new.cluster-git-repository />
     @else
         <livewire:project.new.select />
     @endif

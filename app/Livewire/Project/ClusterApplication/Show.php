@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\ClusterApplication;
 
+use App\Actions\Node\Build\CancelNodeBuild;
+use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
@@ -20,12 +22,14 @@ use App\Jobs\MoveNodeWorkloadJob;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Environment;
 use App\Models\Node;
+use App\Models\NodeBuild;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\Project;
+use App\Rules\ValidGitBranch;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,7 +45,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'logs', 'servers', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'environment-variables', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -53,6 +57,9 @@ class Show extends Component
 
     #[Locked]
     public ?string $deploymentUuid = null;
+
+    #[Locked]
+    public ?string $buildUuid = null;
 
     public int $deploymentPage = 1;
 
@@ -97,6 +104,12 @@ class Show extends Component
 
     public string $startCommand = '';
 
+    public string $gitBranch = '';
+
+    public string $baseDirectory = '';
+
+    public string $dockerfileLocation = '';
+
     public string $httpPort = '';
 
     public string $newDomain = '';
@@ -118,7 +131,7 @@ class Show extends Component
     /** Uuid of the server to move the application to. */
     public string $moveTarget = '';
 
-    public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null): void
+    public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null, ?string $build_uuid = null): void
     {
         abort_unless(nodesEnabled(), 404);
         $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
@@ -130,6 +143,9 @@ class Show extends Component
         $this->section = $this->resolveSection(request()->route()?->getName());
         if ($this->section === 'deployment') {
             $this->deploymentUuid = $this->deploymentQuery()->where('uuid', $deployment_uuid)->firstOrFail()->uuid;
+        }
+        if ($this->section === 'build') {
+            $this->buildUuid = $this->workload->builds()->where('uuid', $build_uuid)->firstOrFail()->uuid;
         }
         $this->loadData();
         $this->loadDetails();
@@ -148,6 +164,18 @@ class Show extends Component
         try {
             $this->authorize('update', $this->workload);
             if (! $this->ensureHasServer()) {
+                return;
+            }
+            // A Git application deploys through a build: its job publishes the revision and deploys it.
+            if ($this->workload->buildsFromSource()) {
+                $build = StartNodeBuild::run($this->workload, auth()->user());
+                redirectRoute($this, 'project.cluster-application.build.show', [
+                    'project_uuid' => $this->project->uuid,
+                    'environment_uuid' => $this->environment->uuid,
+                    'workload_uuid' => $this->workload->uuid,
+                    'build_uuid' => $build->uuid,
+                ]);
+
                 return;
             }
             $revision = PrepareNodeWorkloadRevision::run($this->workload);
@@ -179,6 +207,14 @@ class Show extends Component
             'workload_uuid' => $this->workload->uuid,
             'deployment_uuid' => $operation->uuid,
         ]);
+    }
+
+    public function cancelBuild(): void
+    {
+        $this->authorize('update', $this->workload);
+        $build = $this->workload->builds()->where('uuid', $this->buildUuid)->firstOrFail();
+        CancelNodeBuild::run($build);
+        $this->dispatch('success', 'Build cancelled.');
     }
 
     public function refresh(): void
@@ -222,6 +258,11 @@ class Show extends Component
     public function saveConfiguration(): void
     {
         $this->authorize('update', $this->workload);
+        if ($this->workload->buildsFromSource()) {
+            $this->saveSourceConfiguration();
+
+            return;
+        }
         $this->validate([
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),
@@ -576,6 +617,12 @@ class Show extends Component
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
             'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentFilterOptions() : null,
             'selectedDeployment' => $this->section === 'deployment' ? $this->selectedDeployment() : null,
+            'recentBuilds' => in_array($this->section, ['deployments', 'build'], true) && $this->workload->buildsFromSource()
+                ? $this->workload->builds()->with('node')->latest('id')->limit(10)->get()
+                : collect(),
+            'selectedBuild' => $this->section === 'build'
+                ? NodeBuild::query()->with(['node', 'logLines' => fn ($query) => $query->orderBy('id')])->where('uuid', $this->buildUuid)->first()
+                : null,
             'routeParameters' => [
                 'project_uuid' => $this->project->uuid,
                 'environment_uuid' => $this->environment->uuid,
@@ -814,6 +861,9 @@ class Show extends Component
         if ($routeName === 'project.cluster-application.deployment.show') {
             return 'deployment';
         }
+        if ($routeName === 'project.cluster-application.build.show') {
+            return 'build';
+        }
         $section = str($routeName ?? '')->after('project.cluster-application.')->toString();
 
         return in_array($section, self::SECTIONS, true) ? $section : 'general';
@@ -855,8 +905,47 @@ class Show extends Component
         $this->description = $this->workload->description;
     }
 
+    /**
+     * Saves the Git source of a built application. The next build uses it; the start command
+     * goes into a new revision like for an image application.
+     */
+    private function saveSourceConfiguration(): void
+    {
+        $this->gitBranch = trim($this->gitBranch);
+        $this->validate([
+            'gitBranch' => ['required', 'string', 'max:255', new ValidGitBranch],
+            'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'startCommand' => ['nullable', 'string', 'max:16384'],
+        ]);
+        $command = $this->parseStartCommand();
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+        $this->workload->update([
+            'git_branch' => $this->gitBranch,
+            'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
+            'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
+        ]);
+        $revision = $this->workload->revisions()->latest('id')->first();
+        if ($revision !== null && $command !== ($revision->configuration['command'] ?? [])) {
+            UpdateNodeWorkloadConfiguration::run($this->workload, $command, null, $revision->image);
+        } elseif ($revision === null && $command !== []) {
+            $this->addError('startCommand', 'Deploy the application once before you set a start command.');
+
+            return;
+        }
+        $this->loadData();
+        $this->loadConfiguration();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Configuration saved. Deploy to build the new source.');
+    }
+
     private function loadConfiguration(): void
     {
+        $this->gitBranch = (string) $this->workload->git_branch;
+        $this->baseDirectory = (string) $this->workload->base_directory;
+        $this->dockerfileLocation = (string) $this->workload->dockerfile_location;
         $revision = $this->workload->revisions->first();
         $configuration = $revision?->configuration ?? [];
         $image = (new DockerImageParser)->parse($revision?->image ?? '');

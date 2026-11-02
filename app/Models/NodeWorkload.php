@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
+use App\Enums\NodeWorkloadSourceType;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +28,7 @@ class NodeWorkload extends BaseModel
     {
         return [
             'desired_state' => NodeWorkloadDesiredState::class,
+            'source_type' => NodeWorkloadSourceType::class,
             'domains' => 'array',
             'http_port' => 'integer',
             'is_env_sorting_enabled' => 'boolean',
@@ -131,6 +133,17 @@ class NodeWorkload extends BaseModel
     public function revisions(): HasMany
     {
         return $this->hasMany(NodeWorkloadRevision::class);
+    }
+
+    public function builds(): HasMany
+    {
+        return $this->hasMany(NodeBuild::class);
+    }
+
+    /** Whether Coolify builds the image of this workload from a Git repository. */
+    public function buildsFromSource(): bool
+    {
+        return ($this->source_type ?? NodeWorkloadSourceType::IMAGE)->builds();
     }
 
     /**

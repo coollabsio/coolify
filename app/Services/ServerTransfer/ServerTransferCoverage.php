@@ -31,10 +31,13 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
 use App\Models\Node;
+use App\Models\NodeBuild;
+use App\Models\NodeBuildLogLine;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\NotificationThrottle;
@@ -369,5 +372,8 @@ final class ServerTransferCoverage
         NodeOperation::class => 'v5 cluster data. Server transfer moves Docker servers only.',
         NodeWorkload::class => 'v5 cluster data. Server transfer moves Docker servers only.',
         NodeWorkloadRevision::class => 'v5 cluster data. Server transfer moves Docker servers only.',
+        NodeBuild::class => 'v5 cluster data. Server transfer moves Docker servers only.',
+        NodeBuildLogLine::class => 'v5 cluster data. Server transfer moves Docker servers only.',
+        NodeRegistry::class => 'v5 cluster data. Server transfer moves Docker servers only.',
     ];
 }

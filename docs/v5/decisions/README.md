@@ -17,6 +17,7 @@ current v5 architecture.
 | [0003: Transport Sentinel logs on demand](0003-transport-sentinel-logs-on-demand.md) | Accepted | Keep a bounded structured log buffer in Sentinel, read it through Flux on demand, and retain SSH plus journald as the failure-path fallback. |
 | [0004: Support legacy servers and nodes permanently](0004-support-legacy-servers-and-nodes-permanently.md) | Accepted | Keep legacy Docker servers and Podman nodes as permanent parallel models, with shared product ownership but separate runtime state and control paths. |
 | [0005: Serve public HTTP through ingress Nodes](0005-node-ingress.md) | Accepted (HTTP) | Run Caddy on each ingress Node, configured by its Sentinel from Corrosion; Coolify writes intent only, and HTTPS follows with certificates in Corrosion. |
+| [0006: Build images on builder Nodes and store them in a cluster registry](0006-node-image-builds.md) | Accepted | Build Git sources with rootless BuildKit in one-shot Podman containers on builder Nodes (all Nodes by default), push to a per-cluster zot registry with its own CA, and create a revision only from a built digest. |
 
 ## Adding a decision
 

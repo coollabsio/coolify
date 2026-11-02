@@ -5,8 +5,10 @@ namespace App\Livewire\NodeCluster;
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\DetermineWorkloadState;
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
+use App\Actions\Node\SetNodeBuilder;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpdateNodeCluster;
 use App\Enums\NodeWorkloadState;
@@ -189,6 +191,45 @@ class Show extends Component
         }
         $this->cluster->refresh();
         $this->dispatch('success', $enabled ? "Ingress turned on for {$node->name}." : "Ingress turned off for {$node->name}.");
+    }
+
+    public function setBuilder(string $nodeUuid, bool $enabled): void
+    {
+        $this->authorize('update', $this->cluster);
+        $node = Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
+        try {
+            SetNodeBuilder::run($this->cluster, $node, $enabled, auth()->user());
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
+        $this->cluster->refresh();
+        $this->dispatch('success', $enabled ? "Builds turned on for {$node->name}." : "Builds turned off for {$node->name}.");
+    }
+
+    /** Selects the Node that runs the image registry, or clears the selection for automatic. */
+    public function setRegistryNode(string $nodeUuid = ''): void
+    {
+        $this->authorize('update', $this->cluster);
+        $registry = $this->cluster->registry;
+        if ($registry === null) {
+            $this->dispatch('error', 'The cluster has no image registry yet. It is created with the first Git application.');
+
+            return;
+        }
+        $nodeId = $nodeUuid === '' ? null : Node::query()
+            ->where('team_id', $this->cluster->team_id)
+            ->where('node_cluster_id', $this->cluster->id)
+            ->where('uuid', $nodeUuid)
+            ->firstOrFail()->id;
+        $registry->update(['selected_node_id' => $nodeId]);
+        if ($this->cluster->refresh()->syncRegistryNode()) {
+            QueueNodeClusterNetworkRevision::run($this->cluster, auth()->user());
+        }
+        $this->dispatch('success', $nodeId === null
+            ? 'The registry runs on the first available server.'
+            : 'The registry moves to the selected server. Images stored on the previous server are rebuilt on the next deploy.');
     }
 
     public function deleteCluster(mixed $password = null): bool|string

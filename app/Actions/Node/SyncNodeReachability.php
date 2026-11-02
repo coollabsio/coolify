@@ -32,6 +32,10 @@ class SyncNodeReachability
         if ($node->is_ingress && $node->cluster !== null) {
             $this->moveTlsIssuer($node->cluster);
         }
+        // The registry moves when its Node goes offline, unless the user selected that Node.
+        if ($node->cluster?->syncRegistryNode()) {
+            QueueNodeClusterNetworkRevision::run($node->cluster);
+        }
 
         return $isReachable;
     }

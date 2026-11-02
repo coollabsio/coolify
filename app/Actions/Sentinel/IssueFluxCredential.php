@@ -45,6 +45,9 @@ class IssueFluxCredential
             'logs.read.v1',
             'container.logs.v1',
             'trust.bundle.update.v1',
+            'image.build.v1',
+            'builder.reconcile.v1',
+            'registry.reconcile.v1',
         ], $capabilities));
 
         $credential = JWT::encode([

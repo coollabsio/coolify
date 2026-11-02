@@ -437,7 +437,8 @@ class Select extends Component
 
             return;
         }
-        if ($type === 'docker-image' && $this->clusters?->isNotEmpty()) {
+        // Clusters run Docker images and build public Git repositories; Docker servers keep their flow.
+        if (in_array($type, ['docker-image', 'public'], true) && $this->clusters?->isNotEmpty()) {
             $this->current_step = 'targets';
 
             return;
@@ -504,7 +505,7 @@ class Select extends Component
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_uuid' => $this->parameters['environment_uuid'],
-            'type' => 'docker-image',
+            'type' => $this->clusterResourceType(),
             'cluster' => $cluster->uuid,
         ]);
     }
@@ -524,9 +525,15 @@ class Select extends Component
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_uuid' => $this->parameters['environment_uuid'],
-            'type' => 'docker-image',
+            'type' => $this->clusterResourceType(),
             'server' => $node->uuid,
         ]);
+    }
+
+    /** The resource type that a cluster target creates: a Git build or a Docker image. */
+    private function clusterResourceType(): string
+    {
+        return ($this->type ?? null) === 'public' ? 'public' : 'docker-image';
     }
 
     private function findDestination(Server $server, string $destinationUuid): ?object

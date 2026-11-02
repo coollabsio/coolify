@@ -36,6 +36,11 @@ class Create extends Component
 
             return;
         }
+        if ($type->value() === 'public' && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
+            $this->type = 'cluster-git-repository';
+
+            return;
+        }
         if (isset($type) && isset($destination_uuid)) {
             $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {

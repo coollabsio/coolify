@@ -1,7 +1,7 @@
 @props(['section', 'routeParameters'])
 
 @php
-    $activeKey = $section === 'deployment' ? 'deployments' : $section;
+    $activeKey = in_array($section, ['deployment', 'build'], true) ? 'deployments' : $section;
     $menuItems = collect([
         [
             'key' => 'general',

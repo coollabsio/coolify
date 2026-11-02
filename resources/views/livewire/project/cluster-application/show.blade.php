@@ -7,6 +7,7 @@
             'resource-limits' => 'Resource Limits',
             'deployments' => 'Deployments',
             'deployment' => 'Deployment',
+            'build' => 'Build',
             'logs' => 'Logs',
             'servers' => 'Servers',
             'danger' => 'Danger Zone',
@@ -14,6 +15,7 @@
         $isRunning = $status === 'Running';
         $pollInterval = match (true) {
             $section === 'deployment' && $selectedDeployment['isActive'] => '2000ms',
+            $section === 'build' && $selectedBuild?->status?->isFinal() === false => '2000ms',
             in_array($section, ['general', 'deployments', 'deployment'], true) => '10000ms',
             default => null,
         };

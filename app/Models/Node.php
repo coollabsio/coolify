@@ -56,6 +56,7 @@ class Node extends BaseModel
             'network_next_attempt_at' => 'datetime',
             'network_pending_leave' => 'array',
             'is_ingress' => 'boolean',
+            'is_builder' => 'boolean',
         ];
     }
 
@@ -72,6 +73,18 @@ class Node extends BaseModel
     public function cluster(): BelongsTo
     {
         return $this->belongsTo(NodeCluster::class, 'node_cluster_id');
+    }
+
+    /** Whether this Node may build images: the builder role on a Node that runs workloads. */
+    public function canBuild(): bool
+    {
+        return $this->is_builder !== false && ($this->role?->runsWorkloads() ?? true);
+    }
+
+    /** Builds that ran or run on this Node. */
+    public function builds(): HasMany
+    {
+        return $this->hasMany(NodeBuild::class);
     }
 
     public function privateKey(): BelongsTo

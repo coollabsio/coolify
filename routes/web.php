@@ -427,6 +427,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/resource-limits', ClusterApplicationShow::class)->name('project.cluster-application.resource-limits');
             Route::get('/deployments', ClusterApplicationShow::class)->name('project.cluster-application.deployments');
             Route::get('/deployments/{deployment_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.deployment.show');
+            Route::get('/builds/{build_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.build.show');
             Route::get('/logs', ClusterApplicationShow::class)->name('project.cluster-application.logs');
             Route::get('/servers', ClusterApplicationShow::class)->name('project.cluster-application.servers');
             Route::get('/danger', ClusterApplicationShow::class)->name('project.cluster-application.danger');

@@ -276,3 +276,4 @@
 
 ## Measure database reads end to end
 - On PostgreSQL 15, `EXPLAIN (ANALYZE, BUFFERS)` does not detoast or send the selected columns, so a wide `jsonb`/`json`/`text` column does not show in it. Time the full fetch (`psql \timing` with `-o /dev/null`, or PDO `fetchAll`) as well before you blame or rule out an index.
+- A new service on a Node mesh IP needs a cluster firewall rule in both the `input` and the `output` chain, also for traffic from a Node to itself. The cluster firewall drops all other traffic from and to the cluster range.

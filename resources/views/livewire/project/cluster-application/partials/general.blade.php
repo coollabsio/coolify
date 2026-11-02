@@ -73,21 +73,42 @@
 
 <form wire:submit="saveConfiguration" class="flex flex-col gap-6">
     @can('update', $workload)
-        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand" />
+        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,baseDirectory,dockerfileLocation" />
     @endcan
 
     <x-application.settings-section id="cluster-application-build" title="Build & deploy"
         helper="How Coolify deploys the application. Changes create a new revision. A running application applies it automatically within about a minute, or redeploy to apply it now.">
-        <p class="text-sm text-neutral-500 dark:text-fg-dim">Nothing to build. This application deploys a prebuilt Docker image.</p>
-        <x-application.settings-subsection title="Image">
-            <div class="grid gap-4 lg:grid-cols-2">
-                <x-forms.input id="imageName" label="Image" placeholder="nginx" required
-                    canGate="update" :canResource="$workload" />
-                <x-forms.input id="imageTag" label="Tag" placeholder="latest"
-                    canGate="update" :canResource="$workload"
-                    helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')" />
-            </div>
-        </x-application.settings-subsection>
+        @if ($workload->buildsFromSource())
+            <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                Coolify builds this public Git repository with {{ $workload->source_type->label() }} on a builder server of the cluster. Deploy builds the latest commit of the branch.
+            </p>
+            <x-application.settings-subsection title="Source">
+                <div class="grid gap-4">
+                    <x-forms.copy-input label="Repository" :text="$workload->git_repository" />
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input id="gitBranch" label="Branch" required canGate="update" :canResource="$workload" />
+                        <x-forms.input id="baseDirectory" label="Base directory" placeholder="/"
+                            canGate="update" :canResource="$workload"
+                            helper="The directory to build, relative to the repository root." />
+                    </div>
+                    @if ($workload->source_type === \App\Enums\NodeWorkloadSourceType::DOCKERFILE)
+                        <x-forms.input id="dockerfileLocation" label="Dockerfile location" placeholder="Dockerfile"
+                            canGate="update" :canResource="$workload" helper="Relative to the base directory." />
+                    @endif
+                </div>
+            </x-application.settings-subsection>
+        @else
+            <p class="text-sm text-neutral-500 dark:text-fg-dim">Nothing to build. This application deploys a prebuilt Docker image.</p>
+            <x-application.settings-subsection title="Image">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input id="imageName" label="Image" placeholder="nginx" required
+                        canGate="update" :canResource="$workload" />
+                    <x-forms.input id="imageTag" label="Tag" placeholder="latest"
+                        canGate="update" :canResource="$workload"
+                        helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')" />
+                </div>
+            </x-application.settings-subsection>
+        @endif
     </x-application.settings-section>
 
     <x-application.settings-section id="cluster-application-container" title="Container"

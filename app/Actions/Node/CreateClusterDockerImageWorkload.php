@@ -51,31 +51,7 @@ class CreateClusterDockerImageWorkload
         }
 
         return DB::transaction(function () use ($project, $environment, $cluster, $image, $targetNode, $name): array {
-            $availableNodes = $cluster->nodes()
-                ->where('is_usable', true)
-                ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
-                ->onDeployableClusterNetwork()
-                ->with('cluster')
-                ->withCount('workloads')
-                ->orderBy('workloads_count')
-                ->orderBy('id');
-            $node = $targetNode === null
-                ? $availableNodes->get()->first(function (Node $candidate): bool {
-                    try {
-                        EnsureNodeAcceptsDeployment::run($candidate);
-
-                        return true;
-                    } catch (\DomainException) {
-                        return false;
-                    }
-                })
-                : $availableNodes->whereKey($targetNode->id)->first();
-            if ($node === null) {
-                throw new RuntimeException($targetNode === null
-                    ? 'The cluster has no workload server that can accept a deployment.'
-                    : 'The selected server is not available in this cluster.');
-            }
-            EnsureNodeAcceptsDeployment::run($node);
+            $node = self::placementNode($cluster, $targetNode);
 
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,
@@ -93,6 +69,41 @@ class CreateClusterDockerImageWorkload
                 'revision' => $revision,
             ];
         });
+    }
+
+    /**
+     * The worker Node that a new cluster application runs on: the selected one, or the
+     * usable worker with the fewest workloads that accepts a deployment.
+     */
+    public static function placementNode(NodeCluster $cluster, ?Node $targetNode): Node
+    {
+        $availableNodes = $cluster->nodes()
+            ->where('is_usable', true)
+            ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
+            ->onDeployableClusterNetwork()
+            ->with('cluster')
+            ->withCount('workloads')
+            ->orderBy('workloads_count')
+            ->orderBy('id');
+        $node = $targetNode === null
+            ? $availableNodes->get()->first(function (Node $candidate): bool {
+                try {
+                    EnsureNodeAcceptsDeployment::run($candidate);
+
+                    return true;
+                } catch (\DomainException) {
+                    return false;
+                }
+            })
+            : $availableNodes->whereKey($targetNode->id)->first();
+        if ($node === null) {
+            throw new RuntimeException($targetNode === null
+                ? 'The cluster has no workload server that can accept a deployment.'
+                : 'The selected server is not available in this cluster.');
+        }
+        EnsureNodeAcceptsDeployment::run($node);
+
+        return $node;
     }
 
     /**

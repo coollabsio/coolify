@@ -7,6 +7,7 @@ use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Cache;
 
 class NodeCluster extends BaseModel
@@ -50,6 +51,52 @@ class NodeCluster extends BaseModel
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    /** The image registry of this cluster (decision 0006). */
+    public function registry(): HasOne
+    {
+        return $this->hasOne(NodeRegistry::class);
+    }
+
+    /**
+     * The Node that should run the registry: the one the user selected, also while it is
+     * offline, or else the first Node by ID that can receive commands and run the registry.
+     */
+    public function desiredRegistryNode(): ?Node
+    {
+        $registry = $this->registry;
+        if ($registry === null) {
+            return null;
+        }
+        if ($registry->selected_node_id !== null) {
+            return $registry->selectedNode;
+        }
+
+        return $this->nodes()
+            ->orderBy('id')
+            ->get()
+            ->first(fn (Node $node): bool => $node->canReceiveNetworkCommands()
+                && $node->supportsCapability(NodeRegistry::CAPABILITY) === true);
+    }
+
+    /**
+     * Records the desired registry Node. Returns whether it changed; the caller then applies a
+     * network revision, so the previous Node stops zot and every Node opens the new address.
+     */
+    public function syncRegistryNode(): bool
+    {
+        $registry = $this->registry;
+        if ($registry === null) {
+            return false;
+        }
+        $nodeId = $this->desiredRegistryNode()?->id;
+        if ($registry->node_id === $nodeId) {
+            return false;
+        }
+        $registry->update(['node_id' => $nodeId]);
+
+        return true;
     }
 
     public function nodes(): HasMany

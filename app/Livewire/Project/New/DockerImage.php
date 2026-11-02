@@ -52,7 +52,29 @@ class DockerImage extends Component
                 ? 'cluster:'.$clusterUuid
                 : (is_string($destinationUuid) && $destinationUuid !== '' ? 'destination:'.$destinationUuid : ''));
 
-        $this->deploymentTargets = ! nodesEnabled() ? [] : NodeCluster::query()
+        $this->deploymentTargets = self::clusterDeploymentTargets();
+
+        if (is_string($destinationUuid) && $destinationUuid !== '') {
+            $destination = find_resource_destination_for_current_team($destinationUuid);
+            if ($destination !== null) {
+                $this->deploymentTargets[] = [
+                    'value' => 'destination:'.$destination->uuid,
+                    'label' => $destination->server->name.' · Docker server',
+                    'disabled' => false,
+                ];
+            }
+        }
+    }
+
+    /**
+     * Cluster targets for a new cluster application: automatic placement in a cluster, or one
+     * of its servers.
+     *
+     * @return array<int, array{value: string, label: string, disabled: bool}>
+     */
+    public static function clusterDeploymentTargets(): array
+    {
+        return ! nodesEnabled() ? [] : NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->with(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
@@ -89,17 +111,28 @@ class DockerImage extends Component
             })
             ->values()
             ->all();
+    }
 
-        if (is_string($destinationUuid) && $destinationUuid !== '') {
-            $destination = find_resource_destination_for_current_team($destinationUuid);
-            if ($destination !== null) {
-                $this->deploymentTargets[] = [
-                    'value' => 'destination:'.$destination->uuid,
-                    'label' => $destination->server->name.' · Docker server',
-                    'disabled' => false,
-                ];
-            }
-        }
+    /**
+     * The cluster and optional server of a `cluster:` or `node:` target, owned by the project team.
+     *
+     * @return array{0: NodeCluster, 1: ?Node}
+     */
+    public static function resolveClusterTarget(Project $project, string $targetType, string $targetUuid): array
+    {
+        $targetNode = $targetType === 'node'
+            ? Node::query()
+                ->where('team_id', $project->team_id)
+                ->where('uuid', $targetUuid)
+                ->whereNotNull('node_cluster_id')
+                ->firstOrFail()
+            : null;
+        $cluster = $targetNode?->cluster ?? NodeCluster::query()
+            ->where('team_id', $project->team_id)
+            ->where('uuid', $targetUuid)
+            ->firstOrFail();
+
+        return [$cluster, $targetNode];
     }
 
     /**
@@ -193,17 +226,7 @@ class DockerImage extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             $this->authorize('create', NodeWorkload::class);
-            $targetNode = $targetType === 'node'
-                ? Node::query()
-                    ->where('team_id', $project->team_id)
-                    ->where('uuid', $targetUuid)
-                    ->whereNotNull('node_cluster_id')
-                    ->firstOrFail()
-                : null;
-            $cluster = $targetNode?->cluster ?? NodeCluster::query()
-                ->where('team_id', $project->team_id)
-                ->where('uuid', $targetUuid)
-                ->firstOrFail();
+            [$cluster, $targetNode] = self::resolveClusterTarget($project, $targetType, $targetUuid);
             $created = CreateClusterDockerImageWorkload::run(
                 $project,
                 $environment,

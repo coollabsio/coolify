@@ -1,7 +1,7 @@
 @php
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $canCreateNode = auth()->user()->can('create', App\Models\Node::class);
-    $nodeGridClasses = 'grid min-w-[600px] grid-cols-[minmax(0,1fr)_7rem_7rem_6rem_9rem] items-center gap-3 px-4';
+    $nodeGridClasses = 'grid min-w-[820px] grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_16rem] items-center gap-3 px-4';
 @endphp
 
 <x-application.settings-section id="node-cluster-nodes-section" title="Servers"
@@ -55,7 +55,7 @@
                 <div>Server</div>
                 <div>Status</div>
                 <div>Network</div>
-                <div>Ingress</div>
+                <div>Roles</div>
                 <div></div>
             </div>
             @foreach ($nodes as $node)
@@ -110,6 +110,15 @@
                             'pending' => 'warning',
                             default => 'neutral',
                         }" />
+                        @if ($cluster->registry?->node_id === $node->id)
+                            <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint">Image registry</p>
+                        @endif
+                        @if ($cluster->registry !== null && $node->canBuild())
+                            <p class="mt-1 truncate text-[11px] {{ data_get($node->metadata, 'build_error') ? 'text-red-500' : 'text-neutral-500 dark:text-fg-faint' }}"
+                                title="{{ data_get($node->metadata, 'build_error') }}">
+                                {{ data_get($node->metadata, 'build_error') ? 'Builder error' : (data_get($node->metadata, 'builder_running') ? 'Builder' : 'Builder pending') }}
+                            </p>
+                        @endif
                         @if ($node->is_ingress && data_get($node->metadata, 'ingress_tls_enabled') === true)
                             <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                 HTTPS{{ $cluster->ingress_tls_issuer_node_id === $node->id ? ' · Certificate issuer' : '' }}
@@ -122,6 +131,11 @@
                                 wire:loading.attr="disabled" wire:target="setIngress"
                                 title="{{ $node->is_ingress ? 'Stop serving public traffic on this server.' : 'Serve public traffic for cluster applications on ports 80 and 443 of this server.' }}">
                                 {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
+                            </x-forms.button>
+                            <x-forms.button wire:click="setBuilder('{{ $node->uuid }}', {{ $node->is_builder ? 'false' : 'true' }})"
+                                wire:loading.attr="disabled" wire:target="setBuilder"
+                                title="{{ $node->is_builder ? 'Stop building images on this server and remove its build cache.' : 'Build images of Git applications on this server.' }}">
+                                {{ $node->is_builder ? 'Turn off builds' : 'Turn on builds' }}
                             </x-forms.button>
                         @endif
                     </div>

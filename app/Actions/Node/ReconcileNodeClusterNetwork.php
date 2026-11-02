@@ -2,11 +2,13 @@
 
 namespace App\Actions\Node;
 
+use App\Actions\Node\Build\EnsureNodeRegistry;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -200,6 +202,13 @@ class ReconcileNodeClusterNetwork
             $fluxProbeHost = parse_url((string) config('constants.flux.public_url'), PHP_URL_HOST) ?: '';
             $firewallRules = $this->firewallRules($cluster);
             $ingressRules = $this->ingressRules($cluster);
+            // The registry exists once the cluster has a Git workload. Its certificate is renewed here.
+            $registry = $cluster->registry()->exists() ? EnsureNodeRegistry::run($cluster) : null;
+            if ($registry !== null && $registry->node_id === null) {
+                $cluster->syncRegistryNode();
+                $registry->refresh();
+            }
+            $registryIp = $registry?->node?->wireguard_ip;
             $workloadCidrs = $members->pluck('workload_cidr')->filter()->values()->all();
             $ingressRoutes = [];
             $workloadNames = [];
@@ -239,6 +248,7 @@ class ReconcileNodeClusterNetwork
                         'workload_cidrs' => $workloadCidrs,
                         'rules' => $firewallRules,
                         'ingress_rules' => $ingressRules,
+                        ...($registryIp !== null ? ['registry_ip' => $registryIp] : []),
                     ]);
                     $operations[] = $this->runOperation($node, $user, $attempt, 'discovery.corrosion.reconcile.v1', [
                         'version' => self::CORROSION_VERSION,
@@ -300,6 +310,14 @@ class ReconcileNodeClusterNetwork
                 } catch (Throwable $exception) {
                     $failures[$nodeId] = $exception->getMessage();
                     unset($applied[$nodeId]);
+                }
+            }
+
+            // Builds come after the network. A failed registry or builder only stops builds on that
+            // Node; routing and DNS stay converged.
+            if ($registry !== null) {
+                foreach ($applied as $node) {
+                    $this->reconcileBuilds($registry, $node->refresh(), $user, $attempt);
                 }
             }
 
@@ -371,6 +389,47 @@ class ReconcileNodeClusterNetwork
         }
 
         return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, $request, $secrets);
+    }
+
+    /**
+     * Installs the registry trust on a Node, runs zot on the registry Node, then converges
+     * BuildKit. Errors are recorded on the Node and do not fail its network.
+     */
+    private function reconcileBuilds(NodeRegistry $registry, Node $node, User $user, string $attempt): void
+    {
+        if ($node->supportsCapability(NodeRegistry::CAPABILITY) !== true) {
+            return;
+        }
+        try {
+            $request = [
+                'ca_pem' => $registry->ca_certificate_pem,
+                'pull_username' => NodeRegistry::PULL_USERNAME,
+            ];
+            $secrets = ['pull_password' => $registry->pull_password];
+            if ($registry->node_id === $node->id) {
+                // The stored request keeps only the settings; the key and passwords are sent, not stored.
+                $request['server'] = ['push_username' => NodeRegistry::PUSH_USERNAME, 'keep_tags' => $registry->keep_tags];
+                $secrets['server'] = [
+                    'certificate_pem' => $registry->certificate_pem,
+                    'private_key_pem' => $registry->private_key_pem,
+                    'htpasswd' => $registry->htpasswd,
+                    'push_username' => NodeRegistry::PUSH_USERNAME,
+                    'keep_tags' => $registry->keep_tags,
+                ];
+            }
+            $this->runOperation($node, $user, $attempt, NodeRegistry::CAPABILITY, $request, $secrets);
+
+            if ($node->supportsCapability(NodeRegistry::BUILDER_CAPABILITY) !== true) {
+                return;
+            }
+            $enabled = $node->canBuild() && $registry->node_id !== null;
+            $this->runOperation($node, $user, $attempt, NodeRegistry::BUILDER_CAPABILITY, [
+                'enabled' => $enabled,
+                ...($enabled ? ['push_username' => NodeRegistry::PUSH_USERNAME] : []),
+            ], $enabled ? ['push_password' => $registry->push_password] : []);
+        } catch (Throwable $exception) {
+            $node->mergeMetadata(['build_error' => mb_substr($exception->getMessage(), 0, 2000)]);
+        }
     }
 
     /**
@@ -541,7 +600,9 @@ class ReconcileNodeClusterNetwork
             throw new RuntimeException('Flux internal API configuration is incomplete.');
         }
         $path = Str::beforeLast($operation->command_type, '.v1');
-        $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(180)
+        // The registry and builder commands can pull their images first.
+        $timeout = in_array($operation->command_type, [NodeRegistry::CAPABILITY, NodeRegistry::BUILDER_CAPABILITY], true) ? 660 : 180;
+        $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout($timeout)
             ->post(rtrim($url, '/').'/v1/commands/'.$path, [
                 'server_id' => $operation->node->uuid,
                 'command_id' => $operation->uuid,
@@ -569,6 +630,11 @@ class ReconcileNodeClusterNetwork
                 && data_get($result, 'listen_port') === data_get($operation->request, 'listen_port')
                 && filled(data_get($result, 'public_key'))
                 && count(data_get($result, 'peers', [])) === count(data_get($operation->request, 'peers', [])),
+            NodeRegistry::CAPABILITY => data_get($result, 'trust_installed') === true
+                && data_get($result, 'server_running') === (data_get($operation->request, 'server') !== null)
+                && data_get($result, 'registry_host') === NodeRegistry::HOST,
+            NodeRegistry::BUILDER_CAPABILITY => data_get($result, 'enabled') === data_get($operation->request, 'enabled')
+                && data_get($result, 'running') === data_get($operation->request, 'enabled'),
             'network.firewall.reconcile.v1' => data_get($result, 'rollback_cancelled') === true
                 && data_get($result, 'ingress_enforced') === true
                 && data_get($result, 'drifted') === false
@@ -617,6 +683,16 @@ class ReconcileNodeClusterNetwork
             'network.firewall.reconcile.v1' => $node->mergeMetadata([
                 'firewall_applied_revision' => data_get($result, 'applied_revision'),
                 'firewall_configuration_hash' => data_get($result, 'configuration_hash'),
+            ]),
+            NodeRegistry::CAPABILITY => $node->mergeMetadata([
+                'registry_trust_installed' => true,
+                'registry_server_running' => (bool) data_get($result, 'server_running'),
+            ]),
+            NodeRegistry::BUILDER_CAPABILITY => $node->mergeMetadata([
+                'builder_enabled' => (bool) data_get($result, 'enabled'),
+                'builder_running' => (bool) data_get($result, 'running'),
+                'builder_apparmor_profile' => (bool) data_get($result, 'apparmor_profile'),
+                'build_error' => null,
             ]),
             self::INGRESS_CAPABILITY => $node->mergeMetadata([
                 'ingress_enabled' => data_get($result, 'enabled'),

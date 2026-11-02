@@ -638,7 +638,7 @@
     @endif
     @if ($current_step === 'targets')
         <x-application.settings-section title="Select a deployment target"
-            description="Deploy this Docker image to a cluster or a Docker server." flush>
+            description="{{ $type === 'public' ? 'Build this Git repository on a cluster, or deploy it to a Docker server.' : 'Deploy this Docker image to a cluster or a Docker server.' }}" flush>
             <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
                 @foreach($clusters ?? [] as $cluster)
                     <button type="button" wire:click="setCluster('{{ $cluster->uuid }}')"

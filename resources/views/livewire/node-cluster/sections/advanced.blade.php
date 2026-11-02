@@ -45,6 +45,32 @@
     </form>
 </x-application.settings-section>
 
+@if ($cluster->registry)
+    <x-application.settings-section id="node-cluster-registry-section" title="Image registry"
+        helper="Git applications push their images to the registry of the cluster. By default it runs on the first available server and moves when that server is offline. A selected server is kept, also while it is offline.">
+        @php
+            $registryOptions = collect([['value' => '', 'label' => 'Automatic (first available server)']])
+                ->concat($cluster->nodes->sortBy('id')->map(fn ($node) => ['value' => $node->uuid, 'label' => $node->name]))
+                ->values()->all();
+            $selectedRegistryNode = $cluster->registry->selectedNode?->uuid ?? '';
+        @endphp
+        <div class="flex flex-col gap-3">
+            <p class="text-sm text-neutral-600 dark:text-fg-dim">
+                Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? 'No available server' }}</span>
+            </p>
+            @if ($canUpdateCluster)
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($registryOptions as $option)
+                        <x-forms.button wire:click="setRegistryNode('{{ $option['value'] }}')"
+                            wire:loading.attr="disabled" wire:target="setRegistryNode"
+                            :isHighlighted="$selectedRegistryNode === $option['value']">{{ $option['label'] }}</x-forms.button>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    </x-application.settings-section>
+@endif
+
 <x-application.settings-section id="node-cluster-troubleshooting-section" title="Troubleshooting"
     helper="Use repair only when servers lost their private network connection and a sync cannot reach them." flush>
     @if ($canUpdateCluster)

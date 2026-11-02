@@ -1,0 +1,204 @@
+<?php
+
+namespace App\Actions\Node\Build;
+
+use App\Enums\NodeBuildStatus;
+use App\Models\Node;
+use App\Models\NodeBuild;
+use App\Models\NodeBuildLogLine;
+use App\Models\NodeRegistry;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
+use Lorisleiva\Actions\Concerns\AsAction;
+use RuntimeException;
+use Throwable;
+
+/**
+ * Runs the build container on the builder Node and follows it until it ends.
+ * Sentinel only starts the container (`image.build.v1`). The state comes from
+ * `container.list` and the output from `container.logs`. The last line of a
+ * successful build carries the image digest.
+ */
+class RunImageBuild
+{
+    use AsAction;
+
+    private const POLL_SECONDS = 3;
+
+    private const RESULT_PREFIX = 'COOLIFY_BUILD_RESULT ';
+
+    /**
+     * @param  array{source_type: string, dockerfile_path?: string}  $source
+     * @return string The image digest, `sha256:...`.
+     */
+    public function handle(NodeBuild $build, Node $node, array $source): string
+    {
+        $build->update([
+            'node_id' => $node->id,
+            'status' => NodeBuildStatus::RUNNING,
+            'started_at' => now(),
+            'image' => NodeRegistry::imageReference($build->workload, $build->uuid),
+        ]);
+        self::flux('image.build', [
+            'server_id' => $node->uuid,
+            'command_id' => (string) Str::uuid(),
+            'build_id' => $build->uuid,
+            'builder_image' => (string) config('constants.node.builder_image'),
+            'repository_url' => $build->git_repository,
+            'commit_sha' => $build->commit_sha,
+            'base_directory' => trim((string) $build->base_directory, '/'),
+            'image' => $build->image,
+            'dockerfile_path' => '',
+            ...$source,
+        ], 660);
+
+        $deadline = now()->addMinutes((int) config('constants.node.build_timeout_minutes'));
+        try {
+            while (true) {
+                $state = $this->containerState($node, $build);
+                $this->appendLogs($node, $build);
+                if ($state !== null && ! in_array($state, ['created', 'running', 'configured', 'initialized', 'stopping'], true)) {
+                    break;
+                }
+                if ($build->refresh()->status === NodeBuildStatus::CANCELLED) {
+                    throw new RuntimeException('The build was cancelled.');
+                }
+                if (now()->greaterThan($deadline)) {
+                    $this->lifecycle($node, $build, 'stop');
+                    throw new RuntimeException('The build did not finish within '.config('constants.node.build_timeout_minutes').' minutes.');
+                }
+                Sleep::sleep(self::POLL_SECONDS);
+            }
+            // The container exited; read what it wrote after the last poll.
+            $this->appendLogs($node, $build);
+        } finally {
+            $this->removeContainer($node, $build);
+        }
+
+        $last = $build->logLines()->latest('id')->value('line');
+        $result = is_string($last) && str_starts_with($last, self::RESULT_PREFIX)
+            ? json_decode(substr($last, strlen(self::RESULT_PREFIX)), true)
+            : null;
+        $digest = is_array($result) ? ($result['digest'] ?? null) : null;
+        if (! is_string($digest) || preg_match('/^sha256:[0-9a-f]{64}$/', $digest) !== 1) {
+            throw new RuntimeException('The build failed. See the build log for the reason.');
+        }
+
+        return $digest;
+    }
+
+    private function containerState(Node $node, NodeBuild $build): ?string
+    {
+        $result = self::flux('container.list', ['server_id' => $node->uuid]);
+        $container = collect(data_get($result, 'containers', []))
+            ->first(fn ($container): bool => data_get($container, 'name') === $build->containerName());
+
+        return $container === null ? 'missing' : strtolower((string) data_get($container, 'state'));
+    }
+
+    /** Appends the lines that are newer than the stored cursor. */
+    private function appendLogs(Node $node, NodeBuild $build): void
+    {
+        $payload = [
+            'server_id' => $node->uuid,
+            'command_id' => (string) Str::uuid(),
+            'name' => $build->containerName(),
+            'lines' => 10_000,
+        ];
+        $cursor = $build->log_cursor;
+        if ($cursor !== null) {
+            // Seconds only: lines of the cursor second come again and are skipped below.
+            $payload['since_unix_seconds'] = (int) substr($cursor, 0, 10);
+        }
+        $result = self::flux('container.logs', $payload);
+        $rows = [];
+        foreach (preg_split('/\R/', (string) data_get($result, 'logs', '')) ?: [] as $raw) {
+            [$timestamp, $line] = array_pad(explode(' ', $raw, 2), 2, '');
+            $key = self::sortKey($timestamp);
+            if ($key === null || ($cursor !== null && strcmp($key, $cursor) <= 0)) {
+                continue;
+            }
+            $rows[] = [
+                'node_build_id' => $build->id,
+                'logged_at' => CarbonImmutable::createFromTimestampUTC(substr($key, 0, 10).'.'.substr($key, 11, 6)),
+                'line' => mb_substr($line, 0, 10_000),
+            ];
+            $cursor = $key;
+        }
+        if ($rows !== []) {
+            foreach (array_chunk($rows, 500) as $chunk) {
+                NodeBuildLogLine::query()->insert($chunk);
+            }
+            $build->update(['log_cursor' => $cursor]);
+        }
+    }
+
+    /**
+     * `<unix seconds, 10 digits>.<nanoseconds, 9 digits>` of an RFC 3339 time, so that string
+     * order is time order. Null when the text is not a time.
+     */
+    public static function sortKey(string $timestamp): ?string
+    {
+        if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/', $timestamp, $match) !== 1) {
+            return null;
+        }
+        try {
+            $seconds = (new \DateTimeImmutable($match[1].$match[3]))->getTimestamp();
+        } catch (Throwable) {
+            return null;
+        }
+
+        return sprintf('%010d.%s', $seconds, str_pad($match[2] ?? '', 9, '0'));
+    }
+
+    private function lifecycle(Node $node, NodeBuild $build, string $action): void
+    {
+        self::flux('workload.lifecycle', [
+            'server_id' => $node->uuid,
+            'command_id' => (string) Str::uuid(),
+            'name' => $build->containerName(),
+            'action' => $action,
+        ], 150);
+    }
+
+    /** The log is stored in Coolify, so the container can go. */
+    private function removeContainer(Node $node, NodeBuild $build): void
+    {
+        try {
+            $this->lifecycle($node, $build, 'remove');
+        } catch (Throwable) {
+            // A leftover build container has no restart policy and only uses disk until removed.
+        }
+    }
+
+    /**
+     * Sends one direct command through the Flux internal API and returns its JSON result.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public static function flux(string $verb, array $payload, int $timeout = 30): array
+    {
+        $url = config('constants.flux.internal_url');
+        $token = config('constants.flux.internal_token');
+        if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {
+            throw new RuntimeException('Flux internal API configuration is incomplete.');
+        }
+        $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout($timeout)
+            ->post(rtrim($url, '/').'/v1/commands/'.$verb, $payload);
+        if ($response->failed()) {
+            $reason = trim(mb_substr($response->body(), 0, 1000));
+            throw new RuntimeException($response->status() === 409
+                ? "The server does not support {$verb}. Upgrade Sentinel and try again."
+                : ($reason === '' ? "Flux rejected {$verb} with HTTP {$response->status()}." : $reason));
+        }
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw new RuntimeException("Flux returned an invalid {$verb} result.");
+        }
+
+        return $data;
+    }
+}
