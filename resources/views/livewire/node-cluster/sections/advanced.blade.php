@@ -54,10 +54,24 @@
                 ->values()->all();
             $selectedRegistryNode = $cluster->registry->selectedNode?->uuid ?? '';
         @endphp
-        <div class="flex flex-col gap-3">
-            <p class="text-sm text-neutral-600 dark:text-fg-dim">
-                Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? 'No available server' }}</span>
-            </p>
+        <div class="flex flex-col gap-3" wire:init="loadRegistryReport">
+            <div class="flex flex-wrap items-center gap-3">
+                <p class="text-sm text-neutral-600 dark:text-fg-dim">
+                    Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? 'No available server' }}</span>
+                </p>
+                @if ($registryReport === null)
+                    <x-status-badge label="Checking" type="neutral" spinning />
+                @elseif ($registryReport['healthy'] === true)
+                    <x-status-badge label="Healthy" type="success" />
+                @elseif ($registryReport['healthy'] === false)
+                    <x-status-badge label="Unhealthy" type="error" />
+                @endif
+                <x-forms.button class="ml-auto" wire:click="loadRegistryReport" wire:loading.attr="disabled"
+                    wire:target="loadRegistryReport">Refresh</x-forms.button>
+            </div>
+            @if (filled($registryReport['error'] ?? null))
+                <x-callout type="danger" title="The registry does not answer">{{ $registryReport['error'] }}</x-callout>
+            @endif
             @if ($canUpdateCluster)
                 <div class="flex flex-wrap gap-2">
                     @foreach ($registryOptions as $option)
@@ -66,6 +80,66 @@
                             :isHighlighted="$selectedRegistryNode === $option['value']">{{ $option['label'] }}</x-forms.button>
                     @endforeach
                 </div>
+            @endif
+            @if ($registryReport !== null)
+                <x-application.settings-subsection title="Disk use">
+                    <div class="data-table">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-xs text-neutral-500 dark:text-fg-faint">
+                                    <th class="py-2 pr-4 font-medium">Server</th>
+                                    <th class="py-2 pr-4 font-medium">Registry</th>
+                                    <th class="py-2 pr-4 font-medium">Build cache</th>
+                                    <th class="py-2 font-medium">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($registryReport['nodes'] as $row)
+                                    <tr wire:key="registry-node-{{ $row['name'] }}" class="border-t border-neutral-200 dark:border-white/[0.07]">
+                                        <td class="py-2 pr-4 font-medium text-black dark:text-fg">{{ $row['name'] }}</td>
+                                        <td class="py-2 pr-4">{{ $row['registry_running'] || $row['registry_bytes'] > 0 ? formatBytes($row['registry_bytes'], 1) : '–' }}</td>
+                                        <td class="py-2 pr-4">{{ $row['builder_running'] || $row['build_cache_bytes'] > 0 ? formatBytes($row['build_cache_bytes'], 1) : '–' }}</td>
+                                        <td class="py-2 text-neutral-500 dark:text-fg-dim">
+                                            {{ $row['error'] ?? collect([$row['registry_running'] ? 'Registry' : null, $row['builder_running'] ? 'Builder' : null])->filter()->implode(' · ') ?: 'Not used' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </x-application.settings-subsection>
+                <x-application.settings-subsection title="Images">
+                    @forelse ($registryReport['repositories'] as $repository)
+                        <div wire:key="registry-repository-{{ $repository['name'] }}" class="border-t border-neutral-200 py-3 first:border-t-0 dark:border-white/[0.07]">
+                            <div class="flex flex-wrap items-baseline gap-2">
+                                @if ($repository['workload'] && $repository['workload']['project_uuid'] && $repository['workload']['environment_uuid'])
+                                    <a class="text-sm font-medium text-black underline-offset-2 hover:underline dark:text-fg" {{ wireNavigate() }}
+                                        href="{{ route('project.cluster-application.show', ['project_uuid' => $repository['workload']['project_uuid'], 'environment_uuid' => $repository['workload']['environment_uuid'], 'workload_uuid' => $repository['workload']['uuid']]) }}">{{ $repository['workload']['name'] }}</a>
+                                @else
+                                    <span class="text-sm font-medium text-black dark:text-fg">Deleted application</span>
+                                @endif
+                                <span class="font-mono text-xs text-neutral-500 dark:text-fg-faint">{{ $repository['name'] }}</span>
+                                <span class="text-xs text-neutral-500 dark:text-fg-faint">· {{ count($repository['tags']) }} {{ Str::plural('image', count($repository['tags'])) }}</span>
+                            </div>
+                            <ul class="mt-2 space-y-1">
+                                @foreach ($repository['tags'] as $tag)
+                                    <li wire:key="registry-tag-{{ $repository['name'] }}-{{ $tag['tag'] }}" class="flex flex-wrap items-center gap-2 text-xs">
+                                        <span class="font-mono text-neutral-700 dark:text-fg-dim">{{ $tag['tag'] }}</span>
+                                        <span class="font-mono text-neutral-400 dark:text-fg-faint">{{ $tag['digest'] ? Str::limit($tag['digest'], 19, '') : 'digest unknown' }}</span>
+                                        @if ($tag['deployed'])
+                                            <x-status-badge label="Deployed" type="success" />
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @empty
+                        <p class="text-sm text-neutral-500 dark:text-fg-dim">{{ $registryReport['healthy'] ? 'The registry stores no images yet.' : 'The image list is not available.' }}</p>
+                    @endforelse
+                    @if ($registryReport['truncated'])
+                        <p class="mt-2 text-xs text-neutral-500 dark:text-fg-faint">Showing the first 100 repositories and 50 images of each.</p>
+                    @endif
+                </x-application.settings-subsection>
             @endif
         </div>
     </x-application.settings-section>

@@ -3,6 +3,7 @@
 namespace App\Livewire\NodeCluster;
 
 use App\Actions\Node\AssignNodeToCluster;
+use App\Actions\Node\Build\InspectNodeRegistry;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
@@ -46,6 +47,9 @@ class Show extends Component
     ];
 
     public NodeCluster $cluster;
+
+    /** @var array<string, mixed>|null The image registry report; loaded after the page renders. */
+    public ?array $registryReport = null;
 
     #[Locked]
     public string $section = 'general';
@@ -206,6 +210,16 @@ class Show extends Component
         }
         $this->cluster->refresh();
         $this->dispatch('success', $enabled ? "Builds turned on for {$node->name}." : "Builds turned off for {$node->name}.");
+    }
+
+    /** Loads the image registry report from the Nodes. The Image registry section calls it on load. */
+    public function loadRegistryReport(): void
+    {
+        $this->authorize('view', $this->cluster);
+        if ($this->cluster->registry === null) {
+            return;
+        }
+        $this->registryReport = InspectNodeRegistry::run($this->cluster);
     }
 
     /** Selects the Node that runs the image registry, or clears the selection for automatic. */

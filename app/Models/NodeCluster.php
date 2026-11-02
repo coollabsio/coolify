@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 class NodeCluster extends BaseModel
@@ -59,9 +60,14 @@ class NodeCluster extends BaseModel
         return $this->hasOne(NodeRegistry::class);
     }
 
+    /** How long the registry Node may be unreachable before the registry moves automatically. */
+    public const REGISTRY_MOVE_AFTER_MINUTES = 10;
+
     /**
-     * The Node that should run the registry: the one the user selected, also while it is
-     * offline, or else the first Node by ID that can receive commands and run the registry.
+     * The Node that should run the registry. A selected Node is kept, also while it is offline.
+     * Otherwise the registry stays on its current Node; it moves to the first available Node by
+     * ID only after the current Node was unreachable for REGISTRY_MOVE_AFTER_MINUTES, because a
+     * move starts an empty registry. It does not move back when the old Node returns.
      */
     public function desiredRegistryNode(): ?Node
     {
@@ -72,12 +78,27 @@ class NodeCluster extends BaseModel
         if ($registry->selected_node_id !== null) {
             return $registry->selectedNode;
         }
+        $available = fn (Node $node): bool => $node->canReceiveNetworkCommands()
+            && $node->supportsCapability(NodeRegistry::CAPABILITY) === true;
+        $current = $registry->node;
+        $awayKey = "node-registry:{$registry->id}:unreachable-since";
+        if ($current !== null && $current->node_cluster_id === $this->id) {
+            if ($available($current)) {
+                Cache::forget($awayKey);
 
-        return $this->nodes()
-            ->orderBy('id')
-            ->get()
-            ->first(fn (Node $node): bool => $node->canReceiveNetworkCommands()
-                && $node->supportsCapability(NodeRegistry::CAPABILITY) === true);
+                return $current;
+            }
+            $since = Cache::get($awayKey);
+            if (! is_string($since)) {
+                Cache::put($awayKey, $since = now()->toIso8601String(), now()->addDay());
+            }
+            if (Carbon::parse($since)->isAfter(now()->subMinutes(self::REGISTRY_MOVE_AFTER_MINUTES))) {
+                return $current;
+            }
+        }
+        Cache::forget($awayKey);
+
+        return $this->nodes()->orderBy('id')->get()->first($available);
     }
 
     /**

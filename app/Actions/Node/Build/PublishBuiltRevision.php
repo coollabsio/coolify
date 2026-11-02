@@ -40,8 +40,10 @@ class PublishBuiltRevision
         $build->update(['image_digest' => $digest, 'node_workload_revision_id' => $revision->id]);
 
         foreach ($build->workload->nodes()->get() as $node) {
-            $operation = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing');
-            DeployNodeWorkloadJob::dispatch($operation->id);
+            $deployment = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing');
+            if ($deployment['created']) {
+                DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+            }
         }
 
         return $revision;

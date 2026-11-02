@@ -26,6 +26,9 @@ class NodeRegistry extends BaseModel
     /** Runs BuildKit on a builder Node. */
     public const BUILDER_CAPABILITY = 'builder.reconcile.v1';
 
+    /** Reports registry health, contents, and disk use (read only). */
+    public const INSPECT_CAPABILITY = 'registry.inspect.v1';
+
     /** Starts one build container. */
     public const BUILD_CAPABILITY = 'image.build.v1';
 

@@ -91,10 +91,17 @@ nginx template) are copied into v5 classes.
 ### Cluster registry
 
 - One zot registry for each cluster, on one Node. By default this is the first
-  active Node by ID. Coolify moves the registry when that Node is offline. A
-  user can select a Node instead. Coolify does not move a selected Node; it
-  shows a warning, and builds fail until the Node is back or the user clears
-  the selection. A move loses the stored images. The next deploy rebuilds them.
+  active Node by ID. The registry stays on its Node while that Node is
+  reachable. Coolify moves it only after the Node was unreachable for 10
+  minutes, and does not move it back when the Node returns. A user can select
+  a Node instead. Coolify does not move a selected Node; builds fail until the
+  Node is back or the user clears the selection.
+- A move starts an empty registry on the new Node. The next deploy of each
+  application rebuilds its image. The previous Node stops zot but keeps its
+  image volume, so a role that returns finds its images again.
+- The Image registry section of the cluster shows the registry health, the
+  disk use of the registry and the build cache on each Node, and the images
+  of each application (`registry.inspect.v1`, read only).
 - The name is `registry.cluster.coolify.internal:5443`. The registry Node
   publishes an endpoint row in the `cluster` namespace while zot runs, and
   Sentinel discovery DNS answers it like a Node name. zot listens on the mesh
@@ -153,6 +160,25 @@ used BuildKit v0.34.1, Railpack v0.43.0, and zot v2.1.23:
   containers continue when it is offline.
 - Every builder Node uses disk for the build cache. The limit and the Node page
   make this visible.
+
+## Before release
+
+For now, cluster applications use the cluster registry (zot) for built images,
+and pull other images only from public registries. These items must be done
+before v5 ships:
+
+- [ ] **Private registry pulls.** v4 runs `docker login` on each server over SSH
+  (Server → Docker Registries). Nodes have no Docker and no SSH deploy path, so
+  v5 needs its own flow: registry credentials for each team in Coolify
+  (encrypted), and an optional registry auth on `workload.deploy` that Sentinel
+  passes to Podman as a temporary `--authfile` and never journals. The v4
+  logins cannot be imported, because they exist only on each v4 server.
+- [ ] **Push built images to an external registry** (the v4 "Docker registry
+  image name" setting), as an extra target next to the cluster registry.
+- [ ] **Release Sentinel and Flux** with the build and registry commands. The
+  latest Sentinel release does not have them, and **Upgrade Sentinel** installs
+  that release. Add the `coolify-builder` image to the Sentinel `release.yaml`
+  workflow; today only `release-main.yaml` publishes it.
 
 ## Left open
 

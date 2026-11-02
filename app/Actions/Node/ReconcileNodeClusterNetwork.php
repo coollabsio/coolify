@@ -422,7 +422,8 @@ class ReconcileNodeClusterNetwork
             if ($node->supportsCapability(NodeRegistry::BUILDER_CAPABILITY) !== true) {
                 return;
             }
-            $enabled = $node->canBuild() && $registry->node_id !== null;
+            // Not tied to the registry Node: a registry move must not remove a build cache.
+            $enabled = $node->canBuild();
             $this->runOperation($node, $user, $attempt, NodeRegistry::BUILDER_CAPABILITY, [
                 'enabled' => $enabled,
                 ...($enabled ? ['push_username' => NodeRegistry::PUSH_USERNAME] : []),

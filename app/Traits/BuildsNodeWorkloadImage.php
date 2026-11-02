@@ -62,8 +62,15 @@ trait BuildsNodeWorkloadImage
                 throw $exception;
             }
             $digest = RunImageBuild::run($build, $node, $this->source($build));
+            // A cancel that arrives while the image is pushed wins: the image is not deployed.
+            if ($build->refresh()->status === NodeBuildStatus::CANCELLED) {
+                return;
+            }
             PublishBuiltRevision::run($build, $digest);
-            $build->update(['status' => NodeBuildStatus::SUCCEEDED, 'finished_at' => now(), 'error' => null]);
+            NodeBuild::query()
+                ->whereKey($build->id)
+                ->whereIn('status', NodeBuildStatus::activeValues())
+                ->update(['status' => NodeBuildStatus::SUCCEEDED, 'finished_at' => now(), 'error' => null]);
         } catch (Throwable $exception) {
             $this->markFailed($build, $exception->getMessage());
         }
