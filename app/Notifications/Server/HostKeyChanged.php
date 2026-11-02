@@ -97,6 +97,6 @@ class HostKeyChanged extends CustomEmailNotification
 
     private function url(): string
     {
-        return base_url().'/server/'.$this->server->uuid.'/security/host-key';
+        return base_url().'/server/'.$this->server->uuid.'/security#server-host-key-section';
     }
 }

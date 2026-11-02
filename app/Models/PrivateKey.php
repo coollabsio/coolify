@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
@@ -300,6 +301,7 @@ class PrivateKey extends BaseModel
                     'path' => $keyLocation,
                 ]);
             }
+            SshMultiplexingHelper::giveToSshDirectoryOwner($keyLocation, $lockFile);
 
             return $keyLocation;
         } finally {
