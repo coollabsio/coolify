@@ -138,6 +138,17 @@ describe('POST /api/v1/security/keys', function () {
 
         expect(PrivateKey::query()->where('team_id', $this->teamA->id)->count())->toBe(1);
     });
+
+    test('a PuTTY key gets the PuTTY message, and a base64 encoded key is still accepted', function () {
+        $this->withHeader('Authorization', 'Bearer '.$this->bearerToken)
+            ->postJson('/api/v1/security/keys', ['private_key' => EC::createKey('Ed25519')->toString('PuTTY')])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'PuTTY and other key formats are not supported. Paste the key in OpenSSH or PEM format. It starts with "-----BEGIN".']);
+
+        $this->withHeader('Authorization', 'Bearer '.$this->bearerToken)
+            ->postJson('/api/v1/security/keys', ['private_key' => base64_encode($this->keyMaterial)])
+            ->assertCreated();
+    });
 });
 
 test('unchanged legacy keys can be renamed before normalization', function (bool $whitespace) {
