@@ -135,7 +135,11 @@
                                         ]" :confirmWithPassword="false" :confirmWithText="false"
                                         step2ButtonText="Delete copy">
                                         <x-slot:trigger>
-                                            <button type="button" class="button text-red-500! dark:text-red-400!">Delete now</button>
+                                            <button type="button"
+                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                title="Delete retained copy" aria-label="Delete the retained copy of {{ $copy['volume'] }}">
+                                                <x-reicon name="trash" class="size-3.5" />
+                                            </button>
                                         </x-slot:trigger>
                                     </x-modal-confirmation>
                                 @endcan
