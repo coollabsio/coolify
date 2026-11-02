@@ -160,4 +160,4 @@
 
 ## Measure database reads end to end
 - On PostgreSQL 15, `EXPLAIN (ANALYZE, BUFFERS)` does not detoast or send the selected columns, so a wide `jsonb`/`json`/`text` column does not show in it. Time the full fetch (`psql \timing` with `-o /dev/null`, or PDO `fetchAll`) as well before you blame or rule out an index.
-- Do not put a required write (audit rows, state that matches a committed change) in `defer()`. Deferred callbacks run in the terminate phase, which PHP-FPM skips when the client or proxy closes the connection (`ignore_user_abort` is off) or the script hits a fatal error. Write it in `DB::afterCommit()` instead.
+- Do not put a required write (audit rows, state that matches a committed change) or required cleanup in `defer()` or `dispatch()->afterResponse()`. Both run in the terminate phase, which PHP-FPM skips when the client or proxy closes the connection (`ignore_user_abort` is off) or the script hits a fatal error. Write it in `DB::afterCommit()`, or queue the job normally, instead. `afterResponse()` also runs a queued job on the `sync` connection in the web worker.
