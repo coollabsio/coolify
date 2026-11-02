@@ -87,7 +87,7 @@ class Index extends Component
 
     public function mount()
     {
-        if (auth()->user()?->isMember() && auth()->user()->currentTeam()->show_boarding === true) {
+        if (auth()->user()?->isMember()) {
             return redirect()->route('dashboard');
         }
 

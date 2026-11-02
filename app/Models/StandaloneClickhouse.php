@@ -9,6 +9,7 @@ use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -16,7 +17,7 @@ use Throwable;
 
 class StandaloneClickhouse extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
 
     protected array $auditExclude = ['last_online_at'];
 

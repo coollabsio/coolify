@@ -463,11 +463,11 @@ test('service storage backups page includes schedules from all compose databases
         'service_uuid' => $this->ownService->uuid,
     ]))
         ->assertOk()
-        ->assertSee('>Database</span>', false)
+        ->assertSee('>Database</button>', false)
         ->assertSee('own-db')
         ->assertSee('analytics-db')
         ->assertSee("wire:click=\"openSchedule('{$backups->first()->uuid}')\"", false)
-        ->assertSee("wire:click.stop=\"backupNow('database', '{$backups->first()->uuid}')\"", false);
+        ->assertSee("wire:click=\"backupNow('database', '{$backups->first()->uuid}')\"", false);
 });
 
 test('service backup settings open automatically from the creation redirect', function () {
@@ -521,18 +521,18 @@ test('service backups have explicit settings actions for database and storage sc
     $dom = new DOMDocument;
     @$dom->loadHTML($html);
     $xpath = new DOMXPath($dom);
-    $buttons = $xpath->query('//button[@aria-label="Edit backup schedule"]');
+    $buttons = $xpath->query('//button[@role="menuitem"][normalize-space()="Edit"]');
     $actions = [];
     foreach ($buttons as $button) {
-        $actions[] = $button->getAttribute('wire:click.stop');
+        $actions[] = $button->getAttribute('wire:click');
     }
 
     expect($actions)->toContain("openSchedule('{$databaseBackup->uuid}')", "openSchedule('{$volumeBackup->uuid}')");
 
     foreach (['database' => $databaseBackup, 'storage' => $volumeBackup] as $type => $backup) {
-        $backupAction = "wire:click.stop=\"backupNow('{$type}', '{$backup->uuid}')\"";
-        $settingsAction = "wire:click.stop=\"openSchedule('{$backup->uuid}')\"";
-        expect(strpos($html, $backupAction))->toBeLessThan(strpos($html, $settingsAction));
+        $backupAction = "wire:click=\"backupNow('{$type}', '{$backup->uuid}')\"";
+        $settingsAction = "wire:click=\"openSchedule('{$backup->uuid}')\"";
+        expect(strpos($html, $backupAction))->toBeLessThan(strrpos($html, $settingsAction));
     }
 
 });

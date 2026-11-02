@@ -268,7 +268,7 @@ class ServerDockerRegistriesController extends Controller
 
     #[OA\Delete(
         summary: 'Log out from a registry on a server',
-        description: 'Run docker logout on the server for a registry. Needs a token with the write and deploy permissions.',
+        description: 'Run docker logout on the server for a registry.',
         path: '/servers/{uuid}/registries/{registry}',
         operationId: 'logout-server-registry',
         security: [['bearerAuth' => []]],

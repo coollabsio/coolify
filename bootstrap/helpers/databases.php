@@ -17,6 +17,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -189,7 +190,7 @@ function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker 
     $database = new StandaloneSqlite;
     $database->uuid = new_public_id();
     $database->name = 'sqlite-database-'.$database->uuid;
-    $database->image = 'peakimages/sqlite:3.53.4-v0.1.0';
+    $database->image = 'peakimages/sqlite:3.54.1-v0.2.0';
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -500,14 +501,13 @@ function deleteOldBackupsFromS3($backup): Collection
 
 function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null): bool
 {
+    // A member limited to some projects must still see the ports of every database on the server.
+    $databases = app(AccessResolver::class)->withoutVisibilityScope(fn () => $server->databases());
+
+    $query = $databases->where('public_port', $port)->where('is_public', true);
     if ($id) {
-        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->where('id', '!=', $id)->first();
-    } else {
-        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->first();
-    }
-    if ($foundDatabase) {
-        return true;
+        $query = $query->where('id', '!=', $id);
     }
 
-    return false;
+    return $query->isNotEmpty();
 }

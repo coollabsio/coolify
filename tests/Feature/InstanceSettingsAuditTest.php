@@ -163,7 +163,7 @@ test('resend settings save is audited without the api key', function () {
 test('manual instance upgrade is audited', function () {
     Bus::fake();
     config()->set('constants.coolify.version', '4.0.0');
-    Cache::put('coolify:versions:all', ['coolify' => ['v4' => ['version' => '4.0.1']]], 3600);
+    Cache::put('coolify:versions', ['coolify' => ['version' => '4.0.1']], 3600);
 
     Livewire::test(Upgrade::class)->call('upgrade');
 

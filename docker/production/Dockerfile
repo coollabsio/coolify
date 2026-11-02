@@ -17,6 +17,12 @@ ARG PHP_UV_VERSION=0.3.0
 ARG USER_ID=9999
 ARG GROUP_ID=9999
 
+# Set by the build workflow
+ARG COOLIFY_VERSION
+ARG SOURCE_DATE_EPOCH
+ARG CREATED
+ARG GIT_SHA
+
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
@@ -197,8 +203,7 @@ COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
-# Version data for Traefik, Sentinel, and helper checks until CheckForUpdatesJob refreshes it
-COPY --chown=www-data:www-data versions.json ./versions.json
+COPY --chown=www-data:www-data release.json upstream.json ./
 
 RUN composer dump-autoload
 
@@ -218,6 +223,29 @@ RUN mkdir -p /etc/nginx/conf.d && \
 # Install MinIO client
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
+
+ARG SERVERSIDEUP_PHP_VERSION
+ARG NODE_VERSION
+ARG CREATED
+ARG GIT_SHA
+
+LABEL org.opencontainers.image.title="Coolify" \
+    org.opencontainers.image.description="An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 360+ one-click services on your own servers." \
+    org.opencontainers.image.version="${COOLIFY_VERSION}" \
+    org.opencontainers.image.created="${CREATED}" \
+    org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.authors="coollabsio" \
+    org.opencontainers.image.vendor="coollabsio" \
+    org.opencontainers.image.url="https://coolify.io" \
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
+    org.opencontainers.image.documentation="https://coolify.io/docs" \
+    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
+    io.coolify.nginx.version="${NGINX_VERSION}" \
+    io.coolify.node.version="${NODE_VERSION}" \
+    io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
+    io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
+    io.coolify.php-uv.version="${PHP_UV_VERSION}"
 
 # Switch to non-root user
 USER www-data

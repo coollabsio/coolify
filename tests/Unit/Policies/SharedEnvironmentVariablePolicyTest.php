@@ -1,8 +1,15 @@
 <?php
 
+use App\Enums\AccessLevel;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\User;
 use App\Policies\SharedEnvironmentVariablePolicy;
+use App\Services\Access\AccessResolver;
+use Illuminate\Container\Container;
+
+afterEach(function () {
+    Container::getInstance()->forgetInstance(AccessResolver::class);
+});
 
 it('allows any user to view any shared environment variables', function () {
     $user = Mockery::mock(User::class)->makePartial();
@@ -12,28 +19,26 @@ it('allows any user to view any shared environment variables', function () {
 });
 
 it('allows team member to view their team shared environment variable', function () {
-    $teams = collect([
-        (object) ['id' => 1, 'pivot' => (object) ['role' => 'member']],
-    ]);
-
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('getAttribute')->with('teams')->andReturn($teams);
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
+
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->with($user, AccessLevel::Read, 1)->andReturn(true);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
 
     $policy = new SharedEnvironmentVariablePolicy;
     expect($policy->view($user, $model))->toBeTrue();
 });
 
 it('denies non-team member to view shared environment variable', function () {
-    $teams = collect([
-        (object) ['id' => 1, 'pivot' => (object) ['role' => 'member']],
-    ]);
-
     $user = Mockery::mock(User::class)->makePartial();
-    $user->shouldReceive('getAttribute')->with('teams')->andReturn($teams);
 
     $model = mockSharedEnvironmentVariable(teamId: 2);
+
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->with($user, AccessLevel::Read, 2)->andReturn(false);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
 
     $policy = new SharedEnvironmentVariablePolicy;
     expect($policy->view($user, $model))->toBeFalse();

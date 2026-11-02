@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\ApplicationSetting;
 use App\Models\User;
 
@@ -20,9 +21,7 @@ class ApplicationSettingPolicy
      */
     public function view(User $user, ApplicationSetting $applicationSetting): bool
     {
-        $teamId = $this->getTeamId($applicationSetting);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        return $this->allows($user, AccessLevel::Read, $applicationSetting);
     }
 
     /**
@@ -38,9 +37,7 @@ class ApplicationSettingPolicy
      */
     public function update(User $user, ApplicationSetting $applicationSetting): bool
     {
-        $teamId = $this->getTeamId($applicationSetting);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allows($user, AccessLevel::Write, $applicationSetting);
     }
 
     /**
@@ -48,9 +45,7 @@ class ApplicationSettingPolicy
      */
     public function delete(User $user, ApplicationSetting $applicationSetting): bool
     {
-        $teamId = $this->getTeamId($applicationSetting);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $this->allows($user, AccessLevel::Delete, $applicationSetting);
     }
 
     /**
@@ -69,8 +64,10 @@ class ApplicationSettingPolicy
         return false;
     }
 
-    private function getTeamId(ApplicationSetting $applicationSetting): ?int
+    private function allows(User $user, AccessLevel $level, ApplicationSetting $applicationSetting): bool
     {
-        return $applicationSetting->application?->team()?->id;
+        $application = $applicationSetting->application;
+
+        return $application !== null && $user->canAccess($level, $application);
     }
 }

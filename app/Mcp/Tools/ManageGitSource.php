@@ -19,7 +19,7 @@ class ManageGitSource extends RestActionTool
             'list' => ['method' => 'GET', 'paths' => ['github' => 'github-apps', 'gitlab' => 'gitlab-apps'], 'ability' => 'read', 'description' => 'git apps of the team and system-wide apps'],
             'create' => ['method' => 'POST', 'paths' => ['github' => 'github-apps', 'gitlab' => 'gitlab-apps'], 'ability' => 'write', 'description' => 'add a git app (github data: name, html_url, api_url, app_id, installation_id, client_id, client_secret, webhook_secret, private_key_uuid, organization, custom_user, custom_port; gitlab data: name, html_url, api_url, group_name, client_id, client_secret, webhook_token, redirect_uri, custom_user, custom_port)'],
             'update' => ['method' => 'PATCH', 'paths' => ['github' => 'github-apps/{source_id}', 'gitlab' => 'gitlab-apps/{source_id}'], 'ability' => 'write', 'description' => 'update a git app of the team (data: same fields as create, all optional)'],
-            'delete' => ['method' => 'DELETE', 'paths' => ['github' => 'github-apps/{source_id}', 'gitlab' => 'gitlab-apps/{source_id}'], 'ability' => 'write', 'confirm' => true, 'description' => 'delete a git app of the team that no application uses'],
+            'delete' => ['method' => 'DELETE', 'paths' => ['github' => 'github-apps/{source_id}', 'gitlab' => 'gitlab-apps/{source_id}'], 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a git app of the team that no application uses'],
         ];
     }
 

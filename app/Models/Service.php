@@ -12,6 +12,7 @@ use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasMaintenancePage;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,7 +47,7 @@ use OpenApi\Attributes as OA;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -103,6 +104,11 @@ class Service extends BaseModel
         static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
             $service->save();
+        });
+        static::saving(function ($service) {
+            if ($service->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($service, $service->getOriginal('docker_compose_raw'), $service->docker_compose_raw, 'docker_compose_raw');
+            }
         });
     }
 

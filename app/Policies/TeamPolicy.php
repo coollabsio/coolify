@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class TeamPolicy
 {
@@ -21,6 +23,14 @@ class TeamPolicy
     public function view(User $user, Team $team): bool
     {
         return $user->teams->contains('id', $team->id);
+    }
+
+    /**
+     * Determine whether the user can read the team shared variables (team-wide read).
+     */
+    public function viewSharedVariables(User $user, Team $team): bool
+    {
+        return app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $team->id);
     }
 
     /**

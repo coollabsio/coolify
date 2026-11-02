@@ -18,7 +18,7 @@ class ManageTags extends RestActionTool
         return [
             'create' => ['method' => 'POST', 'path' => 'tags', 'ability' => 'write', 'description' => 'create a team tag (data: name)'],
             'update' => ['method' => 'PATCH', 'path' => 'tags/{tag_uuid}', 'ability' => 'write', 'description' => 'rename a team tag (data: name)'],
-            'delete' => ['method' => 'DELETE', 'path' => 'tags/{tag_uuid}', 'ability' => 'write', 'confirm' => true, 'description' => 'delete a team tag and detach it from all resources'],
+            'delete' => ['method' => 'DELETE', 'path' => 'tags/{tag_uuid}', 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a team tag and detach it from all resources'],
             'attach' => ['method' => 'POST', 'paths' => [
                 'application' => 'applications/{uuid}/tags',
                 'database' => 'databases/{uuid}/tags',
@@ -28,7 +28,7 @@ class ManageTags extends RestActionTool
                 'application' => 'applications/{uuid}/tags/{tag_uuid}',
                 'database' => 'databases/{uuid}/tags/{tag_uuid}',
                 'service' => 'services/{uuid}/tags/{tag_uuid}',
-            ], 'ability' => 'write', 'description' => 'detach a tag from the resource'],
+            ], 'ability' => 'delete', 'description' => 'detach a tag from the resource'],
         ];
     }
 

@@ -31,6 +31,7 @@ class DeploymentsIndicator extends Component
         return ApplicationDeploymentQueue::with(['application.environment.project'])
             ->ownedByTeam(currentTeam()->id)
             ->whereIn('status', ['in_progress', 'queued'])
+            ->visibleToCurrentActor()
             ->orderBy('id')
             ->get([
                 'id',

@@ -50,7 +50,7 @@ class ListUnhealthyResources extends Tool
         $args = $this->paginationArgs($request);
 
         // --- Servers (small set; filter via settings) ---
-        $unhealthyServers = Server::whereTeamId($teamId)
+        $unhealthyServers = $this->visibleServers($request, $teamId)
             ->with('settings:id,server_id,is_reachable,is_usable')
             ->whereHas('settings', function ($q) {
                 $q->where('is_reachable', false)->orWhere('is_usable', false);

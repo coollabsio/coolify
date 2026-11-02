@@ -61,6 +61,22 @@ class IntegrationToken extends BaseModel
         return $this->hasMany(ManagedDnsRecord::class);
     }
 
+    /**
+     * Why the token cannot be deleted yet, or null when it can.
+     */
+    public function deletionBlocker(): ?string
+    {
+        if ($this->secretManagerLinks()->exists()) {
+            return 'This token is used by one or more resources as a secret manager source. Remove those links first.';
+        }
+
+        if ($this->managedDnsRecords()->exists()) {
+            return 'This token manages DNS records. Remove those domains or records first.';
+        }
+
+        return null;
+    }
+
     public function isSecretManager(): bool
     {
         return in_array($this->provider, self::SECRET_MANAGER_PROVIDERS, true);

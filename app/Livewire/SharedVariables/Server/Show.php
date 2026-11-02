@@ -59,7 +59,7 @@ class Show extends Component
         if (! $server) {
             return redirect()->route('dashboard');
         }
-        $this->authorize('view', $server);
+        $this->authorize('viewSharedVariables', $server);
         $this->server = $server;
         if ($this->prefersCanvasView('server_variables')) {
             return $this->redirectRoute('shared-variables.server.canvas', ['server_uuid' => $server->uuid], navigate: true);
@@ -69,7 +69,7 @@ class Show extends Component
 
     public function switch()
     {
-        $this->authorize('view', $this->server);
+        $this->authorize('viewSharedVariables', $this->server);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         $this->getDevView();
     }

@@ -2,39 +2,49 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Access\AccessResolver;
 use Illuminate\Auth\AuthenticationException;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
 class ApiAbility extends CheckForAnyAbility
 {
     /**
-     * Permissions that only admins/owners may use.
+     * First path segment after /api/v1/ of the routes that work on projects and their resources.
+     * A token or member limited to some projects, environments, or resources can use only these.
+     * Everything else (servers, keys, git sources, S3, cloud providers, team, notifications, settings, ...) is team-level.
      */
-    private const MEMBER_DISALLOWED_ABILITIES = [
-        'root',
-        'write',
-        'write:sensitive',
+    public const SCOPED_ACCESS_ROUTES = [
+        'applications',
+        'services',
+        'databases',
+        'projects',
         'deploy',
-        'read:sensitive',
+        'deployments',
+        'resources',
+        'version',
     ];
+
+    public const SCOPED_ACCESS_DENIED_MESSAGE = 'This API token is limited to selected projects, environments, or resources, so it cannot use this endpoint.';
 
     public function handle($request, $next, ...$abilities)
     {
         try {
-            $token = $request->user()->currentAccessToken();
-            $teamId = data_get($token, 'team_id');
+            $user = $request->user();
+            $teamId = data_get($user?->currentAccessToken(), 'team_id');
 
-            if ($teamId !== null && ! $request->user()->isAdminOfTeam((int) $teamId)) {
-                $disallowed = array_filter(self::MEMBER_DISALLOWED_ABILITIES, fn (string $ability) => $token->can($ability));
+            if ($request->is('api/v1/*')
+                && ! in_array($request->segment(3), self::SCOPED_ACCESS_ROUTES, true)
+                && $teamId !== null
+                && ! app(AccessResolver::class)->coversWholeTeam($user, (int) $teamId)) {
+                auditLog('api.auth.scope_denied', [
+                    'token_id' => $user->currentAccessToken()?->id,
+                    'path' => $request->path(),
+                ], 'warning');
 
-                if (! empty($disallowed)) {
-                    return response()->json([
-                        'message' => 'This API token has permissions ('.implode(', ', $disallowed).') that exceed your current role as a team member. Members are restricted to read-only API access. Please revoke this token and create a new one with only read permissions.',
-                    ], 403);
-                }
+                return response()->json(['message' => self::SCOPED_ACCESS_DENIED_MESSAGE], 403);
             }
 
-            if ($request->user()->tokenCan('root')) {
+            if ($user?->tokenCan('root')) {
                 return $next($request);
             }
 

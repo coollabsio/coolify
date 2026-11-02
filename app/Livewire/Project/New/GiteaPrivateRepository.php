@@ -66,6 +66,8 @@ class GiteaPrivateRepository extends Component
 
     private function getGiteaApp(): GiteaApp
     {
+        $this->authorize('useTeamCredentials');
+
         return GiteaApp::private()->where('id', $this->gitea_app_id)->firstOrFail();
     }
 

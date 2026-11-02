@@ -302,7 +302,7 @@ class All extends Component
 
     private function canViewEnvironmentValues(): bool
     {
-        return auth()->user()?->can('manageEnvironment', $this->resource) ?? false;
+        return auth()->user()?->can('viewSensitive', $this->resource) ?? false;
     }
 
     private function nullLockedValues($envs)
@@ -848,8 +848,7 @@ class All extends Component
         }
         // Otherwise keep order from docker-compose file
 
-        // Compose content is visible only to users who can edit the resource.
-        $canViewValues = auth()->user()?->can('update', $this->resource) ?? false;
+        $canViewValues = $this->canViewEnvironmentValues();
 
         return $hardcodedVars->map(fn (array $variable): array => [
             ...$variable,

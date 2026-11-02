@@ -159,6 +159,7 @@ it('denies member from using root permissions', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
     $user->shouldReceive('isOwner')->andReturn(false);
+    $user->shouldReceive('currentTeam')->andReturnNull();
 
     $policy = new ApiTokenPolicy;
     expect($policy->useRootPermissions($user))->toBeFalse();
@@ -176,6 +177,7 @@ it('denies member from using write permissions', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
     $user->shouldReceive('isOwner')->andReturn(false);
+    $user->shouldReceive('currentTeam')->andReturnNull();
 
     $policy = new ApiTokenPolicy;
     expect($policy->useWritePermissions($user))->toBeFalse();
@@ -202,6 +204,7 @@ it('denies member from using deploy permissions', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
     $user->shouldReceive('isOwner')->andReturn(false);
+    $user->shouldReceive('currentTeam')->andReturnNull();
 
     $policy = new ApiTokenPolicy;
     expect($policy->useDeployPermissions($user))->toBeFalse();
@@ -228,6 +231,7 @@ it('denies member from using sensitive permissions', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
     $user->shouldReceive('isOwner')->andReturn(false);
+    $user->shouldReceive('currentTeam')->andReturnNull();
 
     $policy = new ApiTokenPolicy;
     expect($policy->useSensitivePermissions($user))->toBeFalse();

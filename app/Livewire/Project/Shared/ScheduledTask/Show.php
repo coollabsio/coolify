@@ -145,7 +145,7 @@ class Show extends Component
     public function delete()
     {
         try {
-            $this->authorize('update', $this->resource);
+            $this->authorize('delete', $this->resource);
             $this->authorize('delete', $this->task);
             $this->task->delete();
             auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());

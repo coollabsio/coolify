@@ -97,6 +97,8 @@ class ActiveDeployments extends Component
     }
 
     /**
+     * The Application access grant scope also limits the IDs to the applications the current actor can see.
+     *
      * @return Collection<int, string>
      */
     private function teamApplicationIds(): Collection

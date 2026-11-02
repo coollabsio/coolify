@@ -430,6 +430,12 @@ class ImportForm extends Component
                 return;
             }
 
+            if (! StartDatabaseImport::allowsSourcePath($this->resource, $this->customLocation)) {
+                $this->dispatch('error', StartDatabaseImport::OWN_BACKUPS_ONLY_MESSAGE);
+
+                return;
+            }
+
             if (! $this->server) {
                 $this->dispatch('error', 'Server not found. Please refresh the page.');
 
@@ -623,6 +629,12 @@ class ImportForm extends Component
         // Validate the S3 path early to prevent command injection in subsequent operations
         if (! $this->validateS3Path($cleanPath)) {
             $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+            return;
+        }
+
+        if (! StartDatabaseImport::allowsSourcePath($this->resource, $cleanPath)) {
+            $this->dispatch('error', StartDatabaseImport::OWN_BACKUPS_ONLY_MESSAGE);
 
             return;
         }

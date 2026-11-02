@@ -50,7 +50,7 @@ class BackupExecutions extends Component
     public function cleanupFailed()
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
             if ($this->backup) {
                 $this->backup->executions()->where('status', 'failed')->delete();
                 $this->refreshBackupExecutions();
@@ -64,7 +64,7 @@ class BackupExecutions extends Component
     public function cleanupDeleted()
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
             if ($this->backup) {
                 $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
                 if ($deletedCount > 0) {
@@ -83,7 +83,7 @@ class BackupExecutions extends Component
     public function deleteBackup($executionId, $password, $selectedActions = [])
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

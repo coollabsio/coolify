@@ -3,14 +3,17 @@
 namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
+use App\Enums\AccessLevel;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\EmailChangeVerification;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Services\Access\AccessResolver;
 use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -20,7 +23,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -266,12 +268,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
 
     public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null, ?int $teamId = null)
     {
-        $plainTextToken = sprintf(
-            '%s%s%s',
-            config('sanctum.token_prefix', ''),
-            $tokenEntropy = Str::random(40),
-            hash('crc32b', $tokenEntropy)
-        );
+        $plainTextToken = PersonalAccessToken::generateSecret();
 
         $token = $this->tokens()->create([
             'name' => $name,
@@ -286,7 +283,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
 
     public function teams()
     {
-        return $this->belongsToMany(Team::class)->withPivot('role');
+        return $this->belongsToMany(Team::class)->withPivot('role', 'access');
     }
 
     public function changelogReads()
@@ -483,6 +480,14 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
         $team = $this->teams->where('id', $teamId)->first();
 
         return data_get($team, 'pivot.role');
+    }
+
+    /**
+     * Check the access grants of the user (and the API token of the request) on a project, environment, or resource.
+     */
+    public function canAccess(AccessLevel $level, Model $target): bool
+    {
+        return app(AccessResolver::class)->allows($this, $level, $target);
     }
 
     /**

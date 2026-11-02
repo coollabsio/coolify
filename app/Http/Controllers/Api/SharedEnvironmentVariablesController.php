@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\Team;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -191,7 +192,9 @@ class SharedEnvironmentVariablesController extends Controller
             return $validated;
         }
 
-        $this->authorize('create', SharedEnvironmentVariable::class);
+        if (in_array($type, ['team', 'server'], true)) {
+            $this->authorize('create', SharedEnvironmentVariable::class);
+        }
 
         $scope = array_filter([
             'project_id' => $attributes['project_id'] ?? null,
@@ -361,7 +364,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $teamId;
         }
 
-        $this->authorize('viewAny', SharedEnvironmentVariable::class);
+        $this->authorize('viewSharedVariables', Team::findOrFail($teamId));
 
         return $this->listEnvs($teamId, 'team');
     }
@@ -475,7 +478,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $project;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('viewSharedVariables', $project);
 
         return $this->listEnvs($teamId, 'project', ['project_id' => $project->id]);
     }
@@ -511,7 +514,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $project;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('update', $project);
 
         return $this->createEnv($request, $teamId, 'project', ['project_id' => $project->id]);
     }
@@ -633,7 +636,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('viewSharedVariables', $environment);
 
         return $this->listEnvs($teamId, 'environment', ['environment_id' => $environment->id]);
     }
@@ -675,7 +678,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('update', $environment);
 
         return $this->createEnv($request, $teamId, 'environment', ['environment_id' => $environment->id]);
     }
@@ -717,7 +720,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('view', $environment);
 
         return $this->updateEnv(
             $request,
@@ -763,7 +766,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('view', $environment);
 
         return $this->deleteEnv(
             $teamId,
@@ -803,7 +806,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $server;
         }
 
-        $this->authorize('view', $server);
+        $this->authorize('viewSharedVariables', $server);
 
         return $this->listEnvs($teamId, 'server', ['server_id' => $server->id]);
     }
