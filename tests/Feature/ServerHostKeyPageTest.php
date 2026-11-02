@@ -36,7 +36,7 @@ beforeEach(function () {
 });
 
 it('opens the host key page for an admin of the server team', function () {
-    $this->get(route('server.security.host-key', ['server_uuid' => $this->server->uuid]))
+    $this->get(route('server.security', ['server_uuid' => $this->server->uuid]))
         ->assertOk()
         ->assertSee('Trust new key');
 });

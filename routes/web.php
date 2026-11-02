@@ -101,9 +101,7 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Registries as ServerRegistries;
 use App\Livewire\Server\Resources as ResourcesShow;
-use App\Livewire\Server\Security\HostKey;
-use App\Livewire\Server\Security\Patches;
-use App\Livewire\Server\Security\TerminalAccess;
+use App\Livewire\Server\Security\Index as ServerSecurityIndex;
 use App\Livewire\Server\Sentinel\Logs as SentinelLogs;
 use App\Livewire\Server\Sentinel\Show as SentinelShow;
 use App\Livewire\Server\Show as ServerShow;
@@ -538,10 +536,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/images', DockerImages::class)->name('server.docker-images');
         Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
         Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
-        Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
-        Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
-        Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
-        Route::get('/security/host-key', HostKey::class)->name('server.security.host-key')->middleware('can.update.resource');
+        Route::get('/security', ServerSecurityIndex::class)->name('server.security')->middleware('can.update.resource');
+        // Old sub pages. Links in sent notifications still use them.
+        foreach (['patches' => 'server-patching-overview-section', 'terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
+            Route::get("/security/{$page}", fn (string $server_uuid) => redirect(route('server.security', ['server_uuid' => $server_uuid]).'#'.$section))
+                ->name("server.security.{$page}");
+        }
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
