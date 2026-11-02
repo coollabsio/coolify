@@ -50,6 +50,8 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toContain('TOKEN=sentinel-token')
         ->toContain('PUSH_ENDPOINT=http://coolify:8000/api/v1/sentinel')
         ->toContain('PUSH_ENABLED=false')
+        ->toContain('COLLECTOR_ENABLED=true')
+        ->toContain('STORAGE_ENABLED=true')
         ->and($unit)->toContain('ExecStart=/usr/local/bin/sentinel')
         ->toContain('EnvironmentFile=/etc/coolify/sentinel.env')
         ->toContain('KillMode=process')
@@ -63,7 +65,7 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toContain('systemctl enable sentinel.service')
         ->toContain('systemctl restart sentinel.service')
         ->toContain('systemctl is-active --quiet sentinel.service')
-        ->toContain('curl --fail --silent http://127.0.0.1:8888/api/health');
+        ->toContain('curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8888/api/health');
 
     expect(strpos($script, 'openssl x509 -in /etc/coolify/sentinel-flux-ca.pem.new -noout'))
         ->toBeLessThan(strrpos($script, 'systemctl enable sentinel.service'));
@@ -141,7 +143,7 @@ it('accepts a pinned digest image and keeps the replaced binary only after a hea
         ->toContain('install -m 0755 "$backup_directory/sentinel" /usr/local/bin/sentinel.previous.new')
         ->toContain('mv -f /usr/local/bin/sentinel.previous.new /usr/local/bin/sentinel.previous')
         ->and(strpos($script, 'sentinel.previous.new /usr/local/bin/sentinel.previous'))
-        ->toBeGreaterThan(strpos($script, 'curl --fail --silent http://127.0.0.1:8888/api/health'))
+        ->toBeGreaterThan(strpos($script, 'curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8888/api/health'))
         ->toBeLessThan(strpos($script, 'completed=true'));
 });
 

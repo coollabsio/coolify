@@ -28,7 +28,8 @@ class CreateMoveOperation
             if ($source->id === $target->id
                 || $source->team_id !== $target->team_id
                 || $source->node_cluster_id === null
-                || $source->node_cluster_id !== $target->node_cluster_id) {
+                || $source->node_cluster_id !== $target->node_cluster_id
+                || ! $target->role->runsWorkloads()) {
                 throw new RuntimeException('Select another server in the same mesh.');
             }
 

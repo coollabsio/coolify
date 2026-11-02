@@ -14,7 +14,7 @@ class RenewFluxCertificate extends Command
 
     public function handle(): int
     {
-        if (! config('constants.sentinel.host_enabled')) {
+        if (! nodesEnabled()) {
             return self::SUCCESS;
         }
 

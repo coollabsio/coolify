@@ -14,6 +14,9 @@ class EnsureNodeAcceptsDeployment
 
     public function handle(Node $node, ?NodeWorkloadRevision $revision = null): void
     {
+        if ($node->role !== null && ! $node->role->runsWorkloads()) {
+            throw new DomainException("Server {$node->name} is a controller and does not run workloads.");
+        }
         if (! $node->is_usable) {
             throw new DomainException("Server {$node->name} is not usable.");
         }

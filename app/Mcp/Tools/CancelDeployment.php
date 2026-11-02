@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Actions\Application\CleanupCancelledDeployment;
+use App\Enums\AccessLevel;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ChecksTokenAbilities;
@@ -60,7 +61,8 @@ class CancelDeployment extends Tool
         // Server-scoped checks allow a shared-server host team to cancel another team's deployment.
         // Include soft-deleted apps so in-flight deploys remain cancellable after app delete.
         $application = $deployment->application()->withTrashed()->first();
-        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId
+            || ! $request->user()->canAccess(AccessLevel::Deploy, $application)) {
             return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 

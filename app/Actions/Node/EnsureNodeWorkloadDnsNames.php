@@ -50,7 +50,8 @@ class EnsureNodeWorkloadDnsNames
     {
         $name = Str::slug($workload->name);
 
-        return Str::limit($name !== '' ? $name : strtolower($workload->uuid), 63, '');
+        // Truncation can end on a hyphen, which is not a valid DNS label.
+        return rtrim(Str::limit($name !== '' ? $name : strtolower($workload->uuid), 63, ''), '-');
     }
 
     /** @param array<string, string> $usedNames */
@@ -58,7 +59,7 @@ class EnsureNodeWorkloadDnsNames
     {
         for ($length = 8; $length <= strlen($uuid); $length++) {
             $suffix = strtolower(substr($uuid, 0, $length));
-            $candidate = Str::limit($baseName, 63 - strlen($suffix) - 1, '').'-'.$suffix;
+            $candidate = rtrim(Str::limit($baseName, 63 - strlen($suffix) - 1, ''), '-').'-'.$suffix;
             if (! array_key_exists($candidate, $usedNames)) {
                 return $candidate;
             }

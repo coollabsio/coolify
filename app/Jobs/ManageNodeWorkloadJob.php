@@ -23,7 +23,7 @@ class ManageNodeWorkloadJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 180;
+    public int $timeout = 300;
 
     public function __construct(public int $operationId) {}
 

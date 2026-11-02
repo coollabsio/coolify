@@ -2,32 +2,61 @@
 
 namespace App\Actions\Node;
 
+use App\Models\Node;
 use App\Models\NodeCluster;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
+use RuntimeException;
+use Throwable;
 
 class RepairNodeClusterNetwork
 {
     use AsAction;
 
-    /** @return array<string, ?string> */
+    /**
+     * Restores the last good network state on every member Node that applied the network once.
+     * A failing Node does not stop the others; the failures are reported together at the end.
+     *
+     * @return array<string, ?string>
+     *
+     * @throws LockTimeoutException when a network reconciliation of this cluster is running.
+     */
     public function handle(NodeCluster $cluster): array
     {
-        $outputs = [];
-        $cluster->nodes()
-            ->where('team_id', $cluster->team_id)
-            ->orderBy('id')
-            ->get()
-            ->each(function ($node) use ($cluster, &$outputs): void {
-                $outputs[$node->uuid] = instant_remote_process(
-                    [InstallSentinel::remoteCommand(self::repairScript($cluster->wireguard_interface))],
-                    $node,
-                    timeout: 300,
-                    disableMultiplexing: true,
-                );
-            });
+        $lock = $cluster->networkLock();
+        if (! $lock->get()) {
+            throw new LockTimeoutException('A network reconciliation of this cluster is running. Try again when it finishes.');
+        }
 
-        return $outputs;
+        try {
+            $outputs = [];
+            $failures = [];
+            $cluster->nodes()
+                ->where('team_id', $cluster->team_id)
+                ->whereNotNull('network_applied_revision')
+                ->orderBy('id')
+                ->get()
+                ->each(function (Node $node) use ($cluster, &$outputs, &$failures): void {
+                    try {
+                        $outputs[$node->uuid] = instant_remote_process(
+                            [InstallSentinel::remoteCommand(self::repairScript($cluster->wireguard_interface))],
+                            $node,
+                            timeout: 300,
+                            disableMultiplexing: true,
+                        );
+                    } catch (Throwable $exception) {
+                        $failures[] = "{$node->name}: ".mb_substr($exception->getMessage(), 0, 500);
+                    }
+                });
+            if ($failures !== []) {
+                throw new RuntimeException('The network could not be restored on: '.implode('; ', $failures));
+            }
+
+            return $outputs;
+        } finally {
+            $lock->release();
+        }
     }
 
     public static function repairScript(string $interface): string

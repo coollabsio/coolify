@@ -6,6 +6,7 @@ use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 /**
@@ -39,8 +40,15 @@ class QueueNodeClusterNetworkRevision
         if ($nodeIds === []) {
             return false;
         }
+        // The scheduled repair skips the cluster for a short time, so it does not queue a second run for the same Nodes.
+        Cache::put(self::queuedCacheKey($cluster), true, 120);
         ReconcileNodeClusterNetworkJob::dispatch($cluster->id, $operator->id, $nodeIds)->afterCommit();
 
         return true;
+    }
+
+    public static function queuedCacheKey(NodeCluster $cluster): string
+    {
+        return "node-cluster-network-revision-queued:{$cluster->id}";
     }
 }

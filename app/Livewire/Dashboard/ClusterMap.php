@@ -36,7 +36,7 @@ class ClusterMap extends Component
     /** Whether the cluster stack, and with it the map, is available on this instance. */
     public static function isEnabled(): bool
     {
-        return isDev() && (bool) config('constants.sentinel.host_enabled', false);
+        return nodesEnabled();
     }
 
     /** Whether the dashboard offers the map to the current team: the stack is enabled and the team has a cluster. */

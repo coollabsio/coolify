@@ -7,6 +7,7 @@ use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeRole;
 use App\Support\DevelopmentIngressTarget;
 use App\Traits\Auditable;
+use App\Traits\HasMetrics;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,7 +21,7 @@ use RuntimeException;
 
 class Node extends BaseModel
 {
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasMetrics;
 
     protected $guarded = [];
 
@@ -43,6 +44,7 @@ class Node extends BaseModel
             'role' => NodeRole::class,
             'sentinel_token' => 'encrypted',
             'metadata' => 'array',
+            'settings' => 'array',
             'sentinel_capabilities' => 'array',
             'is_reachable' => 'boolean',
             'is_usable' => 'boolean',
@@ -55,6 +57,11 @@ class Node extends BaseModel
             'network_pending_leave' => 'array',
             'is_ingress' => 'boolean',
         ];
+    }
+
+    public function isMetricsEnabled(): bool
+    {
+        return (bool) data_get($this->settings, 'is_metrics_enabled', true);
     }
 
     public function team(): BelongsTo

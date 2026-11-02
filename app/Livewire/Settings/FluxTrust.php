@@ -22,7 +22,7 @@ class FluxTrust extends Component
 
     public function mount(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
         $this->authorize('update', instanceSettings());
         $this->loadStatus();
     }

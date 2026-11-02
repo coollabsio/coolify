@@ -24,7 +24,7 @@ class FetchLatestSentinelRelease
     /** @return array{version: string, digest: string, image: string}|null */
     public function handle(): ?array
     {
-        if (! config('constants.sentinel.host_enabled', false)) {
+        if (! nodesEnabled()) {
             return null;
         }
 

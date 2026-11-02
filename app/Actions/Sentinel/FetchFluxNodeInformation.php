@@ -32,7 +32,8 @@ class FetchFluxNodeInformation
                 'server_id' => $node->uuid,
             ]);
         $response->throw();
-        $validator = Validator::make($response->json(), [
+        $payload = $response->json();
+        $validator = Validator::make(is_array($payload) ? $payload : [], [
             'command_id' => ['required', 'string'],
             'observed_at_unix_ms' => ['required', 'integer'],
             'hostname' => ['nullable', 'string'],

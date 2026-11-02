@@ -12,6 +12,12 @@ class CleanupOperations
 
     public function handle(): int
     {
+        // Periodic checks run every few minutes for every Node, so their successful rows are kept only briefly.
+        $background = NodeOperation::query()
+            ->where('status', NodeOperationStatus::SUCCEEDED)
+            ->whereIn('command_type', NodeOperation::BACKGROUND_COMMAND_TYPES)
+            ->where('completed_at', '<', now()->subDay())
+            ->delete();
         $successful = NodeOperation::query()
             ->where('status', NodeOperationStatus::SUCCEEDED)
             ->where('completed_at', '<', now()->subDays(config('constants.node.operation_success_retention_days', 30)))
@@ -21,6 +27,6 @@ class CleanupOperations
             ->where('completed_at', '<', now()->subDays(config('constants.node.operation_failure_retention_days', 90)))
             ->delete();
 
-        return $successful + $failed;
+        return $background + $successful + $failed;
     }
 }

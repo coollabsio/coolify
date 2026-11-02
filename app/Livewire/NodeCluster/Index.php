@@ -8,11 +8,13 @@ use App\Actions\Node\UpgradeSentinel;
 use App\Jobs\UpgradeAllNodeSentinelsJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Rules\PrivateIpv4Cidr;
+use DomainException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 /**
@@ -23,27 +25,34 @@ class Index extends Component
 {
     use AuthorizesRequests;
 
-    #[Validate('required|string|max:255')]
     public string $name = '';
 
-    #[Validate('nullable|string|max:1000')]
     public string $description = '';
 
-    #[Validate('nullable|string|max:64')]
     public string $cidr = '';
 
     public function mount(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
         $this->authorize('viewAny', NodeCluster::class);
     }
 
     public function createCluster(): void
     {
         $this->authorize('create', NodeCluster::class);
-        $this->validate();
         $team = auth()->user()->currentTeam();
-        CreateNodeCluster::run($team, auth()->user(), $this->name, blank($this->description) ? null : $this->description, blank($this->cidr) ? null : $this->cidr);
+        $this->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('node_clusters')->where('team_id', $team->id)],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'cidr' => ['nullable', 'string', 'max:64', new PrivateIpv4Cidr],
+        ]);
+        try {
+            CreateNodeCluster::run($team, auth()->user(), $this->name, blank($this->description) ? null : $this->description, blank($this->cidr) ? null : $this->cidr);
+        } catch (DomainException $exception) {
+            $this->addError('cidr', $exception->getMessage());
+
+            return;
+        }
         $this->reset('name', 'description', 'cidr');
         $this->dispatch('closeModal');
         $this->dispatch('close-modal');

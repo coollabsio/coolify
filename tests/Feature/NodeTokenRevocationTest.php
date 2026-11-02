@@ -113,7 +113,7 @@ it('restores the previous token when the host cannot receive the new one', funct
 
 it('deletes a standalone node and rejects its token', function () {
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->call('deleteNode')
+        ->call('deleteNode', 'password')
         ->assertRedirect(route('server.index'));
 
     expect(Node::query()->whereKey($this->node->id)->exists())->toBeFalse();
@@ -125,7 +125,7 @@ it('refuses to delete a node that is in a cluster', function () {
     $this->node->forceFill(['node_cluster_id' => $cluster->id])->save();
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->call('deleteNode')
+        ->call('deleteNode', 'password')
         ->assertDispatched('error');
 
     expect($this->node->fresh())->not->toBeNull();
@@ -136,7 +136,7 @@ it('refuses to delete a node that runs workloads', function () {
     $this->node->workloads()->attach($workload);
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->call('deleteNode')
+        ->call('deleteNode', 'password')
         ->assertDispatched('error');
 
     expect($this->node->fresh())->not->toBeNull();

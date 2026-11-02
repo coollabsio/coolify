@@ -1,11 +1,11 @@
 @php
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $canCreateNode = auth()->user()->can('create', App\Models\Node::class);
-    $nodeGridClasses = 'grid min-w-[760px] grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_6rem_13rem] items-center gap-3 px-4';
+    $nodeGridClasses = 'grid min-w-[600px] grid-cols-[minmax(0,1fr)_7rem_7rem_6rem_9rem] items-center gap-3 px-4';
 @endphp
 
 <x-application.settings-section id="node-cluster-nodes-section" title="Servers"
-    helper="Servers in this cluster share an encrypted private network. Each server gets a stable private IP." flush>
+    helper="Servers in this cluster share an encrypted private network." flush>
     @if ($canCreateNode || ($canUpdateCluster && $availableNodes->isNotEmpty()))
         <x-slot:actions>
             @if ($canCreateNode)
@@ -53,7 +53,6 @@
             <div
                 class="{{ $nodeGridClasses }} border-b border-neutral-200 bg-neutral-50 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                 <div>Server</div>
-                <div>Private IP</div>
                 <div>Status</div>
                 <div>Network</div>
                 <div>Ingress</div>
@@ -80,9 +79,6 @@
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description }}</p>
                             @endif
                         </div>
-                    </div>
-                    <div class="truncate font-mono text-[12px] text-neutral-600 dark:text-fg-dim">
-                        {{ $node->wireguard_ip ?? '—' }}
                     </div>
                     <div>
                         <x-status-badge :status="$node->is_usable ? 'Ready' : 'Not ready'"
@@ -114,9 +110,6 @@
                             'pending' => 'warning',
                             default => 'neutral',
                         }" />
-                        @if ($ingressState === 'active')
-                            <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->ip }}</p>
-                        @endif
                     </div>
                     <div class="flex justify-end gap-2">
                         @if ($canUpdateCluster)
@@ -125,11 +118,6 @@
                                 title="{{ $node->is_ingress ? 'Stop serving public HTTP traffic on this server.' : 'Serve public HTTP traffic for cluster applications on port 80 of this server.' }}">
                                 {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
                             </x-forms.button>
-                            <x-modal-confirmation title="Remove server from cluster?" buttonTitle="Remove"
-                                submitAction="removeNode({{ $node->uuid }})" :actions="[
-                                    $node->name.' is removed from this cluster.',
-                                    'Its private network configuration is removed now, or as soon as it reconnects when it is offline.',
-                                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Remove server" />
                         @endif
                     </div>
                 </div>

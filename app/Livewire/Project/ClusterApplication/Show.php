@@ -66,7 +66,8 @@ class Show extends Component
 
     public NodeWorkload $workload;
 
-    public Node $node;
+    /** The first server of the application, or null when no server runs it. */
+    public ?Node $node = null;
 
     public string $status = 'Unknown';
 
@@ -110,6 +111,7 @@ class Show extends Component
 
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null): void
     {
+        abort_unless(nodesEnabled(), 404);
         $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
         $this->environment = $this->project->environments()->where('uuid', $environment_uuid)->firstOrFail();
         $this->workload = NodeWorkload::query()->where('team_id', currentTeam()->id)
@@ -136,6 +138,9 @@ class Show extends Component
         $operation = null;
         try {
             $this->authorize('update', $this->workload);
+            if (! $this->ensureHasServer()) {
+                return;
+            }
             $revision = PrepareNodeWorkloadRevision::run($this->workload);
             foreach ($this->workload->nodes()->orderBy('nodes.id')->get() as $node) {
                 $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer');
@@ -202,7 +207,7 @@ class Show extends Component
         $this->loadData();
         $this->loadResourceSettings();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
-        $this->dispatch('success', 'Resource settings saved. Redeploy the application to apply them.');
+        $this->dispatch('success', 'Resource settings saved. A running application applies them automatically within about a minute, or redeploy to apply them now.');
     }
 
     public function saveConfiguration(): void
@@ -226,7 +231,7 @@ class Show extends Component
         $this->loadData();
         $this->loadConfiguration();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
-        $this->dispatch('success', 'Configuration saved. Redeploy the application to apply it.');
+        $this->dispatch('success', 'Configuration saved. A running application applies it automatically within about a minute, or redeploy to apply it now.');
     }
 
     public function addDomain(): void
@@ -450,6 +455,9 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->workload);
+            if (! $this->ensureHasServer()) {
+                return;
+            }
             $revision = $this->workload->revisions()->latest('id')->firstOrFail();
             $failures = [];
             $queued = 0;
@@ -476,6 +484,18 @@ class Show extends Component
             handleError($exception, $this);
         }
         $this->loadData();
+    }
+
+    /** Shows an error toast and returns false when no server runs the application. */
+    private function ensureHasServer(): bool
+    {
+        if ($this->workload->nodes()->exists()) {
+            return true;
+        }
+        $this->dispatch('error', 'This application is not placed on any server.', 'Delete it from the Danger Zone and create it again on a cluster.');
+        $this->loadData();
+
+        return false;
     }
 
     public function render(): View
@@ -505,7 +525,7 @@ class Show extends Component
 
         return [
             'ingressAddresses' => $ingressAddresses,
-            'ingressCluster' => $this->node->cluster,
+            'ingressCluster' => $this->node?->cluster,
             'suggestedDomain' => $this->suggestedDomain($ingressAddresses),
         ];
     }
@@ -513,7 +533,7 @@ class Show extends Component
     /** @return list<string> */
     private function ingressAddresses(): array
     {
-        $cluster = $this->node->cluster;
+        $cluster = $this->node?->cluster;
 
         return $cluster === null ? [] : Node::query()
             ->where('team_id', $this->workload->team_id)
@@ -534,6 +554,17 @@ class Show extends Component
      */
     private function suggestedDomain(array $ingressAddresses): ?string
     {
+        $ingress = $this->node?->cluster === null ? null : Node::query()
+            ->where('team_id', $this->workload->team_id)
+            ->where('node_cluster_id', $this->node->node_cluster_id)
+            ->where('is_ingress', true)
+            ->orderBy('name')
+            ->first();
+        $wildcard = data_get($ingress?->settings, 'wildcard_domain');
+        if (filled($wildcard)) {
+            return $this->workload->uuid.'.'.parse_url($wildcard, PHP_URL_HOST);
+        }
+
         $ip = isDev() ? config('constants.coolify.dev_seed_ip') : ($ingressAddresses[0] ?? null);
         if ($ip === null || filter_var(normalizeIpAddress($ip), FILTER_VALIDATE_IP) === false) {
             return null;
@@ -727,7 +758,7 @@ class Show extends Component
             'nodes.cluster',
             'operations' => fn ($query) => $query->latest('id')->limit(20),
         ]);
-        $this->node = $this->workload->nodes->firstOrFail();
+        $this->node = $this->workload->nodes->first();
         // Worst state wins across servers, like the Resources page of a cluster.
         $states = $this->workload->nodes->map(fn (Node $node): NodeWorkloadState => DetermineWorkloadState::run($node, $this->workload));
         $state = $states->first(fn (NodeWorkloadState $state): bool => $state !== NodeWorkloadState::RUNNING)

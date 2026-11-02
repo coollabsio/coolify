@@ -32,7 +32,7 @@ class Index extends Component
     public function render(): View
     {
         return view('livewire.server.index', [
-            'clusterServersEnabled' => isDev() && config('constants.sentinel.host_enabled', false),
+            'clusterServersEnabled' => nodesEnabled(),
         ]);
     }
 }

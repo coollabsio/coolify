@@ -76,8 +76,9 @@ class RenewFluxCertificate
                     }
                 } catch (Throwable $rollbackException) {
                     throw new RuntimeException('Flux certificate renewal failed and rollback failed.', previous: $rollbackException);
+                } finally {
+                    $candidate->update(['state' => 'failed']);
                 }
-                $candidate->update(['state' => 'failed']);
                 throw $exception;
             }
 

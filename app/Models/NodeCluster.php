@@ -149,7 +149,9 @@ class NodeCluster extends BaseModel
 
     /**
      * Derives the cluster network status from its member Nodes: `active` when every Node
-     * converged, `degraded` when only some did, and `error` when none did.
+     * converged, `degraded` when only some did, and `error` when none did. When none converged
+     * because an activated network only got a new revision that no Node failed to apply yet,
+     * for example right after a revision bump, the status is `pending`, not `error`.
      */
     public function deriveNetworkStatus(): string
     {
@@ -162,6 +164,7 @@ class NodeCluster extends BaseModel
         return match (true) {
             $converged === $states->count() => 'active',
             $converged > 0 => 'degraded',
+            ! $states->contains('error') && $this->hasActivatedNetwork() => 'pending',
             default => 'error',
         };
     }

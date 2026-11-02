@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\NodeCluster;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class NodeClusterPolicy
 {
@@ -14,7 +16,7 @@ class NodeClusterPolicy
 
     public function view(User $user, NodeCluster $cluster): bool
     {
-        return $user->teams->contains('id', $cluster->team_id);
+        return app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $cluster->team_id);
     }
 
     public function create(User $user): bool

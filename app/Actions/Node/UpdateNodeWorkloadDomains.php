@@ -50,10 +50,12 @@ class UpdateNodeWorkloadDomains
         $httpPort = $validated['http_port'] === null ? null : (int) $validated['http_port'];
 
         // One writer at a time, so two applications cannot claim the same domain concurrently.
-        $changed = Cache::lock('node-workload-domains', 30)->block(10, fn (): bool => DB::transaction(function () use ($workload, $domains, $httpPort): bool {
+        $changed = Cache::lock('node-workload-domains', 30)->block(10, fn (): bool => DB::transaction(function () use ($workload, $domains, $httpPort, $user): bool {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             if ($domains !== []) {
+                // Each cluster serves only its own team's routes, so a domain is unique per team.
                 $taken = NodeWorkload::query()
+                    ->where('team_id', $workload->team_id)
                     ->whereKeyNot($workload->id)
                     ->whereNotNull('domains')
                     ->where(function ($query) use ($domains): void {
@@ -67,6 +69,11 @@ class UpdateNodeWorkloadDomains
                     ->first();
                 if ($taken !== null) {
                     throw ValidationException::withMessages(['domains' => "{$taken} is already used by another application."]);
+                }
+                // v4 applications and services of the team route through another proxy, so the same host cannot serve both.
+                $legacyConflict = legacyResourceDomainConflict($domains, $workload->team_id, $user);
+                if ($legacyConflict !== null) {
+                    throw ValidationException::withMessages(['domains' => $legacyConflict]);
                 }
             }
 

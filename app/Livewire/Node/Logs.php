@@ -48,7 +48,7 @@ class Logs extends Component
 
     public function mount(string $node_uuid): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
         $this->node = Node::query()
             ->where('uuid', $node_uuid)
             ->where('team_id', currentTeam()->id)

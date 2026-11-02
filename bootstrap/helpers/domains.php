@@ -2,9 +2,11 @@
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\NodeWorkload;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\User;
 use App\Services\Access\AccessResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -142,6 +144,108 @@ function hiddenDomainConflict(string $domain, string $type): array
     ];
 }
 
+/**
+ * Host of a v4 FQDN or a cluster application domain: lowercase, without scheme, port, and path.
+ */
+function domainConflictHost(string $domain): string
+{
+    $domain = trim($domain);
+    $host = parse_url(str_contains($domain, '://') ? $domain : "http://{$domain}", PHP_URL_HOST);
+
+    return strtolower(is_string($host) && $host !== '' ? $host : $domain);
+}
+
+/**
+ * Cluster applications of the team that use the host of one of the domains. Cluster ingress routes a
+ * whole host, so a v4 domain on another port or path of the same host conflicts too.
+ *
+ * @param  Collection<int, string>  $domains
+ * @return list<array{domain: string, resource_name: string, resource_link: ?string, resource_uuid: ?string, resource_type: string, message: string}>
+ */
+function clusterApplicationDomainConflicts(Collection $domains, int $teamId): array
+{
+    $hosts = $domains->map(fn ($domain) => domainConflictHost((string) $domain))->filter()->unique()->values();
+    if ($hosts->isEmpty()) {
+        return [];
+    }
+
+    $workloads = app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
+        ->where('team_id', $teamId)
+        ->whereNotNull('domains')
+        ->where(function ($query) use ($hosts) {
+            foreach ($hosts as $host) {
+                $query->orWhereJsonContains('domains', $host);
+            }
+        })
+        ->with(['project:id,uuid', 'environment:id,uuid'])
+        ->get());
+
+    $conflicts = [];
+    foreach ($workloads as $workload) {
+        foreach (collect($workload->domains)->intersect($hosts) as $host) {
+            if (domainConflictResourceIsHidden($workload)) {
+                $conflicts[] = hiddenDomainConflict($host, 'cluster-application');
+
+                continue;
+            }
+            $link = $workload->project && $workload->environment
+                ? route('project.cluster-application.show', ['project_uuid' => $workload->project->uuid, 'environment_uuid' => $workload->environment->uuid, 'workload_uuid' => $workload->uuid])
+                : null;
+            $conflicts[] = [
+                'domain' => $host,
+                'resource_name' => $workload->name,
+                'resource_link' => $link,
+                'resource_uuid' => $workload->uuid,
+                'resource_type' => 'cluster-application',
+                'message' => "Domain $host is already in use by cluster application '{$workload->name}'",
+            ];
+        }
+    }
+
+    return $conflicts;
+}
+
+/**
+ * First v4 application, service, or instance domain of the team on one of the hosts, for the cluster
+ * application domain check. Returns the conflict message, without the name of a resource the user cannot see.
+ *
+ * @param  list<string>  $hosts
+ */
+function legacyResourceDomainConflict(array $hosts, int $teamId, User $user): ?string
+{
+    $hosts = collect($hosts)->map(fn (string $host) => domainConflictHost($host));
+    $describe = fn (string $host, Model $resource, string $type, string $name): string => Gate::forUser($user)->denies('view', $resource)
+        ? "{$host} is already used by another resource in this team."
+        : "{$host} is already used by {$type} '{$name}'.";
+
+    [$applications, $serviceApplications] = app(AccessResolver::class)->withoutVisibilityScope(fn () => [
+        Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id', 'docker_compose_domains', 'build_pack', 'environment_id']),
+        ServiceApplication::ownedByCurrentTeamAPI($teamId)->with('service')->get(['fqdn', 'uuid', 'id', 'service_id']),
+    ]);
+    foreach ($applications as $application) {
+        foreach (applicationDomainEntries($application) as $entry) {
+            $host = domainConflictHost($entry['domain']);
+            if ($hosts->contains($host)) {
+                return $describe($host, $application, 'application', $application->name);
+            }
+        }
+    }
+    foreach ($serviceApplications as $serviceApplication) {
+        foreach (explode(',', (string) $serviceApplication->fqdn) as $domain) {
+            $host = $domain === '' ? '' : domainConflictHost($domain);
+            if ($host !== '' && $hosts->contains($host) && $serviceApplication->service !== null) {
+                return $describe($host, $serviceApplication->service, 'service', $serviceApplication->service->name);
+            }
+        }
+    }
+    $instanceFqdn = data_get(instanceSettings(), 'fqdn');
+    if (filled($instanceFqdn) && $hosts->contains(domainConflictHost($instanceFqdn))) {
+        return domainConflictHost($instanceFqdn).' is already used by this Coolify instance.';
+    }
+
+    return null;
+}
+
 function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     $conflicts = [];
@@ -239,6 +343,10 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
                 'message' => "Domain $naked_domain is already in use by service '{$app->service->name}'",
             ];
         }
+    }
+
+    if ($currentTeam) {
+        $conflicts = [...$conflicts, ...clusterApplicationDomainConflicts($domains, $currentTeam->id)];
     }
 
     if ($resource) {
@@ -344,6 +452,8 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
             }
         }
     }
+
+    $conflicts = [...$conflicts, ...clusterApplicationDomainConflicts($domains, (int) $teamId)];
 
     // Check instance-level domain
     $settings = instanceSettings();

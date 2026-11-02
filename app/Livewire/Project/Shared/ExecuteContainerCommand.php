@@ -87,7 +87,7 @@ class ExecuteContainerCommand extends Component
             $this->servers = $this->servers->push($this->resource);
             $this->containersLoaded = true;
         } elseif (data_get($this->parameters, 'node_uuid')) {
-            abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+            abort_unless(nodesEnabled(), 404);
             $this->type = 'node';
             $this->resource = Node::query()
                 ->where('uuid', $this->parameters['node_uuid'])

@@ -11,6 +11,15 @@ use InvalidArgumentException;
 class PrivateIpv4Cidr implements ValidationRule
 {
     /**
+     * Default container bridge networks on Node hosts. The cluster firewall drops host traffic to and
+     * from the cluster CIDR, so an overlap breaks local containers.
+     */
+    public const RESERVED_RANGES = [
+        '10.88.0.0/16' => 'default Podman',
+        '172.17.0.0/16' => 'default Docker',
+    ];
+
+    /**
      * Run the validation rule.
      *
      * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
@@ -19,6 +28,13 @@ class PrivateIpv4Cidr implements ValidationRule
     {
         try {
             self::range((string) $value);
+            foreach (self::RESERVED_RANGES as $reserved => $owner) {
+                if (self::overlaps((string) $value, $reserved)) {
+                    $fail("The cluster CIDR overlaps the {$owner} network {$reserved}. Choose another range.");
+
+                    return;
+                }
+            }
         } catch (InvalidArgumentException $exception) {
             $fail($exception->getMessage());
         }

@@ -19,7 +19,7 @@ class FluxConnectionEventController extends Controller
 {
     public function __invoke(Request $request, ResolveFluxPublicUrl $resolveFluxPublicUrl): Response
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
 
         $expectedToken = config('constants.flux.internal_token');
         $providedToken = $request->bearerToken();

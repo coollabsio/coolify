@@ -30,6 +30,10 @@ class BuildNodeClusterIngressRoutes
         $routes = [];
         foreach (self::routedWorkloads($cluster) as $workload) {
             foreach ($workload->domains as $host) {
+                // Sentinel rejects the whole route table for one invalid host, so skip it here.
+                if (! is_string($host) || ! self::validHost($host)) {
+                    continue;
+                }
                 // Domains are unique across workloads. Keep the first route if old data disagrees.
                 $routes[$host] ??= [
                     'host' => $host,
@@ -60,6 +64,9 @@ class BuildNodeClusterIngressRoutes
             ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id))
             ->orderBy('id')
             ->get(['id', 'uuid', 'internal_dns_name'])
+            // Sentinel rejects the whole name table for one invalid or duplicate name.
+            ->filter(fn (NodeWorkload $workload): bool => self::validLabel((string) $workload->internal_dns_name))
+            ->unique('internal_dns_name')
             ->map(fn (NodeWorkload $workload): array => [
                 'name' => $workload->internal_dns_name,
                 'workload_id' => $workload->uuid,
@@ -72,6 +79,25 @@ class BuildNodeClusterIngressRoutes
         }
 
         return $names;
+    }
+
+    /** A lowercase RFC 1123 hostname with at least two labels, as Sentinel accepts it. */
+    public static function validHost(string $host): bool
+    {
+        if ($host === '' || strlen($host) > 253 || ! str_contains($host, '.') || filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return false;
+        }
+        $labels = explode('.', $host);
+        if (ctype_digit(end($labels))) {
+            return false;
+        }
+
+        return collect($labels)->every(fn (string $label): bool => preg_match('/\A(?!-)[a-z0-9-]{1,63}(?<!-)\z/', $label) === 1);
+    }
+
+    private static function validLabel(string $value): bool
+    {
+        return preg_match('/\A(?!-)[a-zA-Z0-9-]{1,63}(?<!-)\z/', $value) === 1;
     }
 
     /**

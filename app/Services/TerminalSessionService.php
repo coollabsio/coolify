@@ -89,7 +89,7 @@ class TerminalSessionService
     /** @param array{server_uuid: string, container: ?string} $payload */
     private function redeemNode(User $user, array $payload): string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false) || $payload['container'] !== null) {
+        if (! nodesEnabled() || $payload['container'] !== null) {
             throw new AccessDeniedHttpException('Terminal target is not authorized.');
         }
 

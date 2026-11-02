@@ -43,8 +43,8 @@ class DockerImage extends Component
 
     public function loadDeploymentTargets(): void
     {
-        $clusterUuid = $this->query['cluster'] ?? null;
-        $nodeUuid = $this->query['server'] ?? null;
+        $clusterUuid = nodesEnabled() ? ($this->query['cluster'] ?? null) : null;
+        $nodeUuid = nodesEnabled() ? ($this->query['server'] ?? null) : null;
         $destinationUuid = $this->query['destination'] ?? null;
         $this->deploymentTarget = is_string($nodeUuid) && $nodeUuid !== ''
             ? 'node:'.$nodeUuid
@@ -52,7 +52,7 @@ class DockerImage extends Component
                 ? 'cluster:'.$clusterUuid
                 : (is_string($destinationUuid) && $destinationUuid !== '' ? 'destination:'.$destinationUuid : ''));
 
-        $this->deploymentTargets = NodeCluster::query()
+        $this->deploymentTargets = ! nodesEnabled() ? [] : NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->with(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
@@ -189,6 +189,7 @@ class DockerImage extends Component
 
         [$targetType, $targetUuid] = explode(':', $this->deploymentTarget, 2);
         if (in_array($targetType, ['cluster', 'node'], true)) {
+            abort_unless(nodesEnabled(), 404);
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             $this->authorize('create', NodeWorkload::class);

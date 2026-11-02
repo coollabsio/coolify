@@ -19,6 +19,10 @@ class DispatchWorkloadDeployment
         if ($operation->command_type !== 'workload.deploy.v1' || $operation->workload === null || $operation->revision === null) {
             throw new RuntimeException('The deployment operation is incomplete.');
         }
+        // A replayed or late deployment must not recreate a container on a server that lost the placement (failed move, removal).
+        if (! $operation->node->workloads()->whereKey($operation->workload->id)->exists()) {
+            throw new RuntimeException('The workload is no longer assigned to this server.');
+        }
 
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');

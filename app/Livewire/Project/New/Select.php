@@ -489,6 +489,8 @@ class Select extends Component
 
     public function setCluster(string $clusterUuid)
     {
+        abort_unless(nodesEnabled(), 404);
+
         $cluster = NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->where('uuid', $clusterUuid)
@@ -509,6 +511,8 @@ class Select extends Component
 
     public function setNode(string $nodeUuid)
     {
+        abort_unless(nodesEnabled(), 404);
+
         $node = Node::query()
             ->where('team_id', currentTeam()->id)
             ->where('uuid', $nodeUuid)
@@ -565,7 +569,7 @@ class Select extends Component
         $this->buildServers = Server::isUsableBuildServer()->get()->sortBy('name');
         $this->allServers = $this->servers->concat($this->buildServers);
         $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
-        $this->clusters = NodeCluster::query()
+        $this->clusters = ! nodesEnabled() ? collect() : NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->whereIn('network_status', ['active', 'degraded'])
             ->whereHas('nodes', fn ($query) => $query

@@ -30,9 +30,11 @@ use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
+use App\Rules\ValidServerIp;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -43,9 +45,11 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    private const SECTIONS = ['general', 'workloads', 'containers', 'sentinel'];
+    private const SECTIONS = ['general', 'workloads', 'containers', 'sentinel', 'danger'];
 
     public Node $node;
+
+    public array $connection = [];
 
     #[Locked]
     public string $section = 'general';
@@ -69,14 +73,39 @@ class Show extends Component
 
     public function mount(string $node_uuid, ?string $section = null): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
         $this->node = Node::query()
             ->where('uuid', $node_uuid)
             ->where('team_id', currentTeam()->id)
             ->firstOrFail();
         $this->authorize('view', $this->node);
+        $this->connection = $this->node->only(['name', 'description', 'ip', 'user', 'port']);
+        $this->connection['settings'] = array_replace([
+            'connection_timeout' => 10,
+            'server_timezone' => 'UTC',
+            'wildcard_domain' => null,
+        ], $this->node->settings ?? []);
         $this->section = $this->resolveSection($section);
         $this->loadSectionData();
+    }
+
+    public function saveConnection(): void
+    {
+        $this->authorize('update', $this->node);
+        $validated = Validator::make(['connection' => $this->connection], [
+            'connection.name' => 'required|string|max:255',
+            'connection.description' => 'nullable|string|max:255',
+            'connection.ip' => ['required', 'string', new ValidServerIp],
+            'connection.user' => ['required', 'string', 'regex:/^[a-z_][a-z0-9_-]*[$]?$/i', 'max:255'],
+            'connection.port' => 'required|integer|min:1|max:65535',
+            'connection.settings.connection_timeout' => 'required|integer|min:1|max:300',
+            'connection.settings.server_timezone' => 'required|timezone:all',
+            'connection.settings.wildcard_domain' => 'nullable|url:http,https|max:255',
+        ])->validate()['connection'];
+        $validated['ip'] = trim($validated['ip'], '[]');
+        $validated['settings'] = array_replace($this->node->fresh()->settings ?? [], $validated['settings']);
+        $this->node->update($validated);
+        $this->dispatch('success', 'Connection settings saved.');
     }
 
     public function installSentinel(): void
@@ -321,9 +350,12 @@ class Show extends Component
         $this->runAction(fn () => RotateSentinelToken::run($this->node), 'Sentinel token rotated. The previous token no longer works.');
     }
 
-    public function deleteNode(): void
+    public function deleteNode(mixed $password = null): bool|string
     {
         $this->authorize('delete', $this->node);
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
 
         try {
             $deleted = DB::transaction(function (): bool {
@@ -337,16 +369,18 @@ class Show extends Component
         } catch (\Throwable $e) {
             handleError($e, $this);
 
-            return;
+            return true;
         }
 
         if (! $deleted) {
             $this->dispatch('error', 'Remove this server from its cluster and move or delete its applications before deleting it.');
 
-            return;
+            return true;
         }
 
         $this->redirectRoute('server.index', navigate: true);
+
+        return true;
     }
 
     public function renewFluxCertificate(): void
@@ -464,6 +498,7 @@ class Show extends Component
             'node.workloads' => 'workloads',
             'node.containers' => 'containers',
             'node.sentinel' => 'sentinel',
+            'node.danger' => 'danger',
             default => 'general',
         };
 

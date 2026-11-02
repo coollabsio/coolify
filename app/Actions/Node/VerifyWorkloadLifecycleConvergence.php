@@ -32,7 +32,7 @@ class VerifyWorkloadLifecycleConvergence
                 && $container->image === $operation->revision->image
                 && $container->state === 'running'
                 && ($action === NodeWorkloadAction::START || $this->restarted($operation)),
-            NodeWorkloadAction::STOP => $container !== null && in_array($container->state, ['exited', 'stopped'], true),
+            NodeWorkloadAction::STOP => $container !== null && in_array($container->state, ['exited', 'stopped', 'created', 'configured', 'dead'], true),
             NodeWorkloadAction::REMOVE => $container === null,
         };
 

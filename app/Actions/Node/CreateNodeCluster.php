@@ -20,14 +20,15 @@ class CreateNodeCluster
     {
         return Cache::lock('node-cluster:cidr-allocation', 10)->block(5, function () use ($team, $creator, $name, $description, $cidr): NodeCluster {
             return DB::transaction(function () use ($team, $creator, $name, $description, $cidr): NodeCluster {
-                $cidr ??= $this->nextCidr();
+                $cidr ??= $this->nextCidr($team);
                 try {
                     $cidr = PrivateIpv4Cidr::range($cidr)['canonical'];
                 } catch (InvalidArgumentException $exception) {
                     throw new DomainException($exception->getMessage(), previous: $exception);
                 }
-                if (NodeCluster::query()->lockForUpdate()->get(['cidr'])->contains(fn (NodeCluster $cluster): bool => PrivateIpv4Cidr::overlaps($cluster->cidr, $cidr))) {
-                    throw new DomainException('The cluster CIDR overlaps an existing cluster network.');
+                // Each cluster is its own WireGuard mesh and a Node joins one cluster, so only clusters of the same team must not overlap.
+                if (NodeCluster::query()->where('team_id', $team->id)->lockForUpdate()->get(['cidr'])->contains(fn (NodeCluster $cluster): bool => PrivateIpv4Cidr::overlaps($cluster->cidr, $cidr))) {
+                    throw new DomainException('The cluster CIDR overlaps another cluster network of this team.');
                 }
                 $hostAddress = PrivateIpv4Cidr::firstContainedAddress($cidr, [PrivateIpv4Cidr::coolifyHostAddress()]);
                 if ($hostAddress !== null) {
@@ -39,9 +40,9 @@ class CreateNodeCluster
         });
     }
 
-    private function nextCidr(): string
+    private function nextCidr(Team $team): string
     {
-        $used = NodeCluster::query()->pluck('cidr')->all();
+        $used = NodeCluster::query()->where('team_id', $team->id)->pluck('cidr')->all();
         $hostAddress = PrivateIpv4Cidr::coolifyHostAddress();
         for ($i = 0; $i < 4096; $i++) {
             $cidr = '10.'.(240 + intdiv($i, 256)).'.'.($i % 256).'.0/24';

@@ -201,8 +201,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
     /**
      * Detaches the target placement that the move attached before the target became ready, so
-     * the reconciler does not deploy the workload on both servers. Runs from the job, `failed()`,
-     * and stale operation recovery.
+     * the reconciler does not deploy the workload on both servers. A container that the move
+     * already deployed there gets a REMOVE first. Runs from the job, `failed()`, and stale
+     * operation recovery.
      */
     public static function releaseTarget(NodeOperation $operation): void
     {
@@ -214,13 +215,58 @@ class MoveNodeWorkloadJob implements ShouldQueue
             ->where('uuid', data_get($operation->request, 'target_node_uuid'))
             ->where('team_id', $operation->node->team_id)
             ->first();
-        if ($target === null || $target->workloads()->detach($operation->workload) === 0) {
+        if ($target === null) {
+            return;
+        }
+        if ($target->workloads()->whereKey($operation->workload->id)->exists()) {
+            self::queueTargetRemoval($operation, $target);
+        }
+        if ($target->workloads()->detach($operation->workload) === 0) {
             return;
         }
         if ($operation->workload->hasIngressRoutes() && $target->cluster !== null) {
             // Withdraw the firewall allow for the address that the target no longer uses.
             QueueNodeClusterNetworkRevision::run($target->cluster, $operation->requestedBy);
         }
+    }
+
+    /**
+     * Queues a REMOVE of the target container while the target is still assigned, because
+     * CreateLifecycleOperation needs the assignment and no reconciler manages the container
+     * after the detach. The lifecycle job sends the command with the container name, so it
+     * still runs after the detach. When the Node is offline or rejects the operation, the
+     * target is detached anyway and the outcome is recorded on the move.
+     */
+    private static function queueTargetRemoval(NodeOperation $operation, Node $target): void
+    {
+        $deployed = NodeOperation::query()
+            ->where('node_id', $target->id)
+            ->where('node_workload_id', $operation->workload->id)
+            ->where('command_type', 'workload.deploy.v1')
+            ->where('created_at', '>=', $operation->created_at)
+            ->exists()
+            || $target->containers()->where('node_workload_id', $operation->workload->id)->where('is_managed', true)->exists();
+        if (! $deployed || $operation->revision === null) {
+            return;
+        }
+
+        $outcome = ['target_removal' => 'skipped: the target server is offline'];
+        if ($target->is_usable && $target->hasRecentFluxHeartbeat()) {
+            try {
+                $removal = CreateLifecycleOperation::run(
+                    $target,
+                    $operation->revision,
+                    NodeWorkloadAction::REMOVE,
+                    $operation->requestedBy,
+                    updateDesiredState: false,
+                );
+                ManageNodeWorkloadJob::dispatch($removal->id);
+                $outcome = ['target_removal' => 'queued', 'target_removal_operation_uuid' => $removal->uuid];
+            } catch (Throwable $exception) {
+                $outcome = ['target_removal' => 'failed: '.mb_substr($exception->getMessage(), 0, 500)];
+            }
+        }
+        $operation->update(['result' => [...($operation->refresh()->result ?? []), ...$outcome]]);
     }
 
     public function failed(?Throwable $exception): void

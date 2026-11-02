@@ -6,9 +6,9 @@
                 class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
                 <x-reicon name="destinations" class="size-5" />
             </div>
-            <h4 class="truncate text-sm font-semibold text-black dark:text-fg">{{ $node->cluster?->name ?? 'None' }}</h4>
+            <h4 class="truncate text-sm font-semibold text-black dark:text-fg">{{ $node?->cluster?->name ?? 'None' }}</h4>
         </div>
-        @if ($node->cluster)
+        @if ($node?->cluster)
             <a href="{{ route('node-cluster.show', ['cluster_uuid' => $node->cluster->uuid]) }}" {{ wireNavigate() }}
                 class="button shrink-0">Open cluster</a>
         @endif
@@ -18,7 +18,7 @@
 <x-application.settings-section id="cluster-application-servers" :title="$servers->count() > 1 ? 'Servers' : 'Server'"
     helper="The servers that run this application.">
     <div class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.07]">
-        @foreach ($servers as $server)
+        @forelse ($servers as $server)
             <div wire:key="cluster-application-server-{{ $server->uuid }}"
                 class="flex flex-col gap-4 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex min-w-0 items-center gap-3">
@@ -36,6 +36,8 @@
                 <a href="{{ route('node.show', ['node_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                     class="button shrink-0">Open server</a>
             </div>
-        @endforeach
+        @empty
+            <p class="text-sm text-neutral-500 dark:text-fg-dim">No server runs this application.</p>
+        @endforelse
     </div>
 </x-application.settings-section>

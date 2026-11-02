@@ -30,7 +30,7 @@ class RemoveNodeFromCluster
             throw new DomainException('Stop and remove managed containers from this server before removing it from the cluster.');
         }
 
-        $hadAppliedNetwork = $node->network_applied_revision !== null || in_array($cluster->network_status, ['active', 'degraded'], true);
+        $hadAppliedNetwork = filled($node->wireguard_ip) && ($node->network_applied_revision !== null || in_array($cluster->network_status, ['active', 'degraded'], true));
         $leaveRequest = [
             'interface' => $cluster->wireguard_interface,
             'owner_node_ip' => $node->wireguard_ip,
@@ -51,6 +51,10 @@ class RemoveNodeFromCluster
             $node = Node::query()->lockForUpdate()->findOrFail($node->id);
             if ($node->node_cluster_id !== $cluster->id) {
                 throw new DomainException('The server does not belong to this cluster.');
+            }
+            // An application can be placed here while the network leave runs; detaching it would orphan its container.
+            if ($node->workloads()->exists()) {
+                throw new DomainException('Move or delete the applications on this server before removing it from the cluster.');
             }
 
             NodeFirewallRule::query()->where('source_node_id', $node->id)->delete();

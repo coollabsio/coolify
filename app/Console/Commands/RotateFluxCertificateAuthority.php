@@ -18,7 +18,7 @@ class RotateFluxCertificateAuthority extends Command
 
     public function handle(): int
     {
-        if (! config('constants.sentinel.host_enabled')) {
+        if (! nodesEnabled()) {
             $this->error('Host-native Sentinel is disabled.');
 
             return self::FAILURE;

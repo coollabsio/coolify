@@ -176,7 +176,7 @@ class Terminal extends Component
     private function terminalNode(string $uuid, bool $isContainer): Node
     {
         abort_if($isContainer, 404);
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
 
         return Node::query()
             ->where('team_id', currentTeam()->id)

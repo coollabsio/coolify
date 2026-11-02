@@ -113,6 +113,7 @@ return [
     'sentinel' => [
         'dev_url' => env('DEV_SENTINEL_URL'),
         'host_enabled' => env('SENTINEL_HOST_ENABLED', false),
+        // Fallback install image, used only when versions.json has no valid `coolify.sentinel-host` release.
         'host_image' => env('SENTINEL_HOST_IMAGE', 'ghcr.io/coollabsio/sentinel-host:main'),
         // Upgrades install `host_repository@digest` from the `coolify.sentinel-host` entry in versions.json.
         'host_repository' => env('SENTINEL_HOST_REPOSITORY', 'ghcr.io/coollabsio/sentinel-host'),

@@ -71,7 +71,7 @@ it('falls back to one fetch per metric when the batch fails', function () {
 it('quotes the bucketed history URL in a single fetch for a non-root user', function () {
     $commands = [];
     Process::fake(function (PendingProcess $process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return Process::result('[{"time":60000,"percent":5}]');
     });

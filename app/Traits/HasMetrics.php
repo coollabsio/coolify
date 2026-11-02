@@ -2,6 +2,8 @@
 
 namespace App\Traits;
 
+use App\Actions\Node\InstallSentinel;
+use App\Models\Node;
 use App\Models\Server;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -25,6 +27,9 @@ trait HasMetrics
      */
     public function prefetchMetrics(array $types, int $mins): void
     {
+        if ($this instanceof Node && ($mins < 1 || $mins > 43200)) {
+            throw new \InvalidArgumentException('Invalid metrics time range.');
+        }
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
             return;
@@ -35,15 +40,19 @@ trait HasMetrics
         // The token reaches curl on stdin (`-H @-`), so it is not a process argument. The token
         // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
         // cannot end the heredoc. Responses are separated by a 0x1E record separator.
+        $curl = $server instanceof Node ? 'curl --fail --silent --show-error --max-time 10' : 'curl -s';
         $script = implode("\nprintf '\\036'\n", array_map(
-            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            fn (string $type) => $curl.' -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
             $types
         ));
 
         try {
             $output = instant_remote_process(
-                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+                [$server instanceof Node
+                    ? InstallSentinel::hostCommand($server, "sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT")
+                    : "docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
                 $server,
+                timeout: $server instanceof Node ? 60 : 3600,
                 maxAttempts: 1
             );
         } catch (\Throwable) {
@@ -138,6 +147,9 @@ trait HasMetrics
      */
     protected function fetchMetricRows(string $type, int $mins): ?array
     {
+        if ($this instanceof Node && ($mins < 1 || $mins > 43200)) {
+            throw new \InvalidArgumentException('Invalid metrics time range.');
+        }
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
             return null;
@@ -152,11 +164,20 @@ trait HasMetrics
             $endpoint = $this->getMetricsEndpoint($type, $from, $mins);
             $token = $this->metricsToken($server);
 
-            $response = instant_remote_process(
-                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$endpoint}\"'"],
-                $server,
-                false
-            );
+            if ($server instanceof Node) {
+                $this->prefetchMetrics([$type], $mins);
+                if (! array_key_exists($key, $this->prefetchedMetricResponses)) {
+                    throw new \RuntimeException('Could not read Sentinel metrics from this node.');
+                }
+                $response = $this->prefetchedMetricResponses[$key];
+                unset($this->prefetchedMetricResponses[$key]);
+            } else {
+                $response = instant_remote_process(
+                    ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$endpoint}\"'"],
+                    $server,
+                    false
+                );
+            }
         }
 
         if (str($response)->contains('error')) {
@@ -168,7 +189,12 @@ trait HasMetrics
             throw new \Exception($error);
         }
 
-        return json_decode($response, true) ?: [];
+        $rows = json_decode($response, true);
+        if ($server instanceof Node && (! is_array($rows) || ! array_is_list($rows))) {
+            throw new \RuntimeException('Sentinel returned invalid metrics history.');
+        }
+
+        return $rows ?: [];
     }
 
     /**
@@ -224,8 +250,11 @@ trait HasMetrics
         return array_map(fn (int $bucket) => [$bucket, $sums[$bucket] / $counts[$bucket]], array_keys($sums));
     }
 
-    private function metricsToken(Server $server): string
+    private function metricsToken(Server|Node $server): string
     {
+        if ($server instanceof Node) {
+            return $server->ensureValidSentinelToken();
+        }
         $previousToken = null;
         try {
             $previousToken = $server->settings->sentinel_token;
@@ -242,10 +271,10 @@ trait HasMetrics
 
     private function isServerMetrics(): bool
     {
-        return $this instanceof Server;
+        return $this instanceof Server || $this instanceof Node;
     }
 
-    private function getMetricsServer(): Server
+    private function getMetricsServer(): Server|Node
     {
         return $this->isServerMetrics() ? $this : $this->destination->server;
     }

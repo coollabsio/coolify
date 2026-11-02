@@ -77,7 +77,7 @@
     @endcan
 
     <x-application.settings-section id="cluster-application-build" title="Build & deploy"
-        helper="How Coolify deploys the application. Changes create a new revision. Redeploy the application to apply them.">
+        helper="How Coolify deploys the application. Changes create a new revision. A running application applies it automatically within about a minute, or redeploy to apply it now.">
         <p class="text-sm text-neutral-500 dark:text-fg-dim">Nothing to build. This application deploys a prebuilt Docker image.</p>
         <x-application.settings-subsection title="Image">
             <div class="grid gap-4 lg:grid-cols-2">
@@ -91,7 +91,7 @@
     </x-application.settings-section>
 
     <x-application.settings-section id="cluster-application-container" title="Container"
-        helper="Options applied to the container when it starts. Changes create a new revision. Redeploy the application to apply them.">
+        helper="Options applied to the container when it starts. Changes create a new revision. A running application applies it automatically within about a minute, or redeploy to apply it now.">
         <x-forms.input id="startCommand" label="Start command" placeholder="nginx -g &quot;daemon off;&quot;"
             canGate="update" :canResource="$workload"
             helper="Overrides the image command. Use double quotes for arguments with spaces. Leave empty to use the image default." />

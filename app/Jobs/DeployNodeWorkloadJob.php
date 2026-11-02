@@ -22,7 +22,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 660;
+    public int $timeout = 720;
 
     public function __construct(public int $operationId) {}
 

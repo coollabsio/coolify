@@ -1013,6 +1013,15 @@ function isDev(): bool
 }
 
 /**
+ * The single gate for the Node product (Podman Nodes, clusters, host Sentinel, Flux). Flux ships only in the
+ * development stack today, so Nodes also need a development instance.
+ */
+function nodesEnabled(): bool
+{
+    return isDev() && (bool) config('constants.sentinel.host_enabled', false);
+}
+
+/**
  * Path that the Docker daemon of $server must use as a bind mount source for $path, a path that Coolify
  * writes through SSH (below base_configuration_dir()).
  *

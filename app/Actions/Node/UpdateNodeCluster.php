@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Models\NodeCluster;
 use App\Rules\PrivateIpv4Cidr;
 use DomainException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -33,8 +34,9 @@ class UpdateNodeCluster
             if ($cidr !== $cluster->cidr && $hostAddress !== null) {
                 throw new DomainException("The cluster CIDR contains the Coolify server address {$hostAddress}. Choose a range that does not include it.");
             }
-            if (NodeCluster::query()->whereKeyNot($cluster->id)->get(['cidr'])->contains(fn (NodeCluster $other): bool => PrivateIpv4Cidr::overlaps($other->cidr, $cidr))) {
-                throw new DomainException('The cluster CIDR overlaps an existing cluster network.');
+            // Each cluster is its own WireGuard mesh and a Node joins one cluster, so only clusters of the same team must not overlap.
+            if (NodeCluster::query()->where('team_id', $cluster->team_id)->whereKeyNot($cluster->id)->get(['cidr'])->contains(fn (NodeCluster $other): bool => PrivateIpv4Cidr::overlaps($other->cidr, $cidr))) {
+                throw new DomainException('The cluster CIDR overlaps another cluster network of this team.');
             }
 
             $networkChanged = $cluster->cidr !== $cidr || $cluster->wireguard_interface !== $interface || $cluster->wireguard_port !== $port;
@@ -42,7 +44,15 @@ class UpdateNodeCluster
             if ($networkChanged) {
                 $cluster->desired_revision++;
             }
-            $cluster->save();
+            try {
+                $cluster->save();
+            } catch (UniqueConstraintViolationException $exception) {
+                if (! str_contains($exception->getMessage(), 'node_clusters_team_id_cidr_unique')) {
+                    throw $exception;
+                }
+
+                throw new DomainException('This cluster CIDR is not available. Choose another range.', previous: $exception);
+            }
 
             return $cluster;
         });

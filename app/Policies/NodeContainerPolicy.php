@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\NodeContainer;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class NodeContainerPolicy
 {
@@ -14,7 +16,9 @@ class NodeContainerPolicy
 
     public function view(User $user, NodeContainer $nodeContainer): bool
     {
-        return $user->teams->contains('id', $nodeContainer->node->team_id);
+        $teamId = $nodeContainer->node?->team_id;
+
+        return $teamId !== null && app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $teamId);
     }
 
     public function create(User $user): bool

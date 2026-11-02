@@ -37,6 +37,7 @@ use App\Livewire\ForcePasswordReset;
 use App\Livewire\Node\Activity as NodeActivity;
 use App\Livewire\Node\InternalDns as NodeInternalDns;
 use App\Livewire\Node\Logs as NodeLogs;
+use App\Livewire\Node\Metrics;
 use App\Livewire\Node\Onboarding as NodeOnboarding;
 use App\Livewire\Node\Show as NodeShow;
 use App\Livewire\NodeCluster\Show as NodeClusterShow;
@@ -379,7 +380,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     base_ip(),
                 ])->filter()->unique()->values();
 
-                if (config('constants.sentinel.host_enabled', false)) {
+                if (nodesEnabled()) {
                     $nodeIpAddresses = Node::query()
                         ->where('team_id', $team->id)
                         ->where('is_reachable', true)
@@ -547,6 +548,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/applications', NodeShow::class)->name('node.workloads');
             Route::get('/containers', NodeShow::class)->name('node.containers');
             Route::get('/sentinel', NodeShow::class)->name('node.sentinel');
+            Route::get('/metrics', Metrics::class)->name('node.metrics');
+            Route::get('/danger', NodeShow::class)->name('node.danger');
             Route::get('/internal-dns', NodeInternalDns::class)->name('node.internal-dns');
             Route::get('/activity', NodeActivity::class)->name('node.activity');
             Route::get('/logs', NodeLogs::class)->name('node.logs');

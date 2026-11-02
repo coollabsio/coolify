@@ -16,7 +16,7 @@ class RepairFluxTrust
 
     public function handle(Node $node): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
+        if (! nodesEnabled()) {
             return null;
         }
 
@@ -130,7 +130,7 @@ systemctl restart sentinel.service
 systemctl is-active --quiet sentinel.service
 
 attempt=0
-until curl --fail --silent http://127.0.0.1:8888/api/health >/dev/null; do
+until curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8888/api/health >/dev/null; do
     attempt=\$((attempt + 1))
     if [ "\$attempt" -ge 30 ]; then
         journalctl --unit sentinel.service --no-pager --lines 50

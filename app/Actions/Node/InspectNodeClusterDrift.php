@@ -113,7 +113,7 @@ class InspectNodeClusterDrift
             throw new RuntimeException('Flux internal API configuration is incomplete.');
         }
 
-        $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(120)
+        $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(30)
             ->post(rtrim($url, '/').'/v1/commands/'.Str::beforeLast($operation->command_type, '.v1'), [
                 'server_id' => $operation->node->uuid,
                 'command_id' => $operation->uuid,

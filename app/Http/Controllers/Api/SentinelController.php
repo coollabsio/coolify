@@ -27,7 +27,7 @@ class SentinelController extends Controller
 
     public function assignment(Request $request, IssueFluxCredential $issueFluxCredential, ResolveFluxPublicUrl $resolveFluxPublicUrl, EnsureFluxCertificateAuthority $ensureFluxCertificateAuthority, ResolveFluxTrustBundle $resolveFluxTrustBundle): JsonResponse
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
+        if (! nodesEnabled()) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -142,7 +142,7 @@ class SentinelController extends Controller
             return response()->json(['message' => 'Server is not functional'], 401);
         }
 
-        if ($server->settings->sentinel_token !== $naked_token) {
+        if (! is_string($server->settings->sentinel_token) || ! hash_equals($server->settings->sentinel_token, $naked_token)) {
             auditLogWebhookFailure('sentinel', 'token_mismatch', [
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,

@@ -18,6 +18,7 @@ use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Rules\PrivateIpv4Cidr;
 use DomainException;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -27,6 +28,7 @@ use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use RuntimeException;
 
 class Show extends Component
 {
@@ -79,7 +81,7 @@ class Show extends Component
 
     public function mount(string $cluster_uuid): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        abort_unless(nodesEnabled(), 404);
         $this->cluster = NodeCluster::query()->where('team_id', currentTeam()->id)->where('uuid', $cluster_uuid)->firstOrFail();
         $this->authorize('view', $this->cluster);
         $this->section = self::SECTIONS_BY_ROUTE[request()->route()?->getName()] ?? 'general';
@@ -125,7 +127,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->cluster);
         $this->validate(['nodeUuid' => ['required', 'string']], [], ['nodeUuid' => 'server']);
-        $node = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->where('uuid', $this->nodeUuid)->firstOrFail();
+        $node = Node::query()->where('team_id', $this->cluster->team_id)->whereNull('node_cluster_id')->where('uuid', $this->nodeUuid)->firstOrFail();
         try {
             AssignNodeToCluster::run($this->cluster, $node, auth()->user());
         } catch (DomainException $exception) {
@@ -162,7 +164,7 @@ class Show extends Component
     public function removeNode(string $nodeUuid): void
     {
         $this->authorize('update', $this->cluster);
-        $node = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
+        $node = Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
         try {
             RemoveNodeFromCluster::run($this->cluster, $node, auth()->user());
         } catch (DomainException $exception) {
@@ -177,7 +179,7 @@ class Show extends Component
     public function setIngress(string $nodeUuid, bool $enabled): void
     {
         $this->authorize('update', $this->cluster);
-        $node = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
+        $node = Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
         try {
             SetNodeIngress::run($this->cluster, $node, $enabled, auth()->user());
         } catch (DomainException $exception) {
@@ -352,7 +354,13 @@ class Show extends Component
     public function repairNetwork(): void
     {
         $this->authorize('update', $this->cluster);
-        RepairNodeClusterNetwork::run($this->cluster);
+        try {
+            RepairNodeClusterNetwork::run($this->cluster);
+        } catch (LockTimeoutException|RuntimeException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
         $this->cluster->update(['network_status' => 'pending']);
         $this->dispatch('success', 'Cluster network state restored over SSH. Reconcile the network to verify current state.');
     }
@@ -436,7 +444,7 @@ class Show extends Component
         return [
             'nodes' => $this->clusterNodes()->get(),
             'availableNodes' => auth()->user()->can('update', $this->cluster)
-                ? Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->orderBy('name')->get()
+                ? Node::query()->where('team_id', $this->cluster->team_id)->whereNull('node_cluster_id')->orderBy('name')->get()
                 : collect(),
         ];
     }
@@ -509,7 +517,7 @@ class Show extends Component
         return [
             'operations' => NodeOperation::query()
                 ->with('node')
-                ->whereHas('node', fn ($query) => $query->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id))
+                ->whereHas('node', fn ($query) => $query->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id))
                 ->userFacing()
                 ->latest('id')
                 ->limit(10)
@@ -519,7 +527,7 @@ class Show extends Component
 
     private function clusterNodes(): Builder
     {
-        return Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->orderBy('name');
+        return Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->orderBy('name');
     }
 
     private function meshWorkloads(): Builder

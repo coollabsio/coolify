@@ -19,11 +19,17 @@ class ReconcileNodeWorkloads
 {
     use AsAction;
 
+    /** Container states that need no stop. A stop leaves a never-started container in `created`, so stopping it again would loop. */
+    private const NOT_RUNNING_STATES = ['exited', 'stopped', 'created', 'configured', 'dead'];
+
+    /** A failed deployment of the same revision on a Node is not retried before this many minutes. */
+    private const FAILED_DEPLOYMENT_BACKOFF_MINUTES = 10;
+
     public function handle(Node $node): int
     {
         $workloads = $node->workloads()
             ->with([
-                'revisions' => fn ($query) => $query->latest('id'),
+                'revisions' => fn ($query) => $query->latest('id')->limit(1),
                 'containers' => fn ($query) => $query
                     ->where('node_id', $node->id)
                     ->where('is_managed', true),
@@ -96,7 +102,7 @@ class ReconcileNodeWorkloads
                 $currentContainer,
             ),
             NodeWorkloadDesiredState::STOPPED => $container !== null
-                && ! in_array($container->state, ['exited', 'stopped'], true)
+                && ! in_array($container->state, self::NOT_RUNNING_STATES, true)
                     ? $this->dispatchLifecycle($node, $container, $latestRevision, NodeWorkloadAction::STOP)
                     : 0,
             NodeWorkloadDesiredState::REMOVED => $container !== null
@@ -115,6 +121,18 @@ class ReconcileNodeWorkloads
         }
         if ($currentContainer !== null) {
             return $this->dispatchLifecycle($node, $currentContainer, $latestRevision, NodeWorkloadAction::START);
+        }
+
+        // Without a backoff, an image that cannot run creates a failing deployment every minute.
+        $recentlyFailed = NodeOperation::query()
+            ->where('node_id', $node->id)
+            ->where('node_workload_revision_id', $latestRevision->id)
+            ->where('command_type', 'workload.deploy.v1')
+            ->whereIn('status', [NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT])
+            ->where('completed_at', '>=', now()->subMinutes(self::FAILED_DEPLOYMENT_BACKOFF_MINUTES))
+            ->exists();
+        if ($recentlyFailed) {
+            return 0;
         }
 
         $deployment = CreateDeploymentOperation::run($node, $latestRevision);

@@ -55,6 +55,9 @@ class AccessResolver
     /** @var array<string, AccessGrants> */
     private array $layers = [];
 
+    /** @var array<string, object|null> `team_user` rows read in this request, by user and team */
+    private array $memberships = [];
+
     private bool $resolving = false;
 
     private int $unscopedDepth = 0;
@@ -86,6 +89,7 @@ class AccessResolver
     public function flush(): void
     {
         $this->layers = [];
+        $this->memberships = [];
     }
 
     /**
@@ -145,6 +149,8 @@ class AccessResolver
      * The `team_user` row of the user. It uses the loaded `teams` relation, the same data `isAdminOfTeam()`
      * reads, but it never loads that relation itself: list queries call this early in a request, and a
      * relation cached then would hide a role change made later in the same request.
+     * Without the relation, the row is read once per request, because every scoped query asks for it;
+     * flush() forgets it after a change to access grants.
      */
     private function membership(User $user, int $teamId): ?object
     {
@@ -152,7 +158,12 @@ class AccessResolver
             return $user->teams->firstWhere('id', $teamId)?->pivot;
         }
 
-        return $user->teams()->where('teams.id', $teamId)->first()?->pivot;
+        $key = $user->getKey().':'.$teamId;
+        if (! array_key_exists($key, $this->memberships)) {
+            $this->memberships[$key] = $user->teams()->where('teams.id', $teamId)->first()?->pivot;
+        }
+
+        return $this->memberships[$key];
     }
 
     public function allows(User $user, AccessLevel $level, Model $target): bool
@@ -276,8 +287,12 @@ class AccessResolver
         }
 
         $teamId = data_get(session('currentTeam'), 'id') ?? data_get($user->currentAccessToken(), 'team_id');
-        if ($teamId === null || ! $this->isMember($user, (int) $teamId)) {
+        if ($teamId === null) {
             return [];
+        }
+        // A user who is no longer in the team sees nothing there, instead of every row.
+        if (! $this->isMember($user, (int) $teamId)) {
+            return [$this->resolve((int) $teamId, [])];
         }
 
         return $this->layersFor($user, (int) $teamId);

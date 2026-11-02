@@ -11,7 +11,7 @@
             ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
         ],
     ];
-    if (isDev() && config('constants.sentinel.host_enabled', false)) {
+    if (nodesEnabled()) {
         $settingsMenuSections['Instance'][] = ['label' => 'Cluster trust', 'route' => 'settings.node-trust', 'icon' => 'shield-star'];
     }
 @endphp

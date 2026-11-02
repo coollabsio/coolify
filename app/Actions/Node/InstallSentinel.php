@@ -12,18 +12,19 @@ class InstallSentinel
 {
     use AsAction;
 
-    public function handle(Node $node, ?string $image = null): ?string
+    public function handle(Node $node, ?string $image = null, ?bool $metricsEnabled = null): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
+        if (! nodesEnabled()) {
             return null;
         }
 
         $token = $node->ensureValidSentinelToken();
         $endpoint = $node->ensureSentinelUrl();
-        $image ??= config('constants.sentinel.host_image');
+        // Pin a fresh install to the latest release digest; the mutable tag is only the fallback when no release resolves.
+        $image ??= FetchLatestSentinelRelease::run()['image'] ?? config('constants.sentinel.host_image');
         // The current bundle includes both CAs while a CA rotation overlaps them.
         $bundle = ResolveFluxTrustBundle::run();
-        $script = self::installationScript($token, $endpoint, $image, $bundle['certificate_pem'], $bundle['version']);
+        $script = self::installationScript($token, $endpoint, $image, $bundle['certificate_pem'], $bundle['version'], $metricsEnabled ?? $node->isMetricsEnabled());
 
         $output = instant_remote_process(
             [self::remoteCommand($script)],
@@ -36,11 +37,11 @@ class InstallSentinel
         return $output;
     }
 
-    public static function installationScript(string $token, string $endpoint, string $image, string $certificate, int $trustBundleVersion): string
+    public static function installationScript(string $token, string $endpoint, string $image, string $certificate, int $trustBundleVersion, bool $metricsEnabled = true): string
     {
         self::validateInputs($token, $endpoint, $image, $certificate, $trustBundleVersion);
 
-        $environment = self::environmentFile($token, $endpoint, $trustBundleVersion);
+        $environment = self::environmentFile($token, $endpoint, $trustBundleVersion, $metricsEnabled);
         $unit = self::serviceUnit();
         $encodedEnvironment = base64_encode($environment);
         $encodedUnit = base64_encode($unit);
@@ -77,7 +78,7 @@ cleanup() {
         "\$runtime" container rm -f "\$container_id" >/dev/null 2>&1 || true
     fi
     rm -f "\$temporary_binary"
-    rm -f /usr/local/bin/sentinel.new /usr/local/bin/sentinel.previous.new /etc/coolify/sentinel.env.new /etc/systemd/system/sentinel.service.new
+    rm -f /usr/local/bin/sentinel.new /usr/local/bin/sentinel.previous.new /etc/coolify/sentinel.env.new /etc/systemd/system/sentinel.service.new /etc/coolify/sentinel.env.previous.new /etc/systemd/system/sentinel.service.previous.new
     rm -f /etc/coolify/sentinel-flux-ca.pem.new /etc/coolify/sentinel-flux-ca.version.new
     rm -rf "\$backup_directory"
 }
@@ -155,7 +156,7 @@ if [ "\$discovery_dns_was_active" = true ]; then
 fi
 
 attempt=0
-until curl --fail --silent http://127.0.0.1:8888/api/health >/dev/null; do
+until curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8888/api/health >/dev/null; do
     attempt=\$((attempt + 1))
     if [ "\$attempt" -ge 30 ]; then
         journalctl --unit sentinel.service --no-pager --lines 50
@@ -168,6 +169,18 @@ if [ "\$had_binary" = true ]; then
     install -m 0755 "\$backup_directory/sentinel" /usr/local/bin/sentinel.previous.new
     mv -f /usr/local/bin/sentinel.previous.new /usr/local/bin/sentinel.previous
 fi
+if [ "\$had_environment" = true ]; then
+    install -m 0600 "\$backup_directory/sentinel.env" /etc/coolify/sentinel.env.previous.new
+    mv -f /etc/coolify/sentinel.env.previous.new /etc/coolify/sentinel.env.previous
+else
+    rm -f /etc/coolify/sentinel.env.previous
+fi
+if [ "\$had_unit" = true ]; then
+    install -m 0644 "\$backup_directory/sentinel.service" /etc/systemd/system/sentinel.service.previous.new
+    mv -f /etc/systemd/system/sentinel.service.previous.new /etc/systemd/system/sentinel.service.previous
+else
+    rm -f /etc/systemd/system/sentinel.service.previous
+fi
 
 completed=true
 trap - EXIT
@@ -175,7 +188,7 @@ cleanup
 SCRIPT;
     }
 
-    public static function environmentFile(string $token, string $endpoint, int $trustBundleVersion): string
+    public static function environmentFile(string $token, string $endpoint, int $trustBundleVersion, bool $metricsEnabled = true): string
     {
         return implode("\n", [
             'TOKEN='.$token,
@@ -184,8 +197,8 @@ SCRIPT;
             'FLUX_CA_PATH=/etc/coolify/sentinel-flux-ca.pem',
             'FLUX_TRUST_BUNDLE_VERSION='.$trustBundleVersion,
             'CONTROL_PLANE_ENABLED=true',
-            'COLLECTOR_ENABLED=false',
-            'STORAGE_ENABLED=false',
+            'COLLECTOR_ENABLED='.($metricsEnabled ? 'true' : 'false'),
+            'STORAGE_ENABLED='.($metricsEnabled ? 'true' : 'false'),
             'STORAGE_VOLUMES_ENABLED=false',
             'TRAFFIC_ENABLED=false',
             'SENTINEL_DEVELOPMENT=false',

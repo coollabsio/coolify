@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Node\InspectNodeClusterDrift;
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -10,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Repairs cluster networks Node by Node: a reachable Node that is behind, drifted, or failed
@@ -23,8 +25,19 @@ class InspectNodeClusterNetworksJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 300;
 
+    public int $uniqueFor = 600;
+
+    /** Each drift inspection records three Node operations per Node, so it runs less often than the job. */
+    private const DRIFT_INSPECTION_INTERVAL_SECONDS = 300;
+
+    /** Stop starting cluster repairs before the job timeout kills the worker while it holds a cluster lock. */
+    private const DEADLINE_SECONDS = 200;
+
+    private int $startedAt = 0;
+
     public function handle(): void
     {
+        $this->startedAt = time();
         Node::query()
             ->whereNull('node_cluster_id')
             ->whereNotNull('network_pending_leave')
@@ -41,10 +54,15 @@ class InspectNodeClusterNetworksJob implements ShouldBeUnique, ShouldQueue
             ->where(fn (Builder $query) => $query
                 ->whereIn('network_status', ['active', 'degraded', 'error'])
                 ->orWhere(fn (Builder $query) => $query->where('network_status', 'pending')->whereNotNull('last_reconciled_at')))
-            ->chunkById(50, function ($clusters): void {
+            ->chunkById(50, function ($clusters): bool {
                 foreach ($clusters as $cluster) {
+                    if (time() - $this->startedAt >= self::DEADLINE_SECONDS) {
+                        return false;
+                    }
                     $this->repair($cluster);
                 }
+
+                return true;
             });
     }
 
@@ -65,7 +83,9 @@ class InspectNodeClusterNetworksJob implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $drifted = InspectNodeClusterDrift::run($cluster);
+            $drifted = Cache::add("node-cluster-drift-inspected:{$cluster->id}", true, self::DRIFT_INSPECTION_INTERVAL_SECONDS)
+                ? InspectNodeClusterDrift::run($cluster)
+                : [];
             if ($drifted !== []) {
                 // Re-apply the same revision to the drifted Nodes only.
                 Node::query()->whereKey($drifted)->update([
@@ -90,7 +110,7 @@ class InspectNodeClusterNetworksJob implements ShouldBeUnique, ShouldQueue
             $lock->release();
         }
 
-        if ($due !== []) {
+        if ($due !== [] && ! Cache::has(QueueNodeClusterNetworkRevision::queuedCacheKey($cluster))) {
             ReconcileNodeClusterNetworkJob::dispatch($cluster->id, $operator->id, $due, onlyDueNodes: true);
         }
     }

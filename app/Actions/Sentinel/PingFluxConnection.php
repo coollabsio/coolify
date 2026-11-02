@@ -31,7 +31,8 @@ class PingFluxConnection
                 'server_id' => $node->uuid,
             ]);
         $response->throw();
-        $validator = Validator::make($response->json(), [
+        $payload = $response->json();
+        $validator = Validator::make(is_array($payload) ? $payload : [], [
             'command_id' => ['required', 'string'],
             'nonce' => ['required', 'string'],
             'sentinel_time_unix_ms' => ['required', 'integer'],

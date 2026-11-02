@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\AccessLevel;
 use App\Models\Environment;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use Illuminate\Auth\Access\Response;
 
 class DatabasePolicy
@@ -23,7 +24,7 @@ class DatabasePolicy
     public function view(User $user, $database): bool
     {
         if ($this->isInstanceDatabase($database)) {
-            return $user->teams->contains('id', 0);
+            return app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, 0);
         }
 
         return $user->canAccess(AccessLevel::Read, $database);

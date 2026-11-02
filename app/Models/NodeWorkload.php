@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class NodeWorkload extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, ScopedByAccessGrants;
 
     protected $guarded = [];
 

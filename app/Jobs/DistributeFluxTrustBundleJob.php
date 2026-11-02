@@ -35,7 +35,7 @@ class DistributeFluxTrustBundleJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        if (! config('constants.sentinel.host_enabled', false)) {
+        if (! nodesEnabled()) {
             return;
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node;
 
+use App\Actions\Sentinel\FetchNodeLogs;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeOperation;
@@ -168,7 +169,7 @@ class UpgradeSentinel
                     'status' => 'failed',
                     'failed_node_uuid' => $node->uuid,
                     'failed_node_name' => $node->name,
-                    'error' => mb_substr($exception->getMessage(), 0, 2000),
+                    'error' => mb_substr(FetchNodeLogs::redact($exception->getMessage()), 0, 2000),
                 ];
                 break;
             }
@@ -185,7 +186,7 @@ class UpgradeSentinel
 
     public static function isEnabled(): bool
     {
-        return isDev() && (bool) config('constants.sentinel.host_enabled', false);
+        return nodesEnabled();
     }
 
     private function waitForReconnect(Node $node, string $version, Carbon $startedAt): bool
@@ -225,6 +226,6 @@ class UpgradeSentinel
             return $operation;
         }
 
-        return TransitionOperation::run($operation, NodeOperationStatus::FAILED, result: $result, error: mb_substr($error, 0, 2000));
+        return TransitionOperation::run($operation, NodeOperationStatus::FAILED, result: $result, error: mb_substr(FetchNodeLogs::redact($error), 0, 2000));
     }
 }

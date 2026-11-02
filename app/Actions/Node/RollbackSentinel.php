@@ -6,7 +6,7 @@ use App\Models\Node;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 /**
- * Restores the Sentinel binary that InstallSentinel kept at /usr/local/bin/sentinel.previous.
+ * Restores the Sentinel binary, environment file, and unit that InstallSentinel kept as *.previous files.
  * The script is fixed text and never contains user input.
  */
 class RollbackSentinel
@@ -15,7 +15,7 @@ class RollbackSentinel
 
     public function handle(Node $node): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
+        if (! nodesEnabled()) {
             return null;
         }
 
@@ -40,6 +40,15 @@ fi
 
 chmod 0755 /usr/local/bin/sentinel.previous
 mv -f /usr/local/bin/sentinel.previous /usr/local/bin/sentinel
+if [ -f /etc/coolify/sentinel.env.previous ]; then
+    chmod 0600 /etc/coolify/sentinel.env.previous
+    mv -f /etc/coolify/sentinel.env.previous /etc/coolify/sentinel.env
+fi
+if [ -f /etc/systemd/system/sentinel.service.previous ]; then
+    chmod 0644 /etc/systemd/system/sentinel.service.previous
+    mv -f /etc/systemd/system/sentinel.service.previous /etc/systemd/system/sentinel.service
+fi
+systemctl daemon-reload
 systemctl restart sentinel.service
 systemctl is-active --quiet sentinel.service
 SCRIPT;

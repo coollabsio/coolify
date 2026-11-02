@@ -13,6 +13,7 @@ use App\Models\NodeWorkload;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Internal\GeneralNotification;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ use Throwable;
  * the team is notified, like a v4 service whose server is unreachable. The application then
  * keeps the desired state `removed`, so a server that reconnects removes the container itself.
  */
-class DeleteNodeWorkloadJob implements ShouldQueue
+class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -46,6 +47,17 @@ class DeleteNodeWorkloadJob implements ShouldQueue
         $this->onQueue('high');
         $servers = NodeWorkload::query()->find($workloadId)?->nodes()->count() ?? 0;
         $this->timeout = max($this->timeout, $servers * (new ManageNodeWorkloadJob(0))->timeout + 120);
+    }
+
+    /** A second deletion of the same application would fail on the active removal and notify a false failure. */
+    public function uniqueId(): string
+    {
+        return (string) $this->workloadId;
+    }
+
+    public function uniqueFor(): int
+    {
+        return $this->timeout + 60;
     }
 
     public function handle(): void

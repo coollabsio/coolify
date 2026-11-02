@@ -5,7 +5,7 @@
     @endcan
 
     <x-application.settings-section id="cluster-application-cpu-limits" title="CPU"
-        helper="Optional runtime limit and scheduling reservation. Empty values mean unlimited. Redeploy the application to apply changes.">
+        helper="Optional runtime limit and scheduling reservation. Empty values mean unlimited. A running application applies changes automatically within about a minute, or redeploy to apply them now.">
         <div class="grid gap-4 sm:grid-cols-2">
             <x-forms.input id="cpuLimit" type="number" min="0.01" max="1024" step="0.01"
                 label="CPU limit (cores)" canGate="update" :canResource="$workload"
@@ -17,7 +17,7 @@
     </x-application.settings-section>
 
     <x-application.settings-section id="cluster-application-memory-limits" title="Memory"
-        helper="Optional runtime limit and scheduling reservation. Empty values mean unlimited. Redeploy the application to apply changes.">
+        helper="Optional runtime limit and scheduling reservation. Empty values mean unlimited. A running application applies changes automatically within about a minute, or redeploy to apply them now.">
         <div class="grid gap-4 sm:grid-cols-2">
             <x-forms.input id="memoryLimitMb" type="number" min="4" max="1048576"
                 label="Memory limit (MiB)" canGate="update" :canResource="$workload"

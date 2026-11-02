@@ -91,6 +91,12 @@ class ReconcileNodeClusterNetwork
         return data_get($result, 'member_state') === 'converged';
     }
 
+    /** WireGuard needs brackets around an IPv6 endpoint address; Node IPs are stored without them. */
+    public static function endpointHost(string $host): string
+    {
+        return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "[{$host}]" : $host;
+    }
+
     /** Whether an automatic run should apply the network to this member Node now. */
     public static function isDue(NodeCluster $cluster, Node $node): bool
     {
@@ -216,7 +222,7 @@ class ReconcileNodeClusterNetwork
                         'revision' => $cluster->desired_revision,
                         'peers' => $nodePeers->map(fn (Node $peer): array => [
                             'public_key' => $peer->wireguard_public_key,
-                            'endpoint' => $peer->wireguard_endpoint ?: $peer->ip.':'.$cluster->wireguard_port,
+                            'endpoint' => $peer->wireguard_endpoint ?: self::endpointHost($peer->ip).':'.$cluster->wireguard_port,
                             'allowed_ips' => [$peer->wireguard_ip.'/32', $peer->workload_cidr],
                             'persistent_keepalive_seconds' => 25,
                         ])->all(),

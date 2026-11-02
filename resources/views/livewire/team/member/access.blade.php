@@ -35,8 +35,9 @@
                 <button type="button" class="button h-7! px-2.5! text-[11px]!" wire:click="applyPreset('operator')">
                     Operator
                 </button>
-                <button type="button" class="button h-7! px-2.5! text-[11px]!" wire:click="applyPreset('full')">
-                    Full access
+                <button type="button" class="button h-7! px-2.5! text-[11px]!" wire:click="applyPreset('full')"
+                    title="Every level on all projects and resources. Team settings and servers stay for owners and admins.">
+                    All resources
                 </button>
             </div>
 
