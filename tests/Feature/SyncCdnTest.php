@@ -51,7 +51,9 @@ it('only removes validated Coolify CDN temporary directories', function () {
 
 it('selects the environment and release files to sync to GitHub', function (string $targetDirectory, string $environment, array $selectedBasenames) {
     Http::fake([
-        'api.github.com/repos/coollabsio/coolify/releases*' => Http::response([], 200),
+        'api.github.com/repos/coollabsio/coolify/releases*' => Http::response([
+            ['tag_name' => 'v'.config('constants.coolify.version')],
+        ], 200),
     ]);
 
     $binDir = sys_get_temp_dir().'/sync-cdn-bin-'.uniqid();
@@ -151,6 +153,34 @@ SH);
         'service-templates-latest.json',
     ]],
 ]);
+
+it('does not sync production releases before the current release is published', function () {
+    Http::fake([
+        'api.github.com/repos/coollabsio/coolify/releases*' => Http::response([['tag_name' => 'v0.0.1']], 200),
+    ]);
+
+    $this->artisan('sync:cdn')
+        ->expectsChoice('Which environment would you like to sync?', 'production', [
+            'production' => 'Production',
+            'nightly' => 'Nightly',
+        ])
+        ->expectsChoice('Which files would you like to sync?', ['json/coolify/releases.json'], [
+            'json/coolify/releases.json',
+            'json/coolify/versions.json',
+            'json/coolify/docker-compose.yml',
+            'json/coolify/docker-compose.prod.yml',
+            'json/coolify/.env.production',
+            'json/coolify/install.sh',
+            'json/coolify/upgrade.sh',
+            'json/coolify/upgrade-postgres.sh',
+            'json/coolify/patch.sh',
+            'json/coolify/service-templates-latest.json',
+        ])
+        ->expectsOutputToContain('is not published yet')
+        ->doesntExpectOutputToContain('After the CDN pull request is merged');
+
+    Http::assertSentCount(1);
+});
 
 it('purges the CDN files from the Cloudflare cache', function (string $environment, array $cdnDirectories) {
     config()->set('constants.cloudflare.api_token', 'test-token');
