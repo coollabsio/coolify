@@ -202,6 +202,7 @@ class GithubPrivateRepository extends Component
     {
         try {
             $this->authorize('create', Application::class);
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 
             // Validate git repository parts and branch
             $validator = validator([

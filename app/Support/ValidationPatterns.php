@@ -577,6 +577,17 @@ class ValidationPatterns
     }
 
     /**
+     * Normalize a typed directory path to the form that DIRECTORY_PATH_PATTERN expects:
+     * "apps/web/" becomes "/apps/web", and an empty value becomes "/".
+     */
+    public static function normalizeDirectoryPath(?string $path): string
+    {
+        $path = trim(trim((string) $path), '/');
+
+        return '/'.$path;
+    }
+
+    /**
      * Get validation rules for Docker build target fields
      */
     public static function dockerTargetRules(int $maxLength = 128): array
