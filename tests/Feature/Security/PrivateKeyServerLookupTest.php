@@ -70,7 +70,7 @@ function teamKey(Team $team): PrivateKey
 
 function assertMuxStops(Server $server, int $times): void
 {
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -O stop')
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop')
         && str_contains($process->command, 'mux_'.$server->uuid), $times);
 }
 

@@ -394,7 +394,7 @@ class SshMultiplexingHelper
     public static function runMuxSocketCommand(string $muxSocket, string $operation): ?ProcessResult
     {
         return self::runWithTimeout(
-            "ssh -O {$operation} -o ControlPath=".escapeshellarg($muxSocket).' localhost',
+            "ssh -F /dev/null -O {$operation} -o ControlPath=".escapeshellarg($muxSocket).' localhost',
             (int) config('constants.ssh.mux_health_check_timeout'),
         );
     }
@@ -432,7 +432,7 @@ class SshMultiplexingHelper
 
     private static function muxControlCommand(Server $server, string $operation): string
     {
-        $command = "ssh -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
+        $command = "ssh -F /dev/null -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
