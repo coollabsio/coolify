@@ -116,7 +116,7 @@ class SshMultiplexingHelper
         }
 
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
-        $establishCommand .= self::escapedUserAtHost($server).' true';
+        $establishCommand .= '-- '.self::escapedUserAtHost($server).' true';
 
         $establishProcess = Process::run($establishCommand);
         self::noticeHostKeyMismatch($server, $establishProcess->errorOutput());
@@ -208,10 +208,10 @@ class SshMultiplexingHelper
 
         // Upload: local source -> remote dest
         if ($server->isIpv6()) {
-            return $scpCommand.escapeshellarg($source).' '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($dest);
+            return $scpCommand.'-- '.escapeshellarg($source).' '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($dest);
         }
 
-        return $scpCommand.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
+        return $scpCommand.'-- '.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
     }
 
     /**
@@ -249,10 +249,10 @@ class SshMultiplexingHelper
 
         // Download: remote source -> local dest
         if ($server->isIpv6()) {
-            return $scpCommand.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
+            return $scpCommand.'-- '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
         }
 
-        return $scpCommand.self::escapedUserAtHost($server).':'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
+        return $scpCommand.'-- '.self::escapedUserAtHost($server).':'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
     }
 
     public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
@@ -263,7 +263,7 @@ class SshMultiplexingHelper
         $command = str_replace($delimiter, '', $command);
         $remoteShellCommand = self::remoteShellCommand();
 
-        return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
+        return $sshCommand.'-- '.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
             .$delimiter;
     }
@@ -276,7 +276,7 @@ class SshMultiplexingHelper
     public static function generateSshStdinCommand(Server $server, string $remoteCommand, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
     {
         return self::sshCommandPrefix($server, $disableMultiplexing, $commandTimeout)
-            .self::escapedUserAtHost($server).' '.escapeshellarg($remoteCommand);
+            .'-- '.self::escapedUserAtHost($server).' '.escapeshellarg($remoteCommand);
     }
 
     private static function sshCommandPrefix(Server $server, bool $disableMultiplexing, ?int $commandTimeout): string
@@ -340,7 +340,7 @@ class SshMultiplexingHelper
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
         $healthCommand .= self::getCommonSshOptions($server, $sshConfig['sshKeyLocation'], self::getConnectionTimeout($server), config('constants.ssh.server_interval'));
-        $healthCommand .= self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
+        $healthCommand .= '-- '.self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
         // The health check goes over the network, so a slow link gets at least the server's connection timeout.
         $timeout = max((int) config('constants.ssh.mux_health_check_timeout'), self::getConnectionTimeout($server));
@@ -394,7 +394,7 @@ class SshMultiplexingHelper
     public static function runMuxSocketCommand(string $muxSocket, string $operation): ?ProcessResult
     {
         return self::runWithTimeout(
-            "ssh -O {$operation} -o ControlPath=".escapeshellarg($muxSocket).' localhost',
+            "ssh -F /dev/null -O {$operation} -o ControlPath=".escapeshellarg($muxSocket).' localhost',
             (int) config('constants.ssh.mux_health_check_timeout'),
         );
     }
@@ -432,12 +432,12 @@ class SshMultiplexingHelper
 
     private static function muxControlCommand(Server $server, string $operation): string
     {
-        $command = "ssh -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
+        $command = "ssh -F /dev/null -O {$operation} -o ControlPath=".escapeshellarg(self::muxSocket($server)).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
 
-        return $command.self::escapedUserAtHost($server);
+        return $command.'-- '.self::escapedUserAtHost($server);
     }
 
     private static function multiplexingOptions(Server $server): string
@@ -501,6 +501,7 @@ class SshMultiplexingHelper
                 ]);
             }
         }
+        self::giveToSshDirectoryOwner($keyLocation, $keyLocation.'.lock');
     }
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
@@ -510,6 +511,8 @@ class SshMultiplexingHelper
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
             ."-o ServerAliveInterval=$serverInterval "
+            .'-F /dev/null -o IdentitiesOnly=yes '
+            .'-o ClearAllForwardings=yes -o ForwardAgent=no '
             .'-o RequestTTY=no '
             .'-o LogLevel=ERROR ';
 
@@ -571,20 +574,21 @@ class SshMultiplexingHelper
         $connectTimeout = min(self::getConnectionTimeout($server), self::HOST_KEY_SCAN_TIMEOUT_SECONDS);
         $directory = self::knownHostsDirectory();
         File::ensureDirectoryExists($directory, 0700);
+        self::giveToSshDirectoryOwner($directory);
         $scanFile = $directory.'/scan_'.$server->uuid.'_'.Str::random(8);
 
         $command = 'ssh ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
-        $command .= '-o HostKeyAlias='.self::hostKeyAlias($server).' '
+        $command .= '-F /dev/null -o HostKeyAlias='.self::hostKeyAlias($server).' '
             .'-o UserKnownHostsFile='.escapeshellarg($scanFile).' -o GlobalKnownHostsFile=/dev/null '
             .'-o StrictHostKeyChecking=accept-new -o BatchMode=yes '
             .'-o PubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no '
             .'-o HostbasedAuthentication=no '
             .'-o ConnectTimeout='.$connectTimeout.' -o LogLevel=ERROR '
             .'-p '.escapeshellarg((string) $server->port).' '
-            .self::escapedUserAtHost($server).' true';
+            .'-- '.self::escapedUserAtHost($server).' true';
 
         try {
             $result = self::runWithTimeout($command, $connectTimeout + 5);
@@ -713,6 +717,7 @@ class SshMultiplexingHelper
             chmod($temporaryPath, 0600);
             rename($temporaryPath, $path);
         }
+        self::giveToSshDirectoryOwner(self::knownHostsDirectory(), $path);
 
         return $path;
     }
@@ -720,6 +725,30 @@ class SshMultiplexingHelper
     private static function knownHostsDirectory(): string
     {
         return storage_path('app/ssh/known_hosts');
+    }
+
+    /**
+     * Horizon runs as root and php-fpm runs as www-data. Files that a root process writes under storage/app/ssh
+     * get the owner of that directory, so that the web process can still read and replace them.
+     */
+    public static function giveToSshDirectoryOwner(string ...$paths): void
+    {
+        if (! function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            return;
+        }
+
+        $owner = @fileowner(storage_path('app/ssh'));
+        $group = @filegroup(storage_path('app/ssh'));
+        if ($owner === false || $owner === 0) {
+            return;
+        }
+
+        foreach ($paths as $path) {
+            if (file_exists($path) && (fileowner($path) !== $owner || filegroup($path) !== $group)) {
+                @chown($path, $owner);
+                @chgrp($path, $group);
+            }
+        }
     }
 
     private static function hostKeyAlias(Server $server): string
