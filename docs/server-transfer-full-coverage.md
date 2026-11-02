@@ -36,6 +36,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Disk usage notification | threshold 70, check frequency `*/30 * * * *`, interval 12 h |
 | ✅ | Security > Patches | check frequency `daily`, automatic security updates on at `04:30` (the last check result is not moved; the target shows "never" until its first check) |
 | ✅ | Terminal | terminal access off |
+| ➕ | Security > Host Key | a trusted host key (shown by fingerprint), and "host key check" disabled on one server. Expected: the target shows the same fingerprint with source `transfer` and connects without a new trust step |
 | ✅ | Image retention | "disable application image retention" on |
 | ✅ | Labels / Traefik | generate exact labels on, Traefik certificate resolver `custom` |
 | ✅ | Backup compression | CPU percentage 50 |
@@ -91,6 +92,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Static app (`is_static`, `is_spa`) | |
 | ➕ | Docker Compose app | raw compose on, one variable with an empty value (`preserve_compose_null`) |
 | ➕ | App with GitHub App source, app with GitLab App source, app with deploy key | |
+| ➕ | Saved SSH host keys | app with a deploy key on a self-hosted Git host, deployed once, so Source → SSH host keys has a line. Expected: the same line on the target |
 | ✅ | Domains | 2 domains, noindex domains, domain port overrides, preview URL template |
 | ✅ | Health check | custom path, port, method, return code, interval, retries, start period |
 | ✅ | Limits | memory, swap, swappiness, reservation, CPUs, cpuset, CPU shares |

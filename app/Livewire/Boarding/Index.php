@@ -291,6 +291,7 @@ class Index extends Component
             ]);
 
             $this->createdPrivateKey = $privateKey;
+            $this->privateKey = null;
             $this->currentState = 'create-server';
         } catch (\Exception $e) {
             $this->addError('privateKey', 'Failed to save private key: '.$e->getMessage());

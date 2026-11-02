@@ -287,3 +287,77 @@ test('changeSource rejects a GiteaApp owned by another team', function () {
     expect($this->applicationA->source_type)->not->toBe(GiteaApp::class);
     Http::assertNothingSent();
 });
+
+test('submit reports invalid SSH known hosts as a field error without saving', function () {
+    $originalKnownHosts = $this->applicationA->git_ssh_known_hosts;
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitSshKnownHosts', 'invalid-host-key')
+        ->call('submit')
+        ->assertHasErrors(['gitSshKnownHosts'])
+        ->assertDispatched('known-hosts-invalid')
+        ->assertNotDispatched('configurationChanged');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($originalKnownHosts);
+});
+
+test('saving the source form keeps host keys that a deployment saved after the page opened', function () {
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);
+
+    $component->set('gitBranch', 'other-branch')->call('submit')->assertHasNoErrors();
+
+    expect($this->applicationA->fresh())
+        ->git_branch->toBe('other-branch')
+        ->git_ssh_known_hosts->toBe('git.example.com ssh-ed25519 AAAA');
+});
+
+test('saving the source form stores host keys that the user edited', function () {
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);
+
+    $component->set('gitSshKnownHosts', 'other.example.com ssh-ed25519 BBBB')->call('submit')->assertHasNoErrors();
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('other.example.com ssh-ed25519 BBBB');
+});
+
+test('removing a host key keeps another host that has the same key', function () {
+    $this->applicationA->update(['git_ssh_known_hosts' => "git.example.com ssh-ed25519 AAAA\n[git.example.com]:2222 ssh-ed25519 AAAA"]);
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    $keys = $component->instance()->knownHostFingerprints();
+
+    expect(array_unique(array_column($keys, 'id')))->toHaveCount(2);
+
+    $component->call('removeHostKey', $keys[1]['id']);
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('git.example.com ssh-ed25519 AAAA');
+});
+
+test('a member or a user of another team cannot fetch, accept, or remove host keys', function (string $role) {
+    $saved = 'git.example.com ssh-ed25519 AAAA';
+    $this->applicationA->update(['git_repository' => 'git@git.example.com:org/repo.git', 'git_ssh_known_hosts' => $saved]);
+    $user = User::factory()->create();
+    $team = $role === 'member' ? $this->teamA : $this->teamB;
+    $team->members()->attach($user->id, ['role' => $role === 'member' ? 'member' : 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    $component->call('fetchHostKeys')->assertDispatched('error')->assertSet('fetchedHostKeys', []);
+    $component->call('acceptFetchedHostKeys')->assertDispatched('error');
+    $component->call('removeHostKey', sha1($saved))->assertDispatched('error');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($saved);
+})->with(['member', 'other team owner']);
+
+test('the ssh host keys section shows only when git uses ssh or keys are saved', function (string $repository, ?string $saved, bool $shown) {
+    $this->applicationA->update(['git_repository' => $repository, 'git_ssh_known_hosts' => $saved]);
+
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+
+    $shown ? $component->assertSee('SSH host keys') : $component->assertDontSee('SSH host keys');
+})->with([
+    'https repository' => ['https://github.com/coollabsio/coolify-examples', null, false],
+    'ssh repository' => ['git@git.example.com:org/repo.git', null, true],
+    'https repository with saved submodule keys' => ['https://github.com/coollabsio/coolify-examples', 'git.example.com ssh-ed25519 AAAA', true],
+]);
