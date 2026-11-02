@@ -146,11 +146,46 @@ trait HasSecretManager
      * Decides the escaping of a variable for all paths (service .env, database environment,
      * Redis password). A variable saved before exact escaping keeps the old escaping, so its
      * container gets the same value as before the upgrade. Saving the variable again switches
-     * it to exact escaping.
+     * it to exact escaping. Compose references that got the stored value before the upgrade
+     * (such as `FOO=${FOO:-}`) use exact escaping, so they keep getting that value. So do old
+     * .env lines that Docker Compose cannot read, because they stop the deployment.
      */
     public function useExactEscaping(EnvironmentVariable $environmentVariable): bool
     {
-        return ! $environmentVariable->uses_legacy_escaping;
+        if (! $environmentVariable->uses_legacy_escaping) {
+            return true;
+        }
+
+        if (! $this instanceof Service && ! $this instanceof Application) {
+            return false;
+        }
+
+        if ($this->legacyEnvFileLineIsUnreadable($environmentVariable)) {
+            return true;
+        }
+
+        $parsesCompose = $this instanceof Service
+            || ($this->build_pack === 'dockercompose' && ! $this->settings?->is_raw_compose_deployment_enabled);
+
+        return $parsesCompose
+            && dockerComposeVariablesWithStoredValueBeforeExactEscaping($this->docker_compose_raw)->contains($environmentVariable->key);
+    }
+
+    /**
+     * The old escaping puts literal and multiline values in single quotes without escaping. Docker
+     * Compose ends the value at the next quote, so a value with a quote breaks the whole .env file.
+     */
+    private function legacyEnvFileLineIsUnreadable(EnvironmentVariable $environmentVariable): bool
+    {
+        if (! $environmentVariable->is_literal && ! $environmentVariable->is_multiline) {
+            return false;
+        }
+
+        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+
+        return is_string($value)
+            && str_contains($value, "'")
+            && ! (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '[')));
     }
 
     /**
@@ -210,8 +245,9 @@ trait HasSecretManager
         }
 
         if ($environmentVariable->is_literal || $environmentVariable->is_multiline) {
-            // Service and application .env files strip the old single quotes; database environment lists keep them.
-            return ($this instanceof Service || $this instanceof Application) ? str_contains($value, "'") : true;
+            // Service and application .env files strip the old single quotes (values with a quote use exact
+            // escaping); database environment lists keep them.
+            return ! ($this instanceof Service || $this instanceof Application);
         }
 
         return escapeEnvVariables($value) !== $value

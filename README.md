@@ -136,7 +136,6 @@ Thank you so much!
 <a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://cdn.coollabs.io/sponsors/piloterr.svg"/></a>
 <a href="https://yoxel.com/?utm_source=coolify.io"><img width="60px" alt="Alexey Panteleev" src="https://github.com/aspantel.png"/></a>
 <a href="https://summyt.app?utm_source=coolify.io"><img width="60px" alt="SummYT - YouTube Summarizer" src="https://summyt.app/logo.svg"/></a>
-<a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
 <a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="Xaman" src="https://github.com/XamanApp.png"/></a>
 <a href="https://monadical.com/?utm_source=coolify.io"><img width="60px" alt="Monadical" src="https://github.com/Monadical-SAS.png"/></a>
 <a href="https://maas.engineering/?utm_source=coolify.io"><img width="60px" alt="Magic as a Service" src="https://github.com/magicasaservice.png"/></a>

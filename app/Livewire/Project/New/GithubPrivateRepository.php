@@ -202,6 +202,8 @@ class GithubPrivateRepository extends Component
     public function submit()
     {
         try {
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
+
             // Validate git repository parts and branch
             $validator = validator([
                 'selected_repository_owner' => $this->selected_repository_owner,

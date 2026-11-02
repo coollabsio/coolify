@@ -13,7 +13,6 @@ use App\Models\Server;
 use App\Models\VolumeBackupS3Replica;
 use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
-use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -104,7 +103,10 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $archiveScript = self::archiveScript($compressionCpuPercentage);
             if ($streamToS3) {
                 $this->execution->update(['local_storage_deleted' => true]);
-                $archiveCommand = $this->streamToS3Command($destinations->first(), $archiveScript, $backupLocation, $containerName);
+                $streamS3 = $destinations->first();
+                $streamS3->testConnection(shouldSave: true);
+                $streamResolveOptions = $streamS3->minioClientResolveOptions($server, $image);
+                $archiveCommand = $this->streamToS3Command($streamS3, $archiveScript, $backupLocation, $containerName, $streamResolveOptions);
                 $this->execution->update(['s3_cleanup_pending' => true]);
             } else {
                 $archiveCommand = 'docker run --rm --name '.escapeshellarg($containerName)
@@ -128,7 +130,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             try {
                 if ($streamToS3) {
-                    $this->startStreamHelper($destinations->first(), $verifySourceCommand, $source, $containerName, $image, $server);
+                    $this->startStreamHelper($streamS3, $verifySourceCommand, $source, $containerName, $image, $server, $streamResolveOptions);
                 }
                 $archiveOutput = instant_remote_process(array_filter([
                     $verifySourceCommand,
@@ -440,7 +442,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
         $image = coolifyHelperImage().':'.getHelperVersion();
-        $resolveOptions = $this->minioClientResolveOptions($s3);
+        $resolveOptions = $s3->minioClientResolveOptions($server, $image);
 
         try {
             instant_remote_process([
@@ -467,7 +469,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
      * Starts the helper container that streams the volume to S3 and sets its mc alias. The archive then
      * runs in it with `docker exec`, so the S3 keys are never part of a command line.
      */
-    private function startStreamHelper(S3Storage $s3, string $verifySourceCommand, string $source, string $containerName, string $image, Server $server): void
+    private function startStreamHelper(S3Storage $s3, string $verifySourceCommand, string $source, string $containerName, string $image, Server $server, string $resolveOptions): void
     {
         instant_remote_process([
             $verifySourceCommand,
@@ -477,7 +479,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 .' -v '.escapeshellarg($source.':/volume:ro')
                 .' '.escapeshellarg($image).' >/dev/null',
         ], $server, timeout: $this->timeout, disableMultiplexing: true);
-        $this->setMinioClientAlias($server, $containerName, $s3, $this->minioClientResolveOptions($s3));
+        $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
     }
 
     /**
@@ -506,19 +508,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         );
     }
 
-    private function minioClientResolveOptions(S3Storage $s3): string
+    private function streamToS3Command(S3Storage $s3, string $archiveScript, string $backupLocation, string $containerName, string $resolveOptions): string
     {
-        $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($s3->endpoint, $s3->trustedInternalHosts()))
-            ->map(fn (string $option): string => '--resolve '.escapeshellarg($option))
-            ->implode(' ');
-
-        return $resolveOptions === '' ? '' : ' '.$resolveOptions;
-    }
-
-    private function streamToS3Command(S3Storage $s3, string $archiveScript, string $backupLocation, string $containerName): string
-    {
-        $s3->testConnection(shouldSave: true);
-        $resolveOptions = $this->minioClientResolveOptions($s3);
         $destination = 'temporary/'.$s3->bucket.$backupLocation;
         // `mc pipe --quiet` panics in recent mc releases, so keep its progress bar out of the error output instead.
         // Each progress frame starts with "\r", so printing the last field per line keeps only the final frame and real errors.

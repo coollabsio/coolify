@@ -14116,6 +14116,9 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Coolify could not connect to the provider API."
                     }
                 },
                 "security": [
@@ -14309,6 +14312,9 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Coolify could not connect to the provider API."
                     }
                 },
                 "security": [
@@ -14367,6 +14373,9 @@
                     },
                     "422": {
                         "description": "The token is not a Cloudflare token."
+                    },
+                    "502": {
+                        "description": "Coolify could not connect to the Cloudflare API."
                     }
                 },
                 "security": [
@@ -23621,37 +23630,7 @@
                     "content": {
                         "application\/json": {
                             "schema": {
-                                "required": [
-                                    "key"
-                                ],
-                                "properties": {
-                                    "key": {
-                                        "type": "string"
-                                    },
-                                    "value": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "is_literal": {
-                                        "type": "boolean"
-                                    },
-                                    "is_multiline": {
-                                        "type": "boolean"
-                                    },
-                                    "is_shown_once": {
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
-                                        "type": "boolean"
-                                    },
-                                    "comment": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableCreateRequest"
                             }
                         }
                     }
@@ -23731,6 +23710,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableUpdateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Environment variable updated."
@@ -23806,6 +23795,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableCreateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "201": {
                         "description": "Environment variable created."
@@ -23902,6 +23901,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableUpdateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Environment variable updated."
@@ -23995,6 +24004,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableCreateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "201": {
                         "description": "Environment variable created."
@@ -24109,6 +24128,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableUpdateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Environment variable updated."
@@ -24184,6 +24213,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableCreateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "201": {
                         "description": "Environment variable created."
@@ -24280,6 +24319,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/SharedEnvironmentVariableUpdateRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Environment variable updated."
@@ -26388,6 +26437,72 @@
                             },
                             "type": "object"
                         }
+                    }
+                },
+                "type": "object"
+            },
+            "SharedEnvironmentVariableCreateRequest": {
+                "required": [
+                    "key"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_literal": {
+                        "type": "boolean"
+                    },
+                    "is_multiline": {
+                        "type": "boolean"
+                    },
+                    "is_shown_once": {
+                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
+                        "type": "boolean"
+                    },
+                    "comment": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 256
+                    }
+                },
+                "type": "object"
+            },
+            "SharedEnvironmentVariableUpdateRequest": {
+                "description": "Send at least one field.",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_literal": {
+                        "type": "boolean"
+                    },
+                    "is_multiline": {
+                        "type": "boolean"
+                    },
+                    "is_shown_once": {
+                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
+                        "type": "boolean"
+                    },
+                    "comment": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 256
                     }
                 },
                 "type": "object"

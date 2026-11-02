@@ -307,7 +307,11 @@ class EnvironmentVariable extends BaseModel
 
         $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables, $sharedVariables, $canReveal);
 
-        return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
+        if ($value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping) {
+            return $value;
+        }
+
+        return method_exists($resource, 'useExactEscaping') && $resource->useExactEscaping($this) ? $value : $this->legacyEscapedValue($value);
     }
 
     /**

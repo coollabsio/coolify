@@ -2124,7 +2124,7 @@ function generateDockerBuildArgs($variables): Collection
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key' and 'value'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string
@@ -2138,11 +2138,6 @@ function generateDockerEnvFlags($variables): string
 
             if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
                 throw new InvalidArgumentException('Invalid environment variable key.');
-            }
-
-            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
-            if ($isMultiline) {
-                $value = trim($value, "'");
             }
 
             return '-e '.escapeshellarg("{$key}={$value}");

@@ -159,6 +159,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     {
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
+        $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
         $this->validate();
         try {
             $destination_uuid = $this->query['destination'] ?? null;
