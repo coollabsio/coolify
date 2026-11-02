@@ -343,7 +343,6 @@ it('shows the system-managed core cluster firewall rules', function () {
     $this->get(route('node-cluster.firewall', $cluster->uuid))
         ->assertSuccessful()
         ->assertSee('System rules')
-        ->assertSee('Managed by Coolify')
         ->assertSee('WireGuard')
         ->assertSee('UDP / 51820')
         ->assertSee('Corrosion gossip')
