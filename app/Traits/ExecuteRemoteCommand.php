@@ -215,6 +215,7 @@ trait ExecuteRemoteCommand
                 }
             }
         }
+        SshMultiplexingHelper::noticeHostKeyMismatch($this->server, $process_result->errorOutput());
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
                 // Check if deployment was cancelled while command was running

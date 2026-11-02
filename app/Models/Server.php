@@ -18,6 +18,7 @@ use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
+use App\Notifications\Server\HostKeyChanged;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\DigitalOceanService;
@@ -192,6 +193,9 @@ class Server extends BaseModel
             $server->fill($payload);
         });
         static::saved(function ($server) {
+            if ($server->wasChanged(['ip', 'port'])) {
+                $server->settings?->forgetSshHostKey('address_changed');
+            }
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             } elseif ($server->wasChanged(['user', 'ip', 'port'])) {
@@ -2461,6 +2465,9 @@ $siteAddress {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
+            if ($e->getMessage() === SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE) {
+                $this->recordHostKeyMismatch();
+            }
             if ($justCheckingNewKey) {
                 return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
             }
@@ -2472,6 +2479,30 @@ $siteAddress {
 
             return ['uptime' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * The server sent an SSH host key that does not match the pinned key. Save the new key as pending,
+     * so that an admin can compare and trust it, and notify the team once for each new key.
+     */
+    public function recordHostKeyMismatch(): void
+    {
+        $settings = $this->settings;
+        $newKey = SshMultiplexingHelper::scanHostKey($this);
+        if ($newKey === null || $newKey === $settings->ssh_host_key_pending
+            || array_diff(explode("\n", $newKey), explode("\n", (string) $settings->ssh_host_key)) === []) {
+            return;
+        }
+
+        $settings->forceFill(['ssh_host_key_pending' => $newKey])->save();
+        Log::warning('SSH host key of server changed', ['server_uuid' => $this->uuid, 'mode' => SshMultiplexingHelper::hostKeyCheckingMode($this)]);
+        auditLog('server.ssh_host_key_changed', [
+            'team_id' => $this->team_id,
+            'server_uuid' => $this->uuid,
+            'server_name' => $this->name,
+            'fingerprints' => ServerSetting::sshHostKeyFingerprints($newKey),
+        ], 'warning');
+        $this->team?->notify(new HostKeyChanged($this));
     }
 
     public function installDocker()

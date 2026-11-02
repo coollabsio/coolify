@@ -45,7 +45,8 @@ function backupRedactionServer(Team $team): Server
 {
     $server = Server::factory()->create(['team_id' => $team->id]);
     $server->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id]);
-    $server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    // The test counts ssh attempts; the host key check would add a key scan.
+    $server->settings()->update(['is_reachable' => true, 'is_usable' => true, 'is_ssh_host_key_check_disabled' => true]);
 
     return $server->fresh();
 }

@@ -10824,7 +10824,7 @@ paths:
       tags:
         - Servers
       summary: 'Check a registry login on a server'
-      description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server.'
+      description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server. Needs a token with the write and deploy permissions.'
       operationId: check-server-registry-login
       parameters:
         -
@@ -10866,7 +10866,7 @@ paths:
       tags:
         - Servers
       summary: 'Log out from a registry on a server'
-      description: 'Run docker logout on the server for a registry.'
+      description: 'Run docker logout on the server for a registry. Needs a token with the write and deploy permissions.'
       operationId: logout-server-registry
       parameters:
         -
@@ -11617,6 +11617,10 @@ paths:
                   enum: [traefik, caddy, none]
                   example: traefik
                   description: 'The proxy type.'
+                ssh_host_key:
+                  type: string
+                  example: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...'
+                  description: 'The SSH host key(s) of the server, as public key lines (for example the content of /etc/ssh/ssh_host_ed25519_key.pub) or known_hosts lines. Without it, Coolify trusts the key that the server sends on the first connection.'
               type: object
       responses:
         '201':
@@ -11936,6 +11940,52 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Validation started.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/host-key/reset':
+    post:
+      tags:
+        - Servers
+      summary: 'Reset host key'
+      description: 'Remove the trusted SSH host key of the server, or trust the given key. Without ssh_host_key, Coolify trusts the key that the server sends on the next connection.'
+      operationId: reset-server-host-key-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              properties:
+                ssh_host_key:
+                  description: 'The SSH host key(s) to trust, as public key lines or known_hosts lines.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Host key reset.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Host key reset.' }
+                  ssh_host_key_fingerprints: { type: array, items: { type: string } }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -16666,6 +16716,40 @@ components:
           description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'
         is_reachable:
           type: boolean
+        ssh_host_key:
+          type: string
+          nullable: true
+          description: 'Pinned SSH host key(s) of the server, one "type base64" line per key.'
+        ssh_host_key_source:
+          type: string
+          nullable: true
+          enum:
+            - tofu
+            - upgrade
+            - transfer
+            - manual
+        ssh_host_key_trusted_at:
+          type: string
+          format: date-time
+          nullable: true
+        ssh_host_key_pending:
+          type: string
+          nullable: true
+          description: 'Host key that the server sent when it did not match the pinned key.'
+        is_ssh_host_key_check_disabled:
+          type: boolean
+        ssh_host_key_fingerprints:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'
+        ssh_host_key_pending_fingerprints:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: 'SHA256 fingerprints of the host key that did not match.'
         is_sentinel_enabled:
           type: boolean
         is_swarm_manager:

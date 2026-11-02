@@ -10,6 +10,14 @@
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full min-w-0">
+            {{-- Outside the layout switch, so that the localhost server shows it too. --}}
+            @if (filled($server->settings->ssh_host_key_pending))
+                <x-callout type="danger" title="The SSH host key of this server changed" class="mb-4">
+                    The server sent a host key that does not match the key that Coolify trusts. Check it on the
+                    <a href="{{ route('server.security.host-key', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                        class="underline">Host Key</a> page.
+                </x-callout>
+            @endif
             @if ($server->isLocalhost())
                 @include('livewire.server.partials.localhost-general')
             @else
@@ -28,6 +36,7 @@
                         'Hostinger' => $hostingerVirtualMachineStatus,
                         default => null,
                     };
+                    $canRefreshProvider = $provider && $server->cloudProviderToken && ! $server->isTransferredAway();
                     $providerStatusType = match (true) {
                         in_array($providerStatus, ['running', 'active']) => 'success',
                         in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'initial', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
@@ -265,35 +274,14 @@
 
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Provider state, operating system, and hardware details.">
-                        <x-slot:actions>
-                            @if ($provider)
+                        @if ($provider)
+                            <x-slot:badges>
                                 <x-status-badge :label="$provider . ($providerStatus ? ' · ' . ucfirst($providerStatus) : '')"
                                     :type="$providerStatusType" />
-                                @if ($provider === 'Hetzner')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkHetznerServerStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'DigitalOcean')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkDigitalOceanDropletStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'Vultr')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkVultrInstanceStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'Hostinger')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkHostingerVirtualMachineStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @endif
+                            </x-slot:badges>
+                        @endif
+                        <x-slot:actions>
+                            @if ($provider)
                                 @if ($server->cloudProviderToken && ! $server->isTransferredAway())
                                     @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
                                         <x-forms.button type="button" wire:click.prevent="startHetznerServer" isHighlighted
@@ -314,8 +302,8 @@
                                 @endif
                             @endif
                             <x-forms.button type="button" wire:click="refreshServerMetadata"
-                                :disabled="! $server->isFunctional()"
-                                :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
+                                :disabled="! $server->isFunctional() && ! $canRefreshProvider"
+                                :tooltip="$server->isFunctional() || $canRefreshProvider ? null : 'Validate the connection first.'">
                                 <x-reicon name="refresh" class="size-3.5" />
                                 {{ $server->server_metadata ? 'Refresh details' : 'Fetch server details' }}
                             </x-forms.button>

@@ -53,6 +53,8 @@ function makeMuxServer(): Server
         'team_id' => $team->id,
         'private_key_id' => $privateKey->id,
     ]);
+    // These tests count ssh processes; the host key check would add a key scan.
+    $server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
 
     Storage::disk('ssh-keys')->put("ssh_key@{$server->privateKey->uuid}", $server->privateKey->private_key);
 
@@ -242,6 +244,32 @@ it('gives the mux health check at least the server connection timeout', function
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'health_check_ok') && $process->timeout === 30);
     Process::assertNotRan(fn ($process) => str_contains($process->command, '-O check') && $process->timeout !== 5);
+});
+
+it('runs the mux health check with the server port and key, and never as a new master', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_enabled' => true,
+    ]);
+    $server = makeMuxServer();
+    $server->update(['port' => 2222]);
+    $server->settings->update(['connection_timeout' => 17]);
+    $server = $server->fresh();
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 0),
+        '*health_check_ok*' => Process::result(output: 'health_check_ok', exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'health_check_ok')
+        && str_contains($process->command, '-o ControlMaster=no ')
+        && ! str_contains($process->command, 'ControlMaster=auto')
+        && str_contains($process->command, "-p '2222' ")
+        && str_contains($process->command, '-i '.escapeshellarg($server->privateKey->getKeyLocation()).' ')
+        && str_contains($process->command, '-o ConnectTimeout=17 ')
+        && str_contains($process->command, '-o StrictHostKeyChecking=no '));
 });
 
 it('does not spawn a master when the per-server lock is already held', function () {
