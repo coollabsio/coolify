@@ -11,6 +11,64 @@ class SentinelMetricsClient
 
     public function __construct(protected Server $server) {}
 
+    /**
+     * Optional charts must not occupy web workers for the general SSH timeout.
+     * One in-flight read per server, a short shared response cache, and a cooldown
+     * keep repeated dashboard refreshes from reconnecting to an unavailable server.
+     */
+    public static function fetchOverSsh(Server $server, array $commands, string $cacheKey): ?string
+    {
+        $prefix = 'sentinel:metrics-ssh:'.$server->id;
+        $responseKey = $prefix.':response:'.hash('sha256', $cacheKey);
+        if (Cache::has($prefix.':unavailable')) {
+            return null;
+        }
+        $cached = Cache::get($responseKey);
+        if (is_string($cached)) {
+            return $cached;
+        }
+
+        $lock = Cache::lock($prefix.':inflight', 15);
+        if (! $lock->get()) {
+            return null;
+        }
+
+        try {
+            // Another node may have completed a fetch while this lock was acquired.
+            if (Cache::has($prefix.':unavailable')) {
+                return null;
+            }
+            $cached = Cache::get($responseKey);
+            if (is_string($cached)) {
+                return $cached;
+            }
+
+            try {
+                $response = instant_remote_process(
+                    $commands,
+                    $server,
+                    timeout: 8,
+                    // Mux setup and health checks have separate, longer timeouts.
+                    disableMultiplexing: true,
+                    maxAttempts: 1
+                );
+                if ($response === null || trim($response) === '') {
+                    throw new \RuntimeException('Metrics returned an empty response.');
+                }
+            } catch (\Throwable) {
+                Cache::put($prefix.':unavailable', true, 60);
+
+                return null;
+            }
+
+            Cache::put($responseKey, $response, 10);
+
+            return $response;
+        } finally {
+            $lock->release();
+        }
+    }
+
     /** Rounded to the minute so the history URL (and its cache key) is stable within a minute. */
     public static function rangeFrom(string $range): string
     {
@@ -238,14 +296,13 @@ class SentinelMetricsClient
     {
         $token = $this->server->settings->ensureValidSentinelToken();
 
-        return instant_remote_process(
-            ["docker exec coolify-sentinel sh -c 'curl -s --max-time 10 -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
+        $command = "curl -sS --connect-timeout 2 --max-time 3 -H @- \"{$url}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH";
+
+        return self::fetchOverSsh(
             $this->server,
-            false,
-            timeout: 15,
-            // Metrics are read again on the next refresh. SSH retries would keep a worker past its timeout.
-            maxAttempts: 1
-        );
+            ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
+            $url
+        ) ?? '';
     }
 
     private function guard(string $response): string
