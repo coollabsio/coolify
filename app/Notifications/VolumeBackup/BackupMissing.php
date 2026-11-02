@@ -5,6 +5,7 @@ namespace App\Notifications\VolumeBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -79,6 +80,16 @@ class BackupMissing extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'Scheduled storage backup missing',
+            level: 'error',
+            message: $this->summary(),
+            buttons: $this->url ? [['text' => 'Open resource in Coolify', 'url' => $this->url]] : [],
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
             title: 'Scheduled storage backup missing',
             level: 'error',
             message: $this->summary(),

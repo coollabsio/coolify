@@ -17,6 +17,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
+use App\Models\GotifyNotificationSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -68,6 +69,7 @@ class DeleteTeamData
         SlackNotificationSettings::class,
         TelegramNotificationSettings::class,
         PushoverNotificationSettings::class,
+        GotifyNotificationSettings::class,
         WebhookNotificationSettings::class,
     ];
 

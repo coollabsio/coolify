@@ -154,6 +154,7 @@
                             ['label' => 'Telegram', 'brandIcon' => 'telegram', 'href' => route('notifications.telegram'), 'active' => request()->is('notifications/telegram')],
                             ['label' => 'Slack', 'brandIcon' => 'slack', 'href' => route('notifications.slack'), 'active' => request()->is('notifications/slack')],
                             ['label' => 'Pushover', 'brandIcon' => 'pushover', 'href' => route('notifications.pushover'), 'active' => request()->is('notifications/pushover')],
+                            ['label' => 'Gotify', 'brandIcon' => 'gotify', 'href' => route('notifications.gotify'), 'active' => request()->is('notifications/gotify')],
                             ['label' => 'Webhook', 'icon' => 'destinations', 'href' => route('notifications.webhook'), 'active' => request()->is('notifications/webhook')],
                         ]],
                         ['label' => 'Keys & Tokens', 'icon' => 'keys', 'children' => [

@@ -882,6 +882,13 @@ class GlobalSearch extends Component
                 'search_text' => 'notifications alerts pushover',
             ],
             [
+                'name' => 'Gotify Notifications',
+                'type' => 'navigation',
+                'description' => 'Configure Gotify notifications',
+                'link' => route('notifications.gotify'),
+                'search_text' => 'notifications alerts gotify',
+            ],
+            [
                 'name' => 'Webhook Notifications',
                 'type' => 'navigation',
                 'description' => 'Configure webhook notifications',

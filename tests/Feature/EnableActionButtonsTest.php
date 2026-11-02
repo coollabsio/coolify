@@ -2,6 +2,7 @@
 
 use App\Livewire\Notifications\Discord;
 use App\Livewire\Notifications\Email;
+use App\Livewire\Notifications\Gotify;
 use App\Livewire\Notifications\Pushover;
 use App\Livewire\Notifications\Slack;
 use App\Livewire\Notifications\Telegram;
@@ -87,6 +88,7 @@ it('shows notification provider save buttons while disabled', function (string $
     'slack' => [Slack::class],
     'telegram' => [Telegram::class],
     'pushover' => [Pushover::class],
+    'gotify' => [Gotify::class],
     'webhook' => [Webhook::class],
 ]);
 
@@ -107,6 +109,7 @@ it('hides notification provider test buttons while disabled and shows them when 
     'slack' => [Slack::class, 'slackEnabled'],
     'telegram' => [Telegram::class, 'telegramEnabled'],
     'pushover' => [Pushover::class, 'pushoverEnabled'],
+    'gotify' => [Gotify::class, 'gotifyEnabled'],
     'webhook' => [Webhook::class, 'webhookEnabled'],
 ]);
 
@@ -131,6 +134,7 @@ it('keeps notification providers disabled when enable validation fails', functio
     'slack' => [Slack::class, 'toggleSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', 'slack_enabled'],
     'telegram' => [Telegram::class, 'toggleTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', 'telegram_enabled'],
     'pushover' => [Pushover::class, 'togglePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'gotify' => [Gotify::class, 'toggleGotifyEnabled', 'gotifyEnabled', 'gotifyUrl', 'gotifyNotificationSettings', 'gotify_enabled'],
     'webhook' => [Webhook::class, 'toggleWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
@@ -158,6 +162,7 @@ it('reverts a notification provider toggle to the saved value when enabling fail
     'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackNotificationSettings', 'slack_enabled'],
     'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramNotificationSettings', 'telegram_enabled'],
     'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'gotify' => [Gotify::class, 'instantSaveGotifyEnabled', 'gotifyEnabled', 'gotifyNotificationSettings', 'gotify_enabled'],
     'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
@@ -179,6 +184,7 @@ it('reverts a notification provider toggle to the saved value when disabling fai
     'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C']],
     'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42']],
     'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token']],
+    'gotify' => [Gotify::class, 'instantSaveGotifyEnabled', 'gotifyEnabled', 'gotifyUrl', 'gotifyNotificationSettings', ['gotify_enabled' => true, 'gotify_url' => 'https://gotify.example.com', 'gotify_token' => 'token']],
     'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify']],
 ]);
 
@@ -231,6 +237,7 @@ it('saves cleared notification provider fields while the provider is disabled', 
     'slack' => [Slack::class, 'slackNotificationSettings', ['slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C'], ['slackWebhookUrl']],
     'telegram' => [Telegram::class, 'telegramNotificationSettings', ['telegram_token' => '123:abc', 'telegram_chat_id' => '42'], ['telegramToken', 'telegramChatId']],
     'pushover' => [Pushover::class, 'pushoverNotificationSettings', ['pushover_user_key' => 'user', 'pushover_api_token' => 'token'], ['pushoverUserKey', 'pushoverApiToken']],
+    'gotify' => [Gotify::class, 'gotifyNotificationSettings', ['gotify_url' => 'https://gotify.example.com', 'gotify_token' => 'token'], ['gotifyUrl', 'gotifyToken']],
     'webhook' => [Webhook::class, 'webhookNotificationSettings', ['webhook_url' => 'https://hooks.example.com/coolify'], ['webhookUrl']],
 ]);
 
@@ -250,5 +257,6 @@ it('rejects cleared notification provider fields while the provider is enabled',
     'slack' => [Slack::class, 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C'], 'slackWebhookUrl'],
     'telegram' => [Telegram::class, 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42'], 'telegramToken'],
     'pushover' => [Pushover::class, 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token'], 'pushoverUserKey'],
+    'gotify' => [Gotify::class, 'gotifyNotificationSettings', ['gotify_enabled' => true, 'gotify_url' => 'https://gotify.example.com', 'gotify_token' => 'token'], 'gotifyUrl'],
     'webhook' => [Webhook::class, 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify'], 'webhookUrl'],
 ]);

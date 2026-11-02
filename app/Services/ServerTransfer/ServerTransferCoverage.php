@@ -21,6 +21,7 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\GitlabApp;
+use App\Models\GotifyNotificationSettings;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
@@ -338,6 +339,7 @@ final class ServerTransferCoverage
         SlackNotificationSettings::class => 'Team notification settings, not server data.',
         TelegramNotificationSettings::class => 'Team notification settings, not server data.',
         PushoverNotificationSettings::class => 'Team notification settings, not server data.',
+        GotifyNotificationSettings::class => 'Team notification settings, not server data.',
         WebhookNotificationSettings::class => 'Team notification settings, not server data.',
         CloudInitScript::class => 'Team server-creation templates, not server data.',
         ProjectSetting::class => 'Created with the project on the target; it has no settings of its own yet.',

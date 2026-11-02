@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Send team alerts through a self-hosted Gotify server, from Notifications and through the API and the MCP server
+
 ## [v4.6.0] - 2026-11-02
 
 ### Breaking Changes

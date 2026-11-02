@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\PersonalAccessToken;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -76,6 +77,24 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
         $message .= '<b>Action Required:</b> Rotate this token before it expires to avoid API outages.';
 
         return new PushoverMessage(
+            title: 'API token expiring soon',
+            level: 'warning',
+            message: $message,
+            buttons: [
+                [
+                    'text' => 'Manage API tokens',
+                    'url' => $this->manageUrl,
+                ],
+            ],
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        $message = "API token <b>{$this->tokenName}</b> expires on {$this->expiresAt}.<br/><br/>";
+        $message .= '<b>Action Required:</b> Rotate this token before it expires to avoid API outages.';
+
+        return new GotifyMessage(
             title: 'API token expiring soon',
             level: 'warning',
             message: $message,

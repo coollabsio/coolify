@@ -9396,6 +9396,43 @@ paths:
       security:
         -
           bearerAuth: []
+  /notifications/gotify:
+    get:
+      tags:
+        - Notifications
+      summary: 'Get Gotify notification settings'
+      description: 'Get the current team Gotify notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
+      operationId: get-current-team-gotify-notifications
+      responses:
+        '200':
+          description: 'Gotify notification settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Notifications
+      summary: 'Update Gotify notification settings'
+      description: 'Update the current team Gotify notification settings.'
+      operationId: update-current-team-gotify-notifications
+      responses:
+        '200':
+          description: 'Updated Gotify notification settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /notifications/webhook:
     get:
       tags:

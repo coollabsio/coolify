@@ -51,6 +51,9 @@ it('notification settings have traefik_outdated fields', function () {
     // Check Pushover notification settings
     expect($team->pushoverNotificationSettings)->toHaveKey('traefik_outdated_pushover_notifications');
 
+    // Check Gotify notification settings
+    expect($team->gotifyNotificationSettings)->toHaveKey('traefik_outdated_gotify_notifications');
+
     // Check Webhook notification settings
     expect($team->webhookNotificationSettings)->toHaveKey('traefik_outdated_webhook_notifications');
 });
