@@ -16,7 +16,6 @@ services:
       - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
       - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
       - WORDPRESS_DB_NAME=wordpress
-      - "WORDPRESS_CONFIG_EXTRA=if (getenv('SERVICE_URL_WORDPRESS')) { define('WP_HOME', getenv('SERVICE_URL_WORDPRESS')); define('WP_SITEURL', getenv('SERVICE_URL_WORDPRESS')); }"
     depends_on:
       - mariadb
     healthcheck:
