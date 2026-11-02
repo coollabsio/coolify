@@ -1,13 +1,13 @@
 {{-- Cluster server rows on the Servers page. Expects $nodes, $cluster (nullable), and $sentinelRelease. --}}
 @php
-    $serverGridClasses = 'grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 md:min-w-[620px] md:grid-cols-[minmax(0,1fr)_6.5rem_10rem_9.5rem]';
+    $serverGridClasses = 'grid min-w-[620px] grid-cols-[minmax(0,1fr)_6.5rem_10rem_9.5rem] gap-3 px-4';
 @endphp
 <div class="overflow-x-auto">
     <div
         class="{{ $serverGridClasses }} border-b border-neutral-200 bg-neutral-50 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
         <div>Server</div>
-        <div class="hidden md:block">Ingress</div>
-        <div class="hidden md:block">Sentinel</div>
+        <div>Ingress</div>
+        <div>Sentinel</div>
         <div>Status</div>
     </div>
     @foreach ($nodes as $node)
@@ -29,10 +29,10 @@
                     <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description }}</p>
                 </div>
             </div>
-            <div class="hidden md:block">
+            <div>
                 <x-status-badge :status="$ingressBadge['status']" :type="$ingressBadge['type']" />
             </div>
-            <div class="hidden min-w-0 flex-col items-start gap-1 md:flex">
+            <div class="flex min-w-0 flex-col items-start gap-1">
                 <span class="truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim">{{ $sentinelVersion ?? '-' }}</span>
                 @if ($node->needsSentinelUpgrade($sentinelRelease))
                     <x-status-badge status="Upgrade available" type="warning" />
