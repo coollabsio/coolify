@@ -171,10 +171,10 @@
                         No matches found.
                     </div>
                     @if ($build = $selectedDeployment['build'])
-                        <div wire:key="deployment-build-{{ $selectedDeployment['uuid'] }}" class="mb-2 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
-                            <button type="button" wire:click="toggleBuildLog" aria-expanded="{{ $buildLogOpen ? 'true' : 'false' }}"
+                        <div wire:key="deployment-build-{{ $selectedDeployment['uuid'] }}" x-data="{ open: @js($build['open']) }" class="mb-2 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
+                            <button type="button" x-on:click="open = !open" :aria-expanded="open"
                                 class="flex w-full items-center gap-2 py-1 text-left font-sans text-xs text-neutral-600 hover:text-black dark:text-fg-dim dark:hover:text-white">
-                                <x-reicon name="chevron-down" @class(['size-3.5 shrink-0 transition-transform', '-rotate-90' => ! $buildLogOpen]) />
+                                <span class="flex shrink-0 transition-transform" :class="open ? '' : '-rotate-90'"><x-reicon name="chevron-down" class="size-3.5" /></span>
                                 <span class="font-medium text-neutral-950 dark:text-fg">Build</span>
                                 <span @class([
                                     'size-2 shrink-0 rounded-full',
@@ -184,10 +184,17 @@
                                     'bg-neutral-400 dark:bg-neutral-500' => ! in_array($build['statusType'], ['success', 'warning', 'error'], true),
                                 ])></span>
                                 <span>{{ $build['status'] }}</span>
-                                <span class="truncate text-neutral-500 dark:text-fg-faint">{{ $build['summary'] }}@if ($build['duration']) · {{ $build['duration'] }}@endif</span>
-                                <span wire:loading wire:target="toggleBuildLog" class="text-neutral-500 dark:text-fg-faint">Loading…</span>
+                                @if ($build['duration'])
+                                    <span class="ml-auto tabular-nums text-neutral-500 dark:text-fg-faint">{{ $build['duration'] }}</span>
+                                @endif
                             </button>
-                            @if ($buildLogOpen)
+                            @if ($build['isActive'])
+                                @can('update', $workload)
+                                    <button type="button" wire:click="cancelBuild" wire:confirm="Cancel this build?"
+                                        class="mb-1 font-sans text-xs font-medium text-red-500 underline underline-offset-2 hover:text-red-400">Cancel build</button>
+                                @endcan
+                            @endif
+                            <div x-show="open" class="flex min-w-0 flex-col">
                                 @forelse ($build['lines'] as $line)
                                     <div wire:key="deployment-build-log-{{ $loop->index }}"
                                         data-log-line data-log-content="{{ $line['timestamp'].' '.$line['line'] }}"
@@ -196,9 +203,9 @@
                                         <span class="logs-viewer-line-text">{{ $line['line'] }}</span>
                                     </div>
                                 @empty
-                                    <span class="font-logs text-neutral-400">This build wrote no output.</span>
+                                    <span class="font-logs text-neutral-400">{{ $build['isActive'] ? 'Waiting for the build to start…' : 'This build wrote no output.' }}</span>
                                 @endforelse
-                            @endif
+                            </div>
                         </div>
                     @endif
                     <div wire:key="deployment-deploy-{{ $selectedDeployment['uuid'] }}" x-data="{ open: true }">
@@ -215,6 +222,9 @@
                                 'bg-neutral-400 dark:bg-neutral-500' => ! in_array($selectedDeployment['statusType'], ['success', 'warning', 'error'], true),
                             ])></span>
                             <span>{{ $selectedDeployment['status'] }}</span>
+                            @if ($selectedDeployment['duration'])
+                                <span class="ml-auto tabular-nums text-neutral-500 dark:text-fg-faint">{{ $selectedDeployment['duration'] }}</span>
+                            @endif
                         </button>
                     @endif
                     <div x-show="open" class="flex min-w-0 flex-col">
@@ -226,7 +236,7 @@
                             <span @class(['logs-viewer-line-text', 'text-red-500' => $line['stderr']])>{{ $line['line'] }}</span>
                         </div>
                     @empty
-                        <span class="mb-2 font-logs text-neutral-400">No logs yet.</span>
+                        <span class="mb-2 font-logs text-neutral-400">{{ $selectedDeployment['deployNote'] ?? 'No logs yet.' }}</span>
                     @endforelse
                     </div>
                     </div>

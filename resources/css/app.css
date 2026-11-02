@@ -3728,6 +3728,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 /* The embedded history shows the start time and a status dot in the last column. */
+.deployment-table-compact .deployment-table-grid,
 .deployment-table-embedded .deployment-table-grid {
     grid-template-columns: minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) 6.5rem minmax(7rem, 0.8fr) 5rem;
 }

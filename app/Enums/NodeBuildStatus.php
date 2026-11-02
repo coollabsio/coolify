@@ -20,6 +20,18 @@ enum NodeBuildStatus: string
         return ucfirst($this->value);
     }
 
+    /** The status of a deploy that has not passed this build, in the words of a deployment status. */
+    public function deploymentLabel(): string
+    {
+        return match ($this) {
+            self::QUEUED => 'Queued',
+            self::RUNNING => 'In progress',
+            self::SUCCEEDED => 'Success',
+            self::FAILED => 'Failed',
+            self::CANCELLED => 'Cancelled',
+        };
+    }
+
     /** The `type` of `x-status-badge`. */
     public function badgeType(): string
     {

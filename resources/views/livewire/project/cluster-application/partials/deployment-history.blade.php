@@ -1,5 +1,5 @@
 <x-application.settings-section id="cluster-application-deployments" title="Deployments"
-    helper="A deploy of a Git application builds the image first, then deploys it to each server. A build that deployed nothing shows as a row of its own. Open a row to see its logs." flush>
+    helper="A deploy of a Git application builds the image first, then deploys it to each server. Open a deploy to see its build and deploy logs." flush>
     {{-- Same toolbar as the v4 deployment history: search, Filter (status and server), Sort. --}}
     <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
         <x-slot:search>
@@ -57,44 +57,29 @@
             @php
                 $embedded = filled($selectedDeploymentUuid ?? null);
             @endphp
-            {{-- Same columns and markup as the v4 deployment table (project/application/deployment/index). --}}
+            {{-- The compact v4 deployment table (project/application/deployment/index) on both pages; it folds into one column beside the log only. --}}
             {{-- Like v4: a click loads only the deployment log; modifier clicks still open the link. --}}
-            <div @class(['deployment-table-scroll', 'deployment-table-embedded' => $embedded])
+            <div @class(['deployment-table-scroll deployment-table-compact', 'deployment-table-embedded' => $embedded])
                 @click="const link = $event.target.closest('a[data-select-deployment]');
                     if (!link || $event.button !== 0 || $event.metaKey || $event.ctrlKey || $event.shiftKey || $event.altKey) return;
                     $event.preventDefault();
                     $wire.selectDeployment(link.dataset.selectDeployment)">
                 <div class="data-table-header deployment-table-grid rounded-none!">
-                    @unless ($embedded)
-                        <span>Status</span>
-                    @endunless
                     <span>Source</span>
                     <span>Revision</span>
-                    @unless ($embedded)
-                        <span>Started</span>
-                    @endunless
                     <span>Duration</span>
                     <span>Server</span>
-                    @if ($embedded)
-                        <span class="text-right">Status</span>
-                    @endif
+                    <span class="text-right">Status</span>
                 </div>
 
                 @foreach ($deploymentHistory['rows'] as $deployment)
                     @php
-                        $rowLink = $deployment['kind'] === 'build'
-                            ? new \Illuminate\View\ComponentAttributeBag(['href' => $deployment['href']])
-                            : new \Illuminate\View\ComponentAttributeBag(['href' => $deployment['href'], 'data-select-deployment' => $deployment['uuid']]);
+                        $rowLink = new \Illuminate\View\ComponentAttributeBag(['href' => $deployment['href'], 'data-select-deployment' => $deployment['uuid']]);
                     @endphp
                     <div wire:key="cluster-app-{{ $deployment['kind'] }}-{{ $deployment['uuid'] }}" @class([
                         'data-table-row deployment-table-row deployment-table-grid group relative border-b border-neutral-200 text-[13px] text-neutral-600 hover:text-neutral-950 dark:border-white/[0.08] dark:text-fg-dim dark:hover:text-white',
                         'data-table-row-active' => ($selectedDeploymentUuid ?? null) === $deployment['uuid'],
                     ])>
-                        @unless ($embedded)
-                            <a {{ $rowLink }}>
-                                <x-status-badge :status="$deployment['status']" :type="$deployment['statusType']" />
-                            </a>
-                        @endunless
                         <a {{ $rowLink }}>{{ $deployment['source'] }}</a>
                         <span class="min-w-0">
                             @if ($deployment['revision'])
@@ -112,27 +97,20 @@
                                 </span>
                             @endif
                         </span>
-                        @unless ($embedded)
-                            <a {{ $rowLink }} title="{{ $deployment['createdAt'] }}">
-                                {{ $deployment['createdAt']->diffForHumans() }}
-                            </a>
-                        @endunless
                         <a {{ $rowLink }} class="tabular-nums">{{ $deployment['duration'] }}</a>
                         <a {{ $rowLink }} class="truncate">{{ $deployment['node'] ?? '-' }}</a>
-                        @if ($embedded)
-                            <a {{ $rowLink }}
-                                class="flex items-center justify-end gap-2 pr-1 tabular-nums"
-                                title="{{ $deployment['status'] }} · {{ $deployment['createdAt'] }}">
-                                <span>{{ $deployment['createdAt']->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true) }}</span>
-                                <span @class([
-                                    'size-2 shrink-0 rounded-full',
-                                    'bg-emerald-500' => $deployment['statusType'] === 'success',
-                                    'bg-warning motion-safe:animate-pulse' => $deployment['statusType'] === 'warning',
-                                    'bg-red-500' => $deployment['statusType'] === 'error',
-                                    'bg-neutral-400 dark:bg-neutral-500' => ! in_array($deployment['statusType'], ['success', 'warning', 'error'], true),
-                                ])></span>
-                            </a>
-                        @endif
+                        <a {{ $rowLink }}
+                            class="flex items-center justify-end gap-2 pr-1 tabular-nums"
+                            title="{{ $deployment['status'] }} · {{ $deployment['createdAt'] }}">
+                            <span>{{ $deployment['createdAt']->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true) }}</span>
+                            <span @class([
+                                'size-2 shrink-0 rounded-full',
+                                'bg-emerald-500' => $deployment['statusType'] === 'success',
+                                'bg-warning motion-safe:animate-pulse' => $deployment['statusType'] === 'warning',
+                                'bg-red-500' => $deployment['statusType'] === 'error',
+                                'bg-neutral-400 dark:bg-neutral-500' => ! in_array($deployment['statusType'], ['success', 'warning', 'error'], true),
+                            ])></span>
+                        </a>
                         <a {{ $rowLink }} class="deployment-row-link absolute inset-0"
                             aria-hidden="true" tabindex="-1"></a>
                     </div>

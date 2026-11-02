@@ -67,9 +67,6 @@ class Show extends Component
     #[Locked]
     public ?string $deploymentUuid = null;
 
-    /** The build section of the deployment log loads its lines only when it is open. */
-    public bool $buildLogOpen = false;
-
     #[Locked]
     public ?string $buildUuid = null;
 
@@ -698,23 +695,32 @@ class Show extends Component
     }
 
     /**
-     * Shows the log of a deployment without a page load, like the v4 deployment page.
+     * Shows the log of a deployment, or of a build that deployed nothing, without a
+     * page load, like the v4 deployment page.
      */
     public function selectDeployment(string $deploymentUuid): void
     {
-        $uuid = $this->deploymentQuery()->where('uuid', $deploymentUuid)->value('uuid');
-        if ($uuid === null) {
-            return;
-        }
-        $this->section = 'deployment';
-        $this->deploymentUuid = $uuid;
-        $this->buildLogOpen = false;
-        $url = route('project.cluster-application.deployment.show', [
+        $routeParameters = [
             'project_uuid' => $this->project->uuid,
             'environment_uuid' => $this->environment->uuid,
             'workload_uuid' => $this->workload->uuid,
-            'deployment_uuid' => $uuid,
-        ]);
+        ];
+        $uuid = $this->deploymentQuery()->where('uuid', $deploymentUuid)->value('uuid');
+        if ($uuid !== null) {
+            $this->section = 'deployment';
+            $this->deploymentUuid = $uuid;
+            $this->buildUuid = null;
+            $url = route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $uuid]);
+        } else {
+            $uuid = $this->buildTimelineQuery()->where('uuid', $deploymentUuid)->value('uuid');
+            if ($uuid === null) {
+                return;
+            }
+            $this->section = 'build';
+            $this->buildUuid = $uuid;
+            $this->deploymentUuid = null;
+            $url = route('project.cluster-application.build.show', [...$routeParameters, 'build_uuid' => $uuid]);
+        }
         $this->js('history.replaceState(history.state, "", '.json_encode($url).')');
     }
 
@@ -791,12 +797,9 @@ class Show extends Component
             ...($this->section === 'storage' ? $this->storageData() : []),
             ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
-            'deploymentHistory' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentHistory() : null,
-            'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment'], true) ? $this->deploymentFilterOptions() : null,
-            'selectedDeployment' => $this->section === 'deployment' ? $this->selectedDeployment() : null,
-            'selectedBuild' => $this->section === 'build'
-                ? NodeBuild::query()->with(['node', 'logLines' => fn ($query) => $query->orderBy('id')])->where('uuid', $this->buildUuid)->first()
-                : null,
+            'deploymentHistory' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentHistory() : null,
+            'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentFilterOptions() : null,
+            'selectedDeployment' => in_array($this->section, ['deployment', 'build'], true) ? $this->selectedDeployment() : null,
             'routeParameters' => [
                 'project_uuid' => $this->project->uuid,
                 'environment_uuid' => $this->environment->uuid,
@@ -890,7 +893,7 @@ class Show extends Component
             ->get();
         $operations = NodeOperation::query()->with(['node', 'revision.build'])
             ->findMany($page->where('kind', 'deployment')->pluck('id'))->keyBy('id');
-        $buildRows = NodeBuild::query()->with('node')
+        $buildRows = NodeBuild::query()
             ->findMany($page->where('kind', 'build')->pluck('id'))->keyBy('id');
         $rows = $page
             ->map(fn (object $row): array => $row->kind === 'build'
@@ -909,40 +912,64 @@ class Show extends Component
         ];
     }
 
-    public function toggleBuildLog(): void
-    {
-        $this->buildLogOpen = ! $this->buildLogOpen;
-    }
-
-    /** @return array{uuid: string, status: string, statusType: string, isActive: bool, build: ?array<string, mixed>, lines: list<array{timestamp: string, line: string, stderr: bool}>} */
+    /**
+     * The deploy that the log viewer shows: a deployment with the build that made its
+     * image, or a build that has deployed nothing (yet). On the build page of a build
+     * that deployed, the view follows its deployment.
+     *
+     * @return array{uuid: string, status: string, statusType: string, isActive: bool, duration: ?string, build: ?array<string, mixed>, deployNote: ?string, lines: list<array{timestamp: string, line: string, stderr: bool}>}
+     */
     private function selectedDeployment(): array
     {
-        $operation = $this->deploymentQuery()
-            ->with(['node', 'revision.build', 'requestedBy'])
-            ->where('uuid', $this->deploymentUuid)
-            ->firstOrFail();
-        $build = $operation->revision?->build;
+        if ($this->section === 'build') {
+            $build = $this->workload->builds()->where('uuid', $this->buildUuid)->firstOrFail();
+            $operation = $build->node_workload_revision_id === null ? null : NodeOperation::query()
+                ->with(['node', 'revision', 'requestedBy'])
+                ->where('node_workload_id', $this->workload->id)
+                ->whereIn('command_type', self::DEPLOYMENT_COMMAND_TYPES)
+                ->where('node_workload_revision_id', $build->node_workload_revision_id)
+                ->latest('id')
+                ->first();
+        } else {
+            $operation = $this->deploymentQuery()
+                ->with(['node', 'revision.build', 'requestedBy'])
+                ->where('uuid', $this->deploymentUuid)
+                ->firstOrFail();
+            $build = $operation->revision?->build;
+        }
 
         return [
-            'uuid' => $operation->uuid,
+            'uuid' => $operation?->uuid ?? $build->uuid,
             'build' => $build ? [
-                'status' => $build->status->label(),
+                'status' => $build->status->deploymentLabel(),
                 'statusType' => $build->status->badgeType(),
-                'summary' => $build->git_branch.($build->commit_sha ? ' · '.substr($build->commit_sha, 0, 8) : '').' · '.$build->source_type->label(),
+                'isActive' => ! $build->status->isFinal(),
+                // Open while it is the interesting part: the build page, or a build that deployed nothing.
+                'open' => $this->section === 'build' || $operation === null,
                 'duration' => $build->started_at && $build->finished_at ? calculateDuration($build->started_at, $build->finished_at) : null,
-                'lines' => $this->buildLogOpen
-                    ? $build->logLines()->orderBy('id')->get()
-                        ->map(fn (NodeBuildLogLine $line): array => [
-                            'timestamp' => $line->logged_at->format('Y-M-d H:i:s'),
-                            'line' => $line->line,
-                            'stderr' => false,
-                        ])->all()
-                    : [],
+                'lines' => $build->logLines()->orderBy('id')->get()
+                    ->map(fn (NodeBuildLogLine $line): array => [
+                        'timestamp' => $line->logged_at->format('Y-M-d H:i:s'),
+                        'line' => $line->line,
+                        'stderr' => false,
+                    ])->all(),
             ] : null,
-            'status' => $operation->status->label(),
-            'statusType' => $operation->status->badgeType(),
-            'isActive' => $operation->status->isActive(),
-            'lines' => $this->deploymentLogLines($operation),
+            'status' => $operation?->status->label() ?? $build->status->deploymentLabel(),
+            'statusType' => $operation?->status->badgeType() ?? $build->status->badgeType(),
+            'isActive' => $operation ? $operation->status->isActive() : ! $build->status->isFinal(),
+            'duration' => match (true) {
+                $operation === null => null,
+                $operation->completed_at !== null => calculateDuration($operation->created_at, $operation->completed_at),
+                $operation->status->isActive() => calculateDuration($operation->created_at, now()),
+                default => null,
+            },
+            'deployNote' => $operation ? null : match ($build->status) {
+                NodeBuildStatus::QUEUED, NodeBuildStatus::RUNNING => 'The deploy starts when the build succeeds.',
+                NodeBuildStatus::FAILED => 'Nothing was deployed because the build failed.',
+                NodeBuildStatus::CANCELLED => 'Nothing was deployed because the build was cancelled.',
+                NodeBuildStatus::SUCCEEDED => 'Nothing was deployed. The application has no server.',
+            },
+            'lines' => $operation ? $this->deploymentLogLines($operation) : [],
         ];
     }
 
@@ -1100,17 +1127,11 @@ class Show extends Component
                 'workload_uuid' => $this->workload->uuid,
                 'build_uuid' => $build->uuid,
             ]),
-            'status' => match ($build->status) {
-                NodeBuildStatus::QUEUED => 'Build queued',
-                NodeBuildStatus::RUNNING => 'Building',
-                NodeBuildStatus::SUCCEEDED => 'Built',
-                NodeBuildStatus::FAILED => 'Build failed',
-                NodeBuildStatus::CANCELLED => 'Build cancelled',
-            },
+            'status' => $build->status->deploymentLabel(),
             'statusType' => $build->status->badgeType(),
             'source' => $build->requested_by_user_id !== null ? 'Manual' : 'Automatic',
             'revision' => $build->commit_sha ? substr($build->commit_sha, 0, 8) : null,
-            'image' => $build->git_branch.' · '.$build->source_type->label().' build',
+            'image' => $build->git_branch.' · '.$build->source_type->label(),
             'imageTitle' => $build->git_repository,
             'createdAt' => $build->created_at,
             'duration' => match (true) {
@@ -1118,7 +1139,7 @@ class Show extends Component
                 ! $build->status->isFinal() => calculateDuration($build->started_at, now()),
                 default => $build->finished_at ? calculateDuration($build->started_at, $build->finished_at) : '-',
             },
-            'node' => $build->node?->name,
+            'node' => null,
         ];
     }
 
@@ -1152,12 +1173,12 @@ class Show extends Component
             ->where('node_workload_id', $this->workload->id)
             ->whereDoesntHave('revision.operations', fn (Builder $operation) => $operation->whereIn('command_type', self::DEPLOYMENT_COMMAND_TYPES))
             ->when($statuses->isNotEmpty(), fn (Builder $query) => $query->whereIn('status', $statuses->all()))
-            ->when($serverUuids->isNotEmpty(), fn (Builder $query) => $query->whereHas('node', fn (Builder $node) => $node->whereIn('uuid', $serverUuids->all())))
+            // These builds deployed to no server, so a server filter hides them.
+            ->when($serverUuids->isNotEmpty(), fn (Builder $query) => $query->whereRaw('1 = 0'))
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $match) => $match
                 ->where('uuid', 'like', $search.'%')
                 ->orWhere('commit_sha', 'like', $search.'%')
-                ->orWhere('git_branch', 'like', '%'.$search.'%')
-                ->orWhereHas('node', fn (Builder $node) => $node->where('name', 'like', '%'.$search.'%'))));
+                ->orWhere('git_branch', 'like', '%'.$search.'%')));
     }
 
     private function deploymentQuery(): Builder
