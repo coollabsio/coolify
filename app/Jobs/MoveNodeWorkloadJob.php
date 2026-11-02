@@ -7,6 +7,7 @@ use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\EnsureNodeWorkloadAddress;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\TransitionOperation;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
@@ -14,6 +15,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\SerializesModels;
@@ -160,6 +162,16 @@ class MoveNodeWorkloadJob implements ShouldQueue
             return;
         }
         $revision = $cluster->desired_revision;
+        // Apply the revision in this worker. The queued run can wait behind this job when Horizon
+        // has one worker; it then finds the Nodes converged. Another run holding the lock is
+        // waited for below.
+        $operator = $user !== null && $user->can('update', $cluster) ? $user : $cluster->networkOperator();
+        if ($operator !== null) {
+            try {
+                ReconcileNodeClusterNetwork::run($cluster, $operator, $nodes->pluck('id')->values()->all());
+            } catch (LockTimeoutException) {
+            }
+        }
 
         for ($poll = 0; $poll <= self::NETWORK_WAIT_SECONDS; $poll++) {
             $pending = Node::query()->whereKey($nodes->pluck('id'))->orderBy('id')->get()

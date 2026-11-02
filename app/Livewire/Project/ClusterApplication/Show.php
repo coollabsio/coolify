@@ -584,7 +584,7 @@ class Show extends Component
         ]);
     }
 
-    /** @return array{ingressAddresses: list<string>, ingressCluster: ?NodeCluster, suggestedDomain: ?string} */
+    /** @return array{ingressAddresses: list<string>, ingressCluster: ?NodeCluster, ingressTls: bool, domainCertificates: array<string, array<string, mixed>>, suggestedDomain: ?string} */
     private function ingressData(): array
     {
         $ingressAddresses = $this->ingressAddresses();
@@ -592,6 +592,8 @@ class Show extends Component
         return [
             'ingressAddresses' => $ingressAddresses,
             'ingressCluster' => $this->node?->cluster,
+            'ingressTls' => (bool) $this->node?->cluster?->supportsIngressTls(),
+            'domainCertificates' => $this->workload->domainCertificates(),
             'suggestedDomain' => $this->suggestedDomain($ingressAddresses),
         ];
     }

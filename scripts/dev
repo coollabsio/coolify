@@ -324,18 +324,27 @@ host_qemu_artisan() {
     "${privileged[@]}" php artisan "$@"
 }
 
-# Forward DEV_SEED_IP:80 to the ingress Node of this instance, so the sslip.io domains of cluster
-# applications work. Coolify writes the Node IP to storage/app/dev-ingress-target when ingress
-# changes, and socat reads it for each connection. One forward per host: the last started instance owns port 80.
+# Forward DEV_SEED_IP:80 and :443 to the ingress Node of this instance, so the sslip.io domains of
+# cluster applications work, also over HTTPS with scripts/dev-pebble. Coolify writes the Node IP to
+# storage/app/dev-ingress-target when ingress changes, and socat reads it for each connection.
+# One forward per host: the last started instance owns the ports.
 start_ingress_forward() {
-  local ip=""
+  local ip="" port container
   [[ -f .env ]] && ip="$(grep -E '^DEV_SEED_IP=' .env | tail -n1 | cut -d= -f2- | tr -d "\"'" || true)"
   [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 0
-  docker rm -f coolify-dev-ingress >/dev/null 2>&1 || true
-  docker run -d --name coolify-dev-ingress --network host --restart unless-stopped \
-    -v "$ROOT/storage/app:/state:ro" alpine/socat -d "TCP-LISTEN:80,bind=$ip,fork,reuseaddr" \
-    'SYSTEM:exec socat STDIO TCP\:$(cat /state/dev-ingress-target)\:80' >/dev/null ||
-    echo "Could not forward $ip:80 to the ingress Node; another process may use the port." >&2
+  for port in 80 443; do
+    container=coolify-dev-ingress
+    [[ "$port" == 443 ]] && container=coolify-dev-ingress-tls
+    docker rm -f "$container" >/dev/null 2>&1 || true
+    if ss -Hltn "sport = :$port" 2>/dev/null | awk '{print $4}' | grep -qE "^($ip|0\.0\.0\.0|\*|\[::\]):$port$"; then
+      echo "Not forwarding $ip:$port to the ingress Node: another process uses the port." >&2
+      continue
+    fi
+    docker run -d --name "$container" --network host --restart unless-stopped \
+      -v "$ROOT/storage/app:/state:ro" alpine/socat -d "TCP-LISTEN:$port,bind=$ip,fork,reuseaddr" \
+      "SYSTEM:exec socat STDIO TCP\\:\$(cat /state/dev-ingress-target)\\:$port" >/dev/null ||
+      echo "Could not forward $ip:$port to the ingress Node." >&2
+  done
 }
 
 # A failure leaves the stack and VMs running for inspection instead of tearing everything down.

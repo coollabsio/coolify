@@ -41,6 +41,7 @@ class IssueFluxCredential
             'discovery.corrosion.inspect.v1',
             'discovery.corrosion.reconcile.v1',
             'ingress.reconcile.v1',
+            'ingress.tls.v1',
             'logs.read.v1',
             'container.logs.v1',
             'trust.bundle.update.v1',

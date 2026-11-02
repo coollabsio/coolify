@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Models\Node;
+use App\Models\NodeCluster;
 use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -28,6 +29,25 @@ class SyncNodeReachability
             }
         }
 
+        if ($node->is_ingress && $node->cluster !== null) {
+            $this->moveTlsIssuer($node->cluster);
+        }
+
         return $isReachable;
+    }
+
+    /**
+     * Queues a network revision when the certificate issuer must change: the issuer went offline,
+     * came back, or HTTPS became available or unavailable for the cluster.
+     */
+    private function moveTlsIssuer(NodeCluster $cluster): void
+    {
+        $issuerId = $cluster->supportsIngressTls() ? $cluster->tlsIssuerNode()?->id : null;
+        if ($cluster->ingress_tls_issuer_node_id === $issuerId) {
+            return;
+        }
+        // Recorded now, so the next check does not queue again before the run applies it.
+        $cluster->update(['ingress_tls_issuer_node_id' => $issuerId]);
+        QueueNodeClusterNetworkRevision::run($cluster);
     }
 }

@@ -56,6 +56,7 @@ class FetchFluxNodeInformation
             'load_average_one' => ['nullable', 'numeric', 'min:0'],
             'load_average_five' => ['nullable', 'numeric', 'min:0'],
             'load_average_fifteen' => ['nullable', 'numeric', 'min:0'],
+            'ingress_certificates' => ['nullable', 'array', 'max:10000'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('Flux returned an invalid server information response.');
@@ -66,6 +67,20 @@ class FetchFluxNodeInformation
             $information['operating_system_version'] ?? null,
         ])));
         $observedAt = Carbon::createFromTimestampMs($information['observed_at_unix_ms']);
+        // Only the certificate issuer reports certificates. An empty list keeps the last report.
+        $certificates = collect($information['ingress_certificates'] ?? [])
+            ->filter(fn ($certificate): bool => is_array($certificate)
+                && is_string($certificate['host'] ?? null)
+                && is_string($certificate['status'] ?? null))
+            ->map(fn (array $certificate): array => [
+                'host' => mb_substr($certificate['host'], 0, 253),
+                'status' => mb_substr($certificate['status'], 0, 32),
+                'not_after' => (int) ($certificate['not_after'] ?? 0),
+                'error' => mb_substr((string) ($certificate['error'] ?? ''), 0, 500),
+                'next_attempt_at' => (int) ($certificate['next_attempt_at'] ?? 0),
+            ])
+            ->values()
+            ->all();
         // Merged under a row lock: a network command may record its own keys while this request waits.
         $node->mergeMetadata([
             'hostname' => $information['hostname'] ?? null,
@@ -93,6 +108,10 @@ class FetchFluxNodeInformation
             ],
             'collected_at' => $observedAt->toIso8601String(),
             'source' => 'flux',
+            ...($certificates === [] ? [] : [
+                'ingress_certificates' => $certificates,
+                'ingress_certificates_at' => $observedAt->timestamp,
+            ]),
         ], ['sentinel_version' => mb_substr($information['sentinel_version'], 0, 100)]);
 
         return $information;

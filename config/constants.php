@@ -17,6 +17,11 @@ return [
         'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
         // Development only: IP for the seeded sslip.io wildcard domain and application domains (for example a Tailscale IP).
         'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
+        // The ACME directory that cluster ingress certificates come from. Empty turns HTTPS off. Development
+        // defaults to empty, so dev clusters do not send orders to Let's Encrypt that must fail (scripts/dev-pebble).
+        'acme_directory_url' => env('ACME_DIRECTORY_URL', env('APP_ENV', 'production') === 'local' ? '' : 'https://acme-v02.api.letsencrypt.org/directory'),
+        // Optional PEM file of the only root CA to trust for that directory, for a test CA like Pebble (scripts/dev-pebble).
+        'acme_ca_file' => env('ACME_CA_FILE'),
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),

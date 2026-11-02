@@ -50,6 +50,37 @@ class NodeWorkload extends BaseModel
     }
 
     /** Whether ingress Nodes route public HTTP traffic to this workload. */
+    /**
+     * The certificate report of each domain, from the clusters of this workload that serve HTTPS.
+     *
+     * @return array<string, array{host: string, status: string, not_after: int, error: string, next_attempt_at: int}>
+     */
+    public function domainCertificates(): array
+    {
+        if (blank($this->domains)) {
+            return [];
+        }
+
+        return NodeCluster::query()
+            ->whereKey($this->clusterIds())
+            ->get()
+            ->filter(fn (NodeCluster $cluster): bool => $cluster->supportsIngressTls())
+            ->flatMap(fn (NodeCluster $cluster): array => $cluster->ingressCertificates())
+            ->only($this->domains)
+            ->all();
+    }
+
+    /**
+     * Whether ingress serves the domain over HTTPS now: it has a certificate that has not expired.
+     * A failed renewal keeps serving the old certificate.
+     *
+     * @param  array{not_after?: int}|null  $certificate
+     */
+    public static function servesHttps(?array $certificate): bool
+    {
+        return (int) ($certificate['not_after'] ?? 0) > now()->timestamp;
+    }
+
     public function hasIngressRoutes(): bool
     {
         return is_array($this->domains) && $this->domains !== [] && $this->http_port !== null;

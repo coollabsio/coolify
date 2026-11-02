@@ -13,6 +13,7 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -292,9 +293,10 @@ class ReconcileNodeClusterNetwork
             }
 
             // Ingress is the last step: Caddy reads its routes and endpoints from a converged Corrosion.
+            $tls = $this->ingressTls($cluster);
             foreach ($applied as $nodeId => $node) {
                 try {
-                    $operations[] = $this->reconcileIngress($cluster, $node->refresh(), $user, $attempt, $ingressRoutes, $workloadNames, $ingressRoutesError);
+                    $operations[] = $this->reconcileIngress($cluster, $node->refresh(), $user, $attempt, $ingressRoutes, $workloadNames, $ingressRoutesError, $tls);
                 } catch (Throwable $exception) {
                     $failures[$nodeId] = $exception->getMessage();
                     unset($applied[$nodeId]);
@@ -335,23 +337,90 @@ class ReconcileNodeClusterNetwork
      * Corrosion from any Node. `enabled` only controls Caddy: Nodes that are not ingress Nodes
      * get `enabled: false`, so a Node that served ingress before removes Caddy.
      *
+     * HTTPS is sent only to Nodes that support it: an older Sentinel or Flux would drop the fields.
+     *
      * @param  list<array{host: string, workload_id: string, namespace: string, port: int}>  $routes
      * @param  list<array{name: string, workload_id: string, namespace: string}>  $names
+     * @param  array{key: string, issuer_id: ?int, public_ips: list<string>, acme_ca_pem: ?string}|null  $tls
      */
-    private function reconcileIngress(NodeCluster $cluster, Node $node, User $user, string $attempt, array $routes, array $names, ?string $routesError): NodeOperation
+    private function reconcileIngress(NodeCluster $cluster, Node $node, User $user, string $attempt, array $routes, array $names, ?string $routesError, ?array $tls): NodeOperation
     {
         // Without the full lists a Node would write an empty route and name table.
         if ($routesError !== null) {
             throw new RuntimeException($routesError);
         }
-
-        return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, [
+        $request = [
             'enabled' => (bool) $node->is_ingress,
             'caddy_version' => self::CADDY_VERSION,
             'revision' => $cluster->desired_revision,
             'routes' => $routes,
             'names' => $names,
-        ]);
+        ];
+        $secrets = [];
+        if ($tls !== null && $node->is_ingress) {
+            $request['tls_enabled'] = true;
+            $secrets['tls_key'] = $tls['key'];
+            if ($tls['issuer_id'] === $node->id) {
+                $request['tls_issuer'] = true;
+                $request['acme_directory_url'] = (string) config('constants.coolify.acme_directory_url');
+                $request['ingress_public_ips'] = $tls['public_ips'];
+                if ($tls['acme_ca_pem'] !== null) {
+                    $request['acme_ca_pem'] = $tls['acme_ca_pem'];
+                }
+            }
+        }
+
+        return $this->runOperation($node, $user, $attempt, self::INGRESS_CAPABILITY, $request, $secrets);
+    }
+
+    /**
+     * The HTTPS settings of this run, or null while a member Node cannot serve HTTPS. The issuer
+     * is the one SyncNodeReachability recorded: it is the only writer, and it queues a revision for
+     * every Node when the role moves, so the previous issuer always learns that it stopped.
+     *
+     * @return array{key: string, issuer_id: ?int, public_ips: list<string>, acme_ca_pem: ?string}|null
+     */
+    private function ingressTls(NodeCluster $cluster): ?array
+    {
+        if (! $cluster->supportsIngressTls()) {
+            return null;
+        }
+        $publicIps = $cluster->nodes()
+            ->where('is_ingress', true)
+            ->orderBy('id')
+            ->pluck('ip')
+            ->filter(fn ($ip): bool => filter_var(normalizeIpAddress((string) $ip), FILTER_VALIDATE_IP) !== false)
+            ->map(fn ($ip): string => normalizeIpAddress((string) $ip));
+        // In development the ingress Nodes are VMs on a private network behind the DEV_SEED_IP:80 forward.
+        $devSeedIp = (string) config('constants.coolify.dev_seed_ip');
+        if (isDev() && filter_var($devSeedIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) !== false) {
+            $publicIps->push($devSeedIp);
+        }
+
+        return [
+            'key' => $cluster->ingressTlsKey(),
+            'issuer_id' => $cluster->ingress_tls_issuer_node_id,
+            'public_ips' => $publicIps->unique()->values()->all(),
+            'acme_ca_pem' => $this->acmeCaPem(),
+        ];
+    }
+
+    /** The configured test CA for the ACME directory, or null for the system roots. */
+    private function acmeCaPem(): ?string
+    {
+        $path = config('constants.coolify.acme_ca_file');
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+        $pem = @file_get_contents($path);
+        if (! is_string($pem) || ! str_contains($pem, '-----BEGIN CERTIFICATE-----')) {
+            // The issuer then fails each order with a TLS error; the network itself must still converge.
+            Log::warning("The ACME CA file {$path} cannot be read. The certificate issuer uses the system roots.");
+
+            return null;
+        }
+
+        return $pem;
     }
 
     private function markPending(NodeCluster $cluster, Node $node): void
@@ -429,8 +498,11 @@ class ReconcileNodeClusterNetwork
             ->get();
     }
 
-    /** @param array<string, mixed> $payload */
-    private function runOperation(Node $node, User $user, string $attempt, string $commandType, array $payload): NodeOperation
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $secrets  Sent to Flux with the payload, but not stored in the operation.
+     */
+    private function runOperation(Node $node, User $user, string $attempt, string $commandType, array $payload, array $secrets = []): NodeOperation
     {
         $operation = CreateOperation::run(
             $node,
@@ -443,7 +515,7 @@ class ReconcileNodeClusterNetwork
         try {
             TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
-            $result = $this->dispatch($operation);
+            $result = $this->dispatch($operation, $secrets);
             $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
             $this->recordObservedState($operation->node, $commandType, $result);
 
@@ -457,8 +529,11 @@ class ReconcileNodeClusterNetwork
         }
     }
 
-    /** @return array<string, mixed> */
-    private function dispatch(NodeOperation $operation): array
+    /**
+     * @param  array<string, mixed>  $secrets
+     * @return array<string, mixed>
+     */
+    private function dispatch(NodeOperation $operation, array $secrets): array
     {
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');
@@ -471,6 +546,7 @@ class ReconcileNodeClusterNetwork
                 'server_id' => $operation->node->uuid,
                 'command_id' => $operation->uuid,
                 ...$operation->request,
+                ...$secrets,
             ]);
         $response->throw();
         $result = $response->json();
@@ -508,6 +584,7 @@ class ReconcileNodeClusterNetwork
                 && data_get($result, 'revision') === data_get($operation->request, 'revision')
                 && data_get($result, 'route_count') === count(data_get($operation->request, 'routes', []))
                 && data_get($result, 'name_count') === count(data_get($operation->request, 'names', []))
+                && (bool) data_get($result, 'tls_enabled', false) === (bool) data_get($operation->request, 'tls_enabled', false)
                 && (data_get($operation->request, 'enabled') !== true || data_get($result, 'active') === true),
             default => false,
         };
@@ -548,6 +625,7 @@ class ReconcileNodeClusterNetwork
                 'ingress_route_count' => data_get($result, 'route_count'),
                 'ingress_name_count' => data_get($result, 'name_count'),
                 'ingress_caddy_version' => data_get($result, 'caddy_version'),
+                'ingress_tls_enabled' => (bool) data_get($result, 'tls_enabled', false),
             ]),
             default => null,
         };

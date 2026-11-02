@@ -55,10 +55,19 @@
                 @foreach ($domainList as $domain)
                     <div wire:key="cluster-application-domain-{{ $domain }}" class="env-table-item"
                         x-show="matchesDomainSearch(@js($domain))">
+                        @php
+                            $certificate = $domainCertificates[$domain] ?? null;
+                            $domainUrl = (\App\Models\NodeWorkload::servesHttps($certificate) ? 'https://' : 'http://').$domain;
+                        @endphp
                         <div class="data-table-row {{ $gridClass }} py-2!">
-                            <a href="http://{{ $domain }}" target="_blank" rel="noopener noreferrer"
-                                class="min-w-0 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
-                                title="http://{{ $domain }}">http://{{ $domain }}</a>
+                            <div class="flex min-w-0 items-center gap-2">
+                                <a href="{{ $domainUrl }}" target="_blank" rel="noopener noreferrer"
+                                    class="min-w-0 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
+                                    title="{{ $domainUrl }}">{{ $domainUrl }}</a>
+                                @if ($ingressTls)
+                                    <x-cluster-applications.https-badge :certificate="$certificate" />
+                                @endif
+                            </div>
                             <span class="text-center text-[12px]">{{ $httpPort }}</span>
                             <div class="flex items-center justify-end gap-1">
                                 @can('update', $workload)
@@ -121,8 +130,17 @@
                     @endforeach
                 </div>
             @endif
-            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">HTTPS is not available yet. Ingress serves
-                these domains over HTTP on port 80.</p>
+            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                @if ($ingressTls)
+                    When a domain points to the ingress servers, they get a Let's Encrypt certificate for it and
+                    redirect HTTP to HTTPS. Until then, they serve it over HTTP on port 80. Ports 80 and 443 must be
+                    open on the ingress servers.
+                @else
+                    HTTPS is not available for this cluster: it needs the latest Sentinel on every server of the
+                    cluster and an ACME directory on this instance. Until then, ingress serves these domains over
+                    HTTP on port 80.
+                @endif
+            </p>
         </div>
     </x-application.settings-section>
 

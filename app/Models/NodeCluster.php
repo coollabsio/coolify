@@ -22,9 +22,16 @@ class NodeCluster extends BaseModel
 
     protected $guarded = [];
 
+    protected $hidden = ['ingress_tls_key'];
+
+    /** Sentinel serves HTTPS and can be the certificate issuer. */
+    public const INGRESS_TLS_CAPABILITY = 'ingress.tls.v1';
+
     protected function casts(): array
     {
         return [
+            'ingress_tls_key' => 'encrypted',
+            'ingress_tls_issuer_node_id' => 'integer',
             'desired_revision' => 'integer',
             'wireguard_port' => 'integer',
             'cpu_pressure_threshold' => 'integer',
@@ -145,6 +152,64 @@ class NodeCluster extends BaseModel
     public function isNodeNetworkInSync(Node $node): bool
     {
         return $this->nodeNetworkState($node) === 'converged';
+    }
+
+    /**
+     * HTTPS needs an ACME directory, at least one ingress Node, and Sentinel with `ingress.tls.v1`
+     * on every member Node, because every Node keeps the certificate tables in its Corrosion.
+     */
+    public function supportsIngressTls(): bool
+    {
+        if (blank(config('constants.coolify.acme_directory_url'))) {
+            return false;
+        }
+        $nodes = $this->nodes()->get();
+
+        return $nodes->contains('is_ingress', true)
+            && $nodes->every(fn (Node $node): bool => $node->supportsCapability(self::INGRESS_TLS_CAPABILITY) === true);
+    }
+
+    /** The ingress Node that orders certificates: the oldest ingress Node that can take commands now. */
+    public function tlsIssuerNode(): ?Node
+    {
+        return $this->nodes()
+            ->where('is_ingress', true)
+            ->orderBy('id')
+            ->get()
+            ->first(fn (Node $node): bool => $node->canReceiveNetworkCommands()
+                && $node->supportsCapability(self::INGRESS_TLS_CAPABILITY) === true);
+    }
+
+    /**
+     * The base64 32-byte key that seals certificate private keys in Corrosion. Created once; the
+     * caller holds the network lock, so two runs cannot create different keys.
+     */
+    public function ingressTlsKey(): string
+    {
+        if (blank($this->ingress_tls_key)) {
+            $this->forceFill(['ingress_tls_key' => base64_encode(random_bytes(32))])->save();
+        }
+
+        return $this->ingress_tls_key;
+    }
+
+    /**
+     * The newest certificate report of the issuer, by host.
+     *
+     * @return array<string, array{host: string, status: string, not_after: int, error: string, next_attempt_at: int}>
+     */
+    public function ingressCertificates(): array
+    {
+        $report = $this->nodes()
+            ->where('is_ingress', true)
+            ->get()
+            ->sortByDesc(fn (Node $node): int => (int) data_get($node->metadata, 'ingress_certificates_at'))
+            ->first(fn (Node $node): bool => is_array(data_get($node->metadata, 'ingress_certificates')));
+
+        return collect(data_get($report?->metadata, 'ingress_certificates', []))
+            ->filter(fn ($certificate): bool => is_array($certificate) && is_string($certificate['host'] ?? null))
+            ->keyBy('host')
+            ->all();
     }
 
     /**

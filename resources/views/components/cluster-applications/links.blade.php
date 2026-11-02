@@ -52,12 +52,18 @@
                 <span class="text-neutral-500 dark:text-fg-dim">Pending</span>
             </div>
         @endif
+        @php
+            $domainCertificates = $workload->domainCertificates();
+        @endphp
         @forelse ($workload->domains ?? [] as $domain)
-            <a class="{{ $linkItemClasses }}" target="_blank" rel="noopener noreferrer" href="http://{{ $domain }}">
+            @php
+                $domainUrl = (\App\Models\NodeWorkload::servesHttps($domainCertificates[$domain] ?? null) ? 'https://' : 'http://').$domain;
+            @endphp
+            <a class="{{ $linkItemClasses }}" target="_blank" rel="noopener noreferrer" href="{{ $domainUrl }}">
                 <span class="shrink-0 rounded-md bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success ring-1 ring-success/20">
                     External
                 </span>
-                <span class="min-w-0 truncate">http://{{ $domain }}</span>
+                <span class="min-w-0 truncate">{{ $domainUrl }}</span>
             </a>
         @empty
             <div class="{{ $linkItemClasses }} cursor-default!" aria-disabled="true">

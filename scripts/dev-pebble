@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Development only: runs Pebble, a local ACME test CA, so the cluster ingress can get HTTPS
+# certificates without Let's Encrypt. Dev VMs reach the host as `coolify-flux`, so Pebble's API
+# certificate names that host, and the certificate issuer on the ingress Node trusts the CA below.
+#
+# Usage:
+#   ./scripts/dev-pebble start   # start Pebble (shared by all instances) and point this checkout at it
+#   ./scripts/dev-pebble stop    # stop Pebble and point this checkout back at Let's Encrypt
+#
+# Pebble runs with PEBBLE_VA_ALWAYS_VALID=1: it accepts every challenge without a request, because
+# it cannot reach the ingress VMs. The issuer still checks DNS and that every ingress Node serves the
+# challenge. Browsers do not trust Pebble certificates: use `curl -k`.
+set -euo pipefail
+
+repo="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)"
+main_checkout="$(dirname "$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)")"
+state="$main_checkout/.dev-instances/pebble"
+container="coolify-dev-pebble"
+port=14000
+ca_in_checkout="storage/app/dev-pebble-ca.pem"
+env_file="$repo/.env"
+
+set_env() {
+  local key="$1" value="$2"
+  touch "$env_file"
+  sed -i "/^${key}=/d" "$env_file"
+  [[ -n "$value" ]] && printf '%s=%s\n' "$key" "$value" >>"$env_file"
+  return 0
+}
+
+reload_coolify() {
+  # Queue workers keep the old configuration until they restart.
+  "$repo/scripts/dev" exec php artisan config:clear >/dev/null || true
+  "$repo/scripts/dev" exec php artisan horizon:terminate >/dev/null || true
+}
+
+start() {
+  mkdir -p "$state"
+  if [[ ! -s "$state/ca.pem" ]]; then
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=Coolify dev Pebble CA" \
+      -keyout "$state/ca.key" -out "$state/ca.pem" 2>/dev/null
+    openssl req -newkey rsa:2048 -nodes -subj "/CN=coolify-flux" \
+      -keyout "$state/key.pem" -out "$state/cert.csr" 2>/dev/null
+    printf 'subjectAltName=DNS:coolify-flux,DNS:localhost,IP:127.0.0.1\n' >"$state/san.ext"
+    openssl x509 -req -in "$state/cert.csr" -CA "$state/ca.pem" -CAkey "$state/ca.key" -CAcreateserial \
+      -days 825 -extfile "$state/san.ext" -out "$state/cert.pem" 2>/dev/null
+    chmod 644 "$state/key.pem"
+  fi
+  cat >"$state/pebble-config.json" <<JSON
+{
+  "pebble": {
+    "listenAddress": "0.0.0.0:14000",
+    "managementListenAddress": "",
+    "certificate": "/pebble/cert.pem",
+    "privateKey": "/pebble/key.pem",
+    "httpPort": 80,
+    "tlsPort": 443,
+    "ocspResponderURL": "",
+    "externalAccountBindingRequired": false,
+    "keyAlgorithm": "ecdsa"
+  }
+}
+JSON
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  docker run -d --name "$container" --restart unless-stopped -p "$port:14000" \
+    -e PEBBLE_VA_ALWAYS_VALID=1 -e PEBBLE_VA_NOSLEEP=1 -e PEBBLE_WFE_NONCEREJECT=0 \
+    -v "$state:/pebble:ro" ghcr.io/letsencrypt/pebble:latest -config /pebble/pebble-config.json >/dev/null
+
+  for _ in $(seq 1 30); do
+    curl -fsS --cacert "$state/ca.pem" --resolve "coolify-flux:$port:127.0.0.1" \
+      "https://coolify-flux:$port/dir" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  curl -fsS --cacert "$state/ca.pem" --resolve "coolify-flux:$port:127.0.0.1" \
+    "https://coolify-flux:$port/dir" >/dev/null || { echo "Pebble did not start. Run: docker logs $container" >&2; exit 1; }
+
+  cp "$state/ca.pem" "$repo/$ca_in_checkout"
+  set_env ACME_DIRECTORY_URL "https://coolify-flux:$port/dir"
+  set_env ACME_CA_FILE "/var/www/html/$ca_in_checkout"
+  reload_coolify
+  echo "Pebble runs at https://coolify-flux:$port/dir (CA: $state/ca.pem)."
+  echo "This checkout uses it. The next network revision of a cluster sends it to the certificate issuer."
+}
+
+stop() {
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  rm -f "$repo/$ca_in_checkout"
+  set_env ACME_DIRECTORY_URL ""
+  set_env ACME_CA_FILE ""
+  reload_coolify
+  echo "Pebble stopped. This checkout uses Let's Encrypt again."
+}
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

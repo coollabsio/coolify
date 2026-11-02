@@ -110,12 +110,17 @@
                             'pending' => 'warning',
                             default => 'neutral',
                         }" />
+                        @if ($node->is_ingress && data_get($node->metadata, 'ingress_tls_enabled') === true)
+                            <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                HTTPS{{ $cluster->ingress_tls_issuer_node_id === $node->id ? ' · Certificate issuer' : '' }}
+                            </p>
+                        @endif
                     </div>
                     <div class="flex justify-end gap-2">
                         @if ($canUpdateCluster)
                             <x-forms.button wire:click="setIngress('{{ $node->uuid }}', {{ $node->is_ingress ? 'false' : 'true' }})"
                                 wire:loading.attr="disabled" wire:target="setIngress"
-                                title="{{ $node->is_ingress ? 'Stop serving public HTTP traffic on this server.' : 'Serve public HTTP traffic for cluster applications on port 80 of this server.' }}">
+                                title="{{ $node->is_ingress ? 'Stop serving public traffic on this server.' : 'Serve public traffic for cluster applications on ports 80 and 443 of this server.' }}">
                                 {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
                             </x-forms.button>
                         @endif

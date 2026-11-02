@@ -23,7 +23,7 @@ class RefreshConnectedNodesJob implements ShouldBeUnique, ShouldQueue
     {
         Node::query()
             ->where('is_usable', true)
-            ->select(['id', 'uuid', 'is_reachable'])
+            ->select(['id', 'uuid', 'is_reachable', 'is_ingress', 'node_cluster_id'])
             ->chunkById(500, function ($nodes): void {
                 foreach ($nodes as $node) {
                     if (SyncNodeReachability::run($node)) {
