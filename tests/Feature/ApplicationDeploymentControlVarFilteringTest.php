@@ -2200,3 +2200,56 @@ YAML;
     'production' => [0],
     'preview' => [7],
 ]);
+
+it('hides the build secret values of the helper container from commands that start Compose services', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
+    $application->settings()->update(['use_build_secrets' => true]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'DATABASE_URL',
+        'value' => 'postgresql://user:pass@db:5432/app',
+        'is_literal' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => 'dockercompose']);
+    $envFlags = invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets');
+    expect($envFlags)->toBe("-e 'DATABASE_URL=postgresql://user:pass@db:5432/app'");
+
+    // The helper container has the variable in its environment, as `docker run -e` gives it.
+    $command = invokeDeploymentJobMethod($job, $reflection, 'withoutHelperBuildSecretEnvironment', 'echo "[${DATABASE_URL-unset}]"');
+    $process = new Process(['bash', '-c', $command], env: ['DATABASE_URL' => "'postgresql://user:pass@db:5432/app'"]);
+    $process->mustRun();
+
+    expect(trim($process->getOutput()))->toBe('[unset]');
+});
+
+it('leaves commands unchanged when the helper container has no build secret values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
+    createApplicationEnvironmentVariable($application, ['key' => 'DATABASE_URL', 'value' => 'value']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => 'dockercompose']);
+    expect(invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets'))->toBe('');
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'withoutHelperBuildSecretEnvironment', 'docker compose up -d'))
+        ->toBe('docker compose up -d');
+});
+
+it('gives build secrets the stored value without the quotes that Coolify adds', function () {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockerfile']);
+    $application->settings()->update(['use_build_secrets' => true]);
+    createApplicationEnvironmentVariable($application, ['key' => 'LITERAL', 'value' => "'quoted' value", 'is_literal' => true]);
+    createApplicationEnvironmentVariable($application, ['key' => 'MULTILINE', 'value' => "line1\nline2", 'is_multiline' => true]);
+    createApplicationEnvironmentVariable($application, ['key' => 'NORMAL', 'value' => "'kept'"]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => 'dockerfile']);
+    $envFlags = invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets');
+
+    // Read the values as the helper container gets them from `docker run -e`.
+    $process = new Process(['bash', '-c', 'printf "%s\n" '.$envFlags.' | sed -n "s/^\\(LITERAL\\|MULTILINE\\|NORMAL\\)=/&/p"']);
+    $process->mustRun();
+    $output = $process->getOutput();
+
+    expect($output)
+        ->toContain("LITERAL='quoted' value\n")
+        ->toContain("MULTILINE=line1\n")
+        ->toContain("NORMAL='kept'\n");
+});
