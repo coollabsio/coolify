@@ -44,7 +44,7 @@ main() {
 }
 
 check_repository() {
-	local counts behind ahead entries
+	local counts behind ahead entries fetched stale
 	heading "Checking the repository"
 	git rev-parse --is-inside-work-tree > /dev/null 2>&1 || die "$PWD is not a git repository"
 	branch="$(git symbolic-ref --quiet --short HEAD)" || die "HEAD is detached, expected a branch"
@@ -55,7 +55,11 @@ check_repository() {
 	[[ ! "$branch" =~ ^(next|release/) ]] || channel=preview
 	[ -z "$(git status --porcelain)" ] || die "the working tree is not clean, commit or stash first"
 	[ "$(git rev-parse --is-shallow-repository)" = false ] || die "the clone is shallow, run git fetch --unshallow first"
-	git fetch --quiet --prune --tags origin || die "could not fetch origin"
+	fetched="$(git fetch --porcelain --no-progress --prune --tags origin)" || {
+		stale="$(awk '$1 == "!" { sub("^refs/tags/", "", $4); print $4 }' <<< "$fetched" | paste -sd ' ' -)"
+		[ -z "$stale" ] || die "the local tag(s) $stale differ from origin, check them with git ls-remote --tags origin, then run git fetch --tags --force origin"
+		die "could not fetch origin"
+	}
 	counts="$(git rev-list --left-right --count "origin/$branch...HEAD" 2> /dev/null)" || die "origin has no branch $branch, push it first"
 	read -r behind ahead <<< "$counts"
 	[ "$behind$ahead" = 00 ] || die "$branch is $ahead commit(s) ahead of and $behind behind origin/$branch, expected it in sync"
