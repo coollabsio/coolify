@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 if (! function_exists('auditLog')) {
     /**
-     * Queue an audit event for persistence after the response.
+     * Record an audit event. The database row is written at once, or when the open transaction commits.
      *
      * @param  string  $event  Dot-namespaced event name, e.g. `api.private_key.created`.
      * @param  array<string, mixed>  $context  Identifiers + outcome details.
