@@ -1842,6 +1842,56 @@ it('keeps the old runtime env format for variables saved before exact escaping',
         ->toContain('EXACT_PLAIN='.escapeComposeEnvFileValue('a\'b"c\\d', allowInterpolation: true));
 });
 
+it('gives legacy compose variables the value that the compose file got before exact escaping', function (bool $rawCompose, string $expectedDefault) {
+    $compose = <<<'YAML'
+services:
+  app:
+    image: alpine
+    environment:
+      - TRUSTED_HOST_PATTERNS=${TRUSTED_HOST_PATTERNS:-}
+      - PLAIN_REFERENCE=${PLAIN_REFERENCE}
+YAML;
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+    ]);
+    $application->settings()->update(['is_raw_compose_deployment_enabled' => $rawCompose]);
+
+    foreach (['TRUSTED_HOST_PATTERNS', 'PLAIN_REFERENCE'] as $key) {
+        $variable = createApplicationEnvironmentVariable($application, ['key' => $key, 'value' => '^example\\.com$', 'is_runtime' => true, 'is_buildtime' => false]);
+        $variable->uses_legacy_escaping = true;
+        $variable->save();
+    }
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('TRUSTED_HOST_PATTERNS='.$expectedDefault)
+        ->toContain('PLAIN_REFERENCE=^example\\\\.com$');
+})->with([
+    'parsed compose' => [false, '"^example\\\\.com$"'],
+    'raw compose deployment' => [true, '^example\\\\.com$'],
+]);
+
+it('writes a readable runtime env line for legacy literal values with a single quote', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    $variable = createApplicationEnvironmentVariable($application, ['key' => 'LEGACY_QUOTE', 'value' => "it's", 'is_literal' => true, 'is_runtime' => true, 'is_buildtime' => false]);
+    $variable->uses_legacy_escaping = true;
+    $variable->save();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain('LEGACY_QUOTE="it\'s"');
+});
+
 it('keeps the old runtime env format for preview variables saved before exact escaping', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 

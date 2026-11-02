@@ -5605,6 +5605,54 @@ function dockerComposeEnvironmentVariableShouldBeUnset(?string $dockerCompose, s
     return extractDockerComposeEnvironmentVariableReferences($dockerCompose)->contains($key);
 }
 
+/**
+ * Variables whose stored value the Compose parser before v4.5.0 wrote straight into the `environment:`
+ * list, so their containers got the value without the old .env escaping: references with a default or
+ * under another name (`FOO=${FOO:-}`, `BAR=${FOO}`, `BAR=$FOO`) and references in such a default.
+ * A plain `FOO=${FOO}` reference kept reading the escaped .env value.
+ *
+ * @return Collection<int, string>
+ */
+function dockerComposeVariablesWithStoredValueBeforeExactEscaping(?string $dockerCompose): Collection
+{
+    static $cache = [];
+    if (blank($dockerCompose)) {
+        return collect();
+    }
+
+    $cacheKey = hash('xxh128', $dockerCompose);
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
+
+    $keys = collect();
+    foreach (extractHardcodedEnvironmentVariables($dockerCompose) as $assignment) {
+        $value = $assignment['value'] ?? null;
+        if (! is_string($value) || ! str_starts_with($value, '$') || replaceVariables($value)->value() === (string) $assignment['key']) {
+            continue;
+        }
+
+        $reference = extractBalancedBraceContent($value, 0);
+        if ($reference === null) {
+            if (preg_match('/\A\$([A-Za-z_][A-Za-z0-9_]*)\z/', $value, $match) === 1) {
+                $keys->push($match[1]);
+            }
+
+            continue;
+        }
+
+        $split = splitOnOperatorOutsideNested($reference['content']);
+        $keys->push($split === null ? $reference['content'] : $split['variable']);
+        if ($split !== null) {
+            $keys = $keys->concat(extractDockerComposeEnvironmentVariableReferences($split['default']));
+        }
+    }
+
+    $cache = [$cacheKey => $keys->reject(fn (string $key): bool => str_starts_with($key, 'SERVICE_'))->unique()->values()];
+
+    return $cache[$cacheKey];
+}
+
 /** @param Collection<int, EnvironmentVariable> $environmentVariables */
 function preserveLegacyDockerComposeNullAssignments(Collection $environment, Collection $environmentVariables): Collection
 {
