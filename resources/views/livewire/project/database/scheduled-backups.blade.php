@@ -86,10 +86,13 @@
                         || @js(strtolower($backup->frequency)).includes(search.toLowerCase())
                         || @js(strtolower($s3StorageNames)).includes(search.toLowerCase())"
                         class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
-                        <div class="min-w-0">
+                        <div class="flex min-w-0 items-center gap-2">
                             <span class="block truncate text-[12px] font-semibold text-black dark:text-fg">
                                 {{ $backup->frequency }}
                             </span>
+                            @unless ($backup->enabled)
+                                <x-status-badge status="Disabled" />
+                            @endunless
                         </div>
                         <div class="flex items-center gap-2">
                             <x-status-badge :status="$statusLabel" :type="$statusType" />
