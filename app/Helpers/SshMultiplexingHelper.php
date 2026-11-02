@@ -578,7 +578,7 @@ class SshMultiplexingHelper
             .'-o UserKnownHostsFile='.escapeshellarg($scanFile).' -o GlobalKnownHostsFile=/dev/null '
             .'-o StrictHostKeyChecking=accept-new -o BatchMode=yes '
             .'-o PubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no '
-            .'-o HostbasedAuthentication=no -o GSSAPIAuthentication=no '
+            .'-o HostbasedAuthentication=no '
             .'-o ConnectTimeout='.$connectTimeout.' -o LogLevel=ERROR '
             .'-p '.escapeshellarg((string) $server->port).' '
             .self::escapedUserAtHost($server).' true';

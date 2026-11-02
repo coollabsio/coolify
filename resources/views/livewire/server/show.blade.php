@@ -10,6 +10,14 @@
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full min-w-0">
+            {{-- Outside the layout switch, so that the localhost server shows it too. --}}
+            @if (filled($server->settings->ssh_host_key_pending))
+                <x-callout type="danger" title="The SSH host key of this server changed" class="mb-4">
+                    The server sent a host key that does not match the key that Coolify trusts. Check it on the
+                    <a href="{{ route('server.security.host-key', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                        class="underline">Host Key</a> page.
+                </x-callout>
+            @endif
             @if ($server->isLocalhost())
                 @include('livewire.server.partials.localhost-general')
             @else
@@ -202,14 +210,6 @@
                             <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
                                 <code
                                     class="mt-2 block overflow-x-auto rounded-lg bg-neutral-950 px-3 py-2 font-mono text-[11px] text-neutral-200">{{ $this->limaStartCommand }}</code>
-                            </x-callout>
-                        @endif
-
-                        @if (filled($server->settings->ssh_host_key_pending))
-                            <x-callout type="danger" title="The SSH host key of this server changed" class="mb-4">
-                                The server sent a host key that does not match the key that Coolify trusts. Check it on the
-                                <a href="{{ route('server.security.host-key', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
-                                    class="underline">Host Key</a> page.
                             </x-callout>
                         @endif
 
