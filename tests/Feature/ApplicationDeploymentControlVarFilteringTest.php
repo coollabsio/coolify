@@ -2143,3 +2143,60 @@ YAML;
     'production' => 0,
     'preview' => 42,
 ]);
+
+it('passes port-suffixed compose service URL variables to production and preview deployments', function (int $pullRequestId) {
+    $compose = <<<'YAML'
+services:
+  docmost:
+    build: .
+    environment:
+      - SERVICE_URL_DOCMOST_3000
+      - APP_URL=$SERVICE_URL_DOCMOST_3000
+YAML;
+
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => json_encode(['docmost' => ['domain' => 'https://docs.example.com']]),
+    ]);
+
+    foreach ([
+        'SERVICE_URL_DOCMOST' => 'https://docs.example.com',
+        'SERVICE_FQDN_DOCMOST' => 'docs.example.com',
+        'SERVICE_URL_DOCMOST_3000' => 'https://stale.example.com:3000',
+        'SERVICE_FQDN_DOCMOST_3000' => 'stale.example.com:3000',
+    ] as $key => $value) {
+        createApplicationEnvironmentVariable($application, ['key' => $key, 'value' => $value, 'is_runtime' => true, 'is_buildtime' => true]);
+    }
+
+    $overrides = ['pull_request_id' => $pullRequestId];
+    $expectedHost = 'docs.example.com';
+    if ($pullRequestId !== 0) {
+        $expectedHost = '7.docs.example.com';
+        $overrides['preview'] = ApplicationPreview::create([
+            'application_id' => $application->id,
+            'pull_request_id' => $pullRequestId,
+            'pull_request_html_url' => 'https://github.com/example/repo/pull/7',
+            'docker_compose_domains' => json_encode(['docmost' => ['domain' => "https://{$expectedHost}"]]),
+        ]);
+    }
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, $overrides);
+
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    expect($runtimeEnvs)
+        ->toContain("SERVICE_URL_DOCMOST=https://{$expectedHost}")
+        ->toContain("SERVICE_URL_DOCMOST_3000=https://{$expectedHost}:3000")
+        ->toContain("SERVICE_FQDN_DOCMOST_3000={$expectedHost}:3000")
+        ->and($runtimeEnvs->implode("\n"))->not->toContain('stale.example.com');
+
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables')->implode("\n");
+    expect($buildtimeEnvs)
+        ->toContain("SERVICE_URL_DOCMOST_3000='https://{$expectedHost}:3000'")
+        ->toContain("SERVICE_FQDN_DOCMOST_3000='{$expectedHost}:3000'")
+        ->not->toContain('stale.example.com');
+})->with([
+    'production' => [0],
+    'preview' => [7],
+]);
