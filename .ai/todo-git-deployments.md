@@ -126,10 +126,20 @@ A job selects the type from the workload source; there is no `if build_pack` cha
       (Nodes run the old Sentinel), cluster pages render, network reconcile still succeeds.
 - [ ] Not done: image apps still deploy from `Show::deploy` (no `DeployImageWorkloadJob` refactor); no tests.
 
-### Slice 4: Dev and end-to-end
-- [ ] Build a public Railpack sample and a Dockerfile sample, deploy to two Nodes.
-- [ ] Failure checks: bad URL, missing branch, failed build, cancel, Sentinel restart during build,
-      registry Node offline.
+### Slice 4: Dev and end-to-end - DONE (2026-11-02)
+- [x] Nodes on Sentinel main `b7ad16f7` (InstallSentinel with pinned digest); registry on node-1, BuildKit on both.
+- [x] DNS `registry.cluster.coolify.internal` on both Nodes, TLS with registry CA, 401 without login, 5443 rules.
+- [x] Railpack build on node-1 -> push -> deploy on node-2 (cross-Node pull) -> app answers.
+- [x] Dockerfile build (`dockerfile/single-stage`) -> deploy on node-1.
+- [x] Cancel: status stays cancelled, no revision, container removed. Missing Dockerfile: failed, reason in log.
+- [x] Fixed: Sentinel `742517d` (container.logs accepts `coolify.build`); PublishBuiltRevision used the array
+      result of CreateDeploymentOperation; a cancel during the push was overwritten by `succeeded`.
+
+## Before release (also in ADR 0006, "Before release")
+- [ ] Private registry pulls: team registry credentials + optional auth on `workload.deploy`
+      (temporary Podman `--authfile`, not journaled). v4 server logins cannot be imported.
+- [ ] Push built images to an external registry (v4 "Docker registry image name").
+- [ ] Release Sentinel + Flux with the build/registry commands; add `coolify-builder` to `release.yaml`.
 
 ## Later
 Private repos (GitHub App / deploy keys; reuse v4 token code), webhooks and auto deploy, build-time

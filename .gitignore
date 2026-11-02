@@ -41,6 +41,7 @@ CHANGELOG.md
 /.superpowers/
 /docs/superpowers/plans/
 /.ai/todo.md
+/.ai/todo-*.md
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
 ref
