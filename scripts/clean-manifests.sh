@@ -160,13 +160,13 @@ write_list() {
 		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub-manifests.tsv" "$WORK_DIR/ghcr-active.tsv" \
 		| sort -t $'\t' -k3,3r -k6,6 > "$WORK_DIR/sorted.tsv"
 	: > "$WORK_DIR/grouped.txt"
-	awk -F '\t' -v grouped="$WORK_DIR/grouped.txt" 'function emit(digest, list, n, i) { printed[digest]; print line[digest]; n = split(children[digest], list, " "); for (i = 1; i <= n; i++) if ((list[i] in line) && !(list[i] in printed)) { print list[i] > grouped; emit(list[i]) } }
-		FILENAME == ARGV[1] || FILENAME == ARGV[2] { children[$1] = children[$1] " " $2; next }
+	awk -F '\t' -v grouped="$WORK_DIR/grouped.txt" 'function emit(digest, list, n, i) { printed[digest]; print line[digest]; n = split(children[digest], list, " "); for (i = 1; i <= n; i++) if ((list[i] in line) && !(list[i] in printed) && --parents[list[i]] == 0) { print list[i] > grouped; emit(list[i]) } }
+		FILENAME == ARGV[1] || FILENAME == ARGV[2] { if (!(($1, $2) in pair)) { pair[$1, $2]; children[$1] = children[$1] " " $2 } next }
 		{ order[++rows] = $9; line[$9] = $0; type[$9] = $3 }
 		END {
-			for (i = 1; i <= rows; i++) if (order[i] in children) { n = split(children[order[i]], list, " "); for (j = 1; j <= n; j++) referenced[list[j]] }
+			for (i = 1; i <= rows; i++) if (order[i] in children) { n = split(children[order[i]], list, " "); for (j = 1; j <= n; j++) if (list[j] in line) parents[list[j]]++ }
 			for (i = 1; i <= rows; i++) if (type[order[i]] == "index" && !(order[i] in children)) emit(order[i])
-			for (i = 1; i <= rows; i++) if (type[order[i]] == "image" && !(order[i] in referenced) && !(order[i] in printed)) emit(order[i])
+			for (i = 1; i <= rows; i++) if (type[order[i]] == "image" && !(order[i] in parents) && !(order[i] in printed)) emit(order[i])
 			for (i = 1; i <= rows; i++) if (!(order[i] in printed)) emit(order[i])
 		}' "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub-images.tsv" "$WORK_DIR/sorted.tsv" > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
