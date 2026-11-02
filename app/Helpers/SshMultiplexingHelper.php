@@ -321,7 +321,9 @@ class SshMultiplexingHelper
     {
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
-        $healthCommand = 'ssh -o ControlMaster=auto -o ControlPath='.escapeshellarg($muxSocket).' ';
+        // A real round trip through the master. If the master is gone, ssh connects directly,
+        // so it needs the same options as every other connection. ControlMaster=no keeps it from becoming a master.
+        $healthCommand = 'ssh -o ControlMaster=no -o ControlPath='.escapeshellarg($muxSocket).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }

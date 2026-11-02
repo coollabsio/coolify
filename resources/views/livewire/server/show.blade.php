@@ -28,6 +28,7 @@
                         'Hostinger' => $hostingerVirtualMachineStatus,
                         default => null,
                     };
+                    $canRefreshProvider = $provider && $server->cloudProviderToken && ! $server->isTransferredAway();
                     $providerStatusType = match (true) {
                         in_array($providerStatus, ['running', 'active']) => 'success',
                         in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'initial', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
@@ -265,35 +266,14 @@
 
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Provider state, operating system, and hardware details.">
-                        <x-slot:actions>
-                            @if ($provider)
+                        @if ($provider)
+                            <x-slot:badges>
                                 <x-status-badge :label="$provider . ($providerStatus ? ' · ' . ucfirst($providerStatus) : '')"
                                     :type="$providerStatusType" />
-                                @if ($provider === 'Hetzner')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkHetznerServerStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'DigitalOcean')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkDigitalOceanDropletStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'Vultr')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkVultrInstanceStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'Hostinger')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkHostingerVirtualMachineStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @endif
+                            </x-slot:badges>
+                        @endif
+                        <x-slot:actions>
+                            @if ($provider)
                                 @if ($server->cloudProviderToken && ! $server->isTransferredAway())
                                     @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
                                         <x-forms.button type="button" wire:click.prevent="startHetznerServer" isHighlighted
@@ -314,8 +294,8 @@
                                 @endif
                             @endif
                             <x-forms.button type="button" wire:click="refreshServerMetadata"
-                                :disabled="! $server->isFunctional()"
-                                :tooltip="$server->isFunctional() ? null : 'Validate the connection first.'">
+                                :disabled="! $server->isFunctional() && ! $canRefreshProvider"
+                                :tooltip="$server->isFunctional() || $canRefreshProvider ? null : 'Validate the connection first.'">
                                 <x-reicon name="refresh" class="size-3.5" />
                                 {{ $server->server_metadata ? 'Refresh details' : 'Fetch server details' }}
                             </x-forms.button>
