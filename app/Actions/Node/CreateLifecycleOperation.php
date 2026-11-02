@@ -26,10 +26,17 @@ class CreateLifecycleOperation
         ?User $requestedBy = null,
         bool $updateDesiredState = true,
         bool $partOfMove = false,
+        ?int $stopTimeoutSeconds = null,
     ): NodeOperation {
         $node->ensureCapability('workload.lifecycle.v1');
+        if ($stopTimeoutSeconds !== null) {
+            if ($stopTimeoutSeconds < 1 || $stopTimeoutSeconds > 600) {
+                throw new RuntimeException('The stop timeout must be 1 to 600 seconds.');
+            }
+            $node->ensureReportedCapability('workload.stop_timeout.v1');
+        }
 
-        return DB::transaction(function () use ($node, $revision, $action, $requestedBy, $updateDesiredState, $partOfMove): NodeOperation {
+        return DB::transaction(function () use ($node, $revision, $action, $requestedBy, $updateDesiredState, $partOfMove, $stopTimeoutSeconds): NodeOperation {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -83,7 +90,11 @@ class CreateLifecycleOperation
                 "lifecycle:{$node->uuid}:{$workload->uuid}:".Str::uuid(),
                 $workload,
                 $revision,
-                ['revision_uuid' => $revision->uuid, 'action' => $action->value],
+                [
+                    'revision_uuid' => $revision->uuid,
+                    'action' => $action->value,
+                    ...($stopTimeoutSeconds === null ? [] : ['stop_timeout_seconds' => $stopTimeoutSeconds]),
+                ],
                 $requestedBy,
             );
         });

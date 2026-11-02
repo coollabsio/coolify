@@ -29,15 +29,19 @@ class DispatchWorkloadLifecycle
         }
 
         $name = 'coolify-'.$operation->workload->uuid.'-main';
+        $stopTimeout = data_get($operation->request, 'stop_timeout_seconds');
+        $stopTimeout = is_int($stopTimeout) ? $stopTimeout : null;
         $response = Http::withToken($token)
             ->acceptJson()
             ->connectTimeout(10)
-            ->timeout(120)
+            // Sentinel waits up to the stop timeout before the container stops.
+            ->timeout(max(120, ($stopTimeout ?? 0) + 90))
             ->post(rtrim($url, '/').'/v1/commands/workload.lifecycle', [
                 'server_id' => $operation->node->uuid,
                 'command_id' => $operation->uuid,
                 'name' => $name,
                 'action' => $action->value,
+                ...($stopTimeout === null ? [] : ['stop_timeout_seconds' => $stopTimeout]),
             ]);
         $response->throw();
 

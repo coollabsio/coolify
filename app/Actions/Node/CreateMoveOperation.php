@@ -89,10 +89,10 @@ class CreateMoveOperation
         if ($volumes->isEmpty()) {
             return $volumes;
         }
-        foreach (['volume.serve.v1', 'volume.delete.v1', 'volume.transfer.v1'] as $capability) {
+        foreach (['volume.serve.v1', 'volume.delete.v1', 'volume.transfer.v1', 'workload.stop_timeout.v1'] as $capability) {
             $source->ensureReportedCapability($capability);
         }
-        foreach (['volume.receive.v1', 'volume.mounts.v1', 'volume.delete.v1', 'volume.transfer.v1'] as $capability) {
+        foreach (['volume.receive.v1', 'volume.mounts.v1', 'volume.delete.v1', 'volume.transfer.v1', 'volume.verify.v1'] as $capability) {
             $target->ensureReportedCapability($capability);
         }
         if (blank($target->wireguard_ip)) {

@@ -81,15 +81,21 @@ WireGuard mesh. It does not go through Flux or Coolify.
    `receiving`.
 3. **Warm pass.** The data is copied while the source runs. Most of the data
    moves without downtime.
-4. **Stop.** Coolify stops the source container. Downtime starts.
+4. **Stop.** Coolify stops the source container and gives it 120 seconds
+   for a clean shutdown before Podman kills it. Downtime starts.
 5. **Final pass.** The copy runs again with `--delete` and sends only the
-   changes since the warm pass. Because the source is stopped, the result is
-   the same as after a clean shutdown, also for databases.
-6. **Switch.** In one transaction, Coolify sets `NodeVolume.node_id` to the
+   changes since the warm pass. Because the source is stopped, nothing writes
+   during this pass.
+6. **Check.** While the source is still stopped, rsync compares every file of
+   the target with the source by checksum, without changes
+   (`--checksum --dry-run --delete --itemize-changes`). Any difference fails
+   the move, and Coolify rolls back to the source. This check reads all data on
+   both Nodes, so it adds downtime that grows with the volume size.
+7. **Switch.** In one transaction, Coolify sets `NodeVolume.node_id` to the
    target for each volume.
-7. **Start.** Coolify deploys the revision on the target and verifies that it
+8. **Start.** Coolify deploys the revision on the target and verifies that it
    runs. Downtime ends.
-8. **Retain.** Coolify records the source copy as `retained`. After 7 days
+9. **Retain.** Coolify records the source copy as `retained`. After 7 days
    Coolify deletes it with `volume.delete.v1`. The user can delete it earlier.
 
 ### Transfer
@@ -121,8 +127,8 @@ Each step is a durable `NodeOperation`. A retry continues the copy, because
 | Failure | Result |
 | --- | --- |
 | Before the stop (steps 1–3) | The source keeps running. Coolify deletes the partial target volumes. |
-| During the final pass (step 5) | Coolify starts the source again. No data is lost. |
-| During the start on the target (step 7) | Coolify rolls back automatically: it sets `node_id` back, removes the target container, and starts the source on its volumes. The target never ran, so no writes are lost. |
+| During the final pass or the check (steps 5–6) | Coolify starts the source again. No data is lost. |
+| During the start on the target (step 8) | Coolify rolls back automatically: it sets `node_id` back, removes the target container, and starts the source on its volumes. The target never ran, so no writes are lost. |
 
 When the source Node is offline, a direct copy is not possible. The user can
 restore the latest volume backup on the target Node instead. The UI shows the
@@ -138,7 +144,7 @@ Field numbers continue after the highest number in use in `control.proto`.
 | `container.list.v1` (extended) | any Node | unchanged | new `repeated VolumeObservation volumes`: `name`, `labels`, `created_at_unix_ms`, only for volumes with `coolify.managed=true` | no |
 | `volume.delete.v1` | any Node | `repeated string names` | `repeated string deleted`, `repeated string missing` | yes |
 | `volume.serve.v1` | source Node | `transfer_id`, `repeated string names`, `peer_ip`, `secret`, `expires_at_unix_ms`, `stop` | `address`, `port`, `repeated VolumeUsage volumes` (`name`, `used_bytes`) | no |
-| `volume.receive.v1` | target Node | `transfer_id`, `pass` (`warm` or `final`), `source_address`, `source_port`, `secret`, `repeated string names` | `state` (`running`, `succeeded`, `failed`), `bytes_total`, `bytes_done`, `error` | no |
+| `volume.receive.v1` | target Node | `transfer_id`, `pass` (`warm`, `final`, or `verify`), `source_address`, `source_port`, `secret`, `repeated string names` | `state` (`running`, `succeeded`, `failed`), `bytes_total`, `bytes_done`, `error` | no |
 
 - Each mount is `--mount type=volume,source=<volume_name>,target=<path>`.
   Sentinel creates a missing volume before it creates the container.
@@ -165,7 +171,10 @@ Field numbers continue after the highest number in use in `control.proto`.
 Coolify uses volumes only on Nodes that report `volume.mounts.v1` and
 `volume.delete.v1`.
 Coolify does not offer a stateful move when the source or the target does not
-report `volume.transfer.v1`.
+report `volume.transfer.v1`, when the source does not report
+`workload.stop_timeout.v1` (`workload.lifecycle.v1` accepts
+`stop_timeout_seconds`, 1 to 600), or when the target does not report
+`volume.verify.v1` (`volume.receive.v1` accepts the `verify` pass).
 
 ## Consequences
 

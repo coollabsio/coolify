@@ -969,9 +969,18 @@ class Show extends Component
             $legacy = data_get($operation->result, 'transfer');
             $transfers = data_get($operation->result, 'transfers')
                 ?? (is_array($legacy) ? [data_get($legacy, 'pass', 'warm') => $legacy] : []);
-            foreach (['warm', 'final'] as $pass) {
+            foreach (['warm', 'final', 'verify'] as $pass) {
                 $transfer = $transfers[$pass] ?? null;
                 if (! is_array($transfer)) {
+                    continue;
+                }
+                if ($pass === 'verify') {
+                    $add($operation->updated_at, match ((string) data_get($transfer, 'state')) {
+                        'succeeded' => 'Volume check: every file matches the source.',
+                        'failed' => 'Volume check: the copy does not match the source.',
+                        default => 'Volume check: comparing every file with the source.',
+                    });
+
                     continue;
                 }
                 $done = (int) data_get($transfer, 'bytes_done', 0);

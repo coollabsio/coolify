@@ -18,7 +18,7 @@ class ReceiveNodeVolumes
     use AsAction;
 
     /**
-     * @param  'warm'|'final'  $pass
+     * @param  'warm'|'final'|'verify'  $pass
      * @param  list<string>  $names
      * @return array{state: 'running'|'succeeded'|'failed', bytes_total: int, bytes_done: int, error: string}
      */

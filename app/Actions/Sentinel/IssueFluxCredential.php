@@ -50,6 +50,8 @@ class IssueFluxCredential
             'volume.serve.v1',
             'volume.receive.v1',
             'volume.transfer.v1',
+            'volume.verify.v1',
+            'workload.stop_timeout.v1',
             'image.build.v1',
             'builder.reconcile.v1',
             'registry.reconcile.v1',

@@ -80,6 +80,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
     public const RETAIN_SOURCE_DAYS = 7;
 
+    /** How long the source may take for a clean shutdown before the final copy. Databases flush their data on stop. */
+    public const SOURCE_STOP_TIMEOUT_SECONDS = 120;
+
     public int $tries = 1;
 
     /** Network wait, an inline target deployment, the ingress settle, and the source removal; below the stale operation limit. */
@@ -257,7 +260,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             ->exists();
         if ($sourceRunning) {
             self::checkpoint($operation, ['source_stopped' => true]);
-            $stop = CreateLifecycleOperation::run($source, $operation->revision, NodeWorkloadAction::STOP, $operation->requestedBy, updateDesiredState: false, partOfMove: true);
+            $stop = CreateLifecycleOperation::run($source, $operation->revision, NodeWorkloadAction::STOP, $operation->requestedBy, updateDesiredState: false, partOfMove: true, stopTimeoutSeconds: self::SOURCE_STOP_TIMEOUT_SECONDS);
             (new ManageNodeWorkloadJob($stop->id))->handle();
             if ($stop->refresh()->status !== NodeOperationStatus::SUCCEEDED) {
                 throw new RuntimeException('The source workload could not be stopped for the final copy. '.($stop->error ?? ''));
@@ -265,6 +268,8 @@ class MoveNodeWorkloadJob implements ShouldQueue
         }
 
         $this->runPass($operation, $target, 'final', $service, $secret, $names, $deadline);
+        // Compares every file by checksum while the source is still stopped, so the switch happens only to an exact copy.
+        $this->runPass($operation, $target, 'verify', $service, $secret, $names, $deadline);
 
         DB::transaction(function () use ($operation, $volumes, $source, $target): void {
             $locked = NodeVolume::query()->whereKey($volumes->modelKeys())->lockForUpdate()->get();
@@ -288,7 +293,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
      * Runs one copy pass on the target and polls it. Every poll touches the operation, so stale
      * operation recovery does not take over a long copy.
      *
-     * @param  'warm'|'final'  $pass
+     * @param  'warm'|'final'|'verify'  $pass
      * @param  array{address: string, port: int}  $service
      * @param  list<string>  $names
      */
@@ -330,6 +335,10 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 return;
             }
             if ($state['state'] === 'failed') {
+                // A difference does not go away when the check runs again.
+                if ($pass === 'verify') {
+                    throw new RuntimeException('The copy of the volumes does not match the source: '.($state['error'] !== '' ? $state['error'] : 'Sentinel reported no reason.'));
+                }
                 if ($attempt >= self::TRANSFER_PASS_ATTEMPTS) {
                     throw new RuntimeException("The {$pass} copy of the volumes failed: ".($state['error'] !== '' ? $state['error'] : 'Sentinel reported no reason.'));
                 }
