@@ -11706,7 +11706,7 @@ paths:
         -
           name: remove_ssh_key
           in: query
-          description: 'Remove the public key of the server''s SSH key from ~/.ssh/authorized_keys on the server before the server is deleted. The server must have no resources. If the key cannot be removed, the server is not deleted.'
+          description: "Remove the public key of the server's SSH key from ~/.ssh/authorized_keys on the server before the server is deleted. The server must have no resources. If the key cannot be removed, the server is not deleted."
           required: false
           schema:
             type: boolean
@@ -15952,6 +15952,10 @@ components:
           type: string
           nullable: true
           description: 'Git full URL.'
+        git_ssh_known_hosts:
+          type: string
+          nullable: true
+          description: 'SSH host keys (known_hosts lines) of self-hosted Git hosts that git over SSH accepts. Saved on the first deployment.'
         docker_registry_image_name:
           type: string
           nullable: true

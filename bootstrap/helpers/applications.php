@@ -546,12 +546,166 @@ function clone_application(Application $source, $destination, array $overrides =
 }
 
 /**
- * The SSH command that git uses to reach a repository.
+ * The published SSH host keys of the large git hosts, also for their SSH endpoints on port 443.
+ * ssh.github.com also serves the GitHub keys on port 22, where a `Port 443` in the SSH config ends because
+ * gitSshCommand() passes the port of the repository URL.
+ * Git over SSH to these hosts accepts only these keys. Update this list when a provider changes its host keys.
+ *
+ * @see https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+ * @see https://api.github.com/meta (ssh_keys)
+ * @see https://docs.gitlab.com/user/gitlab_com/#ssh-known_hosts-entries
+ * @see https://bitbucket.org/site/ssh
+ * @see https://docs.github.com/en/authentication/troubleshooting-ssh/using-ssh-over-the-https-port
+ */
+const GIT_PINNED_HOST_KEYS = [
+    'github.com,ssh.github.com,[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl',
+    'github.com,ssh.github.com,[ssh.github.com]:443 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=',
+    'github.com,ssh.github.com,[ssh.github.com]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=',
+    'gitlab.com,[altssh.gitlab.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf',
+    'gitlab.com,[altssh.gitlab.com]:443 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFSMqzJeV9rUzU4kWitGjeR4PWSa29SPqJ1fVkhtj3Hw9xjLVXVYrU9QlYWrOLXBpQ6KWjbjTDTdDkoohFzgbEY=',
+    'gitlab.com,[altssh.gitlab.com]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsj2bNKTBSpIYDEGk9KxsGh3mySTRgMtXL583qmBpzeQ+jqCMRgBqB98u3z++J1sKlXHWfM9dyhSevkMwSbhoR8XIq/U0tCNyokEi/ueaBMCvbcTHhO7FcwzY92WK4Yt0aGROY5qX2UKSeOvuP4D6TPqKF1onrSzH9bx9XUf2lEdWT/ia1NEKjunUqu1xOB/StKDHMoX4/OKyIzuS0q/T1zOATthvasJFoPrAjkohTyaDUz2LN5JoH839hViyEG82yB+MjcFV5MU3N1l1QL3cVUCh93xSaua1N85qivl+siMkPGbO5xR/En4iEY6K2XPASUEMaieWVNTRCtJ4S8H+9',
+    'bitbucket.org,[altssh.bitbucket.org]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIazEu89wgQZ4bqs3d63QSMzYVa0MuJ2e2gKTKqu+UUO',
+    'bitbucket.org,[altssh.bitbucket.org]:443 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBPIQmuzMBuKdWeF4+a2sjSSpBK0iqitSQ+5BM9KhpexuGt20JpTVM7u5BDZngncgrqDMbWdxMWWOGtZ9UgbqgZE=',
+    'bitbucket.org,[altssh.bitbucket.org]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDQeJzhupRu0u0cdegZIa8e86EG2qOCsIsD1Xw0xSeiPDlCr7kq97NLmMbpKTX6Esc30NuoqEEHCuc7yWtwp8dI76EEEB1VqY9QJq6vk+aySyboD5QF61I/1WeTwu+deCbgKMGbUijeXhtfbxSxm6JwGrXrhBdofTsbKRUsrN1WoNgUa8uqN1Vx6WAJw1JHPhglEGGHea6QICwJOAr/6mrui/oB7pkaWKHj3z7d1IC4KWLtY47elvjbaTlkN04Kc/5LFEirorGYVbt15kAUlqGM65pk6ZBxtaO3+30LVlORZkxOh+LKL/BvbZ/iRNhItLqNyieoQj/uh/7Iv4uyH/cV/0b4WDSd3DptigWq84lJubb9t/DnZlrJazxyDCulTmKdOR7vs9gMTo+uoIrPSb8ScTtvw65+odKAlBj59dhnVp9zd7QUojOpXlL62Aw56U4oO+FALuevvMjiWeavKhJqlR7i5n9srYcrNV7ttmDw7kf/97P5zauIhxcjX+xHv4M=',
+];
+
+function gitSshConfigFile(string $uuid): string
+{
+    return "/root/.ssh/coolify_git_{$uuid}.config";
+}
+
+function gitKnownHostsFile(string $uuid): string
+{
+    return "/root/.ssh/coolify_git_{$uuid}.known_hosts";
+}
+
+/**
+ * A known_hosts line without markers, hashed host names, or comments: `host[,host] key-type key`.
+ * A host with a custom SSH port is written as `[host]:port`.
+ */
+function isValidGitKnownHostsLine(string $line): bool
+{
+    $host = '(?:[A-Za-z0-9._:-]+|\[[A-Za-z0-9._:-]+\]:[0-9]{1,5})';
+    $keyType = '(?:ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)';
+
+    return preg_match("/\\A{$host}(?:,{$host})* {$keyType} [A-Za-z0-9+\/]+={0,2}\\z/", $line) === 1;
+}
+
+/**
+ * The host names of a known_hosts line, without brackets and ports.
+ *
+ * @return list<string>
+ */
+function gitKnownHostsLineHosts(string $line): array
+{
+    return array_map(
+        fn (string $host) => strtolower(preg_replace('/\A\[(.+)\]:[0-9]+\z/', '$1', $host)),
+        explode(',', strtok($line, ' ')),
+    );
+}
+
+/**
+ * The host names in GIT_PINNED_HOST_KEYS.
+ *
+ * @return list<string>
+ */
+function gitPinnedHosts(): array
+{
+    return array_values(array_unique(array_merge(...array_map(gitKnownHostsLineHosts(...), GIT_PINNED_HOST_KEYS))));
+}
+
+/**
+ * The valid known_hosts lines of a text, without blank lines, duplicates, and lines of the pinned hosts.
+ *
+ * @return list<string>
+ */
+function gitKnownHostsLines(?string $text): array
+{
+    return collect(preg_split('/\R/', (string) $text))
+        ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
+        ->filter(fn (string $line) => isValidGitKnownHostsLine($line) && array_intersect(gitKnownHostsLineHosts($line), gitPinnedHosts()) === [])
+        ->unique()
+        ->values()
+        ->all();
+}
+
+/**
+ * The saved known_hosts lines, with the lines of the hosts in $fetchedLines replaced by $fetchedLines.
+ * A saved line belongs to a fetched host when one of its host entries has the same host and port.
+ *
+ * @param  list<string>  $fetchedLines
+ * @return list<string>
+ */
+function gitKnownHostsReplaceHostKeys(?string $saved, array $fetchedLines): array
+{
+    $entries = fn (string $line) => array_map(
+        fn (string $host) => strtolower(preg_match('/\A\[(.+)\]:([0-9]+)\z/', $host, $match) ? "{$match[1]}:{$match[2]}" : "{$host}:22"),
+        explode(',', strtok($line, ' ')),
+    );
+    $fetchedEntries = array_merge(...array_map($entries, $fetchedLines));
+    $otherLines = array_filter(gitKnownHostsLines($saved), fn (string $line) => array_intersect($entries($line), $fetchedEntries) === []);
+
+    return [...array_values($otherLines), ...$fetchedLines];
+}
+
+/**
+ * The host, key type, and SHA256 fingerprint of a known_hosts line, in the format that `ssh-keygen -lf` shows.
+ *
+ * @return array{host: string, type: string, fingerprint: string}
+ */
+function gitKnownHostFingerprint(string $line): array
+{
+    [$host, $type, $key] = explode(' ', $line);
+
+    return [
+        'host' => $host,
+        'type' => $type,
+        'fingerprint' => 'SHA256:'.rtrim(base64_encode(hash('sha256', (string) base64_decode($key), true)), '='),
+    ];
+}
+
+/**
+ * A shell command that writes the SSH config and known_hosts file that gitSshCommand() uses.
+ * Run it in the place where git runs (the helper container or the server) before git uses SSH.
+ *
+ * The hosts in GIT_PINNED_HOST_KEYS must show one of their published keys. Other hosts are trusted on
+ * first use: SSH adds the key of a new host to the known_hosts file and rejects a changed key of a known
+ * host. $knownHosts are the keys that earlier deployments saved (Application::$git_ssh_known_hosts).
+ * The config of the SSH user is read after these rules, so it cannot change StrictHostKeyChecking or
+ * UserKnownHostsFile. Root on the server can still add trusted keys (for example with KnownHostsCommand
+ * or GlobalKnownHostsFile), which is trusted by design. `~` in the Include is resolved from $HOME.
+ */
+function gitSshSetupCommand(string $uuid, ?string $knownHosts = null): string
+{
+    $knownHostsFile = gitKnownHostsFile($uuid);
+    $pinnedHosts = implode(' ', gitPinnedHosts());
+    $config = implode("\n", [
+        "Host {$pinnedHosts}",
+        '    StrictHostKeyChecking yes',
+        'Host *',
+        '    StrictHostKeyChecking accept-new',
+        "    UserKnownHostsFile {$knownHostsFile}",
+        '    HashKnownHosts no',
+        '    Include ~/.ssh/config /etc/ssh/ssh_config',
+    ])."\n";
+    $knownHostsContent = implode("\n", [...GIT_PINNED_HOST_KEYS, ...gitKnownHostsLines($knownHosts)])."\n";
+    $write = fn (string $content, string $file) => "echo '".base64_encode($content)."' | base64 -d | tee {$file} > /dev/null";
+
+    return 'mkdir -p /root/.ssh && '.$write($knownHostsContent, $knownHostsFile).' && '.$write($config, gitSshConfigFile($uuid));
+}
+
+/**
+ * The SSH command that git uses to reach a repository. Run gitSshSetupCommand() with the same $uuid first.
+ * Without a port, SSH uses the port of the repository URL.
  * The keepalive options stop a stalled connection after about one minute; without them git waits until the deployment timeout.
  */
-function gitSshCommand(int|string $port, ?string $identityFile = null, bool $identitiesOnly = true): string
+function gitSshCommand(string $uuid, int|string|null $port = null, ?string $identityFile = null, bool $identitiesOnly = true): string
 {
-    $command = "ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p {$port} -o Port={$port} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+    $command = 'ssh -F '.gitSshConfigFile($uuid).' -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4';
+    if ($port !== null) {
+        $command .= " -p {$port} -o Port={$port}";
+    }
+    $command .= ' -o LogLevel=ERROR';
 
     if ($identityFile !== null) {
         $command .= " -i {$identityFile}".($identitiesOnly ? ' -o IdentitiesOnly=yes' : '');
