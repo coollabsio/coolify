@@ -450,7 +450,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Unsupported database type');
                     }
 
-                    $size = $this->calculate_size();
+                    $size = $this->size = (int) $this->calculate_size();
 
                     // Verify local backup succeeded
                     if ($size > 0) {
@@ -960,8 +960,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedBackupLocation = escapeshellarg($this->backup_location);
                 $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
                 $resolveOptions = $s3->minioClientResolveOptions($this->server, $fullImageName, $network);
+                $partSizeOption = S3Storage::minioClientPartSizeOption($this->size);
                 $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
-                $uploadCommand = "docker exec backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
+                $uploadCommand = "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
             }
             S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
                 [$uploadCommand],

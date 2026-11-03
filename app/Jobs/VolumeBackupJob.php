@@ -178,7 +178,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             } elseif ($this->backup->save_s3) {
                 $s3CleanupPending = true;
                 $this->execution->update(['s3_cleanup_pending' => true]);
-                $uploadErrors = $this->uploadToDestinations($backupLocation, $backupDirectory, $server);
+                $uploadErrors = $this->uploadToDestinations($backupLocation, $size, $backupDirectory, $server);
                 $s3Uploaded = $uploadErrors === [];
 
                 if ($s3Uploaded) {
@@ -439,7 +439,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
      *
      * @return array<int, string> One error message per failed destination.
      */
-    private function uploadToDestinations(string $backupLocation, string $backupDirectory, Server $server): array
+    private function uploadToDestinations(string $backupLocation, int $size, string $backupDirectory, Server $server): array
     {
         $errors = [];
 
@@ -450,7 +450,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                     throw new \RuntimeException('The selected S3 storage no longer exists.');
                 }
 
-                $this->uploadToS3($replica->s3, $backupLocation, $backupDirectory, $server);
+                $this->uploadToS3($replica->s3, $backupLocation, $size, $backupDirectory, $server);
                 $replica->update(['s3_uploaded' => true, 'message' => null]);
             } catch (Throwable $exception) {
                 $message = $this->redact($exception->getMessage());
@@ -464,7 +464,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         return $errors;
     }
 
-    private function uploadToS3(S3Storage $s3, string $backupLocation, string $backupDirectory, Server $server): void
+    private function uploadToS3(S3Storage $s3, string $backupLocation, int $size, string $backupDirectory, Server $server): void
     {
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
@@ -481,7 +481,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $resolveOptions = $s3->minioClientResolveOptions($server, $image);
                 $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
-                $uploadCommand = 'docker exec '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
+                $uploadCommand = 'docker exec '.S3Storage::minioClientPartSizeOption($size).' '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
                     .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/');
             }
             S3Storage::retryMinioClientUpload(fn () => instant_remote_process([$uploadCommand], $server, timeout: $this->timeout, disableMultiplexing: true));

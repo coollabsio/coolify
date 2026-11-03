@@ -42,6 +42,18 @@ class S3Storage extends BaseModel
     private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
 
     /**
+     * The most parts that an upload with the MinIO client uses. Most providers accept 10000 parts, but some, like
+     * Scaleway, accept only 1000. The MinIO client sizes the parts for 10000 parts (16 MiB for files up to about
+     * 156 GiB), so without a part size, files larger than about 15.6 GiB fail on these providers.
+     */
+    private const MINIO_CLIENT_MAX_UPLOAD_PARTS = 1000;
+
+    /**
+     * The smallest part size of an upload with the MinIO client. It is also the default part size of the MinIO client.
+     */
+    private const MINIO_CLIENT_MIN_PART_SIZE_BYTES = 16 * 1024 * 1024;
+
+    /**
      * How long the presigned URL of a curl transfer is valid. S3 checks it when the request starts, so it must
      * cover the wait for the earlier transfers and the retries of the backup job.
      */
@@ -333,6 +345,21 @@ class S3Storage extends BaseModel
     {
         return '-e '.escapeshellarg('MC_REGION='.$this->region)
             .($this->skip_tls_verification ? ' -e MC_INSECURE=true' : '');
+    }
+
+    /**
+     * The `docker exec` option that makes `mc cp` upload a file of $fileSize bytes in at most 1000 parts.
+     * `mc cp` has no part size flag, but it reads the part size from MC_UPLOAD_MULTIPART_SIZE.
+     */
+    public static function minioClientPartSizeOption(int $fileSize): string
+    {
+        $mebibyte = 1024 * 1024;
+        $partSize = max(
+            self::MINIO_CLIENT_MIN_PART_SIZE_BYTES,
+            (int) ceil($fileSize / self::MINIO_CLIENT_MAX_UPLOAD_PARTS / $mebibyte) * $mebibyte,
+        );
+
+        return '-e MC_UPLOAD_MULTIPART_SIZE='.$partSize;
     }
 
     /**

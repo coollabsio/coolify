@@ -299,6 +299,18 @@ test('S3Storage does not retry a MinIO client upload that timed out', function (
     Sleep::assertNeverSlept();
 });
 
+test('S3Storage sizes MinIO client upload parts for at most 1000 parts', function (int $fileSize, int $partSize) {
+    expect(S3Storage::minioClientPartSizeOption($fileSize))->toBe('-e MC_UPLOAD_MULTIPART_SIZE='.$partSize)
+        ->and((int) ceil($fileSize / $partSize))->toBeLessThanOrEqual(1000);
+})->with([
+    'empty file keeps the 16 MiB default' => [0, 16 * 1024 * 1024],
+    'small file keeps the 16 MiB default' => [128, 16 * 1024 * 1024],
+    '1000 parts of 16 MiB keep the default' => [1000 * 16 * 1024 * 1024, 16 * 1024 * 1024],
+    'one byte more needs 17 MiB parts' => [1000 * 16 * 1024 * 1024 + 1, 17 * 1024 * 1024],
+    '19 GiB dump' => [19 * 1024 * 1024 * 1024, 20 * 1024 * 1024],
+    '1 TiB dump' => [1024 * 1024 * 1024 * 1024, 1049 * 1024 * 1024],
+]);
+
 test('S3Storage uses curl transfers only for endpoints with a path, which the MinIO client rejects', function (string $endpoint, bool $expected) {
     $s3Storage = new S3Storage;
     $s3Storage->setRawAttributes(['endpoint' => $endpoint]);
