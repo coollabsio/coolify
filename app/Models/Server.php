@@ -2241,7 +2241,7 @@ $siteAddress {
             return false;
         }
 
-        (new ServerConnectionCheckJob($this, disableMux: false))->handle();
+        (new ServerConnectionCheckJob($this))->handle();
         $this->settings->refresh();
 
         return $this->isFunctional();
