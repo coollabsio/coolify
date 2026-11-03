@@ -183,6 +183,15 @@ function assertGithubClockInSync(Response $response): void
     }
 }
 
+/**
+ * GitHub sometimes answers with a 5xx page or drops the connection. A repeated read or token request is harmless.
+ */
+function isTransientGithubFailure(Throwable $exception): bool
+{
+    return $exception instanceof ConnectionException
+        || ($exception instanceof RequestException && $exception->response->serverError());
+}
+
 function githubAppPrivateKey(GithubApp $source): ?PrivateKey
 {
     $privateKey = $source->privateKey;
@@ -210,17 +219,10 @@ function generateGithubToken(GithubApp $source, string $type)
     return match ($type) {
         'jwt' => $jwt,
         'installation' => (function () use ($source, $jwt) {
-            // GitHub sometimes answers with a 5xx page or drops the connection; a new token request is harmless.
             $response = Http::GitSource($source->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
-            ])->retry(
-                3,
-                fn (int $attempt) => $attempt * 1000,
-                fn (Throwable $exception) => $exception instanceof ConnectionException
-                    || ($exception instanceof RequestException && $exception->response->serverError()),
-                throw: false,
-            )->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+            ])->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false)->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
                 assertGithubClockInSync($response);
@@ -257,15 +259,19 @@ function githubApi(?GithubApp $source, string $endpoint, string $method = 'get',
         throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
-    if ($source->is_public) {
-        $response = Http::GitHub($source->api_url)->$method($endpoint);
+    $request = $source->is_public
+        ? Http::GitHub($source->api_url)
+        : Http::GitHub($source->api_url, generateGithubInstallationToken($source));
+
+    // Only reads are retried: a repeated POST could create a second pull request comment.
+    if (strtolower($method) === 'get') {
+        $request = $request->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false);
+    }
+
+    if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
+        $response = $request->$method($endpoint, $data);
     } else {
-        $token = generateGithubInstallationToken($source);
-        if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
-            $response = Http::GitHub($source->api_url, $token)->$method($endpoint, $data);
-        } else {
-            $response = Http::GitHub($source->api_url, $token)->$method($endpoint);
-        }
+        $response = $request->$method($endpoint);
     }
 
     if (! $response->successful() && $throwError) {
