@@ -194,3 +194,54 @@ test('cloning a cloned service replaces the clone suffix instead of adding anoth
 
     expect($source->name)->toBe("Gitea Runner-clone-{$source->uuid}");
 });
+
+test('cloning a service to another server keeps its generated database credentials and copies its volumes there', function () {
+    $this->service->update(['docker_compose_raw' => <<<'YAML'
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    environment:
+      - SERVICE_URL_FRESHRSS_80
+      - MARIADB_USER=${SERVICE_USER_MARIADB}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    volumes:
+      - freshrss-data:/var/www/FreshRSS/data
+  freshrss-db:
+    image: mariadb:11
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+YAML]);
+    $this->service->parse();
+    $sourceCredentials = $this->service->environment_variables()
+        ->whereIn('key', ['SERVICE_USER_MARIADB', 'SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_ROOT'])
+        ->pluck('value', 'key')
+        ->all();
+    expect($sourceCredentials)->toHaveCount(3);
+
+    $nodeB = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->service->server->private_key_id]);
+    $nodeB->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $nodeBDestination = StandaloneDocker::where('server_id', $nodeB->id)->firstOrFail();
+
+    Livewire::test(ResourceOperations::class, ['resource' => $this->service])
+        ->set('cloneVolumeData', true)
+        ->call('cloneTo', $nodeBDestination->uuid)
+        ->assertHasNoErrors();
+
+    $clone = Service::query()->whereKeyNot($this->service->id)->sole();
+    $cloneCredentials = $clone->environment_variables()
+        ->whereIn('key', array_keys($sourceCredentials))
+        ->pluck('value', 'key')
+        ->all();
+
+    expect($clone->server_id)->toBe($nodeB->id)
+        ->and($cloneCredentials)->toEqual($sourceCredentials)
+        ->and($clone->environment_variables()->where('key', 'SERVICE_PASSWORD_MARIADB')->count())->toBe(1)
+        ->and(chainedServiceVolumeClones())->toEqualCanonicalizing([
+            ["{$this->service->uuid}_freshrss-data", "{$clone->uuid}_freshrss-data"],
+            ["{$this->service->uuid}_mariadb-data", "{$clone->uuid}_mariadb-data"],
+        ]);
+});
