@@ -2539,10 +2539,7 @@ $siteAddress {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
-            if ($justCheckingNewKey) {
-                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
-            }
-            if ($this->settings->is_reachable === true) {
+            if (! $justCheckingNewKey && $this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
                 ServerReachabilityChanged::dispatch($this);
