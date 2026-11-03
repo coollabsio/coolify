@@ -4594,7 +4594,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -4686,7 +4686,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -4777,7 +4777,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -9816,7 +9816,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -9907,7 +9907,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -9997,7 +9997,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -22498,7 +22498,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -22589,7 +22589,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -22679,7 +22679,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -26558,7 +26558,7 @@
                         "type": "boolean"
                     },
                     "is_shown_once": {
-                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
+                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.",
                         "type": "boolean"
                     },
                     "comment": {
@@ -26590,7 +26590,7 @@
                         "type": "boolean"
                     },
                     "is_shown_once": {
-                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
+                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.",
                         "type": "boolean"
                     },
                     "comment": {
@@ -27535,7 +27535,7 @@
                     },
                     "is_shown_once": {
                         "type": "boolean",
-                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                        "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
                     },
                     "key": {
                         "type": "string"

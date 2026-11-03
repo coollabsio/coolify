@@ -32,7 +32,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -173,6 +173,10 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
+            if ($environmentVariable->exists && $environmentVariable->getOriginal('is_shown_once')) {
+                $environmentVariable->is_shown_once = true;
+            }
             if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
                 $environmentVariable->preserve_compose_null = false;
             }

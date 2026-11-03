@@ -413,7 +413,7 @@ describe('application env PATCH keeps omitted flags', function () {
             ->and((bool) $env->is_shown_once)->toBeTrue();
     });
 
-    test('explicit flags are still applied', function () {
+    test('explicit flags are still applied, but a locked variable stays locked', function () {
         $this->withHeaders($this->headers)
             ->patchJson("/api/v1/applications/{$this->application->uuid}/envs", [
                 'key' => 'FLAGGED_KEY',
@@ -427,7 +427,7 @@ describe('application env PATCH keeps omitted flags', function () {
         $env = $this->env->fresh();
         expect((bool) $env->is_literal)->toBeFalse()
             ->and($env->is_multiline)->toBeFalse()
-            ->and((bool) $env->is_shown_once)->toBeFalse();
+            ->and((bool) $env->is_shown_once)->toBeTrue();
     });
 });
 
@@ -635,6 +635,60 @@ describe('env PATCH keeps the value when value is omitted', function () {
         $send(['key' => 'KEEP_ME', 'value' => 'new-value']);
 
         expect($env->fresh()->value)->toBe('new-value');
+    })->with([
+        'application single' => ['application', 'applications', false],
+        'application bulk' => ['application', 'applications', true],
+        'service single' => ['service', 'services', false],
+        'service bulk' => ['service', 'services', true],
+        'database single' => ['database', 'databases', false],
+        'database bulk' => ['database', 'databases', true],
+    ]);
+});
+
+describe('env API cannot unlock a locked variable', function () {
+    test('is_shown_once false keeps the lock and the value can still be replaced', function (string $resourceType, string $endpoint, bool $bulk) {
+        $resource = match ($resourceType) {
+            'application' => Application::factory()->create([
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]),
+            'service' => Service::factory()->create([
+                'server_id' => $this->server->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+                'environment_id' => $this->environment->id,
+            ]),
+            'database' => StandalonePostgresql::create([
+                'name' => 'db',
+                'postgres_user' => 'postgres',
+                'postgres_password' => 'password',
+                'postgres_db' => 'app',
+                'image' => 'postgres:16',
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]),
+        };
+
+        $env = EnvironmentVariable::create([
+            'key' => 'LOCKED_KEY',
+            'value' => 'locked-secret',
+            'is_shown_once' => true,
+            'resourceable_type' => $resource->getMorphClass(),
+            'resourceable_id' => $resource->id,
+            'is_preview' => false,
+        ]);
+
+        $payload = ['key' => 'LOCKED_KEY', 'value' => 'rotated-secret', 'is_shown_once' => false];
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->bearerToken, 'Content-Type' => 'application/json'])
+            ->patchJson("/api/v1/{$endpoint}/{$resource->uuid}/envs".($bulk ? '/bulk' : ''), $bulk ? ['data' => [$payload]] : $payload)
+            ->assertStatus(201)
+            ->assertDontSee('rotated-secret');
+
+        $env->refresh();
+        expect((bool) $env->is_shown_once)->toBeTrue()
+            ->and($env->value)->toBe('rotated-secret');
     })->with([
         'application single' => ['application', 'applications', false],
         'application bulk' => ['application', 'applications', true],
