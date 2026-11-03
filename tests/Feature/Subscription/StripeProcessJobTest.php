@@ -577,3 +577,59 @@ describe('checkout.session.expired', function () {
         expect($this->team->subscription()->first()->stripe_checkout_reminder_sent_at)->toBeNull();
     });
 });
+
+describe('paid rows without a Stripe subscription ID', function () {
+    beforeEach(function () {
+        $this->unlinked = Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_customer_id' => 'cus_unlinked',
+            'stripe_subscription_id' => null,
+            'stripe_invoice_paid' => true,
+        ]);
+
+        $this->stripeSubscriptions = Mockery::mock(SubscriptionService::class);
+        $stripe = Mockery::mock(StripeClient::class);
+        $stripe->subscriptions = $this->stripeSubscriptions;
+        $this->instance(StripeClient::class, $stripe);
+    });
+
+    test('a deleted event of the customer ends the row', function () {
+        $this->stripeSubscriptions->shouldReceive('all')->andReturn((object) ['data' => [
+            (object) ['id' => 'sub_canceled', 'status' => 'canceled'],
+        ]]);
+        $this->stripeSubscriptions->shouldReceive('retrieve')->with('sub_canceled')->andReturn((object) [
+            'status' => 'canceled',
+            'cancel_at_period_end' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.deleted', 'data' => ['object' => [
+            'customer' => 'cus_unlinked',
+            'id' => 'sub_canceled',
+        ]]]))->handle();
+
+        expect($this->unlinked->fresh()->stripe_invoice_paid)->toBeFalsy()
+            ->and($this->unlinked->fresh()->stripe_subscription_id)->toBeNull();
+    });
+
+    test('an updated event of the customer links the active subscription', function () {
+        $this->stripeSubscriptions->shouldReceive('all')->andReturn((object) ['data' => [
+            (object) ['id' => 'sub_old', 'status' => 'canceled'],
+            (object) ['id' => 'sub_live', 'status' => 'active'],
+        ]]);
+        $this->stripeSubscriptions->shouldReceive('retrieve')->with('sub_live')->andReturn((object) [
+            'status' => 'active',
+            'cancel_at_period_end' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.updated', 'data' => ['object' => [
+            'id' => 'sub_live',
+            'customer' => 'cus_unlinked',
+            'status' => 'active',
+            'cancel_at_period_end' => false,
+            'items' => ['data' => [['plan' => ['id' => 'price_monthly'], 'price' => ['lookup_key' => 'monthly']]]],
+        ]]]))->handle();
+
+        expect($this->unlinked->fresh()->stripe_subscription_id)->toBe('sub_live')
+            ->and($this->unlinked->fresh()->stripe_invoice_paid)->toBeTruthy();
+    });
+});

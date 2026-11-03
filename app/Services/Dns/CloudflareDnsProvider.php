@@ -181,7 +181,7 @@ class CloudflareDnsProvider
             throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
         }
         if (count($remoteRecords) === 1) {
-            throw new DnsRecordConflictException($remoteRecords[0]['id'], $remoteRecords[0]['content'], $content);
+            throw new DnsRecordConflictException($remoteRecords[0]['id'], $remoteRecords[0]['content'], $content, $remoteRecords[0]['comment']);
         }
 
         $uuid = new_public_id();

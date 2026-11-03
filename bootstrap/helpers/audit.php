@@ -16,6 +16,11 @@ if (! function_exists('auditLog')) {
      */
     function auditLog(string $event, array $context = [], string $level = 'info'): void
     {
+        // MCP tools also call the REST API controllers through an internal request.
+        if (str_starts_with($event, 'api.') && app()->bound('request') && request()->attributes->get('mcp_rest_bridge') === true) {
+            $event = 'mcp.'.substr($event, 4);
+        }
+
         if (! shouldRecordAuditEvent($event, $context)) {
             return;
         }

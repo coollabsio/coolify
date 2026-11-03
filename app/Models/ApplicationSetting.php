@@ -101,6 +101,8 @@ class ApplicationSetting extends Model
         'include_coolify_default_variables' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'disable_build_cache' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
     ];
 
     protected $fillable = [
@@ -146,6 +148,8 @@ class ApplicationSetting extends Model
         'docker_images_to_keep',
         'stop_grace_period',
         'rolling_update_drain_seconds',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
     ];
 
     /**

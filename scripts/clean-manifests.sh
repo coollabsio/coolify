@@ -35,40 +35,56 @@ main() {
 	GHCR_TOKEN="$(gh auth token)" || die "gh is not signed in with a token that has read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
 	heading "Reading ghcr.io/$IMAGE and docker.io/$IMAGE"
 	read_ghcr_versions
-	read_dockerhub_tags
+	read_dockerhub_manifests
+	read_dockerhub_images
 	select_kept_tags
 	read_manifests
 	select_kept_manifests
 	heading "Selecting what to delete"
-	find_dockerhub_only_manifests
 	write_list
 	delete_manifests
 	verify_kept_manifests
 }
 
 read_ghcr_versions() {
-	local page window=$((${LIMIT:-0} * 2))
 	list_ghcr_versions "state=active" --paginate > "$WORK_DIR/ghcr-active.tsv"
-	for ((page = 1; page <= (window + 99) / 100; page++)); do
-		list_ghcr_versions "state=deleted&page=$page"
-	done | awk -v window="$window" 'NR <= window' > "$WORK_DIR/ghcr-deleted.tsv"
 	cut -f 1 "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/on-ghcr.txt"
 	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged"
 }
 
-read_dockerhub_tags() {
-	local token page last=""
-	token="$(registry_token docker.io pull)"
-	while :; do
-		page="$(curl -sSf --retry 3 -H "Authorization: Bearer $token" "https://registry-1.docker.io/v2/$IMAGE/tags/list?n=1000${last:+&last=$last}" | jq -r '.tags // [] | .[]')" \
-			|| die "could not list the tags of docker.io/$IMAGE"
-		[ -n "$page" ] || break
-		echo "$page" >> "$WORK_DIR/dockerhub-tags.txt"
-		last="$(tail -n 1 <<< "$page")"
+# The manifests endpoint is undocumented, Docker Hub uses it for image management, so it can change without notice
+read_dockerhub_manifests() {
+	local hub base url page key
+	hub="$(hub_token)" || die "could not sign in to the Docker Hub API as $DOCKERHUB_USERNAME"
+	base="https://hub.docker.com/v2/namespaces/${IMAGE%%/*}/repositories/${IMAGE#*/}/manifests?page_size=100"
+	url="$base"
+	while [ -n "$url" ]; do
+		page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")" || die "could not list the manifests of docker.io/$IMAGE from the Docker Hub API"
+		jq -r '.manifests[] | [.manifest_digest, .media_type, (.tags // [] | join(",")), .last_pushed, (if (.media_type // "" | test("index|list")) then .size else .total_size end), ([.os, .arch] | map(select(. != null and . != "")) | join("/"))] | @tsv' <<< "$page" \
+			>> "$WORK_DIR/dockerhub-manifests.tsv"
+		key="$(jq -r 'select(.manifests | length > 0) | .last_evaluated_key // empty' <<< "$page")"
+		url="${key:+$base&last_evaluated_key=$(jq -rn --arg key "$key" '$key | @uri')}"
 	done
-	request_manifests docker.io "$WORK_DIR/dockerhub-tags.txt" -f --head -o /dev/null -w '%header{docker-content-digest}\t%header{content-type}\t{}\n' \
-		> "$WORK_DIR/dockerhub.tsv" || die "could not read the digests of the tags of docker.io/$IMAGE"
-	ok "docker.io/$IMAGE has $(count < "$WORK_DIR/dockerhub.tsv") tags on $(cut -f 1 "$WORK_DIR/dockerhub.tsv" | sort -u | count) manifests"
+	awk -F '\t' -v OFS='\t' '{ n = split($3, tags, ","); for (i = 1; i <= n; i++) print $1, $2, tags[i] }' "$WORK_DIR/dockerhub-manifests.tsv" > "$WORK_DIR/dockerhub.tsv"
+	grep -q $'\tlatest$' "$WORK_DIR/dockerhub.tsv" || die "docker.io/$IMAGE lists no latest tag, expected the Docker Hub API to return the tags of every manifest"
+	awk -F '\t' '$4 != "" { found = 1; exit } END { exit !found }' "$WORK_DIR/dockerhub-manifests.tsv" || die "docker.io/$IMAGE lists no push dates, expected them from the Docker Hub API"
+	ok "docker.io/$IMAGE has $(count < "$WORK_DIR/dockerhub-manifests.tsv") manifests, $(awk -F '\t' '$3 == ""' "$WORK_DIR/dockerhub-manifests.tsv" | count) of them untagged"
+}
+
+read_dockerhub_images() {
+	local hub url page
+	hub="$(hub_token)" || die "could not sign in to the Docker Hub API as $DOCKERHUB_USERNAME"
+	url="https://hub.docker.com/v2/namespaces/${IMAGE%%/*}/repositories/${IMAGE#*/}/tags?page_size=100"
+	while [ -n "$url" ]; do
+		if ! page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")"; then
+			warn "the Docker Hub API refused a page of the tags of docker.io/$IMAGE, the images of an index that only docker.io has are deleted in a later run"
+			: > "$WORK_DIR/dockerhub-images.tsv"
+			return
+		fi
+		jq -r '.results[] | .digest as $index | .images[]? | select($index and .digest and .digest != $index) | [$index, .digest] | @tsv' <<< "$page" >> "$WORK_DIR/dockerhub-images.tsv"
+		url="$(jq -r '.next // empty' <<< "$page")"
+	done
+	ok "read the images of the $(cut -f 1 "$WORK_DIR/dockerhub-images.tsv" | sort -u | count) indexes of the tags of docker.io/$IMAGE from the Docker Hub API"
 }
 
 select_kept_tags() {
@@ -108,7 +124,7 @@ read_manifests() {
 	manifest_fields '(.config // empty), .layers[]? | [manifest, .digest, .size]' > "$WORK_DIR/blobs.tsv"
 	manifest_fields '[manifest, if .manifests then "index" elif any(.layers[]?; .mediaType == "application/vnd.in-toto+json") then "attestation" else "image" end]' \
 		> "$WORK_DIR/kinds.tsv"
-	ok "read the $(count < "$WORK_DIR/bytes.tsv") manifests on ghcr.io and $(count < "$WORK_DIR/dockerhub-roots.tsv") kept manifests that only docker.io has"
+	ok "read the $(count < "$WORK_DIR/bytes.tsv") manifests on ghcr.io and $(count < "$WORK_DIR/dockerhub-roots.tsv") kept manifests that only docker.io has, $(count < "$WORK_DIR/dockerhub-indexes.txt") of them with a GET that counts as a pull"
 }
 
 select_kept_manifests() {
@@ -124,56 +140,61 @@ select_kept_manifests() {
 	ok "keeping $(count < "$WORK_DIR/kept-ghcr.io.txt") manifests on ghcr.io ($kinds) and $(count < "$WORK_DIR/kept-docker.io.txt") on docker.io"
 }
 
-find_dockerhub_only_manifests() {
-	awk -F '\t' 'FILENAME == ARGV[1] || FILENAME == ARGV[2] { skip[$1]; next } !($1 in skip) && !seen[$1]++ { print $1 }' \
-		"$WORK_DIR/kept.txt" "$WORK_DIR/on-ghcr.txt" "$WORK_DIR/dockerhub.tsv" "$WORK_DIR/ghcr-deleted.tsv" > "$WORK_DIR/candidates.txt"
-	request_manifests docker.io "$WORK_DIR/candidates.txt" --head -o /dev/null -w '%{http_code}\t{}\t%header{content-type}\n' \
-		> "$WORK_DIR/dockerhub-only.tsv" || die "could not check which manifests docker.io has"
-	awk '$1 != 200 && $1 != 404 { exit 1 }' "$WORK_DIR/dockerhub-only.tsv" \
-		|| die "docker.io answered neither 200 nor 404 for an unused manifest"
-	ok "found $(awk '$1 == 200' "$WORK_DIR/dockerhub-only.tsv" | count) unused manifests that only docker.io has"
-}
-
 write_list() {
 	local cutoff
 	cutoff="$(jq -nr --argjson days "$MIN_AGE_DAYS" 'now - $days * 86400 | strftime("%Y-%m-%dT%H:%M:%SZ")')"
-	ok "keeping the $(awk -F '\t' -v cutoff="$cutoff" '$4 >= cutoff && !seen[$1]++' "$WORK_DIR/ghcr-active.tsv" | count) versions pushed since $cutoff, a running build may still need them"
+	ok "keeping the $(awk -F '\t' -v cutoff="$cutoff" '$4 >= cutoff && !seen[$1]++' "$WORK_DIR/ghcr-active.tsv" | count) versions on ghcr.io and the $(awk -F '\t' -v cutoff="$cutoff" '$4 >= cutoff' "$WORK_DIR/dockerhub-manifests.tsv" | count) manifests on docker.io pushed since $cutoff, a running build may still need them"
 	awk -F '\t' -v OFS='\t' -v cutoff="$cutoff" 'function platform_of(digest) { return (reference[digest] in platform) ? platform[reference[digest]] : platform[digest] }
 		FILENAME == ARGV[1] { kept[$1]; next }
 		FILENAME == ARGV[2] { kind[$1] = $2; next }
 		FILENAME == ARGV[3] { size[$1] = $2; next }
 		FILENAME == ARGV[4] { size[$1] += $3; next }
 		FILENAME == ARGV[5] { platform[$2] = $3; reference[$2] = $4; next }
-		FILENAME == ARGV[6] { tags[$1] = tags[$1] (tags[$1] == "" ? "" : ",") $3; next }
-		FILENAME == ARGV[7] { version[$1] = $2; created[$1] = $4; next }
-		FILENAME == ARGV[8] { if ($1 == 200) print "no", "yes", ($3 ~ /index|list/ ? "index" : "image"), platform_of($2), tags[$2], created[$2], "", version[$2], $2; next }
-		!($1 in kept) && $4 < cutoff && !seen[$1]++ { print "yes", "undefined", kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
-		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub.tsv" \
-		"$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/dockerhub-only.tsv" "$WORK_DIR/ghcr-active.tsv" | sort -t $'\t' -k3,3r -k1,1 -k6,6 > "$WORK_DIR/rows.tsv"
+		FILENAME == ARGV[6] {
+			on_docker_hub[$1]
+			if (!($1 in kept) && !($1 in kind) && $4 < cutoff && !seen[$1]++)
+				print "no", "yes", ($2 ~ /index|list/ ? "index" : ($6 == "unknown/unknown" ? "attestation" : "image")), ($6 == "unknown/unknown" ? "" : $6), $3, $4, $5, "", $1
+			next
+		}
+		!($1 in kept) && $4 < cutoff && !seen[$1]++ { print "yes", (($1 in on_docker_hub) ? "yes" : "no"), kind[$1], platform_of($1), $3, $4, size[$1], $2, $1 }' \
+		"$WORK_DIR/kept.txt" "$WORK_DIR/kinds.tsv" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub-manifests.tsv" "$WORK_DIR/ghcr-active.tsv" \
+		| sort -t $'\t' -k3,3r -k6,6 > "$WORK_DIR/sorted.tsv"
+	: > "$WORK_DIR/grouped.txt"
+	awk -F '\t' -v grouped="$WORK_DIR/grouped.txt" 'function emit(digest, list, n, i) { printed[digest]; print line[digest]; n = split(children[digest], list, " "); for (i = 1; i <= n; i++) if ((list[i] in line) && !(list[i] in printed) && --parents[list[i]] == 0) { print list[i] > grouped; emit(list[i]) } }
+		FILENAME == ARGV[1] || FILENAME == ARGV[2] { if (!(($1, $2) in pair)) { pair[$1, $2]; children[$1] = children[$1] " " $2 } next }
+		{ order[++rows] = $9; line[$9] = $0; type[$9] = $3 }
+		END {
+			for (i = 1; i <= rows; i++) if (order[i] in children) { n = split(children[order[i]], list, " "); for (j = 1; j <= n; j++) if (list[j] in line) parents[list[j]]++ }
+			for (i = 1; i <= rows; i++) if (type[order[i]] == "index" && !(order[i] in children)) emit(order[i])
+			for (i = 1; i <= rows; i++) if (type[order[i]] == "image" && !(order[i] in parents) && !(order[i] in printed)) emit(order[i])
+			for (i = 1; i <= rows; i++) if (!(order[i] in printed)) emit(order[i])
+		}' "$WORK_DIR/children.tsv" "$WORK_DIR/dockerhub-images.tsv" "$WORK_DIR/sorted.tsv" > "$WORK_DIR/rows.tsv"
 	write_table "$WORK_DIR/rows.tsv" "$TO_DELETE_FILE"
 	ok "$(awk -F '\t' 'END { print ($9 + 0 ? $9 " to delete (" $3 "), they free " $7 : "nothing to delete") }' "$TO_DELETE_FILE")"
-	info "$TO_DELETE_FILE lists every manifest to delete with its type, platform, tags, date and size, indexes first"
+	info "$TO_DELETE_FILE lists every manifest to delete in the order it deletes them, with its type, platform, tags, date and size"
 }
 
 delete_manifests() {
-	local on_ghcr type tags version digest rest name deleted ghcr docker_hub status
+	local on_ghcr on_docker_hub type tags version digest rest name deleted ghcr docker_hub status
 	if [ -z "$LIMIT" ]; then
 		info "a dry run deletes nothing, --delete with a count deletes that many from the top of the list"
 		return
 	fi
 	heading "Deleting"
 	write_table /dev/null "$DELETED_FILE"
-	while IFS='|' read -r on_ghcr type tags version digest rest; do
+	while IFS='|' read -r on_ghcr on_docker_hub type tags version digest rest; do
 		[[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || die "the list names '$digest', expected a sha256 digest"
 		name="$digest${tags:+ ($tags)}"
-		deleted="" ghcr=no docker_hub=no
+		deleted="" ghcr=no docker_hub=no status=""
 		if [ "$on_ghcr" = yes ]; then
 			delete_ghcr_version "$version" "$type $name" || continue
 			deleted=ghcr.io ghcr=yes
 		fi
-		status="$(delete_dockerhub_manifest "$digest")"
-		if [[ "$status" == 2?? ]]; then
-			deleted="${deleted:+$deleted and }docker.io" docker_hub=yes
+		if [ "$on_docker_hub" = yes ]; then
+			status="$(delete_dockerhub_manifest "$digest")"
+			if [[ "$status" == 2?? ]]; then
+				deleted="${deleted:+$deleted and }docker.io" docker_hub=yes
+			fi
 		fi
 		if [ -n "$deleted" ]; then
 			ok "deleted the $type $BOLD$name$RESET from $deleted"
@@ -181,11 +202,11 @@ delete_manifests() {
 			write_table "$WORK_DIR/deleted.tsv" "$DELETED_FILE"
 		fi
 		case "$status" in
-			2?? | 404) ;;
+			"" | 2?? | 404) ;;
 			403 | 5??) warn "docker.io keeps the $type $name for now, it answered $status, the next run tries again" ;;
 			*) die "could not delete the $type $name from docker.io, it answered $status" ;;
 		esac
-	done < <(head -n "$LIMIT" "$WORK_DIR/rows.tsv" | awk -F '\t' -v OFS='|' '{ rest = $3; for (i = 4; i <= NF; i++) rest = rest "\t" $i; print $1, $3, $5, $8, $9, rest }')
+	done < <(awk -F '\t' -v limit="$LIMIT" 'FILENAME == ARGV[1] { grouped[$1]; next } FNR > limit && !($9 in grouped) { exit } { print }' "$WORK_DIR/grouped.txt" "$WORK_DIR/rows.tsv" | awk -F '\t' -v OFS='|' '{ rest = $3; for (i = 4; i <= NF; i++) rest = rest "\t" $i; print $1, $2, $3, $5, $8, $9, rest }')
 	ok "$(awk -F '\t' 'END { print ($9 + 0 ? "deleted " $9 " (" $3 "), they free " $7 : "deleted nothing") }' "$DELETED_FILE")"
 	info "$DELETED_FILE lists what this run deleted and where, ghcr.io can restore them for 30 days, docker.io deletes them permanently"
 }
@@ -239,13 +260,16 @@ write_table() {
 		function amount(count, one, many) { return (count + 0) " " (count == 1 ? one : many) }
 		BEGIN { split("B kB MB GB TB", units, " "); print "ghcr", "docker_hub", "type", "platform", "tags", "created", "size", "ghcr_id", "digest" }
 		FILENAME == ARGV[1] { removed[$9]; types[$3]++; manifests++; if ($7 != "") $7 = human($7); print; next }
-		FILENAME == ARGV[2] { before += $2; if (!($1 in removed)) after += $2; next }
-		{ blob[$2] = $3; if (!($1 in removed)) used[$2] }
+		FILENAME == ARGV[2] { bytes[$1] = $2; before += $2; if (!($1 in removed)) after += $2; next }
+		FILENAME == ARGV[3] { if ($1 in bytes) on_hub[$1]; size = ($1 in bytes) ? bytes[$1] : $5; hub_before += size; if (!($1 in removed)) hub_after += size; next }
+		{ blob[$2] = $3; if (!($1 in removed)) used[$2]; if ($1 in on_hub) { hub_blob[$2] = $3; if (!($1 in removed)) hub_used[$2] } }
 		END {
 			for (digest in blob) { before += blob[digest]; if (digest in used) after += blob[digest] }
+			for (digest in hub_blob) { hub_before += hub_blob[digest]; if (digest in hub_used) hub_after += hub_blob[digest] }
 			print "total", "", amount(types["index"], "index", "indexes") ", " amount(types["image"], "image", "images") ", " amount(types["attestation"], "attestation", "attestations"),
-				"", "", "", human(before - after) " on ghcr.io (" human(before) " → " human(after) ")", "", amount(manifests, "manifest", "manifests")
-		}' "$1" "$WORK_DIR/bytes.tsv" "$WORK_DIR/blobs.tsv" > "$2"
+				"", "", "", human(before - after) " on ghcr.io (" human(before) " → " human(after) ") and ~" human(hub_before - hub_after) " on docker.io (~" human(hub_before) " → ~" human(hub_after) ")",
+				"", amount(manifests, "manifest", "manifests")
+		}' "$1" "$WORK_DIR/bytes.tsv" "$WORK_DIR/dockerhub-manifests.tsv" "$WORK_DIR/blobs.tsv" > "$2"
 }
 
 delete_ghcr_version() {

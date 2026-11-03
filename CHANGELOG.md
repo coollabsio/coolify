@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Cancel the older queued webhook deployments of an application when a newer push arrives, so only the latest commit is built. It is on by default and works per application, pull request, and server. Turn it off in **Advanced > Deployment** or with `is_auto_cancel_queued_deployments_enabled` in the applications API. Manual, API, restart, and rollback deployments are never cancelled ([#10921](https://github.com/coollabsio/coolify/discussions/10921), [#7678](https://github.com/coollabsio/coolify/discussions/7678))
+- Add an opt-in setting to also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. The applications API sets it with `is_auto_cancel_building_deployments_enabled`
+- Add `cancel_previous` (`none`, `queued`, or `building`) to `/api/v1/deploy` and the MCP `deploy` tool, so a deployment from the API or MCP can cancel the older webhook, API, and MCP deployments of the same application, pull request, and server. The default is `none`. Manual, restart, and rollback deployments are never cancelled
+
+### Fixed
+
+- Handle an existing Cloudflare DNS record with a different IP when Coolify adds the DNS record of a new domain automatically. Coolify now replaces the record when it created the record and no other resource uses it. Otherwise it opens the **Configure DNS** dialog, where you can replace the record, and the domain shows the conflict instead of "Not checked"
+- Add the Cloudflare DNS record automatically, or open the **Configure DNS** dialog, also when you edit a domain to a hostname in a connected Cloudflare zone, for example when you change a generated domain to your own domain. Before, Coolify did this only when you added a new domain. This applies to the **Domains** pages, the application and service application settings, and the service application API
+- Save deployments started through the MCP server as MCP deployments, not as API deployments. The deployment list shows them with the **MCP** source and filter, and the API and MCP deployment data have a new `is_mcp` field. The deployments to additional servers keep the source of the main deployment, and the audit log records actions that MCP tools do through the API as MCP events
+- Save the update channel in **Settings > Updates** when you select **Preview** or **Nightly**. Before, the "Save changes" bar did not open for these channels, so the change was lost when you refreshed the page
+- Save the healthcheck **Check type** when it is the only change. Before, the "Save changes" bar did not open when you changed only the check type, for example from **Container command** back to **HTTP request**
+- Coolify Cloud: end a paid subscription that lost its link to Stripe when the customer cancels it. Before, it stayed active, and `cloud:sync-stripe-subscriptions` did not report it
+
 ## [v4.6.0] - 2026-11-02
 
 ### Breaking Changes

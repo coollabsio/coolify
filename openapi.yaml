@@ -533,6 +533,12 @@ paths:
                 is_git_shallow_clone_enabled:
                   type: boolean
                   description: 'Use a shallow Git clone.'
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                  description: 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+                  description: 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'
                 disable_build_cache:
                   type: boolean
                   description: 'Disable the build cache.'
@@ -969,6 +975,12 @@ paths:
                 is_git_shallow_clone_enabled:
                   type: boolean
                   description: 'Use a shallow Git clone.'
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                  description: 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+                  description: 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'
                 disable_build_cache:
                   type: boolean
                   description: 'Disable the build cache.'
@@ -1405,6 +1417,12 @@ paths:
                 is_git_shallow_clone_enabled:
                   type: boolean
                   description: 'Use a shallow Git clone.'
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                  description: 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+                  description: 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'
                 disable_build_cache:
                   type: boolean
                   description: 'Disable the build cache.'
@@ -1778,6 +1796,12 @@ paths:
                 is_git_shallow_clone_enabled:
                   type: boolean
                   description: 'Use a shallow Git clone.'
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                  description: 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+                  description: 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'
                 disable_build_cache:
                   type: boolean
                   description: 'Disable the build cache.'
@@ -2137,6 +2161,12 @@ paths:
                 is_git_shallow_clone_enabled:
                   type: boolean
                   description: 'Use a shallow Git clone.'
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                  description: 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+                  description: 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'
                 disable_build_cache:
                   type: boolean
                   description: 'Disable the build cache.'
@@ -2673,6 +2703,12 @@ paths:
                 is_git_shallow_clone_enabled:
                   type: boolean
                   description: 'Use a shallow Git clone.'
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                  description: 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+                  description: 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'
                 disable_build_cache:
                   type: boolean
                   description: 'Disable the build cache.'
@@ -7105,6 +7141,17 @@ paths:
           description: 'Docker image tag for Docker Image preview deployments. Requires pull_request_id.'
           schema:
             type: string
+        -
+          name: cancel_previous
+          in: query
+          description: 'Cancel the older webhook, API, and MCP deployments of the same application, pull request, and server. `queued` cancels the ones that wait in the queue. `building` also stops the ones that are still building; a deployment that already started to replace containers always finishes. Manual, restart, and rollback deployments are never cancelled. Default: `none`.'
+          schema:
+            type: string
+            default: none
+            enum:
+              - none
+              - queued
+              - building
       responses:
         '200':
           description: "Get deployment(s) UUID's"
@@ -17421,6 +17468,8 @@ components:
         is_webhook:
           type: boolean
         is_api:
+          type: boolean
+        is_mcp:
           type: boolean
         created_at:
           type: string

@@ -390,10 +390,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         }
 
-        $this->application_deployment_queue->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-            'horizon_job_worker' => gethostname(),
-        ]);
+        // A conditional update, so a cancel that came after the check above is not overwritten.
+        ApplicationDeploymentQueue::query()
+            ->whereKey($this->application_deployment_queue->getKey())
+            ->where('status', '!=', ApplicationDeploymentStatus::CANCELLED_BY_USER->value)
+            ->update([
+                'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+                'horizon_job_worker' => gethostname(),
+            ]);
+        $this->application_deployment_queue->refresh();
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+            $this->application_deployment_queue->addLogEntry('Deployment was cancelled before starting.');
+            $this->handleCancelledDeployment();
+
+            return;
+        }
         if ($this->server->isFunctionalAfterRecheck() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
             $this->fail('Server is not functional.');
@@ -898,6 +909,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->pull_docker_compose_images();
 
+        $this->startDeployPhase();
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
@@ -2903,7 +2915,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function rolling_update()
     {
         try {
-            $this->checkForCancellation();
+            $this->startDeployPhase();
             $this->write_compose_file_to_workdir();
             if ($this->server->isSwarm()) {
                 $this->application_deployment_queue->addLogEntry('Rolling update started.');
@@ -3310,12 +3322,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     deployment_uuid: $deployment_uuid,
                     application: $this->application,
                     commit: $this->commit,
+                    is_webhook: (bool) $this->application_deployment_queue->is_webhook,
+                    is_api: (bool) $this->application_deployment_queue->is_api,
                     no_questions_asked: true,
                     server: $server,
                     destination: $destination,
                     rollback: $this->rollback,
                     docker_registry_image_tag: $this->application_deployment_queue->docker_registry_image_tag,
                     parent_deployment_uuid: $this->deployment_uuid,
+                    is_mcp: (bool) $this->application_deployment_queue->is_mcp,
                 );
             } catch (Throwable $e) {
                 \Log::warning("Deployment {$this->deployment_uuid} could not queue the deployment to {$server->name}: {$e->getMessage()}");
@@ -6396,6 +6411,21 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
             throw new DeploymentException('Deployment cancelled by user', 69420);
         }
+    }
+
+    /**
+     * Marks that the deployment starts to change containers. From here on, a newer webhook deployment
+     * does not cancel it, so the application is never left half deployed. The update is conditional,
+     * so it cannot race with that cancel: exactly one of them wins.
+     */
+    private function startDeployPhase(): void
+    {
+        ApplicationDeploymentQueue::query()
+            ->whereKey($this->application_deployment_queue->getKey())
+            ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
+            ->whereNull('deploy_started_at')
+            ->update(['deploy_started_at' => Carbon::now()]);
+        $this->checkForCancellation();
     }
 
     /**
