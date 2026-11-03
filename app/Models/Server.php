@@ -2055,6 +2055,19 @@ $siteAddress {
     {
         return Attribute::make(
             get: function () {
+    /**
+     * Whether a server of any team already uses this SSH endpoint. The port is part of the endpoint,
+     * so servers behind one NAT address with different forwarded SSH ports are different servers.
+     */
+    public static function sshEndpointInUse(?string $ip, int|string|null $port, ?int $exceptServerId = null): bool
+    {
+        return self::query()
+            ->where('ip', self::normalizeIp($ip))
+            ->where('port', (int) ($port ?? 22))
+            ->when($exceptServerId !== null, fn ($query) => $query->whereKeyNot($exceptServerId))
+            ->exists();
+    }
+
                 if (isDev()) {
                     return '127.0.0.1';
                 }

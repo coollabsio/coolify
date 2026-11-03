@@ -620,9 +620,8 @@ class ServersController extends Controller
         if (! $privateKey) {
             return response()->json(['message' => 'Private key not found.'], 404);
         }
-        $foundServer = ModelsServer::whereIp(ModelsServer::normalizeIp($request->ip))->first();
-        if ($foundServer) {
-            return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
+        if (ModelsServer::sshEndpointInUse($request->ip, $request->port)) {
+            return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
         }
         if ($request->instant_validate) {
             ModelsServer::throttleValidation($teamId, $request->ip);
@@ -811,6 +810,13 @@ class ServersController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $connectionErrors,
             ], 422);
+        }
+        $newIp = $request->filled('ip') ? $request->input('ip') : $server->getRawOriginal('ip');
+        $newPort = $request->filled('port') ? (int) $request->input('port') : (int) $server->port;
+        $endpointChanged = ModelsServer::normalizeIp($newIp) !== ModelsServer::normalizeIp($server->getRawOriginal('ip'))
+            || $newPort !== (int) $server->port;
+        if ($endpointChanged && ModelsServer::sshEndpointInUse($newIp, $newPort, $server->id)) {
+            return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
         }
         if ($request->instant_validate) {
             ModelsServer::throttleValidation($teamId, $request->ip ?? $server->ip);

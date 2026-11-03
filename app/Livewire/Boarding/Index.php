@@ -302,9 +302,8 @@ class Index extends Component
 
         $this->validate();
 
-        $foundServer = Server::whereIp(Server::normalizeIp($this->remoteServerHost))->first();
-        if ($foundServer) {
-            return $this->dispatch('error', 'A server with this IP/Domain already exists.');
+        if (Server::sshEndpointInUse($this->remoteServerHost, $this->remoteServerPort)) {
+            return $this->dispatch('error', 'A server with this IP/Domain and SSH port already exists.');
         }
         $privateKeyId = $this->createdPrivateKey?->id ?? $this->selectedExistingPrivateKey;
         $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])->findOrFail($privateKeyId);

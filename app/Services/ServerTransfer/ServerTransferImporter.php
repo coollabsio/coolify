@@ -201,14 +201,15 @@ class ServerTransferImporter
 
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $serverIp = (string) data_get($bundle, 'server.ip');
+        $serverPort = (int) data_get($bundle, 'server.port', 22);
 
         // A server that comes back replaces the archived copy that this instance kept from the first transfer.
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
         $uuidConflict = $archive === null && $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
-        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+        $ipConflict = Server::sshEndpointInUse($serverIp, $serverPort, $archive?->id);
 
         if (! $dryRun) {
-            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
+            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids, $serverPort);
             // The import validates the server over SSH, so it uses the same Cloud limit as a new server.
             Server::throttleValidation($teamId, $serverIp);
         }
@@ -217,7 +218,7 @@ class ServerTransferImporter
             $warnings[] = "A server with UUID {$serverUuid} already exists on this instance.";
         }
         if ($ipConflict) {
-            $warnings[] = "A server with IP/domain {$serverIp} already exists on this instance.";
+            $warnings[] = "A server with IP/domain {$serverIp} and SSH port {$serverPort} already exists on this instance.";
         }
 
         $created = [
@@ -503,7 +504,7 @@ class ServerTransferImporter
      *
      * @return list<array{field: string, label: string, ok: bool, message: string|null}>
      */
-    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): array
+    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true, int $serverPort = 22): array
     {
         $team = Team::find($teamId);
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
@@ -518,7 +519,7 @@ class ServerTransferImporter
             default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
         };
 
-        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+        $ipExists = Server::sshEndpointInUse($serverIp, $serverPort, $archive?->id);
 
         return [
             [
@@ -535,9 +536,9 @@ class ServerTransferImporter
             ],
             [
                 'field' => 'server.ip',
-                'label' => 'no server with the same IP exists',
+                'label' => 'no server with the same IP and SSH port exists',
                 'ok' => ! $ipExists,
-                'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
+                'message' => $ipExists ? "A server with IP/domain {$serverIp} and SSH port {$serverPort} already exists on this instance. Remove it first." : null,
             ],
         ];
     }
@@ -572,9 +573,9 @@ class ServerTransferImporter
     /**
      * @throws ValidationException with the first failed import check
      */
-    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): void
+    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true, int $serverPort = 22): void
     {
-        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids) as $check) {
+        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids, $serverPort) as $check) {
             if (! $check['ok']) {
                 throw ValidationException::withMessages([$check['field'] => [$check['message']]]);
             }
