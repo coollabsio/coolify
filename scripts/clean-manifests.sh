@@ -11,6 +11,7 @@ MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
 GHCR_TOKEN=""
+MANIFEST_TYPES='application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
 TO_DELETE_FILE=scripts/manifests-to-delete.tsv
 DELETED_FILE=scripts/deleted-manifests.tsv
 WORK_DIR="$(mktemp -d)"
@@ -150,8 +151,8 @@ read_manifests() {
 
 select_kept_manifests() {
 	local kinds
-	kept_manifests "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/kept-ghcr.io.txt"
-	kept_manifests "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/kept-docker.io.txt"
+	manifests_of_kept_tags "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/kept-ghcr.io.txt"
+	manifests_of_kept_tags "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/kept-docker.io.txt"
 	sort -u "$WORK_DIR/kept-ghcr.io.txt" "$WORK_DIR/kept-docker.io.txt" > "$WORK_DIR/kept.txt"
 	awk 'FILENAME == ARGV[1] { ghcr[$1]; next } !($1 in ghcr) { exit 1 }' "$WORK_DIR/on-ghcr.txt" "$WORK_DIR/kept-ghcr.io.txt" \
 		|| die "ghcr.io lists no version for some kept manifests, expected one for each"
@@ -262,7 +263,7 @@ request_manifests() {
 	split -l 1000 "$list" "$WORK_DIR/chunk-"
 	for chunk in "$WORK_DIR"/chunk-*; do
 		token="$(registry_token "$registry" pull)"
-		xargs -P 16 -I {} curl -sS --retry 3 -H "Authorization: Bearer $token" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' "$@" "https://${registry/docker.io/registry-1.docker.io}/v2/$IMAGE/manifests/{}" < "$chunk" || return 1
+		xargs -P 16 -I {} curl -sS --retry 3 -H "Authorization: Bearer $token" -H "Accept: $MANIFEST_TYPES" "$@" "https://${registry/docker.io/registry-1.docker.io}/v2/$IMAGE/manifests/{}" < "$chunk" || return 1
 		rm "$chunk"
 	done
 }
@@ -271,7 +272,7 @@ manifest_fields() {
 	find "$WORK_DIR/manifests" -type f -exec jq -r 'def manifest: input_filename | sub(".*/"; ""); '"$1"' | @tsv' {} +
 }
 
-kept_manifests() {
+manifests_of_kept_tags() {
 	awk -F '\t' 'function keep(digest, list, n, i) { if (digest in kept) return; kept[digest]; print digest; n = split(children[digest], list, " "); for (i = 1; i <= n; i++) keep(list[i]) }
 		FILENAME == ARGV[1] || FILENAME == ARGV[2] { children[$1] = children[$1] " " $2; next }
 		FILENAME == ARGV[3] { tag[$1]; next }
@@ -315,7 +316,7 @@ delete_ghcr_version() {
 delete_dockerhub_manifest() {
 	local token status
 	token="$(registry_token docker.io pull,push,delete)"
-	status="$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' --head -H "Authorization: Bearer $token" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' "https://registry-1.docker.io/v2/$IMAGE/manifests/$1")"
+	status="$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' --head -H "Authorization: Bearer $token" -H "Accept: $MANIFEST_TYPES" "https://registry-1.docker.io/v2/$IMAGE/manifests/$1")"
 	[ "$status" = 200 ] || { echo "$status"; return; }
 	while status="$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $token" "https://registry-1.docker.io/v2/$IMAGE/manifests/$1")" && [ "$status" = 429 ]; do
 		sleep 60
