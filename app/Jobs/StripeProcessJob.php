@@ -327,6 +327,9 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         'stripe_plan_id' => $planId,
                         'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                     ]);
+                    if (! $subscription->stripe_subscription_id && $subscription->stripe_invoice_paid) {
+                        VerifyStripeSubscriptionStatusJob::dispatch($subscription);
+                    }
                     if ($status === 'paused' || $status === 'incomplete_expired') {
                         if ($subscription->stripe_subscription_id === $subscriptionId) {
                             $subscription->update([
@@ -377,24 +380,40 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $customerId = data_get($data, 'customer');
                     $subscriptionId = data_get($data, 'id');
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->where('stripe_subscription_id', $subscriptionId)->first();
-                    if ($subscription) {
-                        $team = data_get($subscription, 'team');
-                        if ($team) {
-                            $team->subscriptionEnded($subscription);
-                        } else {
-                            // send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
-                            throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
-                        }
-                    } else {
-                        // send_internal_notification('Subscription deleted but no subscription found in Coolify for customer: '.$customerId);
+                    if (! $subscription) {
+                        $this->verifyUnlinkedPaidSubscription($customerId);
                         break;
                     }
+                    $team = data_get($subscription, 'team');
+                    if (! $team) {
+                        throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                    }
+                    $team->subscriptionEnded($subscription);
                     break;
                 default:
                     throw new \RuntimeException("Unhandled event type: {$type}");
             }
         } catch (\Exception $e) {
             send_internal_notification('StripeProcessJob error: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * A paid row without a Stripe subscription ID matches no webhook by ID. Verify it against Stripe.
+     */
+    private function verifyUnlinkedPaidSubscription(?string $customerId): void
+    {
+        if (! $customerId) {
+            return;
+        }
+
+        $subscription = Subscription::where('stripe_customer_id', $customerId)
+            ->whereNull('stripe_subscription_id')
+            ->where('stripe_invoice_paid', true)
+            ->first();
+
+        if ($subscription) {
+            VerifyStripeSubscriptionStatusJob::dispatch($subscription);
         }
     }
 }

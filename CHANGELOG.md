@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Save deployments started through the MCP server as MCP deployments, not as API deployments. The deployment list shows them with the **MCP** source and filter, and the API and MCP deployment data have a new `is_mcp` field. The deployments to additional servers keep the source of the main deployment, and the audit log records actions that MCP tools do through the API as MCP events
 - Save the update channel in **Settings > Updates** when you select **Preview** or **Nightly**. Before, the "Save changes" bar did not open for these channels, so the change was lost when you refreshed the page
 - Save the healthcheck **Check type** when it is the only change. Before, the "Save changes" bar did not open when you changed only the check type, for example from **Container command** back to **HTTP request**
+- Coolify Cloud: end a paid subscription that lost its link to Stripe when the customer cancels it. Before, it stayed active, and `cloud:sync-stripe-subscriptions` did not report it
 
 ## [v4.6.0] - 2026-11-02
 
