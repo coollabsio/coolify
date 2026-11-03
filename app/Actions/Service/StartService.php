@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Events\ServiceStartFinished;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\LocalFileVolume;
 use App\Models\Service;
@@ -30,6 +31,9 @@ class StartService
         // Fetch remote secrets before stopping: if the secret manager fails, the service keeps running.
         // saveComposeConfigs() below reuses the fetched secrets.
         $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
+        // Compose recreates the containers, so a status check can find them stopped for a moment.
+        $service->applications()->get()->concat($service->databases()->get())
+            ->each(fn (ServiceApplication|ServiceDatabase $part) => NotifyResourceStoppedJob::expectStop($part));
         if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
             StopService::run(service: $service, dockerCleanup: false);
         }
