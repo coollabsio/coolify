@@ -1241,13 +1241,17 @@ class Server extends BaseModel
 $siteAddress {
     encode zstd gzip
     handle /app/* {
-        reverse_proxy coolify:6001
+        reverse_proxy coolify:6001 {
+            stream_close_delay ".CADDY_STREAM_CLOSE_DELAY.'
+        }
     }
     handle /terminal/ws {
-        reverse_proxy coolify:6002
+        reverse_proxy coolify:6002 {
+            stream_close_delay '.CADDY_STREAM_CLOSE_DELAY.'
+        }
     }
     reverse_proxy coolify:8080
-}";
+}';
                 $base64 = base64_encode($caddy_file);
                 instant_remote_process([
                     "echo '$base64' | base64 -d | tee $file > /dev/null",

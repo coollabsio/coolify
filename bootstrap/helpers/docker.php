@@ -937,6 +937,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         } else {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
+        $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.stream_close_delay=".CADDY_STREAM_CLOSE_DELAY);
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");

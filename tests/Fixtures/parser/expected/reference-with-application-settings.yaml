@@ -226,6 +226,7 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-web-2567.rule=Host(`web-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.service=http-0-referenceservice00000001-web-2567
           - traefik.http.services.http-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header.0_-Server=
@@ -348,6 +349,7 @@
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.service=http-0-referenceservice00000001-api-8a5d
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle=/api*'
           - caddy_0.header=-Server
@@ -407,6 +409,7 @@
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.service=http-0-referenceservice00000001-my-app-4dcb
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -464,6 +467,7 @@
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=gzip-sse
           - 'traefik.http.routers.http-0-referenceservice00000001-www-4eae.rule=Host(`www-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -528,6 +532,7 @@
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.service=http-0-referenceservice00000001-blog-126a
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -585,6 +590,7 @@
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=gzip-sse
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -643,6 +649,7 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=http-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-sse'
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/ws`)'
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -1099,6 +1106,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.tls=true
           - traefik.http.services.http-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1227,6 +1235,7 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle=/api*'
           - caddy_0.header=-Server
@@ -1293,6 +1302,7 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1358,6 +1368,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1430,6 +1441,7 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -1492,6 +1504,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1555,6 +1568,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -2014,6 +2028,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.tls=true
           - traefik.http.services.http-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2142,6 +2157,7 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle=/api*'
           - caddy_0.header=-Server
@@ -2208,6 +2224,7 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2273,6 +2290,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2345,6 +2363,7 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -2407,6 +2426,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2470,6 +2490,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -2540,6 +2561,7 @@
           - traefik.http.services.http-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2608,6 +2630,7 @@
           - traefik.http.services.http-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2704,6 +2727,7 @@
           - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server

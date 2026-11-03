@@ -140,6 +140,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -227,6 +228,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3001}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -283,6 +285,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -388,6 +391,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -442,6 +446,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/blog:2368*'
           - caddy_0.header=-Server
@@ -789,6 +794,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -878,6 +884,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3001}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -937,6 +944,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -963,6 +971,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1055,6 +1064,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1111,6 +1121,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/blog:2368*'
           - caddy_0.header=-Server
@@ -1487,6 +1498,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header.0_-Server=
@@ -1579,6 +1591,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3001}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header.0_-Server=
@@ -1640,6 +1653,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header.0_-Server=
@@ -1669,6 +1683,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header.0_-Server=
@@ -1766,6 +1781,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header.0_-Server=
@@ -1823,6 +1839,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/blog:2368*'
           - caddy_0.header.0_-Server=
