@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Cancel the older queued webhook deployments of an application when a newer push arrives, so only the latest commit is built. It is on by default and works per application, pull request, and server. Turn it off in **Advanced > Deployment** or with `is_auto_cancel_queued_deployments_enabled` in the applications API. Manual, API, restart, and rollback deployments are never cancelled ([#10921](https://github.com/coollabsio/coolify/discussions/10921), [#7678](https://github.com/coollabsio/coolify/discussions/7678))
+- Add an opt-in setting to also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. The applications API sets it with `is_auto_cancel_building_deployments_enabled`
+- Add `cancel_previous` (`none`, `queued`, or `building`) to `/api/v1/deploy` and the MCP `deploy` tool, so a deployment from the API or MCP can cancel the older webhook, API, and MCP deployments of the same application, pull request, and server. The default is `none`. Manual, restart, and rollback deployments are never cancelled
+
 ### Fixed
 
 - Handle an existing Cloudflare DNS record with a different IP when Coolify adds the DNS record of a new domain automatically. Coolify now replaces the record when it created the record and no other resource uses it. Otherwise it opens the **Configure DNS** dialog, where you can replace the record, and the domain shows the conflict instead of "Not checked"
