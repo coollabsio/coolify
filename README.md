@@ -91,7 +91,6 @@ Thank you so much!
 * [Logto](https://logto.io) - The better identity infrastructure for developers
 * [Supadata](https://supadata.ai/) - Scrape YouTube, web, and files. Get AI-ready, clean data for your next project. 
 * [Tolgee](https://tolgee.io) - The open source localization platform
-* [Best Consultant](https://bc.direct) - Your trusted technology consulting partner
 * [ArcJet](https://arcjet.com) - Advanced web security and performance solutions
 * [SupaGuide](https://supa.guide) - Your comprehensive guide to Supabase
 * [CodeRabbit](https://coderabbit.ai) - Cut Code Review Time & Bugs in Half
