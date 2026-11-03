@@ -179,10 +179,10 @@ class Server extends BaseModel
         static::saving(function ($server) {
             $payload = [];
             if ($server->user) {
-                $payload['user'] = str($server->user)->trim();
+                $payload['user'] = trim($server->user);
             }
             if ($server->ip) {
-                $payload['ip'] = str($server->ip)->trim();
+                $payload['ip'] = trim($server->ip);
 
                 // Update ip_previous when ip is being changed
                 if ($server->isDirty('ip') && $server->getOriginal('ip')) {

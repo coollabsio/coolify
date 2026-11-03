@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Save the update channel in **Settings > Updates** when you select **Preview** or **Nightly**. Before, the "Save changes" bar did not open for these channels, so the change was lost when you refreshed the page
 - Save the healthcheck **Check type** when it is the only change. Before, the "Save changes" bar did not open when you changed only the check type, for example from **Container command** back to **HTTP request**
 - Coolify Cloud: end a paid subscription that lost its link to Stripe when the customer cancels it. Before, it stayed active, and `cloud:sync-stripe-subscriptions` did not report it
+- Keep the dashboard proxy configuration of a server with the IP `host.docker.internal` that is not the default localhost server. Before, Coolify did not see this server as localhost after it saved the server, for example after a proxy restart, and deleted `coolify.yaml`, so the dashboard was not reachable at its domain ([#12444](https://github.com/coollabsio/coolify/issues/12444))
 
 ## [v4.6.0] - 2026-11-02
 
