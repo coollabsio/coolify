@@ -97,6 +97,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
      */
     public ?string $executionUuidPrefix = null;
 
+    /**
+     * Unix time when the backup timeout of this run ends. Set when handle() starts.
+     */
+    private ?int $deadline = null;
+
     public function __construct(public ScheduledDatabaseBackup $backup, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
@@ -118,6 +123,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $failed = false;
+        $this->deadline = Carbon::now()->getTimestamp() + (int) ($this->backup->timeout ?? 3600);
 
         try {
             $databasesToBackup = null;
@@ -578,9 +584,37 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Seconds left of the backup timeout. The timeout limits the complete run (every database, dump and
+     * upload), so a run that takes too long fails inside handle(), where the cleanup runs, and not when the
+     * worker kills the job.
+     */
     private function commandTimeout(): int
     {
-        return (int) ($this->backup->timeout ?? 3600);
+        $timeout = (int) ($this->backup->timeout ?? 3600);
+        if ($this->deadline === null) {
+            return $timeout;
+        }
+
+        $remaining = $this->deadline - Carbon::now()->getTimestamp();
+        if ($remaining < 1) {
+            throw new \RuntimeException("The backup timeout of {$timeout} seconds has passed.", 124);
+        }
+
+        return $remaining;
+    }
+
+    /**
+     * Runs the commands that write the backup file. They run only once: an SSH retry replays the batch, and
+     * a dump that lost its SSH connection can still run in the database container, so a second dump would
+     * write into the same file.
+     *
+     * @param  list<string>  $commands
+     */
+    private function runBackupCommands(array $commands): void
+    {
+        $output = trim((string) instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true, maxAttempts: 1));
+        $this->backup_output = $output === '' ? null : $output;
     }
 
     private function backupFilenamePart(string $database): string
@@ -652,11 +686,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -711,11 +741,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $commands[] = $backupCommand;
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -738,11 +764,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -765,11 +787,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -788,11 +806,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 backupDirectory: $this->backup_dir,
             )];
 
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -812,11 +826,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' \'.timeout 10000\' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
             $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
             $commands[] = $this->buildCompressedDumpCommand($dumpCommand, escapeshellarg($this->backup_location));
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -830,6 +840,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function exitCodeReason(int|string $exitCode): ?string
     {
         return match ($exitCode) {
+            124 => 'The backup stopped with exit code 124: it did not finish within the backup timeout of '.((int) ($this->backup->timeout ?? 3600)).' seconds. '
+                .'The timeout counts for the complete run: the dumps and S3 uploads of all databases. Increase the timeout in the backup settings.',
             137 => 'The backup stopped with exit code 137: the dump process or the database container was killed (SIGKILL). '
                 .'This is usually the out-of-memory killer: the dump runs inside the database container and shares its memory limit. '
                 .'Check the memory limit of the database and the kernel log (dmesg) on the server.',
