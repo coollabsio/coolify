@@ -369,6 +369,56 @@ it('hides the helper container command when build secrets are passed as environm
     expect((string) $queue->fresh()->logs)->not->toContain(SENSITIVE_FAILURE_SECRET);
 });
 
+it('starts the helper with its own DOCKER_CONFIG after build secret HOME and DOCKER_CONFIG variables', function () {
+    [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob([
+        ['key' => 'HOME', 'value' => '/app', 'is_runtime' => false],
+        ['key' => 'DOCKER_CONFIG', 'value' => '/app/.docker', 'is_runtime' => false],
+    ]);
+    $application->settings()->update(['use_build_secrets' => true]);
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, [
+        'application' => $application->fresh(),
+        'destination' => $server->standaloneDockers()->firstOrFail(),
+    ]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands) {
+        if (str_contains(remoteProcessScript($process), 'docker run -d')) {
+            $helperCommands[] = remoteProcessScript($process);
+        }
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
+
+    // docker run uses the last -e value of a variable, so the helper Docker CLI keeps /root/.docker/cli-plugins.
+    expect($helperCommands)->toHaveCount(1)
+        ->and($helperCommands[0])->toContain('/app/.docker')
+        ->and(strrpos($helperCommands[0], '-e DOCKER_CONFIG=/root/.docker'))->toBeGreaterThan(strpos($helperCommands[0], '/app/.docker'));
+});
+
+it('shows the helper container command when no build secrets are passed', function () {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
+
+    Process::fake(function (PendingProcess $process) {
+        if (str_contains(remoteProcessScript($process), 'docker run -d')) {
+            return Process::result(errorOutput: 'docker: Error response from daemon: network not found.', exitCode: 125);
+        }
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image'));
+
+    expect($exception->getMessage())
+        ->toContain('docker run -d')
+        ->not->toContain('-e DOCKER_CONFIG=')
+        ->not->toContain('[command hidden because it contains sensitive data]');
+});
+
 it('hides the Railpack prepare command that passes build-time values', function () {
     [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob([
         ['key' => 'BUILD_SECRET', 'value' => SENSITIVE_FAILURE_SECRET, 'is_runtime' => false],

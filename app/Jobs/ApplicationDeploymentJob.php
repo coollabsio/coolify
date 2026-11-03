@@ -62,6 +62,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private const BUILD_SCRIPT_PATH = '/artifacts/build.sh';
 
+    /**
+     * The Docker CLI config directory of the helper image, which holds the buildx and compose plugins.
+     * Set explicitly, because a build-time HOME variable would otherwise move it.
+     */
+    private const HELPER_DOCKER_CONFIG = '/root/.docker';
+
     private const NIXPACKS_PLAN_PATH = '/artifacts/thegameplan.json';
 
     private const RAILPACK_REPOSITORY_CONFIG_PATH = 'railpack.json';
@@ -3214,7 +3220,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         instant_remote_process(["mkdir -p {$this->serverUserHomeDir}/.docker/buildx"], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
 
-        $env_flags = $this->generate_docker_env_flags_for_secrets();
+        // Build secrets put user variables such as HOME or DOCKER_CONFIG into the helper environment.
+        // DOCKER_CONFIG comes after them, so the Docker CLI keeps its plugins. Without build secrets the
+        // helper environment stays empty, so Docker Compose interpolates the user DOCKER_CONFIG from the env file.
+        $secretEnvFlags = $this->generate_docker_env_flags_for_secrets();
+        $env_flags = filled($secretEnvFlags) ? "{$secretEnvFlags} -e DOCKER_CONFIG=".self::HELPER_DOCKER_CONFIG : '';
         $buildxMetadataVolume = isDev() && $this->server->isLocalhost()
             ? '-v coolify-buildx:/root/.docker/buildx'
             : "-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx";
@@ -3245,7 +3255,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [
                 $runCommand,
                 'hidden' => true,
-                'skip_command_log' => filled($env_flags),
+                'skip_command_log' => filled($secretEnvFlags),
             ],
             [
                 'command' => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}"),
@@ -4925,6 +4935,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function wrap_build_command_with_env_export(string $build_command): string
     {
+        // A build-time DOCKER_CONFIG must not move the Docker CLI away from its plugins (buildx, compose).
+        $build_command = 'export DOCKER_CONFIG='.self::HELPER_DOCKER_CONFIG." && {$build_command}";
+
         if (! $this->useBuildtimeEnvironmentLauncher) {
             return "cd {$this->workdir} && set -a && source ".self::BUILD_TIME_ENV_PATH." && set +a && {$build_command}";
         }
