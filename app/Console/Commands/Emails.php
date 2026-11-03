@@ -120,8 +120,7 @@ class Emails extends Command
             case 'application-deployment-success-daily':
                 $applications = Application::all();
                 foreach ($applications as $application) {
-                    $deployments = $application->get_last_days_deployments();
-                    if ($deployments->isEmpty()) {
+                    if (! $application->hasDeploymentsInLastDays()) {
                         continue;
                     }
                     $this->mail = (new DeploymentSuccess($application, 'test'))->toMail();

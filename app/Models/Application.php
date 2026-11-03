@@ -1323,9 +1323,9 @@ class Application extends BaseModel
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first($columns);
     }
 
-    public function get_last_days_deployments()
+    public function hasDeploymentsInLastDays(int $days = 7): bool
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays($days))->exists();
     }
 
     /**
