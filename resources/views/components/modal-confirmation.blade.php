@@ -27,6 +27,9 @@
     'dispatchEventMessage' => '',
     'ignoreWire' => true,
     'temporaryDisableTwoStepConfirmation' => false,
+    // Accepted so that callers' canGate/canResource are not rendered as HTML attributes (the model would leak as JSON).
+    'canGate' => null,
+    'canResource' => null,
 ])
 
 @php

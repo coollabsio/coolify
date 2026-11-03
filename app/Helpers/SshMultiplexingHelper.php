@@ -22,8 +22,11 @@ class SshMultiplexingHelper
     /** The host key scan runs while Coolify builds an SSH command, so it must stay short also for a long connection timeout. */
     private const HOST_KEY_SCAN_TIMEOUT_SECONDS = 10;
 
-    /** After a failed scan (server offline), commands do not scan again for this time. */
-    private const HOST_KEY_SCAN_RETRY_SECONDS = 60;
+    /** After a failed scan (server offline), commands do not scan again for this time. The connection check still scans. */
+    private const HOST_KEY_SCAN_RETRY_SECONDS = 600;
+
+    /** The unknown SSH_HOST_KEY_CHECKING value that this process already checked. */
+    private static mixed $checkedUnknownHostKeyCheckingMode = null;
 
     public const HOST_KEY_CHANGED_MESSAGE = 'The SSH host key of this server changed, so Coolify did not connect. An admin must check the new key on the Security page of the server.';
 
@@ -119,7 +122,7 @@ class SshMultiplexingHelper
         $establishCommand .= '-- '.self::escapedUserAtHost($server).' true';
 
         $establishProcess = Process::run($establishCommand);
-        self::noticeHostKeyMismatch($server, $establishProcess->errorOutput());
+        self::noticeHostKeyMismatch($server, $establishProcess);
         if ($establishProcess->exitCode() !== 0) {
             return false;
         }
@@ -548,11 +551,28 @@ class SshMultiplexingHelper
     public static function hostKeyCheckingMode(Server $server): string
     {
         $mode = config('constants.ssh.host_key_checking');
+        if (! in_array($mode, ['warn', 'enforce', 'off'], true)) {
+            self::warnAboutUnknownHostKeyCheckingMode($mode);
+        }
         if ($mode === 'off' || data_get($server, 'settings.is_ssh_host_key_check_disabled')) {
             return 'off';
         }
 
         return $mode === 'enforce' ? 'enforce' : 'warn';
+    }
+
+    /**
+     * A mistyped SSH_HOST_KEY_CHECKING value falls back to warn. Log it once a day, not for every command.
+     */
+    private static function warnAboutUnknownHostKeyCheckingMode(mixed $mode): void
+    {
+        if (self::$checkedUnknownHostKeyCheckingMode === $mode) {
+            return;
+        }
+        self::$checkedUnknownHostKeyCheckingMode = $mode;
+        if (Cache::add('ssh_host_key_checking_unknown_warned_'.hash('sha256', (string) $mode), true, now()->addDay())) {
+            Log::warning('Unknown SSH_HOST_KEY_CHECKING value, Coolify uses warn. Use warn, enforce, or off.', ['value' => $mode]);
+        }
     }
 
     /**
@@ -567,10 +587,17 @@ class SshMultiplexingHelper
     /**
      * When an SSH process reports a changed host key, check the connection once. The check saves the new key
      * as pending and notifies the team, also for a server that the scheduled connection check skips (Sentinel).
+     * The message must name the host key alias or the known_hosts file of the server: a program on the server
+     * (git in a deployment) can print the same text for its own SSH connection. Without strict checking (warn
+     * mode), ssh names only the known_hosts file.
      */
-    public static function noticeHostKeyMismatch(Server $server, string $errorOutput): void
+    public static function noticeHostKeyMismatch(Server $server, ProcessResult $result): void
     {
-        if (! self::isHostKeyMismatch($errorOutput) || ! Cache::add('ssh_host_key_mismatch_noticed_'.$server->uuid, true, 600)) {
+        $errorOutput = $result->errorOutput();
+        $namesThisServer = str_contains($errorOutput, self::hostKeyAlias($server))
+            || str_contains($errorOutput, '/known_hosts_'.$server->uuid.'_');
+        if (! self::isHostKeyMismatch($errorOutput) || ! $namesThisServer
+            || ! Cache::add('ssh_host_key_mismatch_noticed_'.$server->uuid, true, 600)) {
             return;
         }
         ServerConnectionCheckJob::dispatch($server);
@@ -600,7 +627,7 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $command .= "-o ProxyCommand='cloudflared access ssh --hostname %h' ";
         }
-        $command .= '-F /dev/null -o HostKeyAlias='.self::hostKeyAlias($server).' '
+        $command .= '-F /dev/null -o HostKeyAlias='.escapeshellarg(self::hostKeyAlias($server)).' '
             .'-o UserKnownHostsFile='.escapeshellarg($scanFile).' -o GlobalKnownHostsFile=/dev/null '
             .'-o StrictHostKeyChecking=accept-new -o BatchMode=yes '
             .'-o PubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no '
@@ -623,10 +650,15 @@ class SshMultiplexingHelper
 
     /**
      * Pin the host key that the server sends on the first connection (trust on first use).
+     * Commands do not scan a server that is unreachable or failed a recent scan, so they do not wait for the
+     * scan timeout. The connection check passes $evenIfUnreachable, so the server learns its key when it is back.
      */
-    public static function learnHostKey(Server $server): void
+    public static function learnHostKey(Server $server, bool $evenIfUnreachable = false): void
     {
-        if (Cache::has(self::hostKeyScanFailedCacheKey($server))) {
+        if (self::hostKeyCheckingMode($server) === 'off' || filled($server->settings->ssh_host_key) || ! $server->settings->exists) {
+            return;
+        }
+        if (! $evenIfUnreachable && ($server->unreachable_count > 0 || Cache::has(self::hostKeyScanFailedCacheKey($server)))) {
             return;
         }
 
@@ -694,10 +726,8 @@ class SshMultiplexingHelper
 
     private static function hostKeyOptions(Server $server): string
     {
+        self::learnHostKey($server);
         $mode = self::hostKeyCheckingMode($server);
-        if ($mode !== 'off' && blank($server->settings->ssh_host_key) && $server->settings->exists) {
-            self::learnHostKey($server);
-        }
 
         if ($mode === 'off') {
             return '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ';
@@ -711,7 +741,7 @@ class SshMultiplexingHelper
             return '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ';
         }
 
-        return '-o HostKeyAlias='.self::hostKeyAlias($server).' '
+        return '-o HostKeyAlias='.escapeshellarg(self::hostKeyAlias($server)).' '
             .'-o UserKnownHostsFile='.escapeshellarg(self::syncKnownHostsFile($server)).' '
             .'-o StrictHostKeyChecking='.($mode === 'enforce' ? 'yes' : 'no').' ';
     }
@@ -722,12 +752,7 @@ class SshMultiplexingHelper
      */
     private static function syncKnownHostsFile(Server $server): string
     {
-        $alias = self::hostKeyAlias($server);
-        $content = collect(explode("\n", $server->settings->ssh_host_key))
-            ->filter()
-            ->map(fn (string $key) => "{$alias} {$key}\n")
-            ->implode('');
-        $path = self::knownHostsDirectory().'/known_hosts_'.$server->uuid.'_'.substr(hash('sha256', $content), 0, 16);
+        ['path' => $path, 'content' => $content] = self::knownHostsFile($server->uuid, $server->settings->ssh_host_key);
 
         if (@file_get_contents($path) !== $content) {
             File::ensureDirectoryExists(self::knownHostsDirectory(), 0700);
@@ -739,6 +764,36 @@ class SshMultiplexingHelper
         self::giveToSshDirectoryOwner(self::knownHostsDirectory(), $path);
 
         return $path;
+    }
+
+    /**
+     * Delete the known_hosts files of old host keys of a server. Pass null to delete every file of the server.
+     */
+    public static function deleteStaleKnownHostsFiles(string $serverUuid, ?string $pinnedKey): void
+    {
+        $keep = filled($pinnedKey) ? self::knownHostsFile($serverUuid, $pinnedKey)['path'] : null;
+        foreach (File::glob(self::knownHostsDirectory().'/known_hosts_'.$serverUuid.'_*') as $file) {
+            if ($file !== $keep && preg_match('/_[0-9a-f]{16}$/', $file) === 1) {
+                File::delete($file);
+            }
+        }
+    }
+
+    /**
+     * @return array{path: string, content: string}
+     */
+    private static function knownHostsFile(string $serverUuid, string $pinnedKey): array
+    {
+        $alias = 'coolify-'.$serverUuid;
+        $content = collect(explode("\n", $pinnedKey))
+            ->filter()
+            ->map(fn (string $key) => "{$alias} {$key}\n")
+            ->implode('');
+
+        return [
+            'path' => self::knownHostsDirectory().'/known_hosts_'.$serverUuid.'_'.substr(hash('sha256', $content), 0, 16),
+            'content' => $content,
+        ];
     }
 
     private static function knownHostsDirectory(): string

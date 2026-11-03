@@ -62,11 +62,13 @@ class TerminalSessionService
 
         $server = Server::ownedByCurrentTeam()
             ->whereUuid(data_get($payload, 'server_uuid'))
-            ->with('privateKey', 'settings')
+            ->with('privateKey', 'settings', 'team.subscription')
             ->firstOrFail();
 
         if (! $server->isTerminalEnabled()
+            || ! $this->serverTeamHasSubscription($server)
             || $server->isForceDisabled()
+            || $server->isTransferredAway()
             || ! $server->privateKey
             || $server->privateKey->team_id !== $user->currentTeam()->id) {
             throw new AccessDeniedHttpException('Terminal target is not authorized.');
@@ -125,15 +127,35 @@ class TerminalSessionService
         $server = Server::query()
             ->where('team_id', data_get($session, 'team_id'))
             ->whereUuid(data_get($session, 'server_uuid'))
-            ->with('settings')
+            ->with('settings', 'team.subscription')
             ->first();
 
         if (! $server
             || ! $user->isAdminOfTeam($server->team_id)
+            || ($server->team?->is_two_factor_required && blank($user->two_factor_confirmed_at))
+            || ! $this->serverTeamHasSubscription($server)
             || ! $server->isTerminalEnabled()
-            || $server->isForceDisabled()) {
+            || $server->isForceDisabled()
+            || $server->isTransferredAway()) {
             throw new AccessDeniedHttpException('Terminal session is no longer authorized.');
         }
+    }
+
+    /**
+     * On cloud, the team of the server must have an active subscription or one that ends at the
+     * period end, as in DecideWhatToDoWithUser. The root team is exempt. Self-hosted is not limited.
+     */
+    private function serverTeamHasSubscription(Server $server): bool
+    {
+        if (! isCloud() || $server->team_id === 0) {
+            return true;
+        }
+
+        $subscription = $server->team?->subscription;
+
+        return $subscription !== null
+            && isStripe()
+            && ((bool) $subscription->stripe_invoice_paid || (bool) $subscription->stripe_cancel_at_period_end);
     }
 
     /**

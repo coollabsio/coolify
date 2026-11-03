@@ -2,14 +2,32 @@ import { parseCookie } from 'cookie';
 
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
-/** A PTY with no input for this long is ended. */
+/** A PTY with no input and no output for this long is ended. */
 export const TERMINAL_IDLE_TIMEOUT_SECONDS = 30 * 60;
 
 /** How often each live PTY checks with Coolify that the user may still use it. */
 export const TERMINAL_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
 
-/** Consecutive failed checks (Coolify unreachable or 5xx) that end a PTY. */
+/** Consecutive failed checks (Coolify unreachable, 5xx, or an unexpected answer) that end a PTY. */
 export const TERMINAL_SESSION_CHECK_MAX_FAILURES = 3;
+
+/** Session check statuses with which Coolify says that the session is no longer allowed. */
+const TERMINAL_SESSION_REVOKED_STATUSES = new Set([401, 403, 404, 419]);
+
+/**
+ * Reads the answer of Coolify to a session check. Only an explicit rejection revokes the
+ * session at once. Anything else, for example a redirect from a page gate, is a failed check.
+ *
+ * @param {{ status: number, data: unknown } | null} response null when the request failed
+ * @returns {'active' | 'revoked' | 'failed'}
+ */
+export function terminalSessionCheckResult(response) {
+    if (response?.status === 200 && response.data?.active === true) {
+        return 'active';
+    }
+
+    return TERMINAL_SESSION_REVOKED_STATUSES.has(response?.status) ? 'revoked' : 'failed';
+}
 
 /**
  * WebSocket close codes sent to the browser. Browsers cannot read the HTTP

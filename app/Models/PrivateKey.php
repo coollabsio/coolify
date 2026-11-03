@@ -200,14 +200,25 @@ class PrivateKey extends BaseModel
         });
     }
 
-    public static function generateNewKeyPair($type = 'ed25519')
+    /**
+     * @param  int|null  $rsaKeyLength  The RSA key length in bits; null keeps the default of generateSSHKey().
+     */
+    public static function generateNewKeyPair($type = 'ed25519', ?int $rsaKeyLength = null)
     {
         try {
             $instance = new self;
             $instance->rateLimit(10);
             $name = generate_random_name();
             $description = 'Created by Coolify';
-            $keyPair = generateSSHKey($type === 'rsa' ? 'rsa' : 'ed25519');
+            if ($type === 'rsa' && $rsaKeyLength !== null) {
+                $key = RSA::createKey($rsaKeyLength);
+                $keyPair = [
+                    'private' => $key->toString('PKCS1'),
+                    'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key']),
+                ];
+            } else {
+                $keyPair = generateSSHKey($type === 'rsa' ? 'rsa' : 'ed25519');
+            }
 
             return [
                 'name' => $name,

@@ -706,6 +706,14 @@ function gitPinnedHosts(): array
 }
 
 /**
+ * Whether a known_hosts line names a host in GIT_PINNED_HOST_KEYS. Deployments ignore such lines.
+ */
+function gitKnownHostsLineHasPinnedHost(string $line): bool
+{
+    return array_intersect(gitKnownHostsLineHosts($line), gitPinnedHosts()) !== [];
+}
+
+/**
  * The valid known_hosts lines of a text, without blank lines, duplicates, and lines of the pinned hosts.
  *
  * @return list<string>
@@ -714,7 +722,7 @@ function gitKnownHostsLines(?string $text): array
 {
     return collect(preg_split('/\R/', (string) $text))
         ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
-        ->filter(fn (string $line) => isValidGitKnownHostsLine($line) && array_intersect(gitKnownHostsLineHosts($line), gitPinnedHosts()) === [])
+        ->filter(fn (string $line) => isValidGitKnownHostsLine($line) && ! gitKnownHostsLineHasPinnedHost($line))
         ->unique()
         ->values()
         ->all();
@@ -765,8 +773,13 @@ function gitKnownHostFingerprint(string $line): array
  * The config of the SSH user is read after these rules, so it cannot change StrictHostKeyChecking or
  * UserKnownHostsFile. Root on the server can still add trusted keys (for example with KnownHostsCommand
  * or GlobalKnownHostsFile), which is trusted by design. `~` in the Include is resolved from $HOME.
+ *
+ * With $onServer, the command first tests whether the ssh of the server supports accept-new (OpenSSH 7.6+,
+ * which also has Include). An older ssh rejects the whole config, so there every host is checked strictly
+ * against the pinned and saved keys, with no trust on first use, and the config of root and the system
+ * config are appended to the file instead of included.
  */
-function gitSshSetupCommand(string $uuid, ?string $knownHosts = null): string
+function gitSshSetupCommand(string $uuid, ?string $knownHosts = null, bool $onServer = false): string
 {
     $knownHostsFile = gitKnownHostsFile($uuid);
     $pinnedHosts = implode(' ', gitPinnedHosts());
@@ -781,8 +794,20 @@ function gitSshSetupCommand(string $uuid, ?string $knownHosts = null): string
     ])."\n";
     $knownHostsContent = implode("\n", [...GIT_PINNED_HOST_KEYS, ...gitKnownHostsLines($knownHosts)])."\n";
     $write = fn (string $content, string $file) => "echo '".base64_encode($content)."' | base64 -d | tee {$file} > /dev/null";
+    $setup = 'mkdir -p /root/.ssh && '.$write($knownHostsContent, $knownHostsFile).' && ';
+    if (! $onServer) {
+        return $setup.$write($config, gitSshConfigFile($uuid));
+    }
 
-    return 'mkdir -p /root/.ssh && '.$write($knownHostsContent, $knownHostsFile).' && '.$write($config, gitSshConfigFile($uuid));
+    $strictConfig = implode("\n", [
+        'Host *',
+        '    StrictHostKeyChecking yes',
+        "    UserKnownHostsFile {$knownHostsFile}",
+        '    HashKnownHosts no',
+    ])."\n";
+
+    return $setup.'if ssh -F /dev/null -G -o StrictHostKeyChecking=accept-new localhost > /dev/null 2>&1; then '.$write($config, gitSshConfigFile($uuid))
+        ."; else { echo '".base64_encode($strictConfig)."' | base64 -d; cat /root/.ssh/config /etc/ssh/ssh_config 2> /dev/null; } | tee ".gitSshConfigFile($uuid).' > /dev/null; fi';
 }
 
 /**

@@ -21,6 +21,9 @@ class Rotate extends Component
 
     public bool $wasRunning = false;
 
+    /** The type of the new key. RSA works on hosts that do not accept Ed25519, such as FIPS hosts. */
+    public string $keyType = 'ed25519';
+
     public function mount(int $privateKeyId): void
     {
         $this->privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
@@ -29,6 +32,7 @@ class Rotate extends Component
 
     public function rotate(): void
     {
+        $this->validate(['keyType' => 'required|in:ed25519,rsa']);
         try {
             $this->authorize('update', $this->privateKey);
             if (! $this->servers()->exists()) {
@@ -71,7 +75,9 @@ class Rotate extends Component
 
     private function createNewKey(): PrivateKey
     {
-        $keyPair = PrivateKey::generateNewKeyPair('ed25519');
+        $keyPair = $this->keyType === 'rsa'
+            ? PrivateKey::generateNewKeyPair('rsa', 4096)
+            : PrivateKey::generateNewKeyPair('ed25519');
         $baseName = preg_replace('/( \(rotated \d{4}-\d{2}-\d{2}\))+$/', '', $this->privateKey->name);
 
         return PrivateKey::createAndStore([
@@ -101,6 +107,7 @@ class Rotate extends Component
                 'name' => $server->name,
                 'status' => null,
                 'reachable' => (bool) data_get($server, 'settings.is_reachable'),
+                'transferred' => $server->isTransferredAway(),
             ];
         }
 

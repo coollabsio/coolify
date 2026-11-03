@@ -21,6 +21,10 @@ use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
+use App\Http\Middleware\CheckForcePasswordReset;
+use App\Http\Middleware\DecideWhatToDoWithUser;
+use App\Http\Middleware\EnsureTeamWideAccess;
+use App\Http\Middleware\RequireTeamTwoFactor;
 use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Livewire\Admin\Index as AdminIndex;
@@ -380,13 +384,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json($terminalSessionService->redeem($request->user(), $request->string('token')->toString()));
     })->name('terminal.session')->middleware('can.access.terminal');
 
-    // No session-team gate: the check uses the team of the server, and the user can switch teams in another tab.
+    // No page gates: the check uses the team of the server, and the user can switch teams in another tab.
     Route::post('/terminal/session/check', function (Request $request, TerminalSessionService $terminalSessionService) {
         $request->validate(['session_id' => ['required', 'string', 'size:64']]);
         $terminalSessionService->check($request->user(), $request->string('session_id')->toString());
 
         return response()->json(['active' => true]);
-    })->name('terminal.session.check');
+    })->name('terminal.session.check')->withoutMiddleware([CheckForcePasswordReset::class, DecideWhatToDoWithUser::class, RequireTeamTwoFactor::class, EnsureTeamWideAccess::class]);
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
@@ -555,6 +559,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Route::get('/security', fn () => view('security.index'))->name('security.index');
         Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
+        // The key page was merged into the list; keep old bookmarks working.
+        Route::get('/security/private-key/{private_key_uuid}', fn () => redirect()->route('security.private-key.index'))
+            ->name('security.private-key.show');
         // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
 
         Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');

@@ -301,6 +301,36 @@ test('submit reports invalid SSH known hosts as a field error without saving', f
     expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($originalKnownHosts);
 });
 
+test('submit reports manual host keys of a pinned Git provider as a field error without saving', function (string $line) {
+    $this->applicationA->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitSshKnownHosts', "git.example.com ssh-ed25519 AAAA\n{$line}")
+        ->call('submit')
+        ->assertHasErrors(['gitSshKnownHosts'])
+        ->assertDispatched('known-hosts-invalid')
+        ->assertNotDispatched('configurationChanged');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('git.example.com ssh-ed25519 AAAA');
+})->with([
+    'github.com' => 'github.com ssh-ed25519 BBBB',
+    'gitlab.com with a port' => '[altssh.gitlab.com]:443 ssh-ed25519 BBBB',
+    'ssh.github.com on port 443' => '[ssh.github.com]:443 ssh-rsa BBBB',
+    'bitbucket.org in a host list' => 'git.example.com,BITBUCKET.ORG ssh-ed25519 BBBB',
+]);
+
+test('saving the source form does not reject pinned provider host keys that were already saved', function () {
+    Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => "git.example.com ssh-ed25519 AAAA\ngithub.com ssh-ed25519 BBBB"]);
+    $this->applicationA->refresh();
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitBranch', 'other-branch')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($this->applicationA->fresh()->git_branch)->toBe('other-branch');
+});
+
 test('saving the source form keeps host keys that a deployment saved after the page opened', function () {
     $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
     Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);

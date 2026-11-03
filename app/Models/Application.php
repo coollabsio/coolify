@@ -1727,7 +1727,7 @@ class Application extends BaseModel
     {
         try {
             ['commands' => $lsRemoteCommand] = $this->generateGitLsRemoteCommands(deployment_uuid: $deployment_uuid, exec_in_docker: false);
-            instant_remote_process([$this->serverGitSshSetupCommand($deployment_uuid).' && '.$this->gitCommandsAsShellCommand($lsRemoteCommand)], $this->destination->server, true);
+            instant_remote_process([$this->serverGitSshSetupPrefix($deployment_uuid).$this->gitCommandsAsShellCommand($lsRemoteCommand)], $this->destination->server, true);
 
             return [
                 'is_accessible' => true,
@@ -1898,6 +1898,10 @@ class Application extends BaseModel
             if ($gitConfigOption) {
                 $base_command = "git {$gitConfigOption} ls-remote";
             }
+            if ($this->gitUsesSsh()) {
+                $sshCommand = gitSshCommand($deployment_uuid, $customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
+                $base_command = "GIT_SSH_COMMAND=\"{$sshCommand}\" {$base_command}";
+            }
             $base_command = "{$base_command} {$escapedCustomRepository}";
 
             if ($exec_in_docker) {
@@ -2013,12 +2017,39 @@ class Application extends BaseModel
     }
 
     /**
-     * gitSshSetupCommand() for git commands that run on the server, not in a helper container.
-     * The files are removed when the script exits.
+     * gitSshSetupCommand() and ' && ' for git commands that run on the server, not in a helper container.
+     * The files are removed when the script exits. Git over HTTP(S) gets no setup: for a non-root SSH user
+     * the setup makes the sudo parser run the whole line with bash, which the server may not have.
      */
-    private function serverGitSshSetupCommand(string $uuid): string
+    private function serverGitSshSetupPrefix(string $uuid): string
     {
-        return "trap 'rm -f ".gitSshConfigFile($uuid).' '.gitKnownHostsFile($uuid)."' EXIT && ".gitSshSetupCommand($uuid, $this->git_ssh_known_hosts);
+        if (! $this->gitUsesSsh()) {
+            return '';
+        }
+
+        return "trap 'rm -f ".gitSshConfigFile($uuid).' '.gitKnownHostsFile($uuid)."' EXIT && ".gitSshSetupCommand($uuid, $this->git_ssh_known_hosts, onServer: true).' && ';
+    }
+
+    /**
+     * Whether git can reach the repository over SSH. Only an http(s) URL without a deploy key, a GitHub App,
+     * and a connected GitLab or Gitea source (which clone with a token over HTTPS) never use SSH.
+     */
+    private function gitUsesSsh(): bool
+    {
+        $deploymentType = $this->deploymentType();
+        if ($deploymentType === 'deploy_key') {
+            return true;
+        }
+        if ($deploymentType === 'source') {
+            if ($this->source instanceof GithubApp) {
+                return false;
+            }
+            if (($this->source instanceof GitlabApp || $this->source instanceof GiteaApp) && $this->source->isConnected()) {
+                return false;
+            }
+        }
+
+        return preg_match('#\Ahttps?://#i', (string) $this->git_repository) !== 1;
     }
 
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
@@ -2433,6 +2464,9 @@ class Application extends BaseModel
             'error' => $errorOutput,
         ]);
 
+        if (str_contains($errorOutput, 'you have requested strict checking')) {
+            return '<br><br>Reason: '.e('No SSH host key is saved for this Git host, and the SSH client on the server (OpenSSH older than 7.6) cannot trust a new host key on first use. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
+        }
         if (str_contains($errorOutput, 'Host key verification failed')) {
             return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved or published key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
         }
@@ -2462,7 +2496,7 @@ class Application extends BaseModel
 
         // Callers read data from stdout after the checkout, so progress lines of the checkout go to stderr.
         return [
-            'command' => 'exec >&2 && '.$this->serverGitSshSetupCommand($uuid).' && '.str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand)),
+            'command' => 'exec >&2 && '.$this->serverGitSshSetupPrefix($uuid).str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand)),
             'git' => $git,
         ];
     }

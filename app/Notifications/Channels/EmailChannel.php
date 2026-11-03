@@ -102,15 +102,21 @@ class EmailChannel
                 $connectAddress = null;
                 if ($settings instanceof EmailNotificationSettings) {
                     try {
-                        $connectAddress = SafeSmtpHost::connectionAddress((string) $settings->smtp_host, (int) $settings->smtp_port);
+                        $connectAddress = SafeSmtpHost::connectionAddress((string) $settings->smtp_host);
                     } catch (RuntimeException $e) {
-                        if (! $isTestNotification) {
+                        if ($isTestNotification) {
+                            throw NonReportableException::fromException($e);
+                        }
+
+                        // A blocked host fails on every send. A host that did not resolve can be a
+                        // temporary DNS failure, so the job is retried and nothing is counted.
+                        if ($e->getCode() === SafeSmtpHost::HOST_NOT_ALLOWED) {
                             $settings->recordDeliveryFailure($e->getMessage());
 
                             return;
                         }
 
-                        throw NonReportableException::fromException($e);
+                        throw $e;
                     }
                 }
 

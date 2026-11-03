@@ -1,5 +1,9 @@
 <?php
 
+use App\Helpers\SshMultiplexingHelper;
+use App\Models\Server;
+use Illuminate\Support\Facades\Log;
+
 /**
  * Load config/constants.php with SSH_HOST_KEY_CHECKING set to the given value.
  */
@@ -43,3 +47,23 @@ it('normalizes the SSH host key checking mode', function (?string $value, string
     'padded off' => [' OFF ', 'off'],
     'warn' => ['warn', 'warn'],
 ]);
+
+it('logs one warning for an unknown SSH host key checking mode and uses warn', function () {
+    config(['constants.ssh.host_key_checking' => 'enforec']);
+    Log::spy();
+    $server = new Server;
+
+    expect(SshMultiplexingHelper::hostKeyCheckingMode($server))->toBe('warn')
+        ->and(SshMultiplexingHelper::hostKeyCheckingMode($server))->toBe('warn');
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context) => str_contains($message, 'SSH_HOST_KEY_CHECKING') && $context['value'] === 'enforec');
+});
+
+it('does not log a warning for a known SSH host key checking mode', function (string $mode) {
+    config(['constants.ssh.host_key_checking' => $mode]);
+    Log::spy();
+
+    SshMultiplexingHelper::hostKeyCheckingMode(new Server);
+
+    Log::shouldNotHaveReceived('warning');
+})->with(['warn', 'enforce', 'off']);

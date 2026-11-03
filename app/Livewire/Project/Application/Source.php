@@ -301,14 +301,18 @@ class Source extends Component
             if (str($this->gitCommitSha)->isEmpty()) {
                 $this->gitCommitSha = 'HEAD';
             }
-            $invalidKnownHostsLine = collect(preg_split('/\R/', (string) $this->gitSshKnownHosts))
+            $knownHostsLines = collect(preg_split('/\R/', (string) $this->gitSshKnownHosts))
                 ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
-                ->first(fn (string $line) => $line !== '' && ! isValidGitKnownHostsLine($line));
-            if ($invalidKnownHostsLine !== null) {
+                ->filter(fn (string $line) => $line !== '');
+            if ($knownHostsLines->contains(fn (string $line) => ! isValidGitKnownHostsLine($line))) {
                 throw ValidationException::withMessages(['gitSshKnownHosts' => 'Each line must be "host key-type key" (for example "[git.example.com]:2222 ssh-ed25519 AAAA..."). Hashed hosts and comments are not supported.']);
             }
             if (filled($this->gitHttpsUsername) && blank($this->gitHttpsPassword) && ! $this->hasGitHttpsPassword) {
                 throw ValidationException::withMessages(['gitHttpsPassword' => 'Enter the password or token for this username.']);
+            }
+            $loadedKnownHostsLines = array_map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)), preg_split('/\R/', (string) $this->loadedGitSshKnownHosts));
+            if ($knownHostsLines->contains(fn (string $line) => gitKnownHostsLineHasPinnedHost($line) && ! in_array($line, $loadedKnownHostsLines, true))) {
+                throw ValidationException::withMessages(['gitSshKnownHosts' => 'Coolify always uses its built-in published host keys for '.implode(', ', gitPinnedHosts()).'. Remove the lines of these hosts.']);
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');

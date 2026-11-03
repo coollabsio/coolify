@@ -64,3 +64,53 @@ test('pending creation rejects a destination transferred to another team', funct
     $component->call('createResource')->assertForbidden();
     expect(StandaloneRedis::count())->toBe(0);
 });
+
+function pendingCreationMemberWithAccess(Team $team, array $access): User
+{
+    $member = User::factory()->create();
+    $member->teams()->attach($team, ['role' => 'member', 'access' => json_encode($access)]);
+    test()->actingAs($member);
+    session(['currentTeam' => $team]);
+
+    return $member;
+}
+
+test('pending creation allows a member with a write grant on the environment only', function () {
+    pendingCreationMemberWithAccess($this->team, [
+        ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['write']],
+    ]);
+
+    Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])
+        ->test(Create::class)
+        ->call('createResource')
+        ->assertRedirect();
+
+    expect(StandaloneRedis::where('environment_id', $this->environment->id)->count())->toBe(1);
+});
+
+test('pending creation denies a member with only a read grant on the environment', function () {
+    pendingCreationMemberWithAccess($this->team, [
+        ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['read']],
+    ]);
+
+    Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])
+        ->test(Create::class)
+        ->assertForbidden();
+
+    expect(StandaloneRedis::count())->toBe(0);
+});
+
+test('pending creation denies an environment write grant that was revoked after mount', function () {
+    $member = pendingCreationMemberWithAccess($this->team, [
+        ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['write']],
+    ]);
+    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])->test(Create::class);
+
+    $member->teams()->updateExistingPivot($this->team->id, ['access' => json_encode([
+        ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['read']],
+    ])]);
+    $member->unsetRelation('teams');
+
+    $component->call('createResource')->assertForbidden();
+    expect(StandaloneRedis::count())->toBe(0);
+});

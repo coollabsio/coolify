@@ -56,3 +56,8 @@ test('github keys are pinned for ssh.github.com on port 22, where a port 443 red
 
     expect(explode(',', strtok($githubEd25519, ' ')))->toContain('ssh.github.com', '[ssh.github.com]:443');
 });
+
+test('the ssh setup in the helper container does not probe the ssh version', function () {
+    expect(gitSshSetupCommand('test-uuid'))->not->toContain('ssh -F /dev/null -G')
+        ->and(gitSshSetupCommand('test-uuid'))->not->toContain(' if ');
+});

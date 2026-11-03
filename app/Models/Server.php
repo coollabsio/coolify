@@ -273,6 +273,7 @@ class Server extends BaseModel
             }
             $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
+            SshMultiplexingHelper::deleteStaleKnownHostsFiles($server->uuid, null);
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
         });
@@ -445,6 +446,8 @@ class Server extends BaseModel
         $this->forceFill(['ip' => $ip]);
         $this->syncOriginalAttribute('ip');
         static::flushIdentityMap();
+        // The query update skips the saved hook, which forgets the host key of the old address.
+        $this->settings?->forgetSshHostKey('address_changed');
 
         return true;
     }
@@ -2454,8 +2457,13 @@ $siteAddress {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
+            // Enforce mode cannot connect without the key, so it reads the key first. Warn mode learns it after the connection.
+            if (SshMultiplexingHelper::hostKeyCheckingMode($this) === 'enforce') {
+                SshMultiplexingHelper::learnHostKey($this, evenIfUnreachable: true);
+            }
             // One attempt only: retries would repeat failed logins on a host that may not belong to the user.
             instant_remote_process(['ls /'], $this, disableMultiplexing: true, maxAttempts: 1);
+            SshMultiplexingHelper::learnHostKey($this, evenIfUnreachable: true);
             $this->refundValidationAttempt();
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
@@ -2465,8 +2473,9 @@ $siteAddress {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
-            if ($e->getMessage() === SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE) {
-                $this->recordHostKeyMismatch();
+            $error = $e->getMessage();
+            if ($error === SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE && ! $this->recordHostKeyMismatch()) {
+                $error = 'SSH host key verification failed, but the server still sends the trusted host key.';
             }
             if ($justCheckingNewKey) {
                 return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
@@ -2477,24 +2486,48 @@ $siteAddress {
                 ServerReachabilityChanged::dispatch($this);
             }
 
-            return ['uptime' => false, 'error' => $e->getMessage()];
+            return ['uptime' => false, 'error' => $error];
         }
     }
 
     /**
-     * The server sent an SSH host key that does not match the pinned key. Save the new key as pending,
-     * so that an admin can compare and trust it, and notify the team once for each new key.
+     * ssh reported a host key problem. Returns true when the server sends a host key that is not pinned, and
+     * saves that key as pending, so that an admin can compare and trust it. Returns false when the server
+     * still sends the pinned key or the key cannot be read: then it is a normal connection error.
+     * A key is reported once a day, and the team gets at most one notification an hour, because a load
+     * balancer in front of several hosts can switch between keys on every connection. While a key is
+     * pending, the server is scanned at most every ten minutes.
+     *
+     * @param  string|null  $sshErrorOutput  The stderr of ssh. When it shows the fingerprint of the pending key, no scan is needed.
      */
-    public function recordHostKeyMismatch(): void
+    public function recordHostKeyMismatch(?string $sshErrorOutput = null): bool
     {
         $settings = $this->settings;
+        if (filled($settings->ssh_host_key_pending) && preg_match_all('/SHA256:[A-Za-z0-9+\/]+/', (string) $sshErrorOutput, $matches) > 0) {
+            $pendingFingerprints = array_map(fn (string $fingerprint) => strtok($fingerprint, ' '), ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));
+            if (array_diff($matches[0], $pendingFingerprints) === []) {
+                return true;
+            }
+        }
+        // Each scan is a failed login on the server (fail2ban), so a pending key is scanned again at most every ten minutes.
+        $scannedCacheKey = 'ssh_host_key_mismatch_scanned_'.$this->uuid.'_'.hash('sha256', (string) $settings->ssh_host_key);
+        if (filled($settings->ssh_host_key_pending) && Cache::has($scannedCacheKey)) {
+            return true;
+        }
+
         $newKey = SshMultiplexingHelper::scanHostKey($this);
-        if ($newKey === null || $newKey === $settings->ssh_host_key_pending
-            || array_diff(explode("\n", $newKey), explode("\n", (string) $settings->ssh_host_key)) === []) {
-            return;
+        Cache::put($scannedCacheKey, true, now()->addMinutes(10));
+        if ($newKey === null || array_diff(explode("\n", $newKey), explode("\n", (string) $settings->ssh_host_key)) === []) {
+            return false;
+        }
+        if ($newKey === $settings->ssh_host_key_pending) {
+            return true;
         }
 
         $settings->forceFill(['ssh_host_key_pending' => $newKey])->save();
+        if (! Cache::add('ssh_host_key_reported_'.$this->uuid.'_'.hash('sha256', $newKey), true, now()->addDay())) {
+            return true;
+        }
         Log::warning('SSH host key of server changed', ['server_uuid' => $this->uuid, 'mode' => SshMultiplexingHelper::hostKeyCheckingMode($this)]);
         auditLog('server.ssh_host_key_changed', [
             'team_id' => $this->team_id,
@@ -2502,7 +2535,11 @@ $siteAddress {
             'server_name' => $this->name,
             'fingerprints' => ServerSetting::sshHostKeyFingerprints($newKey),
         ], 'warning');
-        $this->team?->notify(new HostKeyChanged($this));
+        if (Cache::add('ssh_host_key_changed_notified_'.$this->uuid, true, now()->addHour())) {
+            $this->team?->notify(new HostKeyChanged($this));
+        }
+
+        return true;
     }
 
     public function installDocker()

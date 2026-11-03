@@ -21,6 +21,7 @@ import {
     isAuthorizedTargetHost,
     rejectTerminalSocket,
     sanitizeSshArgs,
+    terminalSessionCheckResult,
     validateSshArgs,
 } from './terminal-utils.js';
 
@@ -268,7 +269,7 @@ const messageHandlers = {
         if (typeof data !== 'string') {
             return;
         }
-        session.lastInputAt = Date.now();
+        session.lastActivityAt = Date.now();
         session.ptyProcess.write(data);
     },
     resize: (session, size) => {
@@ -284,7 +285,7 @@ const messageHandlers = {
             session.endReason = 'replaced';
             killPtyProcess(session.userId);
         } else {
-            session.ws.send(session.isActive);
+            session.ws.send(String(session.isActive));
         }
     },
     terminalToken: (session, token) => handleTerminalToken(session, token)
@@ -452,16 +453,20 @@ async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
     userSession.endReason = null;
-    userSession.lastInputAt = Date.now();
+    userSession.lastActivityAt = Date.now();
     const sessionWatch = watchTerminalSession(userSession, ptyProcess, terminalSessionId);
     // Attach sessions share the container's main process, so they must be detached, not killed.
     userSession.isAttach = isAttachCommand(hereDocContent);
 
     ws.send('pty-ready');
 
+    // PTY output goes in binary frames. Text frames are only control messages of this server,
+    // so output of the remote shell cannot look like one.
     ptyProcess.onData((data) => {
         if (userSession.ptyProcess !== ptyProcess) return;
-        ws.send(data);
+        // Output counts as activity, so commands like `docker logs -f` are not ended as idle.
+        userSession.lastActivityAt = Date.now();
+        ws.send(Buffer.from(data, 'utf8'));
     });
 
     // when parent closes
@@ -501,7 +506,7 @@ async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) 
 }
 
 /**
- * Ends the PTY when it has no input for too long, or when Coolify no longer allows it:
+ * Ends the PTY when it has no input and no output for too long, or when Coolify no longer allows it:
  * after a logout, a lost admin role, a removal from the team, or when terminal access
  * was turned off on the server.
  */
@@ -514,8 +519,8 @@ function watchTerminalSession(userSession, ptyProcess, terminalSessionId) {
             return;
         }
 
-        if (Date.now() - userSession.lastInputAt >= TERMINAL_IDLE_TIMEOUT_SECONDS * 1000) {
-            await endTerminalSession(userSession, ptyProcess, 'idle', `no input for ${TERMINAL_IDLE_TIMEOUT_SECONDS / 60} minutes.`);
+        if (Date.now() - userSession.lastActivityAt >= TERMINAL_IDLE_TIMEOUT_SECONDS * 1000) {
+            await endTerminalSession(userSession, ptyProcess, 'idle', `no input or output for ${TERMINAL_IDLE_TIMEOUT_SECONDS / 60} minutes.`);
             return;
         }
 
@@ -524,10 +529,10 @@ function watchTerminalSession(userSession, ptyProcess, terminalSessionId) {
         }
 
         checking = true;
-        let status = null;
+        let response = null;
         try {
-            const response = await postToCoolify('/terminal/session/check', userSession.authHeaders, { session_id: terminalSessionId });
-            status = response.status;
+            // Accept JSON so a logged-out session gets a 401 instead of a redirect to the login page.
+            response = await postToCoolify('/terminal/session/check', { ...userSession.authHeaders, Accept: 'application/json' }, { session_id: terminalSessionId });
         } catch (error) {
             logTerminal('error', 'Failed to check terminal session.', {
                 userId: userSession.userId,
@@ -536,18 +541,22 @@ function watchTerminalSession(userSession, ptyProcess, terminalSessionId) {
         }
         checking = false;
 
-        if (status === 200) {
+        const result = terminalSessionCheckResult(response);
+        if (result === 'active') {
             failedChecks = 0;
             return;
         }
 
-        // Coolify answered and did not allow the session (also a redirect to the login page).
-        if (status !== null && status < 500) {
+        if (result === 'revoked') {
             await endTerminalSession(userSession, ptyProcess, 'revoked', 'access to this terminal was revoked.');
             return;
         }
 
-        // Coolify is unavailable, for example during an upgrade. Fail closed after a few minutes.
+        // Coolify is unavailable (for example during an upgrade) or gave an unexpected answer. Fail closed after a few minutes.
+        logTerminal('warn', 'Terminal session check failed.', {
+            userId: userSession.userId,
+            status: response?.status,
+        });
         failedChecks++;
         if (failedChecks >= TERMINAL_SESSION_CHECK_MAX_FAILURES) {
             await endTerminalSession(userSession, ptyProcess, 'revoked', 'Coolify could not verify access to this terminal.');

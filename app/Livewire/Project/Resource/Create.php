@@ -86,7 +86,7 @@ class Create extends Component
         $project = $this->project;
         $environment = $this->environment;
         $destination = $this->destination;
-        $this->authorize('update', $project);
+        $this->authorize('createAnyResource', [$environment]);
         abort_unless((int) $environment->project_id === (int) $project->id, 403);
         abort_unless((int) $destination->server->team_id === (int) $project->team_id, 403);
         $this->pendingType = null;

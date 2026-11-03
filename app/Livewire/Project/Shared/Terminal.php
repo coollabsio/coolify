@@ -116,7 +116,7 @@ class Terminal extends Component
             return;
         }
 
-        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled() || $server->isTransferredAway()) {
             $this->failTerminalSession('Terminal access is disabled on this server.');
 
             return;
@@ -161,7 +161,7 @@ class Terminal extends Component
             $mode = $this->terminalMode = 'shell';
         }
 
-        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode, (string) request()->server('REMOTE_ADDR'), request()->userAgent());
+        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode, client_ip(request()), request()->userAgent());
         $this->dispatch('send-terminal-token', $token);
     }
 

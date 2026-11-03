@@ -52,6 +52,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     /** The server sent a host key that does not match the pinned key. */
     private bool $hostKeyChanged = false;
 
+    private string $sshErrorOutput = '';
+
     public function __construct(
         public Server $server,
         public bool $disableMux = true
@@ -88,11 +90,17 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            // Enforce mode cannot connect without the key, so the check reads the key also of an unreachable server.
+            if (SshMultiplexingHelper::hostKeyCheckingMode($this->server) === 'enforce') {
+                SshMultiplexingHelper::learnHostKey($this->server, evenIfUnreachable: true);
+            }
+
             // Check basic connectivity first
             $isReachable = $this->checkConnection();
 
             if ($this->hostKeyChanged) {
-                $this->server->recordHostKeyMismatch();
+                // A failed host key check with the pinned key (an unreadable known_hosts file) is a normal connection error.
+                $this->hostKeyChanged = $this->server->recordHostKeyMismatch($this->sshErrorOutput);
             }
 
             if (! $isReachable && $this->hostKeyChanged) {
@@ -134,6 +142,9 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->releasedToAnotherInstance()) {
                 return;
             }
+
+            // Warn mode connects without a pinned key. Commands do not scan an unreachable server, so learn the key now.
+            SshMultiplexingHelper::learnHostKey($this->server, evenIfUnreachable: true);
 
             // Server is reachable, check if Docker is available
             $isUsable = $this->checkDockerAvailability();
@@ -248,7 +259,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $process = $this->runSsh(self::probeCommand(), self::SSH_TIMEOUT_SECONDS, disableMultiplexing: true);
-            $this->hostKeyChanged = SshMultiplexingHelper::isHostKeyMismatch($process->errorOutput());
+            $this->sshErrorOutput = $process->errorOutput();
+            $this->hostKeyChanged = SshMultiplexingHelper::isHostKeyMismatch($this->sshErrorOutput);
             if ($process->exitCode() !== 0) {
                 $this->connectionError = 'ssh exit '.$process->exitCode().': '.Str::limit(trim($process->errorOutput()), 300);
             } else {

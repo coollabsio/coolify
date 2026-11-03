@@ -10,6 +10,7 @@ use App\Rules\SafeSmtpHost;
 use App\Rules\ValidHostname;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -141,6 +142,9 @@ class Email extends Component
         if ($toModel) {
             $this->validate();
             $this->validate(['smtpEhloDomain' => ['nullable', 'string', new ValidHostname]]);
+            if ($this->smtpHost !== $this->settings->smtp_host) {
+                $this->validate(['smtpHost' => ['nullable', 'string', new SafeSmtpHost]]);
+            }
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
@@ -456,6 +460,18 @@ class Email extends Component
         $this->authorize('update', $this->settings);
         $settings = instanceSettings();
         $this->authorize('view', $settings);
+
+        // Teams connect to their SMTP host under the rules for team hosts, so an instance host
+        // such as localhost would fail on every send. Copy nothing in that case.
+        $hostCheck = Validator::make(['smtpHost' => $settings->smtp_host], ['smtpHost' => ['nullable', 'string', new SafeSmtpHost]]);
+        if ($hostCheck->fails()) {
+            $message = 'The instance email settings were not copied. '.$hostCheck->errors()->first('smtpHost');
+            $this->addError('smtpHost', $message);
+            $this->dispatch('error', $message);
+
+            return;
+        }
+
         $this->smtpFromAddress = $settings->smtp_from_address;
         $this->smtpFromName = $settings->smtp_from_name;
 

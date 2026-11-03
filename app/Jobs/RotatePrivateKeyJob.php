@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Server\AuthorizedKeys;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use Carbon\CarbonInterval;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,15 +30,20 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
 
     public const RESULT_TTL_SECONDS = 86400;
 
+    /** The server moved; RemoveRotatedAuthorizedKeyJob removes the old key later. */
+    public const OLD_KEY_PENDING = 'moved_old_pending';
+
     public function __construct(
         public int $oldPrivateKeyId,
         public int $newPrivateKeyId,
         public ?int $startedByUserId = null,
     ) {}
 
-    public static function cacheKey(PrivateKey $privateKey): string
+    public static function cacheKey(PrivateKey|string $privateKey): string
     {
-        return "private-key-rotation:{$privateKey->uuid}";
+        $uuid = $privateKey instanceof PrivateKey ? $privateKey->uuid : $privateKey;
+
+        return "private-key-rotation:{$uuid}";
     }
 
     public function middleware(): array
@@ -73,7 +79,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
                 'old_private_key_uuid' => $oldKey->uuid,
                 'new_private_key_uuid' => $newKey->uuid,
                 'result' => $result['status'],
-            ], $result['status'] === 'moved' ? 'info' : 'warning');
+            ], in_array($result['status'], ['moved', self::OLD_KEY_PENDING], true) ? 'info' : 'warning');
         }
 
         $counts = collect($state['servers'])->countBy('status')->all();
@@ -85,7 +91,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
             'new_private_key_uuid' => $newKey->uuid,
             'started_by_user_id' => $this->startedByUserId,
             'servers' => $counts,
-        ], array_diff(array_keys($counts), ['moved']) === [] ? 'info' : 'warning');
+        ], array_diff(array_keys($counts), ['moved', self::OLD_KEY_PENDING]) === [] ? 'info' : 'warning');
     }
 
     public function failed(?Throwable $exception): void
@@ -97,10 +103,13 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * @return array{status: 'moved'|'moved_old_not_removed'|'failed'|'unreachable', message: string}
+     * @return array{status: 'moved_old_pending'|'moved_old_not_removed'|'failed'|'old_key_not_found'|'unreachable'|'skipped', message: string}
      */
     private function rotateServer(Server $server, PrivateKey $oldKey, PrivateKey $newKey): array
     {
+        if ($server->isTransferredAway()) {
+            return ['status' => 'skipped', 'message' => 'Another Coolify instance manages this server now.'];
+        }
         if (! AuthorizedKeys::canRunOn($server)) {
             return ['status' => 'unreachable', 'message' => 'The server is disabled or has no IP address.'];
         }
@@ -108,7 +117,12 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
         try {
             AuthorizedKeys::add($server, $newKey, $oldKey);
         } catch (Throwable $e) {
-            return ['status' => 'unreachable', 'message' => 'Could not connect: '.$this->errorWithoutHost($server, $e)];
+            return match ($e->getCode()) {
+                AuthorizedKeys::OLD_KEY_NOT_FOUND => ['status' => 'old_key_not_found', 'message' => 'The old key is not in ~/.ssh/authorized_keys of the SSH user, so Coolify cannot replace it there. Add the new key on the server yourself.'],
+                // ssh exits with 255 when it cannot connect or log in.
+                255 => ['status' => 'unreachable', 'message' => 'Could not connect: '.self::errorWithoutHost($server, $e)],
+                default => ['status' => 'failed', 'message' => 'Could not add the new key: '.self::errorWithoutHost($server, $e)],
+            };
         }
 
         $probe = clone $server;
@@ -117,7 +131,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
         ['uptime' => $newKeyWorks] = $probe->validateConnection(justCheckingNewKey: true);
         if (! $newKeyWorks) {
             try {
-                AuthorizedKeys::remove($server, $newKey);
+                AuthorizedKeys::undoAdd($server, $newKey, $oldKey);
             } catch (Throwable) {
                 // The server stays on the old key. The next rotation adds the same new key again.
             }
@@ -129,15 +143,13 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
         $server->privateKey()->associate($newKey);
         $server->save();
 
-        try {
-            if (! AuthorizedKeys::remove($server, $oldKey)) {
-                return ['status' => 'moved_old_not_removed', 'message' => 'The old key stays, because another server for this host uses it.'];
-            }
-        } catch (Throwable $e) {
-            return ['status' => 'moved_old_not_removed', 'message' => 'The old key was not removed: '.$this->errorWithoutHost($server, $e)];
-        }
+        $delay = RemoveRotatedAuthorizedKeyJob::delaySeconds($server);
+        RemoveRotatedAuthorizedKeyJob::dispatch($server->id, $oldKey->id, $oldKey->uuid, $oldKey->publicKeyBody())->delay($delay);
 
-        return ['status' => 'moved', 'message' => 'Moved to the new key.'];
+        return [
+            'status' => self::OLD_KEY_PENDING,
+            'message' => 'Moved to the new key. The old key is removed from the server in '.CarbonInterval::seconds($delay)->cascade()->forHumans(['parts' => 2]).', when jobs that started before the rotation have finished.',
+        ];
     }
 
     /**
@@ -149,7 +161,7 @@ class RotatePrivateKeyJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /** The UI shows server names only, so remove the host address from SSH errors. */
-    private function errorWithoutHost(Server $server, Throwable $e): string
+    public static function errorWithoutHost(Server $server, Throwable $e): string
     {
         $message = str_replace((string) $server->ip, 'the server', remove_iip($e->getMessage()));
 

@@ -4,6 +4,7 @@ use App\Http\Middleware\VerifyCsrfToken;
 use App\Models\AuditEvent;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\TerminalSessionService;
@@ -242,3 +243,100 @@ it('rejects a session check without a csrf token', function () {
     enforceTerminalSecurityCsrf();
     $this->postJson('/terminal/session/check', ['session_id' => $id])->assertStatus(419);
 });
+
+it('keeps a session after the user switches to a team that blocks pages', function (array $otherTeamAttributes) {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $otherTeam = Team::factory()->create($otherTeamAttributes);
+    $this->user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->post('/terminal/session/check', ['session_id' => $id])->assertOk()->assertJson(['active' => true]);
+})->with([
+    'two-factor required' => [['is_two_factor_required' => true]],
+    'onboarding' => [['show_boarding' => true]],
+]);
+
+it('rejects an active session after the server team requires two-factor authentication', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $this->team->forceFill(['is_two_factor_required' => true])->saveQuietly();
+    // The session team does not require it, so only the check on the server team can reject.
+    $otherTeam = Team::factory()->create();
+    $this->user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->postJson('/terminal/session/check', ['session_id' => $id])->assertForbidden();
+});
+
+it('rejects a session check after logout with an explicit status', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    auth()->logout();
+
+    $this->post('/terminal/session/check', ['session_id' => $id], ['Accept' => 'application/json'])->assertUnauthorized();
+});
+
+it('rejects a token and an active session for a server transferred to another instance', function () {
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $service = app(TerminalSessionService::class);
+    $token = $service->issue($this->user, $server);
+    $server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+    Server::flushIdentityMap();
+
+    expect(fn () => $service->check($this->user, $id))->toThrow(AccessDeniedHttpException::class)
+        ->and(fn () => $service->redeem($this->user, $token))->toThrow(AccessDeniedHttpException::class);
+});
+
+function useCloudWithSubscription(Team $team, bool $paid = true): void
+{
+    config(['constants.coolify.self_hosted' => false, 'subscription.provider' => 'stripe']);
+    Subscription::factory()->create(['team_id' => $team->id, 'stripe_invoice_paid' => $paid]);
+}
+
+it('rejects an active session and a new token on cloud after the server team subscription ends', function () {
+    useCloudWithSubscription($this->team);
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $service = app(TerminalSessionService::class);
+    $token = $service->issue($this->user, $server);
+    $this->team->subscription->update(['stripe_invoice_paid' => false]);
+    // The session team still pays, so only the check on the server team can reject.
+    $otherTeam = Team::factory()->create();
+    useCloudWithSubscription($otherTeam);
+    $this->user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->postJson('/terminal/session/check', ['session_id' => $id])->assertForbidden();
+
+    session(['currentTeam' => $this->team]);
+    expect(fn () => $service->redeem($this->user, $token))->toThrow(AccessDeniedHttpException::class);
+});
+
+it('keeps an active session on cloud while the server team subscription is active or ends at period end', function (array $subscription) {
+    useCloudWithSubscription($this->team);
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+    $this->team->subscription->update($subscription);
+    // The session team has no subscription; the server team decides.
+    $otherTeam = Team::factory()->create();
+    $this->user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->postJson('/terminal/session/check', ['session_id' => $id])->assertOk()->assertJson(['active' => true]);
+})->with([
+    'paid' => [['stripe_invoice_paid' => true]],
+    'cancel at period end' => [['stripe_invoice_paid' => false, 'stripe_cancel_at_period_end' => true]],
+]);
+
+it('keeps an active session for a self-hosted team without a subscription', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    [$server, $id] = activeTerminalSecuritySession($this->user, $this->team);
+
+    $this->postJson('/terminal/session/check', ['session_id' => $id])->assertOk()->assertJson(['active' => true]);
+});
+
+it('keeps an active session on cloud for a server of the root team without a subscription', function () {
+    config(['constants.coolify.self_hosted' => false, 'subscription.provider' => 'stripe']);
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    $this->user->teams()->attach($rootTeam, ['role' => 'owner']);
+    session(['currentTeam' => $rootTeam]);
+    [$server, $id] = activeTerminalSecuritySession($this->user, $rootTeam);
+
+    app(TerminalSessionService::class)->check($this->user, $id);
+})->throwsNoExceptions();

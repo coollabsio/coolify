@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Rules\SafeSmtpHost;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 
@@ -14,9 +15,10 @@ class SmtpTransportFactory
     public static function fromSettings(object $settings, ?string $localDomain = null, ?string $connectAddress = null): EsmtpTransport
     {
         $mode = self::encryptionMode($settings);
+        $host = SafeSmtpHost::normalizeHost((string) $settings->smtp_host);
 
         $transport = new EsmtpTransport(
-            formatHostForUrl((string) $settings->smtp_host),
+            formatHostForUrl($host),
             (int) $settings->smtp_port,
             match ($mode) {
                 'none' => false,
@@ -42,7 +44,6 @@ class SmtpTransportFactory
             $stream->setTimeout((float) $settings->smtp_timeout);
         }
 
-        $host = normalizeIpAddress((string) $settings->smtp_host);
         if ($connectAddress !== null && $connectAddress !== $host && $stream instanceof SocketStream) {
             $stream->setHost(formatHostForUrl($connectAddress));
             $stream->setStreamOptions(['ssl' => ['peer_name' => $host]]);

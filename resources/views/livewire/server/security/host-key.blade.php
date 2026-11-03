@@ -36,7 +36,8 @@
                         title="{{ $server->settings->is_ssh_host_key_check_disabled ? 'Enable the host key check?' : 'Disable the host key check?' }}"
                         temporaryDisableTwoStepConfirmation
                         buttonTitle="{{ $server->settings->is_ssh_host_key_check_disabled ? 'Enable check' : 'Disable check' }}"
-                        submitAction="toggleHostKeyCheck" :actions="$server->settings->is_ssh_host_key_check_disabled
+                        submitAction="setHostKeyCheckDisabled({{ $server->settings->is_ssh_host_key_check_disabled ? 0 : 1 }})"
+                        :actions="$server->settings->is_ssh_host_key_check_disabled
                             ? ['Coolify checks the host key of this server again.']
                             : [
                                 'Coolify does not check the host key of this server.',

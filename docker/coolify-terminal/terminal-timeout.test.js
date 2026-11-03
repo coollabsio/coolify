@@ -26,7 +26,7 @@ test('idle check continues during pending access request', async () => {
         endTerminalSession: async () => { ended = true; },
     });
     const pty = {};
-    watch({ ptyProcess: pty, lastInputAt: 0 }, pty, 'id');
+    watch({ ptyProcess: pty, lastActivityAt: 0 }, pty, 'id');
     tick(); now = 60000; await tick();
     assert.equal(ended, true);
 });

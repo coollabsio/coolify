@@ -61,12 +61,13 @@ class HostKey extends Component
         ]));
     }
 
-    public function toggleHostKeyCheck(?string $password): bool|string|Event
+    /**
+     * @param  bool  $disabled  The state that the button showed, so that a page open in another tab cannot turn the check back on.
+     */
+    public function setHostKeyCheckDisabled(bool $disabled, ?string $password): bool|string|Event
     {
-        $action = $this->server->settings->is_ssh_host_key_check_disabled ? 'check_enabled' : 'check_disabled';
-
-        return $this->changeHostKey($password, $action, fn (ServerSetting $settings) => $settings->forceFill([
-            'is_ssh_host_key_check_disabled' => ! $settings->is_ssh_host_key_check_disabled,
+        return $this->changeHostKey($password, $disabled ? 'check_disabled' : 'check_enabled', fn (ServerSetting $settings) => $settings->forceFill([
+            'is_ssh_host_key_check_disabled' => $disabled,
         ]));
     }
 
@@ -98,8 +99,10 @@ class HostKey extends Component
             ]);
 
             SshMultiplexingHelper::removeMuxFile($this->server);
+            // The check can take up to a minute on a slow server, so it runs in the queue and the page polls for the result.
             ServerConnectionCheckJob::dispatch($this->server);
-            $this->dispatch('success', 'The host key settings were saved. Coolify checks the connection again.');
+            $this->dispatch('hostKeySettingsChanged')->to(Index::class);
+            $this->dispatch('success', 'The host key settings were saved. Coolify now checks the connection again.');
 
             return true;
         } catch (\Throwable $e) {

@@ -1,4 +1,4 @@
-<div>
+<div @if ($isWaitingForConnectionCheck) wire:poll.3s="pollConnectionCheck" @endif>
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Security | Coolify
     </x-slot>

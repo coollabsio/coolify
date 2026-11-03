@@ -233,6 +233,19 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
             && ! TeamInvitation::whereEmail($this->email)->exists();
     }
 
+    /**
+     * Whether a new invitation from the team may carry a magic login link for this account.
+     * A pending invitation of another team keeps the only login, so the admin of a second team cannot sign in as the invitee.
+     */
+    public function canReceiveInvitationLoginFrom(int $teamId): bool
+    {
+        return $this->needsInitialInvitationLogin()
+            && TeamInvitation::whereEmail($this->email)
+                ->where('team_id', '!=', $teamId)
+                ->get()
+                ->every(fn (TeamInvitation $invitation) => $invitation->hasExpired());
+    }
+
     public function needsInitialInvitationLogin(): bool
     {
         return ! $this->hasVerifiedEmail()

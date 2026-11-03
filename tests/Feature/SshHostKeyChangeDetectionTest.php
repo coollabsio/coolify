@@ -17,6 +17,14 @@ const DETECTION_PINNED_KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ
 const DETECTION_PENDING_KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjaL3Lqt0tZl4iVZw8x1v2b9fM8r6Yq0nH0bUq3dQ0h';
 const HOST_KEY_CHANGED_BANNER = "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
 
+/**
+ * The warning of ssh names the host key alias of the server, as OpenSSH prints it.
+ */
+function hostKeyChangedBannerFor(Server $server): string
+{
+    return HOST_KEY_CHANGED_BANNER."\n  ssh-keygen -f '/var/www/html/storage/app/ssh/known_hosts/known_hosts_{$server->uuid}_0' -R 'coolify-{$server->uuid}'\n";
+}
+
 function makeDetectionTestServer(): Server
 {
     $user = User::factory()->create();
@@ -61,8 +69,8 @@ beforeEach(function () {
 });
 
 it('checks the connection once when a command in warn mode reports a changed host key', function () {
-    Process::fake(['*' => Process::result(output: 'ok', errorOutput: HOST_KEY_CHANGED_BANNER)]);
     $server = makeDetectionTestServer();
+    Process::fake(['*' => Process::result(output: 'ok', errorOutput: hostKeyChangedBannerFor($server))]);
 
     expect(instant_remote_process(['ls'], $server))->toBe('ok')
         ->and(instant_remote_process(['ls'], $server))->toBe('ok');
@@ -72,8 +80,8 @@ it('checks the connection once when a command in warn mode reports a changed hos
 
 it('checks the connection when enforce mode refuses a changed host key', function () {
     config(['constants.ssh.host_key_checking' => 'enforce']);
-    Process::fake(['*' => Process::result(errorOutput: "Host key verification failed.\n", exitCode: 255)]);
     $server = makeDetectionTestServer();
+    Process::fake(['*' => Process::result(errorOutput: hostKeyChangedBannerFor($server)."Host key for coolify-{$server->uuid} has changed and you have requested strict checking.\nHost key verification failed.\n", exitCode: 255)]);
 
     expect(fn () => instant_remote_process(['ls'], $server))->toThrow(RuntimeException::class);
 
@@ -82,8 +90,8 @@ it('checks the connection when enforce mode refuses a changed host key', functio
 
 it('checks the connection when the multiplexed master connection reports a changed host key', function () {
     config(['constants.ssh.mux_enabled' => true]);
-    Process::fake(['*' => Process::result(errorOutput: HOST_KEY_CHANGED_BANNER)]);
     $server = makeDetectionTestServer();
+    Process::fake(['*' => Process::result(errorOutput: hostKeyChangedBannerFor($server))]);
 
     SshMultiplexingHelper::establishNewMultiplexedConnection($server);
 

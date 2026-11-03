@@ -1,6 +1,7 @@
 <div @if ($isRunning) wire:poll.3s @endif>
-    @if ($hasServers || $isRunning || $open)
-        <x-modal-input title="Rotate key" buttonTitle="Rotate key" :wireIgnore="false" wireOpen="open" :closeEvent="false"
+    {{-- The result of the last rotation stays reachable after every server moved. --}}
+    @if ($hasServers || $isRunning || $open || $state)
+        <x-modal-input title="Rotate key" :buttonTitle="$hasServers || $isRunning ? 'Rotate key' : 'Rotation result'" :wireIgnore="false" wireOpen="open" :closeEvent="false"
             subtitle="Move the servers to a new key. Servers that fail stay on this key.">
             <div class="flex flex-col gap-3 text-sm">
                 <ul class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.06]">
@@ -11,6 +12,7 @@
                                 <span class="ml-auto">
                                     @switch(data_get($row, 'status'))
                                         @case('moved')
+                                        @case('moved_old_pending')
                                             <x-status-badge size="sm" label="Moved" type="success" />
                                         @break
                                         @case('moved_old_not_removed')
@@ -19,11 +21,19 @@
                                         @case('failed')
                                             <x-status-badge size="sm" label="Failed" type="error" />
                                         @break
+                                        @case('old_key_not_found')
+                                            <x-status-badge size="sm" label="Old key not found" type="error" />
+                                        @break
                                         @case('unreachable')
                                             <x-status-badge size="sm" label="Unreachable" type="error" />
                                         @break
+                                        @case('skipped')
+                                            <x-status-badge size="sm" label="Transferred" type="warning" />
+                                        @break
                                         @default
-                                            @if ($isRunning)
+                                            @if (data_get($row, 'transferred'))
+                                                <x-status-badge size="sm" label="Transferred" type="warning" />
+                                            @elseif ($isRunning)
                                                 <x-status-badge size="sm" label="Waiting" pulse />
                                             @elseif (! data_get($row, 'reachable'))
                                                 <x-status-badge size="sm" label="Not reachable" type="warning" />
@@ -33,6 +43,8 @@
                             </span>
                             @if (! in_array(data_get($row, 'status'), [null, 'moved'], true))
                                 <span class="text-xs text-neutral-500 dark:text-fg-dim">{{ data_get($row, 'message') }}</span>
+                            @elseif (data_get($row, 'status') === null && data_get($row, 'transferred'))
+                                <span class="text-xs text-neutral-500 dark:text-fg-dim">Another Coolify instance manages this server now.</span>
                             @endif
                         </li>
                     @endforeach
@@ -40,6 +52,12 @@
 
                 @if (! $state)
                     <p class="text-xs text-neutral-500 dark:text-fg-dim">Rotation progress and logs will appear here.</p>
+                @endif
+                @if ($hasServers && ! $isRunning && ! $newKey)
+                    <x-forms.listbox id="keyType" label="New key type" :options="[
+                        ['value' => 'ed25519', 'label' => 'Ed25519', 'description' => 'Recommended.'],
+                        ['value' => 'rsa', 'label' => 'RSA 4096', 'description' => 'For hosts that do not accept Ed25519, for example FIPS hosts.'],
+                    ]" />
                 @endif
                 @if (data_get($state, 'status') === 'failed')
                     <p class="text-xs text-red-500">{{ data_get($state, 'error') }}</p>
@@ -64,9 +82,11 @@
                             </x-forms.button>
                         @endcan
                     @endif
-                    <x-forms.button isHighlighted wire:click="rotate" :disabled="$isRunning || ! $hasServers">
-                        {{ $isRunning ? 'Rotating...' : ($state ? 'Rotate again' : 'Rotate key') }}
-                    </x-forms.button>
+                    @if ($hasServers || $isRunning)
+                        <x-forms.button isHighlighted wire:click="rotate" :disabled="$isRunning">
+                            {{ $isRunning ? 'Rotating...' : ($state ? 'Rotate again' : 'Rotate key') }}
+                        </x-forms.button>
+                    @endif
                 </div>
             </div>
         </x-modal-input>

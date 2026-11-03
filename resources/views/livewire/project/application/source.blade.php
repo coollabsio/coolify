@@ -117,7 +117,7 @@
                 <div id="manual-host-keys" x-show="editManually" x-cloak class="p-4">
                     <div>
                         <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"
-                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. Click Save to apply."
+                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. GitHub, GitLab.com, and Bitbucket Cloud use built-in keys and cannot be added. Click Save to apply."
                             placeholder="[git.example.com]:2222 ssh-ed25519 AAAA..." canGate="update"
                             :canResource="$application" />
                     </div>

@@ -25,6 +25,14 @@ export function isTerminalAuthRejectionCode(code) {
 }
 
 /**
+ * Whether a WebSocket message is PTY output. The terminal server sends PTY output in
+ * binary frames and its own control messages as text, so output cannot spoof them.
+ */
+export function isTerminalOutputFrame(data) {
+    return data instanceof ArrayBuffer;
+}
+
+/**
  * Whether a plain-text message from the terminal server rejects a session start,
  * for example a target host that is not authorized or an invalid SSH command.
  * Authentication rejections arrive as close codes instead.

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
+use App\Helpers\SshMultiplexingHelper;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -263,6 +264,9 @@ class ServerSetting extends Model
             // A save that sets the key too (a transfer import) already has the key of the new address.
             if ($settings->wasChanged('is_cloudflare_tunnel') && ! $settings->wasChanged('ssh_host_key')) {
                 $settings->forgetSshHostKey('cloudflare_tunnel_changed');
+            }
+            if ($settings->wasChanged('ssh_host_key') && $settings->server) {
+                SshMultiplexingHelper::deleteStaleKnownHostsFiles($settings->server->uuid, $settings->ssh_host_key);
             }
             if (
                 $settings->wasChanged('sentinel_token') ||
@@ -536,6 +540,9 @@ class ServerSetting extends Model
         // A query update, so that other unsaved changes stay unsaved and the model events do not run again.
         self::query()->whereKey($this->getKey())->update($cleared);
         $this->forceFill($cleared)->syncOriginalAttributes(array_keys($cleared));
+        if ($this->server) {
+            SshMultiplexingHelper::deleteStaleKnownHostsFiles($this->server->uuid, null);
+        }
 
         auditLog('server.ssh_host_key.forgotten', [
             'team_id' => $this->server?->team_id,

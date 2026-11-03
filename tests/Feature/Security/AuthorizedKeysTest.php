@@ -36,9 +36,9 @@ beforeEach(function () {
     ]);
     $this->scripts = [];
     Process::fake(function (PendingProcess $process) {
-        $lines = explode("\n", (string) $process->command);
-        if (count($lines) > 2) {
-            $this->scripts[] = implode("\n", array_slice($lines, 1, -1));
+        // Batches go to the remote shell on stdin.
+        if (filled($process->input)) {
+            $this->scripts[] = rtrim((string) $process->input, "\n");
         }
 
         return Process::result();
@@ -82,10 +82,13 @@ it('serializes concurrent additions and removals without losing recovery keys or
     $newKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id, 'private_key' => generateSSHKey('ed25519')['private'],
     ]);
-    AuthorizedKeys::add($this->server, $newKey);
+    $nextKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id, 'private_key' => generateSSHKey('ed25519')['private'],
+    ]);
+    AuthorizedKeys::add($this->server, $nextKey, $newKey);
     $add = end($this->scripts);
     $file = $this->home.'/.ssh/authorized_keys';
-    file_put_contents($file, $this->key->publicKeyBody()." old\nssh-ed25519 RECOVERY operator\n");
+    file_put_contents($file, $this->key->publicKeyBody()." old\n".$newKey->publicKeyBody()." current\nssh-ed25519 RECOVERY operator\n");
     chmod($file, 0640);
     $processes = [];
     for ($i = 0; $i < 6; $i++) {
@@ -100,7 +103,7 @@ it('serializes concurrent additions and removals without losing recovery keys or
         expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
     }
 
-    expect(file_get_contents($file))->toBe("ssh-ed25519 RECOVERY operator\n".$newKey->authorizedKeysLine()."\n")
+    expect(file_get_contents($file))->toBe($newKey->publicKeyBody()." current\nssh-ed25519 RECOVERY operator\n".$nextKey->authorizedKeysLine()."\n")
         ->and(fileperms($file) & 0777)->toBe(0640);
 });
 
@@ -184,4 +187,111 @@ it('preserves quoted restrictions and duplicate entries when rotating a key', fu
     expect(file_get_contents($file))
         ->toContain($options.' '.$newKey->authorizedKeysLine())
         ->toContain('restrict '.$newKey->authorizedKeysLine());
+});
+
+function runAuthorizedKeysScript(string $home, string $script): ShellProcess
+{
+    $process = new ShellProcess(['bash', '-se'], null, ['HOME' => $home, 'PATH' => getenv('PATH')], $script);
+    $process->run();
+
+    return $process;
+}
+
+it('keeps the last line intact when a rotation appends to a file without a final newline', function () {
+    $newKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id, 'private_key' => generateSSHKey('ed25519')['private'],
+    ]);
+    $file = $this->home.'/.ssh/authorized_keys';
+    file_put_contents($file, $this->key->publicKeyBody()." old\nssh-ed25519 PERSONAL operator");
+    AuthorizedKeys::add($this->server, $newKey, $this->key);
+    $process = runAuthorizedKeysScript($this->home, end($this->scripts));
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(file($file, FILE_IGNORE_NEW_LINES))->toBe([
+            $this->key->publicKeyBody().' old',
+            'ssh-ed25519 PERSONAL operator',
+            $newKey->authorizedKeysLine(),
+        ]);
+
+    // A failed login test removes the new key again; the personal key must stay.
+    expect(AuthorizedKeys::undoAdd($this->server, $newKey, $this->key))->toBeTrue();
+    $process = runAuthorizedKeysScript($this->home, end($this->scripts));
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(file_get_contents($file))->toBe($this->key->publicKeyBody()." old\nssh-ed25519 PERSONAL operator\n");
+});
+
+it('takes over a lock that a crashed edit left behind', function () {
+    $lock = $this->home.'/.ssh/.coolify-authorized-keys.lock';
+    mkdir($lock);
+    touch($lock, time() - 1200);
+    $file = $this->home.'/.ssh/authorized_keys';
+    file_put_contents($file, $this->key->publicKeyBody()." old\nssh-ed25519 RECOVERY operator\n");
+    AuthorizedKeys::remove($this->server, $this->key);
+
+    $started = microtime(true);
+    $process = runAuthorizedKeysScript($this->home, end($this->scripts));
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(microtime(true) - $started)->toBeLessThan(5)
+        ->and(file_get_contents($file))->toBe("ssh-ed25519 RECOVERY operator\n")
+        ->and(is_dir($lock))->toBeFalse();
+});
+
+it('does not retain a key because of another key without a fingerprint on the same host', function () {
+    $otherTeam = Team::factory()->create();
+    $legacy = PrivateKey::factory()->create([
+        'team_id' => $otherTeam->id, 'private_key' => generateSSHKey('ed25519')['private'],
+    ]);
+    $legacy->forceFill(['fingerprint' => null])->saveQuietly();
+    Server::factory()->create([
+        'team_id' => $otherTeam->id, 'private_key_id' => $legacy->id,
+        'ip' => $this->server->ip, 'user' => 'root',
+    ]);
+
+    expect(AuthorizedKeys::remove($this->server, $this->key))->toBeTrue();
+});
+
+it('removes only the lines it added when the new key cannot log in', function () {
+    $newKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id, 'private_key' => generateSSHKey('ed25519')['private'],
+    ]);
+    $file = $this->home.'/.ssh/authorized_keys';
+    $manual = 'from="192.0.2.0/24" '.$newKey->publicKeyBody().' added by hand';
+    $original = 'restrict '.$this->key->publicKeyBody()." old\n{$manual}\nssh-ed25519 PERSONAL operator\n";
+    file_put_contents($file, $original);
+    AuthorizedKeys::add($this->server, $newKey, $this->key);
+    expect(runAuthorizedKeysScript($this->home, end($this->scripts))->isSuccessful())->toBeTrue()
+        ->and(file_get_contents($file))->toContain('restrict '.$newKey->authorizedKeysLine());
+
+    AuthorizedKeys::undoAdd($this->server, $newKey, $this->key);
+    $process = runAuthorizedKeysScript($this->home, end($this->scripts));
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(file_get_contents($file))->toBe($original);
+});
+
+it('stops with its own exit code when the old key is not in the file', function () {
+    $newKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id, 'private_key' => generateSSHKey('ed25519')['private'],
+    ]);
+    $file = $this->home.'/.ssh/authorized_keys';
+    file_put_contents($file, "ssh-ed25519 PERSONAL operator\n");
+    AuthorizedKeys::add($this->server, $newKey, $this->key);
+    $process = runAuthorizedKeysScript($this->home, end($this->scripts));
+
+    expect($process->getExitCode())->toBe(AuthorizedKeys::OLD_KEY_NOT_FOUND)
+        ->and(file_get_contents($file))->toBe("ssh-ed25519 PERSONAL operator\n");
+});
+
+it('retains the same key material saved without a fingerprint by another team on the same host', function () {
+    $otherTeam = Team::factory()->create();
+    $copy = PrivateKey::factory()->create([
+        'team_id' => $otherTeam->id, 'private_key' => $this->key->private_key,
+    ]);
+    $copy->forceFill(['fingerprint' => null])->saveQuietly();
+    Server::factory()->create([
+        'team_id' => $otherTeam->id, 'private_key_id' => $copy->id,
+        'ip' => $this->server->ip, 'user' => 'root', 'port' => 2222,
+    ]);
+
+    expect(AuthorizedKeys::remove($this->server, $this->key))->toBeFalse();
 });
