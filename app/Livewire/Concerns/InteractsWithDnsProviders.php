@@ -230,11 +230,16 @@ trait InteractsWithDnsProviders
 
     protected function markDnsManaged(string $hostname, string $credential): void
     {
+        $this->markDnsStatus($hostname, 'ok', "DNS record created through {$credential}.");
+    }
+
+    private function markDnsStatus(string $hostname, string $status, string $message): void
+    {
         foreach ($this->domainRows as $index => $row) {
             $rowHostname = parse_url((string) ($row['url'] ?? ''), PHP_URL_HOST);
             if (is_string($rowHostname) && strtolower($rowHostname) === strtolower($hostname)) {
-                $this->domainRows[$index]['dns_status'] = 'ok';
-                $this->domainRows[$index]['dns_message'] = "DNS record created through {$credential}.";
+                $this->domainRows[$index]['dns_status'] = $status;
+                $this->domainRows[$index]['dns_message'] = $message;
                 $this->domainRows[$index]['checked_at'] = now()->toIso8601String();
             }
         }
@@ -272,6 +277,17 @@ trait InteractsWithDnsProviders
             return;
         }
 
+        $conflict = $event['conflict'] ?? null;
+        if (is_array($conflict) && is_numeric($conflict['zone_id'] ?? null) && is_string($conflict['record_id'] ?? null)
+            && is_string($conflict['current'] ?? null) && is_string($conflict['proposed'] ?? null)) {
+            $this->dnsProviderConflicts[strtolower($event['hostname']).'|'.(int) $conflict['zone_id']] = [
+                'record_id' => $conflict['record_id'], 'current' => $conflict['current'], 'proposed' => $conflict['proposed'],
+            ];
+            $this->loadDnsProviderProposals();
+            $this->showDnsProviderModal = true;
+        }
+
+        $this->markDnsStatus($event['hostname'], 'failed', $event['message']);
         $this->dispatch('error', "DNS record could not be added for {$event['hostname']}: {$event['message']}");
     }
 
