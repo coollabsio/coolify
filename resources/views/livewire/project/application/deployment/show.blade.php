@@ -199,14 +199,14 @@
                 return '';
             }
         },
-        async copyLogs() {
-            const content = await this.exportLogs();
-            if (!content) return;
-            if (!navigator.clipboard?.writeText) {
+        copyLogs() {
+            if (!navigator.clipboard) {
                 Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
                 return;
             }
-            navigator.clipboard.writeText(content).then(() => {
+            // No await before the copy: iOS accepts the write only during the click.
+            const content = this.$wire.exportLogs(this.showTimestamps, this.searchQuery.trim());
+            window.copyTextToClipboard(content).then(() => {
                 Livewire.dispatch('success', ['Logs copied to clipboard.']);
             }).catch(() => {
                 Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);

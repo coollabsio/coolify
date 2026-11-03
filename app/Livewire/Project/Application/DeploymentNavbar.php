@@ -67,36 +67,6 @@ class DeploymentNavbar extends Component
         }
     }
 
-    public function copyLogsToClipboard(): string
-    {
-        $this->authorize('view', $this->application);
-
-        $logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-
-        if (! $logs) {
-            return '';
-        }
-
-        $teamId = $this->application->team()?->id;
-        $hideDebugLines = is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId);
-
-        $markdown = "# Deployment Logs\n\n";
-        $markdown .= "```\n";
-
-        foreach ($logs as $log) {
-            if ($hideDebugLines && ! empty($log['hidden'])) {
-                continue;
-            }
-            if (isset($log['output'])) {
-                $markdown .= $log['output']."\n";
-            }
-        }
-
-        $markdown .= "```\n";
-
-        return $markdown;
-    }
-
     public function cancel()
     {
         try {
