@@ -303,13 +303,23 @@
             },
         });
 
-        document.addEventListener('livewire:navigated', window.applyStoredTheme);
+        // wire:navigate copies the server <html> attributes over the live ones, which removes
+        // the theme class and colors. Apply them again in the same task as the swap, before
+        // the browser can paint the new page (livewire:navigated can run after a paint).
+        document.addEventListener('livewire:navigating', (event) => event.detail.onSwap(window.applyStoredTheme));
         window.applyStoredTheme();
     })();
 </script>
 
 <head>
     <meta charset="utf-8">
+    <style>
+        /* The page background in the saved theme before app.css loads, so a full page load does not
+           paint the browser default (white with a light OS theme). :where() keeps app.css in charge after it loads. */
+        :where(html) { background-color: oklch(98.5% 0 0); }
+        :where(html.dark) { background-color: oklch(14.48% 0 0); }
+        :where(html[data-theme="custom"]) { background-color: var(--theme-bg); }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#101010" id="theme-color-meta" />
