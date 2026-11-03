@@ -1,6 +1,6 @@
 @php
         [$statusType, $statusLabel] = match (true) {
-            str($resource->status)->contains('running') => ['success', formatContainerStatus($resource->status)],
+            str($resource->status)->contains('running') && ! str($resource->status)->contains('starting') => ['success', formatContainerStatus($resource->status)],
             str($resource->status)->contains(['starting', 'restarting', 'degraded']) => ['warning', formatContainerStatus($resource->status)],
             default => ['error', formatContainerStatus($resource->status)],
         };
