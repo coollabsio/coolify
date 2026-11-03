@@ -313,14 +313,19 @@ class SentinelMetricsClient
      * Sentinel runs in a container and reports only the disks of its own mounts:
      * 1.1.2 and older as `/app/db`, 1.1.3 and newer by host mount point, which is
      * `/data` or `/data/coolify` when that directory is on its own disk.
+     * Sentinel 1.1.3 names a disk by its shortest host mount point, which can be any
+     * path (for example `/home` when `/data` is a symlink into a NAS volume). When none
+     * of ROOT_MOUNTS is reported, the only reported disk is the one under Sentinel's
+     * `/app/db`; with several, the right one is unknown.
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
     public static function rootMountName(array $rows): ?string
     {
-        $mounts = array_column($rows, 'mount');
+        $mounts = array_values(array_unique(array_column($rows, 'mount')));
 
-        return collect(self::ROOT_MOUNTS)->first(fn ($mount) => in_array($mount, $mounts, true));
+        return collect(self::ROOT_MOUNTS)->first(fn ($mount) => in_array($mount, $mounts, true))
+            ?? (count($mounts) === 1 ? $mounts[0] : null);
     }
 
     /**
@@ -352,13 +357,10 @@ class SentinelMetricsClient
             'memory', 'disk', 'load', 'network' => "/{$metric}/history",
             default => '/cpu/history',
         };
-        $query = self::historyQuery($range);
-        if ($metric === 'disk') {
-            // Sentinel 1.1.4+ returns only these mounts; older versions ignore the param.
-            $query['mount'] = implode(',', self::ROOT_MOUNTS);
-        }
 
-        return $this->url($path, $query);
+        // No `mount` filter for disk history: rootMountName() can pick a disk that is not in
+        // ROOT_MOUNTS, and Sentinel reports only the few disks of its own mounts.
+        return $this->url($path, self::historyQuery($range));
     }
 
     /**
