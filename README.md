@@ -163,6 +163,7 @@ Thank you so much!
 <a href="https://decidable.no?utm_source=coolify.io"><img width="60px" alt="Decidable" src="https://github.com/Decidable-AS.png"/></a>
 <a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
 <a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
+<a href="https://bragly.io"><img width="60px" alt="Bragly" src="https://cdn.coollabs.io/sponsors/bragly.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 
