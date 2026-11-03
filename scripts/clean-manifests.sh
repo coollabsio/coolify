@@ -36,6 +36,7 @@ main() {
 	heading "Reading ghcr.io/$IMAGE and docker.io/$IMAGE"
 	read_ghcr_versions
 	read_dockerhub_manifests
+	read_dockerhub_manifests_deleted_on_ghcr
 	read_dockerhub_images
 	select_kept_tags
 	read_manifests
@@ -47,7 +48,11 @@ main() {
 }
 
 read_ghcr_versions() {
+	local page window=$((${LIMIT:-0} * 2))
 	list_ghcr_versions "state=active" --paginate > "$WORK_DIR/ghcr-active.tsv"
+	for ((page = 1; page <= (window + 99) / 100; page++)); do
+		list_ghcr_versions "state=deleted&page=$page"
+	done | awk -v window="$window" 'NR <= window' > "$WORK_DIR/ghcr-deleted.tsv"
 	cut -f 1 "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/on-ghcr.txt"
 	ok "ghcr.io/$IMAGE has $(count < "$WORK_DIR/ghcr-active.tsv") versions, $(awk -F '\t' '$3 == ""' "$WORK_DIR/ghcr-active.tsv" | count) of them untagged"
 }
@@ -69,6 +74,15 @@ read_dockerhub_manifests() {
 	grep -q $'\tlatest$' "$WORK_DIR/dockerhub.tsv" || die "docker.io/$IMAGE lists no latest tag, expected the Docker Hub API to return the tags of every manifest"
 	awk -F '\t' '$4 != "" { found = 1; exit } END { exit !found }' "$WORK_DIR/dockerhub-manifests.tsv" || die "docker.io/$IMAGE lists no push dates, expected them from the Docker Hub API"
 	ok "docker.io/$IMAGE has $(count < "$WORK_DIR/dockerhub-manifests.tsv") manifests, $(awk -F '\t' '$3 == ""' "$WORK_DIR/dockerhub-manifests.tsv" | count) of them untagged"
+}
+
+read_dockerhub_manifests_deleted_on_ghcr() {
+	awk -F '\t' 'FILENAME == ARGV[1] { listed[$1]; next } !($1 in listed) && !seen[$1]++ { print $1 }' "$WORK_DIR/dockerhub-manifests.tsv" "$WORK_DIR/ghcr-deleted.tsv" > "$WORK_DIR/deleted-on-ghcr.txt"
+	request_manifests docker.io "$WORK_DIR/deleted-on-ghcr.txt" --head -o /dev/null -w '%{http_code}\t{}\t%header{content-type}\n' > "$WORK_DIR/deleted-on-ghcr.tsv" \
+		|| die "could not check which of the versions that ghcr.io deleted last docker.io still has"
+	awk '$1 != 200 && $1 != 404 { exit 1 }' "$WORK_DIR/deleted-on-ghcr.tsv" || die "docker.io answered neither 200 nor 404 for a version that ghcr.io deleted last"
+	awk -F '\t' -v OFS='\t' 'FILENAME == ARGV[1] { created[$1] = $4; next } $1 == 200 { print $2, $3, "", created[$2], "", "" }' "$WORK_DIR/ghcr-deleted.tsv" "$WORK_DIR/deleted-on-ghcr.tsv" >> "$WORK_DIR/dockerhub-manifests.tsv"
+	ok "docker.io still has $(awk '$1 == 200' "$WORK_DIR/deleted-on-ghcr.tsv" | count) of the $(count < "$WORK_DIR/ghcr-deleted.tsv") versions that ghcr.io deleted last and no tag references"
 }
 
 read_dockerhub_images() {
