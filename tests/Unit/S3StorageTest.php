@@ -64,6 +64,7 @@ test('S3Storage model fillable attributes are configured correctly', function ()
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'skip_tls_verification',
         'is_usable',
         'unusable_email_sent',
     ]);
@@ -120,6 +121,30 @@ test('S3Storage uses path-style URLs unless the storage turns them off', functio
     'not saved yet' => [null, true, ' --api S3v4'],
     'path-style' => [true, true, ' --api S3v4'],
     'virtual-hosted-style' => [false, false, ' --api S3v4 --path off'],
+]);
+
+test('S3Storage checks the TLS certificate unless the storage skips the check', function (?bool $setting, bool $verify, string $mcOptions) {
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    Storage::expects('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config) => $config['http']['verify'] === $verify))
+        ->andReturn($disk);
+
+    $s3Storage = new S3Storage;
+    $s3Storage->setRawAttributes([
+        'region' => 'us-east-1',
+        'bucket' => 'backups',
+        'endpoint' => 'https://93.184.216.34:9000',
+        'skip_tls_verification' => $setting,
+    ]);
+
+    expect($s3Storage->filesystem())->toBe($disk)
+        ->and($s3Storage->httpClientOptions()['verify'])->toBe($verify)
+        ->and($s3Storage->minioClientEnvOptions())->toBe($mcOptions);
+})->with([
+    'not saved yet' => [null, true, "-e 'MC_REGION=us-east-1'"],
+    'checks the certificate' => [false, true, "-e 'MC_REGION=us-east-1'"],
+    'skips the check' => [true, false, "-e 'MC_REGION=us-east-1' -e MC_INSECURE=true"],
 ]);
 
 test('S3Storage detects the URL style from the endpoint host', function (?string $endpoint, bool $usesPathStyle) {

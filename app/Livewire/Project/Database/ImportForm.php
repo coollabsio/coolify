@@ -11,7 +11,6 @@ use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
-use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
@@ -625,7 +624,7 @@ class ImportForm extends Component
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
                 'use_path_style_endpoint' => $s3Storage->usesPathStyleEndpoint(),
-                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
+                'http' => $s3Storage->httpClientOptions(),
             ]);
 
             // Check if file exists

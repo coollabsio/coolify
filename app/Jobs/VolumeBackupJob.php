@@ -447,7 +447,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             instant_remote_process([
                 'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
-                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientRegionOption().' -v '
+                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' -v '
                     .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
             $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
@@ -475,7 +475,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $verifySourceCommand,
             'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
             'docker run -d --rm --name '.escapeshellarg($containerName)
-                .' '.$s3->minioClientRegionOption()
+                .' '.$s3->minioClientEnvOptions()
                 .' -v '.escapeshellarg($source.':/volume:ro')
                 .' '.escapeshellarg($image).' >/dev/null',
         ], $server, timeout: $this->timeout, disableMultiplexing: true);

@@ -15737,6 +15737,9 @@
                                             "use_path_style_endpoint": {
                                                 "type": "boolean"
                                             },
+                                            "skip_tls_verification": {
+                                                "type": "boolean"
+                                            },
                                             "is_usable": {
                                                 "type": "boolean"
                                             },
@@ -15819,6 +15822,10 @@
                                     "use_path_style_endpoint": {
                                         "type": "boolean",
                                         "description": "Use path-style URLs (endpoint\/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints."
+                                    },
+                                    "skip_tls_verification": {
+                                        "type": "boolean",
+                                        "description": "Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
                                     },
                                     "key": {
                                         "type": "string",
@@ -15919,6 +15926,9 @@
                                             "type": "string"
                                         },
                                         "use_path_style_endpoint": {
+                                            "type": "boolean"
+                                        },
+                                        "skip_tls_verification": {
                                             "type": "boolean"
                                         },
                                         "is_usable": {
@@ -16049,6 +16059,10 @@
                                     "use_path_style_endpoint": {
                                         "type": "boolean",
                                         "description": "Use path-style URLs (endpoint\/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS."
+                                    },
+                                    "skip_tls_verification": {
+                                        "type": "boolean",
+                                        "description": "Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
                                     },
                                     "key": {
                                         "type": "string",

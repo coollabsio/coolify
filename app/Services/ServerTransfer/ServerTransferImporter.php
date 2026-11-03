@@ -2008,6 +2008,7 @@ class ServerTransferImporter
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
             'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
+            'skip_tls_verification' => (bool) data_get($payload, 'skip_tls_verification', false),
             'is_usable' => (bool) data_get($payload, 'is_usable', true),
         ]);
         $storage->uuid = $uuid;

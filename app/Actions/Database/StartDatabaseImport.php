@@ -341,7 +341,7 @@ class StartDatabaseImport
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
                 'docker run -d --network '.escapeshellarg($network)
                     .' --name '.escapeshellarg($helper)
-                    .' '.$storage->minioClientRegionOption()
+                    .' '.$storage->minioClientEnvOptions()
                     .' '.escapeshellarg($image).' sleep 86400',
             ], $server);
             $resolveOptions = $storage->minioClientResolveOptions($server, $image, $network);

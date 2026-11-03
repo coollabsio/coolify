@@ -1490,6 +1490,7 @@ class ServerTransferExporter
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
+            'skip_tls_verification' => (bool) $storage->skip_tls_verification,
             'is_usable' => (bool) $storage->is_usable,
         ];
     }

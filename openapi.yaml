@@ -10045,7 +10045,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, description: { type: string, nullable: true }, endpoint: { type: string }, bucket: { type: string }, region: { type: string }, use_path_style_endpoint: { type: boolean }, is_usable: { type: boolean }, team_id: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, name: { type: string }, description: { type: string, nullable: true }, endpoint: { type: string }, bucket: { type: string }, region: { type: string }, use_path_style_endpoint: { type: boolean }, skip_tls_verification: { type: boolean }, is_usable: { type: boolean }, team_id: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -10097,6 +10097,9 @@ paths:
                 use_path_style_endpoint:
                   type: boolean
                   description: 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints.'
+                skip_tls_verification:
+                  type: boolean
+                  description: 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'
                 key:
                   type: string
                   description: 'Access key.'
@@ -10154,6 +10157,7 @@ paths:
                   bucket: { type: string }
                   region: { type: string }
                   use_path_style_endpoint: { type: boolean }
+                  skip_tls_verification: { type: boolean }
                   is_usable: { type: boolean }
                   team_id: { type: integer }
                   created_at: { type: string }
@@ -10236,6 +10240,9 @@ paths:
                 use_path_style_endpoint:
                   type: boolean
                   description: 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS.'
+                skip_tls_verification:
+                  type: boolean
+                  description: 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'
                 key:
                   type: string
                   description: 'Access key.'

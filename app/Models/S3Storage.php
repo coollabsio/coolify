@@ -59,6 +59,7 @@ class S3Storage extends BaseModel
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'skip_tls_verification',
         'is_usable',
         'unusable_email_sent',
     ];
@@ -71,6 +72,7 @@ class S3Storage extends BaseModel
     protected $casts = [
         'is_usable' => 'boolean',
         'use_path_style_endpoint' => 'boolean',
+        'skip_tls_verification' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
@@ -292,7 +294,7 @@ class S3Storage extends BaseModel
             'bucket' => $this['bucket'],
             'endpoint' => $this['endpoint'],
             'use_path_style_endpoint' => $this->usesPathStyleEndpoint(),
-            'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint'], $this->trustedInternalHosts()), [
+            'http' => array_merge($this->httpClientOptions(), [
                 'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                 'timeout' => self::REQUEST_TIMEOUT_SECONDS,
             ]),
@@ -300,12 +302,27 @@ class S3Storage extends BaseModel
     }
 
     /**
-     * The `docker run` option that makes the MinIO client sign requests for the storage region, as filesystem() does.
-     * Without it, mc signs for us-east-1, and providers that enforce the region reject the requests.
+     * The Guzzle options of every request from Coolify to the endpoint: the DNS pin of SafeWebhookUrl, and the TLS
+     * certificate check, which a storage with a self-signed or private CA certificate can turn off.
+     *
+     * @return array<string, mixed>
      */
-    public function minioClientRegionOption(): string
+    public function httpClientOptions(): array
     {
-        return '-e '.escapeshellarg('MC_REGION='.$this->region);
+        return array_merge(SafeWebhookUrl::httpClientOptions((string) $this->endpoint, $this->trustedInternalHosts()), [
+            'verify' => ! $this->skip_tls_verification,
+        ]);
+    }
+
+    /**
+     * The `docker run` options of the MinIO client helper. `MC_REGION` makes mc sign requests for the storage region,
+     * as filesystem() does. Without it, mc signs for us-east-1, and providers that enforce the region reject the
+     * requests. `MC_INSECURE` turns off the TLS certificate check, as httpClientOptions() does.
+     */
+    public function minioClientEnvOptions(): string
+    {
+        return '-e '.escapeshellarg('MC_REGION='.$this->region)
+            .($this->skip_tls_verification ? ' -e MC_INSECURE=true' : '');
     }
 
     /**
