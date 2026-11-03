@@ -1117,6 +1117,40 @@ class Application extends BaseModel
     }
 
     /**
+     * A deployments-only server cannot build this application, so a build server must build it.
+     * Docker image applications build nothing, and Compose applications do not use build servers.
+     */
+    public function mustBuildOnBuildServer(Server $server): bool
+    {
+        return ! $server->canBuildApplications()
+            && ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+    }
+
+    /**
+     * The build servers that can build a deployment of this application on $server. It is empty when
+     * the deployment builds on $server, or when $server is an additional server that pulls the image.
+     *
+     * @return Collection<int, Server>
+     */
+    public function buildServerCandidates(Server $server): Collection
+    {
+        $pullsImage = str($this->docker_registry_image_name)->isNotEmpty()
+            && $this->additional_servers()->wherePivot('server_id', $server->id)->exists();
+        if ($pullsImage) {
+            return collect();
+        }
+        if (! $this->mustBuildOnBuildServer($server) && ! data_get($this, 'settings.is_build_server_enabled')) {
+            return collect();
+        }
+        $teamId = $this->team()?->id;
+        if ($teamId === null) {
+            return collect();
+        }
+
+        return Server::buildServers($teamId)->whereKeyNot($server->id)->get();
+    }
+
+    /**
      * Another application of the team that builds and pushes an image with the same Docker image name.
      * Both push the same tags (the commit SHA, `latest`, `pr-<id>`), so one application can run the image of the other.
      */

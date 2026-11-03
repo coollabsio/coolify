@@ -530,8 +530,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // A deployments-only server never builds. Docker image and Compose applications are exempt:
         // the first builds nothing and the second does not support build servers.
-        $mustBuildElsewhere = ! $this->server->canBuildApplications()
-            && ! in_array($this->application->build_pack, ['dockerimage', 'dockercompose'], true);
+        $mustBuildElsewhere = $this->application->mustBuildOnBuildServer($this->server);
 
         if (! $mustBuildElsewhere && ! data_get($this->application, 'settings.is_build_server_enabled')) {
             return;
@@ -542,7 +541,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $team = $this->application->environment->project->team;
-        $buildServers = Server::buildServers($team->id)->whereKeyNot($this->server->id)->get();
+        $buildServers = $this->application->buildServerCandidates($this->server);
 
         if ($buildServers->isEmpty()) {
             // A restart only rebuilds when the image is missing, so it may still run on the deployment server.
@@ -559,7 +558,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $this->build_server = $buildServers->random();
+        // Admission reserved a build server with a free build slot. A forced start reserved none, and
+        // the reserved server can become unusable before the job runs.
+        $reservedId = $this->application_deployment_queue->build_server_id;
+        $this->build_server = ($reservedId === null ? null : $buildServers->firstWhere('id', $reservedId))
+            ?? least_busy_build_server($buildServers)
+            ?? least_busy_build_server($buildServers, onlyWithFreeSlot: false);
         // Saved now: the cancel action looks for the helper container on this server.
         $this->application_deployment_queue->update(['build_server_id' => $this->build_server->id]);
         $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");

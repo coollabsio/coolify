@@ -102,7 +102,7 @@ function queue_application_deployment(Application $application, string $deployme
         // Decide whether to start while the application and server rows are still locked,
         // so concurrent requests cannot both see an idle queue and start two deployments.
         // After a cancelled build, CancelSupersededDeploymentJob starts it once the build is stopped.
-        $started = $superseded['building']->isEmpty() && ($no_questions_asked || next_queuable($server_id, $application_id, $commit, $pull_request_id));
+        $started = $superseded['building']->isEmpty() && ($no_questions_asked || next_queuable($deployment));
         if ($started) {
             $deployment->update([
                 'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
@@ -270,8 +270,14 @@ function start_next_queued_deployments(Application $application, ?int $finished_
         ->where('status', ApplicationDeploymentStatus::QUEUED)
         ->distinct()
         ->pluck('server_id');
+    // A build on a build server frees a slot that deployments on other servers of the team can wait for.
+    $primary_server = $application->destination?->server;
+    $build_server_team_server_ids = $primary_server && $application->buildServerCandidates($primary_server)->isNotEmpty()
+        ? Server::where('team_id', $primary_server->team_id)->pluck('id')
+        : collect();
     $server_ids = collect([$application->destination?->server_id, $finished_deployment_server_id])
         ->merge($application_queued_server_ids)
+        ->merge($build_server_team_server_ids)
         ->filter(fn ($server_id) => $server_id !== null)
         ->unique()
         ->values();
@@ -306,7 +312,7 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
             return false;
         }
 
-        if (! $force && ! next_queuable($current->server_id, $current->application_id, $current->commit, $current->pull_request_id)) {
+        if (! $force && ! next_queuable($current)) {
             return false;
         }
 
@@ -381,12 +387,18 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
     }
 }
 
-function next_queuable(string $server_id, string $application_id, string $commit = 'HEAD', int $pull_request_id = 0): bool
+/**
+ * Decide whether a queued deployment can start now. Each deployment holds one build slot of the
+ * server that builds it: its deployment server, or a build server of the team. When it builds on a
+ * build server, it reserves the least busy one with a free slot in build_server_id, which the caller
+ * saves with the status change. Call it while the application and deployment server rows are locked.
+ */
+function next_queuable(ApplicationDeploymentQueue $deployment): bool
 {
     // Check if there's already a deployment in progress for this application with the same pull_request_id
     // This allows normal deployments and PR deployments to run concurrently
-    $in_progress = ApplicationDeploymentQueue::where('application_id', $application_id)
-        ->where('pull_request_id', $pull_request_id)
+    $in_progress = ApplicationDeploymentQueue::where('application_id', $deployment->application_id)
+        ->where('pull_request_id', $deployment->pull_request_id)
         ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
         ->exists();
 
@@ -394,22 +406,56 @@ function next_queuable(string $server_id, string $application_id, string $commit
         return false;
     }
 
-    // Check server's concurrent build limit
     // A deleted server keeps its queued deployments; they cannot run anymore.
-    $server = Server::find($server_id);
-    if (! $server) {
+    $server = Server::find($deployment->server_id);
+    $application = Application::find($deployment->application_id);
+    if (! $server || ! $application) {
         return false;
     }
-    $concurrent_builds = $server->settings->concurrent_builds;
-    $active_deployments = ApplicationDeploymentQueue::where('server_id', $server_id)
-        ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
-        ->count();
 
-    if ($active_deployments >= $concurrent_builds) {
+    $buildServers = $application->buildServerCandidates($server);
+    if ($buildServers->isEmpty()) {
+        return active_builds_on_server($server->id) < $server->settings->concurrent_builds;
+    }
+
+    // Deployments of other servers can take the same build slots, so lock the build servers too.
+    Server::query()->whereKey($buildServers->modelKeys())->orderBy('id')->lockForUpdate()->get();
+    $buildServer = least_busy_build_server($buildServers);
+    if (! $buildServer) {
         return false;
     }
+    $deployment->build_server_id = $buildServer->id;
 
     return true;
+}
+
+/**
+ * The running deployments that build on a server: its own deployments without a build server,
+ * and the deployments that it builds as a build server.
+ */
+function active_builds_on_server(int $server_id): int
+{
+    return ApplicationDeploymentQueue::where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
+        ->where(fn ($query) => $query->where('build_server_id', $server_id)
+            ->orWhere(fn ($query) => $query->where('server_id', $server_id)->whereNull('build_server_id')))
+        ->count();
+}
+
+/**
+ * The build server with the fewest running builds, at random among equals. With $onlyWithFreeSlot,
+ * a server that already runs as many builds as its "Concurrent builds" setting allows is skipped,
+ * and null means that all servers are full.
+ *
+ * @param  Collection<int, Server>  $buildServers
+ */
+function least_busy_build_server(Collection $buildServers, bool $onlyWithFreeSlot = true): ?Server
+{
+    return $buildServers
+        ->map(fn (Server $buildServer) => ['server' => $buildServer, 'builds' => active_builds_on_server($buildServer->id)])
+        ->filter(fn (array $candidate) => ! $onlyWithFreeSlot || $candidate['builds'] < $candidate['server']->settings->concurrent_builds)
+        ->shuffle()
+        ->sortBy('builds')
+        ->first()['server'] ?? null;
 }
 /**
  * Start the queued deployments that can run after a cancellation. With the application of the
