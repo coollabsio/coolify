@@ -4,6 +4,7 @@ namespace App\Notifications\Channels;
 
 use App\Exceptions\NonReportableException;
 use App\Models\EmailNotificationSettings;
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\SmtpTransportFactory;
@@ -41,6 +42,10 @@ class EmailChannel
             } else {
                 $settings = $notifiable->emailNotificationSettings;
             }
+
+            // Only the instance settings have a notification sender. A test email can ask for it explicitly.
+            $asNotification = $settings instanceof InstanceSettings
+                && (data_get($notification, 'usesNotificationSender') ?? ! $isTransactionalEmail);
 
             $isResendEnabled = $settings->resend_enabled;
             $isSmtpEnabled = $settings->smtp_enabled;
@@ -82,7 +87,7 @@ class EmailChannel
             if ($isResendEnabled) {
                 $resend = Resend::client($settings->resend_api_key);
                 $response = $resend->emails->send([
-                    'from' => mail_from_formatted($settings),
+                    'from' => mail_from_formatted($settings, $asNotification),
                     'to' => $recipients,
                     'subject' => $mailMessage->subject,
                     'html' => (string) $mailMessage->render(),
@@ -102,7 +107,7 @@ class EmailChannel
                 );
                 $mailer = new Mailer($transport);
 
-                $email = mail_from_email(new Email, $settings)
+                $email = mail_from_email(new Email, $settings, $asNotification)
                     ->to(...$recipients)
                     ->subject($mailMessage->subject)
                     ->html((string) $mailMessage->render());

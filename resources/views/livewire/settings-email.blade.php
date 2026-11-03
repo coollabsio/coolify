@@ -8,7 +8,7 @@
         {{-- One bar for the whole page. Three stacked bars made Save run
              submitResend(), which required an API key even when Resend was off. --}}
         <x-unsaved-bar action="submit"
-            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey" />
+            targets="smtpFromName,smtpFromAddress,notificationFromName,notificationFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey" />
 
         <form wire:submit="submit">
             <x-application.settings-section title="Sender">
@@ -20,6 +20,12 @@
                         label="From name" />
                     <x-forms.input required id="smtpFromAddress" helper="Address used for outgoing email."
                         label="From address" />
+                    <x-forms.input id="notificationFromName" placeholder="Uses the from name when empty"
+                        helper="Name shown in notification emails (deployments, backups, server alerts) to teams that use the instance email settings."
+                        label="Notification from name" />
+                    <x-forms.input id="notificationFromAddress" placeholder="Uses the from address when empty"
+                        helper="Address used for notification emails. Password resets and invitations still use the from address. Use a separate subdomain (for example alerts@notifications.example.com) to keep the reputation of the two senders apart. Your SMTP provider or Resend must allow this address."
+                        label="Notification from address" />
                 </div>
             </x-application.settings-section>
         </form>

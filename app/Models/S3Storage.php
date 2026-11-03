@@ -268,7 +268,7 @@ class S3Storage extends BaseModel
                     // Get admins directly from the pivot relationship for this specific team
                     $users = $team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
                     foreach ($users as $user) {
-                        send_user_an_email($mail, $user->email);
+                        send_user_an_email($mail, $user->email, asNotification: true);
                     }
                     $this->unusable_email_sent = true;
                 } catch (\Throwable $emailException) {
