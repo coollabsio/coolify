@@ -131,5 +131,6 @@ const NEEDS_TO_DISABLE_GZIP = [
 ];
 const NEEDS_TO_DISABLE_STRIPPREFIX = [
     'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
+    'rybbit' => ['rybbit_backend'],
 ];
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];
