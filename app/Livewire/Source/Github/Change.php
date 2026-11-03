@@ -272,6 +272,7 @@ class Change extends Component
             ])->timeout(10)->get("{$this->github_app->api_url}/app");
 
             if (! $appResponse->successful()) {
+                assertGithubClockInSync($appResponse);
                 $error = data_get($appResponse->json(), 'message', 'Unknown error');
                 $this->dispatch('error', "Connection failed: {$error}");
 

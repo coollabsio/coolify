@@ -841,6 +841,9 @@ class Github extends Controller
             ])
                 ->timeout(10)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
+            if (! $response->successful()) {
+                assertGithubClockInSync($response);
+            }
         } catch (\Throwable $e) {
             return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
         }

@@ -35,11 +35,7 @@ beforeEach(function () {
         'team_id' => $this->team->id,
     ]);
 
-    Http::fake([
-        'https://api.github.com/zen' => fn () => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
-    ]);
+    Http::preventStrayRequests();
 });
 
 function fakeGithubInstallationTokenResponses(mixed $response): void
@@ -118,4 +114,22 @@ it('reports the HTTP status when GitHub keeps failing without an error message',
     expect(fn () => generateGithubInstallationToken($this->githubApp))
         ->toThrow(RuntimeException::class, 'Failed to get installation token for Private GitHub App with error: HTTP 503')
         ->and(githubInstallationTokenRequests())->toBe(3);
+});
+
+it('requests the installation token without a separate GitHub clock request', function () {
+    fakeGithubInstallationTokenResponses(Http::response(['token' => 'only-token'], 201));
+
+    expect(generateGithubInstallationToken($this->githubApp))->toBe('only-token')
+        ->and(Http::recorded())->toHaveCount(1);
+});
+
+it('reports the clock difference when GitHub rejects the token request of an out-of-sync server', function () {
+    fakeGithubInstallationTokenResponses(Http::response(
+        ['message' => "'Issued at' claim ('iat') must be an Integer representing a time in the past"],
+        401,
+        ['Date' => now()->addMinutes(5)->toRfc7231String()],
+    ));
+
+    expect(fn () => generateGithubInstallationToken($this->githubApp))
+        ->toThrow(Exception::class, 'System time is out of sync with GitHub API time');
 });
