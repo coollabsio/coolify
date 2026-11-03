@@ -32,7 +32,7 @@ return [
 
     'cloud' => [
         // Days after a subscription ends (or after a never-paid team was created) before cloud:cleanup-unsubscribed-teams deletes the team's data.
-        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 30),
+        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 60),
     ],
 
     'urls' => [
