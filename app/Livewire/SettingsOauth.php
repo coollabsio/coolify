@@ -36,7 +36,7 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.enabled"] = 'required|boolean';
             $carry["oauth_settings_map.$setting->provider.client_id"] = 'nullable|string';
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable|string';
-            $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable|string|max:2048|url:http,https';
+            $carry["oauth_settings_map.$setting->provider.redirect_uri"] = ['nullable', 'string', 'max:2048', 'url:http,https', $this->callbackPathRule($setting->provider)];
             $carry["oauth_settings_map.$setting->provider.tenant"] = 'nullable|string';
             $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable|string|max:2048|url:http,https';
             $carry["oauth_settings_map.$setting->provider.custom_label"] = 'nullable|string|max:255';
@@ -55,6 +55,23 @@ class SettingsOauth extends Component
         }
 
         return $rules;
+    }
+
+    /**
+     * The provider sends the browser back to the redirect URI. Only the callback route can
+     * finish the login; any other path falls through to the catch-all route, which sends
+     * the user to the login page without an error.
+     */
+    private function callbackPathRule(string $provider): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($provider): void {
+            $expectedPath = route('auth.callback', $provider, false);
+            $path = rtrim((string) parse_url((string) $value, PHP_URL_PATH), '/');
+
+            if ($path !== $expectedPath) {
+                $fail("The redirect URI must end with {$expectedPath}.");
+            }
+        };
     }
 
     public function mount(?string $provider = null): ?Redirector
