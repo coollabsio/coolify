@@ -128,6 +128,21 @@ test('deploy key application keeps the base directory for every build pack', fun
     expect(Application::query()->sole()->base_directory)->toBe('/apps/api');
 })->with(['dockerfile', 'railpack', 'static', 'dockercompose']);
 
+test('deploy key application accepts a base directory without a leading slash', function (string $typed) {
+    actAsDeployKeyUser($this->admin, $this->team);
+
+    deployKeyComponent()
+        ->call('setPrivateKey', $this->privateKey->id)
+        ->set('repository_url', 'git@example.com:owner/monorepo.git')
+        ->set('branch', 'main')
+        ->set('build_pack', 'dockerfile')
+        ->set('base_directory', $typed)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Application::query()->sole()->base_directory)->toBe('/apps/api');
+})->with(['apps/api', 'apps/api/', ' /apps/api/ ']);
+
 test('deploy key application uses the repository root when the base directory is empty', function () {
     actAsDeployKeyUser($this->admin, $this->team);
 

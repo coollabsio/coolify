@@ -16,7 +16,7 @@ test('generateDockerBuildArgs returns only keys without values', function () {
 test('generateDockerBuildArgs works with collection of objects', function () {
     $variables = collect([
         (object) ['key' => 'VAR1', 'value' => 'value1', 'is_multiline' => false],
-        (object) ['key' => 'VAR2', 'value' => "'multiline\nvalue'", 'is_multiline' => true],
+        (object) ['key' => 'VAR2', 'value' => "multiline\nvalue"],
     ]);
 
     $buildArgs = generateDockerBuildArgs($variables);
@@ -59,7 +59,7 @@ test('generateDockerBuildArgs handles variables without is_multiline', function 
 test('generateDockerEnvFlags produces correct format', function () {
     $variables = [
         ['key' => 'NORMAL_VAR', 'value' => 'value', 'is_multiline' => false],
-        ['key' => 'MULTILINE_VAR', 'value' => "'line1\nline2'", 'is_multiline' => true],
+        ['key' => 'MULTILINE_VAR', 'value' => "line1\nline2"],
     ];
 
     $envFlags = generateDockerEnvFlags($variables);
@@ -73,7 +73,7 @@ test('generateDockerEnvFlags produces correct format', function () {
 test('generateDockerEnvFlags works with collection input', function () {
     $variables = collect([
         (object) ['key' => 'VAR1', 'value' => 'value1', 'is_multiline' => false],
-        (object) ['key' => 'VAR2', 'value' => "'multiline\nvalue'", 'is_multiline' => true],
+        (object) ['key' => 'VAR2', 'value' => "multiline\nvalue"],
     ]);
 
     $envFlags = generateDockerEnvFlags($variables);

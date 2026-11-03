@@ -64,9 +64,13 @@ print_build_version() {
 }
 
 fetch_origin() {
-	local current behind
+	local current behind fetched stale
 	[ "$(git rev-parse --is-shallow-repository)" = false ] || die "the clone is shallow, run git fetch --unshallow first"
-	git fetch --quiet --prune --tags origin || die "could not fetch origin"
+	fetched="$(git fetch --porcelain --no-progress --prune --tags origin)" || {
+		stale="$(awk '$1 == "!" { sub("^refs/tags/", "", $4); print $4 }' <<< "$fetched" | paste -sd ' ' -)"
+		[ -z "$stale" ] || die "the local tag(s) $stale differ from origin, check them with git ls-remote --tags origin, then run git fetch --tags --force origin"
+		die "could not fetch origin"
+	}
 	current="$(git branch --show-current)"
 	if [ -n "$current" ] && behind="$(git rev-list --count "HEAD..origin/$current" 2> /dev/null)"; then
 		[ "$behind" = 0 ] || die "$current is $behind commit(s) behind origin/$current, pull first"
