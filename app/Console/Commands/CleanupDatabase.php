@@ -33,7 +33,8 @@ class CleanupDatabase extends Command
         $this->line("Keep days: $keep_days");
         $this->cleanupTable('failed_jobs', 'failed_at', now()->subDays(1));
 
-        $this->cleanupTable('sessions', 'last_activity', now()->subDays($keep_days)->timestamp);
+        // A session older than its lifetime can no longer be used, so do not keep it for the retention days.
+        $this->cleanupTable('sessions', 'last_activity', now()->subMinutes((int) config('session.lifetime'))->timestamp);
 
         $this->cleanupTable('activity_log', 'created_at', now()->subDays($keep_days));
 
