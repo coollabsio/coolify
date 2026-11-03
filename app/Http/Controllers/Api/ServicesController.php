@@ -611,6 +611,8 @@ class ServicesController extends Controller
                     $this->attachTagsToResource($service, $request->tags, $teamId);
                 }
 
+                app(ResourceDnsRecords::class)->queueAutomaticRecords($service, []);
+
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }
@@ -798,6 +800,8 @@ class ServicesController extends Controller
             if ($request->has('tags')) {
                 $this->attachTagsToResource($service, $request->tags, $teamId);
             }
+
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($service, []);
 
             if ($instantDeploy) {
                 StartService::dispatch($service);

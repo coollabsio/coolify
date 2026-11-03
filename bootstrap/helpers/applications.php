@@ -14,6 +14,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
+use App\Services\Dns\ResourceDnsRecords;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -610,6 +611,9 @@ function clone_application(Application $source, $destination, array $overrides =
             $newPreviewEnvironmentVariable->save();
         });
     }
+
+    $dnsRecords = app(ResourceDnsRecords::class);
+    $dnsRecords->queueAutomaticRecords($newApplication, array_keys($dnsRecords->hostnameUsers($source)));
 
     return $newApplication;
 }

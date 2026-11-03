@@ -39,6 +39,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
@@ -2519,12 +2520,12 @@ function validateDNSEntry(string $fqdn, Server $server)
             if ($results !== false) {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (isCloudflareIp($result->getData())) {
+                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
                             $found_matching_ip = true;
                             break 2;
                         }
-                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
-                            $found_matching_ip = true;
+                        if (isCloudflareIp($result->getData())) {
+                            $found_matching_ip = ! app(CloudflareDnsProvider::class)->sendsHostnameToAnotherServer($server, $host, $ip);
                             break 2;
                         }
                     }

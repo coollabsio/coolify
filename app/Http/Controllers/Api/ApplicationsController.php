@@ -1768,6 +1768,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2031,6 +2032,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2263,6 +2265,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2402,6 +2405,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2537,6 +2541,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {

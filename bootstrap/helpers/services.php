@@ -36,6 +36,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Dns\ResourceDnsRecords;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
@@ -789,6 +790,9 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             $pendingVolumeClones,
         ));
     }
+
+    $dnsRecords = app(ResourceDnsRecords::class);
+    $dnsRecords->queueAutomaticRecords($newService, array_keys($dnsRecords->hostnameUsers($source)));
 
     return $newService;
 }

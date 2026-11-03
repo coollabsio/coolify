@@ -3,6 +3,7 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Services\Dns\CloudflareDnsProvider;
 use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
 use PurplePixie\PhpDns\DNSTypes;
@@ -81,15 +82,20 @@ class CheckDomainDns
                     continue;
                 }
 
+                $addresses = [];
                 foreach ($records as $record) {
-                    if ($record->getType() !== $type) {
-                        continue;
+                    if ($record->getType() === $type) {
+                        $addresses[] = $record->getData();
                     }
+                }
+                if ($addresses === []) {
+                    continue;
+                }
 
-                    $receivedAddressRecord = true;
-                    if (isCloudflareIp($record->getData()) || ($expectedIp && DnsRecordHints::sameAddress($record->getData(), $expectedIp))) {
-                        return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
-                    }
+                $receivedAddressRecord = true;
+                $result = $this->resultForAddresses($addresses, $host, $server, $expectedIp, $deadline);
+                if ($result !== null) {
+                    return $result;
                 }
             } catch (\Throwable) {
                 continue;
@@ -97,14 +103,34 @@ class CheckDomainDns
         }
 
         if (! $receivedAddressRecord && hrtime(true) < $deadline) {
-            foreach ($this->resolveWithSystemDns($host, $type) as $resolvedIp) {
-                if (isCloudflareIp($resolvedIp) || ($expectedIp && DnsRecordHints::sameAddress($resolvedIp, $expectedIp))) {
-                    return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
-                }
+            $result = $this->resultForAddresses($this->resolveWithSystemDns($host, $type), $host, $server, $expectedIp, $deadline);
+            if ($result !== null) {
+                return $result;
             }
         }
 
         return $this->result('failed', dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+    }
+
+    /**
+     * The result for the addresses that DNS returned for the host, or null when none of them matches.
+     * A Cloudflare IP matches unless the Cloudflare records of the team's zone send the host to another server.
+     *
+     * @param  array<int, string>  $addresses
+     * @return array{status: string, message: string, expected_ip: ?string, checked_at: string}|null
+     */
+    private function resultForAddresses(array $addresses, string $host, Server $server, ?string $expectedIp, int $deadline): ?array
+    {
+        $matches = collect($addresses)->contains(fn (string $address): bool => $expectedIp && DnsRecordHints::sameAddress($address, $expectedIp));
+        if (! $matches && collect($addresses)->contains(fn (string $address): bool => isCloudflareIp($address))) {
+            $timeoutSeconds = max(1, intdiv($deadline - hrtime(true), 1_000_000_000));
+            if (app(CloudflareDnsProvider::class)->sendsHostnameToAnotherServer($server, $host, $expectedIp, $timeoutSeconds)) {
+                return $this->result('failed', "Cloudflare sends {$host} to another server. ".dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+            }
+            $matches = true;
+        }
+
+        return $matches ? $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp) : null;
     }
 
     /**
