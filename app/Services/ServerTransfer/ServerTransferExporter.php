@@ -1405,6 +1405,7 @@ class ServerTransferExporter
             'contents' => $app->contents,
             'metadata' => $app->metadata,
             'pull_requests' => $app->pull_requests,
+            'deployments' => $app->deployments,
             'administration' => $app->administration,
             'organization_self_hosted_runners' => $app->organization_self_hosted_runners,
             'actions' => $app->actions,

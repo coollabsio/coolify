@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Services\Access\AccessResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,6 +99,12 @@ class ApplicationDeploymentQueue extends Model
                 'deployment_uuid' => $deployment->deployment_uuid,
                 'commit' => $deployment->commit,
             ]);
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if ($deployment->wasChanged('status')) {
+                SyncGithubDeploymentJob::dispatchFor($deployment);
+            }
         });
 
         static::updated(function (ApplicationDeploymentQueue $deployment): void {

@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Actions\Application\CleanupCancelledDeployment;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ChecksTokenAbilities;
 use App\Mcp\Concerns\ResolvesTeam;
@@ -80,6 +81,8 @@ class CancelDeployment extends Tool
         }
 
         $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
+        // The query update above fires no model event.
+        SyncGithubDeploymentJob::dispatchFor($deployment);
 
         try {
             $deployment->addLogEntry('Deployment cancelled by user via MCP.', 'stderr');

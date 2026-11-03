@@ -1855,6 +1855,7 @@ class ServerTransferImporter
             'contents' => data_get($payload, 'contents'),
             'metadata' => data_get($payload, 'metadata'),
             'pull_requests' => data_get($payload, 'pull_requests'),
+            'deployments' => data_get($payload, 'deployments'),
             'administration' => data_get($payload, 'administration'),
             'organization_self_hosted_runners' => data_get($payload, 'organization_self_hosted_runners'),
             'actions' => data_get($payload, 'actions'),
