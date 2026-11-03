@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Handle an existing Cloudflare DNS record with a different IP when Coolify adds the DNS record of a new domain automatically. Coolify now replaces the record when it created the record and no other resource uses it. Otherwise it opens the **Configure DNS** dialog, where you can replace the record, and the domain shows the conflict instead of "Not checked"
+- Add the Cloudflare DNS record automatically, or open the **Configure DNS** dialog, also when you edit a domain to a hostname in a connected Cloudflare zone, for example when you change a generated domain to your own domain. Before, Coolify did this only when you added a new domain. This applies to the **Domains** pages, the application and service application settings, and the service application API
 - Save deployments started through the MCP server as MCP deployments, not as API deployments. The deployment list shows them with the **MCP** source and filter, and the API and MCP deployment data have a new `is_mcp` field. The deployments to additional servers keep the source of the main deployment, and the audit log records actions that MCP tools do through the API as MCP events
 
 ## [v4.6.0] - 2026-11-02

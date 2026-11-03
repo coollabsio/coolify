@@ -154,6 +154,28 @@ trait InteractsWithDnsProviders
         return true;
     }
 
+    /**
+     * Configures DNS for the hostnames that a domain edit added, like configureDnsAfterDomainAdd() does for a new domain.
+     *
+     * @param  array<int, string>  $urls  the URLs of the edit that need a DNS check
+     * @param  array<int, string>  $previousHostnames  the hostnames of the resource before the edit
+     * @return array<int, string> the URLs that still need a DNS check
+     */
+    protected function configureDnsAfterDomainEdit(array $urls, array $previousHostnames): array
+    {
+        $addedUrls = array_values(array_filter($urls, function (string $url) use ($previousHostnames): bool {
+            $hostname = parse_url($url, PHP_URL_HOST);
+
+            return is_string($hostname) && ! in_array(strtolower($hostname), $previousHostnames, true);
+        }));
+
+        if ($addedUrls === [] || ! $this->configureDnsAfterDomainAdd($addedUrls)) {
+            return $urls;
+        }
+
+        return array_values(array_diff($urls, $addedUrls));
+    }
+
     public function openManualDnsRecords(): void
     {
         $this->authorizeDnsProviderChange();
