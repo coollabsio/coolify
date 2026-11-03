@@ -513,29 +513,7 @@ function clone_application(Application $source, $destination, array $overrides =
         $newTask->save();
     }
 
-    // Clone previews with FQDN regeneration
-    $applicationPreviews = $source->previews()->get();
-    foreach ($applicationPreviews as $preview) {
-        $newPreview = $preview->replicate([
-            'id',
-            'created_at',
-            'updated_at',
-        ])->fill([
-            'uuid' => new_public_id(),
-            'application_id' => $newApplication->id,
-            'status' => 'exited',
-            'fqdn' => null,
-            'docker_compose_domains' => null,
-        ]);
-        $newPreview->save();
-
-        // Regenerate FQDN for the cloned preview
-        if ($newApplication->build_pack === 'dockercompose') {
-            $newPreview->generate_preview_fqdn_compose();
-        } else {
-            $newPreview->generate_preview_fqdn();
-        }
-    }
+    // Preview records belong to the pull request deployments of the source. The clone gets its own on the next pull request.
 
     // Clone persistent volumes
     $pendingVolumeClones = [];
