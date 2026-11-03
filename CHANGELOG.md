@@ -16,9 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Stop the notification storm from scheduled jobs that keep failing. A failed scheduled task, database backup, storage backup, or Docker cleanup now notifies on the first failure, then at most once a day while it keeps failing. The first successful run after a failure sends one "works again" notification to the failure channels. A database backup whose S3 upload keeps failing is also notified at most once a day
-- Disable a scheduled task automatically when it failed 10 times in a row and its first failure is more than 24 hours old, and send one notification about it. The task page shows why the task was disabled. Enable the task again to clear the reason. The scheduled tasks API returns `consecutive_failures`, `failing_since`, and `disabled_reason`. Backups and Docker cleanup are never disabled automatically, so they start again by themselves after an outage
-- Skip a scheduled task when its application or service has no running container, instead of a failed run with "No containers running". A skipped run sends no notification and does not count toward the automatic disable
 - Move **Import Backup** from the resource menu to an **Import backup** button on the **Backups** page of databases and services. The button opens the import in a dialog. Old **Import Backup** links open the **Backups** page ([#11818](https://github.com/coollabsio/coolify/discussions/11818))
 
 ### Fixed
