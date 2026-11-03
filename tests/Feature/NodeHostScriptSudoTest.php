@@ -83,7 +83,7 @@ it('inspects the host inside one elevated shell for a non-root ssh user', functi
     $facts = InspectNodeHost::run(nodeWithSshUser('coolify', $this->privateKey));
 
     expect($facts['package_manager'])->toBe('apt-get')
-        ->and($facts['podman_installed'])->toBeTrue()
+        ->and($facts['podman_installed'])->toBeFalse()
         ->and($facts['os'])->not->toBeEmpty()
         ->and(loggedHostCommands($this->log))->toContain('sudo bash')
         ->and(loggedHostCommands($this->log))->not->toContain('apt-get elevated=0');

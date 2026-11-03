@@ -27,7 +27,7 @@ printf 'arch=%s\n' "$(uname -m)"
 printf 'cpus=%s\n' "$(getconf _NPROCESSORS_ONLN)"
 printf 'memory_bytes=%s\n' "$(awk '/MemTotal/ { print $2 * 1024 }' /proc/meminfo | cut -d. -f1)"
 printf 'package_manager=%s\n' "$package_manager"
-printf 'podman_installed=%s\n' "$(command -v podman >/dev/null && echo 1 || echo 0)"
+printf 'podman_version=%s\n' "$(cat /etc/coolify/podman-version 2>/dev/null || echo none)"
 SH;
         $output = instant_remote_process([InstallSentinel::hostCommand($node, $command)], $node, timeout: 30, disableMultiplexing: true);
         if (! is_string($output) || blank($output)) {
@@ -39,7 +39,7 @@ SH;
 
             return [$key => $value];
         });
-        foreach (['hostname', 'os', 'arch', 'cpus', 'memory_bytes', 'package_manager', 'podman_installed'] as $key) {
+        foreach (['hostname', 'os', 'arch', 'cpus', 'memory_bytes', 'package_manager', 'podman_version'] as $key) {
             if (blank($values->get($key))) {
                 throw new RuntimeException('The server inspection returned incomplete information.');
             }
@@ -52,7 +52,7 @@ SH;
             'cpus' => (int) $values['cpus'],
             'memory_bytes' => (int) $values['memory_bytes'],
             'package_manager' => (string) $values['package_manager'],
-            'podman_installed' => $values['podman_installed'] === '1',
+            'podman_installed' => $values['podman_version'] === PrepareNodeHost::PODMAN_VERSION,
         ];
     }
 }
