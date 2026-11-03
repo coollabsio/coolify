@@ -215,7 +215,7 @@
                         @if ($buildPack === 'dockercompose')
                             <div class="flex flex-col gap-2">
                                 <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
-                                    file="dockerComposeLocation" fileLabel="Docker compose location"
+                                    file="dockerComposeLocation" fileLabel="Docker compose location" compose
                                     defaultFile="/docker-compose.yaml" disabled="shouldDisable()" />
                                 <div class="w-full sm:w-96">
                                     <x-forms.checkbox instantSave id="isPreserveRepositoryEnabled"
