@@ -13,7 +13,8 @@ use OpenApi\Attributes as OA;
 class InstanceEmailSettingsController extends Controller
 {
     private const FIELDS = [
-        'smtp_enabled', 'smtp_from_address', 'smtp_from_name', 'smtp_host',
+        'smtp_enabled', 'smtp_from_address', 'smtp_from_name',
+        'notification_from_address', 'notification_from_name', 'smtp_host',
         'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
         'smtp_timeout', 'smtp_ehlo_domain', 'resend_enabled', 'resend_api_key',
     ];
@@ -58,6 +59,8 @@ class InstanceEmailSettingsController extends Controller
             'smtp_enabled' => 'sometimes|boolean',
             'smtp_from_address' => 'sometimes|nullable|email',
             'smtp_from_name' => 'sometimes|nullable|string|max:255',
+            'notification_from_address' => 'sometimes|nullable|email',
+            'notification_from_name' => 'sometimes|nullable|string|max:255',
             'smtp_host' => 'sometimes|nullable|string|max:255',
             'smtp_port' => 'sometimes|nullable|integer|min:1|max:65535',
             'smtp_encryption' => 'sometimes|nullable|string|in:starttls,tls,none',

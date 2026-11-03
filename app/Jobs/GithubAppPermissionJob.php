@@ -35,6 +35,7 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             ])->get("{$this->github_app->api_url}/app");
 
             if (! $response->successful()) {
+                assertGithubClockInSync($response);
                 throw new \RuntimeException('Failed to fetch GitHub app permissions: '.$response->body());
             }
 

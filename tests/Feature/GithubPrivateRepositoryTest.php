@@ -53,9 +53,6 @@ beforeEach(function () {
 function fakeGithubHttp(array $repositories): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
             'token' => 'fake-installation-token',
         ], 201),
@@ -129,9 +126,6 @@ describe('GitHub Private Repository Component', function () {
 
         fakeGithubHttp([$repository]);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'fake-installation-token',
             ], 201),
@@ -281,9 +275,6 @@ describe('GitHub Private Repository Component', function () {
 
         $callCount = 0;
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'fake-installation-token',
             ], 201),
@@ -346,9 +337,6 @@ describe('GitHub Private Repository Component', function () {
 
     test('loadRepositories shows an error when the installation is not found', function () {
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response(['message' => 'Not Found'], 404),
         ]);
 
@@ -360,9 +348,6 @@ describe('GitHub Private Repository Component', function () {
 
     test('loadRepositories shows the GitHub error when listing repositories fails', function () {
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'fake-installation-token',
             ], 201),

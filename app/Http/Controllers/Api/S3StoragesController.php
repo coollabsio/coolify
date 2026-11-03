@@ -98,6 +98,7 @@ class S3StoragesController extends Controller
                                     'bucket' => ['type' => 'string'],
                                     'region' => ['type' => 'string'],
                                     'use_path_style_endpoint' => ['type' => 'boolean'],
+                                    'skip_tls_verification' => ['type' => 'boolean'],
                                     'is_usable' => ['type' => 'boolean'],
                                     'team_id' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -162,6 +163,7 @@ class S3StoragesController extends Controller
                                 'bucket' => ['type' => 'string'],
                                 'region' => ['type' => 'string'],
                                 'use_path_style_endpoint' => ['type' => 'boolean'],
+                                'skip_tls_verification' => ['type' => 'boolean'],
                                 'is_usable' => ['type' => 'boolean'],
                                 'team_id' => ['type' => 'integer'],
                                 'created_at' => ['type' => 'string'],
@@ -223,6 +225,7 @@ class S3StoragesController extends Controller
                         'bucket' => ['type' => 'string', 'example' => 'my-bucket', 'description' => 'S3 bucket name.'],
                         'region' => ['type' => 'string', 'example' => 'us-east-1', 'description' => 'S3 region.'],
                         'use_path_style_endpoint' => ['type' => 'boolean', 'description' => 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints.'],
+                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
                         'key' => ['type' => 'string', 'description' => 'Access key.'],
                         'secret' => ['type' => 'string', 'description' => 'Secret key.'],
                         'is_usable' => ['type' => 'boolean', 'description' => 'Whether the storage is marked usable.'],
@@ -261,7 +264,7 @@ class S3StoragesController extends Controller
     )]
     public function store(Request $request)
     {
-        $allowedFields = ['name', 'description', 'endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'is_usable'];
+        $allowedFields = ['name', 'description', 'endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'skip_tls_verification', 'is_usable'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -285,6 +288,7 @@ class S3StoragesController extends Controller
             'key' => 'required|string|max:255',
             'secret' => 'required|string|max:255',
             'use_path_style_endpoint' => 'sometimes|boolean',
+            'skip_tls_verification' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
         ]);
         if ($validationError instanceof JsonResponse) {
@@ -301,6 +305,7 @@ class S3StoragesController extends Controller
             'key' => $body['key'],
             'secret' => $body['secret'],
             'use_path_style_endpoint' => $body['use_path_style_endpoint'] ?? S3Storage::detectPathStyleEndpoint($body['endpoint']),
+            'skip_tls_verification' => $body['skip_tls_verification'] ?? false,
             'is_usable' => $body['is_usable'] ?? false,
         ]);
 
@@ -341,6 +346,7 @@ class S3StoragesController extends Controller
                         'bucket' => ['type' => 'string', 'description' => 'S3 bucket name.'],
                         'region' => ['type' => 'string', 'description' => 'S3 region.'],
                         'use_path_style_endpoint' => ['type' => 'boolean', 'description' => 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS.'],
+                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
                         'key' => ['type' => 'string', 'description' => 'Access key.'],
                         'secret' => ['type' => 'string', 'description' => 'Secret key.'],
                         'is_usable' => ['type' => 'boolean', 'description' => 'Whether the storage is marked usable.'],
@@ -379,7 +385,7 @@ class S3StoragesController extends Controller
     )]
     public function update(Request $request)
     {
-        $allowedFields = ['name', 'description', 'endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'is_usable'];
+        $allowedFields = ['name', 'description', 'endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'skip_tls_verification', 'is_usable'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -402,6 +408,7 @@ class S3StoragesController extends Controller
             'key' => 'sometimes|string|max:255',
             'secret' => 'sometimes|string|max:255',
             'use_path_style_endpoint' => 'sometimes|boolean',
+            'skip_tls_verification' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
         ]);
         if ($validationError instanceof JsonResponse) {

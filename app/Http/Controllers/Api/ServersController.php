@@ -633,9 +633,8 @@ class ServersController extends Controller
         if (! $privateKey) {
             return response()->json(['message' => 'Private key not found.'], 404);
         }
-        $foundServer = ModelsServer::whereIp(ModelsServer::normalizeIp($request->ip))->first();
-        if ($foundServer) {
-            return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
+        if (ModelsServer::sshEndpointInUse($request->ip, $request->port)) {
+            return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
         }
         if ($request->instant_validate) {
             ModelsServer::throttleValidation($teamId, $request->ip);
@@ -832,6 +831,13 @@ class ServersController extends Controller
                 'errors' => $connectionErrors,
             ], 422);
         }
+        $newIp = $request->filled('ip') ? $request->input('ip') : $server->getRawOriginal('ip');
+        $newPort = $request->filled('port') ? (int) $request->input('port') : (int) $server->port;
+        $endpointChanged = ModelsServer::normalizeIp($newIp) !== ModelsServer::normalizeIp($server->getRawOriginal('ip'))
+            || $newPort !== (int) $server->port;
+        if ($endpointChanged && ModelsServer::sshEndpointInUse($newIp, $newPort, $server->id)) {
+            return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
+        }
         if ($request->instant_validate) {
             ModelsServer::throttleValidation($teamId, $request->ip ?? $server->ip);
         }
@@ -969,7 +975,7 @@ class ServersController extends Controller
             new OA\Parameter(
                 name: 'force',
                 in: 'query',
-                description: 'Also delete all resources on the server. Needs the deploy permission.',
+                description: 'Also delete all resources whose main destination is on the server. Applications that use the server only as an additional destination are not deleted. They are removed from the server and keep running on their other servers. Needs the deploy permission.',
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false)
             ),
@@ -1060,7 +1066,8 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server deleted.']);
         }
 
-        if ($server->definedResources()->count() > 0 && ! $force) {
+        $resources = $server->primaryResources();
+        if ($resources->isNotEmpty() && ! $force) {
             return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
         if ($server->is_coolify_host) {
@@ -1103,8 +1110,10 @@ class ServersController extends Controller
             auditLog('api.server.ssh_key_removed', [...$context, 'result' => $removed ? 'removed' : 'kept_for_other_server']);
         }
 
+        // Applications that use the server only as an additional destination keep running on their other servers.
+        $server->detachAdditionalApplications();
         if ($force) {
-            foreach ($server->definedResources() as $resource) {
+            foreach ($resources as $resource) {
                 DeleteResourceJob::dispatch($resource);
             }
         }

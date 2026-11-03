@@ -221,7 +221,7 @@ describe('GetLogs browser-rendered output', function () {
             ->call('getLogs', '2026-09-28T10:00:02.123456789Z')
             ->assertReturned('2026-09-28T10:00:03Z new');
 
-        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs --since 2026-09-28T10:00:02.123456789Z -t test-container'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs --since 2026-09-28T10:00:02.123456789Z -n 50000 -t test-container'));
     });
 
     test('getLogs prefixes the streaming command with sudo for non-root servers', function () {
@@ -234,7 +234,7 @@ describe('GetLogs browser-rendered output', function () {
             'container' => 'test-container',
         ])->call('getLogs', '2026-09-28T10:00:02Z');
 
-        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '(sudo docker logs --since 2026-09-28T10:00:02Z -t test-container) 2>&1 | head -c'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '(sudo docker logs --since 2026-09-28T10:00:02Z -n 50000 -t test-container) 2>&1 | head -c'));
     });
 
     test('getLogs ignores a since value that is not a docker timestamp', function (string $since) {

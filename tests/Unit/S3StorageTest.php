@@ -64,6 +64,7 @@ test('S3Storage model fillable attributes are configured correctly', function ()
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'skip_tls_verification',
         'is_usable',
         'unusable_email_sent',
     ]);
@@ -120,6 +121,30 @@ test('S3Storage uses path-style URLs unless the storage turns them off', functio
     'not saved yet' => [null, true, ' --api S3v4'],
     'path-style' => [true, true, ' --api S3v4'],
     'virtual-hosted-style' => [false, false, ' --api S3v4 --path off'],
+]);
+
+test('S3Storage checks the TLS certificate unless the storage skips the check', function (?bool $setting, bool $verify, string $mcOptions) {
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    Storage::expects('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config) => $config['http']['verify'] === $verify))
+        ->andReturn($disk);
+
+    $s3Storage = new S3Storage;
+    $s3Storage->setRawAttributes([
+        'region' => 'us-east-1',
+        'bucket' => 'backups',
+        'endpoint' => 'https://93.184.216.34:9000',
+        'skip_tls_verification' => $setting,
+    ]);
+
+    expect($s3Storage->filesystem())->toBe($disk)
+        ->and($s3Storage->httpClientOptions()['verify'])->toBe($verify)
+        ->and($s3Storage->minioClientEnvOptions())->toBe($mcOptions);
+})->with([
+    'not saved yet' => [null, true, "-e 'MC_REGION=us-east-1'"],
+    'checks the certificate' => [false, true, "-e 'MC_REGION=us-east-1'"],
+    'skips the check' => [true, false, "-e 'MC_REGION=us-east-1' -e MC_INSECURE=true"],
 ]);
 
 test('S3Storage detects the URL style from the endpoint host', function (?string $endpoint, bool $usesPathStyle) {
@@ -273,3 +298,28 @@ test('S3Storage does not retry a MinIO client upload that timed out', function (
     expect($attempts)->toBe(1);
     Sleep::assertNeverSlept();
 });
+
+test('S3Storage sizes MinIO client upload parts for at most 1000 parts', function (int $fileSize, int $partSize) {
+    expect(S3Storage::minioClientPartSizeOption($fileSize))->toBe('-e MC_UPLOAD_MULTIPART_SIZE='.$partSize)
+        ->and((int) ceil($fileSize / $partSize))->toBeLessThanOrEqual(1000);
+})->with([
+    'empty file keeps the 16 MiB default' => [0, 16 * 1024 * 1024],
+    'small file keeps the 16 MiB default' => [128, 16 * 1024 * 1024],
+    '1000 parts of 16 MiB keep the default' => [1000 * 16 * 1024 * 1024, 16 * 1024 * 1024],
+    'one byte more needs 17 MiB parts' => [1000 * 16 * 1024 * 1024 + 1, 17 * 1024 * 1024],
+    '19 GiB dump' => [19 * 1024 * 1024 * 1024, 20 * 1024 * 1024],
+    '1 TiB dump' => [1024 * 1024 * 1024 * 1024, 1049 * 1024 * 1024],
+]);
+
+test('S3Storage uses curl transfers only for endpoints with a path, which the MinIO client rejects', function (string $endpoint, bool $expected) {
+    $s3Storage = new S3Storage;
+    $s3Storage->setRawAttributes(['endpoint' => $endpoint]);
+
+    expect($s3Storage->usesCurlTransfer())->toBe($expected);
+})->with([
+    'Supabase Storage' => ['https://abcd.storage.supabase.co/storage/v1/s3', true],
+    'path with trailing slash' => ['http://minio:9000/s3/', true],
+    'host only' => ['https://s3.amazonaws.com', false],
+    'host with trailing slash' => ['https://s3.amazonaws.com/', false],
+    'host with port' => ['http://coolify-minio:9000', false],
+]);

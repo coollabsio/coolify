@@ -169,6 +169,8 @@ final class ServerTransferCoverage
 
     private const RUNTIME = 'Runtime state: the target sets it again when it manages the server.';
 
+    private const FROM_COMPOSE = 'The target sets it again when it parses the Docker Compose file of the service.';
+
     /**
      * Columns of transferred models that are not in the bundle under their own name, with the reason.
      * Columns in ALWAYS_NOT_EXPORTED are left out of every model.
@@ -255,7 +257,10 @@ final class ServerTransferCoverage
             'container_id' => 'Not used: only listed in $fillable.',
         ],
         LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED],
-        ScheduledTask::class => ['team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED],
+        ScheduledTask::class => [
+            'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
+            'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,
+        ],
         Tag::class => ['team_id' => self::TEAM],
         ScheduledDatabaseBackup::class => [
             'team_id' => self::TEAM, 'database_type' => self::LINKED, 'database_id' => self::LINKED, 's3_storage_id' => self::LINKED,
@@ -267,8 +272,8 @@ final class ServerTransferCoverage
         Service::class => [
             'environment_id' => self::LINKED, 'server_id' => self::LINKED, 'destination_type' => self::LINKED, 'destination_id' => self::LINKED,
         ],
-        ServiceApplication::class => ['service_id' => self::LINKED],
-        ServiceDatabase::class => ['service_id' => self::LINKED],
+        ServiceApplication::class => ['service_id' => self::LINKED, 'is_removed_from_compose' => self::FROM_COMPOSE],
+        ServiceDatabase::class => ['service_id' => self::LINKED, 'is_removed_from_compose' => self::FROM_COMPOSE],
         StandalonePostgresql::class => [
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',

@@ -55,8 +55,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     private string $sshErrorOutput = '';
 
     public function __construct(
-        public Server $server,
-        public bool $disableMux = true
+        public Server $server
     ) {}
 
     public function middleware(): array
@@ -338,11 +337,14 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * Run one Docker command with a single attempt. Returns null when it fails or times out.
+     * The command goes through the multiplexed connection: the probe already proved a fresh login,
+     * and each new SSH connection opens a systemd-logind session on the host. Some systemd versions
+     * leak closed sessions until the host refuses new logins at 8192 sessions.
      */
     private function runDockerCommand(string $command): ?string
     {
         try {
-            $process = $this->runSsh($command, self::DOCKER_TIMEOUT_SECONDS, disableMultiplexing: $this->disableMux);
+            $process = $this->runSsh($command, self::DOCKER_TIMEOUT_SECONDS);
         } catch (\Throwable $e) {
             Log::debug('ServerConnectionCheck: Docker command failed', [
                 'server_id' => $this->server->id,

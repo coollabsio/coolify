@@ -3062,7 +3062,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -3123,7 +3123,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -3167,7 +3167,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -6464,7 +6464,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -6524,7 +6524,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -6570,7 +6570,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -10057,7 +10057,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string }, name: { type: string }, description: { type: string, nullable: true }, endpoint: { type: string }, bucket: { type: string }, region: { type: string }, use_path_style_endpoint: { type: boolean }, is_usable: { type: boolean }, team_id: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  properties: { uuid: { type: string }, name: { type: string }, description: { type: string, nullable: true }, endpoint: { type: string }, bucket: { type: string }, region: { type: string }, use_path_style_endpoint: { type: boolean }, skip_tls_verification: { type: boolean }, is_usable: { type: boolean }, team_id: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -10109,6 +10109,9 @@ paths:
                 use_path_style_endpoint:
                   type: boolean
                   description: 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints.'
+                skip_tls_verification:
+                  type: boolean
+                  description: 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'
                 key:
                   type: string
                   description: 'Access key.'
@@ -10166,6 +10169,7 @@ paths:
                   bucket: { type: string }
                   region: { type: string }
                   use_path_style_endpoint: { type: boolean }
+                  skip_tls_verification: { type: boolean }
                   is_usable: { type: boolean }
                   team_id: { type: integer }
                   created_at: { type: string }
@@ -10248,6 +10252,9 @@ paths:
                 use_path_style_endpoint:
                   type: boolean
                   description: 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS.'
+                skip_tls_verification:
+                  type: boolean
+                  description: 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'
                 key:
                   type: string
                   description: 'Access key.'
@@ -10382,6 +10389,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -10489,6 +10500,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -10624,6 +10639,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -10731,6 +10750,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -12636,7 +12659,7 @@ paths:
         -
           name: force
           in: query
-          description: 'Also delete all resources on the server. Needs the deploy permission.'
+          description: 'Also delete all resources whose main destination is on the server. Applications that use the server only as an additional destination are not deleted. They are removed from the server and keep running on their other servers. Needs the deploy permission.'
           required: false
           schema:
             type: boolean
@@ -14235,7 +14258,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -14295,7 +14318,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -14341,7 +14364,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -16925,7 +16948,7 @@ components:
         is_multiline:
           type: boolean
         is_shown_once:
-          description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+          description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
           type: boolean
         comment:
           type:
@@ -16947,7 +16970,7 @@ components:
         is_multiline:
           type: boolean
         is_shown_once:
-          description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+          description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
           type: boolean
         comment:
           type:
@@ -17656,7 +17679,7 @@ components:
           type: boolean
         is_shown_once:
           type: boolean
-          description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+          description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
         key:
           type: string
         value:
@@ -17742,6 +17765,21 @@ components:
         timeout:
           type: integer
           description: 'The timeout of the scheduled task in seconds.'
+        use_shell:
+          type: boolean
+          description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+        consecutive_failures:
+          type: integer
+          description: 'The number of failed runs since the last successful run.'
+        failing_since:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'The date and time of the first failed run since the last successful run.'
+        disabled_reason:
+          type: string
+          nullable: true
+          description: 'Why Coolify disabled the task automatically. It is cleared when the task is enabled again.'
         created_at:
           type: string
           format: date-time

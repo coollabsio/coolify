@@ -250,14 +250,13 @@ class Show extends Component
                 $this->port = $this->server->port;
                 throw new \Exception('The IP address, SSH user, and SSH port of a transferred server cannot be changed.');
             }
-            // Check only a changed IP, so that an old duplicate does not block saving other fields.
-            $ipChanged = $this->ip !== Server::normalizeIp($this->server->getRawOriginal('ip'));
-            $foundServer = $ipChanged ? Server::where('ip', $this->ip)
-                ->where('id', '!=', $this->server->id)
-                ->first() : null;
-            if ($foundServer) {
+            // Check only a changed IP or port, so that an old duplicate does not block saving other fields.
+            $endpointChanged = $this->ip !== Server::normalizeIp($this->server->getRawOriginal('ip'))
+                || (int) $this->port !== (int) $this->server->port;
+            if ($endpointChanged && Server::sshEndpointInUse($this->ip, $this->port, $this->server->id)) {
                 $this->ip = $this->server->ip;
-                throw new \Exception('A server with this IP/Domain already exists.');
+                $this->port = $this->server->port;
+                throw new \Exception('A server with this IP/Domain and SSH port already exists.');
             }
 
             $this->server->name = $this->name;

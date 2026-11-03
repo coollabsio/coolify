@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Events\ServiceStartFinished;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -19,6 +20,7 @@ class DeployServiceApplication
     {
         $service = $serviceApplication->service;
         $composeServiceName = $serviceApplication->name;
+        NotifyResourceStoppedJob::expectStop($serviceApplication);
 
         $service->parse();
         StartService::queueFileStorageSync($service);
@@ -59,6 +61,7 @@ class DeployServiceApplication
         }
         // No stdin for Compose prompts: they would read the next script lines (see StartService).
         $upCommand .= " {$safeComposeServiceName} < /dev/null";
+        $commands->push(...StartService::removeContainersWithRemovedVolumesCommands($service, $composeServiceName));
         $commands->push('echo Starting service container.');
         $commands->push($upCommand);
 

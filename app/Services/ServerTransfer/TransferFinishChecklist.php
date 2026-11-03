@@ -467,6 +467,7 @@ class TransferFinishChecklist
             ->withHeaders(['Authorization' => 'Bearer '.generateGithubJwt($githubApp), 'Accept' => 'application/vnd.github+json'])
             ->{$method}(rtrim($githubApp->api_url, '/').$path, $data);
         if (! $response->successful()) {
+            assertGithubClockInSync($response);
             throw new RuntimeException('GitHub answered with HTTP '.$response->status().': '.data_get($response->json(), 'message', 'no details'));
         }
 

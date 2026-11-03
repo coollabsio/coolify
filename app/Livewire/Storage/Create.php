@@ -33,6 +33,8 @@ class Create extends Component
 
     public bool $usePathStyleEndpointChanged = false;
 
+    public bool $skipTlsVerification = false;
+
     public array $endpointParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
     public bool $endpointPartsChanged = false;
@@ -50,6 +52,7 @@ class Create extends Component
             'bucket' => ['required', new ValidS3BucketName],
             'endpoint' => ['required', 'max:255', new SafeWebhookUrl],
             'usePathStyleEndpoint' => 'boolean',
+            'skipTlsVerification' => 'boolean',
         ];
     }
 
@@ -80,6 +83,7 @@ class Create extends Component
         'bucket' => 'Bucket',
         'endpoint' => 'Endpoint',
         'usePathStyleEndpoint' => 'Use path-style URLs',
+        'skipTlsVerification' => 'Skip TLS certificate verification',
     ];
 
     public function submit()
@@ -100,6 +104,7 @@ class Create extends Component
             $this->storage->secret = $this->secret;
             $this->storage->bucket = $this->bucket;
             $this->storage->use_path_style_endpoint = $this->usePathStyleEndpoint;
+            $this->storage->skip_tls_verification = $this->skipTlsVerification;
             if (empty($this->endpoint)) {
                 $this->storage->endpoint = "https://s3.{$this->region}.amazonaws.com";
             } else {

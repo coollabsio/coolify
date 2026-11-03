@@ -56,6 +56,7 @@ it('tests the S3 connection with the values currently entered in the form', func
     $form->key = 'new-key';
     $form->secret = 'new-secret';
     $form->usePathStyleEndpoint = false;
+    $form->skipTlsVerification = true;
     $form->isUsable = false;
 
     $form->testConnection();
@@ -70,5 +71,6 @@ it('tests the S3 connection with the values currently entered in the form', func
             'secret' => 'new-secret',
             'use_path_style_endpoint' => false,
         ])
+        ->and($testedConfig['http']['verify'])->toBeFalse()
         ->and($form->isUsable)->toBeTrue();
 });

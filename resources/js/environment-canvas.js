@@ -570,7 +570,7 @@ export function statusTone(status) {
   const value = String(status ?? '').trim().toLowerCase();
   if (!value) return 'idle';
   const [state, health = ''] = value.replace(/\)$/, '').split(/\s*[:(]\s*/);
-  if (BUSY.includes(state)) return 'busy';
+  if (BUSY.includes(state) || health === 'starting') return 'busy';
   if (BAD.includes(state)) return 'bad';
   if (state === 'degraded') return 'warn';
   if (state === 'running' || state === 'healthy') return health === 'unhealthy' ? 'warn' : 'ok';

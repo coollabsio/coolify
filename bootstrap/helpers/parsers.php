@@ -1784,8 +1784,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $networks_temp->put($key, $network);
                 }
             }
+            // A preview renames its services to "<name>-pr-<id>". The alias keeps the original name as a hostname
+            // on the preview network, so that services can still reach each other by their Compose names.
             foreach ($baseNetwork as $key => $network) {
-                $networks_temp->put($network, null);
+                $networks_temp->put($network, $isPullRequest ? ['aliases' => [(string) $serviceName]] : null);
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
@@ -2002,10 +2004,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $branch = $originalResource->git_branch;
-        if ($pullRequestId !== 0) {
-            $branch = "pull/{$pullRequestId}/head";
-        }
+        $branch = $originalResource->coolifyBranch($pullRequestId);
         if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
             $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
         }
@@ -2389,6 +2388,28 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     return $topLevel;
 }
 
+/**
+ * Marks the applications and databases of a service whose names are no longer in its compose file.
+ * They keep their settings, so a part that comes back under the same name is used again.
+ * The service status ignores marked parts, and the user can delete them.
+ *
+ * @param  array<string|int, mixed>|Collection<string|int, mixed>  $services
+ */
+function markServicePartsRemovedFromCompose(Service $resource, array|Collection $services): void
+{
+    $serviceNames = collect($services)->keys()->map(fn ($name): string => (string) $name)->all();
+    if ($serviceNames === []) {
+        return;
+    }
+
+    foreach ([$resource->applications(), $resource->databases()] as $parts) {
+        (clone $parts)->whereIn('name', $serviceNames)->where('is_removed_from_compose', true)
+            ->update(['is_removed_from_compose' => false]);
+        (clone $parts)->whereNotIn('name', $serviceNames)->where('is_removed_from_compose', false)
+            ->update(['is_removed_from_compose' => true]);
+    }
+}
+
 function serviceParser(Service $resource): Collection
 {
     $resource->resetComposeVolumeWarnings();
@@ -2513,6 +2534,7 @@ function serviceParser(Service $resource): Collection
             $savedService->save();
         }
     }
+    markServicePartsRemovedFromCompose($resource, $services);
     foreach ($services as $serviceName => $service) {
         $predefinedPort = null;
         $magicEnvironments = collect([]);

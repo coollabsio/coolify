@@ -118,7 +118,41 @@ class Certificates extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            $certificate = DeleteTraefikCertificate::run($this->server, $certificateId);
+            $this->certificatesDeleted(DeleteTraefikCertificate::run($this->server, [$certificateId]));
+            $this->dispatch('success', 'TLS certificate deleted. Restart Traefik to remove it from the running proxy.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /** Deletes the certificates that no route and no resource on the server uses, so Traefik stops renewing them. */
+    public function deleteUnusedTraefikCertificates(string $password = ''): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $unusedIds = collect(GetTraefikCertificates::run($this->server))
+                ->where('in_use', false)
+                ->pluck('id')
+                ->all();
+            if ($unusedIds === []) {
+                $this->traefikCertificates = GetTraefikCertificates::run($this->server);
+                $this->dispatch('info', 'No unused TLS certificates found.');
+
+                return;
+            }
+
+            $deleted = DeleteTraefikCertificate::run($this->server, $unusedIds);
+            $this->certificatesDeleted($deleted);
+            $this->dispatch('success', count($deleted).' unused TLS certificates deleted. Restart Traefik to remove them from the running proxy.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /** @param array<int, array{main_domain: string, resolver: string}> $certificates */
+    private function certificatesDeleted(array $certificates): void
+    {
+        foreach ($certificates as $certificate) {
             auditLog('ui.proxy.certificate_deleted', [
                 'team_id' => $this->server->team_id,
                 'server_uuid' => $this->server->uuid,
@@ -126,13 +160,11 @@ class Certificates extends Component
                 'domain' => $certificate['main_domain'],
                 'resolver' => $certificate['resolver'],
             ]);
-            $this->traefikCertificates = GetTraefikCertificates::run($this->server);
-            $this->loadTraefikAcmeBackups();
-            $this->dispatch('refreshServerShow');
-            $this->dispatch('success', 'TLS certificate deleted. Restart Traefik to remove it from the running proxy.');
-        } catch (\Throwable $e) {
-            handleError($e, $this);
         }
+
+        $this->traefikCertificates = GetTraefikCertificates::run($this->server);
+        $this->loadTraefikAcmeBackups();
+        $this->dispatch('refreshServerShow');
     }
 
     public function render(): View

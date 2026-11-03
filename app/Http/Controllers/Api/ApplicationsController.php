@@ -1768,6 +1768,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2031,6 +2032,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2263,6 +2265,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2402,6 +2405,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2537,6 +2541,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -4033,7 +4038,7 @@ class ApplicationsController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -4186,7 +4191,7 @@ class ApplicationsController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4376,7 +4381,7 @@ class ApplicationsController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                     ],
                 ),
             ),

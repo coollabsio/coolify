@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Models\User;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
@@ -34,6 +35,9 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
+    $this->user = User::factory()->create();
+    $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+    $this->actingAs($this->user);
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
     $this->server = Server::factory()->create([
         'team_id' => $this->team->id,
@@ -357,4 +361,56 @@ it('removes the S3 restore helper when the mc alias cannot be set', function () 
         ->contains(fn (array $process) => preg_match("/docker rm -f '?s3-restore-/", $process['command']."\n".$process['input']) === 1);
     expect($removedAfterAlias)->toBeTrue();
     Queue::assertNothingPushed();
+});
+
+test('s3 import downloads with curl and a presigned URL when the endpoint has a path', function () {
+    $storage = S3Storage::create([
+        'name' => 'Supabase',
+        'region' => 'eu-central-1',
+        'key' => 'AKIA_PATH_ENDPOINT_KEY',
+        'secret' => 'path/endpoint/SECRET',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://8.8.8.8/storage/v1/s3',
+        'is_usable' => true,
+        'team_id' => $this->team->id,
+    ]);
+
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('exists')->once()->with('backups/restore.sql')->andReturn(true);
+    $disk->shouldReceive('size')->once()->with('backups/restore.sql')->andReturn(1024);
+    $disk->shouldReceive('temporaryUrl')->once()->with('backups/restore.sql', Mockery::any())
+        ->andReturn('https://8.8.8.8/storage/v1/s3/test-bucket/backups/restore.sql?X-Amz-Signature=presigned');
+    $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
+    $filesystem->shouldReceive('build')->twice()->andReturn($disk);
+    Storage::swap($filesystem);
+
+    $processes = collect();
+    Process::fake(function ($process) use ($processes) {
+        $processes->push(['command' => $process->command, 'input' => $process->input]);
+
+        return Process::result();
+    });
+    Queue::fake();
+
+    $activity = app(StartDatabaseImport::class)->handle(
+        $this->database,
+        new DatabaseImportSource('s3', path: 'backups/restore.sql', s3StorageUuid: $storage->uuid),
+        $this->team->id,
+    );
+
+    $command = (string) RemoteProcessCommand::read($activity);
+    $config = $processes->sole(fn (array $process) => str_contains($process['command'], 'cat > /tmp/s3-transfer.curl'))['input'];
+
+    expect($config)->toBe(implode("\n", [
+        'url = "https://8.8.8.8/storage/v1/s3/test-bucket/backups/restore.sql?X-Amz-Signature=presigned"',
+        'silent',
+        'show-error',
+        'output = "/tmp/restore"',
+        'fail',
+    ])."\n")
+        ->and($command)->toContain("docker exec 's3-restore-")
+        ->and($command)->toContain(' curl --config /tmp/s3-transfer.curl')
+        ->and($command)->not->toContain('mc cp')
+        ->and($command)->not->toContain('X-Amz-Signature')
+        ->and($command)->not->toContain('path/endpoint/SECRET');
 });

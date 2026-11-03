@@ -144,9 +144,8 @@ class ByIp extends Component
         try {
             $this->authorize('create', Server::class);
             $this->ip = Server::normalizeIp($this->ip);
-            $foundServer = Server::whereIp($this->ip)->first();
-            if ($foundServer) {
-                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
+            if (Server::sshEndpointInUse($this->ip, $this->port)) {
+                return $this->dispatch('error', 'A server with this IP/Domain and SSH port already exists.');
             }
 
             if (is_null($this->private_key_id)) {

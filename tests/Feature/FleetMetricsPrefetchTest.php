@@ -64,7 +64,7 @@ it('fetches the page metrics of every server in one SSH command each', function 
     expect($commands)->toHaveCount(2)
         ->and($commands[0])->toContain('/api/summary', '/api/containers/current', '/api/load/history', '/api/network/history', '-H @-')
         ->and($commands[0])->toContain('/api/disk/history?from=')
-        ->and($commands[0])->toContain('mount=%2F%2C%2Fapp%2Fdb%2C%2Fdata%2Fcoolify%2C%2Fdata');
+        ->and($commands[0])->not->toContain('mount=');
 });
 
 it('does not fetch each metric again when the batch fails', function () {

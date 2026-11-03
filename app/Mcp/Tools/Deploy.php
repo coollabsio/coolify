@@ -80,7 +80,6 @@ class Deploy extends Tool
             pull_request_id: $pullRequestId,
             force_rebuild: $force,
             is_mcp: true,
-            no_questions_asked: true,
             cancel_previous: $cancelPrevious,
         );
 
@@ -88,7 +87,7 @@ class Deploy extends Tool
             return $this->mcpSuccess($request, $this->respond([
                 'ok' => false,
                 'message' => $result['message'] ?? 'Deployment not queued.',
-                'deployment_uuid' => null,
+                'deployment_uuid' => $result['deployment_uuid'] ?? null,
             ]), ['resource_uuid' => $uuid]);
         }
 

@@ -156,7 +156,7 @@ it('tries a failed SSH login only once', function () {
 
     expect($this->server->validateConnection()['uptime'])->toBeFalse();
 
-    Process::assertRanTimes(fn ($process): bool => str_contains(implode(' ', (array) $process->command), 'ssh'), 1);
+    Process::assertRanTimes(fn ($process): bool => str_contains(implode(' ', (array) $process->command), 'ssh -i '), 1);
 });
 
 it('does not connect to the server when the retry button is throttled on cloud', function () {

@@ -39,6 +39,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\DnsRecord;
 use App\Services\Dns\DnsResolver;
 use App\Services\Security\SensitiveDataRedactor;
@@ -2518,12 +2519,12 @@ function validateDNSEntry(string $fqdn, Server $server)
             if ($results !== false) {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (isCloudflareIp($result->getData())) {
+                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
                             $found_matching_ip = true;
                             break 2;
                         }
-                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
-                            $found_matching_ip = true;
+                        if (isCloudflareIp($result->getData())) {
+                            $found_matching_ip = ! app(CloudflareDnsProvider::class)->sendsHostnameToAnotherServer($server, $host, $ip);
                             break 2;
                         }
                     }
@@ -4619,8 +4620,10 @@ function generate_fluentd_configuration(): array
             'fluentd-address' => 'tcp://127.0.0.1:24224',
             'fluentd-async' => 'true',
             'fluentd-sub-second-precision' => 'true',
-            // env vars are used in the LogDrain configurations
+            // The env vars exist only when the resource includes the Coolify default variables.
             'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
+            // Every Coolify container has these labels. Docker skips a label that a container does not have.
+            'labels' => 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName',
         ],
     ];
 }
@@ -5122,6 +5125,75 @@ function getJobStatus(?string $jobId = null)
     }
 
     return $jobFound->first()->status;
+}
+
+/**
+ * Find the HEALTHCHECK instruction that applies to the image built from the Dockerfile.
+ *
+ * Docker builds the target stage, or the last stage when no target is set. A stage keeps the
+ * HEALTHCHECK of an earlier stage that it starts FROM, and the last HEALTHCHECK of a stage wins.
+ * Returns null when no HEALTHCHECK applies or when it is HEALTHCHECK NONE.
+ */
+function dockerfileHealthcheckInstruction(?string $dockerfile, ?string $target = null): ?string
+{
+    $instructions = [];
+    $current = '';
+    foreach (preg_split('/\R/', (string) $dockerfile) as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $continues = str_ends_with($line, '\\');
+        $current = trim($current.' '.rtrim($line, '\\ '));
+        if (! $continues) {
+            $instructions[] = $current;
+            $current = '';
+        }
+    }
+    if ($current !== '') {
+        $instructions[] = $current;
+    }
+
+    /** @var array<int, array{name: ?string, parent: string, healthcheck: ?string}> $stages */
+    $stages = [];
+    foreach ($instructions as $instruction) {
+        if (preg_match('/^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i', $instruction, $matches)) {
+            $stages[] = [
+                'name' => isset($matches[2]) ? strtolower($matches[2]) : null,
+                'parent' => strtolower($matches[1]),
+                'healthcheck' => null,
+            ];
+        } elseif ($stages !== [] && preg_match('/^HEALTHCHECK(\s|$)/i', $instruction)) {
+            $stages[array_key_last($stages)]['healthcheck'] = $instruction;
+        }
+    }
+    if ($stages === []) {
+        return null;
+    }
+
+    $target = filled($target) ? strtolower(trim($target)) : null;
+    $index = $target === null ? array_key_last($stages) : null;
+    foreach ($stages as $i => $stage) {
+        if ($target !== null && $stage['name'] === $target) {
+            $index = $i;
+        }
+    }
+
+    while ($index !== null) {
+        $stage = $stages[$index];
+        if ($stage['healthcheck'] !== null) {
+            return preg_match('/^HEALTHCHECK\s+NONE$/i', $stage['healthcheck']) ? null : $stage['healthcheck'];
+        }
+        $parentIndex = null;
+        foreach ($stages as $i => $candidate) {
+            if ($i < $index && $candidate['name'] === $stage['parent']) {
+                $parentIndex = $i;
+            }
+        }
+        $index = $parentIndex;
+    }
+
+    return null;
 }
 
 function parseDockerfileInterval(string $something)

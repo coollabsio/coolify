@@ -5,18 +5,17 @@ namespace App\Livewire\Project\Database;
 use App\Actions\Database\StartDatabaseImport;
 use App\Models\S3Storage;
 use App\Models\Server;
-use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
-use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -134,9 +133,6 @@ class ImportForm extends Component
     #[Locked]
     public string $resourceDbType = '';
 
-    #[Locked]
-    public array $parameters = [];
-
     public array $containers = [];
 
     public bool $scpInProgress = false;
@@ -246,10 +242,9 @@ class ImportForm extends Component
         $this->activityId = null;
     }
 
-    public function mount()
+    public function mount(Model $resource): void
     {
-        $this->parameters = get_route_parameters();
-        $this->getContainers();
+        $this->loadResource($resource);
         $this->loadAvailableS3Storages();
         $this->initializeRestoreOptions();
     }
@@ -316,42 +311,9 @@ class ImportForm extends Component
         }
     }
 
-    private function getContainers()
+    private function loadResource(Model $resource): void
     {
         $this->containers = [];
-        $teamId = data_get(auth()->user()->currentTeam(), 'id');
-
-        // Try to find resource by route parameter
-        $databaseUuid = data_get($this->parameters, 'database_uuid');
-        $stackServiceUuid = data_get($this->parameters, 'stack_service_uuid');
-
-        $resource = null;
-        if ($databaseUuid) {
-            // Standalone database route
-            $resource = getResourceByUuid($databaseUuid, $teamId);
-            if (is_null($resource)) {
-                abort(404);
-            }
-        } elseif ($stackServiceUuid) {
-            // ServiceDatabase route - look up the service database
-            $serviceUuid = data_get($this->parameters, 'service_uuid');
-            $project = currentTeam()
-                ->projects()
-                ->select('id', 'uuid', 'team_id')
-                ->where('uuid', data_get($this->parameters, 'project_uuid'))
-                ->firstOrFail();
-            $environment = $project->environments()
-                ->select('id', 'uuid', 'name', 'project_id')
-                ->where('uuid', data_get($this->parameters, 'environment_uuid'))
-                ->firstOrFail();
-            $service = $environment->services()->whereUuid($serviceUuid)->firstOrFail();
-            $resource = $service->databases()->whereUuid($stackServiceUuid)->first();
-            if (is_null($resource)) {
-                abort(404);
-            }
-        } else {
-            abort(404);
-        }
 
         $this->authorize('view', $resource);
 
@@ -662,7 +624,7 @@ class ImportForm extends Component
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
                 'use_path_style_endpoint' => $s3Storage->usesPathStyleEndpoint(),
-                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
+                'http' => $s3Storage->httpClientOptions(),
             ]);
 
             // Check if file exists

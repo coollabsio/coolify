@@ -125,7 +125,7 @@ it('records docker and compose versions during connection checks', function () {
         ),
     ]);
 
-    (new ServerConnectionCheckJob($server, disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server))->handle();
 
     $settings = $server->settings->fresh();
 

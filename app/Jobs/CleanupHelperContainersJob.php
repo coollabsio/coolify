@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -38,9 +40,9 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
     }
 
     /**
-     * Removes helper containers of finished deployments. Backups, imports, and file browsers also run in
-     * helper containers, so a container is removed only when its name is the UUID of a deployment that
-     * is not queued or in progress.
+     * Removes helper containers of finished deployments and the S3 upload containers (`backup-of-<execution uuid>`)
+     * of database backups that are not running. Imports and file browsers also run in helper containers, so
+     * other containers stay.
      */
     public function handle(): void
     {
@@ -62,12 +64,23 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                 ->pluck('deployment_uuid')
                 ->all();
 
+            $runningBackupUploadNames = ScheduledDatabaseBackupExecution::query()
+                ->whereIn('uuid', $helperContainers->pluck('Names')->map(fn (string $name): string => Str::after($name, 'backup-of-'))->all())
+                ->where('status', 'running')
+                ->pluck('uuid')
+                ->map(fn (string $uuid): string => "backup-of-{$uuid}")
+                ->all();
+
             foreach ($helperContainers as $container) {
-                if (! in_array($container['Names'], $finishedDeploymentUuids, true)) {
+                $isFinishedDeployment = in_array($container['Names'], $finishedDeploymentUuids, true);
+                // A worker that is killed during the upload never removes its upload container.
+                $isOrphanedBackupUpload = str_starts_with($container['Names'], 'backup-of-')
+                    && ! in_array($container['Names'], $runningBackupUploadNames, true);
+                if (! $isFinishedDeployment && ! $isOrphanedBackupUpload) {
                     continue;
                 }
 
-                \Log::info('CleanupHelperContainersJob - Removing orphaned deployment helper container', [
+                \Log::info('CleanupHelperContainersJob - Removing orphaned helper container', [
                     'container' => $container['Names'],
                     'id' => $container['ID'],
                 ]);

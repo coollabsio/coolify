@@ -4,7 +4,6 @@ namespace App\Services\ServerTransfer;
 
 use App\Enums\GithubRunnerStatus;
 use App\Jobs\DeleteResourceJob;
-use App\Models\Application;
 use App\Models\GithubRunnerExecution;
 use App\Models\ManagedDnsRecord;
 use App\Models\Server;
@@ -185,47 +184,12 @@ class ServerTransferClaimer
         }
 
         $this->forgetDnsRecords($server);
-        $this->detachAdditionalApplications($server);
-        foreach ($this->archiveResources($server) as $resource) {
+        // Another instance manages the server, so the containers of its additional applications stay as they are.
+        $server->detachAdditionalApplications(stopContainers: false);
+        foreach ($server->primaryResources() as $resource) {
             (new DeleteResourceJob($resource, deleteFromCoolifyOnly: true))->handle();
         }
         $server->forceDelete();
-    }
-
-    /**
-     * The resources that the archive of a transferred server deletes. An application that has the server only as an
-     * additional destination runs on another server of this instance, so it is not one of them.
-     *
-     * @return Collection<int, Model>
-     */
-    public function archiveResources(Server $server): Collection
-    {
-        return $this->primaryApplications($server)
-            ->concat($server->databases())
-            ->concat($server->services()->get());
-    }
-
-    /**
-     * Remove the server from applications that run on it only as an additional destination.
-     */
-    public function detachAdditionalApplications(Server $server): void
-    {
-        $primaryIds = $this->primaryApplications($server)->pluck('id');
-        DB::table('additional_destinations')
-            ->where('server_id', $server->id)
-            ->whereNotIn('application_id', $primaryIds)
-            ->delete();
-    }
-
-    /**
-     * @return Collection<int, Application>
-     */
-    private function primaryApplications(Server $server): Collection
-    {
-        return $server->applications()
-            ->filter(fn (Application $application) => (int) data_get($application, 'destination.server_id') === (int) $server->id)
-            ->unique('id')
-            ->values();
     }
 
     /**
@@ -235,7 +199,7 @@ class ServerTransferClaimer
     {
         // The server itself owns the DNS record of its Cloudflare tunnel.
         return collect([$server])
-            ->concat($this->primaryApplications($server))
+            ->concat($server->primaryApplications())
             ->concat($server->services()->with('applications')->get()->flatMap->applications);
     }
 

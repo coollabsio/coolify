@@ -32,7 +32,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -173,6 +173,10 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
+            if ($environmentVariable->exists && $environmentVariable->getOriginal('is_shown_once')) {
+                $environmentVariable->is_shown_once = true;
+            }
             if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
                 $environmentVariable->preserve_compose_null = false;
             }
@@ -747,7 +751,7 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
         }
-        $environment_variable = trim($environment_variable);
+        $environment_variable = self::withoutEdgeWhitespace($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
@@ -800,7 +804,19 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return trim(decrypt($environment_variable));
+        return self::withoutEdgeWhitespace(decrypt($environment_variable));
+    }
+
+    /**
+     * Single-line values lose their edge whitespace. Multiline content (a private key, a
+     * certificate, a config file) is kept as it is, because tools such as OpenSSH reject a key
+     * without its trailing newline.
+     */
+    private static function withoutEdgeWhitespace(string $value): string
+    {
+        $trimmed = trim($value);
+
+        return str_contains($trimmed, "\n") ? $value : $trimmed;
     }
 
     private function set_environment_variables(?string $environment_variable = null): ?string
@@ -808,13 +824,8 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable)) {
             return null;
         }
-        $environment_variable = trim($environment_variable);
-        $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt($environment_variable);
-        }
 
-        return encrypt($environment_variable);
+        return encrypt(self::withoutEdgeWhitespace($environment_variable));
     }
 
     protected function key(): Attribute

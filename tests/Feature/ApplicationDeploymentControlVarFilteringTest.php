@@ -497,7 +497,7 @@ it('loads shell variables and passes dotted variables through the build-time env
 
         expect($wrappedCommand)
             ->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH)
-            ->toContain("/bin/bash -c 'printenv X.VALUE'")
+            ->toContain("/bin/bash -c 'export DOCKER_CONFIG=/root/.docker && printenv X.VALUE'")
             ->not->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH);
 
         file_put_contents($shellEnvironmentPath, $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH]);
@@ -546,9 +546,53 @@ it('keeps the original sourced environment path when build-time keys are shell s
     $wrappedCommand = invokeDeploymentJobMethod($job, $reflection, 'wrap_build_command_with_env_export', 'docker build .');
 
     expect($wrappedCommand)
-        ->toContain('set -a && source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH.' && set +a && docker build .')
+        ->toContain('set -a && source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH.' && set +a && export DOCKER_CONFIG=/root/.docker && docker build .')
         ->not->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH);
 });
+
+it('keeps the Docker CLI on the helper plugins when build-time variables set HOME or DOCKER_CONFIG', function (bool $withDottedVariable) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'HOME', 'value' => '/app']);
+    createApplicationEnvironmentVariable($application, ['key' => 'DOCKER_CONFIG', 'value' => '/app/.docker']);
+    if ($withDottedVariable) {
+        createApplicationEnvironmentVariable($application, ['key' => 'X.VALUE', 'value' => 'dotted']);
+    }
+
+    $temporaryDirectory = sys_get_temp_dir().'/coolify-docker-config-'.str()->random(8);
+    expect(mkdir($temporaryDirectory))->toBeTrue();
+
+    try {
+        [$job, $reflection] = makeControlVarFilteringJob($application, $server, ['workdir' => $temporaryDirectory]);
+        invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
+
+        $localPaths = [];
+        foreach ($job->writtenArtifacts as $artifactPath => $contents) {
+            $localPath = $temporaryDirectory.'/'.basename($artifactPath);
+            $localPaths[$artifactPath] = $localPath;
+            file_put_contents($localPath, $contents);
+        }
+        foreach ($localPaths as $artifactPath => $localPath) {
+            file_put_contents($localPath, strtr(file_get_contents($localPath), $localPaths));
+        }
+
+        $wrappedCommand = invokeDeploymentJobMethod($job, $reflection, 'wrap_build_command_with_env_export', 'echo "$HOME|$DOCKER_CONFIG"');
+
+        $process = new Process(['/bin/bash', '-c', strtr($wrappedCommand, $localPaths)], env: ['HOME' => '/root']);
+        $process->mustRun();
+
+        // HOME keeps the user value for --build-arg HOME, but the Docker CLI finds buildx in /root/.docker/cli-plugins.
+        expect(trim($process->getOutput()))->toBe('/app|/root/.docker');
+    } finally {
+        foreach (glob($temporaryDirectory.'/*') as $file) {
+            @unlink($file);
+        }
+        @rmdir($temporaryDirectory);
+    }
+})->with([
+    'sourced build-time env file' => [false],
+    'build-time env launcher' => [true],
+]);
 
 it('skips dotted keys from the Nixpacks plan without failing the deployment', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
@@ -1890,6 +1934,22 @@ it('writes a readable runtime env line for legacy literal values with a single q
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
     expect($runtimeEnvs)->toContain('LEGACY_QUOTE="it\'s"');
+});
+
+it('writes a readable runtime env line for legacy multiline JSON values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $json = "{\n  \"type\": \"service_account\"\n}";
+
+    $variable = createApplicationEnvironmentVariable($application, ['key' => 'GOOGLE_CREDENTIALS_JSON', 'value' => $json, 'is_multiline' => true, 'is_runtime' => true, 'is_buildtime' => false]);
+    $variable->uses_legacy_escaping = true;
+    $variable->save();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain('GOOGLE_CREDENTIALS_JSON='.escapeComposeEnvFileValue($json));
 });
 
 it('keeps the old runtime env format for preview variables saved before exact escaping', function () {

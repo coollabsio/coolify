@@ -1119,6 +1119,40 @@ class Application extends BaseModel
     }
 
     /**
+     * A deployments-only server cannot build this application, so a build server must build it.
+     * Docker image applications build nothing, and Compose applications do not use build servers.
+     */
+    public function mustBuildOnBuildServer(Server $server): bool
+    {
+        return ! $server->canBuildApplications()
+            && ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+    }
+
+    /**
+     * The build servers that can build a deployment of this application on $server. It is empty when
+     * the deployment builds on $server, or when $server is an additional server that pulls the image.
+     *
+     * @return Collection<int, Server>
+     */
+    public function buildServerCandidates(Server $server): Collection
+    {
+        $pullsImage = str($this->docker_registry_image_name)->isNotEmpty()
+            && $this->additional_servers()->wherePivot('server_id', $server->id)->exists();
+        if ($pullsImage) {
+            return collect();
+        }
+        if (! $this->mustBuildOnBuildServer($server) && ! data_get($this, 'settings.is_build_server_enabled')) {
+            return collect();
+        }
+        $teamId = $this->team()?->id;
+        if ($teamId === null) {
+            return collect();
+        }
+
+        return Server::buildServers($teamId)->whereKeyNot($server->id)->get();
+    }
+
+    /**
      * Another application of the team that builds and pushes an image with the same Docker image name.
      * Both push the same tags (the commit SHA, `latest`, `pr-<id>`), so one application can run the image of the other.
      */
@@ -1325,9 +1359,9 @@ class Application extends BaseModel
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first($columns);
     }
 
-    public function get_last_days_deployments()
+    public function hasDeploymentsInLastDays(int $days = 7): bool
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays($days))->exists();
     }
 
     /**
@@ -2050,6 +2084,18 @@ class Application extends BaseModel
         }
 
         return preg_match('#\Ahttps?://#i', (string) $this->git_repository) !== 1;
+    }
+
+    /**
+     * The COOLIFY_BRANCH value of a deployment. Preview deployments use the pull request ref.
+     */
+    public function coolifyBranch(int $pullRequestId = 0): ?string
+    {
+        if ($pullRequestId !== 0) {
+            return "pull/{$pullRequestId}/head";
+        }
+
+        return $this->git_branch;
     }
 
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
@@ -2936,8 +2982,8 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
-        $dockerfile = str($dockerfile)->trim()->explode("\n");
-        $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
+        $healthcheckCommand = dockerfileHealthcheckInstruction($dockerfile, $this->dockerfile_target_build);
+        $hasHealthcheck = $healthcheckCommand !== null;
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
@@ -2953,45 +2999,26 @@ class Application extends BaseModel
         }
 
         if ($hasHealthcheck && ($this->isHealthcheckDisabled() || $isInit)) {
-            $healthcheckCommand = null;
-            $lines = $dockerfile->toArray();
-            foreach ($lines as $line) {
-                $trimmedLine = trim($line);
-                if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
-                    $healthcheckCommand .= trim($trimmedLine, '\\ ');
+            $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
+            $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
+            $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
+            $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
 
-                    continue;
-                }
-                if (isset($healthcheckCommand) && str_contains($trimmedLine, '\\')) {
-                    $healthcheckCommand .= ' '.trim($trimmedLine, '\\ ');
-                }
-                if (isset($healthcheckCommand) && ! str_contains($trimmedLine, '\\') && ! empty($healthcheckCommand)) {
-                    $healthcheckCommand .= ' '.$trimmedLine;
-                    break;
-                }
+            if ($interval->isNotEmpty()) {
+                $this->health_check_interval = parseDockerfileInterval($interval);
             }
-            if (str($healthcheckCommand)->isNotEmpty()) {
-                $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
-                $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
-                $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
-                $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
-
-                if ($interval->isNotEmpty()) {
-                    $this->health_check_interval = parseDockerfileInterval($interval);
-                }
-                if ($timeout->isNotEmpty()) {
-                    $this->health_check_timeout = parseDockerfileInterval($timeout);
-                }
-                if ($start_period->isNotEmpty()) {
-                    $this->health_check_start_period = parseDockerfileInterval($start_period);
-                }
-                if ($retries->isNotEmpty()) {
-                    $this->health_check_retries = $retries->toInteger();
-                }
-                if ($interval || $timeout || $start_period || $retries) {
-                    $this->custom_healthcheck_found = true;
-                    $this->save();
-                }
+            if ($timeout->isNotEmpty()) {
+                $this->health_check_timeout = parseDockerfileInterval($timeout);
+            }
+            if ($start_period->isNotEmpty()) {
+                $this->health_check_start_period = parseDockerfileInterval($start_period);
+            }
+            if ($retries->isNotEmpty()) {
+                $this->health_check_retries = $retries->toInteger();
+            }
+            if ($interval || $timeout || $start_period || $retries) {
+                $this->custom_healthcheck_found = true;
+                $this->save();
             }
         }
     }

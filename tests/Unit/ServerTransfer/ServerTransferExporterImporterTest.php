@@ -194,6 +194,7 @@ beforeEach(function () {
         'service_id' => $this->service->id,
         'team_id' => $this->team->id,
         'enabled' => true,
+        'use_shell' => false,
     ]);
 
     $this->exporter = app(ServerTransferExporter::class);
@@ -239,7 +240,8 @@ test('export includes server applications databases and secrets in plaintext', f
     $service = $environment['services'][0];
     expect($service['uuid'])->toBe($this->service->uuid)
         ->and($service['scheduled_tasks'])->toHaveCount(1)
-        ->and($service['scheduled_tasks'][0]['name'])->toBe('service-ping');
+        ->and($service['scheduled_tasks'][0]['name'])->toBe('service-ping')
+        ->and($service['scheduled_tasks'][0]['use_shell'])->toBeFalse();
 });
 
 test('export refuses localhost coolify host', function () {
@@ -339,7 +341,8 @@ test('round trip import preserves uuids secrets and related resources after sour
     expect($serviceTask)->not->toBeNull()
         ->and($serviceTask->service_id)->toBe($service->id)
         ->and($serviceTask->name)->toBe('service-ping')
-        ->and($serviceTask->command)->toBe('echo ping');
+        ->and($serviceTask->command)->toBe('echo ping')
+        ->and($serviceTask->use_shell)->toBeFalse();
 
     $shared = SharedEnvironmentVariable::query()
         ->where('server_id', $server->id)

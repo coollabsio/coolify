@@ -231,7 +231,6 @@ describe('GitHub Source Change Component', function () {
     test('syncGithubAppName persists the github slug and renames the private key', function () {
         Http::fake([
             '*/app' => Http::response(['slug' => 'actual-github-slug']),
-            '*/zen' => Http::response('Keep it logically awesome.'),
         ]);
 
         $privateKey = PrivateKey::create([
@@ -680,9 +679,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app' => Http::response([
                 'permissions' => [
                     'contents' => 'read',
@@ -735,9 +731,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.ghe.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.ghe.com/app' => Http::response([
                 'slug' => 'octocorp-app',
             ]),
@@ -837,9 +830,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app' => Http::response([
                 'name' => 'Coolify GitHub App',
                 'slug' => 'coolify-github-app',
@@ -932,7 +922,6 @@ describe('GitHub App name sync after the user switches the session team', functi
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, ['date' => now()->toRfc7231String()]),
             'https://api.github.com/app' => Http::response(['slug' => 'synced-app']),
         ]);
 

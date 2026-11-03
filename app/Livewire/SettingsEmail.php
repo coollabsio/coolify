@@ -30,6 +30,12 @@ class SettingsEmail extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $smtpFromName = null;
 
+    #[Validate(['nullable', 'email'])]
+    public ?string $notificationFromAddress = null;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $notificationFromName = null;
+
     #[Validate(['nullable', 'string'])]
     public ?string $smtpRecipients = null;
 
@@ -63,6 +69,8 @@ class SettingsEmail extends Component
     #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
 
+    public bool $testUsesNotificationSender = false;
+
     public function mount()
     {
         if (isInstanceAdmin() === false) {
@@ -89,6 +97,8 @@ class SettingsEmail extends Component
             $this->settings->smtp_ehlo_domain = $this->smtpEhloDomain;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->notification_from_address = $this->notificationFromAddress;
+            $this->settings->notification_from_name = $this->notificationFromName;
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
@@ -104,6 +114,8 @@ class SettingsEmail extends Component
             $this->smtpEhloDomain = $this->settings->smtp_ehlo_domain;
             $this->smtpFromAddress = $this->settings->smtp_from_address;
             $this->smtpFromName = $this->settings->smtp_from_name;
+            $this->notificationFromAddress = $this->settings->notification_from_address;
+            $this->notificationFromName = $this->settings->notification_from_name;
 
             $this->resendEnabled = $this->settings->resend_enabled;
             $this->resendApiKey = $this->settings->resend_api_key;
@@ -329,7 +341,10 @@ class SettingsEmail extends Component
                 'testEmailAddress' => 'required|email',
                 'smtpFromAddress' => 'required|email',
                 'smtpFromName' => 'required|string',
+                'notificationFromAddress' => $this->testUsesNotificationSender ? 'required|email' : 'nullable|email',
+                'notificationFromName' => 'nullable|string|max:255',
             ], [
+                'notificationFromAddress.required' => 'Notification from address is required to test the notification sender.',
                 'testEmailAddress.required' => 'Test email address is required.',
                 'testEmailAddress.email' => 'Please enter a valid email address.',
                 'smtpFromAddress.required' => 'From Address is required.',
@@ -339,13 +354,18 @@ class SettingsEmail extends Component
 
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->notification_from_address = $this->notificationFromAddress;
+            $this->settings->notification_from_name = $this->notificationFromName;
             $this->saveAndAudit();
 
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notifyNow(new Test($this->testEmailAddress));
+                    $this->team?->notifyNow(new Test(
+                        $this->testEmailAddress,
+                        usesNotificationSender: $this->testUsesNotificationSender,
+                    ));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,

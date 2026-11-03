@@ -5,6 +5,7 @@ namespace App\Actions\Service;
 use App\Actions\Server\CleanupDocker;
 use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\Server;
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -39,10 +40,12 @@ class StopService
             $containersToStop = [];
             $applications = $service->applications()->get();
             foreach ($applications as $application) {
+                NotifyResourceStoppedJob::expectStop($application);
                 $containersToStop[] = "{$application->name}-{$service->uuid}";
             }
             $dbs = $service->databases()->get();
             foreach ($dbs as $db) {
+                NotifyResourceStoppedJob::expectStop($db);
                 $containersToStop[] = "{$db->name}-{$service->uuid}";
             }
 
