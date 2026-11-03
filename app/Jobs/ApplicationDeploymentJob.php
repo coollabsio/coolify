@@ -141,6 +141,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $currently_running_container_name = null;
 
+    /**
+     * Containers that ran before the rolling update started its new container. Only these are
+     * removed after it, so the new container of another deployment of the application stays.
+     *
+     * @var list<string>|null
+     */
+    private ?array $containerNamesBeforeRollingUpdate = null;
+
     private string $basedir;
 
     private string $workdir;
@@ -2944,6 +2952,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     $this->application_deployment_queue->addLogEntry('Rolling update started.');
+                    $this->containerNamesBeforeRollingUpdate = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id)
+                        ->pluck('Names')
+                        ->all();
                     $this->start_by_compose_file();
                     $this->health_check();
                     $this->wait_for_proxy_to_route_new_container();
@@ -5310,13 +5321,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     });
                 } else {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
-                    if ($this->pull_request_id === 0) {
-                        $containers = $containers->filter(function ($container) {
-                            return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id);
-                        });
-                    }
-                    $containers->each(function ($container) {
-                        $this->graceful_shutdown_container(data_get($container, 'Names'));
+                    $this->oldGeneratedContainerNames($containers)->each(function (string $containerName) {
+                        $this->graceful_shutdown_container($containerName);
                     });
                 }
             } else {
@@ -5344,6 +5350,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Only re-throw if deployment hasn't succeeded yet
             throw new DeploymentException("Failed to stop running container: {$e->getMessage()}", $e->getCode(), $e);
         }
+    }
+
+    /**
+     * The containers to remove when container names are generated per deployment: all except the
+     * new one, and after a rolling update only the ones that ran before its new container started.
+     */
+    private function oldGeneratedContainerNames(Collection $containers): Collection
+    {
+        $names = $containers->pluck('Names')->filter();
+        if ($this->pull_request_id === 0) {
+            $names = $names->reject(fn (string $name) => $name === $this->container_name || $name === addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id));
+        }
+        if ($this->containerNamesBeforeRollingUpdate !== null) {
+            $names = $names->filter(fn (string $name) => in_array($name, $this->containerNamesBeforeRollingUpdate, true));
+        }
+
+        return $names->values();
     }
 
     private function containerNamesToRemove(Collection $containers): Collection
