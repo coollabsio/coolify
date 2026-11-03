@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
 use App\Traits\Auditable;
@@ -38,6 +40,14 @@ class S3Storage extends BaseModel
      * Waits before the second and the third attempt of an upload with the MinIO client.
      */
     private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
+
+    /**
+     * How long the presigned URL of a curl transfer is valid. S3 checks it when the request starts, so it must
+     * cover the wait for the earlier transfers and the retries of the backup job.
+     */
+    private const CURL_TRANSFER_URL_TTL_HOURS = 24;
+
+    private const CURL_TRANSFER_CONFIG_PATH = '/tmp/s3-transfer.curl';
 
     /**
      * The exception code of runSshProcess() when a remote command times out.
@@ -389,6 +399,80 @@ class S3Storage extends BaseModel
     public function minioClientAliasOptions(): string
     {
         return ' --api S3v4'.($this->usesPathStyleEndpoint() ? '' : ' --path off');
+    }
+
+    /**
+     * The MinIO client accepts only `scheme://host[:port]` endpoints. Providers like Supabase Storage need a path
+     * (`/storage/v1/s3`), so transfers to these endpoints use curl with a presigned URL instead.
+     */
+    public function usesCurlTransfer(): bool
+    {
+        return trim((string) parse_url((string) $this->endpoint, PHP_URL_PATH), '/') !== '';
+    }
+
+    /**
+     * Prepares the upload of $localPath in $container to $key and returns the command that runs it.
+     */
+    public function prepareCurlUpload(Server $server, string $container, string $localPath, string $key): string
+    {
+        $url = $this->filesystem()->temporaryUploadUrl($key, now()->addHours(self::CURL_TRANSFER_URL_TTL_HOURS))['url'];
+
+        // An S3 error is an XML body. Write it to stderr, so it becomes the error message of the backup.
+        return $this->prepareCurlTransfer($server, $container, $url, ['upload-file = '.self::curlConfigValue($localPath), 'fail-with-body', 'output = "/dev/stderr"']);
+    }
+
+    /**
+     * Prepares the download of $key to $localPath in $container and returns the command that runs it.
+     */
+    public function prepareCurlDownload(Server $server, string $container, string $key, string $localPath): string
+    {
+        $url = $this->filesystem()->temporaryUrl($key, now()->addHours(self::CURL_TRANSFER_URL_TTL_HOURS));
+
+        return $this->prepareCurlTransfer($server, $container, $url, ['output = '.self::curlConfigValue($localPath), 'fail']);
+    }
+
+    /**
+     * Writes the curl config of a transfer into $container through the stdin of the SSH process. The config holds
+     * the presigned URL, so the URL is not in the arguments of any process, and the S3 keys never reach the server.
+     * The `resolve` line pins the endpoint host to its validated IPs, as minioClientResolveOptions() does for mc.
+     *
+     * @param  array<int, string>  $options
+     */
+    private function prepareCurlTransfer(Server $server, string $container, string $url, array $options): string
+    {
+        $entries = SafeWebhookUrl::minioClientResolveOptions((string) $this->endpoint, $this->trustedInternalHosts());
+        $config = collect(['url = '.self::curlConfigValue($url), 'silent', 'show-error', ...$options])
+            ->when($entries !== [], fn ($lines) => $lines->push('resolve = '.self::curlConfigValue(
+                str($entries[0])->beforeLast('=')->toString().':'.collect($entries)
+                    ->map(fn (string $entry): string => str($entry)->afterLast('=')->toString())
+                    ->map(fn (string $ip): string => str_contains($ip, ':') ? "[{$ip}]" : $ip)
+                    ->implode(',')
+            )))
+            ->when($this->skip_tls_verification, fn ($lines) => $lines->push('insecure'))
+            ->implode("\n")."\n";
+
+        $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
+            .' sh -c '.escapeshellarg('umask 077 && cat > '.self::CURL_TRANSFER_CONFIG_PATH);
+        $timeout = (int) config('constants.ssh.command_timeout');
+
+        SshRetryHandler::retry(
+            function () use ($server, $remoteCommand, $config, $timeout) {
+                $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+                $process = runSshProcess($sshCommand, $timeout, $config);
+
+                if ($process->exitCode() !== 0) {
+                    excludeCertainErrors($process->errorOutput(), $process->exitCode());
+                }
+            },
+            ['server' => $server->ip, 'function' => 'prepareCurlTransfer'],
+        );
+
+        return 'docker exec '.escapeshellarg($container).' curl --config '.self::CURL_TRANSFER_CONFIG_PATH;
+    }
+
+    private static function curlConfigValue(string $value): string
+    {
+        return '"'.addcslashes($value, '"\\').'"';
     }
 
     /**

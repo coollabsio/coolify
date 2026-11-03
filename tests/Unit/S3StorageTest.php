@@ -298,3 +298,16 @@ test('S3Storage does not retry a MinIO client upload that timed out', function (
     expect($attempts)->toBe(1);
     Sleep::assertNeverSlept();
 });
+
+test('S3Storage uses curl transfers only for endpoints with a path, which the MinIO client rejects', function (string $endpoint, bool $expected) {
+    $s3Storage = new S3Storage;
+    $s3Storage->setRawAttributes(['endpoint' => $endpoint]);
+
+    expect($s3Storage->usesCurlTransfer())->toBe($expected);
+})->with([
+    'Supabase Storage' => ['https://abcd.storage.supabase.co/storage/v1/s3', true],
+    'path with trailing slash' => ['http://minio:9000/s3/', true],
+    'host only' => ['https://s3.amazonaws.com', false],
+    'host with trailing slash' => ['https://s3.amazonaws.com/', false],
+    'host with port' => ['http://coolify-minio:9000', false],
+]);

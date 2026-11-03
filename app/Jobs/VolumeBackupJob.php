@@ -90,8 +90,9 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $filename = str($this->backup->targetType())->lower().'-'.str($this->backup->targetName())->slug().'-'.Carbon::now()->timestamp.'.tar.gz';
         $backupLocation = $backupDirectory.'/'.$filename;
         $this->execution->update(['filename' => $backupLocation]);
-        // Streaming writes no local archive, so it can upload to one destination only.
-        $streamToS3 = $this->backup->disable_local_backup && $destinations->count() === 1;
+        // Streaming writes no local archive, so it can upload to one destination only. A curl upload needs the size
+        // of the file before it starts, so it cannot stream.
+        $streamToS3 = $this->backup->disable_local_backup && $destinations->count() === 1 && ! $destinations->first()->usesCurlTransfer();
 
         try {
             $source = $this->backup->sourcePath();
@@ -468,7 +469,6 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
         $image = coolifyHelperImage().':'.getHelperVersion();
-        $resolveOptions = $s3->minioClientResolveOptions($server, $image);
 
         try {
             instant_remote_process([
@@ -476,11 +476,15 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' -v '
                     .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
-            $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
-            S3Storage::retryMinioClientUpload(fn () => instant_remote_process([
-                'docker exec '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
-                    .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/'),
-            ], $server, timeout: $this->timeout, disableMultiplexing: true));
+            if ($s3->usesCurlTransfer()) {
+                $uploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, ltrim($backupDirectory, '/').'/'.basename($backupLocation));
+            } else {
+                $resolveOptions = $s3->minioClientResolveOptions($server, $image);
+                $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
+                $uploadCommand = 'docker exec '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
+                    .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/');
+            }
+            S3Storage::retryMinioClientUpload(fn () => instant_remote_process([$uploadCommand], $server, timeout: $this->timeout, disableMultiplexing: true));
         } finally {
             instant_remote_process(
                 ['docker rm -f '.escapeshellarg($containerName)],
