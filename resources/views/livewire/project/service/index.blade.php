@@ -176,102 +176,98 @@
                         {{ data_get_str($serviceDatabase, 'name')->limit(10) }} | Coolify
                     </x-slot>
                 @endunless
-                @if ($currentRoute === 'project.service.database.import')
-                    <livewire:project.database.import :resource="$serviceDatabase" :key="'import-' . $serviceDatabase->uuid" />
-                @else
-                    <form wire:submit="submitDatabase" class="space-y-6">
-                        <div class="space-y-5">
-                            <div class="grid gap-4 sm:grid-cols-2">
-                                <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Name" id="humanName"
-                                    placeholder="Name"></x-forms.input>
-                                <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Description"
-                                    id="description"></x-forms.input>
-                                <x-forms.input class="sm:col-span-2" canGate="update" :canResource="$serviceDatabase" required
-                                    helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
-                                    label="Image" id="image"></x-forms.input>
-                            </div>
-                            <div class="border-t border-neutral-200 pt-5 dark:border-white/[0.06]">
-                                <div class="mb-4 flex items-center justify-between gap-2">
-                                    <h3 class="text-sm font-semibold text-black dark:text-fg">Public access</h3>
-                                    <div class="flex items-center gap-2">
-                                        <x-loading wire:loading wire:target="instantSave" />
-                                        @if ($serviceDatabase->is_public)
-                                            <x-process-dialog closeWithX size="xl">
-                                                <x-slot:title>Proxy Logs</x-slot:title>
-                                                <x-slot:content>
-                                                    <livewire:project.shared.get-logs :server="$server" :resource="$service"
-                                                        :servicesubtype="$serviceDatabase" container="{{ $serviceDatabase->uuid }}-proxy" :collapsible="false" lazy />
-                                                </x-slot:content>
-                                                <x-forms.button @click="processDialogOpen = true">Logs</x-forms.button>
-                                            </x-process-dialog>
-                                        @endif
-                                    </div>
-                                </div>
-                                <div class="space-y-4">
-                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end"
-                                        x-data="{ port: @js(filled($publicPort) ? (string) $publicPort : '') }"
-                                        @input="if ($event.target.matches('input[type=number], input:not([type])')) port = $event.target.value">
-                                        <div class="w-full sm:max-w-xs">
-                                            <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase"
-                                                placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
-                                                label="Public Port" />
-                                        </div>
-                                        <div class="flex shrink-0 flex-wrap items-center gap-2">
-                                            @if ($isPublic)
-                                                <x-status-badge status="Public" type="success" />
-                                                <x-forms.button canGate="update" :canResource="$serviceDatabase"
-                                                    wire:click="disablePublicAccess">
-                                                    Make private
-                                                </x-forms.button>
-                                            @else
-                                                {{-- Do not nest @if/@endif inside an <x-*> opening tag: Blade component
-                                                     compilation breaks and yields "unexpected token endif". --}}
-                                                <x-forms.button canGate="update" :canResource="$serviceDatabase"
-                                                    wire:click="enablePublicAccess"
-                                                    x-bind:disabled="!String(port ?? '').trim()">
-                                                    Make publicly available
-                                                </x-forms.button>
-                                            @endif
-                                        </div>
-                                    </div>
-                                    @if ($db_url_public)
-                                        <x-forms.input label="Database IP:PORT (public)"
-                                            helper="Your credentials are available in your environment variables." type="password"
-                                            readonly wire:model="db_url_public" />
+                <form wire:submit="submitDatabase" class="space-y-6">
+                    <div class="space-y-5">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Name" id="humanName"
+                                placeholder="Name"></x-forms.input>
+                            <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Description"
+                                id="description"></x-forms.input>
+                            <x-forms.input class="sm:col-span-2" canGate="update" :canResource="$serviceDatabase" required
+                                helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
+                                label="Image" id="image"></x-forms.input>
+                        </div>
+                        <div class="border-t border-neutral-200 pt-5 dark:border-white/[0.06]">
+                            <div class="mb-4 flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold text-black dark:text-fg">Public access</h3>
+                                <div class="flex items-center gap-2">
+                                    <x-loading wire:loading wire:target="instantSave" />
+                                    @if ($serviceDatabase->is_public)
+                                        <x-process-dialog closeWithX size="xl">
+                                            <x-slot:title>Proxy Logs</x-slot:title>
+                                            <x-slot:content>
+                                                <livewire:project.shared.get-logs :server="$server" :resource="$service"
+                                                    :servicesubtype="$serviceDatabase" container="{{ $serviceDatabase->uuid }}-proxy" :collapsible="false" lazy />
+                                            </x-slot:content>
+                                            <x-forms.button @click="processDialogOpen = true">Logs</x-forms.button>
+                                        </x-process-dialog>
                                     @endif
                                 </div>
                             </div>
-                        </div>
-
-                        @include('livewire.project.service.advanced-settings')
-
-                        <div data-service-resource-actions
-                            class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-5 dark:border-white/[0.08]">
-                            <div>
-                                @can('delete', $serviceDatabase)
-                                    <x-modal-confirmation title="Confirm Service Database Deletion?" buttonTitle="Delete"
-                                        isErrorButton submitAction="deleteDatabase" :actions="[
-                                            'The selected service database container will be stopped and permanently deleted.',
-                                        ]"
-                                        confirmationText="{{ Str::headline($serviceDatabase->name) }}"
-                                        confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
-                                        shortConfirmationLabel="Service Database Name" />
-                                @endcan
+                            <div class="space-y-4">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-end"
+                                    x-data="{ port: @js(filled($publicPort) ? (string) $publicPort : '') }"
+                                    @input="if ($event.target.matches('input[type=number], input:not([type])')) port = $event.target.value">
+                                    <div class="w-full sm:max-w-xs">
+                                        <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase"
+                                            placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
+                                            label="Public Port" />
+                                    </div>
+                                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                        @if ($isPublic)
+                                            <x-status-badge status="Public" type="success" />
+                                            <x-forms.button canGate="update" :canResource="$serviceDatabase"
+                                                wire:click="disablePublicAccess">
+                                                Make private
+                                            </x-forms.button>
+                                        @else
+                                            {{-- Do not nest @if/@endif inside an <x-*> opening tag: Blade component
+                                                 compilation breaks and yields "unexpected token endif". --}}
+                                            <x-forms.button canGate="update" :canResource="$serviceDatabase"
+                                                wire:click="enablePublicAccess"
+                                                x-bind:disabled="!String(port ?? '').trim()">
+                                                Make publicly available
+                                            </x-forms.button>
+                                        @endif
+                                    </div>
+                                </div>
+                                @if ($db_url_public)
+                                    <x-forms.input label="Database IP:PORT (public)"
+                                        helper="Your credentials are available in your environment variables." type="password"
+                                        readonly wire:model="db_url_public" />
+                                @endif
                             </div>
-                            <div class="ml-auto flex items-center gap-2">
-                                @can('update', $serviceDatabase)
-                                    <x-modal-confirmation wire:click="convertToApplication" title="Convert to Application"
-                                        buttonTitle="Convert to Application" submitAction="convertToApplication"
-                                        :actions="['The selected resource will be converted to an application.']"
-                                        confirmationText="{{ Str::headline($serviceDatabase->name) }}"
-                                        confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
-                                        shortConfirmationLabel="Service Database Name" />
-                                    <x-forms.button type="submit" isHighlighted>Save changes</x-forms.button>
-                                @endcan
-                            </div>
                         </div>
-                    </form>
-                @endif
+                    </div>
+
+                    @include('livewire.project.service.advanced-settings')
+
+                    <div data-service-resource-actions
+                        class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-5 dark:border-white/[0.08]">
+                        <div>
+                            @can('delete', $serviceDatabase)
+                                <x-modal-confirmation title="Confirm Service Database Deletion?" buttonTitle="Delete"
+                                    isErrorButton submitAction="deleteDatabase" :actions="[
+                                        'The selected service database container will be stopped and permanently deleted.',
+                                    ]"
+                                    confirmationText="{{ Str::headline($serviceDatabase->name) }}"
+                                    confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
+                                    shortConfirmationLabel="Service Database Name" />
+                            @endcan
+                        </div>
+                        <div class="ml-auto flex items-center gap-2">
+                            @can('update', $serviceDatabase)
+                                <x-modal-confirmation wire:click="convertToApplication" title="Convert to Application"
+                                    buttonTitle="Convert to Application" submitAction="convertToApplication"
+                                    :actions="['The selected resource will be converted to an application.']"
+                                    confirmationText="{{ Str::headline($serviceDatabase->name) }}"
+                                    confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
+                                    shortConfirmationLabel="Service Database Name" />
+                                <x-forms.button type="submit" isHighlighted>Save changes</x-forms.button>
+                            @endcan
+                        </div>
+                    </div>
+                </form>
             @endif
         </div>
         </div>

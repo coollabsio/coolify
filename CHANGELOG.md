@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Add an opt-in setting to also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. The applications API sets it with `is_auto_cancel_building_deployments_enabled`
 - Add `cancel_previous` (`none`, `queued`, or `building`) to `/api/v1/deploy` and the MCP `deploy` tool, so a deployment from the API or MCP can cancel the older webhook, API, and MCP deployments of the same application, pull request, and server. The default is `none`. Manual, restart, and rollback deployments are never cancelled
 
+### Changed
+
+- Move **Import Backup** from the resource menu to an **Import backup** button on the **Backups** page of databases and services. The button opens the import in a dialog. Old **Import Backup** links open the **Backups** page ([#11818](https://github.com/coollabsio/coolify/discussions/11818))
+
 ### Fixed
 
 - Handle an existing Cloudflare DNS record with a different IP when Coolify adds the DNS record of a new domain automatically. Coolify now replaces the record when it created the record and no other resource uses it. Otherwise it opens the **Configure DNS** dialog, where you can replace the record, and the domain shows the conflict instead of "Not checked"

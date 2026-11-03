@@ -7,7 +7,6 @@
                 'active' => request()->routeIs('project.database.configuration')
                     || request()->routeIs('project.database.environment-variables')
                     || request()->routeIs('project.database.servers')
-                    || request()->routeIs('project.database.import-backup')
                     || request()->routeIs('project.database.persistent-storage')
                     || request()->routeIs('project.database.healthcheck')
                     || request()->routeIs('project.database.webhooks')

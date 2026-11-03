@@ -13,7 +13,6 @@
         ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
         ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
         ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
-        ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
         ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Files', 'route' => 'project.service.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
@@ -30,15 +29,13 @@
                 || ($item['route'] === 'project.service.scheduled-tasks.show'
                     && str($currentRoute)->startsWith('project.service.scheduled-tasks'))
                 || ($item['route'] === 'project.service.volume-backups.index'
-                    && str($currentRoute)->startsWith('project.service.volume-backups'))
-                || ($item['route'] === 'project.service.import-backup'
-                    && str($currentRoute)->startsWith('project.service.import-backup')),
+                    && str($currentRoute)->startsWith('project.service.volume-backups')),
         ]);
 
     $menuGroups = [
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
         'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics'],
-        'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
+        'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
         'Operations' => ['Resource Operations', 'Tags'],
         'Danger Zone' => ['Danger Zone'],
     ];

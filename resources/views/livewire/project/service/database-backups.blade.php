@@ -50,14 +50,20 @@
                                 <h2>Scheduled backups</h2>
                                 <p>Automate backups for {{ $serviceDatabase->human_name ?: $serviceDatabase->name }}.</p>
                             </div>
-                            @if (filled($serviceDatabase->custom_type) || ! $serviceDatabase->is_migrated)
-                                @can('update', $serviceDatabase)
-                                    <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                                        <livewire:project.database.create-scheduled-backup
-                                            :database="$serviceDatabase" />
+                            @can('update', $serviceDatabase)
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <x-modal-input title="Import backup" buttonTitle="Import backup">
+                                        <livewire:project.database.import :resource="$serviceDatabase"
+                                            wire:key="service-database-import-{{ $serviceDatabase->uuid }}" />
                                     </x-modal-input>
-                                @endcan
-                            @endif
+                                    @if (filled($serviceDatabase->custom_type) || ! $serviceDatabase->is_migrated)
+                                        <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                                            <livewire:project.database.create-scheduled-backup
+                                                :database="$serviceDatabase" />
+                                        </x-modal-input>
+                                    @endif
+                                </div>
+                            @endcan
                         </div>
                         <div class="application-settings-section-body p-0!">
                             <livewire:project.database.scheduled-backups :database="$serviceDatabase" />

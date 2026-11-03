@@ -123,6 +123,10 @@
             helper="Manage database, persistent volume, and directory backup schedules for this service.">
             @can('update', $service)
                 <x-slot:actions>
+                    <x-modal-input title="Import backup" buttonTitle="Import backup">
+                        <livewire:project.service.import-backup :service="$service"
+                            wire:key="service-import-backup-{{ $service->id }}" />
+                    </x-modal-input>
                     <div x-data="{ dropdownOpen: false }">
                         <div class="relative" @click.outside="dropdownOpen = false">
                             <x-forms.button class="button-highlighted" @click="dropdownOpen = !dropdownOpen"
