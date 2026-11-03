@@ -9,8 +9,24 @@
     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
         <x-application.settings-section id="server-proxy-certificates-section" title="TLS certificates"
             x-init="$wire.loadTraefikCertificates()"
-            helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority. If a route still uses the domain, Traefik requests a new certificate after the restart.">
+            helper="Review certificates stored in Traefik's acme.json file. Traefik renews every certificate in this file, also when no route uses its domain any more. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority. If a route still uses the domain, Traefik requests a new certificate after the restart.">
             <x-slot:actions>
+                @php $unusedCertificates = collect($traefikCertificates)->where('in_use', false); @endphp
+                @if ($unusedCertificates->isNotEmpty())
+                    @can('update', $server)
+                        <x-modal-confirmation title="Delete Unused TLS Certificates?" isErrorButton
+                            buttonTitle="Delete unused ({{ $unusedCertificates->count() }})"
+                            submitAction="deleteUnusedTraefikCertificates"
+                            :actions="[
+                                'Save the current acme.json as a backup that you can restore below.',
+                                'Delete '.$unusedCertificates->count().' certificates that no route and no resource on this server uses: '.$unusedCertificates->pluck('main_domain')->implode(', ').'.',
+                            ]"
+                            warningMessage="The proxy keeps using the certificates until you restart it. If a route still uses a domain, Traefik requests a new certificate after the restart. You can restore the backup below to undo this."
+                            step2ButtonText="Delete Certificates"
+                            :confirmWithPassword="false"
+                            :confirmWithText="false" />
+                    @endcan
+                @endif
                 <x-forms.button type="button" wire:click="loadTraefikCertificates"
                     wire:loading.attr="disabled" wire:target="loadTraefikCertificates">
                     Refresh
@@ -44,7 +60,13 @@
                                     @foreach ($traefikCertificates as $certificate)
                                         <tr wire:key="traefik-certificate-{{ $certificate['id'] }}">
                                             <td class="font-medium text-neutral-950 dark:text-fg">
-                                                {{ $certificate['main_domain'] }}
+                                                <div class="flex flex-col items-start gap-1">
+                                                    {{ $certificate['main_domain'] }}
+                                                    @if (($certificate['in_use'] ?? null) === false)
+                                                        <x-status-badge label="Not used" type="warning" size="sm"
+                                                            title="No route and no resource on this server uses this domain. Traefik renews the certificate until you delete it." />
+                                                    @endif
+                                                </div>
                                             </td>
                                             <td>
                                                 <span class="font-mono text-xs">{{ $certificate['resolver'] }}</span>
