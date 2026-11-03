@@ -112,14 +112,10 @@ class ApplicationDeploymentQueue extends Model
                 return;
             }
 
+            // The API and MCP cancel paths do not fire model events and record their own audit event.
             $application = $deployment->application;
-            $source = match (true) {
-                (bool) $deployment->is_mcp => 'mcp',
-                (bool) $deployment->is_api => 'api',
-                default => 'ui',
-            };
 
-            auditLog("{$source}.deployment.cancelled", [
+            auditLog('ui.deployment.cancelled', [
                 'team_id' => $application?->team()?->id,
                 'application_uuid' => $application?->uuid,
                 'application_name' => $application?->name,
