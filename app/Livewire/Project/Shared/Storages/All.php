@@ -47,6 +47,13 @@ class All extends Component
 
     public bool $deleteDockerVolume = false;
 
+    /**
+     * Volume rename that waits for confirmation. A new name mounts another Docker volume, and the data stays in the old one.
+     *
+     * @var array{storageId: int, from: string, to: string}|null
+     */
+    public ?array $pendingRename = null;
+
     protected $listeners = ['refreshVolumeList' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
     public function mount(): void
@@ -80,11 +87,12 @@ class All extends Component
             $this->resource->loadMissing('environment.project');
         }
 
+        $this->pendingRename = null;
         $this->rebuildForms();
         $this->rebuildVolumeBackupMeta();
     }
 
-    public function submit(int $storageId): void
+    public function submit(int $storageId, bool $renameConfirmed = false): void
     {
         $this->authorize('update', $this->resource);
         $this->validateStorage($storageId);
@@ -97,7 +105,16 @@ class All extends Component
         }
 
         $form = $this->forms[$storageId];
-        if (! $storage->isSharedWithAnotherResource()) {
+        $isRename = ! $storage->isSharedWithAnotherResource() && $form['name'] !== $storage->name;
+        $rename = ['storageId' => $storageId, 'from' => $storage->name, 'to' => $form['name']];
+        if ($isRename && ! ($renameConfirmed && $this->pendingRename === $rename)) {
+            $this->pendingRename = $rename;
+
+            return;
+        }
+        $this->pendingRename = null;
+
+        if ($isRename) {
             $storage->name = $form['name'];
         }
         $storage->mount_path = $form['mountPath'];
@@ -110,6 +127,14 @@ class All extends Component
         }
 
         $this->dispatch('success', 'Storage updated successfully');
+    }
+
+    public function cancelRename(int $storageId): void
+    {
+        $this->authorize('view', $this->resource);
+        $storage = $this->findStorageOrFail($storageId);
+        $this->forms[$storageId]['name'] = $storage->name;
+        $this->pendingRename = null;
     }
 
     public function instantSave(int $storageId): void
