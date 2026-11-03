@@ -2850,8 +2850,8 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
-        $dockerfile = str($dockerfile)->trim()->explode("\n");
-        $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
+        $healthcheckCommand = dockerfileHealthcheckInstruction($dockerfile, $this->dockerfile_target_build);
+        $hasHealthcheck = $healthcheckCommand !== null;
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
@@ -2867,45 +2867,26 @@ class Application extends BaseModel
         }
 
         if ($hasHealthcheck && ($this->isHealthcheckDisabled() || $isInit)) {
-            $healthcheckCommand = null;
-            $lines = $dockerfile->toArray();
-            foreach ($lines as $line) {
-                $trimmedLine = trim($line);
-                if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
-                    $healthcheckCommand .= trim($trimmedLine, '\\ ');
+            $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
+            $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
+            $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
+            $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
 
-                    continue;
-                }
-                if (isset($healthcheckCommand) && str_contains($trimmedLine, '\\')) {
-                    $healthcheckCommand .= ' '.trim($trimmedLine, '\\ ');
-                }
-                if (isset($healthcheckCommand) && ! str_contains($trimmedLine, '\\') && ! empty($healthcheckCommand)) {
-                    $healthcheckCommand .= ' '.$trimmedLine;
-                    break;
-                }
+            if ($interval->isNotEmpty()) {
+                $this->health_check_interval = parseDockerfileInterval($interval);
             }
-            if (str($healthcheckCommand)->isNotEmpty()) {
-                $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
-                $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
-                $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
-                $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
-
-                if ($interval->isNotEmpty()) {
-                    $this->health_check_interval = parseDockerfileInterval($interval);
-                }
-                if ($timeout->isNotEmpty()) {
-                    $this->health_check_timeout = parseDockerfileInterval($timeout);
-                }
-                if ($start_period->isNotEmpty()) {
-                    $this->health_check_start_period = parseDockerfileInterval($start_period);
-                }
-                if ($retries->isNotEmpty()) {
-                    $this->health_check_retries = $retries->toInteger();
-                }
-                if ($interval || $timeout || $start_period || $retries) {
-                    $this->custom_healthcheck_found = true;
-                    $this->save();
-                }
+            if ($timeout->isNotEmpty()) {
+                $this->health_check_timeout = parseDockerfileInterval($timeout);
+            }
+            if ($start_period->isNotEmpty()) {
+                $this->health_check_start_period = parseDockerfileInterval($start_period);
+            }
+            if ($retries->isNotEmpty()) {
+                $this->health_check_retries = $retries->toInteger();
+            }
+            if ($interval || $timeout || $start_period || $retries) {
+                $this->custom_healthcheck_found = true;
+                $this->save();
             }
         }
     }
