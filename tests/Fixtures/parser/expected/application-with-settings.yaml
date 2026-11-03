@@ -1789,7 +1789,9 @@
         container_name: web-referenceapplication0001-pr-7
         restart: unless-stopped
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - web
           coolify: null
         logging:
           driver: fluentd
@@ -1885,7 +1887,9 @@
           - 'caddy_0=https://7.www.api.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - api
           coolify: null
         logging:
           driver: fluentd
@@ -1967,7 +1971,9 @@
           - 'caddy_0=https://7.my-app.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - my-app
           coolify: null
         logging:
           driver: fluentd
@@ -2013,7 +2019,9 @@
           - 'caddy_0=https://7.api-v2.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - api.v2
           coolify: null
         environment:
           COOLIFY_BRANCH: '"pull/7/head"'
@@ -2091,7 +2099,9 @@
         networks:
           internal:
             ipv4_address: 172.30.0.10
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - admin
           coolify: null
         container_name: admin-referenceapplication0001-pr-7
         restart: unless-stopped
@@ -2210,7 +2220,9 @@
           - 'caddy_0=https://7.blog.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - blog
           coolify: null
         logging:
           driver: fluentd
@@ -2259,7 +2271,9 @@
           - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
         networks:
           internal: null
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - db
           coolify: null
         healthcheck:
           test:
@@ -2397,7 +2411,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - worker
           coolify: null
         logging:
           driver: fluentd
@@ -2614,7 +2630,9 @@
         container_name: web-referenceapplication0001-pr-8
         restart: unless-stopped
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - web
           coolify: null
         logging:
           driver: fluentd
@@ -2673,7 +2691,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - api
           coolify: null
         logging:
           driver: fluentd
@@ -2718,7 +2738,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - my-app
           coolify: null
         logging:
           driver: fluentd
@@ -2745,7 +2767,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - api.v2
           coolify: null
         environment:
           COOLIFY_BRANCH: '"pull/8/head"'
@@ -2795,7 +2819,9 @@
         networks:
           internal:
             ipv4_address: 172.30.0.10
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - admin
           coolify: null
         container_name: admin-referenceapplication0001-pr-8
         restart: unless-stopped
@@ -2853,7 +2879,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - blog
           coolify: null
         logging:
           driver: fluentd
@@ -2890,7 +2918,9 @@
           - 'referenceapplication0001_db-data-pr-8:/var/lib/postgresql/data'
         networks:
           internal: null
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - db
           coolify: null
         healthcheck:
           test:
@@ -3004,7 +3034,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - worker
           coolify: null
         logging:
           driver: fluentd

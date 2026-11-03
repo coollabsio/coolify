@@ -1784,8 +1784,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $networks_temp->put($key, $network);
                 }
             }
+            // A preview renames its services to "<name>-pr-<id>". The alias keeps the original name as a hostname
+            // on the preview network, so that services can still reach each other by their Compose names.
             foreach ($baseNetwork as $key => $network) {
-                $networks_temp->put($network, null);
+                $networks_temp->put($network, $isPullRequest ? ['aliases' => [(string) $serviceName]] : null);
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
