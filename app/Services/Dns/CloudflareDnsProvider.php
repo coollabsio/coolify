@@ -119,7 +119,8 @@ class CloudflareDnsProvider
 
     /**
      * Whether Cloudflare sends a proxied hostname to another server than the given one. A Cloudflare IP in DNS hides
-     * the origin, so the zone's records are read: the hostname's own record, or else the wildcard record that covers it.
+     * the origin, so the zone's records are read: the hostname's own record, or else the closest wildcard record that
+     * covers it (a Cloudflare wildcard also covers deeper names, so `*.example.com` covers `app.apps.example.com`).
      * False when Coolify cannot tell: no zone of the server's team manages the hostname, the records cannot be read,
      * a CNAME sends the hostname on, or no record is found.
      */
@@ -136,9 +137,11 @@ class CloudflareDnsProvider
         }
 
         $names = [$hostname];
-        $parent = str($hostname)->after('.')->value();
-        if ($parent === $zone->name || str_ends_with($parent, '.'.$zone->name)) {
+        for ($parent = str($hostname)->after('.')->value(); str_ends_with($parent, '.'.$zone->name); $parent = str($parent)->after('.')->value()) {
             $names[] = '*.'.$parent;
+        }
+        if (str_ends_with($hostname, '.'.$zone->name)) {
+            $names[] = '*.'.$zone->name;
         }
 
         try {

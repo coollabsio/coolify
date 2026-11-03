@@ -312,7 +312,7 @@ it('passes bracketed IPv6 custom dns servers to the dns query', function () {
     expect($queriedServers->getArrayCopy())->toBe(['[2606:4700:4700::1111]', '[2001:db8::53]', '192.0.2.1']);
 });
 
-it('checks the Cloudflare record origin when a proxied hostname is in a zone of the team', function (array $records, string $status) {
+it('checks the Cloudflare record origin when a proxied hostname is in a zone of the team', function (array $records, string $status, string $hostname = 'app.example.com') {
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
         ['id' => 0],
         ['is_dns_validation_enabled' => true, 'custom_dns_servers' => '192.0.2.1']
@@ -337,12 +337,12 @@ it('checks the Cloudflare record origin when a proxied hostname is in a zone of 
     $server = new Server(['ip' => '203.0.113.10']);
     $server->team_id = $team->id;
 
-    $result = CheckDomainDns::run(['app' => 'https://app.example.com'], $server, '203.0.113.10');
+    $result = CheckDomainDns::run(['app' => "https://{$hostname}"], $server, '203.0.113.10');
 
     expect($result['app']['status'])->toBe($status)
-        ->and(validateDNSEntry('https://app.example.com', $server))->toBe($status === 'ok');
+        ->and(validateDNSEntry("https://{$hostname}", $server))->toBe($status === 'ok');
     if ($status === 'failed') {
-        expect($result['app']['message'])->toBe('Cloudflare sends app.example.com to another server. Required DNS record type A pointing to 203.0.113.10');
+        expect($result['app']['message'])->toBe("Cloudflare sends {$hostname} to another server. Required DNS record type A pointing to 203.0.113.10");
     }
 })->with([
     'record points to the server' => [[['type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10']], 'ok'],
@@ -353,6 +353,11 @@ it('checks the Cloudflare record origin when a proxied hostname is in a zone of 
         ['type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10'],
         ['type' => 'A', 'name' => '*.example.com', 'content' => '198.51.100.20'],
     ], 'ok'],
+    'wildcard of the zone covers a deeper hostname' => [[['type' => 'A', 'name' => '*.example.com', 'content' => '198.51.100.20']], 'failed', 'app.apps.example.com'],
+    'closest wildcard wins for a deeper hostname' => [[
+        ['type' => 'A', 'name' => '*.apps.example.com', 'content' => '203.0.113.10'],
+        ['type' => 'A', 'name' => '*.example.com', 'content' => '198.51.100.20'],
+    ], 'ok', 'app.apps.example.com'],
     'CNAME origin cannot be verified' => [[['type' => 'CNAME', 'name' => 'app.example.com', 'content' => 'tunnel.cfargotunnel.com']], 'ok'],
     'no record found' => [[], 'ok'],
 ]);
