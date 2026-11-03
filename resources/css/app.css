@@ -3818,9 +3818,9 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-executions-table-grid {
-    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 10rem 5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: 6.5rem minmax(6rem, 0.7fr) minmax(10rem, 1.6fr) 9.5rem 4.5rem minmax(6rem, 0.8fr) 4rem;
     gap: 0.75rem;
-    min-width: 67.5rem;
+    min-width: 52rem;
 }
 
 .backup-executions-table-scroll {
@@ -3829,10 +3829,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Match the grid width so the log output spans the full scrolled row. */
 .backup-execution-row {
-    min-width: 67.5rem;
+    min-width: 52rem;
 }
 
-.backup-execution-row:last-child > .data-table-row {
+.backup-execution-row:last-child {
     border-bottom: 0;
 }
 
@@ -3884,7 +3884,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 10rem minmax(8rem, 1fr) 5rem;
+        grid-template-columns: 6.5rem minmax(6rem, 0.7fr) minmax(10rem, 1.6fr) 9.5rem minmax(6rem, 0.8fr) 4rem;
     }
 
     .backup-executions-table-grid > :nth-child(5) {
