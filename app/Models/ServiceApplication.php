@@ -68,6 +68,7 @@ class ServiceApplication extends BaseModel
             'noindex_domains' => 'array',
             'is_force_https_enabled' => 'boolean',
             'is_permanent_redirect_enabled' => 'boolean',
+            'is_removed_from_compose' => 'boolean',
         ];
     }
 

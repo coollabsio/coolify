@@ -2386,6 +2386,28 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     return $topLevel;
 }
 
+/**
+ * Marks the applications and databases of a service whose names are no longer in its compose file.
+ * They keep their settings, so a part that comes back under the same name is used again.
+ * The service status ignores marked parts, and the user can delete them.
+ *
+ * @param  array<string|int, mixed>|Collection<string|int, mixed>  $services
+ */
+function markServicePartsRemovedFromCompose(Service $resource, array|Collection $services): void
+{
+    $serviceNames = collect($services)->keys()->map(fn ($name): string => (string) $name)->all();
+    if ($serviceNames === []) {
+        return;
+    }
+
+    foreach ([$resource->applications(), $resource->databases()] as $parts) {
+        (clone $parts)->whereIn('name', $serviceNames)->where('is_removed_from_compose', true)
+            ->update(['is_removed_from_compose' => false]);
+        (clone $parts)->whereNotIn('name', $serviceNames)->where('is_removed_from_compose', false)
+            ->update(['is_removed_from_compose' => true]);
+    }
+}
+
 function serviceParser(Service $resource): Collection
 {
     $resource->resetComposeVolumeWarnings();
@@ -2510,6 +2532,7 @@ function serviceParser(Service $resource): Collection
             $savedService->save();
         }
     }
+    markServicePartsRemovedFromCompose($resource, $services);
     foreach ($services as $serviceName => $service) {
         $predefinedPort = null;
         $magicEnvironments = collect([]);
