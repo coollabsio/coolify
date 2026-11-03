@@ -2100,6 +2100,26 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     padding: 1rem;
 }
 
+/* Sections inside a modal well: the modal is already the card, so show each
+   section flat (title row and fields) with a divider between sections. */
+.modal-flat-sections .application-settings-section,
+.modal-flat-sections .application-settings-section-body {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+.modal-flat-sections .application-settings-section > :is(header, .application-settings-section-header) {
+    padding-inline: 0;
+}
+
+.modal-flat-sections .application-settings-section ~ .application-settings-section {
+    border-top: 1px solid var(--well-border);
+    padding-top: 1.5rem;
+}
+
 /* The dark well is darker than the canvas, so controls inside it use a darker,
    translucent fill and border (like haruvo) instead of the global opaque ones. */
 .dark .application-settings-section-body {
