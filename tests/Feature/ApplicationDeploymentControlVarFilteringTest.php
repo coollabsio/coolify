@@ -1936,6 +1936,22 @@ it('writes a readable runtime env line for legacy literal values with a single q
     expect($runtimeEnvs)->toContain('LEGACY_QUOTE="it\'s"');
 });
 
+it('writes a readable runtime env line for legacy multiline JSON values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $json = "{\n  \"type\": \"service_account\"\n}";
+
+    $variable = createApplicationEnvironmentVariable($application, ['key' => 'GOOGLE_CREDENTIALS_JSON', 'value' => $json, 'is_multiline' => true, 'is_runtime' => true, 'is_buildtime' => false]);
+    $variable->uses_legacy_escaping = true;
+    $variable->save();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain('GOOGLE_CREDENTIALS_JSON='.escapeComposeEnvFileValue($json));
+});
+
 it('keeps the old runtime env format for preview variables saved before exact escaping', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 
