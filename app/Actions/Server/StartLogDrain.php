@@ -19,7 +19,7 @@ class StartLogDrain
      * Bump when the generated files change (image, config, compose, or README), so that the
      * server checks start running log drains again with the new files.
      */
-    public const CONFIG_VERSION = '1';
+    public const CONFIG_VERSION = '2';
 
     public const CONFIG_VERSION_LABEL = 'coolify.logDrainConfigVersion';
 
@@ -56,6 +56,24 @@ class StartLogDrain
             return 'Amazon CloudWatch Logs uses the built-in Docker awslogs driver.';
         }
         $serverName = $this->fluentBitValue((string) $server->name);
+        // Rename keeps a key that exists, so the container labels fill a field only when the
+        // Coolify default variables are not on the container. Then the labels are removed.
+        $coolifyFieldsFilter = "[FILTER]
+    Name                modify
+    Match               *
+    Set                 coolify.server_name {$serverName}
+    Rename              COOLIFY_APP_NAME coolify.app_name
+    Rename              COOLIFY_PROJECT_NAME coolify.project_name
+    Rename              COOLIFY_SERVER_IP coolify.server_ip
+    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
+    Rename              coolify.resourceName coolify.app_name
+    Rename              coolify.projectName coolify.project_name
+    Rename              coolify.environmentName coolify.environment_name
+    Rename              coolify.serviceName coolify.service_name
+    Remove              coolify.resourceName
+    Remove              coolify.projectName
+    Remove              coolify.environmentName
+";
         try {
             if ($type === 'none') {
                 return 'No log drain is enabled.';
@@ -77,15 +95,7 @@ class StartLogDrain
     Name grep
     Match *
     Exclude log 127.0.0.1
-[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$serverName}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
-[OUTPUT]
+{$coolifyFieldsFilter}[OUTPUT]
     Name nrlogs
     Match *
     license_key \${LICENSE_KEY}
@@ -111,15 +121,7 @@ class StartLogDrain
     Name grep
     Match *
     Exclude log 127.0.0.1
-[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$serverName}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
-[OUTPUT]
+{$coolifyFieldsFilter}[OUTPUT]
     Name            http
     Match           *
     Host            \${AXIOM_DOMAIN}

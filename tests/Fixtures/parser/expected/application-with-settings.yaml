@@ -180,6 +180,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
         image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
@@ -265,6 +266,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       my-app:
@@ -336,6 +338,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       api.v2:
@@ -390,6 +393,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       admin:
@@ -462,6 +466,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       blog:
@@ -537,6 +542,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       db:
@@ -602,6 +608,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       sidecar:
@@ -656,6 +663,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       worker:
@@ -718,6 +726,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
     volumes:
@@ -949,6 +958,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
         image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
@@ -1048,6 +1058,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       my-app:
@@ -1128,6 +1139,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       api.v2:
@@ -1203,6 +1215,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       admin:
@@ -1284,6 +1297,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       blog:
@@ -1366,6 +1380,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       db:
@@ -1433,6 +1448,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       sidecar:
@@ -1489,6 +1505,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       worker:
@@ -1553,6 +1570,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
     volumes:
@@ -1812,6 +1830,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
         image: 'referenceapplication0001_web:pr-7'
@@ -1911,6 +1930,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       my-app-pr-7:
@@ -1996,6 +2016,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       api.v2-pr-7:
@@ -2076,6 +2097,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       admin-pr-7:
@@ -2162,6 +2184,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       blog-pr-7:
@@ -2248,6 +2271,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       db-pr-7:
@@ -2317,6 +2341,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       sidecar-pr-7:
@@ -2373,6 +2398,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       worker-pr-7:
@@ -2439,6 +2465,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
     volumes:
@@ -2658,6 +2685,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
         image: 'referenceapplication0001_web:pr-8'
@@ -2719,6 +2747,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       my-app-pr-8:
@@ -2766,6 +2795,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       api.v2-pr-8:
@@ -2812,6 +2842,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       admin-pr-8:
@@ -2860,6 +2891,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       blog-pr-8:
@@ -2907,6 +2939,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       db-pr-8:
@@ -2964,6 +2997,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       sidecar-pr-8:
@@ -3008,6 +3042,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
       worker-pr-8:
@@ -3062,6 +3097,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
     volumes:

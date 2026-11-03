@@ -270,6 +270,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
       api:
         image: 'node:22-alpine'
         build:
@@ -1149,6 +1150,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
       api:
         image: 'node:22-alpine'
         build:
@@ -2071,6 +2073,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+            labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
       api:
         image: 'node:22-alpine'
         build:

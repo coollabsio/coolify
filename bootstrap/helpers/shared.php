@@ -4621,8 +4621,10 @@ function generate_fluentd_configuration(): array
             'fluentd-address' => 'tcp://127.0.0.1:24224',
             'fluentd-async' => 'true',
             'fluentd-sub-second-precision' => 'true',
-            // env vars are used in the LogDrain configurations
+            // The env vars exist only when the resource includes the Coolify default variables.
             'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
+            // Every Coolify container has these labels. Docker skips a label that a container does not have.
+            'labels' => 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName',
         ],
     ];
 }
