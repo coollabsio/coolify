@@ -32,6 +32,7 @@ use OpenApi\Attributes as OA;
         'status' => ['type' => 'string'],
         'is_webhook' => ['type' => 'boolean'],
         'is_api' => ['type' => 'boolean'],
+        'is_mcp' => ['type' => 'boolean'],
         'created_at' => ['type' => 'string'],
         'updated_at' => ['type' => 'string'],
         'logs' => ['type' => 'string'],
@@ -89,7 +90,11 @@ class ApplicationDeploymentQueue extends Model
             }
 
             $application = $deployment->application;
-            $source = $deployment->is_api ? 'api' : 'ui';
+            $source = match (true) {
+                (bool) $deployment->is_mcp => 'mcp',
+                (bool) $deployment->is_api => 'api',
+                default => 'ui',
+            };
 
             auditLog("{$source}.application.rollback", [
                 'team_id' => $application?->team()?->id,
@@ -108,7 +113,11 @@ class ApplicationDeploymentQueue extends Model
             }
 
             $application = $deployment->application;
-            $source = $deployment->is_api ? 'api' : 'ui';
+            $source = match (true) {
+                (bool) $deployment->is_mcp => 'mcp',
+                (bool) $deployment->is_api => 'api',
+                default => 'ui',
+            };
 
             auditLog("{$source}.deployment.cancelled", [
                 'team_id' => $application?->team()?->id,
@@ -145,6 +154,7 @@ class ApplicationDeploymentQueue extends Model
         'rollback',
         'commit_message',
         'is_api',
+        'is_mcp',
         'build_server_id',
         'horizon_job_id',
         'horizon_job_worker',

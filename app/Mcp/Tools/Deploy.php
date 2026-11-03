@@ -74,7 +74,7 @@ class Deploy extends Tool
             deployment_uuid: $deploymentUuid,
             pull_request_id: $pullRequestId,
             force_rebuild: $force,
-            is_api: true,
+            is_mcp: true,
             no_questions_asked: true,
         );
 

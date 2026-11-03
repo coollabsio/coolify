@@ -125,7 +125,7 @@ class Control extends Tool
             deployment_uuid: $deploymentUuid,
             force_rebuild: false,
             restart_only: $action === 'restart',
-            is_api: true,
+            is_mcp: true,
             no_questions_asked: $action === 'start',
         );
 

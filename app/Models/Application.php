@@ -1378,12 +1378,14 @@ class Application extends BaseModel
                     'webhook', 'webhooks' => $query->orWhere('is_webhook', true),
                     'rollback', 'rollbacks' => $query->orWhere('rollback', true),
                     'api' => $query->orWhere('is_api', true),
+                    'mcp' => $query->orWhere('is_mcp', true),
                     'manual' => $query->orWhere(function ($sourceQuery) {
                         $sourceQuery
                             ->where('pull_request_id', '<=', 0)
                             ->where('is_webhook', false)
                             ->where('rollback', false)
-                            ->where('is_api', false);
+                            ->where('is_api', false)
+                            ->where('is_mcp', false);
                     }),
                     default => null,
                 };
@@ -1409,7 +1411,8 @@ class Application extends BaseModel
                             'webhook' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', true),
                             'rollback' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', true),
                             'api' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', true),
-                            'manual' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', false),
+                            'mcp' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_mcp', true),
+                            'manual' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', false)->where('is_mcp', false),
                             default => $sourceQuery->where('id', -1),
                         };
                     });

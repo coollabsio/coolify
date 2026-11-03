@@ -27187,6 +27187,9 @@
                     "is_api": {
                         "type": "boolean"
                     },
+                    "is_mcp": {
+                        "type": "boolean"
+                    },
                     "created_at": {
                         "type": "string"
                     },

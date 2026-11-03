@@ -17360,6 +17360,8 @@ components:
           type: boolean
         is_api:
           type: boolean
+        is_mcp:
+          type: boolean
         created_at:
           type: string
         updated_at:
