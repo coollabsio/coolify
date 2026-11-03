@@ -101,7 +101,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Persistent volume | the seed has one; add a host-path bind mount and preview suffix on |
 | ✅ | File mount + directory mount | content, chown, chmod |
 | ✅ | Volume backup | on the persistent volume: S3 on, stop during backup, all retention values, timeout, missing-backup days |
-| ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout; an auto-disabled task keeps its disabled reason |
+| ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout + "Run in a shell" off; an auto-disabled task keeps its disabled reason |
 | ✅ | Tag | |
 | ✅ | Preview deployment | PR preview with domain port overrides + max restart count + keeps production values (previews from before v4.5.1) (needs the GitHub App, or create it in the database) |
 | ✅ | Secret manager link | the app loads variables from the secret manager token |

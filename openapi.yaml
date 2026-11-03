@@ -10377,6 +10377,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -10484,6 +10488,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -10619,6 +10627,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -10726,6 +10738,10 @@ paths:
                   description: 'The timeout of the scheduled task in seconds.'
                   default: 300
                   maximum: 36000
+                use_shell:
+                  type: boolean
+                  description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
+                  default: true
                 enabled:
                   type: boolean
                   description: 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.'
@@ -17673,6 +17689,9 @@ components:
         timeout:
           type: integer
           description: 'The timeout of the scheduled task in seconds.'
+        use_shell:
+          type: boolean
+          description: 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'
         consecutive_failures:
           type: integer
           description: 'The number of failed runs since the last successful run.'

@@ -1324,6 +1324,7 @@ class ServerTransferExporter
                 'frequency' => $task->frequency,
                 'container' => $task->container,
                 'timeout' => $task->timeout,
+                'use_shell' => (bool) ($task->use_shell ?? true),
                 'enabled' => (bool) ($task->enabled ?? true),
                 'disabled_reason' => $task->disabled_reason,
             ];

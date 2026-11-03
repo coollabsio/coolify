@@ -1688,6 +1688,7 @@ class ServerTransferImporter
                 'frequency' => data_get($task, 'frequency'),
                 'container' => data_get($task, 'container'),
                 'timeout' => data_get($task, 'timeout'),
+                'use_shell' => (bool) data_get($task, 'use_shell', true),
                 'enabled' => (bool) data_get($task, 'enabled', true),
                 'disabled_reason' => data_get($task, 'disabled_reason'),
                 'team_id' => $teamId,

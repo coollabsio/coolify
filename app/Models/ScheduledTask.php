@@ -21,6 +21,7 @@ use OpenApi\Attributes as OA;
         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.'],
+        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.'],
         'consecutive_failures' => ['type' => 'integer', 'description' => 'The number of failed runs since the last successful run.'],
         'failing_since' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time of the first failed run since the last successful run.'],
         'disabled_reason' => ['type' => 'string', 'nullable' => true, 'description' => 'Why Coolify disabled the task automatically. It is cleared when the task is enabled again.'],
@@ -41,6 +42,7 @@ class ScheduledTask extends BaseModel
         'frequency',
         'container',
         'timeout',
+        'use_shell',
         'team_id',
         'application_id',
         'service_id',
@@ -83,6 +85,7 @@ class ScheduledTask extends BaseModel
         return [
             'enabled' => 'boolean',
             'timeout' => 'integer',
+            'use_shell' => 'boolean',
             'consecutive_failures' => 'integer',
             'failing_since' => 'datetime',
         ];
@@ -123,6 +126,98 @@ class ScheduledTask extends BaseModel
         }
 
         return NotificationThrottle::release($this, TaskFailed::class);
+    }
+
+    /**
+     * The part of `docker exec <container> ...` that runs the command, quoted for the host shell.
+     * Without a shell, the command is split into words like a POSIX shell does, but nothing is expanded,
+     * so it also runs in containers that have no `sh` (distroless or scratch images).
+     */
+    public function containerCommand(): string
+    {
+        if ($this->use_shell ?? true) {
+            return 'sh -c '.escapeshellarg($this->command);
+        }
+
+        $arguments = self::splitCommandArguments($this->command);
+        if ($arguments === []) {
+            throw new \InvalidArgumentException('The command is empty.');
+        }
+
+        return implode(' ', array_map(escapeshellarg(...), $arguments));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function splitCommandArguments(string $command): array
+    {
+        $arguments = [];
+        $word = null;
+        $quote = null;
+        $length = strlen($command);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $command[$i];
+            $next = $command[$i + 1] ?? null;
+
+            if ($quote === "'") {
+                if ($char === "'") {
+                    $quote = null;
+                } else {
+                    $word .= $char;
+                }
+
+                continue;
+            }
+
+            if ($quote === '"') {
+                if ($char === '"') {
+                    $quote = null;
+                } elseif ($char === '\\' && in_array($next, ['"', '\\', '$', '`'], true)) {
+                    $word .= $next;
+                    $i++;
+                } else {
+                    $word .= $char;
+                }
+
+                continue;
+            }
+
+            if ($char === '\\' && $next === "\n") {
+                $i++;
+
+                continue;
+            }
+
+            if (ctype_space($char)) {
+                if ($word !== null) {
+                    $arguments[] = $word;
+                    $word = null;
+                }
+
+                continue;
+            }
+
+            $word ??= '';
+            if ($char === "'" || $char === '"') {
+                $quote = $char;
+            } elseif ($char === '\\' && $next !== null) {
+                $word .= $next;
+                $i++;
+            } else {
+                $word .= $char;
+            }
+        }
+
+        if ($quote !== null) {
+            throw new \InvalidArgumentException('The command has a quote that is not closed.');
+        }
+        if ($word !== null) {
+            $arguments[] = $word;
+        }
+
+        return $arguments;
     }
 
     public function url(): ?string
