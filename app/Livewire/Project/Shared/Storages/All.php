@@ -24,7 +24,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
      */
     public array $forms = [];
 
@@ -89,6 +89,7 @@ class All extends Component
 
         $this->pendingRename = null;
         $this->rebuildForms();
+        $this->rebuildStaleVolumeContainers();
         $this->rebuildVolumeBackupMeta();
     }
 
@@ -247,9 +248,45 @@ class All extends Component
                 'canDeleteToApplyDriverOptions' => $this->canUpdate && $ignoresDriverOptions,
                 'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
                 'ignoresDriverOptions' => $ignoresDriverOptions,
+                'usedByContainers' => [],
             ];
         }
         $this->forms = $forms;
+    }
+
+    /**
+     * Finds the containers that still use a stale volume. Docker Compose can keep such a volume
+     * in a container after the line was removed from the Compose file. After the entry is
+     * deleted, the next deployment starts that container without the data (#6875).
+     */
+    private function rebuildStaleVolumeContainers(): void
+    {
+        $staleNames = collect($this->forms)->filter(fn (array $form) => $form['canDeleteStale'])->pluck('name');
+        if ($staleNames->isEmpty()) {
+            return;
+        }
+        $server = $this->resource instanceof Application
+            ? $this->resource->destination->server
+            : $this->resource->service->server;
+        try {
+            $output = (string) instant_remote_process(["docker ps -a --no-trunc --format '{{.Names}} {{.Mounts}}'"], $server, false, maxAttempts: 1);
+        } catch (\Throwable) {
+            return;
+        }
+        $containers = collect(preg_split('/\R/', trim($output)))->filter()->mapWithKeys(function (string $line) {
+            [$name, $mounts] = array_pad(explode(' ', $line, 2), 2, '');
+
+            return [$name => explode(',', $mounts)];
+        });
+        foreach ($this->forms as $id => $form) {
+            if ($form['canDeleteStale']) {
+                $this->forms[$id]['usedByContainers'] = $containers
+                    ->filter(fn (array $mounts) => in_array($form['name'], $mounts, true))
+                    ->keys()
+                    ->values()
+                    ->all();
+            }
+        }
     }
 
     private function rebuildVolumeBackupMeta(): void

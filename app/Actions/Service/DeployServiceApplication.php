@@ -61,6 +61,7 @@ class DeployServiceApplication
         }
         // No stdin for Compose prompts: they would read the next script lines (see StartService).
         $upCommand .= " {$safeComposeServiceName} < /dev/null";
+        $commands->push(...StartService::removeContainersWithRemovedVolumesCommands($service, $composeServiceName));
         $commands->push('echo Starting service container.');
         $commands->push($upCommand);
 

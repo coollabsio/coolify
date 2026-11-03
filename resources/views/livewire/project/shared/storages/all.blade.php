@@ -177,7 +177,10 @@
                                                                 $form['replacedExternalVolume']
                                                                     ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
                                                                     : null,
-                                                            ]))" confirmationText="{{ $form['name'] }}"
+                                                            ]))"
+                                                            :warningMessage="$form['usedByContainers'] !== []
+                                                                ? e('This volume is still in use by: '.implode(', ', $form['usedByContainers']).'. After you delete this entry, the next deployment starts the resource without the data in this volume. Back up the data first if you need it.')
+                                                                : null" confirmationText="{{ $form['name'] }}"
                                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                                             shortConfirmationLabel="Storage Name">
                                                             <x-slot:trigger>

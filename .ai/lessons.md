@@ -39,6 +39,8 @@
 - SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely.
 - SQLite does not enforce `varchar(255)` lengths, while Postgres rejects a longer value (`SQLSTATE[22001]`). Tests cannot show a too-long name, so assert the length or the exact value of generated strings.
 
+- `docker compose up` gives a recreated container the old mount at each path that the image declares with `VOLUME`, also a named volume or bind mount that the Compose file no longer has. Remove the old container first when a mount must go (`composeContainersWithRemovedVolumes()`); do not use `--renew-anon-volumes`, because it deletes the data of anonymous volumes.
+
 - The Compose parsers (`parse()`, `applicationParser`, `serviceParser`) run on page mounts, refreshes, and deployments. Do not dispatch jobs or run server commands from them; let the caller that changes data start the work. Code that only needs the service names reads `docker_compose_raw` (`Application::composeServicesWithoutParse()`).
 
 - MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
