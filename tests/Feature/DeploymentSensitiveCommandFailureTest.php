@@ -658,3 +658,26 @@ it('mounts the seccomp profile from custom docker options into the helper contai
         ->and($helperCommands[0])->toContain('type=bind,source=/etc/docker/seccomp-profile.json,target=/etc/docker/seccomp-profile.json,readonly')
         ->and($exception->getMessage())->toContain('bind source path does not exist: /etc/docker/seccomp-profile.json');
 });
+
+it('removes the old helper synchronously before it starts the helper again with the same name', function () {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
+
+    $commands = [];
+    Process::fake(function (PendingProcess $process) use (&$commands) {
+        $commands[] = remoteProcessScript($process);
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'restart_builder_container_with_actual_commit');
+
+    $runIndex = collect($commands)->search(fn (string $command) => str_contains($command, 'docker run -d'));
+    $beforeRun = collect($commands)->take($runIndex);
+
+    // "docker stop" lets the --rm auto-removal hold the name after it returns; "docker rm -f" frees the name before it returns.
+    expect($runIndex)->toBeInt()
+        ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker rm -f') && str_contains($command, 'sensitive-failure-deployment')))->toBeTrue()
+        ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker stop')))->toBeFalse();
+});
