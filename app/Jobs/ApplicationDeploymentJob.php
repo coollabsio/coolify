@@ -3380,8 +3380,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
-        if (isset($this->application->git_branch)) {
-            $this->coolify_variables .= 'COOLIFY_BRANCH='.escapeShellValue($this->application->git_branch).' ';
+        $branch = $this->application->coolifyBranch($this->pull_request_id);
+        if (isset($branch)) {
+            $this->coolify_variables .= 'COOLIFY_BRANCH='.escapeShellValue($branch).' ';
         }
         $this->coolify_variables .= 'COOLIFY_RESOURCE_UUID='.escapeShellValue($this->application->uuid).' ';
     }
@@ -4298,7 +4299,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     protected function generate_coolify_env_variables(bool $forBuildTime = false): Collection
     {
         $coolify_envs = collect([]);
-        $local_branch = $this->branch;
+        $local_branch = $this->application->coolifyBranch($this->pull_request_id);
         if ($this->pull_request_id !== 0) {
             // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
             // SOURCE_COMMIT changes with each commit and breaks Docker cache if included in build

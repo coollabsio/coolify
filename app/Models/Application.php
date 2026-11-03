@@ -1962,6 +1962,18 @@ class Application extends BaseModel
         return $commands;
     }
 
+    /**
+     * The COOLIFY_BRANCH value of a deployment. Preview deployments use the pull request ref.
+     */
+    public function coolifyBranch(int $pullRequestId = 0): ?string
+    {
+        if ($pullRequestId !== 0) {
+            return "pull/{$pullRequestId}/head";
+        }
+
+        return $this->git_branch;
+    }
+
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
         $branch = $this->git_branch;

@@ -2002,10 +2002,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $branch = $originalResource->git_branch;
-        if ($pullRequestId !== 0) {
-            $branch = "pull/{$pullRequestId}/head";
-        }
+        $branch = $originalResource->coolifyBranch($pullRequestId);
         if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
             $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
         }
