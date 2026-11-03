@@ -6554,6 +6554,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     }
@@ -6631,6 +6634,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
@@ -6701,6 +6707,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -6748,6 +6757,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -6816,6 +6828,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -6872,6 +6887,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -20473,6 +20491,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can reset the host key."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"

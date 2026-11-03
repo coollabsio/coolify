@@ -96,7 +96,7 @@ class Destination extends Component
     {
         try {
             $this->authorize('deploy', $this->resource);
-            $server = $this->findUsableServer((int) $serverId);
+            $server = $this->resourceServers()->findOrFail((int) $serverId);
             StopApplicationOneServer::run($this->resource, $server);
             auditLog('ui.application.destination_stopped', [
                 'team_id' => $this->resource->team()?->id,

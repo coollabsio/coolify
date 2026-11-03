@@ -4242,6 +4242,8 @@ paths:
                   type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can manage cloud provider tokens.'
         '400':
           $ref: '#/components/responses/400'
       security:
@@ -4289,6 +4291,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can manage cloud provider tokens.'
         '400':
           $ref: '#/components/responses/400'
         '422':
@@ -4328,6 +4332,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can manage cloud provider tokens.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -4358,6 +4364,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can manage cloud provider tokens.'
         '400':
           $ref: '#/components/responses/400'
         '404':
@@ -4401,6 +4409,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can manage cloud provider tokens.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -4435,6 +4445,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can manage cloud provider tokens.'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -12923,6 +12935,8 @@ paths:
                 type: object
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Only team admins and owners can reset the host key.'
         '400':
           $ref: '#/components/responses/400'
         '404':

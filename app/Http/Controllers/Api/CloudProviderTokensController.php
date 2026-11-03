@@ -109,6 +109,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),
@@ -170,6 +174,10 @@ class CloudProviderTokensController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
             ),
             new OA\Response(
                 response: 404,
@@ -240,6 +248,10 @@ class CloudProviderTokensController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
             ),
             new OA\Response(
                 response: 400,
@@ -361,6 +373,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
@@ -468,6 +484,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),
@@ -545,6 +565,10 @@ class CloudProviderTokensController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
             ),
             new OA\Response(
                 response: 404,

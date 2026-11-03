@@ -2,6 +2,10 @@
 
 use App\Jobs\CleanupUnusedSshKeys;
 use App\Jobs\RotatePrivateKeyJob;
+use App\Models\Application;
+use App\Models\GiteaApp;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Cache\Events\CacheMissed;
@@ -81,6 +85,62 @@ it('keeps a key referenced by a server', function () {
     app(CleanupUnusedSshKeys::class)->handle();
 
     Storage::disk('ssh-keys')->assertExists($file);
+});
+
+it('keeps a key referenced by an application or a git source', function (Closure $reference) {
+    $key = unusedSshCleanupKey('referenced-key');
+    $file = unusedSshCleanupFile($key->uuid);
+    $reference($key);
+
+    app(CleanupUnusedSshKeys::class)->handle();
+
+    Storage::disk('ssh-keys')->assertExists($file);
+})->with([
+    'application' => [fn (PrivateKey $key) => Application::withoutEvents(fn () => Application::factory()->create(['uuid' => 'cleanup-app', 'private_key_id' => $key->id]))],
+    'GitHub app' => [fn (PrivateKey $key) => GithubApp::withoutEvents(fn () => GithubApp::forceCreate([
+        'uuid' => 'cleanup-github', 'name' => 'github', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'team_id' => 1, 'private_key_id' => $key->id,
+    ]))],
+    'GitLab app' => [fn (PrivateKey $key) => GitlabApp::withoutEvents(fn () => GitlabApp::forceCreate([
+        'uuid' => 'cleanup-gitlab', 'name' => 'gitlab', 'api_url' => 'https://gitlab.example.com/api/v4', 'html_url' => 'https://gitlab.example.com', 'team_id' => 1, 'private_key_id' => $key->id,
+    ]))],
+    'Gitea app' => [fn (PrivateKey $key) => GiteaApp::withoutEvents(fn () => GiteaApp::forceCreate([
+        'uuid' => 'cleanup-gitea', 'name' => 'gitea', 'api_url' => 'https://gitea.example.com/api/v1', 'html_url' => 'https://gitea.example.com', 'team_id' => 1, 'private_key_id' => $key->id,
+    ]))],
+]);
+
+it('removes the file of a key that only a deleted server references', function () {
+    $key = unusedSshCleanupKey('deleted-server-key');
+    $file = unusedSshCleanupFile($key->uuid);
+    $server = Server::withoutEvents(fn () => Server::factory()->create([
+        'uuid' => 'deleted-server', 'private_key_id' => $key->id, 'team_id' => 1,
+    ]));
+    Server::withoutEvents(fn () => $server->delete());
+
+    app(CleanupUnusedSshKeys::class)->handle();
+
+    Storage::disk('ssh-keys')->assertMissing($file);
+});
+
+it('uses a fixed number of queries for any number of key files', function () {
+    foreach (range(1, 40) as $id) {
+        $key = unusedSshCleanupKey('bounded-'.$id);
+        unusedSshCleanupFile($key->uuid);
+        if ($id % 2 === 0) {
+            Server::withoutEvents(fn () => Server::factory()->create([
+                'uuid' => 'bounded-server-'.$id, 'private_key_id' => $key->id, 'team_id' => 1,
+            ]));
+        }
+    }
+    $queries = 0;
+    (new PrivateKey)->getConnection()->listen(function () use (&$queries) {
+        $queries++;
+    });
+
+    app(CleanupUnusedSshKeys::class)->handle();
+
+    expect($queries)->toBeLessThanOrEqual(6);
+    $remaining = array_values(array_filter(Storage::disk('ssh-keys')->files(), fn ($file) => ! str_ends_with($file, '.lock')));
+    expect($remaining)->toHaveCount(20);
 });
 
 it('cleans up 10000 local key files with mixed usage', function () {

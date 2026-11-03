@@ -2,7 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Models\Application;
+use App\Models\GiteaApp;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
+use App\Models\Server;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,14 +18,16 @@ class CleanupUnusedSshKeys
     {
         // Read metadata only: cleanup must never decrypt key material.
         $keys = PrivateKey::query()->select(['id', 'uuid'])->get()->keyBy('uuid');
+        $rotationStates = $keys->isEmpty() ? [] : Cache::many($keys->map(fn (PrivateKey $key) => RotatePrivateKeyJob::cacheKey($key))->values()->all());
         $rotatingIds = [];
         foreach ($keys as $key) {
-            $state = Cache::get(RotatePrivateKeyJob::cacheKey($key), []);
-            if (in_array($state['status'] ?? null, ['queued', 'running'], true)) {
+            $state = $rotationStates[RotatePrivateKeyJob::cacheKey($key)] ?? null;
+            if (is_array($state) && in_array($state['status'] ?? null, ['queued', 'running'], true)) {
                 $rotatingIds[] = $key->id;
                 $rotatingIds[] = $state['new_private_key_id'] ?? null;
             }
         }
+        $keyIdsInUse = null;
 
         $disk = Storage::disk('ssh-keys');
         foreach ($disk->files() as $filename) {
@@ -41,7 +49,8 @@ class CleanupUnusedSshKeys
                     continue;
                 }
                 $key = $keys->get($matches[1]);
-                if ($key && (in_array($key->id, $rotatingIds) || $key->isInUse())) {
+                $keyIdsInUse ??= $this->keyIdsInUse();
+                if ($key && (in_array($key->id, $rotatingIds) || isset($keyIdsInUse[$key->id]))) {
                     continue;
                 }
                 $disk->delete($filename);
@@ -50,5 +59,24 @@ class CleanupUnusedSshKeys
                 fclose($lock);
             }
         }
+    }
+
+    /**
+     * The ids of the keys that PrivateKey::isInUse() reports as used, as array keys.
+     *
+     * @return array<int, true>
+     */
+    private function keyIdsInUse(): array
+    {
+        return collect([
+            Server::query(),
+            Application::query()->withoutGlobalScope('withRelations'),
+            GithubApp::query(),
+            GitlabApp::query(),
+            GiteaApp::query(),
+        ])
+            ->flatMap(fn (Builder $query) => $query->whereNotNull('private_key_id')->distinct()->pluck('private_key_id'))
+            ->mapWithKeys(fn (int|string $id) => [(int) $id => true])
+            ->all();
     }
 }

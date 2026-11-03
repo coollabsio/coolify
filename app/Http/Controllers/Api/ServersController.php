@@ -1298,6 +1298,10 @@ class ServersController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can reset the host key.',
+            ),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),

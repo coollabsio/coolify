@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Docker\GetContainersStatus;
 use App\Livewire\Project\Shared\Destination;
 use App\Models\Application;
@@ -259,6 +260,31 @@ describe('Destination::removeServer', function () {
             ->where('standalone_docker_id', $this->destinationA2->id)
             ->where('server_id', $this->serverA2->id)
             ->exists())->toBeFalse();
+    });
+});
+
+describe('Destination::stop', function () {
+    test('stops the application on an additional server that is no longer usable', function (array $settings) {
+        $this->applicationA->additional_networks()->attach($this->destinationA2->id, ['server_id' => $this->serverA2->id]);
+        $this->serverA2->settings->update($settings);
+        Server::flushIdentityMap();
+        StopApplicationOneServer::shouldRun()->once()
+            ->withArgs(fn (Application $application, Server $server) => $application->is($this->applicationA) && $server->is($this->serverA2));
+
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('stop', $this->serverA2->id)
+            ->assertHasNoErrors();
+    })->with([
+        'unreachable' => [['is_reachable' => false]],
+        'unusable' => [['is_usable' => false]],
+        'force disabled' => [['force_disabled' => true]],
+    ]);
+
+    test('cannot stop the application on a server of another team', function () {
+        StopApplicationOneServer::shouldNotRun();
+
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('stop', $this->serverB->id);
     });
 });
 

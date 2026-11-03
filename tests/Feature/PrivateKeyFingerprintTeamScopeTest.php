@@ -182,14 +182,15 @@ test('a legacy key with unnormalized stored text can be renamed in the key edito
     $key->uuid = (string) Str::uuid();
     $key->saveQuietly();
 
-    // The browser sends the textarea text with LF line endings.
     Livewire::test(Show::class, ['private_key_uuid' => $key->uuid])
+        ->assertSet('newPrivateKey', '')
         ->set('name', 'renamed')
-        ->set('privateKeyValue', $material)
         ->call('changePrivateKey')
+        ->assertHasNoErrors()
         ->assertDispatched('success');
 
     expect($key->fresh()->name)->toBe('renamed');
+    expect(str_replace("\r\n", "\n", $key->fresh()->private_key))->toBe(formatPrivateKey($material));
 })->with(['no final newline' => "\n", 'CRLF' => "\r\n"]);
 
 test('keys that OpenSSH cannot read are rejected', function (string $material, ?string $error) {
