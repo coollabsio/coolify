@@ -398,6 +398,40 @@ it('starts the helper with its own DOCKER_CONFIG after build secret HOME and DOC
         ->and(strrpos($helperCommands[0], '-e DOCKER_CONFIG=/root/.docker'))->toBeGreaterThan(strpos($helperCommands[0], '/app/.docker'));
 });
 
+it('mounts the server CA bundle into the helper so the Docker CLI can fetch registry tokens', function (string $detectedBundle, ?string $expectedMount) {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands, $detectedBundle) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'docker run -d')) {
+            $helperCommands[] = $script;
+        }
+
+        return Process::result(output: match (true) {
+            str_contains($script, 'echo $HOME') => '/root',
+            str_contains($script, 'for f in /etc/ssl/certs/ca-certificates.crt') => $detectedBundle,
+            default => 'NOK',
+        });
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
+
+    expect($helperCommands)->toHaveCount(1);
+    if ($expectedMount === null) {
+        expect($helperCommands[0])->not->toContain('coolify-host-ca-certificates.crt');
+    } else {
+        expect($helperCommands[0])->toContain($expectedMount);
+    }
+})->with([
+    'Debian and Ubuntu bundle' => ['/etc/ssl/certs/ca-certificates.crt', '--mount type=bind,source=/etc/ssl/certs/ca-certificates.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
+    'RHEL bundle' => ['/etc/pki/tls/certs/ca-bundle.crt', '--mount type=bind,source=/etc/pki/tls/certs/ca-bundle.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
+    'no bundle' => ['', null],
+    'unknown output' => ['/root:/x -v /', null],
+]);
+
 it('shows the helper container command when no build secrets are passed', function () {
     [$job, $reflection] = makeSensitiveCommandFailureJob();
     $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
