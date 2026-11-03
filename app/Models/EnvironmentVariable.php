@@ -747,7 +747,7 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
         }
-        $environment_variable = trim($environment_variable);
+        $environment_variable = self::withoutEdgeWhitespace($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
@@ -800,7 +800,19 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return trim(decrypt($environment_variable));
+        return self::withoutEdgeWhitespace(decrypt($environment_variable));
+    }
+
+    /**
+     * Single-line values lose their edge whitespace. Multiline content (a private key, a
+     * certificate, a config file) is kept as it is, because tools such as OpenSSH reject a key
+     * without its trailing newline.
+     */
+    private static function withoutEdgeWhitespace(string $value): string
+    {
+        $trimmed = trim($value);
+
+        return str_contains($trimmed, "\n") ? $value : $trimmed;
     }
 
     private function set_environment_variables(?string $environment_variable = null): ?string
@@ -808,13 +820,8 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable)) {
             return null;
         }
-        $environment_variable = trim($environment_variable);
-        $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt($environment_variable);
-        }
 
-        return encrypt($environment_variable);
+        return encrypt(self::withoutEdgeWhitespace($environment_variable));
     }
 
     protected function key(): Attribute

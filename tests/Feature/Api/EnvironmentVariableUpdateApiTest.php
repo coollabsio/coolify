@@ -644,3 +644,33 @@ describe('env PATCH keeps the value when value is omitted', function () {
         'database bulk' => ['database', 'databases', true],
     ]);
 });
+
+describe('env API keeps multiline values exact', function () {
+    test('create and bulk update keep the trailing newline of a private key', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $key = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----\n";
+        $headers = ['Authorization' => 'Bearer '.$this->bearerToken];
+
+        $this->withHeaders($headers)->postJson("/api/v1/applications/{$application->uuid}/envs", [
+            'key' => 'SSH_KEY',
+            'value' => $key,
+            'is_multiline' => true,
+        ])->assertStatus(201);
+
+        $this->withHeaders($headers)->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [
+                ['key' => 'OTHER_KEY', 'value' => $key, 'is_multiline' => true],
+                ['key' => 'PLAIN', 'value' => "  plain \n"],
+            ],
+        ])->assertStatus(201);
+
+        $values = $application->environment_variables()->get()->pluck('value', 'key');
+        expect($values['SSH_KEY'])->toBe($key)
+            ->and($values['OTHER_KEY'])->toBe($key)
+            ->and($values['PLAIN'])->toBe('plain');
+    });
+});
