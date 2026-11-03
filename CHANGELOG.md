@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Coolify Cloud: end a paid subscription that lost its link to Stripe when the customer cancels it. Before, it stayed active, and `cloud:sync-stripe-subscriptions` did not report it
 - Keep the dashboard proxy configuration of a server with the IP `host.docker.internal` that is not the default localhost server. Before, Coolify did not see this server as localhost after it saved the server, for example after a proxy restart, and deleted `coolify.yaml`, so the dashboard was not reachable at its domain ([#12444](https://github.com/coollabsio/coolify/issues/12444))
 - Show the disk usage of a server on the **Metrics** tab, on the **Fleet** page, and in the MCP `get_server_metrics` tool when Sentinel reports the Coolify data disk under a different mount point than `/`, `/data`, or `/data/coolify`. For example, this occurs on a NAS where `/data` is a symlink into a data volume. Before, the disk usage was always empty on these servers ([#12448](https://github.com/coollabsio/coolify/issues/12448))
+- Pin the Usesend service template to `usesend/usesend:v1.10.0`, which has the Next.js, Node.js 24, and nodemailer security updates. Before, the template used `latest`, so a server kept an old cached image until you pulled the images again. The template does not use MinIO, so the MinIO-to-RustFS change of v1.10.0 does not affect it ([#12443](https://github.com/coollabsio/coolify/issues/12443))
 
 ## [v4.6.0] - 2026-11-02
 
