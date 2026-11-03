@@ -256,7 +256,10 @@ final class ServerTransferCoverage
             'container_id' => 'Not used: only listed in $fillable.',
         ],
         LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED],
-        ScheduledTask::class => ['team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED],
+        ScheduledTask::class => [
+            'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
+            'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,
+        ],
         Tag::class => ['team_id' => self::TEAM],
         ScheduledDatabaseBackup::class => [
             'team_id' => self::TEAM, 'database_type' => self::LINKED, 'database_id' => self::LINKED, 's3_storage_id' => self::LINKED,

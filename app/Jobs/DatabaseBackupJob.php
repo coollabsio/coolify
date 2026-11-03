@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\BackupCreated;
 use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SshRetryHandler;
+use App\Models\NotificationThrottle;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -20,6 +21,7 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Notifications\ScheduledJobRecovered;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -316,6 +318,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
+            $runHadProblem = false;
             foreach ($databasesToBackup as $database) {
                 // Reset per-database state, so a failure before this database's execution exists
                 // does not mark the previous database's execution failed or delete its backup file.
@@ -450,6 +453,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Local backup file is empty or was not created');
                     }
                 } catch (Throwable $e) {
+                    $runHadProblem = true;
                     // Local backup failed: the partial file is not tracked, so retention would never remove it.
                     deleteBackupsLocally($this->backup_location, $this->server);
                     $failureMessage = $this->redact($this->error_output ?? $this->backup_output ?? $e->getMessage());
@@ -498,6 +502,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 // Step 3: Update status and send notifications based on results
+                if ($s3UploadError) {
+                    $runHadProblem = true;
+                }
                 if ($localBackupSucceeded) {
                     $message = $this->backup_output === null ? null : $this->redact($this->backup_output);
 
@@ -535,6 +542,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->backup_log && $this->backup_log->status === 'success') {
                 $this->removeExpiredBackups();
+            }
+            if (! $runHadProblem) {
+                $this->notifyIfRecovered();
             }
         } catch (Throwable $e) {
             $failed = true;
@@ -1097,6 +1107,33 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
      *
      * @return string|array<int, string>|null
      */
+    /**
+     * After a run without problems, tell the team once that a backup that failed before works again.
+     */
+    private function notifyIfRecovered(): void
+    {
+        $wasFailing = NotificationThrottle::release($this->backup, BackupFailed::class);
+        $hadS3Warning = NotificationThrottle::release($this->backup, BackupSuccessWithS3Warning::class);
+        if (! $wasFailing && ! $hadS3Warning) {
+            return;
+        }
+
+        try {
+            $this->team?->notify(new ScheduledJobRecovered(
+                failureEvent: 'backup_failure',
+                title: "Database backup for {$this->database->name} works again.",
+                webhookEvent: 'backup_recovered',
+                url: base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid,
+                webhookData: ['database_name' => $this->database->name, 'database_uuid' => $this->database->uuid, 'backup_uuid' => $this->backup->uuid],
+            ));
+        } catch (Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Failed to send backup recovery notification', [
+                'backup_id' => $this->backup->uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function configuredDatabasesToBackup(): string|array|null
     {
         if ($this->backup->dump_all) {

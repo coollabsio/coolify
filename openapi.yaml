@@ -17673,6 +17673,18 @@ components:
         timeout:
           type: integer
           description: 'The timeout of the scheduled task in seconds.'
+        consecutive_failures:
+          type: integer
+          description: 'The number of failed runs since the last successful run.'
+        failing_since:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'The date and time of the first failed run since the last successful run.'
+        disabled_reason:
+          type: string
+          nullable: true
+          description: 'Why Coolify disabled the task automatically. It is cleared when the task is enabled again.'
         created_at:
           type: string
           format: date-time

@@ -12,6 +12,12 @@
         @endforeach
     </nav>
 
+    @if (! $isEnabled && $task->disabled_reason)
+        <x-callout type="danger" title="Disabled because it keeps failing">
+            {{ $task->disabled_reason }} Fix the task, then click Enable.
+        </x-callout>
+    @endif
+
     <form x-show="activeSection === 'general'" wire:submit="submit" class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit" />
         <x-application.settings-section id="task-configuration-section" title="Task configuration"

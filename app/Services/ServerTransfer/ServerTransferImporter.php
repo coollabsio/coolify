@@ -1688,6 +1688,7 @@ class ServerTransferImporter
                 'container' => data_get($task, 'container'),
                 'timeout' => data_get($task, 'timeout'),
                 'enabled' => (bool) data_get($task, 'enabled', true),
+                'disabled_reason' => data_get($task, 'disabled_reason'),
                 'team_id' => $teamId,
             ];
 
@@ -1697,7 +1698,7 @@ class ServerTransferImporter
                 $payload['service_id'] = $resource->id;
             }
 
-            ScheduledTask::create($payload);
+            ScheduledTask::forceCreate($payload);
         }
     }
 

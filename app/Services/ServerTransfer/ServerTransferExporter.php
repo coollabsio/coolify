@@ -1325,6 +1325,7 @@ class ServerTransferExporter
                 'container' => $task->container,
                 'timeout' => $task->timeout,
                 'enabled' => (bool) ($task->enabled ?? true),
+                'disabled_reason' => $task->disabled_reason,
             ];
         }
 

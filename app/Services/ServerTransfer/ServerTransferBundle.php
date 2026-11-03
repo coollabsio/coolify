@@ -382,6 +382,7 @@ class ServerTransferBundle
             self::check($errors, "{$at}.scheduled_tasks.{$i}.command", $task['command'] ?? null, ['required', 'string']);
             self::check($errors, "{$at}.scheduled_tasks.{$i}.container", $task['container'] ?? null, ['nullable', ...ValidationPatterns::containerNameRules()]);
             self::checkCron($errors, "{$at}.scheduled_tasks.{$i}.frequency", $task['frequency'] ?? '');
+            self::check($errors, "{$at}.scheduled_tasks.{$i}.disabled_reason", $task['disabled_reason'] ?? null, ['nullable', 'string', 'max:1000']);
         }
     }
 

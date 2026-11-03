@@ -6,11 +6,14 @@ use App\Events\BackupCreated;
 use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SshRetryHandler;
 use App\Models\LocalPersistentVolume;
+use App\Models\NotificationThrottle;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Models\Team;
 use App\Models\VolumeBackupS3Replica;
+use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
 use App\Services\ScheduledJobDeliveryService;
@@ -269,6 +272,29 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $team->notify(new BackupSuccess($this->backup, $warning));
+        if ($warning === null) {
+            $this->notifyIfRecovered($team);
+        }
+    }
+
+    /**
+     * After a run without warning, tell the team once that a backup that failed before works again.
+     */
+    private function notifyIfRecovered(Team $team): void
+    {
+        $wasFailing = NotificationThrottle::release($this->backup, BackupFailed::class);
+        $hadWarning = NotificationThrottle::release($this->backup, BackupSuccess::class);
+        if (! $wasFailing && ! $hadWarning) {
+            return;
+        }
+
+        $team->notify(new ScheduledJobRecovered(
+            failureEvent: 'backup_failure',
+            title: 'Storage backup of '.$this->backup->targetType().' '.$this->backup->targetName().' works again.',
+            webhookEvent: 'volume_backup_recovered',
+            url: $this->backup->resourceUrl(),
+            webhookData: ['backup_uuid' => $this->backup->uuid],
+        ));
     }
 
     public function failed(?Throwable $exception): void
