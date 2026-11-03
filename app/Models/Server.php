@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\InstallPrerequisites;
@@ -32,6 +33,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
@@ -1751,6 +1753,47 @@ $siteAddress {
         return $applications->concat($databases)->concat($services->get());
     }
 
+    /**
+     * The resources that deleting this server with "Delete all resources" deletes. An application that has this server
+     * only as an additional destination runs on another server, so it is detached instead.
+     *
+     * @return Collection<int, Model>
+     */
+    public function primaryResources(): Collection
+    {
+        return $this->primaryApplications()
+            ->concat($this->databases())
+            ->concat($this->services()->get());
+    }
+
+    /**
+     * Remove this server from the applications that use it only as an additional destination.
+     * The applications keep running on their other servers.
+     *
+     * @param  bool  $stopContainers  stop and remove the containers of the applications on this server (best effort)
+     */
+    public function detachAdditionalApplications(bool $stopContainers = true): void
+    {
+        $applications = $this->additionalApplications();
+        if ($stopContainers) {
+            foreach ($applications as $application) {
+                try {
+                    StopApplicationOneServer::run($application, $this);
+                } catch (\Throwable $e) {
+                    logger()->warning('Could not stop the containers of an application on a deleted server.', [
+                        'application_id' => $application->id,
+                        'server_id' => $this->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+        DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->delete();
+    }
+
     public function stopUnmanaged($id)
     {
         return instant_remote_process([dockerStopCommand(0, escapeshellarg($id), $this)], $this);
@@ -1841,18 +1884,6 @@ $siteAddress {
         }
     }
 
-    public function hasDefinedResources()
-    {
-        $applications = $this->applications()->count() > 0;
-        $databases = $this->databases()->count() > 0;
-        $services = $this->services()->count() > 0;
-        if ($applications || $databases || $services) {
-            return true;
-        }
-
-        return false;
-    }
-
     public function databases()
     {
         // Get destination IDs for this server in two efficient queries
@@ -1892,22 +1923,13 @@ $siteAddress {
             ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }
 
+    /**
+     * The applications whose primary destination is on this server, plus the applications that use this server as an
+     * additional destination.
+     */
     public function applications()
     {
-        // Get destination IDs for this server in two efficient queries
-        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
-        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
-
-        // Query all applications in a single query using polymorphic conditions
-        $applications = Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
-            $query->where(function ($q) use ($standaloneDockerIds) {
-                $q->where('destination_type', StandaloneDocker::class)
-                    ->whereIn('destination_id', $standaloneDockerIds);
-            })->orWhere(function ($q) use ($swarmDockerIds) {
-                $q->where('destination_type', SwarmDocker::class)
-                    ->whereIn('destination_id', $swarmDockerIds);
-            });
-        })->get();
+        $applications = $this->primaryApplications();
 
         // Get additional server applications
         $additionalApplicationIds = DB::table('additional_destinations')
@@ -1920,6 +1942,45 @@ $siteAddress {
         }
 
         return $applications;
+    }
+
+    /**
+     * The applications whose primary destination is on this server.
+     *
+     * @return Collection<int, Application>
+     */
+    public function primaryApplications(): Collection
+    {
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
+
+        // Query all applications in a single query using polymorphic conditions
+        return Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        })->get();
+    }
+
+    /**
+     * The applications that use this server only as an additional destination. Their primary destination is on
+     * another server.
+     *
+     * @return Collection<int, Application>
+     */
+    public function additionalApplications(): Collection
+    {
+        $applicationIds = DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->whereNotIn('application_id', $this->primaryApplications()->pluck('id'))
+            ->pluck('application_id');
+
+        return Application::query()->with('destination.server')->whereIn('id', $applicationIds)->get();
     }
 
     public function dockerComposeBasedApplications()

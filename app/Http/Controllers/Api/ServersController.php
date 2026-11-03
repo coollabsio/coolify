@@ -946,7 +946,7 @@ class ServersController extends Controller
             new OA\Parameter(
                 name: 'force',
                 in: 'query',
-                description: 'Also delete all resources on the server. Needs the deploy permission.',
+                description: 'Also delete all resources whose main destination is on the server. Applications that use the server only as an additional destination are not deleted. They are removed from the server and keep running on their other servers. Needs the deploy permission.',
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false)
             ),
@@ -1026,7 +1026,8 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server deleted.']);
         }
 
-        if ($server->definedResources()->count() > 0 && ! $force) {
+        $resources = $server->primaryResources();
+        if ($resources->isNotEmpty() && ! $force) {
             return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
         if ($server->is_coolify_host) {
@@ -1053,8 +1054,10 @@ class ServersController extends Controller
             return $response;
         }
 
+        // Applications that use the server only as an additional destination keep running on their other servers.
+        $server->detachAdditionalApplications();
         if ($force) {
-            foreach ($server->definedResources() as $resource) {
+            foreach ($resources as $resource) {
                 DeleteResourceJob::dispatch($resource);
             }
         }

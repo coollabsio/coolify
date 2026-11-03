@@ -64,20 +64,19 @@ class Delete extends Component
 
                 return;
             }
-            if ($this->server->hasDefinedResources() && ! $this->force_delete_resources) {
+            $resources = $this->server->primaryResources();
+            if ($resources->isNotEmpty() && ! $this->force_delete_resources) {
                 $this->dispatch('error', 'Server has defined resources. Please delete them first or select "Delete all resources".');
 
                 return;
             }
 
-            $resources = $this->server->definedResources();
             if ($isArchive) {
-                $claimer = app(ServerTransferClaimer::class);
-                $claimer->forgetDnsRecords($this->server);
-                // Applications that use the server only as an additional destination stay; they lose this server.
-                $claimer->detachAdditionalApplications($this->server);
-                $resources = $claimer->archiveResources($this->server);
+                app(ServerTransferClaimer::class)->forgetDnsRecords($this->server);
             }
+            // Applications that use the server only as an additional destination stay; they lose this server.
+            // Another instance manages a transferred server, so the containers stay as they are there.
+            $this->server->detachAdditionalApplications(stopContainers: ! $isArchive);
             if ($this->force_delete_resources) {
                 foreach ($resources as $resource) {
                     DeleteResourceJob::dispatch($resource, deleteFromCoolifyOnly: $isArchive);
@@ -109,11 +108,13 @@ class Delete extends Component
     {
         $checkboxes = [];
 
-        if ($this->server->hasDefinedResources() && ! $this->server->isTransferredAway()) {
-            $resourceCount = $this->server->definedResources()->count();
+        $resourcesToDelete = $this->server->primaryResources();
+        $detachedApplications = $this->server->additionalApplications();
+
+        if ($resourcesToDelete->isNotEmpty() && ! $this->server->isTransferredAway()) {
             $checkboxes[] = [
                 'id' => 'force_delete_resources',
-                'label' => "Delete all resources ({$resourceCount} total)",
+                'label' => "Delete all resources ({$resourcesToDelete->count()} total): ".$resourcesToDelete->pluck('name')->implode(', '),
                 'default_warning' => 'Server cannot be deleted while it has resources.',
             ];
         }
@@ -154,6 +155,8 @@ class Delete extends Component
 
         return view('livewire.server.delete', [
             'checkboxes' => $checkboxes,
+            'resourcesToDelete' => $resourcesToDelete,
+            'detachedApplications' => $detachedApplications,
         ]);
     }
 }

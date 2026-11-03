@@ -19974,7 +19974,7 @@
                     {
                         "name": "force",
                         "in": "query",
-                        "description": "Also delete all resources on the server. Needs the deploy permission.",
+                        "description": "Also delete all resources whose main destination is on the server. Applications that use the server only as an additional destination are not deleted. They are removed from the server and keep running on their other servers. Needs the deploy permission.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
