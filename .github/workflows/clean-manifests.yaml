@@ -2,7 +2,7 @@ name: Clean manifests
 
 on:
   schedule:
-    - cron: "20 * * * *"
+    - cron: "20 */3 * * *"
   workflow_dispatch:
 
 permissions: {}
