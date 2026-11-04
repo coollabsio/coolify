@@ -2931,7 +2931,8 @@ it('links volume backup notifications to the instance URL instead of APP_URL', f
     $notification = new BackupFailed($backup, 'Archive command failed');
 
     expect($notification->url)->toBe($expected)
-        ->and($notification->toPushover()->toPayload('token', 'user')['message'])->toContain("href='{$expected}'");
+        ->and($notification->toPushover()->toPayload('token', 'user')['message'])->toContain("href='{$expected}'")
+        ->and($notification->toGotify()->toPayload()['message'])->toContain($expected);
 });
 
 it('sends volume backup success with a warning through the backup failure channels', function (?string $warning, string $event) {

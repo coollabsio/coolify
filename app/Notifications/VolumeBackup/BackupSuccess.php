@@ -5,6 +5,7 @@ namespace App\Notifications\VolumeBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -87,6 +88,16 @@ class BackupSuccess extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: $this->warning ? 'Storage backup succeeded with a warning' : 'Storage backup successful',
+            level: $this->warning ? 'warning' : 'success',
+            message: "{$this->summary()}<br/><br/><b>Frequency:</b> {$this->frequency}.",
+            buttons: $this->url ? [['text' => 'Open resource in Coolify', 'url' => $this->url]] : [],
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
             title: $this->warning ? 'Storage backup succeeded with a warning' : 'Storage backup successful',
             level: $this->warning ? 'warning' : 'success',
             message: "{$this->summary()}<br/><br/><b>Frequency:</b> {$this->frequency}.",

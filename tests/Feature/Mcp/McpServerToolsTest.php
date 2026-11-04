@@ -800,6 +800,7 @@ test('manage_notifications never returns channel secrets', function (string $cha
     'slack webhook' => ['slack', ['slack_webhook_url' => 'https://hooks.slack.com/services/SLACK_SECRET_PATH'], 'SLACK_SECRET_PATH'],
     'telegram token' => ['telegram', ['telegram_token' => 'TELEGRAM_TOKEN_VALUE', 'telegram_chat_id' => '123'], 'TELEGRAM_TOKEN_VALUE'],
     'pushover keys' => ['pushover', ['pushover_user_key' => 'PUSHOVER_USER_VALUE', 'pushover_api_token' => 'PUSHOVER_TOKEN_VALUE'], 'PUSHOVER_'],
+    'gotify token' => ['gotify', ['gotify_url' => 'https://example.com', 'gotify_token' => 'GOTIFY_TOKEN_VALUE'], 'GOTIFY_TOKEN_VALUE'],
     'webhook url' => ['webhook', ['webhook_url' => 'https://example.com/hook/WEBHOOK_SECRET_PATH'], 'WEBHOOK_SECRET_PATH'],
 ]);
 

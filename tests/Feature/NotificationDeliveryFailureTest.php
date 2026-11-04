@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\SendMessageToDiscordJob;
+use App\Jobs\SendMessageToGotifyJob;
 use App\Jobs\SendMessageToPushoverJob;
 use App\Jobs\SendMessageToSlackJob;
 use App\Jobs\SendMessageToTelegramJob;
@@ -10,6 +11,7 @@ use App\Models\Team;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use App\Notifications\Internal\GeneralNotification;
@@ -54,6 +56,11 @@ function deliveryFailureChannel(Team $team, string $channel): array
             fn ($settings) => new SendMessageToPushoverJob(new PushoverMessage('Title', 'Message'), 'token', 'user', $settings),
             'pushover_enabled',
         ],
+        'gotify' => [
+            tap($team->gotifyNotificationSettings)->update(['gotify_enabled' => true, 'gotify_url' => 'https://example.com', 'gotify_token' => 'token']),
+            fn ($settings) => new SendMessageToGotifyJob(new GotifyMessage('Title', 'Message'), 'https://example.com', 'token', $settings),
+            'gotify_enabled',
+        ],
         'webhook' => [
             tap($team->webhookNotificationSettings)->update(['webhook_enabled' => true, 'webhook_url' => 'https://example.com/webhook']),
             fn ($settings) => new SendWebhookJob(['event' => 'test'], 'https://example.com/webhook', $settings),
@@ -69,6 +76,7 @@ dataset('configuration errors', [
     'telegram malformed token' => ['telegram', 404, ['ok' => false, 'error_code' => 404, 'description' => 'Not Found']],
     'telegram wrong chat' => ['telegram', 400, ['ok' => false, 'description' => 'Bad Request: chat not found']],
     'pushover invalid token' => ['pushover', 400, ['token' => 'invalid', 'errors' => ['application token is invalid'], 'status' => 0]],
+    'gotify invalid token' => ['gotify', 401, ['error' => 'Unauthorized', 'errorCode' => 401, 'errorDescription' => 'you need to provide a valid access token or user']],
     'webhook not found' => ['webhook', 404, 'Not Found'],
 ]);
 
@@ -91,7 +99,7 @@ it('retries rate limits and server errors without counting them', function (stri
 
     expect(fn () => $makeJob($settings->fresh())->handle())->toThrow(RuntimeException::class);
     expect($settings->fresh()->failure_count)->toBe(0);
-})->with(['discord', 'slack', 'telegram', 'pushover', 'webhook'])->with([429, 500]);
+})->with(['discord', 'slack', 'telegram', 'pushover', 'gotify', 'webhook'])->with([429, 500]);
 
 it('does not count errors caused by the message payload', function (string $channel, array|string $body) {
     [$settings, $makeJob] = deliveryFailureChannel($this->team, $channel);
@@ -105,6 +113,7 @@ it('does not count errors caused by the message payload', function (string $chan
     'slack' => ['slack', 'invalid_payload'],
     'telegram' => ['telegram', ['ok' => false, 'description' => "Bad Request: can't parse entities"]],
     'pushover' => ['pushover', ['message' => 'cannot be longer than 1024 characters', 'status' => 0]],
+    'gotify' => ['gotify', ['error' => 'Bad Request', 'errorCode' => 400, 'errorDescription' => 'title or message is empty']],
     'webhook' => ['webhook', 'Bad Request'],
 ]);
 

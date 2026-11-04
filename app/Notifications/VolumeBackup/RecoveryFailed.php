@@ -6,6 +6,7 @@ use App\Jobs\VolumeBackupRecoveryJob;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -96,6 +97,16 @@ class RecoveryFailed extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'Storage backup recovery failed',
+            level: 'error',
+            message: "[ACTION REQUIRED] {$this->summary()}",
+            buttons: $this->url ? [['text' => 'Open resource in Coolify', 'url' => $this->url]] : [],
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
             title: 'Storage backup recovery failed',
             level: 'error',
             message: "[ACTION REQUIRED] {$this->summary()}",

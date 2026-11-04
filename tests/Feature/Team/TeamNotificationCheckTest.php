@@ -44,6 +44,12 @@ describe('isAnyNotificationEnabled', function () {
         expect($this->team->isAnyNotificationEnabled())->toBeTrue();
     });
 
+    test('returns true when gotify notifications are enabled', function () {
+        $this->team->gotifyNotificationSettings->update(['gotify_enabled' => true]);
+
+        expect($this->team->isAnyNotificationEnabled())->toBeTrue();
+    });
+
     test('returns true when webhook notifications are enabled', function () {
         $this->team->webhookNotificationSettings->update(['webhook_enabled' => true]);
 
