@@ -6,7 +6,7 @@ use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
-use App\Services\ImageScan\IgnoreMatcher;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\SecurityGate;
 
 function securityGateFinding(string $id, array $overrides = []): array
@@ -37,9 +37,9 @@ function securityGateScan(array $findings, array $attributes = []): ImageScan
     return $scan;
 }
 
-function securityGateIgnores(array ...$rows): IgnoreMatcher
+function securityGateIgnores(array ...$rows): RelevanceRules
 {
-    return IgnoreMatcher::fromIgnores(collect(array_map(fn (array $row) => new ImageScanIgnore(['reason' => 'test', ...$row]), $rows)));
+    return RelevanceRules::fromIgnores(collect(array_map(fn (array $row) => new ImageScanIgnore(['reason' => 'test', ...$row]), $rows)));
 }
 
 describe('mode on', function () {
@@ -170,6 +170,15 @@ describe('mode on', function () {
     });
 });
 
+it('does not block a relevant medium finding in mode on: it has no exploit signal', function (bool $countMedium) {
+    $medium = securityGateFinding('CVE-2026-1', ['severity' => 'medium', 'cvssScore' => 5.3, 'epss' => 0.5, 'fixState' => 'fixed', 'fixedIn' => '3.0.15']);
+
+    $result = SecurityGate::evaluate(securityGateScan([$medium]), securityGateScan([]), 'on', RelevanceRules::fromIgnores(collect(), $countMedium));
+
+    expect($result['blocked'])->toBeFalse()
+        ->and($result['carried'])->toBe([]);
+})->with(['default' => false, 'medium problems count' => true]);
+
 describe('mode strict', function () {
     it('blocks a critical finding with a package fix', function () {
         $result = SecurityGate::evaluate(
@@ -186,6 +195,25 @@ describe('mode strict', function () {
                 '  CVE-2026-1  8.1 Critical  openssl 3.0.13  fixed in 3.0.15',
                 'See the Security page for all problems.',
             ]);
+    });
+
+    it('blocks a medium finding with a package fix only when it is relevant', function (array $overrides, bool $countMedium, bool $blocked) {
+        $medium = securityGateFinding('CVE-2026-1', ['severity' => 'medium', 'cvssScore' => 5.3, 'fixState' => 'fixed', 'fixedIn' => '3.0.15', ...$overrides]);
+
+        $result = SecurityGate::evaluate(securityGateScan([$medium]), null, 'strict', RelevanceRules::fromIgnores(collect(), $countMedium));
+
+        expect($result['blocked'])->toBe($blocked);
+    })->with([
+        'medium without EPSS' => [[], false, false],
+        'medium with EPSS 0.10 or more' => [['epss' => 0.2], false, true],
+        'medium when medium problems count' => [[], true, true],
+        'low when medium problems count' => [['severity' => 'low', 'cvssScore' => 3.1], true, false],
+    ]);
+
+    it('does not block a relevant medium finding without a package fix', function () {
+        $medium = securityGateFinding('CVE-2026-1', ['severity' => 'medium', 'cvssScore' => 5.3, 'epss' => 0.2]);
+
+        expect(SecurityGate::evaluate(securityGateScan([$medium]), null, 'strict', securityGateIgnores())['blocked'])->toBeFalse();
     });
 
     it('blocks an end-of-life OS', function () {

@@ -4,7 +4,7 @@ use App\Models\ImageScanIgnore;
 use App\Services\ImageScan\CandidateEvaluator;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
-use App\Services\ImageScan\IgnoreMatcher;
+use App\Services\ImageScan\RelevanceRules;
 
 const EVALUATOR_EOL = ['name' => 'alpine', 'version' => '3.16.2'];
 
@@ -24,9 +24,9 @@ function evaluatorFinding(string $id, string $severity = 'high', bool $kev = fal
     ]);
 }
 
-function evaluatorIgnores(string ...$ids): IgnoreMatcher
+function evaluatorIgnores(string ...$ids): RelevanceRules
 {
-    return IgnoreMatcher::fromIgnores(collect(array_map(fn (string $id) => new ImageScanIgnore(['reason' => 'test', 'vulnerability_id' => $id]), $ids)));
+    return RelevanceRules::fromIgnores(collect(array_map(fn (string $id) => new ImageScanIgnore(['reason' => 'test', 'vulnerability_id' => $id]), $ids)));
 }
 
 it('does not recommend 15.11-alpine: it adds findings with an exploit signal that 15.0-alpine does not have', function () {
@@ -45,7 +45,8 @@ it('recommends 15-alpine although it adds critical Go findings in gosu: it fixes
     expect($evaluator->isBetter($current, $candidate, $ignores, EVALUATOR_EOL, null))->toBeTrue()
         ->and($evaluator->isBetter($current, $candidate, $ignores, null, null))->toBeTrue()
         ->and($fixed)->toContain('CVE-2025-1094')
-        ->and($fixed)->not->toContain('CVE-2023-2650');
+        // A medium with an EPSS of 0.10 or more is relevant.
+        ->and($fixed)->toContain('CVE-2023-2650');
 });
 
 it('lists only the relevant findings the candidate no longer has under any of their IDs', function () {

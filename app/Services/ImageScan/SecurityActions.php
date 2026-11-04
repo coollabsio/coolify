@@ -39,9 +39,9 @@ final class SecurityActions
      *
      * @return \Closure(Finding): ImageScanFixState
      */
-    public static function fixStates(ImageScan $scan, IgnoreMatcher $ignores): \Closure
+    public static function fixStates(ImageScan $scan, RelevanceRules $rules): \Closure
     {
-        $byFinding = self::forScan($scan, $ignores)['byFinding'];
+        $byFinding = self::forScan($scan, $rules)['byFinding'];
 
         return fn (Finding $finding): ImageScanFixState => isset($byFinding[$finding->id]) || ($finding->fixState === 'fixed' && filled($finding->fixedIn))
             ? ImageScanFixState::Fixed
@@ -53,7 +53,7 @@ final class SecurityActions
      *
      * @return array{actions: list<SecurityAction>, byFinding: array<string, SecurityAction>, eol: ?SecurityAction}
      */
-    public static function forScan(ImageScan $scan, IgnoreMatcher $ignores): array
+    public static function forScan(ImageScan $scan, RelevanceRules $rules): array
     {
         $owner = $scan->resource;
         if (! $owner instanceof Model) {
@@ -77,7 +77,7 @@ final class SecurityActions
         /** @var array<string, string> $byFinding */
         $byFinding = [];
         foreach (ResourceScans::findings($scan) as $finding) {
-            if (! SecurityRules::isRelevant($finding, $ignores)) {
+            if (! SecurityRules::isRelevant($finding, $rules)) {
                 continue;
             }
 

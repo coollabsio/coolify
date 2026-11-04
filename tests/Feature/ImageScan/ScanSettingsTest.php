@@ -134,7 +134,7 @@ describe('instance scope', function () {
             ->assertSee('Block deploys')
             ->assertSee('Strict')
             ->assertSee('Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.')
-            ->assertSee('Also blocks critical and high problems that have a fix, and operating systems that no longer get security fixes.')
+            ->assertSee('Also blocks critical, high, and counted medium problems that have a fix, and operating systems that no longer get security fixes.')
             ->assertDontSee('Alert on');
     });
 
@@ -615,4 +615,117 @@ describe('stored statuses', function () {
         'block deploys' => ['gateMode', 'strict'],
         'if the scan cannot run' => ['onScanError', 'block'],
     ]);
+});
+
+describe('count medium problems', function () {
+    it('saves the instance default without an inherit option and refreshes every team with scans', function () {
+        Queue::fake([RefreshImageScanSummariesJob::class]);
+        ImageScan::factory()->create(['server_id' => $this->server->id]);
+        $admin = scanSettingsInstanceAdmin();
+
+        scanSettingsAs($admin, Team::find(0), 'instance')
+            ->assertSee('Count medium problems')
+            ->assertSee('Medium problems that an update fixes give a security update. Problems that attackers are likely to use always count.')
+            ->set('countMedium', '')
+            ->assertHasErrors('countMedium')
+            ->set('countMedium', '1')
+            ->assertHasNoErrors()
+            ->assertDispatched('success');
+
+        expect(scanSettingsInstanceRow()->count_medium)->toBeTrue();
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job): bool => $job->teamId === $this->team->id);
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, 1);
+    });
+
+    it('saves the team rule, stores null for the Coolify default, and refreshes the team', function () {
+        Queue::fake([RefreshImageScanSummariesJob::class]);
+
+        scanSettingsAs($this->admin, $this->team, 'team', (string) $this->team->id)
+            ->assertSee('Use Coolify default (No)')
+            ->set('countMedium', '1')
+            ->assertDispatched('success');
+
+        expect(scanSettingsRow($this->team)->count_medium)->toBeTrue();
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job): bool => $job->teamId === $this->team->id);
+
+        scanSettingsAs($this->admin, $this->team, 'team', (string) $this->team->id)->set('countMedium', '');
+
+        expect(scanSettingsRow($this->team)->count_medium)->toBeNull();
+    });
+
+    it('names the inherited value on a server and saves the server rule', function () {
+        Queue::fake([RefreshImageScanSummariesJob::class]);
+        ImageScanPolicy::query()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'count_medium' => true]);
+
+        scanSettingsAs($this->admin, $this->team, 'server', $this->server->uuid)
+            ->assertSee('Use team default (Yes)')
+            ->set('countMedium', '0')
+            ->assertDispatched('success');
+
+        expect(scanSettingsRow($this->server)->count_medium)->toBeFalse();
+        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job): bool => $job->teamId === $this->team->id);
+    });
+
+    it('refreshes the stored status of an app right away', function () {
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+        InstanceSettings::query()->find(0)->forceFill(['is_image_scanning_allowed' => true])->save();
+        Once::flush();
+        $scan = ImageScan::factory()->create([
+            'server_id' => $this->server->id,
+            'resource_type' => $this->application->getMorphClass(),
+            'resource_id' => $this->application->id,
+            'builds_image' => true,
+            'findings' => [[
+                'id' => 'CVE-2024-0001', 'aliases' => [], 'severity' => 'medium', 'package' => 'lodash', 'version' => '4.0.0',
+                'type' => 'npm', 'artifactId' => 'a', 'fixedIn' => '4.17.21', 'fixState' => 'fixed', 'kev' => false, 'epss' => null,
+            ]],
+            'summary' => ['truncated' => false, 'eol_distro' => null],
+            'scanned_at' => now(),
+        ]);
+        $this->application->update(['build_pack' => 'nixpacks']);
+        ResourceScans::refreshSummaries(collect([$scan->fresh()]));
+        expect(data_get($scan->fresh()->summary, 'security.facts.counts.medium_fixed'))->toBe(0);
+
+        scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
+            ->set('countMedium', '1')
+            ->assertDispatched('success');
+
+        expect(scanSettingsRow($this->application)->count_medium)->toBeTrue()
+            ->and(data_get($scan->fresh()->summary, 'security.facts.counts.medium_fixed'))->toBe(1);
+    });
+
+    it('does not let a member or a deploy-only user change the rule', function (string $scope) {
+        Queue::fake([RefreshImageScanSummariesJob::class]);
+        $user = $scope === 'application'
+            ? scanSettingsMember($this->team, 'member', [['scope' => 'resource', 'uuid' => $this->application->uuid, 'levels' => ['read', 'deploy']]])
+            : scanSettingsMember($this->team);
+        $uuid = match ($scope) {
+            'team' => (string) $this->team->id,
+            'server' => $this->server->uuid,
+            'application' => $this->application->uuid,
+        };
+
+        scanSettingsAs($user, $this->team, $scope, $uuid)->set('countMedium', '1')->assertForbidden();
+
+        expect(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(0);
+        Queue::assertNothingPushed();
+    })->with(['team', 'server', 'application']);
+
+    it('forbids a member after the session switched to a team the member owns', function () {
+        $member = scanSettingsMember($this->team);
+        $ownTeam = Team::factory()->create();
+        $member->teams()->attach($ownTeam, ['role' => 'owner']);
+
+        $component = scanSettingsAs($member, $this->team, 'server', $this->server->uuid);
+        session(['currentTeam' => $ownTeam]);
+        $component->set('countMedium', '1')->assertForbidden();
+
+        expect(scanSettingsRow($this->server))->toBeNull();
+    });
+
+    it('returns not found for a server of another team', function () {
+        $stranger = scanSettingsMember(Team::factory()->create(), 'owner');
+
+        scanSettingsAs($stranger, $stranger->teams->first(), 'server', $this->server->uuid)->assertNotFound();
+    });
 });

@@ -17,8 +17,8 @@ use App\Models\ImageScan;
  *   EPSS change of a finding that already runs never blocks. Before the first deploy every finding is new. When the
  *   app ran before but Coolify has no earlier scan to compare with (`$baselineMissing`), nothing blocks: the findings
  *   are listed as a warning and this deploy becomes the baseline.
- * - Strict: blocks on any relevant finding with an exploit signal, any relevant critical or high finding with a
- *   package fix, and an end-of-life OS.
+ * - Strict: blocks on any relevant finding with an exploit signal, any relevant finding with a package fix (a medium
+ *   one only when it is relevant, see `SecurityRules::isRelevant()`), and an end-of-life OS.
  * - Off never blocks. A scan that cannot run, or whose report was cut (`summary.truncated`), follows "If the scan
  *   cannot run".
  */
@@ -26,14 +26,12 @@ final class SecurityGate
 {
     private const LOG_LIMIT = 5;
 
-    private const SERIOUS = ['critical', 'high'];
-
     /**
      * @param  array<string, int|string>  $ctx  Context of the error message (server).
      *                                          `headline` counts the problems (email, deploy log); `headline_plain` does not (chat and webhook channels).
      * @return array{blocked: bool, headline: string, headline_plain: string, new: list<array<string, mixed>>, carried: list<array<string, mixed>>, error: ?string, scan_ran: bool, mode: string, eol: ?array{name: string, version: string}, baseline_missing: bool}
      */
-    public static function evaluate(?ImageScan $new, ?ImageScan $running, string $mode, IgnoreMatcher $ignores, ?ImageScanErrorCode $error = null, array $ctx = [], ImageScanOnError $onScanError = ImageScanOnError::Deploy, bool $baselineMissing = false): array
+    public static function evaluate(?ImageScan $new, ?ImageScan $running, string $mode, RelevanceRules $rules, ?ImageScanErrorCode $error = null, array $ctx = [], ImageScanOnError $onScanError = ImageScanOnError::Deploy, bool $baselineMissing = false): array
     {
         $mode = ImageScanGateMode::tryFrom($mode) ?? ImageScanGateMode::Off;
         $completed = $new !== null && $new->status === ImageScanStatus::Completed;
@@ -70,14 +68,14 @@ final class SecurityGate
         $seen = [];
         foreach (ResourceScans::findings($new) as $finding) {
             $key = mb_strtolower($finding->id);
-            if (isset($seen[$key]) || ! SecurityRules::isRelevant($finding, $ignores)) {
+            if (isset($seen[$key]) || ! SecurityRules::isRelevant($finding, $rules)) {
                 continue;
             }
             $seen[$key] = true;
 
             $signal = SecurityRules::exploitSignal($finding);
             if ($mode === ImageScanGateMode::Strict) {
-                if ($signal !== null || self::hasSeriousPackageFix($finding)) {
+                if ($signal !== null || self::hasPackageFix($finding)) {
                     $blocking[] = self::row($finding, $signal);
                 }
 
@@ -245,11 +243,9 @@ final class SecurityGate
         return $lines;
     }
 
-    private static function hasSeriousPackageFix(Finding $finding): bool
+    private static function hasPackageFix(Finding $finding): bool
     {
-        return in_array(strtolower($finding->severity), self::SERIOUS, true)
-            && $finding->fixState === 'fixed'
-            && filled($finding->fixedIn);
+        return $finding->fixState === 'fixed' && filled($finding->fixedIn);
     }
 
     /**

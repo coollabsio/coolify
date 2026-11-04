@@ -33,6 +33,7 @@ use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ProjectIconStorageService;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1648,7 +1649,7 @@ class ServerTransferExporter
     {
         $fromTeam = collect(ImageScanPolicyResolver::inheritedFor($server))
             ->filter(fn (array $field): bool => $field['source'] === 'team')
-            ->map(fn (array $field): string => $field['value']->value)
+            ->map(fn (array $field): string|bool => $field['value'] instanceof BackedEnum ? $field['value']->value : $field['value'])
             ->all();
         $serverExported = false;
         $out = [];
@@ -1669,6 +1670,7 @@ class ServerTransferExporter
                 'scope_uuid' => $scope->uuid,
                 'gate_mode' => $policy->gate_mode?->value ?? ($isServer ? ($fromTeam['gate_mode'] ?? null) : null),
                 'on_scan_error' => $policy->on_scan_error?->value ?? ($isServer ? ($fromTeam['on_scan_error'] ?? null) : null),
+                'count_medium' => $policy->count_medium ?? ($isServer ? ($fromTeam['count_medium'] ?? null) : null),
             ];
             $serverExported = $serverExported || $isServer;
         }
@@ -1679,6 +1681,7 @@ class ServerTransferExporter
                 'scope_uuid' => $server->uuid,
                 'gate_mode' => $fromTeam['gate_mode'] ?? null,
                 'on_scan_error' => $fromTeam['on_scan_error'] ?? null,
+                'count_medium' => $fromTeam['count_medium'] ?? null,
             ]);
         }
 

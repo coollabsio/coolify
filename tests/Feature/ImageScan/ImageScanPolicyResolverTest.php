@@ -16,6 +16,7 @@ use App\Models\Team;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
@@ -67,9 +68,11 @@ it('uses the instance defaults when no level sets a value', function () {
 
     expect($policy->gateMode)->toBe('off')
         ->and($policy->onScanError)->toBe(ImageScanOnError::Deploy)
+        ->and($policy->countMedium)->toBeFalse()
         ->and($policy->sources)->toBe([
             'gate_mode' => 'instance',
             'on_scan_error' => 'instance',
+            'count_medium' => 'instance',
         ])
         ->and($policy->scanServer->is($this->server))->toBeTrue();
 });
@@ -125,6 +128,7 @@ it('lets the server override the team and the app override the server', function
         ->and($policy->sources)->toBe([
             'gate_mode' => 'app',
             'on_scan_error' => 'team',
+            'count_medium' => 'instance',
         ]);
 });
 
@@ -214,7 +218,69 @@ it('lists the inherited value and its level for each field', function () {
     expect(ImageScanPolicyResolver::inheritedFor($this->application))->toBe([
         'gate_mode' => ['value' => ImageScanGateMode::On, 'source' => 'server'],
         'on_scan_error' => ['value' => ImageScanOnError::Deploy, 'source' => 'instance'],
+        'count_medium' => ['value' => false, 'source' => 'instance'],
     ]);
+});
+
+it('inherits count medium problems through instance, team, server and app', function () {
+    expect(ImageScanPolicyResolver::for($this->application)->countMedium)->toBeFalse();
+
+    resolverPolicyFor($this->team, ['count_medium' => true]);
+    $policy = ImageScanPolicyResolver::for($this->application);
+    expect($policy->countMedium)->toBeTrue()
+        ->and($policy->sources['count_medium'])->toBe('team');
+
+    $serverPolicy = resolverPolicyFor($this->server, ['count_medium' => false]);
+    expect(ImageScanPolicyResolver::for($this->application)->countMedium)->toBeFalse()
+        ->and(ImageScanPolicyResolver::inheritedFor($this->application)['count_medium'])->toBe(['value' => false, 'source' => 'server']);
+
+    resolverPolicyFor($this->application, ['count_medium' => true]);
+    expect(ImageScanPolicyResolver::for($this->application)->sources['count_medium'])->toBe('app')
+        ->and(ImageScanPolicyResolver::countMediumFor($this->application))->toBeTrue();
+
+    $serverPolicy->update(['count_medium' => null]);
+    ImageScanPolicy::query()->where('scope_type', $this->application->getMorphClass())->delete();
+    expect(ImageScanPolicyResolver::countMediumFor($this->application))->toBeTrue();
+});
+
+it('applies count medium problems to databases and services, not only apps', function () {
+    $database = StandalonePostgresql::forceCreate([
+        'name' => 'pg', 'postgres_password' => 'secret', 'image' => 'postgres:16',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $service = resolverService();
+    resolverPolicyFor($this->server, ['count_medium' => true]);
+
+    expect(ImageScanPolicyResolver::for($database)->countMedium)->toBeTrue()
+        ->and(ImageScanPolicyResolver::countMediumFor($database))->toBeTrue()
+        ->and(ImageScanPolicyResolver::countMediumFor($service))->toBeTrue();
+});
+
+it('resolves count medium problems for many resources with a fixed number of queries', function () {
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $otherDestination = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    $applications = collect(range(1, 3))->map(fn () => Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => $otherDestination->getMorphClass(),
+    ]))->push($this->application);
+    resolverPolicyFor($this->team, ['count_medium' => true]);
+    resolverPolicyFor($otherServer, ['count_medium' => false]);
+    resolverPolicyFor($applications[0], ['count_medium' => true]);
+    $applications->each->load('destination.server');
+
+    DB::enableQueryLog();
+    $many = ImageScanPolicyResolver::countMediumForMany($this->team->id, $applications);
+    $queries = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    expect($queries)->toBeLessThanOrEqual(3)
+        ->and($many)->toBe($applications->mapWithKeys(fn (Application $application): array => [
+            $application->getMorphClass().':'.$application->id => ImageScanPolicyResolver::countMediumFor($application),
+        ])->all())
+        ->and(array_values($many))->toBe([true, false, false, true]);
 });
 
 it('keeps scanning off until the server opts in', function () {

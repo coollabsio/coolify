@@ -11,7 +11,9 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\Team;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 /**
  * Resolves scan rules through Instance, Team, Server and App. A null value inherits.
@@ -19,7 +21,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ImageScanPolicyResolver
 {
-    private const FIELDS = ['gate_mode', 'on_scan_error'];
+    private const FIELDS = ['gate_mode', 'on_scan_error', 'count_medium'];
 
     /**
      * Rules always resolve through the main destination server (spec 3.1). The given server only decides where the
@@ -34,19 +36,7 @@ class ImageScanPolicyResolver
         $mainServer = self::mainServer($resource);
         $scanServer = $server ?? $mainServer;
 
-        $levels = [['instance', self::instanceRow()]];
-        $team = method_exists($resource, 'team') ? $resource->team() : null;
-        if ($team instanceof Model) {
-            $levels[] = ['team', self::scopeRow($team)];
-        }
-        if ($mainServer instanceof Server) {
-            $levels[] = ['server', self::scopeRow($mainServer)];
-        }
-        if ($isApplication) {
-            $levels[] = ['app', self::scopeRow($resource)];
-        }
-
-        $resolved = self::resolveLevels($levels);
+        $resolved = self::resolveLevels(self::levelsFor($resource, $mainServer));
         $values = array_map(fn (array $field) => $field['value'], $resolved);
         $sources = array_map(fn (array $field) => $field['source'], $resolved);
 
@@ -59,7 +49,82 @@ class ImageScanPolicyResolver
             scanEnabled: self::isScanEnabled($resource, $scanServer),
             sources: $sources,
             scanServer: $scanServer,
+            countMedium: $values['count_medium'],
         );
+    }
+
+    /**
+     * The "Count medium problems" rule of a resource. Reads only the rule rows, not the scan settings.
+     */
+    public static function countMediumFor(Model $resource): bool
+    {
+        return self::resolveLevels(self::levelsFor($resource, self::mainServer($resource)))['count_medium']['value'];
+    }
+
+    /**
+     * `countMediumFor()` for many resources of one team with a fixed number of queries. Reads the loaded main server
+     * of each resource (`ResourceScans::loadScanRelations()`).
+     *
+     * @param  Collection<int, Model>  $resources
+     * @return array<string, bool> Keyed by `ResourceScans::key()`.
+     */
+    public static function countMediumForMany(int $teamId, Collection $resources): array
+    {
+        if ($resources->isEmpty()) {
+            return [];
+        }
+
+        $servers = $resources->mapWithKeys(fn (Model $resource): array => [ResourceScans::key($resource) => self::mainServer($resource)]);
+        $applications = $resources->filter(fn (Model $resource): bool => $resource instanceof Application);
+        $scopes = [
+            (new Team)->getMorphClass() => [$teamId],
+            (new Server)->getMorphClass() => $servers->filter()->map(fn (Server $server): int => (int) $server->id)->unique()->values()->all(),
+            (new Application)->getMorphClass() => $applications->map(fn (Application $application): int => (int) $application->id)->values()->all(),
+        ];
+        $rows = ImageScanPolicy::query()
+            ->where(function ($query) use ($scopes): void {
+                foreach (array_filter($scopes) as $type => $ids) {
+                    $query->orWhere(fn ($query) => $query->where('scope_type', $type)->whereIn('scope_id', $ids));
+                }
+            })
+            ->get()
+            ->keyBy(fn (ImageScanPolicy $row): string => $row->scope_type.':'.$row->scope_id);
+        $row = fn (Model $scope): ?ImageScanPolicy => $rows->get($scope->getMorphClass().':'.$scope->getKey());
+        $instance = self::instanceRow();
+        $team = $rows->get((new Team)->getMorphClass().':'.$teamId);
+
+        return $resources->mapWithKeys(function (Model $resource) use ($servers, $row, $instance, $team): array {
+            $key = ResourceScans::key($resource);
+            $levels = [['instance', $instance], ['team', $team]];
+            if ($servers[$key] instanceof Server) {
+                $levels[] = ['server', $row($servers[$key])];
+            }
+            if ($resource instanceof Application) {
+                $levels[] = ['app', $row($resource)];
+            }
+
+            return [$key => self::resolveLevels($levels)['count_medium']['value']];
+        })->all();
+    }
+
+    /**
+     * @return list<array{0: string, 1: ?ImageScanPolicy}>
+     */
+    private static function levelsFor(Model $resource, ?Server $mainServer): array
+    {
+        $levels = [['instance', self::instanceRow()]];
+        $team = method_exists($resource, 'team') ? $resource->team() : null;
+        if ($team instanceof Model) {
+            $levels[] = ['team', self::scopeRow($team)];
+        }
+        if ($mainServer instanceof Server) {
+            $levels[] = ['server', self::scopeRow($mainServer)];
+        }
+        if ($resource instanceof Application) {
+            $levels[] = ['app', self::scopeRow($resource)];
+        }
+
+        return $levels;
     }
 
     /**
@@ -81,7 +146,7 @@ class ImageScanPolicyResolver
      * The values a level inherits from the levels above it, each with the level it comes from.
      *
      * @param  Model  $scope  Team, Server or Application.
-     * @return array{gate_mode: array{value: ImageScanGateMode, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
+     * @return array{gate_mode: array{value: ImageScanGateMode, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}, count_medium: array{value: bool, source: string}}
      */
     public static function inheritedFor(Model $scope): array
     {
@@ -106,13 +171,14 @@ class ImageScanPolicyResolver
 
     /**
      * @param  list<array{0: string, 1: ?ImageScanPolicy}>  $levels  From the top level down.
-     * @return array{gate_mode: array{value: ImageScanGateMode, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}}
+     * @return array{gate_mode: array{value: ImageScanGateMode, source: string}, on_scan_error: array{value: ImageScanOnError, source: string}, count_medium: array{value: bool, source: string}}
      */
     private static function resolveLevels(array $levels): array
     {
         $resolved = [
             'gate_mode' => ['value' => ImageScanGateMode::Off, 'source' => 'instance'],
             'on_scan_error' => ['value' => ImageScanOnError::Deploy, 'source' => 'instance'],
+            'count_medium' => ['value' => false, 'source' => 'instance'],
         ];
 
         foreach ($levels as [$source, $row]) {

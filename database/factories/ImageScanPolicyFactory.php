@@ -19,6 +19,7 @@ class ImageScanPolicyFactory extends Factory
             'scope_id' => null,
             'gate_mode' => null,
             'on_scan_error' => null,
+            'count_medium' => null,
         ];
     }
 
@@ -27,6 +28,7 @@ class ImageScanPolicyFactory extends Factory
         return $this->state([
             'gate_mode' => ImageScanGateMode::Off,
             'on_scan_error' => ImageScanOnError::Deploy,
+            'count_medium' => false,
         ]);
     }
 }

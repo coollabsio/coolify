@@ -57,13 +57,13 @@ final class SecurityCard
      * @param  Collection<int, ImageScan>  $scans  The current scans of the owners, with their `resource` set.
      * @param  array<string, int>  $findingCounts  The findings that are not ignored, by scan UUID.
      * @param  array<string, ResourceSecurity>  $imageStatuses  `SecurityStatus::forScan()` of the scans the caller computed, by scan UUID.
-     * @param  (Closure(Model): IgnoreMatcher)|null  $matcherFor  The ignore matcher of an owner, when the caller keeps them.
+     * @param  (Closure(Model): RelevanceRules)|null  $rulesFor  The relevance rules of an owner, when the caller keeps them.
      * @return array{status: string, badge: ?string, badgeType: string, header: ?string, total: int, single: bool, rows: list<ImageRow>}
      */
-    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $matcherFor = null): array
+    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $rulesFor = null): array
     {
         $status = $security->status;
-        $rows = self::images($resource, $security, $owners, $scans, $user, $findingCounts, $imageStatuses, $matcherFor);
+        $rows = self::images($resource, $security, $owners, $scans, $user, $findingCounts, $imageStatuses, $rulesFor);
         $total = count($rows);
         $needsUpdate = count(array_filter($rows, fn (array $row): bool => in_array($row['status'], ['update_now', 'update_available'], true)));
 
@@ -89,12 +89,12 @@ final class SecurityCard
      * @param  Collection<int, ImageScan>  $scans
      * @param  array<string, int>  $findingCounts
      * @param  array<string, ResourceSecurity>  $imageStatuses
-     * @param  (Closure(Model): IgnoreMatcher)|null  $matcherFor
+     * @param  (Closure(Model): RelevanceRules)|null  $rulesFor
      * @return list<ImageRow>
      */
-    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $matcherFor = null): array
+    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $rulesFor = null): array
     {
-        $matcherFor ??= fn (Model $owner): IgnoreMatcher => IgnoreMatcher::forResource($owner);
+        $rulesFor ??= fn (Model $owner): RelevanceRules => RelevanceRules::forResource($owner);
         $isService = $resource instanceof Service;
         $statusOwners = $isService ? $owners->filter(fn (Model $owner): bool => ResourceScans::isScanTarget($owner))->values() : $owners;
         $isStatusOwner = fn (?Model $owner): bool => $owner instanceof Model && $statusOwners->contains(fn (Model $candidate): bool => $candidate->is($owner));
@@ -117,7 +117,7 @@ final class SecurityCard
                 'owner' => $scan->resource,
                 'ref' => (string) $scan->image_ref,
                 'name' => $isService ? self::ownerName($scan->resource) : ($composeServices[ScanImage::imageName((string) $scan->image_ref)] ?? null),
-                'security' => $imageStatuses[(string) $scan->uuid] ?? SecurityStatus::forScan($scan, $matcherFor($scan->resource)),
+                'security' => $imageStatuses[(string) $scan->uuid] ?? SecurityStatus::forScan($scan, $rulesFor($scan->resource)),
             ];
         }
         foreach ($statusOwners as $owner) {
@@ -464,7 +464,7 @@ final class SecurityCard
     }
 
     /**
-     * @return array{action: SecurityAction, rank: array{0: int, 1: int}}|null
+     * @return array{action: SecurityAction, rank: array{0: int, 1: int, 2: int}}|null
      */
     private static function rankedAction(ImageScan $scan): ?array
     {
@@ -475,7 +475,7 @@ final class SecurityCard
         }
         $stats = (array) data_get($security->facts, 'action_stats.0', []);
 
-        return ['action' => $primary, 'rank' => [(int) ($stats['signal'] ?? 0), (int) ($stats['critical'] ?? 0) + (int) ($stats['high'] ?? 0)]];
+        return ['action' => $primary, 'rank' => [(int) ($stats['signal'] ?? 0), (int) ($stats['critical'] ?? 0) + (int) ($stats['high'] ?? 0), (int) ($stats['medium'] ?? 0)]];
     }
 
     /**

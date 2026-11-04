@@ -20,7 +20,7 @@ use App\Models\Team;
 use App\Services\ImageScan\CandidateEvaluator;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
-use App\Services\ImageScan\IgnoreMatcher;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScannerCommands;
 use App\Services\ImageScan\SecurityActions;
@@ -209,7 +209,7 @@ it('recommends the newest tag of the line when it has fewer findings and lists w
         ->and($scan->candidates['checked_at'])->not->toBeNull()
         ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'better' => true, 'eol' => null])
         ->and($line['fixed_ids'])->toContain('CVE-2025-1094')
-        ->and($line['fixed_ids'])->not->toContain('CVE-2023-2650')
+        ->and($line['fixed_ids'])->toContain('CVE-2023-2650')
         ->and($line['left'])->toBe(['critical' => 3, 'high' => 32, 'medium' => 0])
         ->and($line['fixes']['critical'] + $line['fixes']['high'])->toBeGreaterThan(0)
         ->and($line['scanned_at'])->not->toBeNull()
@@ -268,7 +268,7 @@ it('scans the newest tag of the line when the newest patch is not safer', functi
     $lines = collect($scan->candidateEntries())->where('kind', 'line')->values();
     expect($scan->candidateStatus())->toBe('ok')
         ->and($lines->pluck('better', 'ref')->all())->toBe(['postgres:15.0.4-alpine' => false, 'postgres:15.2.0-alpine' => true])
-        ->and(SecurityActions::forScan($scan, IgnoreMatcher::fromIgnores(collect()))['actions'][0]->target)->toBe('15.2.0-alpine');
+        ->and(SecurityActions::forScan($scan, RelevanceRules::fromIgnores(collect()))['actions'][0]->target)->toBe('15.2.0-alpine');
 });
 
 it('scans the newest major for information when nothing of the same major is safer', function () {
@@ -607,7 +607,7 @@ it('marks the findings that a better candidate fixes as fixed by an update', fun
     RefreshCandidates::run($scan);
 
     $scan = $scan->fresh();
-    $byFinding = SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding'];
+    $byFinding = SecurityActions::forScan($scan, RelevanceRules::forResource($scan->resource))['byFinding'];
 
     expect($byFinding)->toHaveKey('CVE-2025-1094');
 });
@@ -810,9 +810,12 @@ function candidatesDockerfileScan(string $baseImageRef = 'postgres:15.0-alpine',
  *
  * @return list<Finding>
  */
+/**
+ * The findings that base attribution stores: every medium counts, so a change of "Count medium problems" needs no new check.
+ */
 function candidatesRelevantFindings(): array
 {
-    return (new CandidateEvaluator)->relevant(candidatesFindings(), IgnoreMatcher::fromIgnores(collect()));
+    return (new CandidateEvaluator)->relevant(candidatesFindings(), RelevanceRules::fromIgnores(collect(), countMedium: true));
 }
 
 function candidatesAttributableCount(): int
@@ -838,7 +841,7 @@ it('attributes findings to the base image from a registry scan of the current ba
         ->and($base['attributable'])->toBe(candidatesAttributableCount())
         ->and($base['attributable_ids'])->not->toContain('CVE-2099-0001')
         ->and($base['attributable_ids'])->toHaveCount(collect(candidatesRelevantFindings())->pluck('id')->unique()->count())
-        ->and($base['attributable_ids'])->not->toContain('CVE-2023-2650')
+        ->and($base['attributable_ids'])->toContain('CVE-2023-2650')
         ->and($base['checked_at'])->not->toBeNull()
         ->and($base['entries'])->toHaveCount(1)
         ->and($line)->toMatchArray(['ref' => 'postgres:15.15-alpine', 'digest' => CANDIDATES_LINE, 'kind' => 'line', 'better' => true, 'left' => ['critical' => 3, 'high' => 32, 'medium' => 0]])
@@ -858,7 +861,7 @@ it('attributes findings to the base image from a registry scan of the current ba
 it('counts only findings that the current base image has as attributable and fixed', function () {
     candidatesFake();
     $scan = candidatesDockerfileScan();
-    // The current base image has 27 of the 50 relevant findings of the app; the line candidate has none of the app's.
+    // The current base image has 37 of the findings the base check stores; the line candidate has none of the app's.
     $this->grype[substr(CANDIDATES_REPO_DIGEST, 7)] = 'grype-candidate-15.11';
     $currentBase = (new GrypeReportParser)->parse(file_get_contents(base_path('tests/Fixtures/image-scan/grype-candidate-15.11.ndjson')))['findings'];
     $baseKeys = collect($currentBase)->flatMap(fn (Finding $finding) => [$finding->id, ...$finding->aliases])->map(fn (string $id) => strtolower($id))->flip();
@@ -869,10 +872,10 @@ it('counts only findings that the current base image has as attributable and fix
 
     $base = $scan->fresh()->candidates['base'];
     $line = $base['entries'][0];
-    expect($attributable)->toHaveCount(27)
+    expect($attributable)->toHaveCount(37)
         ->and($base['status'])->toBe('ok')
-        ->and($base['attributable'])->toBe(27)
-        ->and(array_sum($line['fixes']))->toBe(27)
+        ->and($base['attributable'])->toBe(37)
+        ->and(array_sum($line['fixes']))->toBe(37)
         ->and($line['fixed_ids'])->not->toContain('CVE-2099-0001')
         ->and(collect($line['fixed_ids'])->every(fn (string $id) => $baseKeys->has(strtolower($id))))->toBeTrue();
 });
@@ -887,7 +890,7 @@ it('never makes base image candidates fix an image that the team does not build'
     $finding = collect(candidatesFindings())->first(fn (Finding $finding) => $finding->id === $fixedId || in_array($fixedId, $finding->aliases, true));
     $scan->builds_image = false;
 
-    expect(SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding'])->not->toHaveKey($finding->id);
+    expect(SecurityActions::forScan($scan, RelevanceRules::forResource($scan->resource))['byFinding'])->not->toHaveKey($finding->id);
 });
 
 it('says that no newer base image is better when the line candidate has as many findings as the current base', function () {
@@ -913,7 +916,7 @@ it('learns which findings come from the base image also without a newer tag', fu
     RefreshCandidates::run($scan);
 
     $scan->refresh();
-    $actions = SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource));
+    $actions = SecurityActions::forScan($scan, RelevanceRules::forResource($scan->resource));
     expect($scan->candidates['base'])->toMatchArray(['status' => 'no_better', 'entries' => [], 'attributable' => candidatesAttributableCount()])
         ->and($scan->candidates['base']['attributable_ids'])->not->toContain('CVE-2099-0001')
         ->and($actions['byFinding']['CVE-2099-0001']->type)->toBe(SecurityActionType::Rebuild);
@@ -1005,7 +1008,7 @@ it('cannot compare a base image without a version tag, but learns which findings
         'attributable' => candidatesAttributableCount(), 'current_digest' => CANDIDATES_REPO_DIGEST,
     ])
         ->and(candidatesRan("'registry:"))->toBe(1)
-        ->and(SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding']['CVE-2099-0001']->type)->toBe(SecurityActionType::Rebuild);
+        ->and(SecurityActions::forScan($scan, RelevanceRules::forResource($scan->resource))['byFinding']['CVE-2099-0001']->type)->toBe(SecurityActionType::Rebuild);
 });
 
 it('scans a base image pinned by digest without asking the registry for its digest', function () {
@@ -1036,5 +1039,5 @@ it('leaves the base origin unknown when the scan of the current base image was c
 
     $scan->refresh();
     expect($scan->candidates['base'])->toMatchArray(['status' => 'no_better', 'attributable' => null, 'attributable_ids' => []])
-        ->and(SecurityActions::forScan($scan, IgnoreMatcher::forResource($scan->resource))['byFinding'])->not->toHaveKey('CVE-2099-0001');
+        ->and(SecurityActions::forScan($scan, RelevanceRules::forResource($scan->resource))['byFinding'])->not->toHaveKey('CVE-2099-0001');
 });

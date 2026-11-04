@@ -115,6 +115,16 @@ it('writes update_available for one problem and leaves out a zero part', functio
         ->toBe('Update to 16.4-alpine. This fixes 2 serious problems (2 critical). Attackers are not known to use them.');
 });
 
+it('counts medium problems in update_available without calling them serious', function () {
+    $mixed = sentenceUpdateAvailable(['fixedByPrimary' => 6, 'primaryCritical' => 1, 'primaryHigh' => 3, 'primaryMedium' => 2]);
+    $oneMedium = sentenceUpdateAvailable(['fixedByPrimary' => 1, 'primaryCritical' => 0, 'primaryHigh' => 0, 'primaryMedium' => 1]);
+
+    expect(SecuritySentences::headline($mixed))
+        ->toBe('Update to 16.4-alpine. This fixes 6 problems (1 critical, 3 high, 2 medium). Attackers are not known to use them.')
+        ->and(SecuritySentences::headline($oneMedium))
+        ->toBe('Update to 16.4-alpine. This fixes 1 problem (1 medium). Attackers are not known to use it.');
+});
+
 it('leaves out "Attackers are not known to use" when a problem that attackers use has no fix', function () {
     $security = sentenceUpdateAvailable(['exploitedWithoutFix' => true, 'exploitedCount' => 1]);
 
@@ -299,8 +309,8 @@ it('writes a neutral text for not_checked', function () {
 
 it('writes the why-more line in the right grammar', function () {
     expect(SecuritySentences::whyMore(0))->toBe('')
-        ->and(SecuritySentences::whyMore(1))->toBe('and 1 more serious problem that this update fixes')
-        ->and(SecuritySentences::whyMore(4))->toBe('and 4 more serious problems that this update fixes');
+        ->and(SecuritySentences::whyMore(1))->toBe('and 1 more problem that this update fixes')
+        ->and(SecuritySentences::whyMore(4))->toBe('and 4 more problems that this update fixes');
 });
 
 it('names the badge of each status', function () {
@@ -404,6 +414,16 @@ describe('image rows', function () {
         expect(SecuritySentences::imageSentence(sentenceUpdateAvailable(), 'postgres:16.1-alpine'))
             ->toBe('postgres:16.1-alpine has 3 serious problems (1 critical, 2 high). Update to 16.4-alpine to fix them.');
     });
+
+    it('names medium problems in the sentence of an image', function (int $critical, int $high, int $medium, string $problems) {
+        $security = sentenceUpdateAvailable(['fixedByPrimary' => $critical + $high + $medium, 'primaryCritical' => $critical, 'primaryHigh' => $high, 'primaryMedium' => $medium]);
+
+        expect(SecuritySentences::imageSentence($security, 'postgres:16.1-alpine'))->toBe("postgres:16.1-alpine has {$problems}. Update to 16.4-alpine to fix ".($critical + $high + $medium === 1 ? 'it.' : 'them.'));
+    })->with([
+        'one medium' => [0, 0, 1, 'a medium problem'],
+        'only mediums' => [0, 0, 2, '2 medium problems'],
+        'mixed' => [1, 3, 2, '6 problems (1 critical, 3 high, 2 medium)'],
+    ]);
 
     it('adds the attack note only when the sentence does not mention attackers', function () {
         expect(SecuritySentences::attackNote(sentenceUpdateAvailable()))->toBe('No known attacks on these problems.')

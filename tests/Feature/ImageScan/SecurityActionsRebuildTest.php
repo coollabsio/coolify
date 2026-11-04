@@ -15,7 +15,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
-use App\Services\ImageScan\IgnoreMatcher;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\SecurityActions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -78,14 +78,14 @@ function rebuildLoopScan(array $ids, bool $forceRebuild, int $pullRequestId = 0,
 
 function rebuildLoopAction(ImageScan $scan, string $id): ?SecurityActionType
 {
-    return SecurityActions::forScan($scan->fresh(), IgnoreMatcher::fromIgnores(collect()))['byFinding'][$id]?->type ?? null;
+    return SecurityActions::forScan($scan->fresh(), RelevanceRules::fromIgnores(collect()))['byFinding'][$id]?->type ?? null;
 }
 
 it('switches to an upgrade in the Dockerfile when a finding survives a rebuild without cache', function () {
     rebuildLoopScan(['CVE-1'], forceRebuild: false);
     $scan = rebuildLoopScan(['CVE-1', 'CVE-2'], forceRebuild: true);
 
-    $result = SecurityActions::forScan($scan->fresh(), IgnoreMatcher::fromIgnores(collect()));
+    $result = SecurityActions::forScan($scan->fresh(), RelevanceRules::fromIgnores(collect()));
 
     expect($result['byFinding']['CVE-1']->type)->toBe(SecurityActionType::UpgradeInDockerfile)
         ->and($result['byFinding']['CVE-1']->sentence)->toBe('Upgrade openssl to 3.0.15 or later in your Dockerfile.')

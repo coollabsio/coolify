@@ -9,6 +9,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -218,6 +219,58 @@ describe('status rules', function () {
             ->and($security->highCount)->toBe(1)
             ->and($security->fixedByPrimary)->toBe(2)
             ->and($security->exploitedWithoutFix)->toBeFalse();
+    });
+
+    it('has a security update for a fixed medium finding only with a high EPSS or when medium problems count', function (array $overrides, ?bool $countMedium, SecurityStatusType $status) {
+        if ($countMedium !== null) {
+            ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'count_medium' => $countMedium]);
+        }
+        statusTestScan($this->application, [
+            statusTestFinding('CVE-2024-0001', ['severity' => 'medium', 'cvssScore' => 5.3, ...$overrides]),
+        ], ['candidates' => statusTestCandidates(['nginx:1.28' => ['CVE-2024-0001']])]);
+
+        $security = SecurityStatus::forResource($this->application);
+
+        expect($security->status)->toBe($status)
+            ->and($security->problemCount)->toBe($status === SecurityStatusType::UpdateAvailable ? 1 : 0)
+            ->and($security->mediumCount)->toBe($status === SecurityStatusType::UpdateAvailable ? 1 : 0);
+    })->with([
+        'no EPSS' => [[], null, SecurityStatusType::Ok],
+        'no EPSS, team does not count mediums' => [[], false, SecurityStatusType::Ok],
+        'EPSS 0.10 or more' => [['epss' => 0.3], null, SecurityStatusType::UpdateAvailable],
+        'team counts mediums' => [[], true, SecurityStatusType::UpdateAvailable],
+    ]);
+
+    it('names the medium fixes in the sentence of a security update', function () {
+        ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'count_medium' => true]);
+        statusTestScan($this->application, [
+            statusTestFinding('CVE-2024-0001', ['severity' => 'critical']),
+            statusTestFinding('CVE-2024-0002'),
+            statusTestFinding('CVE-2024-0003', ['severity' => 'medium', 'package' => 'curl']),
+            statusTestFinding('CVE-2024-0004', ['severity' => 'medium', 'package' => 'zlib']),
+            statusTestFinding('CVE-2024-0005', ['severity' => 'low', 'package' => 'musl']),
+        ], ['candidates' => statusTestCandidates(['nginx:1.28' => ['CVE-2024-0001', 'CVE-2024-0002', 'CVE-2024-0003', 'CVE-2024-0004', 'CVE-2024-0005']])]);
+
+        $security = SecurityStatus::forResource($this->application);
+        ResourceScans::refreshSummaries(ResourceScans::current($this->application));
+        $stored = SecurityStatus::stored($this->application->fresh());
+
+        expect($security->status)->toBe(SecurityStatusType::UpdateAvailable)
+            ->and($security->problemCount)->toBe(4)
+            ->and($security->fixedByPrimary)->toBe(4)
+            ->and($security->primaryMedium)->toBe(2)
+            ->and(SecuritySentences::headline($security))->toBe('Update to 1.28. This fixes 4 problems (1 critical, 1 high, 2 medium). Attackers are not known to use them.')
+            ->and($stored->mediumCount)->toBe(2)
+            ->and($stored->primaryMedium)->toBe(2);
+    });
+
+    it('never needs an update now for a medium finding without KEV', function () {
+        ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'count_medium' => true]);
+        statusTestScan($this->application, [
+            statusTestFinding('CVE-2024-0001', ['severity' => 'medium', 'cvssScore' => 5.3, 'epss' => 0.9]),
+        ], ['candidates' => statusTestCandidates(['nginx:1.28' => ['CVE-2024-0001']])]);
+
+        expect(SecurityStatus::forResource($this->application)->status)->toBe(SecurityStatusType::UpdateAvailable);
     });
 
     it('flags a security update when a finding that attackers are using has no fix', function () {

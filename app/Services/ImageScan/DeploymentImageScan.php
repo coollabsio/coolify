@@ -794,7 +794,7 @@ final class DeploymentImageScan
 
         $scan?->setRelation('resource', $this->application);
         $policy = $this->policy();
-        $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, IgnoreMatcher::forResource($this->application), $error, $errorContext, $policy->onScanError, $baselineMissing);
+        $result = SecurityGate::evaluate($scan, $running, $policy->gateMode, new RelevanceRules(IgnoreMatcher::forResource($this->application), $policy->countMedium), $error, $errorContext, $policy->onScanError, $baselineMissing);
         $stored = SecurityGate::stored($result);
         if ($stored['blocked'] && $completed) {
             // The action that fixes the blocked image, for the gate popover.

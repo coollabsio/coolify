@@ -17,6 +17,7 @@ use App\Services\ImageScan\GrypeReportParser;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanFailed;
 use App\Services\ImageScan\ScanLockBusy;
@@ -42,7 +43,8 @@ use Throwable;
  * only the base image was checked. The base image of a Dockerfile build (spec 7.4) is scanned from the registry with the
  * newest tag of its line; the result is under `base`: `{image, status, checked_at, error, tags_truncated, attributable,
  * attributable_ids, current_digest, entries}`. A relevant finding of the app is attributable to the base image when the
- * current base image has it too; the line candidate fixes the attributable findings it does not have. Base entries never make a
+ * current base image has it too. `fixed_ids` and the attributable findings count every medium finding, so a change of
+ * "Count medium problems" needs no new check; the line candidate fixes the attributable findings it does not have. Base entries never make a
  * finding fixable now. Never throws for registry or scan problems: they become the status. Registry credentials are read only after an anonymous request failed, only for the registry of the image, and are
  * never stored or logged.
  */
@@ -212,17 +214,17 @@ class RefreshCandidates
     }
 
     /**
-     * The relevant findings of the scan (spec 15.2).
+     * The relevant findings of the scan (spec 15.2), by the rules of the resource unless `$rules` is given.
      *
      * @return list<Finding>
      */
-    public static function relevantFindings(ImageScan $scan, Model $resource): array
+    public static function relevantFindings(ImageScan $scan, Model $resource, ?RelevanceRules $rules = null): array
     {
-        $ignores = IgnoreMatcher::forResource($resource);
+        $rules ??= RelevanceRules::forResource($resource);
 
         return array_values(array_filter(
             ResourceScans::findings($scan),
-            fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $ignores),
+            fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $rules),
         ));
     }
 
@@ -469,7 +471,7 @@ class RefreshCandidates
         // A truncated scan of the current base image cannot tell which findings come from it.
         $attributableOf = fn (array $currentBase): ?array => $currentBase['truncated']
             ? null
-            : (new CandidateEvaluator)->shared(self::relevantFindings($scan, $resource), $currentBase['findings']);
+            : (new CandidateEvaluator)->shared(self::relevantFindings($scan, $resource, new RelevanceRules(IgnoreMatcher::forResource($resource), countMedium: true)), $currentBase['findings']);
 
         if (! $comparable) {
             // No newer tag can be chosen, but the current base image (by tag or pinned digest) still tells the origin.
@@ -506,7 +508,7 @@ class RefreshCandidates
             return $failure(null, $currentDigest);
         }
 
-        $ignores = IgnoreMatcher::forResource($resource);
+        $rules = RelevanceRules::forResource($resource);
         $evaluator = new CandidateEvaluator;
         $attributable = $attributableOf($currentBase);
         if (! $hasLine || $lineDigest === $currentDigest) {
@@ -520,16 +522,16 @@ class RefreshCandidates
 
         $candidateFindings = $candidate['findings'];
         $better = ! $currentBase['truncated'] && ! $candidate['truncated']
-            && $evaluator->isBetter($currentBase['findings'], $candidateFindings, $ignores, $currentBase['eol'], $candidate['eol']);
+            && $evaluator->isBetter($currentBase['findings'], $candidateFindings, $rules, $currentBase['eol'], $candidate['eol']);
         $entry = [
             'ref' => (string) $this->image->withTag($line),
             'digest' => $lineDigest,
             'kind' => 'line',
             'better' => $better,
-            'fixed_ids' => $evaluator->fixedIds($attributable ?? [], $candidateFindings, $ignores),
+            'fixed_ids' => $evaluator->fixedIds($attributable ?? [], $candidateFindings, $rules->withAllMediums()),
             'fixes' => $evaluator->counts($evaluator->fixed($attributable ?? [], $candidateFindings)),
-            'added' => $evaluator->added($evaluator->relevant($currentBase['findings'], $ignores), $candidateFindings, $ignores),
-            'left' => $evaluator->counts($evaluator->relevant($candidateFindings, $ignores)),
+            'added' => $evaluator->added($evaluator->relevant($currentBase['findings'], $rules), $candidateFindings, $rules),
+            'left' => $evaluator->counts($evaluator->relevant($candidateFindings, $rules)),
             'eol' => $candidate['eol'],
             'scanned_at' => now()->toIso8601String(),
         ];
@@ -547,10 +549,10 @@ class RefreshCandidates
             return [];
         }
 
-        $ignores = IgnoreMatcher::forResource($resource);
+        $rules = RelevanceRules::forResource($resource);
         $evaluator = new CandidateEvaluator;
         $current = ResourceScans::findings($scan);
-        $currentRelevant = $evaluator->relevant($current, $ignores);
+        $currentRelevant = $evaluator->relevant($current, $rules);
         $currentEol = data_get($scan->summary, 'eol_distro');
         $currentEol = is_array($currentEol) ? $currentEol : null;
 
@@ -566,11 +568,11 @@ class RefreshCandidates
                 'ref' => (string) $this->image->withTag($candidate['tag']),
                 'digest' => $candidate['digest'],
                 'kind' => $candidate['kind'],
-                'better' => ! $report['truncated'] && $evaluator->isBetter($current, $findings, $ignores, $currentEol, $report['eol']),
-                'fixed_ids' => $evaluator->fixedIds($currentRelevant, $findings, $ignores),
+                'better' => ! $report['truncated'] && $evaluator->isBetter($current, $findings, $rules, $currentEol, $report['eol']),
+                'fixed_ids' => $evaluator->fixedIds($current, $findings, $rules->withAllMediums()),
                 'fixes' => $evaluator->counts($evaluator->fixed($currentRelevant, $findings)),
-                'added' => $evaluator->added($currentRelevant, $findings, $ignores),
-                'left' => $evaluator->counts($evaluator->relevant($findings, $ignores)),
+                'added' => $evaluator->added($currentRelevant, $findings, $rules),
+                'left' => $evaluator->counts($evaluator->relevant($findings, $rules)),
                 'eol' => $report['eol'],
                 'scanned_at' => now()->toIso8601String(),
             ];

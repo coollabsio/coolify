@@ -289,9 +289,10 @@ final class TeamVulnerabilities
         }
         $findings = $findings->keyBy('id');
         $ignores = $this->ignores();
+        $countMedium = ImageScanPolicyResolver::countMediumForMany($this->teamId, $entries->pluck('resource'));
 
         return $entries
-            ->map(function (array $entry) use ($term, $findings, $ignores): ?array {
+            ->map(function (array $entry) use ($term, $findings, $ignores, $countMedium): ?array {
                 $matches = [];
                 foreach ($entry['scans'] as $scan) {
                     $loaded = $findings->get($scan->id);
@@ -300,8 +301,8 @@ final class TeamVulnerabilities
                     }
 
                     $scan->setAttribute('findings', $loaded->findings);
-                    $matcher = $this->matcherFor($scan->resource, $ignores);
-                    $classify = SecurityActions::fixStates($scan, $matcher);
+                    $rules = new RelevanceRules($this->matcherFor($scan->resource, $ignores), $countMedium[$entry['key']] ?? false);
+                    $classify = SecurityActions::fixStates($scan, $rules);
                     foreach (ResourceScans::findings($scan) as $finding) {
                         if (! self::matches($finding, $term)) {
                             continue;
@@ -313,7 +314,7 @@ final class TeamVulnerabilities
                             'version' => $finding->version,
                             'fixedIn' => $finding->fixedIn,
                             'severity' => self::severityOf($finding),
-                            'state' => $matcher->matches($finding) !== null ? 'ignored' : $classify($finding)->value,
+                            'state' => $rules->ignores->matches($finding) !== null ? 'ignored' : $classify($finding)->value,
                         ];
                     }
                 }

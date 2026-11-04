@@ -184,7 +184,7 @@ it('describes the gate modes and the scan error options', function () {
         ->and(ImageScanGateMode::Strict->label())->toBe('Strict')
         ->and(ImageScanGateMode::Off->description())->toBeNull()
         ->and(ImageScanGateMode::On->description())->toBe('Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.')
-        ->and(ImageScanGateMode::Strict->description())->toBe('Also blocks critical and high problems that have a fix, and operating systems that no longer get security fixes.')
+        ->and(ImageScanGateMode::Strict->description())->toBe('Also blocks critical, high, and counted medium problems that have a fix, and operating systems that no longer get security fixes.')
         ->and(ImageScanOnError::Deploy->label())->toBe('Deploy anyway')
         ->and(ImageScanOnError::Block->label())->toBe('Block the deploy');
 });

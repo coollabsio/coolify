@@ -411,7 +411,7 @@ final class ScanNotifications
     private static function current(Model $owner, ?Collection $only = null, ?int $released = null): array
     {
         $scans = $only ?? ResourceScans::currentFor($owner);
-        $ignores = IgnoreMatcher::forResource($owner);
+        $rules = RelevanceRules::forResource($owner);
         $signal = [];
         $fixable = [];
         $candidates = [];
@@ -421,14 +421,14 @@ final class ScanNotifications
 
         foreach ($scans as $scan) {
             $scan->setRelation('resource', $owner);
-            $byFinding = SecurityActions::forScan($scan, $ignores)['byFinding'];
+            $byFinding = SecurityActions::forScan($scan, $rules)['byFinding'];
             $anyPending = $anyPending || self::versionCheckPending($scan);
             $check = null;
             foreach (ResourceScans::findings($scan) as $finding) {
                 foreach ([$finding->id, ...$finding->aliases] as $id) {
                     $present[mb_strtolower($id)] = true;
                 }
-                if (! SecurityRules::isRelevant($finding, $ignores)) {
+                if (! SecurityRules::isRelevant($finding, $rules)) {
                     continue;
                 }
 

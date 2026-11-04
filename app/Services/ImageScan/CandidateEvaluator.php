@@ -18,23 +18,23 @@ final class CandidateEvaluator
      * @param  array<string, mixed>|null  $currentEol  The end-of-life distro of the current image.
      * @param  array<string, mixed>|null  $candidateEol  The end-of-life distro of the candidate.
      */
-    public function isBetter(array $currentFindings, array $candidateFindings, IgnoreMatcher $ignores, ?array $currentEol, ?array $candidateEol): bool
+    public function isBetter(array $currentFindings, array $candidateFindings, RelevanceRules $rules, ?array $currentEol, ?array $candidateEol): bool
     {
         $current = [];
-        foreach ($this->notIgnored($currentFindings, $ignores) as $finding) {
+        foreach ($this->notIgnored($currentFindings, $rules) as $finding) {
             foreach ($this->keys($finding) as $key) {
                 $current[$key] = true;
             }
         }
 
-        $candidateRelevant = $this->relevant($candidateFindings, $ignores);
+        $candidateRelevant = $this->relevant($candidateFindings, $rules);
         foreach ($candidateRelevant as $finding) {
             if (SecurityRules::exploitSignal($finding) !== null && array_intersect_key(array_flip($this->keys($finding)), $current) === []) {
                 return false;
             }
         }
 
-        $currentRelevant = $this->relevant($currentFindings, $ignores);
+        $currentRelevant = $this->relevant($currentFindings, $rules);
         $fixesExploit = array_filter($this->fixed($currentRelevant, $candidateFindings), fn (Finding $finding): bool => SecurityRules::exploitSignal($finding) !== null) !== [];
 
         return $fixesExploit
@@ -49,10 +49,10 @@ final class CandidateEvaluator
      * @param  list<Finding>  $candidate  All findings of the candidate.
      * @return list<string>
      */
-    public function fixedIds(array $current, array $candidate, IgnoreMatcher $ignores): array
+    public function fixedIds(array $current, array $candidate, RelevanceRules $rules): array
     {
         $fixed = [];
-        foreach ($this->fixed($this->relevant($current, $ignores), $candidate) as $finding) {
+        foreach ($this->fixed($this->relevant($current, $rules), $candidate) as $finding) {
             array_push($fixed, ...$this->ids($finding));
         }
 
@@ -63,9 +63,9 @@ final class CandidateEvaluator
      * @param  list<Finding>  $findings
      * @return list<Finding>
      */
-    public function relevant(array $findings, IgnoreMatcher $ignores): array
+    public function relevant(array $findings, RelevanceRules $rules): array
     {
-        return array_values(array_filter($findings, fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $ignores)));
+        return array_values(array_filter($findings, fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $rules)));
     }
 
     /**
@@ -108,7 +108,7 @@ final class CandidateEvaluator
      * @param  list<Finding>  $currentRelevant
      * @param  list<Finding>  $candidate  All findings of the candidate.
      */
-    public function added(array $currentRelevant, array $candidate, IgnoreMatcher $ignores): int
+    public function added(array $currentRelevant, array $candidate, RelevanceRules $rules): int
     {
         $known = [];
         foreach ($currentRelevant as $finding) {
@@ -118,7 +118,7 @@ final class CandidateEvaluator
         }
 
         $added = [];
-        foreach ($this->relevant($candidate, $ignores) as $finding) {
+        foreach ($this->relevant($candidate, $rules) as $finding) {
             if (in_array(strtolower($finding->severity), self::COUNTED_SEVERITIES, true)
                 && array_intersect_key(array_flip($this->keys($finding)), $known) === []) {
                 $added[mb_strtolower($finding->id)] = true;
@@ -149,9 +149,9 @@ final class CandidateEvaluator
      * @param  list<Finding>  $findings
      * @return list<Finding>
      */
-    private function notIgnored(array $findings, IgnoreMatcher $ignores): array
+    private function notIgnored(array $findings, RelevanceRules $rules): array
     {
-        return array_values(array_filter($findings, fn (Finding $finding): bool => $ignores->matches($finding) === null));
+        return array_values(array_filter($findings, fn (Finding $finding): bool => $rules->ignores->matches($finding) === null));
     }
 
     /**

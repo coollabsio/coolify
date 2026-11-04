@@ -25,7 +25,7 @@ enum ImageScanGateMode: string
         return match ($this) {
             self::Off => null,
             self::On => 'Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.',
-            self::Strict => 'Also blocks critical and high problems that have a fix, and operating systems that no longer get security fixes.',
+            self::Strict => 'Also blocks critical, high, and counted medium problems that have a fix, and operating systems that no longer get security fixes.',
         };
     }
 }

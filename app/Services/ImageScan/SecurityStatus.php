@@ -69,19 +69,19 @@ final class SecurityStatus
 
     public const STORED_COLUMNS = ['id', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_ref', 'summary', 'scanned_at'];
 
-    private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'relevant_fixed', 'builder_unfixed'];
+    private const COUNT_KEYS = ['signal_fixed', 'signal_unfixed', 'kev_fixed', 'kev_unfixed', 'critical_fixed', 'high_fixed', 'medium_fixed', 'relevant_fixed', 'builder_unfixed'];
 
     /**
-     * The status of one scanned image, with the age of the result. `$ignores` is the ignore matcher of the scan's
-     * owner, when the caller has it.
+     * The status of one scanned image, with the age of the result. `$rules` are the relevance rules of the scan's
+     * owner, when the caller has them.
      */
-    public static function forScan(ImageScan $scan, ?IgnoreMatcher $ignores = null): ResourceSecurity
+    public static function forScan(ImageScan $scan, ?RelevanceRules $rules = null): ResourceSecurity
     {
         if ($scan->status !== ImageScanStatus::Completed || ! $scan->resource instanceof Model) {
             return self::notChecked(self::NOT_SCANNED);
         }
 
-        return self::evaluate($scan, $ignores);
+        return self::evaluate($scan, $rules);
     }
 
     /**
@@ -254,12 +254,12 @@ final class SecurityStatus
     /**
      * The status of one scan before it is combined with other images.
      */
-    private static function evaluate(ImageScan $scan, ?IgnoreMatcher $ignores = null): ResourceSecurity
+    private static function evaluate(ImageScan $scan, ?RelevanceRules $rules = null): ResourceSecurity
     {
         /** @var Model $owner */
         $owner = $scan->resource;
-        $ignores ??= IgnoreMatcher::forResource($owner);
-        $result = SecurityActions::forScan($scan, $ignores);
+        $rules ??= RelevanceRules::forResource($owner);
+        $result = SecurityActions::forScan($scan, $rules);
         $actions = $result['actions'];
         $indexes = [];
         foreach ($actions as $index => $action) {
@@ -275,7 +275,7 @@ final class SecurityStatus
         $isBuilder = SecurityActions::imageKind($scan, $owner) === 'builder';
         foreach (ResourceScans::findings($scan) as $finding) {
             $key = mb_strtolower($finding->id);
-            if (isset($seen[$key]) || ! SecurityRules::isRelevant($finding, $ignores)) {
+            if (isset($seen[$key]) || ! SecurityRules::isRelevant($finding, $rules)) {
                 continue;
             }
             $seen[$key] = true;
@@ -309,7 +309,7 @@ final class SecurityStatus
                 $stats[$index]['kev']++;
                 $counts['kev_fixed']++;
             }
-            if (in_array($severity, ['critical', 'high'], true)) {
+            if (in_array($severity, ['critical', 'high', 'medium'], true)) {
                 $stats[$index][$severity]++;
                 $counts[$severity.'_fixed']++;
             }
@@ -441,7 +441,7 @@ final class SecurityStatus
             exploitedWithoutFix: $counts['signal_unfixed'] > 0 && in_array($status, [SecurityStatusType::UpdateNow, SecurityStatusType::UpdateAvailable], true),
             problemCount: match ($actionStatus) {
                 SecurityStatusType::UpdateNow => $counts['signal_fixed'],
-                SecurityStatusType::UpdateAvailable => $counts['critical_fixed'] + $counts['high_fixed'],
+                SecurityStatusType::UpdateAvailable => $counts['critical_fixed'] + $counts['high_fixed'] + $counts['medium_fixed'],
                 SecurityStatusType::NoFix => $counts['signal_unfixed'],
                 default => 0,
             },
@@ -453,13 +453,15 @@ final class SecurityStatus
             },
             criticalCount: $counts['critical_fixed'],
             highCount: $counts['high_fixed'],
+            mediumCount: $counts['medium_fixed'],
             fixedByPrimary: match ($actionStatus) {
                 SecurityStatusType::UpdateNow => (int) ($primary['signal'] ?? 0),
-                SecurityStatusType::UpdateAvailable => (int) ($primary['critical'] ?? 0) + (int) ($primary['high'] ?? 0),
+                SecurityStatusType::UpdateAvailable => (int) ($primary['critical'] ?? 0) + (int) ($primary['high'] ?? 0) + (int) ($primary['medium'] ?? 0),
                 default => 0,
             },
             primaryCritical: (int) ($primary['critical'] ?? 0),
             primaryHigh: (int) ($primary['high'] ?? 0),
+            primaryMedium: (int) ($primary['medium'] ?? 0),
             eol: $eol,
             checkedAt: $checkedAt,
             facts: [
@@ -502,7 +504,7 @@ final class SecurityStatus
             $last = array_pop($names);
             $stats = self::emptyStats();
             foreach ($group as $entry) {
-                foreach (['signal', 'kev', 'critical', 'high', 'relevant', 'eol'] as $key) {
+                foreach (['signal', 'kev', 'critical', 'high', 'medium', 'relevant', 'eol'] as $key) {
                     $stats[$key] += $entry['stats'][$key];
                 }
                 $stats['why'] = [...$stats['why'], ...$entry['stats']['why']];
@@ -557,7 +559,7 @@ final class SecurityStatus
 
     /**
      * Most fixes with an exploit signal first, then most critical and high fixes (leaving an end-of-life OS counts as
-     * one critical fix), then the order of the action types.
+     * one critical fix), then most medium fixes, then the order of the action types.
      *
      * @param  list<array{action: SecurityAction, stats: array<string, mixed>}>  $entries
      * @return list<array{action: SecurityAction, stats: array<string, mixed>}>
@@ -569,11 +571,13 @@ final class SecurityStatus
         usort($keyed, fn (array $a, array $b): int => [
             -$a['stats']['signal'],
             -($a['stats']['critical'] + $a['stats']['high']),
+            -$a['stats']['medium'],
             $order[$a['action']->type->value],
             $a['index'],
         ] <=> [
             -$b['stats']['signal'],
             -($b['stats']['critical'] + $b['stats']['high']),
+            -$b['stats']['medium'],
             $order[$b['action']->type->value],
             $b['index'],
         ]);
@@ -583,18 +587,18 @@ final class SecurityStatus
 
     /**
      * What one action fixes: owner (name, morph type, key), relevant fixes with an exploit signal, `exploited` ones,
-     * critical and high ones, all relevant ones, an end-of-life OS it leaves (counted in `critical` and `relevant`
+     * critical, high, and medium ones, all relevant ones, an end-of-life OS it leaves (counted in `critical` and `relevant`
      * too), and its why-list.
      *
-     * @return array{owner: ?string, owner_type: ?string, owner_id: int|string|null, signal: int, kev: int, critical: int, high: int, relevant: int, eol: int, why: list<array<string, mixed>>}
+     * @return array{owner: ?string, owner_type: ?string, owner_id: int|string|null, signal: int, kev: int, critical: int, high: int, medium: int, relevant: int, eol: int, why: list<array<string, mixed>>}
      */
     private static function emptyStats(): array
     {
-        return ['owner' => null, 'owner_type' => null, 'owner_id' => null, 'signal' => 0, 'kev' => 0, 'critical' => 0, 'high' => 0, 'relevant' => 0, 'eol' => 0, 'why' => []];
+        return ['owner' => null, 'owner_type' => null, 'owner_id' => null, 'signal' => 0, 'kev' => 0, 'critical' => 0, 'high' => 0, 'medium' => 0, 'relevant' => 0, 'eol' => 0, 'why' => []];
     }
 
     /**
-     * @return array{owner: ?string, owner_type: ?string, owner_id: int|string|null, signal: int, kev: int, critical: int, high: int, relevant: int, eol: int, why: list<array<string, mixed>>}
+     * @return array{owner: ?string, owner_type: ?string, owner_id: int|string|null, signal: int, kev: int, critical: int, high: int, medium: int, relevant: int, eol: int, why: list<array<string, mixed>>}
      */
     private static function stats(mixed $data): array
     {
@@ -609,6 +613,7 @@ final class SecurityStatus
             'kev' => (int) ($data['kev'] ?? 0),
             'critical' => (int) ($data['critical'] ?? 0),
             'high' => (int) ($data['high'] ?? 0),
+            'medium' => (int) ($data['medium'] ?? 0),
             'relevant' => (int) ($data['relevant'] ?? 0),
             'eol' => (int) ($data['eol'] ?? 0),
             'why' => array_map(fn ($entry): array => ResourceSecurity::whyEntry((array) $entry), (array) ($data['why'] ?? [])),

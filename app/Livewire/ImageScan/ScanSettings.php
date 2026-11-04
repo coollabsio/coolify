@@ -6,6 +6,7 @@ use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Jobs\RefreshImageScanSummariesJob;
 use App\Models\Application;
+use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Models\ImageScanPolicy;
 use App\Models\Server;
@@ -50,6 +51,8 @@ class ScanSettings extends Component
 
     public ?string $onScanError = '';
 
+    public ?string $countMedium = '';
+
     public ?string $appScanEnabled = '1';
 
     public ?string $buildsByTeam = '';
@@ -70,6 +73,7 @@ class ScanSettings extends Component
         $policy = ImageScanPolicyResolver::forScope($scope);
         $this->gateMode = $policy->gate_mode?->value ?? '';
         $this->onScanError = $policy->on_scan_error?->value ?? '';
+        $this->countMedium = self::boolToOption($policy->count_medium);
 
         if ($scope instanceof Application) {
             $this->appScanEnabled = self::boolToOption((bool) $scope->settings?->is_image_scan_enabled);
@@ -88,6 +92,11 @@ class ScanSettings extends Component
     public function updatedOnScanError(): void
     {
         $this->saveRule('on_scan_error', 'onScanError');
+    }
+
+    public function updatedCountMedium(): void
+    {
+        $this->saveRule('count_medium', 'countMedium');
     }
 
     public function updatedAppScanEnabled(): void
@@ -184,10 +193,33 @@ class ScanSettings extends Component
         }
 
         $value = $this->{$property} === '' || $this->{$property} === null ? null : $this->{$property};
-        $policy->{$column} = $value;
+        $policy->{$column} = $column === 'count_medium' ? self::optionToBool($value) : $value;
         $policy->save();
+        if ($column === 'count_medium') {
+            $this->refreshStatuses($scope);
+        }
         $this->audit($scope, $column);
         $this->dispatch('success', 'Saved.');
+    }
+
+    /**
+     * Writes the stored statuses again after "Count medium problems" changed: of the app now, of the team of a team
+     * or server in a job, and of every team with scans for the instance.
+     */
+    private function refreshStatuses(?Model $scope): void
+    {
+        if ($scope instanceof Application) {
+            ResourceScans::refreshSummaries(ResourceScans::current($scope));
+
+            return;
+        }
+
+        $teamIds = $scope === null
+            ? Server::query()->whereIn('id', ImageScan::query()->select('server_id'))->distinct()->pluck('team_id')->all()
+            : [$this->teamIdOf($scope)];
+        foreach (array_filter($teamIds, fn ($teamId): bool => $teamId !== null) as $teamId) {
+            RefreshImageScanSummariesJob::dispatch((int) $teamId);
+        }
     }
 
     /**
@@ -322,6 +354,7 @@ class ScanSettings extends Component
         return [
             'gate_mode' => $label('gate_mode', $inherited['gate_mode']['value']->label()),
             'on_scan_error' => $label('on_scan_error', $inherited['on_scan_error']['value']->label()),
+            'count_medium' => $label('count_medium', $inherited['count_medium']['value'] ? 'Yes' : 'No'),
         ];
     }
 
@@ -397,6 +430,7 @@ class ScanSettings extends Component
             'onScanErrorOptions' => collect(ImageScanOnError::cases())
                 ->map(fn (ImageScanOnError $option) => ['value' => $option->value, 'label' => $option->label()])
                 ->all(),
+            'countMediumOptions' => [['value' => '1', 'label' => 'Yes'], ['value' => '0', 'label' => 'No']],
             'appScanOn' => $scope instanceof Application ? (bool) $scope->settings?->is_image_scan_enabled : true,
             'isDockerImage' => $scope instanceof Application && $scope->build_pack === 'dockerimage',
             'showsIgnores' => $scope instanceof Team || $this->isResourceScope($scope),

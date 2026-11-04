@@ -3,7 +3,7 @@
 use App\Models\ImageScanIgnore;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
-use App\Services\ImageScan\IgnoreMatcher;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\SecurityRules;
 
 function securityFinding(array $overrides = []): Finding
@@ -15,9 +15,9 @@ function securityFinding(array $overrides = []): Finding
     ]);
 }
 
-function securityIgnores(string ...$ids): IgnoreMatcher
+function securityIgnores(string ...$ids): RelevanceRules
 {
-    return IgnoreMatcher::fromIgnores(collect(array_map(fn (string $id) => new ImageScanIgnore(['reason' => 'test', 'vulnerability_id' => $id]), $ids)));
+    return RelevanceRules::fromIgnores(collect(array_map(fn (string $id) => new ImageScanIgnore(['reason' => 'test', 'vulnerability_id' => $id]), $ids)));
 }
 
 it('gives a known exploited finding the exploited signal', function () {
@@ -37,13 +37,53 @@ it('gives a likely signal only with an EPSS of 0.10 and a score of 7.0 or more',
     'epss 0.2, no score, medium' => [0.2, null, 'medium', null],
 ]);
 
-it('gives CVE-2023-2650 of the fixture no exploit signal: a high EPSS but a score of 6.5', function () {
+it('gives CVE-2023-2650 of the fixture no exploit signal but counts it: a medium with a high EPSS and a score of 6.5', function () {
     $findings = (new GrypeReportParser)->parse(file_get_contents(dirname(__DIR__, 2).'/Fixtures/image-scan/grype.ndjson'))['findings'];
     $finding = collect($findings)->firstWhere('id', 'CVE-2023-2650');
 
     expect($finding->epss)->toBeGreaterThan(0.1)
         ->and(SecurityRules::exploitSignal($finding))->toBeNull()
-        ->and(SecurityRules::isRelevant($finding, securityIgnores()))->toBeFalse();
+        ->and(SecurityRules::isRelevant($finding, securityIgnores()))->toBeTrue();
+});
+
+it('counts a medium finding with an EPSS of 0.10 or more as relevant without an exploit signal', function (?float $epss, ?float $score, bool $relevant) {
+    $finding = securityFinding(['severity' => 'medium', 'epss' => $epss, 'cvssScore' => $score]);
+
+    expect(SecurityRules::isRelevant($finding, securityIgnores()))->toBe($relevant)
+        ->and(SecurityRules::exploitSignal($finding))->toBeNull();
+})->with([
+    'epss 0.10 and score 5.3' => [0.10, 5.3, true],
+    'epss 0.5 and no score' => [0.5, null, true],
+    'epss 0.09 and score 6.5' => [0.09, 6.5, false],
+    'no epss' => [null, 6.5, false],
+]);
+
+it('counts every medium finding as relevant only when the team counts medium problems', function () {
+    $finding = securityFinding(['severity' => 'medium']);
+
+    expect(SecurityRules::isRelevant($finding, securityIgnores()))->toBeFalse()
+        ->and(SecurityRules::isRelevant($finding, RelevanceRules::fromIgnores(collect(), countMedium: true)))->toBeTrue()
+        ->and(SecurityRules::exploitSignal($finding))->toBeNull();
+});
+
+it('does not count a low finding without KEV as relevant, also when medium problems count', function () {
+    $counting = RelevanceRules::fromIgnores(collect(), countMedium: true);
+
+    expect(SecurityRules::isRelevant(securityFinding(['severity' => 'low', 'epss' => 0.9]), $counting))->toBeFalse()
+        ->and(SecurityRules::isRelevant(securityFinding(['severity' => 'low', 'kev' => true]), securityIgnores()))->toBeTrue();
+});
+
+it('keeps a medium finding in KEV exploited', function () {
+    $finding = securityFinding(['severity' => 'medium', 'kev' => true]);
+
+    expect(SecurityRules::exploitSignal($finding))->toBe('exploited')
+        ->and(SecurityRules::isRelevant($finding, securityIgnores()))->toBeTrue();
+});
+
+it('does not count an ignored medium finding when medium problems count', function () {
+    $rules = RelevanceRules::fromIgnores(collect([new ImageScanIgnore(['reason' => 'test', 'vulnerability_id' => 'CVE-2024-0001'])]), countMedium: true);
+
+    expect(SecurityRules::isRelevant(securityFinding(['severity' => 'medium']), $rules))->toBeFalse();
 });
 
 it('counts high and critical findings and findings with an exploit signal as relevant', function () {
@@ -52,6 +92,7 @@ it('counts high and critical findings and findings with an exploit signal as rel
     expect(SecurityRules::isRelevant(securityFinding(['severity' => 'high']), $none))->toBeTrue()
         ->and(SecurityRules::isRelevant(securityFinding(['severity' => 'critical']), $none))->toBeTrue()
         ->and(SecurityRules::isRelevant(securityFinding(['severity' => 'medium']), $none))->toBeFalse()
+        ->and(SecurityRules::isRelevant(securityFinding(['severity' => 'low']), $none))->toBeFalse()
         ->and(SecurityRules::isRelevant(securityFinding(['severity' => 'low', 'kev' => true]), $none))->toBeTrue()
         ->and(SecurityRules::isRelevant(securityFinding(['severity' => 'medium', 'epss' => 0.5, 'cvssScore' => 7.2]), $none))->toBeTrue();
 });

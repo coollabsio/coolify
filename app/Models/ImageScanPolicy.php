@@ -21,6 +21,7 @@ class ImageScanPolicy extends BaseModel
         'scope_id',
         'gate_mode',
         'on_scan_error',
+        'count_medium',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class ImageScanPolicy extends BaseModel
         return [
             'gate_mode' => ImageScanGateMode::class,
             'on_scan_error' => ImageScanOnError::class,
+            'count_medium' => 'boolean',
         ];
     }
 
@@ -41,6 +43,7 @@ class ImageScanPolicy extends BaseModel
         return [
             'gate_mode' => ['nullable', Rule::enum(ImageScanGateMode::class)],
             'on_scan_error' => ['nullable', Rule::enum(ImageScanOnError::class)],
+            'count_medium' => ['nullable', 'boolean'],
         ];
     }
 

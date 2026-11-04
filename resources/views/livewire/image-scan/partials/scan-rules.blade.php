@@ -36,6 +36,9 @@
         <x-forms.inherited-listbox id="onScanError" label="If the scan cannot run" :disabled="! $canEdit"
             :inheritLabel="$inheritLabels['on_scan_error'] ?? null" :options="$onScanErrorOptions"
             helper="Applies when Block deploys is On or Strict." />
+        <x-forms.inherited-listbox id="countMedium" label="Count medium problems" :disabled="! $canEdit"
+            :inheritLabel="$inheritLabels['count_medium'] ?? null" :options="$countMediumOptions"
+            helper="Medium problems that an update fixes give a security update. Problems that attackers are likely to use always count." />
     </div>
 
     @if (in_array($scopeType, ['instance', 'team', 'server'], true))

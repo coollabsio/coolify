@@ -106,8 +106,8 @@ final class SecuritySentences
         }
 
         return $count === 1
-            ? 'and 1 more serious problem that this update fixes'
-            : "and {$count} more serious problems that this update fixes";
+            ? 'and 1 more problem that this update fixes'
+            : "and {$count} more problems that this update fixes";
     }
 
     public static function badge(SecurityStatusType $status): ?string
@@ -562,21 +562,23 @@ final class SecuritySentences
 
     /**
      * update_available in the words of an image row: "postgres:16-alpine has a newer build that fixes 2 critical
-     * problems." or "{ref} has a serious problem. Update to 16.4-alpine to fix it."
+     * problems." or "{ref} has a serious problem. Update to 16.4-alpine to fix it." Counts with medium problems are not
+     * called serious: "{ref} has 6 problems (1 critical, 3 high, 2 medium)."
      */
     private static function imageUpdateAvailable(ResourceSecurity $security, string $imageRef): string
     {
         $action = $security->primary();
         $fixed = max(1, $security->fixedByPrimary);
-        $onlyCritical = $security->primaryCritical > 0 && $security->primaryHigh === 0;
-        $parts = array_values(array_filter([
-            $security->primaryCritical > 0 ? "{$security->primaryCritical} critical" : null,
-            $security->primaryHigh > 0 ? "{$security->primaryHigh} high" : null,
-        ]));
+        $only = match (true) {
+            $security->primaryCritical > 0 && $security->primaryHigh === 0 && $security->primaryMedium === 0 => 'critical',
+            $security->primaryMedium > 0 && $security->primaryCritical === 0 && $security->primaryHigh === 0 => 'medium',
+            default => null,
+        };
+        $parts = self::severityParts($security);
         $problems = match (true) {
-            $fixed === 1 => $onlyCritical ? 'a critical problem' : 'a serious problem',
-            $onlyCritical => "{$fixed} critical problems",
-            default => "{$fixed} serious problems".($parts === [] ? '' : ' ('.implode(', ', $parts).')'),
+            $fixed === 1 => $only === null ? 'a serious problem' : "a {$only} problem",
+            $only !== null => "{$fixed} {$only} problems",
+            default => "{$fixed} ".self::problemsNoun($security, 'problems').($parts === [] ? '' : ' ('.implode(', ', $parts).')'),
         };
         $it = $fixed === 1 ? 'it' : 'them';
 
@@ -627,13 +629,10 @@ final class SecuritySentences
     {
         $action = $security->primary();
         $fixed = max(1, $security->fixedByPrimary);
-        $parts = array_values(array_filter([
-            $security->primaryCritical > 0 ? "{$security->primaryCritical} critical" : null,
-            $security->primaryHigh > 0 ? "{$security->primaryHigh} high" : null,
-        ]));
+        $parts = self::severityParts($security);
         $breakdown = $parts === [] ? '' : ' ('.implode(', ', $parts).')';
-        $noun = $fixed === 1 ? 'problem' : 'problems';
-        $fixes = "This fixes {$fixed} serious {$noun}{$breakdown}.";
+        $noun = self::problemsNoun($security, $fixed === 1 ? 'problem' : 'problems');
+        $fixes = "This fixes {$fixed} {$noun}{$breakdown}.";
 
         $sentence = $action?->sentence ?? '';
         if ($action?->type === SecurityActionType::PullLatest && $sentence !== SecurityActions::COOLIFY_TEXT) {
@@ -656,6 +655,28 @@ final class SecuritySentences
         }
 
         return $text;
+    }
+
+    /**
+     * "1 critical", "3 high", "2 medium" for the fixes of the primary action, without the zero ones.
+     *
+     * @return list<string>
+     */
+    private static function severityParts(ResourceSecurity $security): array
+    {
+        return array_values(array_filter([
+            $security->primaryCritical > 0 ? "{$security->primaryCritical} critical" : null,
+            $security->primaryHigh > 0 ? "{$security->primaryHigh} high" : null,
+            $security->primaryMedium > 0 ? "{$security->primaryMedium} medium" : null,
+        ]));
+    }
+
+    /**
+     * "serious problems", or only "problems" when the fixes include medium ones.
+     */
+    private static function problemsNoun(ResourceSecurity $security, string $noun): string
+    {
+        return $security->primaryMedium > 0 ? $noun : "serious {$noun}";
     }
 
     private static function noFix(ResourceSecurity $security, string $subject = 'This image'): string

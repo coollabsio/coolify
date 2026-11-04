@@ -26,6 +26,7 @@ return new class extends Migration
             $table->unsignedBigInteger('scope_id')->nullable();
             $table->string('gate_mode')->nullable();
             $table->string('on_scan_error')->nullable();
+            $table->boolean('count_medium')->nullable();
             $table->timestamps();
 
             $table->unique(['scope_type', 'scope_id']);
@@ -37,6 +38,7 @@ return new class extends Migration
             'scope_id' => null,
             'gate_mode' => 'off',
             'on_scan_error' => 'deploy',
+            'count_medium' => false,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

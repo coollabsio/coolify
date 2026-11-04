@@ -12,14 +12,14 @@ use Throwable;
  * Counts follow the status the actions give (the status without the check reasons):
  * - update_now: `problemCount` is the relevant findings with an exploit signal that have an action, `fixedByPrimary`
  *   how many of them the primary action fixes, `anyExploited` whether one of them is `exploited`.
- * - update_available: `problemCount` is the relevant critical and high findings that have an action
- *   (`criticalCount` + `highCount`), `fixedByPrimary` how many of them the primary action fixes.
+ * - update_available: `problemCount` is the relevant critical, high, and medium findings that have an action
+ *   (`criticalCount` + `highCount` + `mediumCount`), `fixedByPrimary` how many of them the primary action fixes.
  * - no_fix: `problemCount` is the relevant findings with an exploit signal without an action, `anyExploited` whether
  *   one of them is `exploited`.
  *
  * `exploitedCount` is all relevant findings with an exploit signal, with or without an action; so
  * `exploitedCount - problemCount` of update_now (or `exploitedCount` of update_available) have no fix yet.
- * `primaryCritical` and `primaryHigh` are the critical and high fixes of the primary action.
+ * `primaryCritical`, `primaryHigh`, and `primaryMedium` are the critical, high, and medium fixes of the primary action.
  *
  * An action that leaves an end-of-life OS counts it as one critical relevant fix (`problemCount`, `criticalCount`,
  * `fixedByPrimary`, `primaryCritical`); `eol.fixed` says so. It is not in `why` or `moreFixed`.
@@ -69,6 +69,8 @@ final readonly class ResourceSecurity
         public ?CarbonImmutable $checkedAt = null,
         public array $facts = [],
         public bool $builderImage = false,
+        public int $mediumCount = 0,
+        public int $primaryMedium = 0,
     ) {}
 
     public function primary(): ?SecurityAction
@@ -94,9 +96,11 @@ final readonly class ResourceSecurity
             'any_exploited' => $this->anyExploited,
             'critical_count' => $this->criticalCount,
             'high_count' => $this->highCount,
+            'medium_count' => $this->mediumCount,
             'fixed_by_primary' => $this->fixedByPrimary,
             'primary_critical' => $this->primaryCritical,
             'primary_high' => $this->primaryHigh,
+            'primary_medium' => $this->primaryMedium,
             'eol' => $this->eol,
             'checked_at' => $this->checkedAt?->toIso8601String(),
             'facts' => $this->facts,
@@ -145,6 +149,8 @@ final readonly class ResourceSecurity
             checkedAt: self::time($data['checked_at'] ?? null),
             facts: $facts,
             builderImage: (bool) ($data['builder_image'] ?? false),
+            mediumCount: (int) ($data['medium_count'] ?? 0),
+            primaryMedium: (int) ($data['primary_medium'] ?? 0),
         );
     }
 

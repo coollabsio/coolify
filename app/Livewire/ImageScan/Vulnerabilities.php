@@ -15,9 +15,9 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Services\ImageScan\Finding;
-use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ImageUpdateRefused;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\SecurityAction;
 use App\Services\ImageScan\SecurityActions;
@@ -102,8 +102,8 @@ class Vulnerabilities extends Component
     /** @var list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>|null */
     private ?array $rows = null;
 
-    /** @var array<string, IgnoreMatcher> */
-    private array $matchers = [];
+    /** @var array<string, RelevanceRules> */
+    private array $relevanceRules = [];
 
     public function getListeners(): array
     {
@@ -546,7 +546,7 @@ class Vulnerabilities extends Component
         ]);
 
         $this->rows = null;
-        $this->matchers = [];
+        $this->relevanceRules = [];
         ResourceScans::refreshSummaries($this->currentScans());
         if ($scope === 'team') {
             RefreshImageScanSummariesJob::dispatch($teamId);
@@ -589,9 +589,9 @@ class Vulnerabilities extends Component
         return $this->scans ??= ResourceScans::current($this->resource(), $this->owners());
     }
 
-    private function matcherFor(Model $owner): IgnoreMatcher
+    private function rulesFor(Model $owner): RelevanceRules
     {
-        return $this->matchers[$owner->getMorphClass().':'.$owner->getKey()] ??= IgnoreMatcher::forResource($owner);
+        return $this->relevanceRules[$owner->getMorphClass().':'.$owner->getKey()] ??= RelevanceRules::forResource($owner);
     }
 
     /**
@@ -751,8 +751,8 @@ class Vulnerabilities extends Component
         $rows = [];
         foreach ($this->currentScans() as $scan) {
             $owner = $scan->resource;
-            $matcher = $this->matcherFor($owner);
-            $classify = SecurityActions::fixStates($scan, $matcher);
+            $rules = $this->rulesFor($owner);
+            $classify = SecurityActions::fixStates($scan, $rules);
             $baseIds = $this->baseIds($scan);
 
             foreach (ResourceScans::findings($scan) as $index => $finding) {
@@ -763,7 +763,7 @@ class Vulnerabilities extends Component
                     'scan' => (string) $scan->uuid,
                     'finding' => $finding,
                     'state' => $classify($finding)->value,
-                    'ignore' => $matcher->matches($finding),
+                    'ignore' => $rules->ignores->matches($finding),
                     'image' => (string) $scan->image_ref,
                     'owner' => (string) $owner->getAttribute('uuid'),
                     'base' => $fromBase ? (string) $scan->base_image_ref : null,
@@ -1003,8 +1003,8 @@ class Vulnerabilities extends Component
         }
 
         $progress = $this->progress($owners);
-        // One status per image, with the matchers of the findings table, shared by the resource status and the rows.
-        $imageStatuses = $scans->mapWithKeys(fn (ImageScan $scan): array => [(string) $scan->uuid => SecurityStatus::forScan($scan, $this->matcherFor($scan->resource))])->all();
+        // One status per image, with the relevance rules of the findings table, shared by the resource status and the rows.
+        $imageStatuses = $scans->mapWithKeys(fn (ImageScan $scan): array => [(string) $scan->uuid => SecurityStatus::forScan($scan, $this->rulesFor($scan->resource))])->all();
         $security = $scans->isEmpty() ? null : SecurityStatus::forResource($resource, $scans, $imageStatuses);
         $checkedAt = $security?->checkedAt ?? $scans->max('scanned_at');
         $imageOptions = $scans->pluck('image_ref')->map(fn ($ref) => (string) $ref)->unique()->values()->all();
@@ -1015,7 +1015,7 @@ class Vulnerabilities extends Component
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
-            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows), $imageStatuses, fn (Model $owner): IgnoreMatcher => $this->matcherFor($owner)),
+            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows), $imageStatuses, fn (Model $owner): RelevanceRules => $this->rulesFor($owner)),
             'hasSettings' => true,
             'isApplication' => $resource instanceof Application,
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),

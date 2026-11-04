@@ -10,7 +10,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\StandalonePostgresql;
-use App\Services\ImageScan\IgnoreMatcher;
+use App\Services\ImageScan\RelevanceRules;
 use App\Services\ImageScan\SecurityAction;
 use App\Services\ImageScan\SecurityActions;
 use Illuminate\Database\Eloquent\Model;
@@ -101,7 +101,7 @@ function actionBase(array $attributableIds, array $entries, string $image = 'nod
  */
 function actionsFor(ImageScan $scan): array
 {
-    return SecurityActions::forScan($scan, IgnoreMatcher::fromIgnores(collect()));
+    return SecurityActions::forScan($scan, RelevanceRules::fromIgnores(collect()));
 }
 
 /**

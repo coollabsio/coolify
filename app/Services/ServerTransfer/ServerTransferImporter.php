@@ -2453,6 +2453,8 @@ class ServerTransferImporter
             $fields = [
                 'gate_mode' => $gateMode,
                 'on_scan_error' => data_get($policyPayload, 'on_scan_error'),
+                // Bundles before the rule have no value: the server inherits it.
+                'count_medium' => data_get($policyPayload, 'count_medium'),
             ];
             if ($scope === null) {
                 $this->importWarnings[] = 'Vulnerability scan rules were not imported, because their server or application is not in the bundle. Set the scan rules again.';

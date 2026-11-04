@@ -11,7 +11,7 @@ use App\Models\Server;
 final readonly class ResolvedImageScanPolicy
 {
     /**
-     * @param  array{gate_mode: string, on_scan_error: string}  $sources  Level each value came from: instance, team, server or app.
+     * @param  array{gate_mode: string, on_scan_error: string, count_medium: string}  $sources  Level each value came from: instance, team, server or app.
      */
     public function __construct(
         public string $gateMode,
@@ -19,5 +19,6 @@ final readonly class ResolvedImageScanPolicy
         public bool $scanEnabled,
         public array $sources,
         public ?Server $scanServer,
+        public bool $countMedium = false,
     ) {}
 }

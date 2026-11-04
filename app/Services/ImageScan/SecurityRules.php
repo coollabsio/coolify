@@ -37,13 +37,13 @@ final class SecurityRules
     }
 
     /**
-     * Not ignored, not a CPE-only OS match, and an exploit signal or severity critical or high.
+     * Not ignored, not a CPE-only OS match, and an exploit signal, severity critical or high, or a counted medium.
      */
-    public static function isRelevant(Finding $finding, IgnoreMatcher $ignores): bool
+    public static function isRelevant(Finding $finding, RelevanceRules $rules): bool
     {
         return ! self::isCpeOnlyOsMatch($finding)
-            && (self::exploitSignal($finding) !== null || self::isSerious($finding))
-            && $ignores->matches($finding) === null;
+            && (self::exploitSignal($finding) !== null || self::isSerious($finding) || self::isCountedMedium($finding, $rules->countMedium))
+            && $rules->ignores->matches($finding) === null;
     }
 
     /**
@@ -61,11 +61,11 @@ final class SecurityRules
      * @param  list<Finding>  $findings
      * @return list<string>
      */
-    public static function relevantIds(array $findings, IgnoreMatcher $ignores): array
+    public static function relevantIds(array $findings, RelevanceRules $rules): array
     {
         $ids = [];
         foreach ($findings as $finding) {
-            if (self::isRelevant($finding, $ignores)) {
+            if (self::isRelevant($finding, $rules)) {
                 foreach ([$finding->id, ...$finding->aliases] as $id) {
                     if ($id !== '') {
                         $ids[] = mb_strtolower($id);
@@ -75,6 +75,16 @@ final class SecurityRules
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * A medium finding with EPSS 0.10 or more, or any medium finding when the rules count medium problems. Not an
+     * exploit signal.
+     */
+    private static function isCountedMedium(Finding $finding, bool $countMedium): bool
+    {
+        return strtolower($finding->severity) === 'medium'
+            && ($countMedium || ($finding->epss !== null && $finding->epss >= self::LIKELY_EPSS));
     }
 
     private static function isSerious(Finding $finding): bool
