@@ -393,7 +393,8 @@ class Email extends Component
             'smtpEnabled' => 'boolean',
             'smtpFromAddress' => 'required|email',
             'smtpFromName' => 'required|string',
-            'smtpHost' => ['required', 'string', new SafeSmtpHost],
+            // A stored host is checked again at send time, so an unchanged host must not block saving other fields.
+            'smtpHost' => $this->smtpHost === $this->settings->smtp_host ? ['required', 'string'] : ['required', 'string', new SafeSmtpHost],
             'smtpPort' => 'required|numeric',
             'smtpEncryption' => 'required|string|in:starttls,tls,none',
             'smtpUsername' => 'nullable|string',

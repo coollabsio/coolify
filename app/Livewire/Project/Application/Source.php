@@ -188,19 +188,28 @@ class Source extends Component
             $this->authorize('update', $this->application);
             $this->fetchedHostKeys = [];
             $sshHost = $this->application->gitSshHost();
-            if ($sshHost === null) {
+            $hosts = $this->application->gitSshHostsToScan();
+            if ($sshHost === null && $hosts === []) {
                 $this->dispatch('error', 'The repository does not use SSH.');
 
                 return;
             }
-            if (in_array(strtolower($sshHost['host']), gitPinnedHosts(), true)) {
-                $this->dispatch('info', "Coolify always uses the published host keys of {$sshHost['host']}.");
-
+            if ($sshHost !== null && in_array(strtolower($sshHost['host']), gitPinnedHosts(), true)) {
+                $providerHosts = gitProviderHostKeySource($sshHost['host']);
+                if ($providerHosts === null) {
+                    $this->dispatch('info', "Coolify always uses the published host keys of {$sshHost['host']}.");
+                } else {
+                    $count = count(fetchGitProviderHostKeys($providerHosts));
+                    $this->dispatch('success', "Deployments now use the {$count} host keys that {$sshHost['host']} publishes.");
+                }
+            }
+            if ($hosts === []) {
                 return;
             }
             $this->fetchedHostKeys = $this->application->fetchGitSshHostKeys();
             if ($this->fetchedHostKeys === []) {
-                $this->dispatch('error', "Could not read the host keys of {$sshHost['host']} on port {$sshHost['port']}.");
+                $names = implode(', ', array_map(fn (array $host) => "{$host['host']} (port {$host['port']})", $hosts));
+                $this->dispatch('error', "Could not read the host keys of {$names}. To add a key, click Edit manually and paste it.");
             }
         } catch (\Throwable $e) {
             handleError($e, $this);

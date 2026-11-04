@@ -102,8 +102,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $this->hostKeyChanged = $this->server->recordHostKeyMismatch($this->sshErrorOutput);
             }
 
-            if (! $isReachable && $this->hostKeyChanged) {
-                // A changed host key is not a short network problem: stop at once, without the retry threshold.
+            if (! $isReachable && $this->hostKeyChanged && SshMultiplexingHelper::hostKeyCheckingMode($this->server) === 'enforce') {
+                // In enforce mode a changed host key blocks every connection: stop at once, without the retry threshold.
                 $this->server->settings->update([
                     'is_reachable' => false,
                     'is_usable' => false,

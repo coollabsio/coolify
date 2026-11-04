@@ -415,7 +415,7 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
 
         // ssh reads every argument after `--` as the destination or the remote command.
         if (hasEndOfOptions) {
-            if (targetHost !== null || !/^[a-zA-Z0-9_][a-zA-Z0-9._-]*@[^@]+$/.test(argument)) {
+            if (targetHost !== null || !/^[a-zA-Z0-9_.][a-zA-Z0-9._-]*@[^@]+$/.test(argument)) {
                 return false;
             }
             targetHost = extractTargetHost([argument]);

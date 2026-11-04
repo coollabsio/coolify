@@ -16,7 +16,9 @@ use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Services\Dns\ResourceDnsRecords;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Spatie\Url\Url;
 
@@ -688,6 +690,88 @@ const GIT_PINNED_HOST_KEYS = [
     'bitbucket.org,[altssh.bitbucket.org]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDQeJzhupRu0u0cdegZIa8e86EG2qOCsIsD1Xw0xSeiPDlCr7kq97NLmMbpKTX6Esc30NuoqEEHCuc7yWtwp8dI76EEEB1VqY9QJq6vk+aySyboD5QF61I/1WeTwu+deCbgKMGbUijeXhtfbxSxm6JwGrXrhBdofTsbKRUsrN1WoNgUa8uqN1Vx6WAJw1JHPhglEGGHea6QICwJOAr/6mrui/oB7pkaWKHj3z7d1IC4KWLtY47elvjbaTlkN04Kc/5LFEirorGYVbt15kAUlqGM65pk6ZBxtaO3+30LVlORZkxOh+LKL/BvbZ/iRNhItLqNyieoQj/uh/7Iv4uyH/cV/0b4WDSd3DptigWq84lJubb9t/DnZlrJazxyDCulTmKdOR7vs9gMTo+uoIrPSb8ScTtvw65+odKAlBj59dhnVp9zd7QUojOpXlL62Aw56U4oO+FALuevvMjiWeavKhJqlR7i5n9srYcrNV7ttmDw7kf/97P5zauIhxcjX+xHv4M=',
 ];
 
+/**
+ * The providers that publish their SSH host keys over HTTPS. "Fetch current host key" on the Source page reads
+ * them (fetchGitProviderHostKeys()), so deployments follow a key change without a Coolify release.
+ * GitLab publishes its keys only in its docs. The key is the host list of the provider's lines in GIT_PINNED_HOST_KEYS.
+ */
+const GIT_PROVIDER_HOST_KEY_SOURCES = [
+    'github.com,ssh.github.com,[ssh.github.com]:443' => 'https://api.github.com/meta',
+    'bitbucket.org,[altssh.bitbucket.org]:443' => 'https://bitbucket.org/site/ssh',
+];
+
+function gitProviderHostKeysCacheKey(string $hosts): string
+{
+    return 'git-provider-host-keys:'.$hosts;
+}
+
+/**
+ * The key of GIT_PROVIDER_HOST_KEY_SOURCES whose host list contains $host, or null.
+ */
+function gitProviderHostKeySource(string $host): ?string
+{
+    foreach (array_keys(GIT_PROVIDER_HOST_KEY_SOURCES) as $hosts) {
+        if (in_array(strtolower($host), gitKnownHostsLineHosts($hosts), true)) {
+            return $hosts;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Reads the host keys that a provider publishes over HTTPS and saves them for gitProviderHostKeys().
+ *
+ * @return list<string>
+ *
+ * @throws RuntimeException When the provider does not answer with valid keys. The saved keys do not change.
+ */
+function fetchGitProviderHostKeys(string $hosts): array
+{
+    $url = GIT_PROVIDER_HOST_KEY_SOURCES[$hosts];
+    $response = Http::timeout(10)->get($url);
+    if (! $response->successful()) {
+        throw new RuntimeException("Could not read the published host keys from {$url} (HTTP {$response->status()}).");
+    }
+    $keys = $hosts === array_key_first(GIT_PROVIDER_HOST_KEY_SOURCES)
+        ? (array) $response->json('ssh_keys')
+        : collect(preg_split('/\R/', $response->body()))
+            ->map(fn (string $line) => preg_split('/\s+/', trim($line)))
+            ->filter(fn (array $parts) => count($parts) >= 3 && $parts[0] === explode(',', $hosts)[0])
+            ->map(fn (array $parts) => "{$parts[1]} {$parts[2]}")
+            ->all();
+    $lines = collect($keys)
+        ->filter(fn ($key) => is_string($key))
+        ->map(fn (string $key) => $hosts.' '.trim($key))
+        ->unique()
+        ->values();
+    if ($lines->isEmpty() || $lines->contains(fn (string $line) => ! isValidGitKnownHostsLine($line))) {
+        throw new RuntimeException("The answer from {$url} has no valid host keys.");
+    }
+    Cache::forever(gitProviderHostKeysCacheKey($hosts), $lines->all());
+
+    return $lines->all();
+}
+
+/**
+ * GIT_PINNED_HOST_KEYS, with the lines of a provider replaced by the keys that it published last.
+ * A replaced list also drops a key that the provider withdrew.
+ *
+ * @return list<string>
+ */
+function gitProviderHostKeys(): array
+{
+    $lines = GIT_PINNED_HOST_KEYS;
+    foreach (array_keys(GIT_PROVIDER_HOST_KEY_SOURCES) as $hosts) {
+        $published = Cache::get(gitProviderHostKeysCacheKey($hosts));
+        if (is_array($published) && $published !== []) {
+            $lines = [...array_filter($lines, fn (string $line) => explode(' ', $line, 2)[0] !== $hosts), ...$published];
+        }
+    }
+
+    return array_values($lines);
+}
+
 function gitSshConfigFile(string $uuid): string
 {
     return "/root/.ssh/coolify_git_{$uuid}.config";
@@ -795,7 +879,7 @@ function gitKnownHostFingerprint(string $line): array
  * A shell command that writes the SSH config and known_hosts file that gitSshCommand() uses.
  * Run it in the place where git runs (the helper container or the server) before git uses SSH.
  *
- * The hosts in GIT_PINNED_HOST_KEYS must show one of their published keys. Other hosts are trusted on
+ * The hosts in GIT_PINNED_HOST_KEYS must show one of their published keys (gitProviderHostKeys()). Other hosts are trusted on
  * first use: SSH adds the key of a new host to the known_hosts file and rejects a changed key of a known
  * host. $knownHosts are the keys that earlier deployments saved (Application::$git_ssh_known_hosts).
  * The config of the SSH user is read after these rules, so it cannot change StrictHostKeyChecking or
@@ -820,7 +904,7 @@ function gitSshSetupCommand(string $uuid, ?string $knownHosts = null, bool $onSe
         '    HashKnownHosts no',
         '    Include ~/.ssh/config /etc/ssh/ssh_config',
     ])."\n";
-    $knownHostsContent = implode("\n", [...GIT_PINNED_HOST_KEYS, ...gitKnownHostsLines($knownHosts)])."\n";
+    $knownHostsContent = implode("\n", [...gitProviderHostKeys(), ...gitKnownHostsLines($knownHosts)])."\n";
     $write = fn (string $content, string $file) => "echo '".base64_encode($content)."' | base64 -d | tee {$file} > /dev/null";
     $setup = 'mkdir -p /root/.ssh && '.$write($knownHostsContent, $knownHostsFile).' && ';
     if (! $onServer) {

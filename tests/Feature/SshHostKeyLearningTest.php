@@ -69,18 +69,21 @@ beforeEach(function () {
     Cache::flush();
 });
 
-it('limits the host key scan to a short timeout when the server has a long connection timeout', function () {
+it('scans the host key with the connection timeout of the server, capped at 30 seconds', function (int $connectionTimeout, int $scanTimeout) {
     fakeHostKeyScan(LEARNED_HOST_KEY);
     $server = makeHostKeyTestServer();
-    $server->settings->forceFill(['connection_timeout' => 120])->save();
+    $server->settings->forceFill(['connection_timeout' => $connectionTimeout])->save();
 
     SshMultiplexingHelper::generateSshCommand($server, 'ls');
 
     Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'PubkeyAuthentication=no')
-        && str_contains($process->command, '-o ConnectTimeout=10 ')
-        && $process->timeout === 15);
+        && str_contains($process->command, "-o ConnectTimeout={$scanTimeout} ")
+        && $process->timeout === $scanTimeout + 5);
     expect($server->settings->fresh()->ssh_host_key)->toBe(LEARNED_HOST_KEY);
-});
+})->with([
+    'slow link' => [20, 20],
+    'long timeout' => [120, 30],
+]);
 
 it('does not wait for another process that reads the host key in warn mode', function () {
     fakeHostKeyScan(LEARNED_HOST_KEY);

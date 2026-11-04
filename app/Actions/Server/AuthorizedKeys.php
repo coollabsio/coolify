@@ -192,6 +192,7 @@ AWK;
             ->whereKeyNot($server->id)
             ->where(fn ($query) => $query->when($privateKeyId, fn ($query) => $query->where('private_key_id', $privateKeyId))
                 ->orWhereHas('privateKey', fn ($keys) => $keys->where('fingerprint', $fingerprint)->orWhereNull('fingerprint')))
+            ->with('settings:id,server_id,ssh_host_key')
             ->get(['id', 'ip', 'private_key_id'])
             ->filter(fn (Server $other) => ($privateKeyId && $other->private_key_id === $privateKeyId)
                 || ($other->privateKey && $fingerprint
@@ -201,6 +202,13 @@ AWK;
             $host = strtolower(rtrim(Server::normalizeIp($server->ip), '.'));
             $otherHost = strtolower(rtrim(Server::normalizeIp($other->ip), '.'));
             if ($host === $otherHost) {
+                return true;
+            }
+            // Two addresses of one machine (for example a public and a Tailscale IP) show the same host key.
+            // Without a pinned host key on both records, it is not known that these are different machines.
+            $hostKeys = self::hostKeys($server);
+            $otherHostKeys = self::hostKeys($other);
+            if ($hostKeys === [] || $otherHostKeys === [] || array_intersect($hostKeys, $otherHostKeys) !== []) {
                 return true;
             }
             $addresses[$host] ??= self::hostAddresses($host);
@@ -213,6 +221,15 @@ AWK;
         }
 
         return false;
+    }
+
+    /** @return list<string> The pinned SSH host keys of the server, as "type base64" lines. */
+    private static function hostKeys(Server $server): array
+    {
+        return array_values(array_filter(array_map(
+            fn (string $line) => implode(' ', array_slice(preg_split('/\s+/', trim($line)), 0, 2)),
+            preg_split('/\R/', (string) $server->settings?->ssh_host_key),
+        )));
     }
 
     /** @return list<string> */

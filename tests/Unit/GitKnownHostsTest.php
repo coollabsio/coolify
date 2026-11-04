@@ -1,5 +1,9 @@
 <?php
 
+use Tests\TestCase;
+
+uses(TestCase::class);
+
 test('known hosts lines accept host names with an underscore', function () {
     expect(gitKnownHostsLines('[git_host.internal]:2222 ssh-ed25519 AAAA'))->toBe(['[git_host.internal]:2222 ssh-ed25519 AAAA']);
 });

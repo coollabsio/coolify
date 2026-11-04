@@ -391,3 +391,35 @@ test('the ssh host keys section shows only when git uses ssh or keys are saved',
     'ssh repository' => ['git@git.example.com:org/repo.git', null, true],
     'https repository with saved submodule keys' => ['https://github.com/coollabsio/coolify-examples', 'git.example.com ssh-ed25519 AAAA', true],
 ]);
+
+test('fetch reads the published host keys of GitHub and Bitbucket for deployments', function () {
+    $this->applicationA->update(['git_repository' => 'git@github.com:org/repo.git']);
+    Http::fake([
+        'api.github.com/meta' => Http::response(['ssh_keys' => ['ssh-ed25519 AAAANEWGITHUB']]),
+    ]);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->call('fetchHostKeys')
+        ->assertDispatched('success')
+        ->assertSet('fetchedHostKeys', []);
+
+    $keys = gitProviderHostKeys();
+    expect($keys)->toContain('github.com,ssh.github.com,[ssh.github.com]:443 ssh-ed25519 AAAANEWGITHUB')
+        ->and(collect($keys)->filter(fn (string $line) => str_starts_with($line, 'github.com,')))->toHaveCount(1)
+        ->and(collect($keys)->filter(fn (string $line) => str_starts_with($line, 'bitbucket.org,')))->toHaveCount(3)
+        ->and(gitSshSetupCommand('app'))->toContain(base64_encode(implode("\n", $keys)."\n"));
+});
+
+test('fetch keeps the built-in host keys when the provider sends no valid keys', function (mixed $response) {
+    $this->applicationA->update(['git_repository' => 'git@bitbucket.org:org/repo.git']);
+    Http::fake(['bitbucket.org/site/ssh' => $response]);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->call('fetchHostKeys')
+        ->assertDispatched('error');
+
+    expect(gitProviderHostKeys())->toBe(GIT_PINNED_HOST_KEYS);
+})->with([
+    'server error' => fn () => Http::response('', 500),
+    'only other hosts' => fn () => Http::response("ssh.bitbucket.org ssh-ed25519 AAAAOTHER\n"),
+]);

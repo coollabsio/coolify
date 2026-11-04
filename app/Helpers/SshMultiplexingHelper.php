@@ -19,11 +19,23 @@ use Illuminate\Support\Str;
 
 class SshMultiplexingHelper
 {
-    /** The host key scan runs while Coolify builds an SSH command, so it must stay short also for a long connection timeout. */
-    private const HOST_KEY_SCAN_TIMEOUT_SECONDS = 10;
+    /** The host key scan uses the connection timeout of the server, but it runs while Coolify builds an SSH command, so it stops after this time. */
+    private const HOST_KEY_SCAN_MAX_CONNECT_TIMEOUT_SECONDS = 30;
 
-    /** After a failed scan (server offline), commands do not scan again for this time. The connection check still scans. */
+    /** After a failed scan (server offline), commands and the connection check do not scan again for this time. */
     private const HOST_KEY_SCAN_RETRY_SECONDS = 600;
+
+    /**
+     * The warning that OpenSSH prints at the start of its own stderr when the server sends a host key that is not
+     * the pinned key: the banner, the fingerprint, the known_hosts lines, and the "is disabled to avoid
+     * man-in-the-middle attacks" lines of the login methods that it turns off.
+     */
+    private const HOST_KEY_CHANGED_WARNING_PATTERN = '/\A@+\r?\n@\s+WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!\s+@\r?\n@+\r?\n'
+        .'(?:[^@\r\n].*\r?\n){0,20}?Offending .+ key in .+\r?\n(?:  remove with:\r?\n  ssh-keygen .+\r?\n)?'
+        .'(?:(?:.+ is disabled to avoid man-in-the-middle attacks\.|UpdateHostkeys is disabled because the host key is not trusted\.)\r?\n)*/';
+
+    /** Stderr that starts like the warning is held at most this long, so other output is never held without limit. */
+    private const HOST_KEY_CHANGED_WARNING_MAX_BYTES = 16384;
 
     /** The unknown SSH_HOST_KEY_CHECKING value that this process already checked. */
     private static mixed $checkedUnknownHostKeyCheckingMode = null;
@@ -604,6 +616,52 @@ class SshMultiplexingHelper
     }
 
     /**
+     * Remove the changed host key warning of OpenSSH from the start of the stderr of an SSH process, for logs and
+     * saved output. Detect a mismatch with the raw output (isHostKeyMismatch()). A warning later in the output
+     * is from a program on the server (git) and stays.
+     */
+    public static function stripHostKeyChangedWarning(string $output): string
+    {
+        return preg_replace(self::HOST_KEY_CHANGED_WARNING_PATTERN, '', $output, 1) ?? $output;
+    }
+
+    /**
+     * Filter streamed stderr of an SSH process: hold the first chunks while they can still be the changed host key
+     * warning, then return them without it. Start with $held = ''; it becomes null when the start is passed.
+     * Pass $final when the warning must be over (stdout arrived or the process ended).
+     */
+    public static function filterHostKeyChangedWarning(?string &$held, string $chunk, bool $final = false): string
+    {
+        if ($held === null) {
+            return $chunk;
+        }
+        $held .= $chunk;
+        if (! $final && self::mayBeHostKeyChangedWarning($held)) {
+            return '';
+        }
+        $output = self::stripHostKeyChangedWarning($held);
+        $held = null;
+
+        return $output;
+    }
+
+    private static function mayBeHostKeyChangedWarning(string $output): bool
+    {
+        if ($output === '') {
+            return true;
+        }
+        if (! str_starts_with($output, '@') || strlen($output) > self::HOST_KEY_CHANGED_WARNING_MAX_BYTES) {
+            return false;
+        }
+        if (! preg_match(self::HOST_KEY_CHANGED_WARNING_PATTERN, $output, $matches)) {
+            return true;
+        }
+
+        // The rest of the warning can follow until a complete line arrives that is not part of it.
+        return ! preg_match('/\A(?!  remove with:).*\n/', substr($output, strlen($matches[0])));
+    }
+
+    /**
      * Read the host key that the server sends now. The probe has every login method off, so it offers no key
      * and runs no command: ssh saves the host key during the key exchange, then the login fails by design.
      */
@@ -617,7 +675,7 @@ class SshMultiplexingHelper
      */
     private static function readHostKey(Server $server): array
     {
-        $connectTimeout = min(self::getConnectionTimeout($server), self::HOST_KEY_SCAN_TIMEOUT_SECONDS);
+        $connectTimeout = self::hostKeyScanConnectTimeout($server);
         $directory = self::knownHostsDirectory();
         File::ensureDirectoryExists($directory, 0700);
         self::giveToSshDirectoryOwner($directory);
@@ -637,7 +695,7 @@ class SshMultiplexingHelper
             .'-- '.self::escapedUserAtHost($server).' true';
 
         try {
-            $result = self::runWithTimeout($command, $connectTimeout + 5);
+            $result = self::runWithTimeout($command, self::hostKeyScanProcessTimeout($server));
 
             return [
                 'key' => ServerSetting::normalizeSshHostKeys(@file_get_contents($scanFile) ?: null),
@@ -648,17 +706,30 @@ class SshMultiplexingHelper
         }
     }
 
+    /** The connection timeout of the server, like the other SSH commands use, capped for the scan. */
+    private static function hostKeyScanConnectTimeout(Server $server): int
+    {
+        return min(self::getConnectionTimeout($server), self::HOST_KEY_SCAN_MAX_CONNECT_TIMEOUT_SECONDS);
+    }
+
+    private static function hostKeyScanProcessTimeout(Server $server): int
+    {
+        return self::hostKeyScanConnectTimeout($server) + 5;
+    }
+
     /**
      * Pin the host key that the server sends on the first connection (trust on first use).
-     * Commands do not scan a server that is unreachable or failed a recent scan, so they do not wait for the
-     * scan timeout. The connection check passes $evenIfUnreachable, so the server learns its key when it is back.
+     * Nothing scans again within HOST_KEY_SCAN_RETRY_SECONDS of a failed scan. Commands also do not scan a server
+     * that is unreachable, so they do not wait for the scan timeout. The connection check passes
+     * $evenIfUnreachable, so the server learns its key when it is back. In enforce mode the check then fails with
+     * the scan error until the next scan.
      */
     public static function learnHostKey(Server $server, bool $evenIfUnreachable = false): void
     {
         if (self::hostKeyCheckingMode($server) === 'off' || filled($server->settings->ssh_host_key) || ! $server->settings->exists) {
             return;
         }
-        if (! $evenIfUnreachable && ($server->unreachable_count > 0 || Cache::has(self::hostKeyScanFailedCacheKey($server)))) {
+        if (Cache::has(self::hostKeyScanFailedCacheKey($server)) || (! $evenIfUnreachable && $server->unreachable_count > 0)) {
             return;
         }
 
@@ -691,11 +762,11 @@ class SshMultiplexingHelper
             self::removeMuxFile($server);
         };
 
-        $lock = Cache::lock('ssh_host_key_learn_'.$server->uuid, self::HOST_KEY_SCAN_TIMEOUT_SECONDS + 20);
+        $lock = Cache::lock('ssh_host_key_learn_'.$server->uuid, self::HOST_KEY_SCAN_MAX_CONNECT_TIMEOUT_SECONDS + 25);
         try {
             // Enforce mode cannot connect without the key, so it waits for another process that reads it. Warn mode connects without it.
             if (self::hostKeyCheckingMode($server) === 'enforce') {
-                $lock->block(self::HOST_KEY_SCAN_TIMEOUT_SECONDS + 5, $learn);
+                $lock->block(self::hostKeyScanProcessTimeout($server), $learn);
             } else {
                 $lock->get($learn);
             }

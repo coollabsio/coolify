@@ -38,14 +38,14 @@
         @endphp
         @if ($usesGitSsh || filled($application->git_ssh_known_hosts))
         <x-application.settings-section id="ssh-host-keys" title="SSH host keys" x-data="{ editManually: false }" x-on:known-hosts-invalid.window="editManually = true" flush
-            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key, click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys.">
+            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key (also of a submodule host), click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys. If GitHub or Bitbucket Cloud changes its keys, click Fetch current host key to read the new keys from their official HTTPS endpoint.">
             @can('update', $application)
                 <x-slot:actions>
                     <button type="button" class="button" @click="editManually = !editManually" :aria-expanded="editManually" aria-controls="manual-host-keys">
                         <x-reicon name="edit" class="size-3.5" />
                         Edit manually
                     </button>
-                    @if ($usesGitSsh)
+                    @if ($usesGitSsh || filled($application->git_ssh_known_hosts))
                         <x-forms.button type="button" wire:click="fetchHostKeys" wire:loading.attr="disabled"
                             wire:target="fetchHostKeys">
                             Fetch current host key

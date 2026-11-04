@@ -142,13 +142,29 @@ it('retains a key used through a hostname alias or an unresolved host', function
 })->with([true, false]);
 
 it('removes a shared key from an independent literal IP server', function () {
-    Server::factory()->create([
+    $other = Server::factory()->create([
         'team_id' => $this->team->id, 'private_key_id' => $this->key->id,
         'ip' => '192.0.2.11', 'user' => 'root',
     ]);
+    $this->server->settings->forceFill(['ssh_host_key' => 'ssh-ed25519 AAAAHOSTA'])->save();
+    $other->settings->forceFill(['ssh_host_key' => 'ssh-ed25519 AAAAHOSTB'])->save();
 
-    expect(AuthorizedKeys::remove($this->server, $this->key))->toBeTrue();
+    expect(AuthorizedKeys::remove($this->server->fresh(), $this->key))->toBeTrue();
 });
+
+it('retains a shared key used through another IP of the same machine', function (?string $otherHostKey) {
+    $other = Server::factory()->create([
+        'team_id' => $this->team->id, 'private_key_id' => $this->key->id,
+        'ip' => '100.64.0.10', 'user' => 'root',
+    ]);
+    $this->server->settings->forceFill(['ssh_host_key' => "ecdsa-sha2-nistp256 AAAAOTHER\nssh-ed25519 AAAAHOSTA"])->save();
+    $other->settings->forceFill(['ssh_host_key' => $otherHostKey])->save();
+
+    expect(AuthorizedKeys::remove($this->server->fresh(), $this->key))->toBeFalse();
+})->with([
+    'same host key' => 'ssh-ed25519 AAAAHOSTA',
+    'host key not known yet' => null,
+]);
 
 it('retains the same legacy key with no fingerprint through a differently cased hostname', function () {
     $this->key->forceFill(['fingerprint' => null])->saveQuietly();

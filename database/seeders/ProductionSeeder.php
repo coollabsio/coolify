@@ -92,13 +92,16 @@ class ProductionSeeder extends Seeder
                 if ($coolify_key) {
                     $user = str($coolify_key)->before('@')->after('id.');
                     $coolify_key = Storage::disk('ssh-keys')->get($coolify_key);
-                    PrivateKey::create([
+                    $localhostKey = (new PrivateKey)->forceFill([
                         'id' => 0,
                         'team_id' => 0,
                         'name' => 'localhost\'s key',
                         'description' => 'The private key for the Coolify host machine (localhost).',
                         'private_key' => $coolify_key,
                     ]);
+                    // The install script created this key, so an older key type must not block the localhost server.
+                    $localhostKey->allowLegacyKey = true;
+                    $localhostKey->save();
                     echo "SSH key found for the Coolify host machine (localhost).\n";
                 } else {
                     echo "No SSH key found for the Coolify host machine (localhost).\n";

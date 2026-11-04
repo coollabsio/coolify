@@ -47,6 +47,9 @@ beforeEach(function () {
     $this->serverB = Server::factory()->create([
         'team_id' => $this->team->id, 'private_key_id' => $this->oldKey->id, 'ip' => '192.0.2.11', 'user' => 'root',
     ]);
+    // Different host keys: these are two machines.
+    $this->serverA->settings->forceFill(['ssh_host_key' => 'ssh-ed25519 AAAAHOSTA'])->save();
+    $this->serverB->settings->forceFill(['ssh_host_key' => 'ssh-ed25519 AAAAHOSTB'])->save();
 
     // Records every SSH command. The login test with the new key fails on the hosts in $this->rejectNewKeyOn.
     // An edit of authorized_keys exits with the code in $this->addExitCode.

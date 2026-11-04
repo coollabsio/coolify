@@ -263,6 +263,57 @@ describe('Destination::removeServer', function () {
     });
 });
 
+describe('Destination on a server that is not usable', function () {
+    test('redeploy shows an error and queues no deployment when the server is not reachable', function (array $settings) {
+        $this->serverA2->settings->update($settings);
+        Server::flushIdentityMap();
+
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('redeploy', $this->destinationA2->id, $this->serverA2->id)
+            ->assertDispatched('error', 'Failed to deploy.', "The server {$this->serverA2->name} is not reachable. Check the connection on the server page and try again.")
+            ->assertStatus(200);
+
+        expect(ApplicationDeploymentQueue::query()->where('server_id', $this->serverA2->id)->exists())->toBeFalse();
+    })->with([
+        'unreachable' => [['is_reachable' => false]],
+        'unusable' => [['is_usable' => false]],
+    ]);
+
+    test('addServer shows an error and attaches nothing when the server is not reachable', function () {
+        $this->serverA2->settings->update(['is_reachable' => false]);
+        Server::flushIdentityMap();
+
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('addServer', $this->destinationA2->id, $this->serverA2->id)
+            ->assertDispatched('error', 'Failed to add server.', "The server {$this->serverA2->name} is not reachable. Check the connection on the server page and try again.")
+            ->assertStatus(200);
+
+        expect($this->applicationA->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('promote shows an error and keeps the main destination when the server is not reachable', function () {
+        $this->applicationA->additional_networks()->attach($this->destinationA2->id, ['server_id' => $this->serverA2->id]);
+        $this->serverA2->settings->update(['is_reachable' => false]);
+        Server::flushIdentityMap();
+
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('promote', $this->destinationA2->id, $this->serverA2->id)
+            ->assertDispatched('error', 'Failed to promote.', "The server {$this->serverA2->name} is not reachable. Check the connection on the server page and try again.")
+            ->assertStatus(200);
+
+        expect($this->applicationA->fresh()->destination_id)->toBe($this->destinationA->id);
+    });
+
+    test('redeploy to a server of another team is still rejected without a toast', function () {
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('redeploy', $this->destinationB->id, $this->serverB->id)
+            ->assertNotDispatched('error')
+            ->assertStatus(404);
+
+        expect(ApplicationDeploymentQueue::query()->where('server_id', $this->serverB->id)->exists())->toBeFalse();
+    });
+});
+
 describe('Destination::stop', function () {
     test('stops the application on an additional server that is no longer usable', function (array $settings) {
         $this->applicationA->additional_networks()->attach($this->destinationA2->id, ['server_id' => $this->serverA2->id]);

@@ -1668,23 +1668,59 @@ class Application extends BaseModel
     }
 
     /**
-     * Reads the SSH host keys that the Git host sends now, from the server of the application, on the
-     * Docker network of the destination, where the deployment helper container runs.
+     * The SSH hosts whose keys "Fetch current host key" reads: the repository host and the hosts of the
+     * saved keys (for example submodule hosts), without the hosts in GIT_PINNED_HOST_KEYS.
+     *
+     * @return list<array{host: string, port: int}>
+     */
+    public function gitSshHostsToScan(): array
+    {
+        $hosts = array_filter([$this->gitSshHost()]);
+        foreach (gitKnownHostsLines($this->git_ssh_known_hosts) as $line) {
+            $entry = explode(',', explode(' ', $line)[0])[0];
+            $hosts[] = preg_match('/\A\[(.+)\]:([0-9]+)\z/', $entry, $match) === 1
+                ? ['host' => $match[1], 'port' => (int) $match[2]]
+                : ['host' => $entry, 'port' => 22];
+        }
+
+        return collect($hosts)
+            ->filter(fn (array $host) => preg_match('/\A[A-Za-z0-9._:][A-Za-z0-9._:-]*\z/', $host['host']) === 1
+                && ! in_array(strtolower($host['host']), gitPinnedHosts(), true))
+            ->unique(fn (array $host) => strtolower($host['host']).':'.$host['port'])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Reads the SSH host keys that the hosts of gitSshHostsToScan() send now, from where the deployment helper
+     * container runs: a build server when the application builds on one, else the server of the application
+     * on the Docker network of the destination. The first server that reads keys is used.
      *
      * @return list<string> known_hosts lines
      */
     public function fetchGitSshHostKeys(): array
     {
-        $sshHost = $this->gitSshHost();
-        if ($sshHost === null) {
+        $hosts = $this->gitSshHostsToScan();
+        if ($hosts === []) {
             return [];
         }
-        $image = coolifyHelperImage().':'.getHelperVersion();
-        $output = instant_remote_process([
-            'docker run --rm --network '.escapeshellarg($this->destination->network).' --entrypoint ssh-keyscan '.escapeshellarg($image).' -T 10 -p '.$sshHost['port'].' -- '.escapeshellarg($sshHost['host']).' 2>/dev/null || true',
-        ], $this->destination->server, false);
+        $image = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+        $server = $this->destination->server;
+        $targets = $this->buildServerCandidates($server)
+            ->map(fn (Server $buildServer) => [$buildServer, ''])
+            ->push([$server, '--network '.escapeshellarg($this->destination->network).' ']);
+        foreach ($targets as [$target, $network]) {
+            $commands = array_map(
+                fn (array $host) => "docker run --rm {$network}--entrypoint ssh-keyscan {$image} -T 10 -p {$host['port']} -- ".escapeshellarg($host['host']).' 2>/dev/null || true',
+                $hosts,
+            );
+            $lines = gitKnownHostsLines(instant_remote_process($commands, $target, false));
+            if ($lines !== []) {
+                return $lines;
+            }
+        }
 
-        return gitKnownHostsLines($output);
+        return [];
     }
 
     public function generateBaseDir(string $uuid)
