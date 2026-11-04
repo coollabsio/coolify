@@ -2055,10 +2055,6 @@ $siteAddress {
         return normalizeIpAddress(preg_replace('/[^0-9a-zA-Z.:%-]/', '', (string) $value));
     }
 
-    public function getIp(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
     /**
      * Whether a server of any team already uses this SSH endpoint. The port is part of the endpoint,
      * so servers behind one NAT address with different forwarded SSH ports are different servers.
@@ -2072,6 +2068,10 @@ $siteAddress {
             ->exists();
     }
 
+    public function getIp(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
                 if (isDev()) {
                     return '127.0.0.1';
                 }
