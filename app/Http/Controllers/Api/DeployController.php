@@ -429,6 +429,11 @@ class DeployController extends Controller
                 $preview = null;
                 if ($pr !== 0) {
                     if ($resource instanceof Application && $resource->build_pack === 'dockerimage') {
+                        if (! auth()->user()?->can('deploy', $resource)) {
+                            $deployments->push(['message' => 'Unauthorized to deploy this application.', 'resource_uuid' => $uuid]);
+
+                            continue;
+                        }
                         $preview = $this->upsertDockerImagePreview($resource, $pr, $dockerTag);
                         $dockerTagForResource = $preview?->docker_registry_image_tag;
                     } else {
