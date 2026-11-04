@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Server;
 use DateTimeInterface;
 
 class CoolifyUpgradeStatus
@@ -83,6 +84,21 @@ class CoolifyUpgradeStatus
             'message' => $message,
             ...$base,
         ];
+    }
+
+    /**
+     * Writes an error that stopped an upgrade before the upgrade script started, so the upgrade modal shows it.
+     * Does nothing while an upgrade script runs, because the error then belongs to this attempt only.
+     */
+    public static function writeError(Server $server, string $message): void
+    {
+        $current = (string) instant_remote_process(['cat '.self::FILE.' 2>/dev/null || true'], $server, false);
+        if (self::isRunning($current)) {
+            return;
+        }
+
+        $line = 'error|'.trim(preg_replace('/[|\r\n]+/', ' ', $message)).'|'.now()->toIso8601String();
+        instant_remote_process(["echo '".base64_encode($line)."' | base64 -d | tee ".self::FILE.' > /dev/null'], $server, false);
     }
 
     public static function isRunning(string $content, ?DateTimeInterface $now = null): bool

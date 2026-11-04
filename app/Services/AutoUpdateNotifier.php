@@ -30,7 +30,7 @@ class AutoUpdateNotifier
     {
         self::clearAttempt();
 
-        self::notify("Automatic update failed: {$reason}", false);
+        self::notify("Automatic update failed: {$reason}\n\nFix the cause, then start the update again: ".base_url().'/settings/updates', false);
     }
 
     /**
