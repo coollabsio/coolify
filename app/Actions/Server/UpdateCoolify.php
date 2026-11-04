@@ -5,6 +5,7 @@ namespace App\Actions\Server;
 use App\Jobs\DatabaseBackupJob;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Services\AutoUpdateNotifier;
 use App\Services\CoolifyUpgradeStatus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
@@ -128,6 +129,9 @@ class UpdateCoolify
 
         $this->backupDatabase();
         $this->update();
+        if (! $manual_update) {
+            AutoUpdateNotifier::started($this->currentVersion, $this->latestVersion);
+        }
         $settings->new_version_available = false;
         $settings->save();
     }

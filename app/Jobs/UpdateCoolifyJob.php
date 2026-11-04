@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Server\UpdateCoolify;
 use App\Models\Server;
+use App\Services\AutoUpdateNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -47,7 +48,7 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
             Log::info('Coolify upgrade script started. Result: /data/coolify/source/.upgrade-status, log: /data/coolify/source/upgrade-*.log.');
         } catch (\Throwable $e) {
             Log::error('UpdateCoolifyJob failed: '.$e->getMessage());
-            // Consider implementing a notification to administrators
+            AutoUpdateNotifier::failed($e->getMessage());
         }
     }
 }
