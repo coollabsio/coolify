@@ -460,7 +460,10 @@ class Show extends Component
                 ServerReachabilityChanged::dispatch($this->server);
                 $this->server->gatherServerMetadata();
                 $this->server->refresh();
+                $this->dispatch('refreshServerShow')->to(Navbar::class);
             } else {
+                $this->isReachable = $this->server->settings->is_reachable;
+                $this->dispatch('refreshServerShow')->to(Navbar::class);
                 $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
                 return;

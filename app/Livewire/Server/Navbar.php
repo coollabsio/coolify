@@ -252,6 +252,11 @@ class Navbar extends Component
         $this->server->refresh();
         $this->server->load('settings');
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $this->serverSwitcherOptions = collect($this->serverSwitcherOptions)
+            ->map(fn (array $option): array => $option['uuid'] === $this->server->uuid
+                ? [...$option, 'functional' => $this->server->isFunctional()]
+                : $option)
+            ->all();
         $this->dispatchProxyConfigurationState();
     }
 

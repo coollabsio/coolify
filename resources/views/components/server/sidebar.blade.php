@@ -302,46 +302,46 @@
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     </span>
-                    @continue
-                @endif
-                <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
-                    @class([
-                        'menu-item',
-                        'menu-item-active' => $menuItem['active'],
-                    ])
-                    @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                    href="{{ route($menuItem['route'], $serverRouteParameters) }}">
-                    <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                    <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                    @if ($menuItem['tracks_proxy_configuration'] ?? false)
-                        <x-reicon name="alert-triangle" x-cloak
-                            x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
-                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                    @elseif ($menuItem['tracks_sentinel_status'] ?? false)
-                        <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
-                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                    @elseif ($menuItem['warning'] ?? false)
-                        <x-reicon name="alert-triangle"
-                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                    @elseif ($menuItem['beta'] ?? false)
-                        <x-beta-badge class="ml-auto shrink-0" />
+                @else
+                    <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
+                        @class([
+                            'menu-item',
+                            'menu-item-active' => $menuItem['active'],
+                        ])
+                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                        href="{{ route($menuItem['route'], $serverRouteParameters) }}">
+                        <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
+                        <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                        @if ($menuItem['tracks_proxy_configuration'] ?? false)
+                            <x-reicon name="alert-triangle" x-cloak
+                                x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
+                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                        @elseif ($menuItem['tracks_sentinel_status'] ?? false)
+                            <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
+                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                        @elseif ($menuItem['warning'] ?? false)
+                            <x-reicon name="alert-triangle"
+                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                        @elseif ($menuItem['beta'] ?? false)
+                            <x-beta-badge class="ml-auto shrink-0" />
+                        @endif
+                    </a>
+                    @if ($menuItem['active'] && isset($menuItem['children']))
+                        <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
+                            @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
+                                <a wire:key="{{ $placement }}-server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
+                                    @class(['menu-item', 'menu-item-active' => $child['active']])
+                                    @if ($child['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                    href="{{ route($child['route'], $serverRouteParameters) }}">
+                                    <x-reicon :name="$child['icon']" class="menu-item-icon" />
+                                    <span class="menu-item-label">{{ $child['label'] }}</span>
+                                    @if ($child['beta'] ?? false)
+                                        <x-beta-badge class="ml-auto shrink-0" />
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
                     @endif
-                </a>
-                @if ($menuItem['active'] && isset($menuItem['children']))
-                    <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
-                        @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
-                            <a wire:key="{{ $placement }}-server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
-                                @class(['menu-item', 'menu-item-active' => $child['active']])
-                                @if ($child['navigate'] ?? true) {{ wireNavigate() }} @endif
-                                href="{{ route($child['route'], $serverRouteParameters) }}">
-                                <x-reicon :name="$child['icon']" class="menu-item-icon" />
-                                <span class="menu-item-label">{{ $child['label'] }}</span>
-                                @if ($child['beta'] ?? false)
-                                    <x-beta-badge class="ml-auto shrink-0" />
-                                @endif
-                            </a>
-                        @endforeach
-                    </div>
                 @endif
             @endforeach
         @endforeach
