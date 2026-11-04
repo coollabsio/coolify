@@ -135,7 +135,7 @@ class UpdateCoolify
     private function backupDatabase(): void
     {
         $backup = StandalonePostgresql::find(0)?->scheduledBackups()->first();
-        if (! $backup || ! instanceSettings()->is_backup_before_update_enabled) {
+        if (! $backup?->enabled || ! instanceSettings()->is_backup_before_update_enabled) {
             return;
         }
 
@@ -144,7 +144,8 @@ class UpdateCoolify
         $job = new DatabaseBackupJob($backup);
         $job->handle();
         if ($job->backup_log?->status !== 'success') {
-            throw new \Exception('The database backup failed, so the update was not started.');
+            $reason = $job->backup_log?->message;
+            throw new \Exception('The database backup failed, so the update was not started.'.($reason ? " Error: {$reason}" : '').' You can turn off "Backup before update" in Settings > Backup to update without a backup.');
         }
     }
 
