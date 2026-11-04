@@ -143,6 +143,7 @@ services:
       - START_RUNNER_API=yes
       - START_RUNNER_LOG_COMPACTOR=yes
       - START_RUNNER_CLEANUP_WORKER=yes
+      - START_RUNNER_TASK_SCHEDULER=yes
       - APP_ENV=production
       - OWNER_SETUP_ENABLED=yes
       - ENABLE_PASSWORD_LOGIN=yes
