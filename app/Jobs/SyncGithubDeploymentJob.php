@@ -25,9 +25,17 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
-    public $tries = 3;
+    /**
+     * API errors are tried three times. Waits for the per-deployment lock are not counted, so a
+     * terminal sync that waits behind a slow sync still runs (see retryUntil()).
+     */
+    public $maxExceptions = 3;
 
     public $backoff = 10;
+
+    private const LOCK_EXPIRES_AFTER = 120;
+
+    private const LOCK_RELEASE_DELAY = 5;
 
     public function __construct(public int $deploymentQueueId, public bool $deactivate = false)
     {
@@ -44,7 +52,8 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $source = $deployment->application?->source;
+        // A soft-deleted application still needs its last status on GitHub.
+        $source = Application::withTrashed()->find($deployment->application_id)?->source;
         if (! $source instanceof GithubApp || ! $source->canSyncDeployments()) {
             return;
         }
@@ -53,31 +62,42 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Mark the GitHub Deployments of a closed pull request as inactive.
+     * Mark the GitHub Deployments of a closed pull request as inactive. This also covers
+     * deployments that GitHub does not know yet, so a late sync cannot create one.
      */
     public static function deactivatePullRequest(Application $application, int $pullRequestId): void
     {
         ApplicationDeploymentQueue::query()
             ->where('application_id', $application->id)
             ->where('pull_request_id', $pullRequestId)
-            ->whereNotNull('github_deployment_id')
             ->where(fn ($query) => $query->whereNull('github_deployment_state')->orWhere('github_deployment_state', '!=', 'inactive'))
             ->pluck('id')
-            ->each(fn (int $id) => self::dispatch($id, deactivate: true));
+            ->each(fn (int $deploymentQueueId) => self::dispatch($deploymentQueueId, deactivate: true));
     }
 
     /**
+     * All syncs of one deployment share this lock, and handle() reads the state while it
+     * holds the lock. Thus a deactivation cannot happen between that read and the requests.
+     *
      * @return array<int, object>
      */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping("github-deployment:{$this->deploymentQueueId}"))->releaseAfter(5)->expireAfter(120)];
+        return [(new WithoutOverlapping("github-deployment:{$this->deploymentQueueId}"))->releaseAfter(self::LOCK_RELEASE_DELAY)->expireAfter(self::LOCK_EXPIRES_AFTER)];
+    }
+
+    /**
+     * A sync can wait for a lock that is held up to its expiry. Fixed at dispatch.
+     */
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addSeconds(self::LOCK_EXPIRES_AFTER + 60);
     }
 
     public function handle(): void
     {
         $deployment = ApplicationDeploymentQueue::find($this->deploymentQueueId);
-        $application = $deployment?->application;
+        $application = $deployment ? Application::withTrashed()->find($deployment->application_id) : null;
         $source = $application?->source;
         if (! $source instanceof GithubApp || ! $source->canSyncDeployments()) {
             return;
@@ -96,8 +116,9 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $repository = gitRepositorySlug($application->git_repository);
         $githubDeploymentId = $deployment->github_deployment_id;
         if (! $githubDeploymentId) {
-            if (in_array($state, ['inactive', 'error'], true)) {
-                // The deployment ended before GitHub knew about it.
+            // The deployment ended before GitHub knew about it. The deployment job sets
+            // horizon_job_worker together with IN_PROGRESS, so a failure without it never started.
+            if (in_array($state, ['inactive', 'error'], true) || ($state === 'failure' && blank($deployment->horizon_job_worker))) {
                 return;
             }
             $githubDeploymentId = $this->createGithubDeployment($deployment, $application, $source, $repository);
@@ -154,7 +175,9 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * GitHub links a deployment to a pull request only when its ref is the head branch. A fork
-     * branch is not in the base repository, so a fork preview uses the head commit.
+     * branch is not in the base repository, so a fork preview uses the head commit. GitHub
+     * resolves a branch to its current commit, so the branch is used only while it still
+     * points to the deployed commit.
      */
     private function ref(ApplicationDeploymentQueue $deployment, Application $application, GithubApp $source, string $repository): string
     {
@@ -165,18 +188,17 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $headRepository = (string) data_get($pullRequest, 'head.repo.full_name', '');
             $baseRepository = (string) data_get($pullRequest, 'base.repo.full_name', $repository);
             $headBranch = data_get($pullRequest, 'head.ref');
-            if (filled($headBranch) && strcasecmp($headRepository, $baseRepository) === 0) {
+            $headCommit = (string) data_get($pullRequest, 'head.sha');
+            $isDeployedCommit = $commit === null || strcasecmp($commit, $headCommit) === 0;
+            if (filled($headBranch) && strcasecmp($headRepository, $baseRepository) === 0 && $isDeployedCommit) {
                 return $headBranch;
             }
 
-            return $commit ?? (string) data_get($pullRequest, 'head.sha');
+            return $commit ?? $headCommit;
         }
 
-        if ($deployment->rollback && $commit) {
-            return $commit;
-        }
-
-        return $application->git_branch;
+        // The branch can move past the deployed commit before the GitHub deployment is created.
+        return $commit ?? $application->git_branch;
     }
 
     private function description(string $state): string
