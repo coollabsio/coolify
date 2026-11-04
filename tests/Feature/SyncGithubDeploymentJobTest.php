@@ -196,8 +196,8 @@ it('uses the deployed commit for a pull request from a fork', function () {
     expect(githubRequests('/deployments')[0]['ref'])->toBe('bbb222');
 });
 
-it('uses the commit of a rollback', function () {
-    $deployment = githubDeployment($this->application, ['commit' => 'ccc333', 'rollback' => true]);
+it('uses the deployed commit of a branch deployment', function () {
+    $deployment = githubDeployment($this->application, ['commit' => 'ccc333']);
 
     syncGithubDeployment($deployment);
 
@@ -231,6 +231,22 @@ it('marks the GitHub deployments of a closed pull request inactive and keeps the
     expect(collect(githubRequests('/deployments/555/statuses'))->pluck('state')->all())->toBe(['in_progress', 'inactive']);
 });
 
+it('does not create a GitHub deployment when the pull request closed before the first sync', function () {
+    $deployment = githubDeployment($this->application, ['pull_request_id' => 7]);
+
+    SyncGithubDeploymentJob::deactivatePullRequest($this->application, 7);
+
+    Queue::assertPushed(SyncGithubDeploymentJob::class, fn (SyncGithubDeploymentJob $job): bool => $job->deploymentQueueId === $deployment->id && $job->deactivate);
+
+    syncGithubDeployment($deployment, deactivate: true);
+    $deployment->update(['status' => ApplicationDeploymentStatus::FINISHED->value]);
+    syncGithubDeployment($deployment);
+
+    expect(githubRequests('/deployments'))->toBe([])
+        ->and(githubRequests('/statuses'))->toBe([])
+        ->and($deployment->fresh()->github_deployment_state)->toBe('inactive');
+});
+
 it('fails the sync job, not the deployment, when GitHub rejects the request', function () {
     $this->createDeploymentResponse = Http::response(['message' => 'Resource not accessible by integration'], 403);
     $deployment = githubDeployment($this->application);
@@ -256,9 +272,25 @@ it('shows an existing App how to add the deployments permission, and hides it af
         ->assertSee('Repository permission &quot;Deployments&quot;: write', false)
         ->assertSee(getPermissionsPath($this->githubApp));
 
-    Http::fake(['https://api.github.com/app' => Http::response(['permissions' => ['contents' => 'read', 'deployments' => 'write'], 'events' => ['push']])]);
+    Http::fake([
+        'https://api.github.com/app' => Http::response(['permissions' => ['contents' => 'read', 'deployments' => 'write'], 'events' => ['push']]),
+        'https://api.github.com/app/installations/67890' => Http::response(['permissions' => ['contents' => 'read', 'deployments' => 'write']]),
+    ]);
     GithubAppPermissionJob::dispatchSync($this->githubApp);
 
     expect($this->githubApp->fresh()->canSyncDeployments())->toBeTrue();
     $page()->assertSee('GitHub deployments')->assertDontSee('Not ready for GitHub deployments');
+});
+
+it('stays not ready until the installation approves the deployments permission', function () {
+    $this->githubApp->update(['deployments' => null]);
+    Http::fake([
+        'https://api.github.com/app' => Http::response(['permissions' => ['contents' => 'read', 'deployments' => 'write']]),
+        'https://api.github.com/app/installations/67890' => Http::response(['permissions' => ['contents' => 'read']]),
+    ]);
+
+    GithubAppPermissionJob::dispatchSync($this->githubApp);
+
+    expect($this->githubApp->fresh()->deployments)->toBeNull()
+        ->and($this->githubApp->fresh()->canSyncDeployments())->toBeFalse();
 });

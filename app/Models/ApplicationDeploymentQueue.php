@@ -102,8 +102,18 @@ class ApplicationDeploymentQueue extends Model
         });
 
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
-            if ($deployment->wasChanged('status')) {
+            if (! $deployment->wasChanged('status')) {
+                return;
+            }
+
+            // A failed GitHub sync must not stop the status transition or the deployment queue.
+            try {
                 SyncGithubDeploymentJob::dispatchFor($deployment);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to queue the GitHub deployment sync.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
             }
         });
 

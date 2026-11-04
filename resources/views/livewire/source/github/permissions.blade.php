@@ -3,10 +3,12 @@
                     description="GitHub permissions currently granted to this App.">
                     <x-slot:actions>
                         @can('view', $github_app)
-                            <x-forms.button type="button" wire:click.prevent="checkPermissions">
-                                <x-reicon name="refresh" class="size-3.5" />
-                                Refetch
-                            </x-forms.button>
+                            @can('update', $github_app)
+                                <x-forms.button type="button" wire:click.prevent="checkPermissions">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Refetch
+                                </x-forms.button>
+                            @endcan
                             <a href="{{ getPermissionsPath($github_app) }}" class="button">
                                 Update on GitHub
                                 <x-external-link />

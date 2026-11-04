@@ -200,7 +200,7 @@ class Change extends Component
     public function checkPermissions()
     {
         try {
-            $this->authorize('view', $this->github_app);
+            $this->authorize('update', $this->github_app);
 
             // Validate required fields before attempting to fetch permissions
             $missingFields = [];

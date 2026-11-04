@@ -81,14 +81,19 @@ class CancelDeployment extends Tool
         }
 
         $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
-        // The query update above fires no model event.
-        SyncGithubDeploymentJob::dispatchFor($deployment);
 
         try {
             $deployment->addLogEntry('Deployment cancelled by user via MCP.', 'stderr');
             CleanupCancelledDeployment::run($deployment, (int) $teamId);
         } catch (\Throwable) {
             // Cancellation is still recorded even if the helper container cleanup fails.
+        }
+
+        try {
+            // The query update above fires no model event.
+            SyncGithubDeploymentJob::dispatchFor($deployment);
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to queue the GitHub deployment sync after cancelling deployment {$deployment->id}: {$e->getMessage()}");
         }
 
         auditLog('mcp.deployment.cancelled', [

@@ -116,9 +116,15 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $repository = gitRepositorySlug($application->git_repository);
         $githubDeploymentId = $deployment->github_deployment_id;
         if (! $githubDeploymentId) {
+            if ($state === 'inactive') {
+                // Keep the marker, so a late sync does not create a GitHub Deployment.
+                ApplicationDeploymentQueue::whereKey($deployment->id)->update(['github_deployment_state' => 'inactive']);
+
+                return;
+            }
             // The deployment ended before GitHub knew about it. The deployment job sets
             // horizon_job_worker together with IN_PROGRESS, so a failure without it never started.
-            if (in_array($state, ['inactive', 'error'], true) || ($state === 'failure' && blank($deployment->horizon_job_worker))) {
+            if ($state === 'error' || ($state === 'failure' && blank($deployment->horizon_job_worker))) {
                 return;
             }
             $githubDeploymentId = $this->createGithubDeployment($deployment, $application, $source, $repository);
