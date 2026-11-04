@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Removed
+
+- Remove the "Copy from instance settings" button from the email notification page. Select "Use system-wide settings" to send team email with the instance email settings
+
 ## [v4.6.0] - 2026-11-02
 
 ### Breaking Changes

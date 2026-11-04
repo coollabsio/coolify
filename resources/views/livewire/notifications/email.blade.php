@@ -65,14 +65,6 @@
                             helper="Name used in emails." label="From name" />
                         <x-forms.input canGate="update" :canResource="$settings" required id="smtpFromAddress"
                             helper="Email address used in emails." label="From address" />
-
-                        @if (isInstanceAdmin())
-                            <div class="lg:col-span-2">
-                                <x-forms.button type="button" wire:click="copyFromInstanceSettings">
-                                    Copy from instance settings
-                                </x-forms.button>
-                            </div>
-                        @endif
                     @endif
                 </div>
             </x-application.settings-section>
