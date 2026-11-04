@@ -180,6 +180,14 @@ it('uses the head branch of a pull request from the same repository', function (
     ])->and(githubRequests('/statuses')[0]['environment_url'])->toBe('https://pr-7.shop.example.com');
 });
 
+it('uses the deployed commit when the head branch of a pull request moved', function () {
+    $deployment = githubDeployment($this->application, ['pull_request_id' => 7, 'commit' => 'old999']);
+
+    syncGithubDeployment($deployment);
+
+    expect(githubRequests('/deployments')[0]['ref'])->toBe('old999');
+});
+
 it('uses the deployed commit for a pull request from a fork', function () {
     $deployment = githubDeployment($this->application, ['pull_request_id' => 8, 'commit' => 'bbb222']);
 
