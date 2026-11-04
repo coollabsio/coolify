@@ -140,7 +140,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server = $this->database->service->server;
             } else {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->destination->server;
+                // The coolify-db container always runs on the Coolify host, whatever its destination row says.
+                $this->server = $this->database instanceof StandalonePostgresql && $this->database->isInstanceDatabase()
+                    ? Server::find(0)
+                    : $this->database->destination->server;
             }
             if (is_null($this->server)) {
                 throw new \Exception('Server not found?!');
