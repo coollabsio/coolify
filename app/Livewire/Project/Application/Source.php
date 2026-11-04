@@ -150,8 +150,25 @@ class Source extends Component
     public function knownHostFingerprints(): array
     {
         return array_map(
-            fn (string $line) => ['id' => sha1($line), ...gitKnownHostFingerprint($line)],
+            fn (string $line) => ['id' => sha1($line), 'published' => false, ...gitKnownHostFingerprint($line)],
             gitKnownHostsLines($this->application->git_ssh_known_hosts),
+        );
+    }
+
+    /**
+     * The keys that deployments use for a repository on GitHub, GitLab.com, or Bitbucket Cloud (gitProviderHostKeys()).
+     */
+    public function publishedHostKeyFingerprints(): array
+    {
+        $host = strtolower($this->application->gitSshHost()['host'] ?? '');
+        if (! in_array($host, gitPinnedHosts(), true)) {
+            return [];
+        }
+        $lines = array_filter(gitProviderHostKeys(), fn (string $line) => in_array($host, gitKnownHostsLineHosts($line), true));
+
+        return array_map(
+            fn (string $line) => ['id' => 'published-'.sha1($line), 'published' => true, ...gitKnownHostFingerprint($line), 'host' => $host],
+            array_values($lines),
         );
     }
 

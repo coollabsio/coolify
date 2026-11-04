@@ -423,3 +423,14 @@ test('fetch keeps the built-in host keys when the provider sends no valid keys',
     'server error' => fn () => Http::response('', 500),
     'only other hosts' => fn () => Http::response("ssh.bitbucket.org ssh-ed25519 AAAAOTHER\n"),
 ]);
+
+test('the ssh host keys section lists the published keys of a GitHub repository without a remove button', function () {
+    $this->applicationA->update(['git_repository' => 'git@github.com:org/repo.git', 'git_ssh_known_hosts' => null]);
+    $published = gitKnownHostFingerprint(GIT_PINNED_HOST_KEYS[0]);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->assertSee('Published by the provider, used for every deployment')
+        ->assertSee($published['fingerprint'])
+        ->assertDontSee('No saved host keys')
+        ->assertDontSee('Remove host key of github.com');
+});

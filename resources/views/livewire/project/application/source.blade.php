@@ -70,7 +70,7 @@
                 </x-callout>
             @endif
             @php
-                $fingerprints = $this->knownHostFingerprints();
+                $fingerprints = [...$this->publishedHostKeyFingerprints(), ...$this->knownHostFingerprints()];
             @endphp
             @if ($fingerprints === [])
                 <x-empty size="sm" icon-name="keys" title="No saved host keys"
@@ -87,10 +87,18 @@
                             class="grid min-h-14 grid-cols-[minmax(0,1fr)_7rem_minmax(0,2fr)_1.75rem] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim"><x-reicon name="keys" class="size-4" /></div>
-                                <span class="break-all text-[13px] font-semibold text-black dark:text-fg">{{ $fingerprint['host'] }}</span>
+                                <div class="min-w-0">
+                                    <span class="break-all text-[13px] font-semibold text-black dark:text-fg">{{ $fingerprint['host'] }}</span>
+                                    @if ($fingerprint['published'])
+                                        <p class="text-[12px] text-neutral-500 dark:text-fg-dim">Published by the provider, used for every deployment</p>
+                                    @endif
+                                </div>
                             </div>
                             <span class="text-[12px] text-neutral-500 dark:text-fg-dim">{{ $fingerprint['type'] }}</span>
                             <span class="break-all font-mono text-[12px] text-neutral-500 dark:text-fg-dim">{{ $fingerprint['fingerprint'] }}</span>
+                            @if ($fingerprint['published'])
+                                <span></span>
+                            @else
                             @can('update', $application)
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove host key?" buttonTitle="Remove"
                                 isErrorButton canGate="update" :canResource="$application"
@@ -107,6 +115,7 @@
                                 </x-slot:trigger>
                             </x-modal-confirmation>
                             @endcan
+                            @endif
                         </li>
                     @endforeach
                     </ul>
@@ -117,7 +126,7 @@
                 <div id="manual-host-keys" x-show="editManually" x-cloak class="p-4">
                     <div>
                         <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"
-                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. GitHub, GitLab.com, and Bitbucket Cloud use built-in keys and cannot be added. Click Save to apply."
+                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. GitHub, GitLab.com, and Bitbucket Cloud use their published keys and cannot be added here. Click Save to apply."
                             placeholder="[git.example.com]:2222 ssh-ed25519 AAAA..." canGate="update"
                             :canResource="$application" />
                     </div>
