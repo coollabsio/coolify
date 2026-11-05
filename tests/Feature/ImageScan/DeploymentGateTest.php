@@ -626,6 +626,23 @@ it('blocks the deploy when scanning is off on the server and the rule says block
         ->and(test()->queue->fresh()->scan_gate_result['blocked'])->toBeTrue();
 });
 
+it('applies the scan error rule when the scan fails with an unexpected error', function (string $onScanError, bool $starts) {
+    deployGatePolicy(onScanError: $onScanError);
+    ScanImage::shouldRun()->once()->andThrow(new RuntimeException('database went away'));
+    $job = deployGateJob();
+
+    if ($starts) {
+        expect(deployGateReachesStart($job))->toBeTrue();
+    } else {
+        expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: '.ImageScanErrorCode::Unknown->message());
+    }
+
+    expect(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => ! $starts, 'error' => ImageScanErrorCode::Unknown->value]);
+})->with([
+    'deploy on error' => ['deploy', true],
+    'block on error' => ['block', false],
+]);
+
 it('pulls a Docker image, pins its digest, and starts it without a compose pull', function () {
     deployGatePolicy();
     ScanImage::shouldRun()->once()
@@ -1494,7 +1511,8 @@ describe('scanned build of a security update', function () {
         $job->outputs = ['docker image inspect' => GATE_IMAGE_ID.' nginx@'.GATE_REPO_DIGEST.' '];
 
         expect(deployGateReachesStart($job))->toBeTrue()
-            ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker pull 'nginx:1.27'")))->toBeFalse();
+            // The pin pulls the tag only as the fallback of a failed digest pull.
+            ->and(collect($job->commands)->contains(fn (string $command) => str_starts_with($command, "docker pull 'nginx:1.27'")))->toBeFalse();
     });
 
     it('does not use the scanned build for a rollback, and keeps it for the next deploy', function () {

@@ -81,7 +81,9 @@ final class ImageStartPin
     }
 
     /**
-     * Pulls the exact build and gives it the configured tag. `$prefix` is the Docker config prefix of the server.
+     * Pulls the exact build and gives it the configured tag. When the build cannot be pulled (a registry error, or the
+     * publisher removed it), the start pulls the tag as usual and the scan after it checks the result.
+     * `$prefix` is the Docker config prefix of the server.
      *
      * @param  array<string, array{ref: string, pull: string}>  $pins
      * @return list<string>
@@ -91,7 +93,7 @@ final class ImageStartPin
         $commands = [];
         foreach ($pins as $pin) {
             $commands[] = 'echo '.escapeshellarg("Pulling the scanned build of {$pin['ref']}.");
-            $commands[] = "{$prefix}docker pull ".escapeshellarg($pin['pull'])." && {$prefix}docker tag ".escapeshellarg($pin['pull']).' '.escapeshellarg($pin['ref']);
+            $commands[] = "{$prefix}docker pull ".escapeshellarg($pin['pull'])." && {$prefix}docker tag ".escapeshellarg($pin['pull']).' '.escapeshellarg($pin['ref'])." || {$prefix}docker pull ".escapeshellarg($pin['ref']);
         }
 
         return $commands;

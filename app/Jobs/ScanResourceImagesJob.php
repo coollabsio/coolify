@@ -54,6 +54,9 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout;
 
+    /** A resource deleted before the delayed scan runs needs no scan. */
+    public $deleteWhenMissingModels = true;
+
     /**
      * @param  list<string>  $imageRefs  Empty: the images of the resource (imageRefsFor()).
      * @param  bool  $retryWhenImageMissing  A job after a service or database start retries an image that is not pulled yet.

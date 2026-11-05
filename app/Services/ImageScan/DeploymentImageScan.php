@@ -185,7 +185,15 @@ final class DeploymentImageScan
             $baselineMissing = $running === null && ! ($image !== null && in_array($image['id'], $this->blockedImageIds(), true));
         }
         $reused = $image !== null ? $this->completedImageScan($image['id']) : null;
-        $scan = $reused ?? ScanImage::run($this->job('server'), $this->application, $imageRef, $this->deployment, lockWaitSeconds: ScanImage::GATE_LOCK_WAIT_SECONDS, baseImageRef: $this->baseImageRef, queueCandidateCheck: false);
+        try {
+            $scan = $reused ?? ScanImage::run($this->job('server'), $this->application, $imageRef, $this->deployment, lockWaitSeconds: ScanImage::GATE_LOCK_WAIT_SECONDS, baseImageRef: $this->baseImageRef, queueCandidateCheck: false);
+        } catch (Throwable $e) {
+            // An unexpected error is a scan that could not run: "If the scan cannot run" decides, not the error.
+            report($e);
+            $this->applyGate(null, ImageScanErrorCode::Unknown, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, imageId: $image['id'] ?? null);
+
+            return;
+        }
         $this->queueCandidates($scan);
 
         $this->applyGate($scan, imageRef: $imageRef, repoDigest: $image['repo_digest'] ?? null, running: $running, baselineMissing: $baselineMissing, imageId: $image['id'] ?? $scan->image_id);

@@ -84,7 +84,20 @@ describe('pins', function () {
     it('pulls the digest and gives it the tag, with quoted arguments', function () {
         $commands = ImageStartPin::commands(['x' => ['ref' => 'ghcr.io/acme/web:2.0', 'pull' => 'ghcr.io/acme/web@'.START_PIN_DIGEST]], 'DOCKER_CONFIG=/auth ');
 
-        expect($commands[1])->toBe("DOCKER_CONFIG=/auth docker pull 'ghcr.io/acme/web@".START_PIN_DIGEST."' && DOCKER_CONFIG=/auth docker tag 'ghcr.io/acme/web@".START_PIN_DIGEST."' 'ghcr.io/acme/web:2.0'");
+        expect($commands[1])->toBe("DOCKER_CONFIG=/auth docker pull 'ghcr.io/acme/web@".START_PIN_DIGEST."' && DOCKER_CONFIG=/auth docker tag 'ghcr.io/acme/web@".START_PIN_DIGEST."' 'ghcr.io/acme/web:2.0' || DOCKER_CONFIG=/auth docker pull 'ghcr.io/acme/web:2.0'");
+    });
+
+    it('pulls the tag when the scanned build cannot be pulled, also for a non-root SSH user', function () {
+        $pins = ['x' => ['ref' => 'ghcr.io/acme/web:2.0', 'pull' => 'ghcr.io/acme/web@'.START_PIN_DIGEST]];
+        $this->server->forceFill(['user' => 'deploy'])->saveQuietly();
+
+        $command = parseCommandsByLineForSudo(collect(ImageStartPin::commands($pins)), $this->server->fresh())[1];
+        // A fake docker that cannot pull the digest. Process is faked in this file, so exec() runs the shell.
+        exec('bash -se -c '.escapeshellarg('docker() { [ "$2" = "ghcr.io/acme/web@'.START_PIN_DIGEST.'" ] && return 1; echo "ran: $*"; }; sudo() { "$@"; }; '.$command), $output, $exitCode);
+
+        expect($command)->toBe("sudo docker pull 'ghcr.io/acme/web@".START_PIN_DIGEST."' && sudo docker tag 'ghcr.io/acme/web@".START_PIN_DIGEST."' 'ghcr.io/acme/web:2.0' || sudo docker pull 'ghcr.io/acme/web:2.0'")
+            ->and($exitCode)->toBe(0)
+            ->and($output)->toBe(['ran: pull ghcr.io/acme/web:2.0']);
     });
 
     it('keeps only the pins of the images a start runs', function () {
