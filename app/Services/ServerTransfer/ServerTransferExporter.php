@@ -1336,6 +1336,9 @@ class ServerTransferExporter
                 'container' => $task->container,
                 'timeout' => $task->timeout,
                 'enabled' => (bool) ($task->enabled ?? true),
+                'failure_count' => (int) $task->failure_count,
+                'failing_since' => $task->failing_since?->toIso8601String(),
+                'auto_disabled_at' => $task->auto_disabled_at?->toIso8601String(),
             ];
         }
 
