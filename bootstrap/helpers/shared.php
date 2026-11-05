@@ -4461,7 +4461,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
-                        $composeRedirect = data_get($domains, "$serviceName.redirect");
+                        $composeRedirect = data_get($domains, [$serviceName, 'redirect']);
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';

@@ -67,7 +67,7 @@ class DeployServiceApplication
 
         if ($connectToPredefinedNetwork) {
             // Connect to the predefined network before the container starts (see StartService).
-            $serviceConfig = data_get(parseDockerComposeYaml($service->docker_compose ?? ''), "services.{$composeServiceName}");
+            $serviceConfig = data_get(parseDockerComposeYaml($service->docker_compose ?? ''), ['services', $composeServiceName]);
             if ($command = StartService::predefinedNetworkConnectCommand($service, $composeServiceName, $serviceConfig)) {
                 $commands->push($command);
             }
