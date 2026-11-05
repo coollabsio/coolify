@@ -60,6 +60,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Retry GitHub API reads, such as the repository lookup before each deployment, up to three times when GitHub answers with a 5xx error or the connection fails. Before, one `502` or one timeout from GitHub failed the deployment. Writes, such as pull request comments, are not retried ([#9785](https://github.com/coollabsio/coolify/issues/9785))
 - Keep an application that uses a server only as an additional destination when you delete that server with **Delete all resources** or with `DELETE /api/v1/servers/{uuid}?force=true`. Before, Coolify deleted the application on all its servers, also after **Promote** made another server its main server. Coolify now removes the application only from the deleted server and stops its containers there. A server that has only such applications can be deleted without **Delete all resources**. The delete confirmation lists the resources that it deletes and the applications that keep running on another server
 - Fix the sign-up and login of the Rybbit service template. The proxy sent all requests to the client container, so the `/api` requests of the browser got a 404 error. The template now routes `/api` on the same domain to the backend on port 3001, and keeps the `/api` prefix. For an existing Rybbit service, add `SERVICE_URL_RYBBIT_3001=/api` to the `rybbit_backend` service, move `rybbit_backend` above `rybbit` in the Docker Compose file, set **Path prefixes** to **Keep prefixes** in the advanced settings of the backend, and redeploy the service ([#9055](https://github.com/coollabsio/coolify/issues/9055))
+- Add SMTP templates for common email providers, such as PostShiba, Amazon SES, Mailgun, SendGrid, Postmark, and Brevo, which fill in the host, port, and encryption
+- Save more than one named SMTP server on the transactional email and email notification pages, and switch between them
+- Give each SMTP server and Resend its own sender name and address, because each provider sends from its own verified domain
+
+### Changed
+
+- Select the email provider from one list on the transactional email and email notification pages, which then show only the settings of that provider
+
+### Removed
+
+- Remove the "Copy from instance settings" button from the email notification page. Select "Use system-wide settings" to send team email with the instance email settings
 
 ## [v4.6.0] - 2026-11-02
 
