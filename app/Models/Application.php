@@ -329,6 +329,7 @@ class Application extends BaseModel
             $application->manual_webhook_secret_gitlab ??= Str::random(40);
             $application->manual_webhook_secret_bitbucket ??= Str::random(40);
             $application->manual_webhook_secret_gitea ??= Str::random(40);
+            $application->compose_parsing_version = self::$parserVersion;
         });
         static::addGlobalScope('withRelations', function ($builder) {
             $builder->withCount([
@@ -426,8 +427,6 @@ class Application extends BaseModel
             ApplicationSetting::create([
                 'application_id' => $application->id,
             ]);
-            $application->compose_parsing_version = self::$parserVersion;
-            $application->save();
 
             // Add default NIXPACKS_NODE_VERSION environment variable for Nixpacks applications
             if ($application->build_pack === 'nixpacks') {

@@ -48,6 +48,9 @@ class EnvironmentVariable extends BaseModel
 {
     use Auditable;
 
+    /** The key is in the metadata of the row, and the flags of a new variable have little audit value. */
+    protected bool $auditCreatedChanges = false;
+
     /**
      * Flags that a "# coolify:" line of the developer view can set, with their defaults.
      *
@@ -140,6 +143,9 @@ class EnvironmentVariable extends BaseModel
 
     protected static function booted()
     {
+        static::creating(function (ModelsEnvironmentVariable $environment_variable) {
+            $environment_variable->version = config('constants.coolify.version');
+        });
         static::created(function (ModelsEnvironmentVariable $environment_variable) {
             if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
@@ -152,7 +158,8 @@ class EnvironmentVariable extends BaseModel
                     $application = Application::find($environment_variable->resourceable_id);
                     // A compose preview generates its own magic secrets on the first pull request parse.
                     if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
-                        ModelsEnvironmentVariable::create([
+                        // The preview copy is part of the same change, so it gets no audit rows of its own.
+                        $preview = new ModelsEnvironmentVariable([
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,
                             'is_multiline' => $environment_variable->is_multiline ?? false,
@@ -166,12 +173,10 @@ class EnvironmentVariable extends BaseModel
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
                         ]);
+                        $preview->withoutAuditLogging(fn () => $preview->save());
                     }
                 }
             }
-            $environment_variable->update([
-                'version' => config('constants.coolify.version'),
-            ]);
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {

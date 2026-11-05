@@ -1584,14 +1584,19 @@ class ServicesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->save();
+        // One audit row with the service context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.service.env_updated', [
-            'team_id' => $teamId,
-            'service_uuid' => $service->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.service.env_updated', [
+                'team_id' => $teamId,
+                'service_uuid' => $service->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }

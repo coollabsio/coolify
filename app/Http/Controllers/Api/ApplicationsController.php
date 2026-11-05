@@ -3631,6 +3631,7 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+        $settingsBefore = $application->settings->getAttributes();
 
         if ($request->has('redact_all_env_values_in_logs') || $request->has('include_coolify_default_variables')) {
             $this->authorize('manageEnvironment', $application);
@@ -4092,12 +4093,18 @@ class ApplicationsController extends Controller
         $dnsCleanup->queueReleaseOfRemovedHostnames($application, $previousDnsHostnames, (int) $teamId);
         app(ResourceDnsRecords::class)->queueAutomaticRecords($application, $previousDnsHostnames);
 
-        auditLog('api.application.updated', [
-            'team_id' => $teamId,
-            'application_uuid' => $application->uuid,
-            'application_name' => $application->name,
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
-        ]);
+        $changedSettings = collect($application->settings->getAttributes())
+            ->reject(fn (mixed $value, string $field): bool => $field === 'updated_at' || ($settingsBefore[$field] ?? null) == $value)
+            ->keys();
+        $changedFields = [...auditSavedFields($application), ...$changedSettings];
+        if ($changedFields !== []) {
+            auditLog('api.application.updated', [
+                'team_id' => $teamId,
+                'application_uuid' => $application->uuid,
+                'application_name' => $application->name,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         if ($instantDeploy) {
             $deployment_uuid = new_public_id();
@@ -4339,15 +4346,20 @@ class ApplicationsController extends Controller
             $env->value = $request->value;
         }
         $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']));
-        $env->save();
+        // One audit row with the application context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.application.env_updated', [
-            'team_id' => $teamId,
-            'application_uuid' => $application->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-            'is_preview' => (bool) $is_preview,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.application.env_updated', [
+                'team_id' => $teamId,
+                'application_uuid' => $application->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'is_preview' => (bool) $is_preview,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }

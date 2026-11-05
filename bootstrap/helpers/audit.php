@@ -71,6 +71,19 @@ if (! function_exists('auditChangedFields')) {
     }
 }
 
+if (! function_exists('auditSavedFields')) {
+    /**
+     * Names of the attributes that the last save() really changed, without timestamps.
+     * Call it after save(), so changes made by saving hooks are included.
+     *
+     * @return array<int, string>
+     */
+    function auditSavedFields(Model $model): array
+    {
+        return array_values(array_diff(array_keys($model->getChanges()), ['created_at', 'updated_at']));
+    }
+}
+
 if (! function_exists('auditFailureDeduplicationWindow')) {
     /**
      * Seconds during which repeated unauthenticated or permission failures from one source are recorded once.

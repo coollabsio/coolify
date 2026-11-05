@@ -123,7 +123,7 @@ class AuditEvent extends Model
      */
     public static function recordModelMutation(string $event, array $context, array $changes): void
     {
-        self::recordWithChanges($event, $context, $changes);
+        self::recordWithChanges($event, $context, $changes ?: null);
     }
 
     /**
@@ -161,6 +161,11 @@ class AuditEvent extends Model
      */
     private static function attributesFor(string $event, array $context, ?array $changes, string $level): array
     {
+        // API tokens store team_id as a string. Keep it an integer, so JSON filters on metadata work.
+        if (is_string($context['team_id'] ?? null) && ctype_digit($context['team_id'])) {
+            $context['team_id'] = (int) $context['team_id'];
+        }
+
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
             ?? (array_key_exists('team_id', $context)
                 ? $context['team_id']

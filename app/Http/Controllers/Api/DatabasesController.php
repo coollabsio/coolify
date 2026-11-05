@@ -4016,14 +4016,19 @@ class DatabasesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->save();
+        // One audit row with the database context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.database.env_updated', [
-            'team_id' => $teamId,
-            'database_uuid' => $database->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.database.env_updated', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
     }

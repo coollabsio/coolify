@@ -100,10 +100,7 @@ class Service extends BaseModel
             if (blank($service->name)) {
                 $service->name = 'service-'.new_public_id();
             }
-        });
-        static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
-            $service->save();
         });
         static::saving(function ($service) {
             if ($service->isDirty('docker_compose_raw')) {
