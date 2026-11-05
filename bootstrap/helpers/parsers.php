@@ -2936,6 +2936,9 @@ function serviceParser(Service $resource): Collection
                 'service_id' => $resource->id,
             ]);
         }
+        $fileStorages = $savedService->fileStorages()->get();
+        $savedService->fileStorages()->delete();
+        $savedService->persistentStorages()->delete();
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
@@ -2955,7 +2958,7 @@ function serviceParser(Service $resource): Collection
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = $fileStorages->firstWhere('mount_path', $target->value());
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -2995,7 +2998,7 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = $fileStorages->firstWhere('mount_path', $target->value());
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
