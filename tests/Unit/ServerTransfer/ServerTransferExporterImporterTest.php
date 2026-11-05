@@ -1471,6 +1471,7 @@ test('transfer keeps preview, backup, GitHub App runner fields and canvas positi
         'organization' => 'acme',
         'organization_self_hosted_runners' => 'write',
         'actions' => 'read',
+        'deployments' => 'write',
         'webhook_events' => ['workflow_job', 'push'],
         'runner_group_id' => 12,
     ]);
@@ -1531,6 +1532,7 @@ test('transfer keeps preview, backup, GitHub App runner fields and canvas positi
         ->and($importedGithubApp)->toBeInstanceOf(GithubApp::class)
         ->and($importedGithubApp->organization_self_hosted_runners)->toBe('write')
         ->and($importedGithubApp->actions)->toBe('read')
+        ->and($importedGithubApp->deployments)->toBe('write')
         ->and($importedGithubApp->webhook_events)->toBe(['workflow_job', 'push'])
         ->and($importedGithubApp->runner_group_id)->toBe(12)
         ->and($application->uuid)->not->toBe($this->application->uuid)

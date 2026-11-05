@@ -6532,6 +6532,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     public function failed(Throwable $exception): void
     {
         $this->failDeployment();
+        // A failed remote command can store the failed status with a query update, which fires no model event.
+        try {
+            SyncGithubDeploymentJob::dispatchFor($this->application_deployment_queue->refresh());
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Queueing the GitHub deployment sync failed', $e);
+        }
 
         // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
         // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written

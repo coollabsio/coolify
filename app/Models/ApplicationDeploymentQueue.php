@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Services\Access\AccessResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,6 +99,22 @@ class ApplicationDeploymentQueue extends Model
                 'deployment_uuid' => $deployment->deployment_uuid,
                 'commit' => $deployment->commit,
             ]);
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if (! $deployment->wasChanged('status')) {
+                return;
+            }
+
+            // A failed GitHub sync must not stop the status transition or the deployment queue.
+            try {
+                SyncGithubDeploymentJob::dispatchFor($deployment);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to queue the GitHub deployment sync.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         });
 
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
