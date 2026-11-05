@@ -35,6 +35,8 @@ class Change extends Component
 
     public ?bool $preview_deployment_permissions = true;
 
+    public ?bool $deployment_status_permissions = true;
+
     public ?bool $administration = false;
 
     public ?bool $github_runners = false;

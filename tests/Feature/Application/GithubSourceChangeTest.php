@@ -686,6 +686,7 @@ describe('GitHub Source Change Component', function () {
                     'pull_requests' => 'write',
                 ],
             ]),
+            'https://api.github.com/app/installations/67890' => Http::response(['permissions' => []]),
         ]);
 
         Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
@@ -707,6 +708,40 @@ describe('GitHub Source Change Component', function () {
         expect($githubApp->contents)->toBe('read')
             ->and($githubApp->metadata)->toBe('read')
             ->and($githubApp->pull_requests)->toBe('write');
+    });
+
+    test('checkPermissions does not let a member refetch permissions', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        Livewire::actingAs($member)
+            ->withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->call('checkPermissions')
+            ->assertNotDispatched('success');
+
+        Http::assertNothingSent();
+        expect($githubApp->fresh()->contents)->toBeNull()
+            ->and($githubApp->fresh()->deployments)->toBeNull();
     });
 
     test('sync name uses normalized resolvable ghe dot com api url', function () {
