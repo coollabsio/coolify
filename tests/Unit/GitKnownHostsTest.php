@@ -12,7 +12,7 @@ test('known hosts lines drop other keys for pinned hosts', function (string $lin
     expect(gitKnownHostsLines($line))->toBe([]);
 })->with([
     'pinned host' => 'github.com ssh-ed25519 AAAA',
-    'pinned host with port' => '[gitlab.com]:2222 ssh-ed25519 AAAA',
+    'pinned host with port' => '[bitbucket.org]:2222 ssh-ed25519 AAAA',
     'pinned host in a list' => 'git.example.com,bitbucket.org ssh-ed25519 AAAA',
     'pinned port 443 host' => '[ssh.github.com]:443 ssh-ed25519 AAAA',
 ]);

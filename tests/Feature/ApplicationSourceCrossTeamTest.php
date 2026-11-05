@@ -314,7 +314,7 @@ test('submit reports manual host keys of a pinned Git provider as a field error 
     expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('git.example.com ssh-ed25519 AAAA');
 })->with([
     'github.com' => 'github.com ssh-ed25519 BBBB',
-    'gitlab.com with a port' => '[altssh.gitlab.com]:443 ssh-ed25519 BBBB',
+    'bitbucket.org with a port' => '[altssh.bitbucket.org]:443 ssh-ed25519 BBBB',
     'ssh.github.com on port 443' => '[ssh.github.com]:443 ssh-rsa BBBB',
     'bitbucket.org in a host list' => 'git.example.com,BITBUCKET.ORG ssh-ed25519 BBBB',
 ]);

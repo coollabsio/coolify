@@ -671,6 +671,7 @@ function clone_application(Application $source, $destination, array $overrides =
  * ssh.github.com also serves the GitHub keys on port 22, where a `Port 443` in the SSH config ends because
  * gitSshCommand() passes the port of the repository URL.
  * Git over SSH to these hosts accepts only these keys. Update this list when a provider changes its host keys.
+ * GitLab.com does not publish its keys over HTTPS, so for gitlab.com an application also accepts the keys that are saved on its Source page.
  *
  * @see https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
  * @see https://api.github.com/meta (ssh_keys)
@@ -818,15 +819,26 @@ function gitPinnedHosts(): array
 }
 
 /**
- * Whether a known_hosts line names a host in GIT_PINNED_HOST_KEYS. Deployments ignore such lines.
+ * The host names of the providers in GIT_PROVIDER_HOST_KEY_SOURCES. Coolify reads their keys over HTTPS, so the
+ * keys that are saved for an application are not used for these hosts.
+ *
+ * @return list<string>
  */
-function gitKnownHostsLineHasPinnedHost(string $line): bool
+function gitHostsWithPublishedKeys(): array
 {
-    return array_intersect(gitKnownHostsLineHosts($line), gitPinnedHosts()) !== [];
+    return array_values(array_unique(array_merge(...array_map(gitKnownHostsLineHosts(...), array_keys(GIT_PROVIDER_HOST_KEY_SOURCES)))));
 }
 
 /**
- * The valid known_hosts lines of a text, without blank lines, duplicates, and lines of the pinned hosts.
+ * Whether a known_hosts line names a host of gitHostsWithPublishedKeys(). Deployments ignore such lines.
+ */
+function gitKnownHostsLineHasHostWithPublishedKeys(string $line): bool
+{
+    return array_intersect(gitKnownHostsLineHosts($line), gitHostsWithPublishedKeys()) !== [];
+}
+
+/**
+ * The valid known_hosts lines of a text, without blank lines, duplicates, and lines of gitHostsWithPublishedKeys().
  *
  * @return list<string>
  */
@@ -834,7 +846,7 @@ function gitKnownHostsLines(?string $text): array
 {
     return collect(preg_split('/\R/', (string) $text))
         ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
-        ->filter(fn (string $line) => isValidGitKnownHostsLine($line) && ! gitKnownHostsLineHasPinnedHost($line))
+        ->filter(fn (string $line) => isValidGitKnownHostsLine($line) && ! gitKnownHostsLineHasHostWithPublishedKeys($line))
         ->unique()
         ->values()
         ->all();
@@ -879,7 +891,8 @@ function gitKnownHostFingerprint(string $line): array
  * A shell command that writes the SSH config and known_hosts file that gitSshCommand() uses.
  * Run it in the place where git runs (the helper container or the server) before git uses SSH.
  *
- * The hosts in GIT_PINNED_HOST_KEYS must show one of their published keys (gitProviderHostKeys()). Other hosts are trusted on
+ * The hosts in GIT_PINNED_HOST_KEYS must show one of their published keys (gitProviderHostKeys()), or for gitlab.com also
+ * a key in $knownHosts. Other hosts are trusted on
  * first use: SSH adds the key of a new host to the known_hosts file and rejects a changed key of a known
  * host. $knownHosts are the keys that earlier deployments saved (Application::$git_ssh_known_hosts).
  * The config of the SSH user is read after these rules, so it cannot change StrictHostKeyChecking or

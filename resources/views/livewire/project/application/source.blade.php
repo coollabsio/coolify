@@ -38,7 +38,7 @@
         @endphp
         @if ($usesGitSsh || filled($application->git_ssh_known_hosts))
         <x-application.settings-section id="ssh-host-keys" title="SSH host keys" x-data="{ editManually: false }" x-on:known-hosts-invalid.window="editManually = true" flush
-            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key (also of a submodule host), click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always use their published keys. If GitHub or Bitbucket Cloud changes its keys, click Fetch current host key to read the new keys from their official HTTPS endpoint.">
+            description="The host keys that git over SSH accepts for self-hosted Git hosts. On the first deployment, Coolify saves the key that the host sends, and later deployments fail if the key changes. To accept a new key (also of a submodule host), click Fetch current host key, compare the fingerprint with the fingerprint from the administrator of the Git host, and click Accept. GitHub, GitLab.com, and Bitbucket Cloud always accept their published keys. If GitHub or Bitbucket Cloud changes its keys, click Fetch current host key to read the new keys from their official HTTPS endpoint. If GitLab.com changes its keys, click Fetch current host key and compare the fingerprint with the keys on docs.gitlab.com.">
             @can('update', $application)
                 <x-slot:actions>
                     <button type="button" class="button" @click="editManually = !editManually" :aria-expanded="editManually" aria-controls="manual-host-keys">
@@ -126,7 +126,7 @@
                 <div id="manual-host-keys" x-show="editManually" x-cloak class="p-4">
                     <div>
                         <x-forms.textarea id="gitSshKnownHosts" rows="4" label="Known hosts"
-                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. GitHub, GitLab.com, and Bitbucket Cloud use their published keys and cannot be added here. Click Save to apply."
+                            helper="One line for each key: host key-type key. Use [host]:port for a custom SSH port. GitHub and Bitbucket Cloud use their published keys and cannot be added here. Click Save to apply."
                             placeholder="[git.example.com]:2222 ssh-ed25519 AAAA..." canGate="update"
                             :canResource="$application" />
                     </div>

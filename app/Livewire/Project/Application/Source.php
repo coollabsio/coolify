@@ -211,22 +211,27 @@ class Source extends Component
 
                 return;
             }
-            if ($sshHost !== null && in_array(strtolower($sshHost['host']), gitPinnedHosts(), true)) {
-                $providerHosts = gitProviderHostKeySource($sshHost['host']);
-                if ($providerHosts === null) {
-                    $this->dispatch('info', "Coolify always uses the published host keys of {$sshHost['host']}.");
-                } else {
-                    $count = count(fetchGitProviderHostKeys($providerHosts));
-                    $this->dispatch('success', "Deployments now use the {$count} host keys that {$sshHost['host']} publishes.");
-                }
+            $providerHosts = $sshHost === null ? null : gitProviderHostKeySource($sshHost['host']);
+            if ($providerHosts !== null) {
+                $count = count(fetchGitProviderHostKeys($providerHosts));
+                $this->dispatch('success', "Deployments now use the {$count} host keys that {$sshHost['host']} publishes.");
             }
             if ($hosts === []) {
                 return;
             }
-            $this->fetchedHostKeys = $this->application->fetchGitSshHostKeys();
-            if ($this->fetchedHostKeys === []) {
+            $fetchedHostKeys = $this->application->fetchGitSshHostKeys();
+            // A gitlab.com key that is the same as a built-in key needs no accept.
+            $builtInHostKeys = collect(gitProviderHostKeys())->flatMap(function (string $line) {
+                [$hosts, $key] = explode(' ', $line, 2);
+
+                return array_map(fn (string $host) => "{$host} {$key}", explode(',', $hosts));
+            })->all();
+            $this->fetchedHostKeys = array_values(array_diff($fetchedHostKeys, $builtInHostKeys));
+            if ($fetchedHostKeys === []) {
                 $names = implode(', ', array_map(fn (array $host) => "{$host['host']} (port {$host['port']})", $hosts));
                 $this->dispatch('error', "Could not read the host keys of {$names}. To add a key, click Edit manually and paste it.");
+            } elseif ($this->fetchedHostKeys === []) {
+                $this->dispatch('success', 'The host sends the built-in published keys. Nothing to accept.');
             }
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -337,8 +342,8 @@ class Source extends Component
                 throw ValidationException::withMessages(['gitHttpsPassword' => 'Enter the password or token for this username.']);
             }
             $loadedKnownHostsLines = array_map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)), preg_split('/\R/', (string) $this->loadedGitSshKnownHosts));
-            if ($knownHostsLines->contains(fn (string $line) => gitKnownHostsLineHasPinnedHost($line) && ! in_array($line, $loadedKnownHostsLines, true))) {
-                throw ValidationException::withMessages(['gitSshKnownHosts' => 'Coolify always uses its built-in published host keys for '.implode(', ', gitPinnedHosts()).'. Remove the lines of these hosts.']);
+            if ($knownHostsLines->contains(fn (string $line) => gitKnownHostsLineHasHostWithPublishedKeys($line) && ! in_array($line, $loadedKnownHostsLines, true))) {
+                throw ValidationException::withMessages(['gitSshKnownHosts' => 'Coolify always uses the published host keys of '.implode(', ', gitHostsWithPublishedKeys()).'. Remove the lines of these hosts.']);
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');

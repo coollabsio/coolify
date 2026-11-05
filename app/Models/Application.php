@@ -1669,7 +1669,7 @@ class Application extends BaseModel
 
     /**
      * The SSH hosts whose keys "Fetch current host key" reads: the repository host and the hosts of the
-     * saved keys (for example submodule hosts), without the hosts in GIT_PINNED_HOST_KEYS.
+     * saved keys (for example submodule hosts), without the hosts of gitHostsWithPublishedKeys().
      *
      * @return list<array{host: string, port: int}>
      */
@@ -1685,7 +1685,7 @@ class Application extends BaseModel
 
         return collect($hosts)
             ->filter(fn (array $host) => preg_match('/\A[A-Za-z0-9._:][A-Za-z0-9._:-]*\z/', $host['host']) === 1
-                && ! in_array(strtolower($host['host']), gitPinnedHosts(), true))
+                && ! in_array(strtolower($host['host']), gitHostsWithPublishedKeys(), true))
             ->unique(fn (array $host) => strtolower($host['host']).':'.$host['port'])
             ->values()
             ->all();

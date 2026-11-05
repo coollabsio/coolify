@@ -57,7 +57,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * Logged when a git command of Coolify fails because of the SSH host key. The deployment page looks for this text.
      */
-    public const GIT_HOST_KEY_CHANGED_HINT = 'The Git host sent an SSH host key that is not the saved or published key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. GitHub, GitLab.com, and Bitbucket Cloud use their published keys; if one of them changed its key, update Coolify.';
+    public const GIT_HOST_KEY_CHANGED_HINT = 'The Git host sent an SSH host key that is not the saved or published key. This can be an attack. Ask the administrator of the Git host if the key changed. Then open Source > SSH host keys, click Fetch current host key, and accept the key only if its fingerprint is the same as the fingerprint from the administrator. For GitHub and Bitbucket Cloud, Fetch current host key also reads the keys that they publish. For GitLab.com, compare the fingerprint with the keys on docs.gitlab.com.';
 
     private const BUILD_FINGERPRINT_LABEL = 'coolify.build-fingerprint';
 
@@ -3757,8 +3757,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Two first deployments can accept different keys at the same time; keep the key that was saved first.
         $hostAndKeyType = fn (string $line): string => implode(' ', array_slice(explode(' ', $line), 0, 2));
         $savedHostsAndKeyTypes = array_map($hostAndKeyType, gitKnownHostsLines($this->application->git_ssh_known_hosts));
+        // The file also has the built-in keys (gitProviderHostKeys()); they are not saved for the application.
         $newLines = array_values(array_filter(
-            gitKnownHostsLines((string) $this->saved_outputs->get('git_ssh_known_hosts')),
+            array_diff(gitKnownHostsLines((string) $this->saved_outputs->get('git_ssh_known_hosts')), gitProviderHostKeys()),
             fn (string $line) => ! in_array($hostAndKeyType($line), $savedHostsAndKeyTypes, true),
         ));
         if ($newLines === []) {
