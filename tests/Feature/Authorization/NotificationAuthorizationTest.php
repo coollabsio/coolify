@@ -296,11 +296,8 @@ test('admin can save team smtp settings without a resend api key when resend is 
     session(['currentTeam' => $this->team]);
 
     Livewire::test(EmailNotification::class)
-        ->set('smtpFromAddress', 'alerts@example.com')
-        ->set('smtpFromName', 'Coolify')
-        ->set('smtpHost', 'smtp.example.com')
-        ->set('smtpPort', '587')
-        ->set('smtpEncryption', 'starttls')
+        ->set('resendFromAddress', 'alerts@example.com')
+        ->set('resendFromName', 'Coolify')
         ->set('resendEnabled', false)
         ->set('resendApiKey', null)
         ->call('submitResend')
@@ -422,9 +419,9 @@ test('member cannot send test on any notification channel', function () {
     expect($this->member->can('sendTest', $this->team->webhookNotificationSettings))->toBeFalse();
 });
 
-test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
+test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets, array $state = []) {
     $settings = $this->team->{$settingsRelation};
-    $settings->update($secrets);
+    $settings->update([...$secrets, ...$state]);
 
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -461,7 +458,7 @@ test('member cannot view notification secrets', function (string $component, str
     'email credentials' => [EmailNotification::class, 'emailNotificationSettings', [
         'smtp_password' => 'smtp-secret-password',
         'resend_api_key' => 'resend-secret-api-key',
-    ]],
+    ], ['smtp_enabled' => true]],
 ]);
 
 test('admin can view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
