@@ -45,6 +45,8 @@
 
 - MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
 
+- To prove BuildKit cache behavior, use a new Dockerfile with a unique step for each experiment and repeat each build. Old cache records can make a changed input look cached. BuildKit keys `RUN` steps on the `--add-host` names and their order, but not on the IPs.
+
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
 - Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.

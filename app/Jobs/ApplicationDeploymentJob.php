@@ -69,6 +69,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private const HELPER_DOCKER_CONFIG = '/root/.docker';
 
     /**
+     * Name prefixes of the helpers that DatabaseBackupJob (S3 upload) and StartDatabaseImport
+     * (S3 download) run on a resource network for the duration of one backup or import.
+     */
+    private const TEMPORARY_HELPER_CONTAINER_PREFIXES = ['backup-of-', 's3-restore-'];
+
+    /**
      * System CA bundles of the supported server distributions, in the order that Go checks them.
      *
      * @var list<string>
@@ -363,9 +369,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * Build the --add-host flags for the containers on the destination network.
      *
-     * Build helper containers are named after their deployment uuid and only live for the
-     * duration of that deployment. BuildKit keys every RUN layer on the --add-host set,
-     * so letting one in gives the next build a different set and forces a full rebuild.
+     * BuildKit keys every RUN layer on the host names of the --add-host set (not on the IPs), so a
+     * container that joins or leaves the network between two builds forces a full rebuild. The set
+     * leaves out the short-lived containers: build helpers (named after their deployment uuid),
+     * rolling update containers, and the backup and S3 import helpers. It also leaves out the proxy,
+     * Sentinel, and the proxy error page containers: no build uses them, and Coolify recreates them.
      */
     private function addHostFlags(Collection $containers): string
     {
@@ -377,13 +385,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $ips = collect([]);
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Name');
-            if ($containerName === 'coolify-proxy') {
+            if (in_array($containerName, ['coolify-proxy', 'coolify-sentinel', Server::PROXY_ERROR_PAGE_CONTAINER], true)) {
                 continue;
             }
             if (isGeneratedContainerName($containerName)) {
                 continue;
             }
             if ($buildHelperNames->contains($containerName)) {
+                continue;
+            }
+            if (str($containerName)->startsWith(self::TEMPORARY_HELPER_CONTAINER_PREFIXES)) {
                 continue;
             }
             $containerIp = data_get($container, 'IPv4Address');
