@@ -80,8 +80,7 @@
                     <div @class([
                         'application-settings-section-body min-h-0 flex-1 overflow-y-auto',
                         'mt-2 sm:mt-0' => isset($headerActions),
-                    ])
-                        style="-webkit-overflow-scrolling: touch;">
+                    ])>
                         {{ $slot }}
                     </div>
                     @isset($footer)

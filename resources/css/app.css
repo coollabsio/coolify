@@ -3049,7 +3049,6 @@ input[type="search"]::-webkit-search-results-decoration {
     max-width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .data-table-header {
@@ -3220,7 +3219,6 @@ input[type="search"]::-webkit-search-results-decoration {
 .environment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .environment-table-scroll .env-table-grid {
@@ -3701,7 +3699,6 @@ input[type="search"]::-webkit-search-results-decoration {
 .deployment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .deployment-table-grid {
@@ -4274,7 +4271,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
 }
 
 .logs-viewer-actions::-webkit-scrollbar {

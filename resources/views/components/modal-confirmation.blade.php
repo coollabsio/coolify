@@ -239,8 +239,7 @@
                         <x-reicon name="x" class="size-4" />
                     </button>
                 </header>
-                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                    style="-webkit-overflow-scrolling: touch;">
+                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">

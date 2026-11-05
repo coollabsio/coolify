@@ -63,8 +63,7 @@
                             </button>
                         </header>
 
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             {{-- Progress View --}}
                             <template x-if="showProgress">
                                 <div class="flex flex-col gap-4">

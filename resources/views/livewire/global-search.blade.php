@@ -852,8 +852,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:project.add-empty key="create-modal-project" />
                         </div>
                     </div>
@@ -895,8 +894,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:team.create key="create-modal-team" />
                         </div>
                     </div>
@@ -938,8 +936,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:storage.create key="create-modal-storage" />
                         </div>
                     </div>
@@ -981,8 +978,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:security.private-key.create key="create-modal-private-key" />
                         </div>
                     </div>
@@ -1024,8 +1020,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:source.github.create key="create-modal-source" />
                         </div>
                     </div>
