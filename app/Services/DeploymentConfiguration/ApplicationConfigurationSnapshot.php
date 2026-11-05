@@ -176,6 +176,7 @@ class ApplicationConfigurationSnapshot
             $this->item('use_build_secrets', 'Use build secrets', data_get($this->application, 'settings.use_build_secrets'), 'build'),
             $this->item('inject_build_args_to_dockerfile', 'Inject build args to Dockerfile', data_get($this->application, 'settings.inject_build_args_to_dockerfile'), 'build'),
             $this->item('include_source_commit_in_build', 'Include source commit in build', data_get($this->application, 'settings.include_source_commit_in_build'), 'build'),
+            $this->item('include_network_hosts_in_build', 'Include network hosts in build', data_get($this->application, 'settings.include_network_hosts_in_build'), 'build'),
             $this->item('disable_build_cache', 'Disable build cache', data_get($this->application, 'settings.disable_build_cache'), 'build'),
             $this->item('is_build_server_enabled', 'Build server', data_get($this->application, 'settings.is_build_server_enabled'), 'build'),
         ];

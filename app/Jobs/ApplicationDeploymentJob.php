@@ -367,12 +367,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * The --add-host flags for the build, from the containers on the destination network.
+     *
+     * A build server gets no flags: the IPs are on the network of the deployment server, so the build
+     * server cannot reach them, and the flags only invalidate the build cache.
+     */
+    private function networkHostFlags(): string
+    {
+        if ($this->use_build_server || ! ($this->application->settings->include_network_hosts_in_build ?? true)) {
+            return '';
+        }
+
+        $safeNetwork = escapeshellarg($this->destination->network);
+        $allContainers = instant_remote_process(["docker network inspect {$safeNetwork} -f '{{json .Containers}}' "], $this->server);
+        if (is_null($allContainers)) {
+            return '';
+        }
+        $allContainers = format_docker_command_output_to_json($allContainers);
+
+        return count($allContainers) > 0 ? $this->addHostFlags(collect($allContainers[0])) : '';
+    }
+
+    /**
      * Build the --add-host flags for the containers on the destination network.
      *
      * BuildKit keys every RUN layer on the host names of the --add-host set (not on the IPs), so a
      * container that joins or leaves the network between two builds forces a full rebuild. The set
      * leaves out the short-lived containers: build helpers (named after their deployment uuid),
-     * rolling update containers, and the backup and S3 import helpers. It also leaves out the proxy,
+     * rolling update containers, preview deployments (named `<name>-pr-<id>`, they come and go with
+     * pull requests), and the backup and S3 import helpers. It also leaves out the proxy,
      * Sentinel, and the proxy error page containers: no build uses them, and Coolify recreates them.
      */
     private function addHostFlags(Collection $containers): string
@@ -389,6 +412,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             if (isGeneratedContainerName($containerName)) {
+                continue;
+            }
+            if (preg_match('/-pr-\d+$/', (string) $containerName) === 1) {
                 continue;
             }
             if ($buildHelperNames->contains($containerName)) {
@@ -454,15 +480,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
-            // Generate custom host<->ip mapping
-            $safeNetwork = escapeshellarg($this->destination->network);
-            $allContainers = instant_remote_process(["docker network inspect {$safeNetwork} -f '{{json .Containers}}' "], $this->server);
-
-            if (! is_null($allContainers)) {
-                $allContainers = format_docker_command_output_to_json($allContainers);
-                $this->addHosts = count($allContainers) > 0 ? $this->addHostFlags(collect($allContainers[0])) : '';
-            }
-
             if ($this->application->dockerfile_target_build) {
                 $target = $this->application->dockerfile_target_build;
                 if (! preg_match(ValidationPatterns::DOCKER_TARGET_PATTERN, $target)) {
@@ -475,6 +492,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
             $this->selectBuildServer();
+            $this->addHosts = $this->networkHostFlags();
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
         } catch (Exception $e) {

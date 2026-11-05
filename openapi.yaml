@@ -548,6 +548,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -990,6 +993,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -1432,6 +1438,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -1874,6 +1883,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -2253,6 +2265,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -2618,6 +2633,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -3163,6 +3181,9 @@ paths:
                 include_source_commit_in_build:
                   type: boolean
                   description: 'Include the source commit in the build.'
+                include_network_hosts_in_build:
+                  type: boolean
+                  description: 'Add the containers of the destination network as build hosts.'
                 is_env_sorting_enabled:
                   type: boolean
                   description: 'Sort environment variables.'
@@ -18022,6 +18043,9 @@ components:
           type: boolean
         include_source_commit_in_build:
           type: boolean
+        include_network_hosts_in_build:
+          type: boolean
+          description: 'Add the containers of the destination network as build hosts (--add-host). Turn off to keep the build cache when resources on the network change.'
         docker_images_to_keep:
           type: integer
         stop_grace_period:
