@@ -39,7 +39,8 @@ class SentinelController extends Controller
         } catch (Exception $e) {
             auditLogWebhookFailure('sentinel', 'decrypt_failed');
 
-            return response()->json(['message' => 'Invalid token'], 401);
+            // Usually a Sentinel of another instance or of an old APP_KEY: it cannot recover, so it waits one hour.
+            return response()->json(['message' => 'Invalid token'], 401, ['Retry-After' => 3600]);
         }
         $server_uuid = data_get($decrypted_token, 'server_uuid');
         if (! $server_uuid) {
@@ -78,7 +79,8 @@ class SentinelController extends Controller
             ]);
             $server->rememberSentinelPushProblem('Coolify rejected the push: the server is marked unreachable, not usable, or disabled. Validate the server connection.');
 
-            return response()->json(['message' => 'Server is not functional'], 401);
+            // SSH checks mark the server reachable again, so pushes can wait 5 minutes.
+            return response()->json(['message' => 'Server is not functional'], 401, ['Retry-After' => 300]);
         }
 
         if ($server->settings->sentinel_token !== $naked_token) {
