@@ -116,13 +116,10 @@ class Index extends Component
             }
 
             // For self-hosted, check if email is enabled
-            if (! isCloud()) {
-                $settings = instanceSettings();
-                if (! $settings->smtp_enabled && ! $settings->resend_enabled) {
-                    $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
+            if (! isCloud() && ! is_transactional_emails_enabled()) {
+                $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
 
-                    return;
-                }
+                return;
             }
 
             $this->validate([
