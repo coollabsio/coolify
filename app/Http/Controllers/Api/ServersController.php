@@ -551,8 +551,8 @@ class ServersController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => ['string', 'max:255', 'not_regex:'.self::SERVER_NAME_CONTROL_CHARACTERS_PATTERN],
-            'description' => 'string|nullable',
+            'name' => ['not_regex:'.self::SERVER_NAME_CONTROL_CHARACTERS_PATTERN, ...ValidationPatterns::nameRules(required: false, nullable: false)],
+            'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['string', 'required', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|required',
@@ -563,6 +563,7 @@ class ServersController extends Controller
             'proxy_type' => 'string|nullable',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
+            ...ValidationPatterns::combinedMessages(),
             'name.not_regex' => 'The name must not contain control characters such as new lines.',
         ]);
 
@@ -756,8 +757,8 @@ class ServersController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => ['string', 'max:255', 'nullable', 'not_regex:'.self::SERVER_NAME_CONTROL_CHARACTERS_PATTERN],
-            'description' => 'string|nullable',
+            'name' => ['not_regex:'.self::SERVER_NAME_CONTROL_CHARACTERS_PATTERN, ...ValidationPatterns::nameRules(required: false, nullable: false)],
+            'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['string', 'nullable', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|nullable',
@@ -783,6 +784,7 @@ class ServersController extends Controller
             'backup_compression_cpu_percentage' => 'integer|in:25,50,75,100',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
+            ...ValidationPatterns::combinedMessages(),
             'name.not_regex' => 'The name must not contain control characters such as new lines.',
         ]);
 
