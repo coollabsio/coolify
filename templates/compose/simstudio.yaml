@@ -1,0 +1,163 @@
+# documentation: https://docs.simstudio.ai
+# slogan: Open source platform for building and running AI agents.
+# category: ai
+# tags: ai,agents,automation,workflows,postgresql
+# logo: svgs/simstudio.svg
+# port: 3000
+
+services:
+  simstudio:
+    image: ghcr.io/simstudioai/simstudio:latest
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-simstudio}
+      - BETTER_AUTH_URL=${SERVICE_URL_SIMSTUDIO}
+      - NEXT_PUBLIC_APP_URL=${SERVICE_URL_SIMSTUDIO}
+      - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-}
+      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_BETTERAUTHSECRET}
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_ENCRYPTIONKEY}
+      - API_ENCRYPTION_KEY=${API_ENCRYPTION_KEY:-}
+      - INTERNAL_API_SECRET=${SERVICE_PASSWORD_64_INTERNALAPISECRET}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - COPILOT_API_KEY=${COPILOT_API_KEY}
+      - SIM_AGENT_API_URL=${SIM_AGENT_API_URL}
+      - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
+      - SOCKET_SERVER_URL=${SOCKET_SERVER_URL:-http://realtime:3002}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-}
+      - ADMISSION_GATE_MAX_INFLIGHT=${ADMISSION_GATE_MAX_INFLIGHT:-500}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+      realtime:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-fsS'
+        - 'http://127.0.0.1:3000'
+      interval: 90s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  gateway:
+    image: caddy:2-alpine
+    environment:
+      - SERVICE_URL_SIMSTUDIO_3000
+    depends_on:
+      simstudio:
+        condition: service_healthy
+      realtime:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - '--quiet'
+        - 'http://127.0.0.1:3000'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        content: |
+          :3000 {
+            @socket path /socket.io*
+            reverse_proxy @socket http://realtime:3002
+            reverse_proxy http://simstudio:3000
+          }
+
+  realtime:
+    image: ghcr.io/simstudioai/realtime:latest
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-simstudio}
+      - NEXT_PUBLIC_APP_URL=${SERVICE_URL_SIMSTUDIO}
+      - BETTER_AUTH_URL=${SERVICE_URL_SIMSTUDIO}
+      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_BETTERAUTHSECRET}
+      - INTERNAL_API_SECRET=${SERVICE_PASSWORD_64_INTERNALAPISECRET}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-fsS'
+        - 'http://127.0.0.1:3002/health'
+      interval: 90s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrations:
+    image: ghcr.io/simstudioai/migrations:latest
+    exclude_from_hc: true
+    working_dir: /app/packages/db
+    environment:
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-simstudio}
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - bun
+      - run
+      - db:migrate
+    restart: 'no'
+
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-simstudio}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
