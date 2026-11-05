@@ -507,6 +507,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('domains');
     $request->offsetUnset('instant_deploy');
     $request->offsetUnset('github_app_uuid');
+    $request->offsetUnset('gitea_app_uuid');
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('use_build_secrets');

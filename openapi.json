@@ -1790,6 +1790,670 @@
                 ]
             }
         },
+        "\/applications\/private-gitea-app": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create (Private - Gitea App)",
+                "description": "Create new application based on a private repository through a Gitea App.",
+                "operationId": "create-private-gitea-app-application",
+                "requestBody": {
+                    "description": "Application object that needs to be created.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "project_uuid",
+                                    "server_uuid",
+                                    "gitea_app_uuid",
+                                    "git_repository",
+                                    "git_branch",
+                                    "build_pack"
+                                ],
+                                "properties": {
+                                    "project_uuid": {
+                                        "type": "string",
+                                        "description": "The project UUID."
+                                    },
+                                    "server_uuid": {
+                                        "type": "string",
+                                        "description": "The server UUID."
+                                    },
+                                    "environment_name": {
+                                        "type": "string",
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "gitea_app_uuid": {
+                                        "type": "string",
+                                        "description": "The Gitea App UUID. The source must be connected."
+                                    },
+                                    "git_repository": {
+                                        "type": "string",
+                                        "description": "The repository as owner\/name, or its URL on the Gitea instance."
+                                    },
+                                    "git_branch": {
+                                        "type": "string",
+                                        "description": "The git branch."
+                                    },
+                                    "ports_exposes": {
+                                        "type": "string",
+                                        "description": "The ports to expose."
+                                    },
+                                    "destination_uuid": {
+                                        "type": "string",
+                                        "description": "The destination UUID."
+                                    },
+                                    "build_pack": {
+                                        "type": "string",
+                                        "enum": [
+                                            "nixpacks",
+                                            "railpack",
+                                            "static",
+                                            "dockerfile",
+                                            "dockercompose"
+                                        ],
+                                        "description": "The build pack type."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The application name."
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "The application description."
+                                    },
+                                    "domains": {
+                                        "type": "string",
+                                        "description": "The application URLs in a comma-separated list."
+                                    },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
+                                    },
+                                    "git_commit_sha": {
+                                        "type": "string",
+                                        "description": "The git commit SHA."
+                                    },
+                                    "docker_registry_image_name": {
+                                        "type": "string",
+                                        "description": "The docker registry image name."
+                                    },
+                                    "docker_registry_image_tag": {
+                                        "type": "string",
+                                        "description": "The docker registry image tag."
+                                    },
+                                    "is_static": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application is static."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true."
+                                    },
+                                    "is_auto_deploy_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if auto-deploy is enabled on git push. Defaults to true."
+                                    },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
+                                    },
+                                    "is_preview_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable preview deployments for pull requests."
+                                    },
+                                    "static_image": {
+                                        "type": "string",
+                                        "enum": [
+                                            "nginx:alpine"
+                                        ],
+                                        "description": "The static image."
+                                    },
+                                    "install_command": {
+                                        "type": "string",
+                                        "description": "The install command."
+                                    },
+                                    "build_command": {
+                                        "type": "string",
+                                        "description": "The build command."
+                                    },
+                                    "start_command": {
+                                        "type": "string",
+                                        "description": "The start command."
+                                    },
+                                    "ports_mappings": {
+                                        "type": "string",
+                                        "description": "The ports mappings."
+                                    },
+                                    "base_directory": {
+                                        "type": "string",
+                                        "description": "The base directory for all commands."
+                                    },
+                                    "publish_directory": {
+                                        "type": "string",
+                                        "description": "The publish directory."
+                                    },
+                                    "health_check_enabled": {
+                                        "type": "boolean",
+                                        "description": "Health check enabled."
+                                    },
+                                    "health_check_path": {
+                                        "type": "string",
+                                        "description": "Health check path."
+                                    },
+                                    "health_check_port": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Health check port."
+                                    },
+                                    "health_check_host": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Health check host."
+                                    },
+                                    "health_check_method": {
+                                        "type": "string",
+                                        "description": "Health check method."
+                                    },
+                                    "health_check_return_code": {
+                                        "type": "integer",
+                                        "description": "Health check return code."
+                                    },
+                                    "health_check_scheme": {
+                                        "type": "string",
+                                        "description": "Health check scheme."
+                                    },
+                                    "health_check_response_text": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Health check response text."
+                                    },
+                                    "health_check_interval": {
+                                        "type": "integer",
+                                        "description": "Health check interval in seconds."
+                                    },
+                                    "health_check_timeout": {
+                                        "type": "integer",
+                                        "description": "Health check timeout in seconds."
+                                    },
+                                    "health_check_retries": {
+                                        "type": "integer",
+                                        "description": "Health check retries count."
+                                    },
+                                    "health_check_start_period": {
+                                        "type": "integer",
+                                        "description": "Health check start period in seconds."
+                                    },
+                                    "limits_memory": {
+                                        "type": "string",
+                                        "description": "Memory limit."
+                                    },
+                                    "limits_memory_swap": {
+                                        "type": "string",
+                                        "description": "Memory swap limit."
+                                    },
+                                    "limits_memory_swappiness": {
+                                        "type": "integer",
+                                        "description": "Memory swappiness."
+                                    },
+                                    "limits_memory_reservation": {
+                                        "type": "string",
+                                        "description": "Memory reservation."
+                                    },
+                                    "limits_cpus": {
+                                        "type": "string",
+                                        "description": "CPU limit."
+                                    },
+                                    "limits_cpuset": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "CPU set."
+                                    },
+                                    "limits_cpu_shares": {
+                                        "type": "integer",
+                                        "description": "CPU shares."
+                                    },
+                                    "custom_labels": {
+                                        "type": "string",
+                                        "description": "Custom labels."
+                                    },
+                                    "custom_docker_run_options": {
+                                        "type": "string",
+                                        "description": "Custom docker run options."
+                                    },
+                                    "post_deployment_command": {
+                                        "type": "string",
+                                        "description": "Post deployment command."
+                                    },
+                                    "post_deployment_command_container": {
+                                        "type": "string",
+                                        "description": "Post deployment command container."
+                                    },
+                                    "pre_deployment_command": {
+                                        "type": "string",
+                                        "description": "Pre deployment command."
+                                    },
+                                    "pre_deployment_command_container": {
+                                        "type": "string",
+                                        "description": "Pre deployment command container."
+                                    },
+                                    "manual_webhook_secret_github": {
+                                        "type": "string",
+                                        "description": "Manual webhook secret for Github. Needs the deploy ability."
+                                    },
+                                    "manual_webhook_secret_gitlab": {
+                                        "type": "string",
+                                        "description": "Manual webhook secret for Gitlab. Needs the deploy ability."
+                                    },
+                                    "manual_webhook_secret_bitbucket": {
+                                        "type": "string",
+                                        "description": "Manual webhook secret for Bitbucket. Needs the deploy ability."
+                                    },
+                                    "manual_webhook_secret_gitea": {
+                                        "type": "string",
+                                        "description": "Manual webhook secret for Gitea. Needs the deploy ability."
+                                    },
+                                    "redirect": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "How to set redirect with Traefik \/ Caddy. www<->non-www.",
+                                        "enum": [
+                                            "www",
+                                            "non-www",
+                                            "both"
+                                        ]
+                                    },
+                                    "instant_deploy": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application should be deployed instantly."
+                                    },
+                                    "dockerfile": {
+                                        "type": "string",
+                                        "description": "The Dockerfile content."
+                                    },
+                                    "dockerfile_location": {
+                                        "type": "string",
+                                        "description": "The Dockerfile location in the repository"
+                                    },
+                                    "dockerfile_target_build": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "The Docker build target (stage) in the Dockerfile."
+                                    },
+                                    "docker_compose_location": {
+                                        "type": "string",
+                                        "description": "The Docker Compose location."
+                                    },
+                                    "docker_compose_custom_start_command": {
+                                        "type": "string",
+                                        "description": "The Docker Compose custom start command."
+                                    },
+                                    "docker_compose_custom_build_command": {
+                                        "type": "string",
+                                        "description": "The Docker Compose custom build command."
+                                    },
+                                    "docker_compose_domains": {
+                                        "type": "array",
+                                        "description": "Array of URLs to be applied to containers of a dockercompose application.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "domain": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                },
+                                                "redirect": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Per-service www\/non-www redirect for this compose service.",
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "watch_paths": {
+                                        "type": "string",
+                                        "description": "Watch path patterns, one per line (newline-separated). Commas do not separate patterns."
+                                    },
+                                    "use_build_server": {
+                                        "type": "boolean",
+                                        "nullable": true,
+                                        "description": "Use build server."
+                                    },
+                                    "use_build_secrets": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "is_git_submodules_enabled": {
+                                        "type": "boolean",
+                                        "description": "Clone Git submodules."
+                                    },
+                                    "is_git_lfs_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable Git LFS."
+                                    },
+                                    "is_git_shallow_clone_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a shallow Git clone."
+                                    },
+                                    "is_auto_cancel_queued_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Cancel older queued webhook deployments when a newer push arrives. Default: true."
+                                    },
+                                    "is_auto_cancel_building_deployments_enabled": {
+                                        "type": "boolean",
+                                        "description": "Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false."
+                                    },
+                                    "disable_build_cache": {
+                                        "type": "boolean",
+                                        "description": "Disable the build cache."
+                                    },
+                                    "inject_build_args_to_dockerfile": {
+                                        "type": "boolean",
+                                        "description": "Inject build arguments into the Dockerfile build."
+                                    },
+                                    "include_source_commit_in_build": {
+                                        "type": "boolean",
+                                        "description": "Include the source commit in the build."
+                                    },
+                                    "is_env_sorting_enabled": {
+                                        "type": "boolean",
+                                        "description": "Sort environment variables."
+                                    },
+                                    "redact_all_env_values_in_logs": {
+                                        "type": "boolean",
+                                        "description": "Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions."
+                                    },
+                                    "include_coolify_default_variables": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it."
+                                    },
+                                    "is_pr_deployments_public_enabled": {
+                                        "type": "boolean",
+                                        "description": "Make pull request deployments public."
+                                    },
+                                    "stop_grace_period": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 3600,
+                                        "description": "Container stop grace period in seconds."
+                                    },
+                                    "rolling_update_drain_seconds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 300,
+                                        "description": "Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5."
+                                    },
+                                    "docker_images_to_keep": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Number of Docker images to retain."
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable gzip compression."
+                                    },
+                                    "is_stripprefix_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable path prefix stripping."
+                                    },
+                                    "is_permanent_redirect_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use permanent redirects (301\/308) instead of temporary (302\/307) for the HTTP to HTTPS and www redirects. Defaults to false."
+                                    },
+                                    "traefik_certificate_resolver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Traefik certificate resolver for this application. Null uses the server setting, \"none\" uses no resolver."
+                                    },
+                                    "is_container_label_readonly_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels."
+                                    },
+                                    "is_raw_compose_deployment_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy the raw Docker Compose definition."
+                                    },
+                                    "is_log_drain_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable log drain for the application."
+                                    },
+                                    "is_gpu_enabled": {
+                                        "type": "boolean",
+                                        "description": "Enable GPU support."
+                                    },
+                                    "gpu_driver": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "GPU driver name."
+                                    },
+                                    "gpu_count": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Number of GPUs to allocate."
+                                    },
+                                    "gpu_device_ids": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated GPU device IDs."
+                                    },
+                                    "gpu_options": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Additional GPU options."
+                                    },
+                                    "is_consistent_container_name_enabled": {
+                                        "type": "boolean",
+                                        "description": "Use a consistent container name across deployments."
+                                    },
+                                    "custom_internal_name": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422."
+                                    },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
+                                    "preview_url_template": {
+                                        "type": "string",
+                                        "description": "Preview URL template."
+                                    },
+                                    "max_restart_count": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "description": "Maximum container restart count before stopping."
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean",
+                                        "description": "HTTP Basic Authentication enabled."
+                                    },
+                                    "http_basic_auth_username": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Username for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the application."
+                                    },
+                                    "is_preserve_repository_enabled": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Preserve repository during deployment."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to set a manual webhook secret."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications\/private-deploy-key": {
             "post": {
                 "tags": [
@@ -3705,6 +4369,10 @@
                                     "github_app_uuid": {
                                         "type": "string",
                                         "description": "The Github App UUID."
+                                    },
+                                    "gitea_app_uuid": {
+                                        "type": "string",
+                                        "description": "The Gitea App UUID. The source must be connected. Do not send it together with github_app_uuid."
                                     },
                                     "git_repository": {
                                         "type": "string",
@@ -12182,6 +12850,90 @@
                     },
                     "502": {
                         "description": "Cloudflare did not respond. Try again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/gitea-apps": {
+            "get": {
+                "tags": [
+                    "Gitea Apps"
+                ],
+                "summary": "List",
+                "description": "List all Gitea apps for the current team (and system-wide sources).",
+                "operationId": "list-gitea-apps",
+                "responses": {
+                    "200": {
+                        "description": "List of Gitea apps.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "organization": {
+                                                "type": "string",
+                                                "nullable": true
+                                            },
+                                            "api_url": {
+                                                "type": "string"
+                                            },
+                                            "html_url": {
+                                                "type": "string"
+                                            },
+                                            "custom_user": {
+                                                "type": "string"
+                                            },
+                                            "custom_port": {
+                                                "type": "integer"
+                                            },
+                                            "client_id": {
+                                                "type": "string",
+                                                "nullable": true
+                                            },
+                                            "redirect_uri": {
+                                                "type": "string",
+                                                "nullable": true
+                                            },
+                                            "is_system_wide": {
+                                                "type": "boolean"
+                                            },
+                                            "is_public": {
+                                                "type": "boolean"
+                                            },
+                                            "is_connected": {
+                                                "type": "boolean",
+                                                "description": "True when the OAuth connection is complete and the source can deploy private repositories."
+                                            },
+                                            "team_id": {
+                                                "type": "integer"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
                     }
                 },
                 "security": [
@@ -28430,6 +29182,10 @@
         {
             "name": "DNS",
             "description": "DNS"
+        },
+        {
+            "name": "Gitea Apps",
+            "description": "Gitea Apps"
         },
         {
             "name": "GitHub Apps",

@@ -119,14 +119,9 @@ function loadGiteaRepositories(GiteaApp $source, int $page = 1): array
     $repositories = collect($response->json());
     $hasMore = count($response->json()) === GITEA_PAGE_SIZE;
 
-    $organizations = collect(explode(',', (string) $source->organization))
-        ->map(fn ($organization) => strtolower(trim($organization)))
-        ->filter();
-    if ($organizations->isNotEmpty()) {
-        $repositories = $repositories->filter(
-            fn ($repository) => $organizations->contains(strtolower((string) data_get($repository, 'owner.login')))
-        );
-    }
+    $repositories = $repositories->filter(
+        fn ($repository) => $source->allowsRepositoryOwner(data_get($repository, 'owner.login'))
+    );
 
     return [
         'total_count' => $repositories->count(),
