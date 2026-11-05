@@ -180,7 +180,7 @@
                     placeholder="Choose an environment…" />
             </div>
 
-            <div class="mt-4">
+            <div class="mt-4 flex">
                 <x-forms.checkbox id="cloneVolumeData" live label="Clone volume data"
                     helper="Copies the data of the persistent volumes to the clone. A running source resource is stopped while the data is copied and started again afterwards." />
             </div>
@@ -243,7 +243,7 @@
                         emptyText="No network destinations are available on this server." />
                 </div>
 
-                <div x-show="selectedMigrateDestination" x-cloak class="mt-4">
+                <div x-show="selectedMigrateDestination" x-cloak class="mt-4 flex">
                     <x-forms.checkbox id="migrateVolumeData" live label="Migrate persistent volume data"
                         helper="Named Docker volumes and bind-mount host paths are transferred when both servers are managed by Coolify." />
                 </div>
