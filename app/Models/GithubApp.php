@@ -35,6 +35,7 @@ class GithubApp extends BaseModel
         'contents',
         'metadata',
         'pull_requests',
+        'deployments',
         'administration',
         'organization_self_hosted_runners',
         'actions',
@@ -147,6 +148,24 @@ class GithubApp extends BaseModel
     public function runnerConfigs()
     {
         return $this->hasMany(GithubRunnerConfig::class);
+    }
+
+    /**
+     * Whether Coolify can create GitHub Deployments and their statuses with this App.
+     */
+    public function canSyncDeployments(): bool
+    {
+        return ! $this->is_public && $this->missingDeploymentRequirements() === [];
+    }
+
+    /**
+     * Permissions that GitHub deployments need but the App does not have.
+     *
+     * @return array<int, string>
+     */
+    public function missingDeploymentRequirements(): array
+    {
+        return $this->deployments === 'write' ? [] : ['Repository permission "Deployments": write'];
     }
 
     /**

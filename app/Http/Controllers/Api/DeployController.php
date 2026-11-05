@@ -7,6 +7,7 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -276,6 +277,13 @@ class DeployController extends Controller
 
             $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
             $cancelled = true;
+
+            try {
+                // The query update above fires no model event.
+                SyncGithubDeploymentJob::dispatchFor($deployment);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to queue the GitHub deployment sync for cancelled deployment {$deployment->id}: {$e->getMessage()}");
+            }
 
             try {
                 $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
