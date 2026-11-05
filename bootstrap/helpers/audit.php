@@ -77,11 +77,16 @@ if (! function_exists('auditFailureDeduplicationWindow')) {
      *
      * Failed logins use a short window so an ongoing brute force attempt stays visible
      * (one row per email and source IP each minute, on top of the login rate limit).
+     * Sentinel pushes for a deleted server or an unpaid team fail until someone acts, so one row each hour is enough.
+     *
+     * @param  array<string, mixed>  $context
      */
-    function auditFailureDeduplicationWindow(string $event): ?int
+    function auditFailureDeduplicationWindow(string $event, array $context = []): ?int
     {
         return match (true) {
             $event === 'auth.user.login_failed' => 60,
+            $event === 'webhook.sentinel.signature_failed'
+                && in_array(data_get($context, 'reason'), ['server_not_found', 'subscription_unpaid'], true) => 3600,
             $event === 'api.auth.unauthenticated',
             preg_match('/^webhook\.[a-z0-9_-]+\.signature_failed$/i', $event) === 1 => 300,
             default => null,
@@ -98,7 +103,7 @@ if (! function_exists('shouldRecordAuditEvent')) {
      */
     function shouldRecordAuditEvent(string $event, array $context): bool
     {
-        $window = auditFailureDeduplicationWindow($event);
+        $window = auditFailureDeduplicationWindow($event, $context);
         if ($window === null) {
             return true;
         }

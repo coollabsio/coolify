@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\StopSentinel;
 use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Controller;
 use App\Jobs\CheckAndStartSentinelJob;
@@ -52,7 +53,8 @@ class SentinelController extends Controller
                 'server_uuid' => $server_uuid,
             ]);
 
-            return response()->json(['message' => 'Server not found'], 404);
+            // 410 and Retry-After make Sentinel wait one day before it pushes again.
+            return response()->json(['message' => 'Server not found'], 410, ['Retry-After' => 86400]);
         }
 
         if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
@@ -61,8 +63,12 @@ class SentinelController extends Controller
                 'team_id' => $server->team_id,
             ]);
             $server->rememberSentinelPushProblem('Coolify rejected the push: the subscription of this team is not active.');
+            // Remove the Sentinel container of the unpaid server once a day. Server validation starts it again after payment.
+            if (Cache::add("sentinel:stop-unpaid:{$server->id}", true, now()->addDay())) {
+                StopSentinel::dispatch($server);
+            }
 
-            return response()->json(['message' => 'Unauthorized'], 401);
+            return response()->json(['message' => 'Subscription is not active'], 402, ['Retry-After' => 3600]);
         }
 
         if ($server->isFunctional() === false) {

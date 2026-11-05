@@ -205,7 +205,13 @@ class ScheduledTasksController extends Controller
             return $response;
         }
 
-        $task->update($request->only($allowedFields));
+        $task->fill($request->only($allowedFields));
+        $changedFields = auditChangedFields($task);
+        $task->save();
+
+        if ($changedFields === []) {
+            return response()->json($this->removeSensitiveData($task), 200);
+        }
 
         auditLog('api.scheduled_task.updated', [
             'team_id' => getTeamIdFromToken(),
@@ -213,7 +219,7 @@ class ScheduledTasksController extends Controller
             'task_name' => $task->name,
             'resource_type' => $resource instanceof Application ? 'application' : 'service',
             'resource_uuid' => $resource->uuid,
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+            'changed_fields' => $changedFields,
         ]);
 
         return response()->json($this->removeSensitiveData($task), 200);
