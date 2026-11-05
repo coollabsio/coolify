@@ -3458,12 +3458,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                                 $savedService->save();
                             }
-                            EnvironmentVariable::create([
-                                'key' => $key,
-                                'value' => $fqdn,
+                            EnvironmentVariable::firstOrCreate([
+                                'key' => $key->value(),
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                            ], [
+                                'value' => $fqdn,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }

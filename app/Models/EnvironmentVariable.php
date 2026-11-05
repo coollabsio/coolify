@@ -12,11 +12,13 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use PDOException;
 
 #[OA\Schema(
     description: 'Environment Variable model',
@@ -199,6 +201,62 @@ class EnvironmentVariable extends BaseModel
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * The variables of one resource and preview flag that have the given key.
+     */
+    public function scopeForResourceKey(Builder $query, string $resourceableType, int $resourceableId, bool $isPreview, string $key): Builder
+    {
+        return $query->where('resourceable_type', $resourceableType)
+            ->where('resourceable_id', $resourceableId)
+            ->where('is_preview', $isPreview)
+            ->where('key', $key);
+    }
+
+    /**
+     * The other variables of this resource and preview flag that have the given key (by default its own key).
+     */
+    public function sameKeyVariables(?string $key = null): Builder
+    {
+        return static::query()
+            ->forResourceKey($this->resourceable_type, $this->resourceable_id, (bool) $this->is_preview, $key ?? $this->key)
+            ->whereKeyNot($this->getKey());
+    }
+
+    /**
+     * The table has no unique index on resource and key, so two requests that create the same key at the
+     * same time (parallel Compose parses or saves) could both insert it. Inserts of one key wait for each
+     * other, and a second row is refused like a unique index refuses it, so firstOrCreate() returns the
+     * existing row.
+     */
+    protected function performInsert(Builder $query)
+    {
+        if ($this->resourceable_type === null || $this->resourceable_id === null) {
+            return parent::performInsert($query);
+        }
+
+        $connection = $this->getConnection();
+
+        return $connection->transaction(function () use ($connection, $query) {
+            if ($connection->getDriverName() === 'pgsql') {
+                // Held until the transaction commits, so the next insert of this key sees this row.
+                $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                    "environment_variables:{$this->resourceable_type}:{$this->resourceable_id}:".(int) (bool) $this->is_preview.":{$this->key}",
+                ]);
+            }
+
+            if ($this->sameKeyVariables()->exists()) {
+                throw new UniqueConstraintViolationException(
+                    $connection->getName(),
+                    'insert into "environment_variables"',
+                    [],
+                    new PDOException("Environment variable {$this->key} already exists."),
+                );
+            }
+
+            return parent::performInsert($query);
+        });
     }
 
     public function scopeWithoutBuildpackControlVariables(Builder $query): Builder

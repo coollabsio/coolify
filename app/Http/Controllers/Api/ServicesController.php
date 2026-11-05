@@ -573,8 +573,7 @@ class ServicesController extends Controller
                             $command = $value->after('SERVICE_')->beforeLast('_');
                             $generatedValue = generateEnvValue($command->value(), $service);
                         }
-                        EnvironmentVariable::create([
-                            'key' => $key,
+                        $service->environment_variables()->updateOrCreate(['key' => $key], [
                             'value' => $generatedValue,
                             'resourceable_id' => $service->id,
                             'resourceable_type' => $service->getMorphClass(),

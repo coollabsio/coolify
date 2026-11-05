@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Resource;
 
-use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -106,8 +105,7 @@ class Create extends Component
                             $key = str()->before($value, '=');
                             $value = str(str()->after($value, '='));
                             if ($value) {
-                                EnvironmentVariable::create([
-                                    'key' => $key,
+                                $service->environment_variables()->updateOrCreate(['key' => $key], [
                                     'value' => $value,
                                     'resourceable_id' => $service->id,
                                     'resourceable_type' => $service->getMorphClass(),

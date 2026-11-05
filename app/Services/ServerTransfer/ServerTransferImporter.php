@@ -1521,6 +1521,10 @@ class ServerTransferImporter
      */
     private function importEnvVars(array $variables, object $resource, bool $isPreview): void
     {
+        // Older sources can export duplicate keys of one resource; Docker Compose uses the last one.
+        $variables = collect($variables)
+            ->keyBy(fn (array $variable): string => ((bool) data_get($variable, 'is_preview', false) || $isPreview ? 'preview:' : 'production:').data_get($variable, 'key'));
+
         foreach ($variables as $variable) {
             EnvironmentVariable::withoutEvents(function () use ($variable, $resource, $isPreview) {
                 $uuid = filled(data_get($variable, 'uuid')) ? (string) data_get($variable, 'uuid') : new_public_id();

@@ -18,8 +18,7 @@ beforeEach(function () {
 
 function createVariable(Application $application, string $value, bool $isMultiline = false): EnvironmentVariable
 {
-    $env = EnvironmentVariable::create([
-        'key' => 'TEST_VAR',
+    $env = $application->environment_variables()->updateOrCreate(['key' => 'TEST_VAR'], [
         'value' => $value,
         'is_multiline' => $isMultiline,
         'is_literal' => true,
