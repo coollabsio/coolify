@@ -2901,27 +2901,14 @@ class Application extends BaseModel
         }
 
         if ($hasHealthcheck && ($this->isHealthcheckDisabled() || $isInit)) {
-            $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
-            $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
-            $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
-            $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
+            $options = dockerfileHealthcheckOptions($healthcheckCommand);
 
-            if ($interval->isNotEmpty()) {
-                $this->health_check_interval = parseDockerfileInterval($interval);
-            }
-            if ($timeout->isNotEmpty()) {
-                $this->health_check_timeout = parseDockerfileInterval($timeout);
-            }
-            if ($start_period->isNotEmpty()) {
-                $this->health_check_start_period = parseDockerfileInterval($start_period);
-            }
-            if ($retries->isNotEmpty()) {
-                $this->health_check_retries = $retries->toInteger();
-            }
-            if ($interval || $timeout || $start_period || $retries) {
-                $this->custom_healthcheck_found = true;
-                $this->save();
-            }
+            $this->health_check_interval = $options['interval'] ?? $this->health_check_interval;
+            $this->health_check_timeout = $options['timeout'] ?? $this->health_check_timeout;
+            $this->health_check_start_period = $options['start_period'] ?? $this->health_check_start_period;
+            $this->health_check_retries = $options['retries'] ?? $this->health_check_retries;
+            $this->custom_healthcheck_found = true;
+            $this->save();
         }
     }
 
