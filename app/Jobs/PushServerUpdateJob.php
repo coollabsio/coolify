@@ -132,6 +132,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function __construct(public Server $server, public $data)
     {
+        $this->onQueue(sentinel_queue());
         $this->containers = collect();
         $this->foundApplicationIds = collect();
         $this->foundDatabaseUuids = collect();

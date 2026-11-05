@@ -1133,6 +1133,18 @@ function webhooks_queue(): string
     return isCloud() ? 'webhooks' : 'high';
 }
 
+/**
+ * Resolve the queue for PushServerUpdateJob, which processes Sentinel pushes.
+ *
+ * On cloud these jobs run on a dedicated `sentinel` queue, so a burst of pushes from many
+ * servers cannot use the workers of the other queues. Self-hosted returns null, so the jobs
+ * stay on the default queue of the connection, as before.
+ */
+function sentinel_queue(): ?string
+{
+    return isCloud() ? 'sentinel' : null;
+}
+
 function translate_cron_expression($expression_to_validate): string
 {
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {

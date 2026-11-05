@@ -46,6 +46,10 @@ $selfHostedSupervisor = $workerOptions + [
 | The `webhooks` pool (see webhooks_queue()) processes GitHub pull request
 | webhooks, Stripe events, and server limit checks, so other jobs cannot
 | delay them.
+|
+| The `sentinel` pool (see sentinel_queue()) processes Sentinel pushes
+| (PushServerUpdateJob), so a push burst from many servers cannot take the
+| workers of the other pools.
 */
 $cloudQueues = [
     'deployments' => ['HORIZON_DEPLOYMENTS_PROCESSES', 60],
@@ -54,6 +58,7 @@ $cloudQueues = [
     'default' => ['HORIZON_DEFAULT_PROCESSES', 40],
     'maintenance' => ['HORIZON_MAINTENANCE_PROCESSES', 60],
     'webhooks' => ['HORIZON_WEBHOOKS_PROCESSES', 10],
+    'sentinel' => ['HORIZON_SENTINEL_PROCESSES', 20],
 ];
 
 $cloudSupervisors = [];
