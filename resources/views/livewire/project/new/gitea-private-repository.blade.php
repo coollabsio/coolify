@@ -3,16 +3,16 @@
         <section class="application-settings-section">
             <div class="application-settings-section-header">
                 <div>
-                    <h2>Gitea App</h2>
-                    <p>Connect a Gitea App before selecting a private repository.</p>
+                    <h2>Gitea / Forgejo App</h2>
+                    <p>Connect a Gitea / Forgejo App before selecting a private repository.</p>
                 </div>
             </div>
             <div class="application-settings-section-body">
-                <x-empty title="No Gitea Apps"
+                <x-empty title="No Gitea / Forgejo Apps"
                     description="Create an app to grant Coolify access to selected repositories."
                     icon-name="sources">
                     <x-slot:contents>
-                        <x-modal-input buttonTitle="+ Add Gitea App" title="New Gitea App" closeOutside="false">
+                        <x-modal-input buttonTitle="+ Add Gitea / Forgejo App" title="New Gitea / Forgejo App" closeOutside="false">
                             <livewire:source.gitea.create />
                         </x-modal-input>
                     </x-slot:contents>
@@ -23,10 +23,10 @@
         <section class="application-settings-section">
             <div class="application-settings-section-header">
                 <div>
-                    <h2>Choose Gitea App</h2>
-                    <p>Select the Gitea App that can access the repository you want to deploy.</p>
+                    <h2>Choose Gitea / Forgejo App</h2>
+                    <p>Select the Gitea / Forgejo App that can access the repository you want to deploy.</p>
                 </div>
-                <x-modal-input buttonTitle="+ Add Gitea App" title="New Gitea App" closeOutside="false">
+                <x-modal-input buttonTitle="+ Add Gitea / Forgejo App" title="New Gitea / Forgejo App" closeOutside="false">
                     <livewire:source.gitea.create />
                 </x-modal-input>
             </div>
@@ -59,7 +59,7 @@
             <div class="application-settings-section-header">
                 <div>
                     <h2>Choose repository</h2>
-                    <p>Search repositories available through the selected Gitea App.</p>
+                    <p>Search repositories available through the selected Gitea / Forgejo App.</p>
                 </div>
                 @if ($gitea_app_id)
                     <x-forms.button wire:click.prevent="loadRepositories({{ $gitea_app_id }})">
@@ -85,7 +85,7 @@
                     </div>
                 @else
                     <x-empty size="sm" title="No repositories available"
-                        description="Review this Gitea App configuration and grant access to a repository." />
+                        description="Review this Gitea / Forgejo App configuration and grant access to a repository." />
                 @endif
             </div>
         </section>

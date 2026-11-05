@@ -36,7 +36,7 @@ test('sources page lists gitea apps with a link to their settings', function () 
 
     $this->get(route('source.all'))
         ->assertOk()
-        ->assertSee('New Gitea App')
+        ->assertSee('New Gitea / Forgejo App')
         ->assertSee('Team Gitea')
         ->assertSee('Gitea · acme')
         ->assertSee(route('source.gitea.show', ['gitea_app_uuid' => $this->giteaApp->uuid]), false);
