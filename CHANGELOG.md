@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add SMTP templates for common email providers, such as PostShiba, Amazon SES, Mailgun, SendGrid, Postmark, and Brevo, which fill in the host, port, and encryption
+- Save more than one named SMTP server on the transactional email and email notification pages, and switch between them
+- Give each SMTP server and Resend its own sender name and address, because each provider sends from its own verified domain
+
+### Changed
+
+- Select the email provider from one list on the transactional email and email notification pages, which then show only the settings of that provider
+
+### Removed
+
+- Remove the "Copy from instance settings" button from the email notification page. Select "Use system-wide settings" to send team email with the instance email settings
+
 ## [v4.6.0] - 2026-11-02
 
 ### Breaking Changes

@@ -16,6 +16,7 @@ class InstanceEmailSettingsController extends Controller
         'smtp_enabled', 'smtp_from_address', 'smtp_from_name', 'smtp_host',
         'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
         'smtp_timeout', 'smtp_ehlo_domain', 'resend_enabled', 'resend_api_key',
+        'resend_from_address', 'resend_from_name',
     ];
 
     #[OA\Get(
@@ -67,6 +68,8 @@ class InstanceEmailSettingsController extends Controller
             'smtp_ehlo_domain' => ['sometimes', 'nullable', 'string', 'max:255', new ValidHostname],
             'resend_enabled' => 'sometimes|boolean',
             'resend_api_key' => 'sometimes|nullable|string|max:255',
+            'resend_from_address' => 'sometimes|nullable|email',
+            'resend_from_name' => 'sometimes|nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {

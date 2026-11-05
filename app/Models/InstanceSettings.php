@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasSmtpServers;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Once;
@@ -9,6 +10,8 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
+    use HasSmtpServers;
+
     protected $attributes = [
         'is_dashboard_force_https_enabled' => true,
     ];
@@ -38,6 +41,8 @@ class InstanceSettings extends Model
         'smtp_ehlo_domain',
         'resend_enabled',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
         'is_dns_validation_enabled',
         'custom_dns_servers',
         'domain_connect_private_key',
@@ -75,6 +80,8 @@ class InstanceSettings extends Model
         'smtp_username',
         'smtp_password',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
         'domain_connect_private_key',
         'sentinel_token',
     ];
@@ -92,6 +99,8 @@ class InstanceSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
         'domain_connect_private_key' => 'encrypted',
 
         'allowed_ip_ranges' => 'array',
