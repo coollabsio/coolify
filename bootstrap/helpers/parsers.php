@@ -1161,7 +1161,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -2431,7 +2434,10 @@ function serviceParser(Service $resource): Collection
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
 
     // Clean up corrupted environment variables from previous parser bugs
     // (keys starting with $ or ending with } should not exist as env var names)

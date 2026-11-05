@@ -254,7 +254,19 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error);
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->sshConnectionLostHint($exitCode);
+    }
+
+    /**
+     * SSH exits with 255 when the connection closes, so the output of the remote command stops without an error.
+     */
+    private function sshConnectionLostHint(int $exitCode): string
+    {
+        if ($exitCode !== 255) {
+            return '';
+        }
+
+        return "\nExit code 255 usually means that the SSH connection to the server closed before the command finished. Check the network between Coolify and the server, and the sshd logs and memory usage of the server, then deploy again.";
     }
 
     /**
