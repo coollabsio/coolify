@@ -1631,6 +1631,11 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
     border-color: var(--coollabs-line) !important;
 }
 
+/* Menu entries (the account menu) follow the sidebar text, not the page scheme. */
+html[data-sidebar-scheme] :where(.app-sidebar, .mobile-sidebar-sheet [role="dialog"]) .listbox-option {
+    color: var(--color-fg);
+}
+
 /* Row and section separators (one-sided borders and divide-y) use the softer
    divider token, so lists read as one card instead of a stack of boxes. Card
    edges (full borders) keep the hairline/line tokens. */
@@ -6635,8 +6640,9 @@ html[data-theme="custom"] .mobile-sidebar-sheet nav.sidebar-nav {
     background-color: transparent !important;
 }
 
-/* The current page in the sidebar uses the Selected color. */
-html[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+/* In the Flat style, the current page in the sidebar uses the Selected color. The 3D style has
+   no row fill, so its label keeps the sidebar text color. */
+html[data-theme="custom"][data-nav-items="flat"] :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
     background-color: var(--theme-selected);
     color: var(--theme-selected-text);
 }
