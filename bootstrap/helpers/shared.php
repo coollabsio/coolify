@@ -743,10 +743,13 @@ function generate_random_name(?string $cuid = null): string
 
     return Str::kebab("{$generator->getName()}-$cuid");
 }
+/**
+ * RSA keys get 4096 bits: GitHub rejects new RSA SSH keys smaller than 3072 bits, and phpseclib makes 2048-bit keys by default.
+ */
 function generateSSHKey(string $type = 'rsa')
 {
     if ($type === 'rsa') {
-        $key = RSA::createKey();
+        $key = RSA::createKey(4096);
 
         return [
             'private' => $key->toString('PKCS1'),
