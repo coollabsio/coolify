@@ -1440,21 +1440,24 @@ html[data-theme="custom"] {
     --theme-base-color: oklch(49.65% 0.2709 289.33);
     --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, oklch(100% 0 0));
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
-    /* Accent text/icons sit directly on dark surfaces. Force the lightness into a
-       readable band (and tame chroma) so any picked hue keeps enough contrast. */
-    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.72, l, 0.86) min(c, 0.13) h);
+    /* Accent text and icons on the page. applyCustomTheme() computes a color with
+       4.5:1 contrast on the page surfaces. */
+    --theme-fg-on-surface: var(--theme-accent-text, var(--theme-bright-color));
+    /* The opposite of the text on accent fills. Shades of a fill that carry that
+       text move toward it, so the text never has less contrast than on the fill. */
+    --theme-accent-away: oklch(from var(--theme-accent-foreground) calc(1 - l) 0 0);
     --color-accent: var(--theme-bright-color);
     --color-coollabs: var(--theme-bright-color);
-    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
-    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(0% 0 0));
+    --color-coollabs-100: var(--theme-bright-color);
+    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, var(--theme-accent-away));
     --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, oklch(0% 0 0));
     /* Legacy dark-theme accent utilities use warning as the brand color. */
     --color-warning: var(--theme-bright-color);
     /* Brand fills, tints, and accent text follow the picked color. Text on a
        brand fill uses the computed foreground, so light colors stay readable. */
     --color-brand: var(--theme-bright-color);
-    --color-brand-hover: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
-    --color-brand-press: color-mix(in oklab, var(--theme-bright-color) 85%, oklch(0% 0 0));
+    --color-brand-hover: color-mix(in oklab, var(--theme-bright-color) 92%, var(--theme-accent-away));
+    --color-brand-press: color-mix(in oklab, var(--theme-bright-color) 85%, var(--theme-accent-away));
     --color-brand-depth: color-mix(in oklab, var(--theme-bright-color) 65%, oklch(0% 0 0));
     --color-brand-ring: color-mix(in oklab, var(--theme-bright-color) 75%, oklch(100% 0 0));
     --color-brand-foreground: var(--theme-accent-foreground);
@@ -1465,11 +1468,13 @@ html[data-theme="custom"] {
 
 html[data-theme="custom"]:not(.dark) {
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-base-color) 45%, oklch(60% 0 0));
-    /* Accent text/icons on light surfaces: force lightness into a dark band. */
-    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.30, l, 0.48) min(c, 0.16) h);
 }
 
+/* The sidebar has its own accent text color. --color-brand-light is resolved on
+   <html>, so set it again here. */
 html[data-theme="custom"] :is(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) {
+    --theme-fg-on-surface: var(--theme-sidebar-accent-text, var(--theme-bright-color));
+    --color-brand-light: var(--theme-fg-on-surface);
     --t-bg: var(--theme-sidebar);
     --t-text: var(--theme-sidebar-text);
     --t-light: var(--theme-sidebar-light);
@@ -1960,8 +1965,10 @@ html[data-theme="custom"] textarea:disabled {
     --card-fg-faint: var(--color-fg-faint);
 }
 
+/* The light well uses the theme surface, like the bg-white remap, instead of white. */
 html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .application-settings-section-body, .empty-state) {
     --card-underlay: var(--coollabs-canvas);
+    --well-bg: var(--coollabs-elevated);
 }
 
 /* Top-level cards and wells sit on the page: paint the translucent tint over
