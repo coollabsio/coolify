@@ -41,14 +41,9 @@
                     search: '',
                     page: 1,
                     perPage: 10,
-                    tokens: @js($tokens->map(fn ($token) => [
-                        'id' => (string) $token->id,
-                        'search' => Str::lower(collect([$token->name, ...($token->abilities ?? [])])
-                            ->merge($token->scopes === null
-                                ? ['All resources in the team']
-                                : collect($token->scopes)->map(fn ($scope) => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? null)->filter())
-                            ->join(' ')),
-                    ])->values()),
+                    get tokens() {
+                        return this.$wire.tokenSearchIndex;
+                    },
                     get filteredTokens() {
                         const query = this.search.trim().toLowerCase();
 
