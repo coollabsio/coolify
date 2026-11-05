@@ -143,7 +143,8 @@
                             @endif
 
                             @if ($server->canBeValidated())
-                                <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
+                                <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating"
+                                    x-on:background-validation-finished.window="processDialogOpen = false">
                                     <x-slot:title>Validate and configure</x-slot:title>
                                     <x-slot:content>
                                         <livewire:server.validate-and-install :server="$server"

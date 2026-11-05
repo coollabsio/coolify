@@ -741,10 +741,15 @@ class Show extends Component
         // Refresh server data and only the display-only state that validation produces.
         // Never re-sync text-input properties via syncData() — would clobber any
         // unsaved typing (see coolify#6062 / #6354 / #9695).
+        $wasValidating = $this->isValidating;
         $this->server->refresh();
         $this->server->settings->refresh();
         $this->isValidating = $this->server->is_validating ?? false;
         $this->validationLogs = $this->server->validation_logs;
+        if ($wasValidating && ! $this->isValidating) {
+            // The dialog was opened for a background validation job, which does not drive its checkpoints.
+            $this->dispatch('background-validation-finished');
+        }
         $this->isReachable = $this->server->settings->is_reachable;
         $this->isUsable = $this->server->settings->is_usable;
 
