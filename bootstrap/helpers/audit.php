@@ -73,7 +73,7 @@ if (! function_exists('auditChangedFields')) {
 
 if (! function_exists('auditFailureDeduplicationWindow')) {
     /**
-     * Seconds during which repeated unauthenticated failures from one source are recorded once.
+     * Seconds during which repeated unauthenticated or permission failures from one source are recorded once.
      *
      * Failed logins use a short window so an ongoing brute force attempt stays visible
      * (one row per email and source IP each minute, on top of the login rate limit).
@@ -88,6 +88,7 @@ if (! function_exists('auditFailureDeduplicationWindow')) {
             $event === 'webhook.sentinel.signature_failed'
                 && in_array(data_get($context, 'reason'), ['server_not_found', 'subscription_unpaid'], true) => 3600,
             $event === 'api.auth.unauthenticated',
+            preg_match('/^(api|mcp)\.auth\.(ability|scope)_denied$/', $event) === 1,
             preg_match('/^webhook\.[a-z0-9_-]+\.signature_failed$/i', $event) === 1 => 300,
             default => null,
         };
@@ -96,8 +97,8 @@ if (! function_exists('auditFailureDeduplicationWindow')) {
 
 if (! function_exists('shouldRecordAuditEvent')) {
     /**
-     * Keep only the first unauthenticated failure per event, source IP, reason, server and
-     * attempted email in each deduplication window. All other events are always recorded.
+     * Keep only the first failure per event, source IP, reason, server, attempted email, token and
+     * required abilities in each deduplication window. All other events are always recorded.
      *
      * @param  array<string, mixed>  $context
      */
@@ -110,12 +111,16 @@ if (! function_exists('shouldRecordAuditEvent')) {
 
         try {
             $request = app()->bound('request') ? request() : null;
+            $tokenId = data_get($context, 'token_id');
             $fingerprint = hash('sha256', json_encode([
                 $event,
-                $request ? client_ip($request) : null,
+                // The token identifies the client, so a token used from many IPs gets one row.
+                $tokenId === null && $request ? client_ip($request) : null,
                 data_get($context, 'reason'),
                 data_get($context, 'server_uuid'),
                 Str::lower(trim((string) data_get($context, 'attempted_email'))),
+                $tokenId,
+                data_get($context, 'required_abilities'),
             ]));
 
             return Cache::add("audit-failure-dedup:{$fingerprint}", true, $window);
