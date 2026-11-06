@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **S3 skip TLS verification**: for endpoints with a self-signed or private CA certificate ([#9762](https://github.com/coollabsio/coolify/issues/9762))
 - **Scheduled tasks without a shell**: **Run in a shell** can be turned off for containers without a shell, such as distroless images ([#8244](https://github.com/coollabsio/coolify/issues/8244))
 - **New resource page list view** and a **UI scale** option in the appearance settings
+- **Orbit service template**: a self-hosted workspace for teams with tasks, docs, chat, and an MCP server for AI clients
 
 ### Changed
 
@@ -41,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Server security page**: patches, terminal access, SSH host key, and image scanning are on one **Security** page
 - **Locked environment variables**: you can replace the value of a locked variable without seeing it ([#6803](https://github.com/coollabsio/coolify/issues/6803))
 - **Same IP, different SSH port**: more than one server can use the same IP when the SSH ports are different ([#7573](https://github.com/coollabsio/coolify/issues/7573))
+- **Maintenance mode**: moved to its own **Maintenance** page of applications and services, and you must confirm the toggle
 
 ### Fixed
 
@@ -58,6 +60,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **UI**: **Copy logs** works on iOS, the dark theme stays during page loads, custom theme colors stay readable, Caddy keeps WebSockets open across reloads, and Reverb accepts large cookie headers ([#9408](https://github.com/coollabsio/coolify/issues/9408), [#7866](https://github.com/coollabsio/coolify/issues/7866), [#7942](https://github.com/coollabsio/coolify/issues/7942))
 - **Rollback**: the commit images of Docker Compose applications are listed ([#12446](https://github.com/coollabsio/coolify/issues/12446))
 - **Service templates**: fixes for AppFlowy, Bugsink, Convex, Ente, LiteLLM, Odoo, Outline, Rybbit, Supabase, and Usesend
+- **Service domains**: a domain without a port no longer shows a port warning, because Coolify routes it to the required port
 
 ### Removed
 
