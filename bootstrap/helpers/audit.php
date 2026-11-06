@@ -138,6 +138,7 @@ if (! function_exists('auditLogWebhookFailure')) {
                 'event_header' => $request?->header('X-GitHub-Event')
                     ?? $request?->header('X-Gitlab-Event')
                     ?? $request?->header('X-Gitea-Event')
+                    ?? $request?->header('X-Forgejo-Event')
                     ?? $request?->header('X-Event-Key'),
             ];
 

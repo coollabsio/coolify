@@ -284,7 +284,7 @@ class Change extends Component
 
             $this->syncData(true);
             $this->gitea_app->save();
-            $this->dispatch('success', 'Gitea App updated.');
+            $this->dispatch('success', 'Gitea / Forgejo App updated.');
             $this->dispatch('name-changed', uuid: $this->gitea_app->uuid, name: $this->gitea_app->name);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -301,7 +301,7 @@ class Change extends Component
 
             $this->gitea_app->is_system_wide = $this->isSystemWide;
             $this->gitea_app->save();
-            $this->dispatch('success', 'Gitea App updated.');
+            $this->dispatch('success', 'Gitea / Forgejo App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -313,7 +313,7 @@ class Change extends Component
             $this->authorize('view', $this->gitea_app);
 
             if (! $this->gitea_app->isConnected()) {
-                $this->dispatch('error', 'Gitea App is not connected. Please complete the OAuth flow first.');
+                $this->dispatch('error', 'Gitea / Forgejo App is not connected. Please complete the OAuth flow first.');
 
                 return;
             }

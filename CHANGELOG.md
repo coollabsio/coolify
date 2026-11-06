@@ -63,6 +63,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Add SMTP templates for common email providers, such as PostShiba, Amazon SES, Mailgun, SendGrid, Postmark, and Brevo, which fill in the host, port, and encryption
 - Save more than one named SMTP server on the transactional email and email notification pages, and switch between them
 - Give each SMTP server and Resend its own sender name and address, because each provider sends from its own verified domain
+- Disable a scheduled task automatically when it fails at least 5 times in a row and has had no successful run for 3 days. Coolify sends a notification on the scheduled task failure channels and shows the reason on the task page until you enable the task again
+- Connect Forgejo instances, including Codeberg and self-hosted Forgejo, with the Gitea / Forgejo App source. A new Provider list on the create form fills in the Gitea.com or Codeberg URLs, and webhooks also accept the `X-Forgejo-*` headers
 
 ### Changed
 

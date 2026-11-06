@@ -9,10 +9,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // A nightly build of `next` added `failing_since` in an earlier version of this feature.
         Schema::table('scheduled_tasks', function (Blueprint $table) {
-            $table->unsignedInteger('consecutive_failures')->default(0);
-            $table->timestamp('failing_since')->nullable();
-            $table->text('disabled_reason')->nullable();
+            if (! Schema::hasColumn('scheduled_tasks', 'consecutive_failures')) {
+                $table->unsignedInteger('consecutive_failures')->default(0);
+            }
+            if (! Schema::hasColumn('scheduled_tasks', 'failing_since')) {
+                $table->timestamp('failing_since')->nullable();
+            }
+            if (! Schema::hasColumn('scheduled_tasks', 'disabled_reason')) {
+                $table->text('disabled_reason')->nullable();
+            }
         });
 
         $this->setExecutionStatuses(['success', 'failed', 'running', 'skipped']);
