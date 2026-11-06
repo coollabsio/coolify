@@ -717,7 +717,7 @@
                                 {{ $server->description ?: $server->ip }}
                             </span>
                         </span>
-                        <x-status-badge status="running" text="Ready" />
+                        <x-status-badge type="success" status="Running" />
                     </button>
                 @empty
                     @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
@@ -744,7 +744,7 @@
                             <span class="block text-[11px] text-neutral-500 dark:text-fg-faint">Build-only servers
                                 cannot host resources.</span>
                         </span>
-                        <x-status-badge status="exited" text="Build only" />
+                        <x-status-badge status="Build only" />
                         <a href="{{ route('server.show', ['server_uuid' => $buildServer->uuid]) }}"
                             {{ wireNavigate() }} class="button">Settings</a>
                     </div>
@@ -788,7 +788,7 @@
                                 <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Network:
                                     {{ $standaloneDocker->network }}</span>
                             </span>
-                            <x-status-badge status="running" text="Standalone Docker" />
+                            <x-status-badge type="success" status="Standalone Docker" />
                         </button>
                     @endforeach
                 @endif
@@ -803,7 +803,7 @@
                     needs bundled extensions.</p>
             </div>
             <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:18-alpine'))"
                     :disabled="selecting">
@@ -826,7 +826,7 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:17-alpine'))"
                     :disabled="selecting">
@@ -847,7 +847,7 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:16-alpine'))"
                     :disabled="selecting">
@@ -868,7 +868,7 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('supabase/postgres:17.11.0.018'))"
                     :disabled="selecting">
@@ -889,7 +889,7 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgis/postgis:18-3.7-alpine'))"
                     :disabled="selecting">
@@ -912,7 +912,7 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('pgvector/pgvector:pg18'))"
                     :disabled="selecting">
@@ -933,7 +933,7 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('pgvector/pgvector:pg17'))"
                     :disabled="selecting">
@@ -965,7 +965,7 @@
                     and configuration.</p>
             </div>
             <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('valkey/valkey:9-alpine'))"
                     :disabled="selecting">
@@ -987,12 +987,12 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('redis:7.2'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('redis:8'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
-                        <div class="text-[13px] font-semibold text-black dark:text-fg">Redis 7.2</div>
+                        <div class="text-[13px] font-semibold text-black dark:text-fg">Redis 8</div>
                         <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
                             The original in-memory key-value store.
                         </div>

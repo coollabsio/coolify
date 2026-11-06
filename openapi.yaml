@@ -5905,7 +5905,7 @@ paths:
       tags:
         - Databases
       summary: 'Create (Redis / Valkey)'
-      description: 'Create a new Redis or Valkey database. Set image to a Valkey image (for example valkey/valkey:9-alpine) for Valkey.'
+      description: 'Create a new Redis or Valkey database. Valkey (valkey/valkey:9-alpine) is the default. Set image to a Redis image (for example redis:8) for Redis.'
       operationId: create-database-redis
       requestBody:
         description: 'Database data'
@@ -5946,7 +5946,7 @@ paths:
                   description: 'Description of the database'
                 image:
                   type: string
-                  description: 'Docker image of the database. Default: redis:7.2. For Valkey, use a Valkey image, for example valkey/valkey:9-alpine.'
+                  description: 'Docker image of the database. Default: valkey/valkey:9-alpine. For Redis, use a Redis image, for example redis:8.'
                 is_public:
                   type: boolean
                   description: 'Is the database public?'

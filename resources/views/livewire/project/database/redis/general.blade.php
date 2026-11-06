@@ -14,7 +14,7 @@
                 <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
                 <div class="lg:col-span-2">
                     <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
-                        helper="Use a published Redis or Valkey image from Docker Hub, for example redis:7.2 or valkey/valkey:9-alpine." />
+                        helper="Use a published Redis or Valkey image from Docker Hub, for example valkey/valkey:9-alpine or redis:8." />
                 </div>
             </div>
             <x-application.settings-subsection id="credentials-section" title="Credentials" helper="Keep these values aligned with the credentials configured inside Redis / Valkey.">
