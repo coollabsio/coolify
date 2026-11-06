@@ -451,3 +451,26 @@ it('does not start the update when the instance backup fails', function () {
         ->toThrow(Exception::class, 'The database backup failed, so the update was not started.')
         ->and(Activity::query()->count())->toBe(0);
 });
+
+it('saves the automatic update attempt before it queues the upgrade script', function () {
+    Notification::fake();
+    updateCoolifyTestPrepareUpgrade();
+    $savedTargetVersion = null;
+    Activity::created(function () use (&$savedTargetVersion) {
+        $savedTargetVersion = InstanceSettings::findOrFail(0)->auto_update_target_version;
+    });
+
+    updateCoolifyTestActionWithStatus('')->handle();
+
+    expect($savedTargetVersion)->toBe('4.0.10');
+});
+
+it('keeps the saved attempt of a running upgrade when an automatic update is skipped', function () {
+    updateCoolifyTestPrepareUpgrade();
+    InstanceSettings::findOrFail(0)->update(['auto_update_target_version' => '4.0.8', 'auto_update_started_at' => now()->subMinutes(5)]);
+    $action = updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(2)->toIso8601String());
+
+    expect(fn () => $action->handle())->toThrow(Exception::class, 'Another Coolify upgrade is already running');
+
+    expect(InstanceSettings::findOrFail(0)->auto_update_target_version)->toBe('4.0.8');
+});
