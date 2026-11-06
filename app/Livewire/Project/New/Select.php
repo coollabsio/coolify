@@ -222,7 +222,7 @@ class Select extends Component
             [
                 'id' => 'postgresql',
                 'name' => 'PostgreSQL',
-                'description' => 'A relational database with strong SQL standards support and extensibility.',
+                'description' => 'An extensible relational database with strong SQL support.',
                 'logo' => resource_logo_url('postgres'),
             ],
             [
@@ -262,13 +262,13 @@ class Select extends Component
             [
                 'id' => 'mongodb',
                 'name' => 'MongoDB',
-                'description' => 'A document-oriented NoSQL database that stores JSON-like documents.',
+                'description' => 'A NoSQL database that stores JSON-like documents.',
                 'logo' => resource_logo_url('mongodb'),
             ],
             [
                 'id' => 'clickhouse',
                 'name' => 'ClickHouse',
-                'description' => 'A column-oriented database for real-time analytics over large datasets.',
+                'description' => 'A column-oriented database for real-time analytics.',
                 'logo' => resource_logo_url('clickhouse'),
             ],
             [
