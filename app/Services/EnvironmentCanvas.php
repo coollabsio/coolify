@@ -43,7 +43,7 @@ class EnvironmentCanvas
 
     private const DATABASE_ENGINE_NAMES = [
         'postgresql' => 'PostgreSQL',
-        'redis' => 'Redis',
+        'redis' => 'Redis / Valkey',
         'mongodb' => 'MongoDB',
         'mysql' => 'MySQL',
         'mariadb' => 'MariaDB',

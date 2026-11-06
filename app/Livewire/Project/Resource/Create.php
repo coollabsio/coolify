@@ -52,7 +52,13 @@ class Create extends Component
                         databaseImage: $database_image
                     );
                 } elseif ($type->value() === 'redis') {
-                    $database = create_standalone_redis($environment->id, $destination);
+                    // Redis requires database_image (Redis or Valkey) to be explicitly set
+                    if (! $database_image) {
+                        $this->type = $type->value();
+
+                        return;
+                    }
+                    $database = create_standalone_redis($environment->id, $destination, ['image' => $database_image]);
                 } elseif ($type->value() === 'mongodb') {
                     $database = create_standalone_mongodb($environment->id, $destination);
                 } elseif ($type->value() === 'mysql') {

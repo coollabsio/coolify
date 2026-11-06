@@ -207,6 +207,7 @@ class GlobalSearch extends Component
             'new mysql' => 'mysql',
             'new mariadb' => 'mariadb',
             'new redis' => 'redis',
+            'new valkey' => 'redis',
             'new keydb' => 'keydb',
             'new dragonfly' => 'dragonfly',
             'new sqlite' => 'sqlite',
@@ -477,7 +478,7 @@ class GlobalSearch extends Component
                         'link' => $db->link(),
                         'project' => $db->environment->project->name ?? null,
                         'environment' => $db->environment->name ?? null,
-                        'search_text' => strtolower($db->name.' '.$db->uuid.' redis '.$db->description.' database databases db'),
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' redis valkey '.$db->description.' database databases db'),
                     ];
                 })
         );
@@ -1324,12 +1325,12 @@ class GlobalSearch extends Component
             ]);
 
             $items->push([
-                'name' => 'Redis',
-                'description' => 'In-memory data structure store',
-                'quickcommand' => '(type: new redis)',
+                'name' => 'Redis / Valkey',
+                'description' => 'In-memory data structure store (Redis or Valkey)',
+                'quickcommand' => '(type: new redis or new valkey)',
                 'type' => 'redis',
                 'category' => 'Databases',
-                'logo' => 'svgs/redis.svg',
+                'logo' => 'svgs/resources/redis-valkey.svg',
                 'resourceType' => 'database',
             ]);
 

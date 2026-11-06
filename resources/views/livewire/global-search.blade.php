@@ -257,7 +257,7 @@
                 'new private github', 'new private gh', 'new private deploy', 'new deploy key',
                 'new dockerfile', 'new docker compose', 'new compose', 'new docker image', 'new image',
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
-                'new redis', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new sqlite'
+                'new redis', 'new valkey', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new sqlite'
             ];
             if (this.scope === 'global' && exactMatchCommands.includes(trimmed)) {
                 const matchingItem = this.creatableItems.find(item => {
