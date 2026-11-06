@@ -28,7 +28,7 @@ class TestableDockerComposeImagePullDeploymentJob extends ApplicationDeploymentJ
     }
 }
 
-function makeDockerComposeImagePullJob(bool $useBuildServer = false, ?string $customBuildCommand = null, ?string $compose = null): array
+function makeDockerComposeImagePullJob(bool $useBuildServer = false, ?string $customBuildCommand = null, ?string $compose = null, int $pullRequestId = 0): array
 {
     $compose ??= <<<'YAML'
         services:
@@ -70,7 +70,7 @@ function makeDockerComposeImagePullJob(bool $useBuildServer = false, ?string $cu
         'use_build_server' => $useBuildServer,
         'workdir' => '/artifacts/application',
         'configuration_dir' => '/runtime/application',
-        'pull_request_id' => 0,
+        'pull_request_id' => $pullRequestId,
         'deployment_uuid' => 'deployment-uuid',
         'docker_compose_location' => '/docker-compose.yaml',
         'coolify_variables' => '',
@@ -142,3 +142,14 @@ it('pulls on the runtime server when a custom build command runs on a build serv
     expect($job->commandServers)->each->toBe($mainServer)
         ->and(last($job->recordedCommands)[0][0])->toEndWith("pull --ignore-buildable 'db' 'cache'");
 });
+
+it('uses its own compose project for each preview deployment', function (int $pullRequestId, string $projectName) {
+    [$job, $reflection] = makeDockerComposeImagePullJob(pullRequestId: $pullRequestId);
+
+    $reflection->getMethod('pull_docker_compose_images')->invoke($job);
+
+    expect($job->recordedCommands[0][0][0])->toContain("--project-name {$projectName} --project-directory");
+})->with([
+    'application' => [0, 'application-uuid'],
+    'preview' => [42, 'application-uuid-pr-42'],
+]);

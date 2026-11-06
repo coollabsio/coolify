@@ -110,6 +110,7 @@
                 'label' => 'Resource Limits',
                 'route' => 'project.application.resource-limits',
                 'active' => $currentRoute === 'project.application.resource-limits',
+                'visible' => $application->build_pack !== 'dockercompose',
             ],
             [
                 'label' => 'Resource Operations',

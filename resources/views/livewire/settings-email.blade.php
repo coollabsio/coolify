@@ -7,7 +7,7 @@
     <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
         {{-- One bar for the whole page. Save validates only the provider that is selected. --}}
         <x-unsaved-bar action="submit"
-            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey,resendFromName,resendFromAddress" />
+            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey,resendFromName,resendFromAddress,notificationFromName,notificationFromAddress" />
 
         <form wire:submit="submit">
             <x-application.settings-section title="Email delivery"
@@ -55,6 +55,15 @@
                         <x-forms.input required id="resendFromAddress"
                             helper="Address used in email from Resend. It must be on a domain verified in Resend."
                             label="From address" />
+                    @endif
+
+                    @if ($emailProvider !== 'none')
+                        <x-forms.input id="notificationFromName" placeholder="Uses the from name when empty"
+                            helper="Name shown in notification emails (deployments, backups, server alerts) to teams that use the instance email settings."
+                            label="Notification from name" />
+                        <x-forms.input id="notificationFromAddress" placeholder="Uses the from address when empty"
+                            helper="Address used for notification emails. Password resets and invitations still use the from address. Use a separate subdomain (for example alerts@notifications.example.com) to keep the reputation of the two senders apart. Your SMTP provider or Resend must allow this address."
+                            label="Notification from address" />
                     @endif
                 </div>
             </x-application.settings-section>

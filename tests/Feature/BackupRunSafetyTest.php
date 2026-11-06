@@ -359,6 +359,7 @@ it('backs up a service database without a database env variable from the backup 
     'mariadb, selected database' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
     'mysql, all databases' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['dump_all' => true], 'all'],
     'mysql, selected database' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
+    'postgres with the maintenance database, all databases' => ['postgres:16-alpine', "POSTGRES_USER=odoo\nPOSTGRES_DB=postgres", ['dump_all' => true], 'all'],
 ]);
 
 it('backs up the databases from the backup settings instead of the container env database', function (string $image, string $env) {

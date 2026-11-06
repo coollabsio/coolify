@@ -26,6 +26,7 @@ class Index extends Component
         'commit_message',
         'is_webhook',
         'is_api',
+        'is_mcp',
         'rollback',
         'server_id',
         'server_name',
@@ -297,6 +298,7 @@ class Index extends Component
                     WHEN pull_request_id > 0 THEN 'pull-request'
                     WHEN is_webhook THEN 'webhook'
                     WHEN rollback THEN 'rollback'
+                    WHEN is_mcp THEN 'mcp'
                     WHEN is_api THEN 'api'
                     ELSE 'manual'
                 END AS source_key
@@ -309,6 +311,7 @@ class Index extends Component
             'pull-request' => 'Pull requests',
             'webhook' => 'Webhooks',
             'api' => 'API',
+            'mcp' => 'MCP',
             'rollback' => 'Rollbacks',
         ];
 

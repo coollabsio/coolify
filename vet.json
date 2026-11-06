@@ -340,10 +340,6 @@
             "version": "v0.12.24",
             "hash": "tree-v2:c518e85e74d1aef81854220186172a87c7e1553652d35eff97655015389e5404"
         },
-        "purplepixie/phpdns": {
-            "version": "2.4.0",
-            "hash": "tree-v2:1c1ebac6d50b61cd01452f9c6cad774c2b641601925c67f33f6329b5d9cfa5c2"
-        },
         "pusher/pusher-php-server": {
             "version": "7.3.0",
             "hash": "tree-v2:c7713b62c33d0f6504f5226e33be144a1255125ec013abfe5ee06fa619c4a340"

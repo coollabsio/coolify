@@ -73,7 +73,7 @@ write_versions() {
 }
 
 commit_channel() {
-	local name count
+	local name count previous
 	mkdir -p "$WORK_DIR/cdn/$channel_path"
 	for name in ${FILES//,/ }; do
 		channel_file "$name" > "$WORK_DIR/cdn/$channel_path/$name"
@@ -86,26 +86,48 @@ commit_channel() {
 		ok "$channel_path on $CDN_REPOSITORY is up to date"
 		exit 0
 	fi
-	title="chore: sync the $channel channel to Coolify $VERSION"
+	previous="$(cdn show HEAD:json/coolify/versions.json 2> /dev/null | jq -r --arg channel "$channel" '.[$channel].coolify.version // if $channel == "stable" then .coolify.v4.version else empty end' || true)"
+	version_change="${previous:+from Coolify v$previous to v$VERSION}"
+	version_change="${version_change:-to Coolify v$VERSION}"
+	title="chore: sync the $channel channel $version_change"
 	count="$(cdn diff --cached --name-only | wc -l | tr -d ' ')"
 	cdn commit --quiet --message "$title"
 	ok "committed $count changed file(s) of $channel_path"
 }
 
 publish_channel() {
-	local previous from branch pull_request
+	local branch pull_request
 	if [ "$channel" != stable ]; then
 		cdn push --quiet origin HEAD:main
 		ok "pushed the $channel channel to main of $CDN_REPOSITORY"
 		return
 	fi
-	previous="$(cdn show HEAD~1:json/coolify/versions.json 2> /dev/null | jq -r '.stable.coolify.version // .coolify.v4.version // empty' || true)"
-	[ "$previous" = "$VERSION" ] || from="${previous:+from Coolify $previous to }"
-	branch="sync/stable-$(date -u +%Y%m%d%H%M%S)"
-	cdn push --quiet origin "HEAD:refs/heads/$branch"
-	pull_request="$(gh pr create --repo "$CDN_REPOSITORY" --base main --head "$branch" --title "$title" \
-		--body "Syncs the stable channel ${from:-to Coolify }$VERSION, see the [release notes](https://github.com/coollabsio/coolify/releases/tag/v$VERSION).")"
-	ok "opened $pull_request"
+	cat > "$WORK_DIR/body.md" <<-BODY
+		Syncs the stable channel to Coolify v$VERSION, see its [release notes](https://github.com/coollabsio/coolify/releases/tag/v$VERSION).
+
+		## Changes
+
+		- Sync the stable channel $version_change
+
+		> [!IMPORTANT]
+		> Squash merge this PR to keep the commit history clean.
+	BODY
+	branch="sync/stable-v$VERSION"
+	cdn push --quiet --force origin "HEAD:refs/heads/$branch"
+	pull_request="$(gh pr list --repo "$CDN_REPOSITORY" --head "$branch" --state open --json url --jq '.[0].url // empty')"
+	if [ -n "$pull_request" ]; then
+		gh pr edit "$pull_request" --repo "$CDN_REPOSITORY" --title "$title" --body-file "$WORK_DIR/body.md" > /dev/null
+		ok "updated $pull_request"
+	else
+		pull_request="$(gh pr create --repo "$CDN_REPOSITORY" --base main --head "$branch" --title "$title" --body-file "$WORK_DIR/body.md")"
+		ok "opened $pull_request"
+	fi
+	gh pr list --repo "$CDN_REPOSITORY" --state open --json headRefName,url \
+		| jq -r --arg branch "$branch" '.[] | select((.headRefName | startswith("sync/stable-")) and .headRefName != $branch) | .url' \
+		| while read -r superseded; do
+			gh pr close "$superseded" --repo "$CDN_REPOSITORY" --delete-branch --comment "Superseded by $pull_request" > /dev/null
+			ok "closed $superseded, superseded by $pull_request"
+		done
 	info "Cloudflare keeps the old files for up to 10 minutes, scripts/sync-cdn.sh --purge clears them once this pull request is merged and deployed"
 }
 

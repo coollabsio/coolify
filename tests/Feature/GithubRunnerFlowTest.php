@@ -127,7 +127,6 @@ function sendWorkflowJobWebhook($test, GithubApp $githubApp, string $secret, str
 function fakeRunnerGithubApi(GithubApp $githubApp): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => Http::response([
             'runner' => ['id' => 42, 'name' => 'runner'],
@@ -140,7 +139,6 @@ function fakeRunnerGithubApi(GithubApp $githubApp): void
 function fakeWorkflowRunApi(GithubApp $githubApp, mixed $runResponse): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/repos/acme/api/actions/runs/321' => $runResponse,
     ]);
@@ -584,7 +582,6 @@ describe('provisioning', function () {
         runnerTestConfig($server, $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($server) {
                 DeleteServer::run($server->id);
@@ -659,7 +656,6 @@ describe('provisioning', function () {
         runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
         $execution = runnerTestExecution($this->githubApp, ['provision_attempts' => $attempts]);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($execution, $status) {
@@ -687,7 +683,6 @@ describe('provisioning', function () {
         runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($execution) {
@@ -712,7 +707,6 @@ describe('provisioning', function () {
         runnerTestConfig($server, $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($server, $execution, $cancelled) {
@@ -942,7 +936,6 @@ describe('server deletion', function () {
 
     it('removes the runner from GitHub and ignores GitHub errors', function (int $status) {
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, $status),
         ]);
@@ -977,7 +970,6 @@ describe('server deletion', function () {
 function fakeRejectedJitConfig(): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => Http::response(['message' => 'Resource not accessible by integration'], 403),
     ]);

@@ -39,6 +39,12 @@ class Advanced extends Component
     public bool $isAutoDeployEnabled = true;
 
     #[Validate(['boolean'])]
+    public bool $isAutoCancelQueuedDeploymentsEnabled = true;
+
+    #[Validate(['boolean'])]
+    public bool $isAutoCancelBuildingDeploymentsEnabled = false;
+
+    #[Validate(['boolean'])]
     public bool $disableBuildCache = false;
 
     #[Validate(['boolean'])]
@@ -121,6 +127,10 @@ class Advanced extends Component
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
             $this->application->settings->is_git_shallow_clone_enabled = $this->isGitShallowCloneEnabled;
             $this->application->settings->is_auto_deploy_enabled = $this->isAutoDeployEnabled;
+            // Stopping older builds also cancels older queued deployments.
+            $this->isAutoCancelQueuedDeploymentsEnabled = $this->isAutoCancelQueuedDeploymentsEnabled || $this->isAutoCancelBuildingDeploymentsEnabled;
+            $this->application->settings->is_auto_cancel_queued_deployments_enabled = $this->isAutoCancelQueuedDeploymentsEnabled;
+            $this->application->settings->is_auto_cancel_building_deployments_enabled = $this->isAutoCancelBuildingDeploymentsEnabled;
             $this->application->settings->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->application->settings->is_gpu_enabled = $this->isGpuEnabled;
             $this->application->settings->gpu_driver = $this->gpuDriver;
@@ -152,6 +162,8 @@ class Advanced extends Component
             $this->isGitLfsEnabled = $this->application->settings->is_git_lfs_enabled;
             $this->isGitShallowCloneEnabled = $this->application->settings->is_git_shallow_clone_enabled ?? false;
             $this->isAutoDeployEnabled = $this->application->settings->is_auto_deploy_enabled;
+            $this->isAutoCancelQueuedDeploymentsEnabled = $this->application->settings->is_auto_cancel_queued_deployments_enabled ?? true;
+            $this->isAutoCancelBuildingDeploymentsEnabled = $this->application->settings->is_auto_cancel_building_deployments_enabled ?? false;
             $this->isGpuEnabled = $this->application->settings->is_gpu_enabled;
             $this->gpuDriver = $this->application->settings->gpu_driver;
             $this->gpuCount = $this->application->settings->gpu_count;

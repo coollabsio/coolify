@@ -239,6 +239,8 @@
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
+                // Coolify restarts during the upgrade, so do not show failed Livewire requests as error pages.
+                window.coolifyUpgradeInProgress = true;
                 // Trigger server-side upgrade script via Livewire
                 this.$wire.$call('upgrade');
                 // Start client-side status polling
@@ -454,6 +456,7 @@
                     this.beforeUnloadHandler = null;
                 }
 
+                window.coolifyUpgradeInProgress = false;
                 this.upgradeError = true;
                 this.currentStatus = `Error: ${message}`;
             },

@@ -51,6 +51,16 @@ class SharedEnvironmentVariable extends Model
         'is_literal' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
+        static::saving(function (SharedEnvironmentVariable $sharedVariable) {
+            if ($sharedVariable->exists && $sharedVariable->getOriginal('is_shown_once')) {
+                $sharedVariable->is_shown_once = true;
+            }
+        });
+    }
+
     /**
      * Scope shared environment variables to a team (API token team_id).
      */

@@ -8,9 +8,10 @@ use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 /**
- * Lists the images an application can roll back to: the images on its server, and the images of
- * recent successful deployments that were pushed to the Docker registry. The deployment pulls a
- * registry image again when the server no longer has it.
+ * Lists the images an application can roll back to: the images on its server (for Docker Compose,
+ * the commit images of its services), and the images of recent successful deployments that were
+ * pushed to the Docker registry. The deployment pulls a registry image again when the server no
+ * longer has it.
  */
 class GetRollbackImages
 {
@@ -28,22 +29,25 @@ class GetRollbackImages
 
         $server = $application->destination?->server;
         if ($server?->isFunctional()) {
-            $current = self::currentTag($server, $application);
+            $repositories = self::imageRepositories($application);
+            $current = self::currentTag($server, $application, $repositories);
 
-            $repository = $application->docker_registry_image_name ?: $application->uuid;
             $output = instant_remote_process([
                 "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
             ], $server);
             $images = str($output)->trim()->explode("\n")
                 ->map(fn (string $line) => explode('#', $line))
                 // Exact repository match only, so other images with a similar name are not listed.
-                ->filter(fn (array $parts) => $parts[0] === $repository && filled($parts[1] ?? null))
+                ->filter(fn (array $parts) => in_array($parts[0], $repositories, true) && filled($parts[1] ?? null))
                 ->map(fn (array $parts) => [
                     'tag' => $parts[1],
                     'created_at' => $parts[2] ?? null,
                     'is_current' => $parts[1] === $current,
                     'source' => 'local',
                 ])
+                // The images of all Docker Compose services of a commit have the same tag. Docker
+                // lists the newest image first, so the newest image of each tag stays.
+                ->unique('tag')
                 ->keyBy('tag');
         }
 
@@ -60,15 +64,39 @@ class GetRollbackImages
     }
 
     /**
-     * The tag of the running production containers. Container names can have a timestamp or a
-     * custom name, so find them by their owner labels. Null when no container runs, or when the
-     * running containers use different tags (for example during a rolling update).
+     * The repositories of the images that the application builds or pulls. A Docker Compose
+     * build names the image of each service `<uuid>_<service>`, like the Compose parser does.
+     *
+     * @return list<string>
      */
-    private static function currentTag(Server $server, Application $application): ?string
+    private static function imageRepositories(Application $application): array
+    {
+        if ($application->build_pack === 'dockercompose') {
+            return collect($application->composeServicesWithoutParse())
+                ->keys()
+                ->map(fn (int|string $service) => "{$application->uuid}_{$service}")
+                ->all();
+        }
+
+        return [$application->docker_registry_image_name ?: $application->uuid];
+    }
+
+    /**
+     * The tag of the running production containers. Container names can have a timestamp or a
+     * custom name, so find them by their owner labels. Only containers of the application images
+     * count, so the image tags of other Docker Compose services (for example `postgres:16`) do not.
+     * Null when no container runs, or when the running containers use different tags (for example
+     * during a rolling update).
+     *
+     * @param  list<string>  $repositories
+     */
+    private static function currentTag(Server $server, Application $application, array $repositories): ?string
     {
         $tags = getCurrentApplicationContainerStatus($server, $application, 0)
             ->filter(fn ($container) => data_get($container, 'State') === 'running')
-            ->map(fn ($container) => self::imageTag((string) data_get($container, 'Image')))
+            ->map(fn ($container) => (string) data_get($container, 'Image'))
+            ->filter(fn (string $image) => collect($repositories)->contains(fn (string $repository) => str_starts_with($image, "{$repository}:")))
+            ->map(fn (string $image) => self::imageTag($image))
             ->unique();
 
         return $tags->count() === 1 ? $tags->first() : null;

@@ -1,3 +1,4 @@
+import { copyTextToClipboard } from './clipboard.js';
 import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeNumberStepperComponent } from './number-stepper.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
@@ -30,6 +31,9 @@ document.addEventListener('livewire:navigated', loadCanvases);
 
 // Used by the modal-confirmation Blade component to call its submitAction.
 window.parseModalSubmitAction = parseSubmitAction;
+
+// Used by the log viewers to copy logs that a Livewire call still loads.
+window.copyTextToClipboard = copyTextToClipboard;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);

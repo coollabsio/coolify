@@ -172,20 +172,23 @@ trait HasSecretManager
     }
 
     /**
-     * The old escaping puts literal and multiline values in single quotes without escaping. Docker
-     * Compose ends the value at the next quote, so a value with a quote breaks the whole .env file.
+     * The old escaping writes JSON objects and arrays without quotes, so a JSON value with a line
+     * break breaks the whole .env file (#8279). It puts other literal and multiline values in single
+     * quotes without escaping, and Docker Compose ends the value at the next quote.
      */
     private function legacyEnvFileLineIsUnreadable(EnvironmentVariable $environmentVariable): bool
     {
-        if (! $environmentVariable->is_literal && ! $environmentVariable->is_multiline) {
+        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+
+        if (! is_string($value)) {
             return false;
         }
 
-        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return str_contains($value, "\n");
+        }
 
-        return is_string($value)
-            && str_contains($value, "'")
-            && ! (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '[')));
+        return ($environmentVariable->is_literal || $environmentVariable->is_multiline) && str_contains($value, "'");
     }
 
     /**

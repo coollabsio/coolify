@@ -96,6 +96,11 @@ class Show extends Component
      */
     public bool $editorOpen = false;
 
+    /**
+     * A new value for a locked variable. The locked value is never sent to the browser, but it can be replaced.
+     */
+    public ?string $newLockedValue = null;
+
     public array $problematicVariables = [];
 
     /**
@@ -120,6 +125,7 @@ class Show extends Component
             'is_runtime' => 'required|boolean',
             'is_buildtime' => 'required|boolean',
             'real_value' => 'nullable',
+            'newLockedValue' => 'nullable|string',
             'is_required' => 'required|boolean',
         ];
     }
@@ -222,6 +228,7 @@ class Show extends Component
                     'is_literal' => 'required|boolean',
                     'is_shown_once' => 'required|boolean',
                     'real_value' => 'nullable',
+                    'newLockedValue' => 'nullable|string',
                 ]);
             } else {
                 $this->validate();
@@ -235,11 +242,14 @@ class Show extends Component
             if (! $this->env->is_shown_once) {
                 $this->env->value = $this->value;
                 $this->env->is_shown_once = $this->is_shown_once;
+            } elseif (filled($this->newLockedValue)) {
+                $this->env->value = $this->newLockedValue;
             }
             $this->env->comment = $this->comment;
             $this->env->is_multiline = $this->is_multiline;
             $this->env->is_literal = $this->is_literal;
             $this->env->save();
+            $this->newLockedValue = null;
             $this->valuesLoaded = true;
         } else {
             // Table metadata only — never decrypt here. Values load via loadValues().
@@ -366,7 +376,9 @@ class Show extends Component
                 }
             }
 
-            $submittedValue = $this->env->is_shown_once ? $this->env->value : $this->value;
+            $submittedValue = $this->env->is_shown_once
+                ? (filled($this->newLockedValue) ? $this->newLockedValue : $this->env->value)
+                : $this->value;
             if (! $this->isSharedVariable && $this->is_required && str($submittedValue)->isEmpty()) {
                 if (! $this->env->is_shown_once) {
                     $this->value = $this->env->getOriginal('value');

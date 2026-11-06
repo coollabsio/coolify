@@ -44,21 +44,33 @@ function enabled_email_provider(?object $settings): ?string
 }
 
 /**
+ * The sender of an email. With $asNotification, the optional notification sender of the
+ * instance settings replaces the default sender, so alerts do not share its reputation.
+ *
  * @return array{address: string, name: string}
  */
-function mail_from_identity(object $settings): array
+function mail_from_identity(object $settings, bool $asNotification = false): array
 {
     // Each provider has its own sender, because each one sends from its own verified domain.
     $prefix = data_get($settings, 'resend_enabled') ? 'resend' : 'smtp';
-    $address = data_get($settings, "{$prefix}_from_address");
 
-    if (blank($address)) {
-        throw new InvalidArgumentException('Transactional email sender address is not configured.');
+    if ($asNotification && filled(data_get($settings, 'notification_from_address'))) {
+        $address = (string) data_get($settings, 'notification_from_address');
+        $name = trim((string) data_get($settings, 'notification_from_name', ''));
+    } else {
+        $address = data_get($settings, "{$prefix}_from_address");
+
+        if (blank($address)) {
+            throw new InvalidArgumentException('Transactional email sender address is not configured.');
+        }
+
+        $address = (string) $address;
+        $name = '';
     }
 
-    $address = (string) $address;
-
-    $name = trim((string) data_get($settings, "{$prefix}_from_name", ''));
+    if ($name === '') {
+        $name = trim((string) data_get($settings, "{$prefix}_from_name", ''));
+    }
 
     return [
         'address' => $address,
@@ -66,29 +78,29 @@ function mail_from_identity(object $settings): array
     ];
 }
 
-function mail_from_address(object $settings): Address
+function mail_from_address(object $settings, bool $asNotification = false): Address
 {
-    $identity = mail_from_identity($settings);
+    $identity = mail_from_identity($settings, $asNotification);
 
     return new Address($identity['address'], $identity['name']);
 }
 
-function mail_from_formatted(object $settings): string
+function mail_from_formatted(object $settings, bool $asNotification = false): string
 {
-    return mail_from_address($settings)->toString();
+    return mail_from_address($settings, $asNotification)->toString();
 }
 
-function mail_from_email(Email $email, object $settings): Email
+function mail_from_email(Email $email, object $settings, bool $asNotification = false): Email
 {
-    $email->from(mail_from_address($settings));
+    $email->from(mail_from_address($settings, $asNotification));
     prevent_mail_from_header_folding($email, $settings);
 
     return $email;
 }
 
-function mail_from_message(Message $message, object $settings): Message
+function mail_from_message(Message $message, object $settings, bool $asNotification = false): Message
 {
-    $identity = mail_from_identity($settings);
+    $identity = mail_from_identity($settings, $asNotification);
     $message->from($identity['address'], $identity['name']);
     prevent_mail_from_header_folding($message->getSymfonyMessage(), $settings);
 
@@ -113,7 +125,11 @@ function send_internal_notification(string $message): void
     }
 }
 
-function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
+/**
+ * Send an email through the instance email settings. Use $asNotification for alerts, so they
+ * come from the notification sender when one is set.
+ */
+function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null, bool $asNotification = false): void
 {
     $settings = instanceSettings();
     $type = set_transanctional_email_settings($settings);
@@ -124,7 +140,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
         Mail::send(
             [],
             [],
-            fn (Message $message) => mail_from_message($message, $settings)
+            fn (Message $message) => mail_from_message($message, $settings, $asNotification)
                 ->to($email)
                 ->replyTo($email)
                 ->cc($cc)
@@ -135,7 +151,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
         Mail::send(
             [],
             [],
-            fn (Message $message) => mail_from_message($message, $settings)
+            fn (Message $message) => mail_from_message($message, $settings, $asNotification)
                 ->to($email)
                 ->subject($mail->subject)
                 ->html((string) $mail->render())

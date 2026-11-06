@@ -15,5 +15,8 @@ class TrimStrings extends Middleware
         'current_password',
         'password',
         'password_confirmation',
+        // Environment variable values: the model trims single-line values and keeps multiline content exact.
+        'value',
+        'data.*.value',
     ];
 }

@@ -68,7 +68,7 @@ test('server creation returns a consistent duplicate address response', function
     $ownResponse->assertBadRequest();
     $otherResponse->assertBadRequest();
     expect($ownResponse->json('message'))
-        ->toBe('A server with this IP/Domain is already in use.')
+        ->toBe('A server with this IP/Domain and SSH port is already in use.')
         ->toBe($otherResponse->json('message'));
 });
 

@@ -28,6 +28,7 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\SecretManagerLink;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -201,14 +202,15 @@ class ServerTransferImporter
 
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $serverIp = (string) data_get($bundle, 'server.ip');
+        $serverPort = (int) data_get($bundle, 'server.port', 22);
 
         // A server that comes back replaces the archived copy that this instance kept from the first transfer.
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
         $uuidConflict = $archive === null && $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
-        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+        $ipConflict = Server::sshEndpointInUse($serverIp, $serverPort, $archive?->id);
 
         if (! $dryRun) {
-            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
+            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids, $serverPort);
             // The import validates the server over SSH, so it uses the same Cloud limit as a new server.
             Server::throttleValidation($teamId, $serverIp);
         }
@@ -217,7 +219,7 @@ class ServerTransferImporter
             $warnings[] = "A server with UUID {$serverUuid} already exists on this instance.";
         }
         if ($ipConflict) {
-            $warnings[] = "A server with IP/domain {$serverIp} already exists on this instance.";
+            $warnings[] = "A server with IP/domain {$serverIp} and SSH port {$serverPort} already exists on this instance.";
         }
 
         $created = [
@@ -503,7 +505,7 @@ class ServerTransferImporter
      *
      * @return list<array{field: string, label: string, ok: bool, message: string|null}>
      */
-    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): array
+    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true, int $serverPort = 22): array
     {
         $team = Team::find($teamId);
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
@@ -518,7 +520,7 @@ class ServerTransferImporter
             default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
         };
 
-        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+        $ipExists = Server::sshEndpointInUse($serverIp, $serverPort, $archive?->id);
 
         return [
             [
@@ -535,9 +537,9 @@ class ServerTransferImporter
             ],
             [
                 'field' => 'server.ip',
-                'label' => 'no server with the same IP exists',
+                'label' => 'no server with the same IP and SSH port exists',
                 'ok' => ! $ipExists,
-                'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
+                'message' => $ipExists ? "A server with IP/domain {$serverIp} and SSH port {$serverPort} already exists on this instance. Remove it first." : null,
             ],
         ];
     }
@@ -572,9 +574,9 @@ class ServerTransferImporter
     /**
      * @throws ValidationException with the first failed import check
      */
-    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): void
+    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true, int $serverPort = 22): void
     {
-        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids) as $check) {
+        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids, $serverPort) as $check) {
             if (! $check['ok']) {
                 throw ValidationException::withMessages([$check['field'] => [$check['message']]]);
             }
@@ -642,6 +644,7 @@ class ServerTransferImporter
             'is_git_related' => (bool) data_get($payload, 'is_git_related', false),
         ]);
         $key->uuid = $uuid;
+        $key->allowLegacyKey = true;
 
         try {
             $key->save();
@@ -722,9 +725,18 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'ssh_host_key_pending',
                 ])
                 ->all();
             $server->settings->fill($safe);
+            // The pinned host key moves with the server, so the target does not trust a new key on its first connection.
+            $sshHostKey = ServerSetting::normalizeSshHostKeys(data_get($settingsPayload, 'ssh_host_key'));
+            $server->settings->forceFill([
+                'ssh_host_key' => $sshHostKey,
+                'ssh_host_key_source' => filled($sshHostKey) ? 'transfer' : null,
+                'ssh_host_key_trusted_at' => filled($sshHostKey) ? data_get($settingsPayload, 'ssh_host_key_trusted_at') : null,
+                'is_ssh_host_key_check_disabled' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_disabled', false),
+            ]);
             $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(
                 data_get($settingsPayload, 'cloudflare_tunnel_integration_token_uuid'),
                 'The Cloudflare tunnel of this server: its Cloudflare API token was not found on this instance; select it again in the Cloudflare tunnel settings.',
@@ -1687,10 +1699,9 @@ class ServerTransferImporter
                 'frequency' => data_get($task, 'frequency'),
                 'container' => data_get($task, 'container'),
                 'timeout' => data_get($task, 'timeout'),
+                'use_shell' => (bool) data_get($task, 'use_shell', true),
                 'enabled' => (bool) data_get($task, 'enabled', true),
-                'failure_count' => (int) data_get($task, 'failure_count', 0),
-                'failing_since' => data_get($task, 'failing_since'),
-                'auto_disabled_at' => data_get($task, 'auto_disabled_at'),
+                'disabled_reason' => data_get($task, 'disabled_reason'),
                 'team_id' => $teamId,
             ];
 
@@ -2012,6 +2023,7 @@ class ServerTransferImporter
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
             'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
+            'skip_tls_verification' => (bool) data_get($payload, 'skip_tls_verification', false),
             'is_usable' => (bool) data_get($payload, 'is_usable', true),
         ]);
         $storage->uuid = $uuid;
