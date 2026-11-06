@@ -81,8 +81,7 @@
                         <span>{{ $execution['type'] }}</span><span>{{ $execution['schedule'] }}</span>
                         <span><x-status-badge :status="str($execution['status'])->headline()" :type="$statusType" /></span>
                         <span>
-                            <span class="block">{{ formatDateInServerTimezone($execution['started_at'], $server) }}</span>
-                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint">{{ $execution['started_at']->diffForHumans() }}</span>
+                            <span tabindex="0" data-tooltip="{{ formatDateInServerTimezone($execution['started_at'], $server) }}">{{ $execution['started_at']->diffForHumans() }}</span>
                         </span>
                         <span>{{ $execution['size'] ? formatBytes($execution['size']) : '-' }}</span>
                         <span class="flex justify-end">
