@@ -1375,7 +1375,7 @@
         "category": "media",
         "logo": "svgs/ente-photos.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
+        "template_last_updated_at": "2026-11-03T22:54:21+01:00",
         "port": "8080"
     },
     "ente-photos": {
@@ -1395,7 +1395,7 @@
         "category": "media",
         "logo": "svgs/ente-photos.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-03-02T12:00:19+01:00",
+        "template_last_updated_at": "2026-11-03T22:54:21+01:00",
         "port": "8080"
     },
     "esphome": {
@@ -4182,6 +4182,28 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-10-22T20:39:08+02:00",
         "port": "80"
+    },
+    "orbit": {
+        "documentation": "https://github.com/coollabsio/orbit/blob/main/docs/operations.md?utm_source=coolify.io",
+        "slogan": "Self-hosted workspace for teams with tasks, docs, chat, and an MCP server for AI clients.",
+        "compose": "c2VydmljZXM6CiAgb3JiaXQ6CiAgICBpbWFnZTogJ2doY3IuaW8vY29vbGxhYnNpby9vcmJpdDowLjIuMCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9PUkJJVF84MDgwCiAgICAgIC0gT1JCSVRfRU5WPXByb2R1Y3Rpb24KICAgICAgLSAnT1JCSVRfUFVCTElDX09SSUdJTj0ke1NFUlZJQ0VfRlFETl9PUkJJVH0nCiAgICAgIC0gJ09SQklUX1RSVVNURURfUFJPWElFUz0ke09SQklUX1RSVVNURURfUFJPWElFUzotMTI3LjAuMC4xLzMyLDEwLjAuMC4wLzgsMTcyLjE2LjAuMC8xMiwxOTIuMTY4LjAuMC8xNn0nCiAgICAgIC0gJ09SQklUX0FQUF9LRVk9JHtTRVJWSUNFX1JFQUxCQVNFNjRfMzJfQVBQS0VZfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ29yYml0LWRhdGE6L3Zhci9saWIvb3JiaXQnCiAgICAgIC0gJ29yYml0LWJhY2t1cHM6L3Zhci9iYWNrdXBzL29yYml0JwogICAgc3RvcF9ncmFjZV9wZXJpb2Q6IDQwcwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIC9vcmJpdAogICAgICAgIC0gaGVhbHRoY2hlY2sKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDNzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "orbit",
+            "tasks",
+            "docs",
+            "wiki",
+            "chat",
+            "project-management",
+            "kanban",
+            "mcp",
+            "ai",
+            "coollabs"
+        ],
+        "category": "productivity",
+        "logo": "svgs/orbit.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "8080"
     },
     "organizr": {
         "documentation": "https://docs.organizr.app/?utm_source=coolify.io",
