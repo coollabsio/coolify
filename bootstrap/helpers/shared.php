@@ -5977,7 +5977,7 @@ function convertContainerMemoryBytesToMegabytes(array $metrics): array
 }
 
 /**
- * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}.
+ * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}, {{server.VAR}}.
  *
  * This is the canonical implementation used by both EnvironmentVariable::realValue and the compose parsers
  * to ensure shared variable references are replaced with their actual values.
@@ -6005,6 +6005,8 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
             $id = $resource->environment->project->id;
         } elseif ($type->value() === 'team') {
             $id = $resource->team()->id;
+        } elseif ($type->value() === 'server') {
+            $id = data_get($resource, 'destination.server_id');
         }
         if (is_null($id)) {
             continue;
@@ -6028,7 +6030,7 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
  * The compose parsers write resolved values into `docker_compose`: environment variables, database
  * overrides, and shared variable references. Deployments need those values, so only the displayed
  * copy is redacted. Covered: the resource's locked variables (also variables that reference a locked
- * shared variable) and locked team, project, and environment variables that the raw compose references.
+ * shared variable) and locked team, project, environment, and server variables that the raw compose references.
  * Values shorter than 4 characters are not replaced, because they would match unrelated text.
  * A parsed compose (array or collection) gets the same replacement in every string value.
  *
@@ -6046,13 +6048,14 @@ function redactLockedValuesInGeneratedCompose(string|array|Collection|null $comp
     $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
 
     preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
-    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], ['team', 'project', 'environment'], true));
+    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], SHARED_VARIABLE_TYPES, true));
     $teamId = $resource->team()?->id;
     if ($references->isNotEmpty() && $teamId !== null) {
         $scopeIds = [
             'team' => $teamId,
             'project' => $resource->environment?->project_id,
             'environment' => $resource->environment_id,
+            'server' => data_get($resource, 'destination.server_id'),
         ];
         $values = SharedEnvironmentVariable::query()
             ->where('team_id', $teamId)

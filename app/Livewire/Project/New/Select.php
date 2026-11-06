@@ -300,7 +300,8 @@ class Select extends Component
 
     /**
      * Derive a website link from the documentation URL. Shared hosts keep the
-     * path that identifies the project, so the link does not open the host root.
+     * path that identifies the project, so the link does not open the host root. The ref tells the site that the
+     * visitor came from Coolify.
      */
     private function serviceWebsiteUrl(?string $documentation): ?string
     {
@@ -318,7 +319,7 @@ class Select extends Component
 
         $projectPath = str($url['path'] ?? '')->explode('/')->filter()->take($projectPathSegments)->implode('/');
 
-        return rtrim("{$url['scheme']}://{$url['host']}/{$projectPath}", '/');
+        return rtrim("{$url['scheme']}://{$url['host']}/{$projectPath}", '/').'?ref=coolify.io';
     }
 
     private function serviceTemplatesLastUpdated(): ?string

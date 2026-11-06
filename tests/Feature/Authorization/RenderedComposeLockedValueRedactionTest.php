@@ -28,6 +28,7 @@ services:
       LOCKED_TOKEN: ""
       PLAIN_TOKEN: ""
       TEAM_SECRET: '{{team.TEAM_SECRET}}'
+      SERVER_SECRET: '{{server.SERVER_SECRET}}'
 YAML;
 
 beforeEach(function () {
@@ -49,6 +50,15 @@ beforeEach(function () {
         'key' => 'TEAM_SECRET',
         'value' => 'team-shared-locked-secret',
         'team_id' => $this->team->id,
+        'is_shown_once' => true,
+    ]);
+
+    SharedEnvironmentVariable::create([
+        'type' => 'server',
+        'key' => 'SERVER_SECRET',
+        'value' => 'server-shared-locked-secret',
+        'team_id' => $this->team->id,
+        'server_id' => $server->id,
         'is_shown_once' => true,
     ]);
 
@@ -92,6 +102,7 @@ function expectLockedValuesRedacted(?string $text): void
 {
     expect($text)->not->toContain('env-locked-secret-value')
         ->not->toContain('team-shared-locked-secret')
+        ->not->toContain('server-shared-locked-secret')
         ->toContain('<locked>')
         ->toContain('plain-visible-value');
 }
@@ -101,7 +112,8 @@ function expectStoredComposeKeepsRealValues(Application|Service $resource): void
     expect($resource->fresh()->docker_compose)
         ->not->toContain('<locked>')
         ->toContain('env-locked-secret-value')
-        ->toContain('team-shared-locked-secret');
+        ->toContain('team-shared-locked-secret')
+        ->toContain('server-shared-locked-secret');
 }
 
 it('writes the locked values into the generated compose that deployments use', function (string $resource) {
@@ -117,7 +129,8 @@ it('hides locked values in the service compose that an owner sees', function (st
     expectLockedValuesRedacted($livewire->get('dockerCompose'));
     expect(json_encode($livewire->snapshot).$livewire->html())
         ->not->toContain('env-locked-secret-value')
-        ->not->toContain('team-shared-locked-secret');
+        ->not->toContain('team-shared-locked-secret')
+        ->not->toContain('server-shared-locked-secret');
 })->with(['stack form' => [StackForm::class], 'compose editor' => [EditCompose::class]]);
 
 it('hides locked values in the application compose that an owner sees', function () {
@@ -129,7 +142,8 @@ it('hides locked values in the application compose that an owner sees', function
     expectLockedValuesRedacted($livewire->get('dockerCompose'));
     expect(json_encode($livewire->snapshot).$livewire->html())
         ->not->toContain('env-locked-secret-value')
-        ->not->toContain('team-shared-locked-secret');
+        ->not->toContain('team-shared-locked-secret')
+        ->not->toContain('server-shared-locked-secret');
 });
 
 it('keeps the real generated compose when an owner saves the service stack form', function () {
