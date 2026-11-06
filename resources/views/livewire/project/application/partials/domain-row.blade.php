@@ -131,14 +131,14 @@
 
         <div class="service-domain-actions flex items-center justify-end gap-1">
             @can('update', $application)
-                <button type="button" wire:click="checkDomainDns({{ $index }})"
-                    wire:loading.attr="disabled"
-                    wire:target="checkDomainDns({{ $index }}),checkAllDns"
-                    class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                    <x-reicon name="refresh" class="size-3.5" />
-                </button>
-                @unless ($labelsAreWritable)
-                    @if ($isSuggested)
+                @if ($labelsAreWritable || $isSuggested)
+                    <button type="button" wire:click="checkDomainDns({{ $index }})"
+                        wire:loading.attr="disabled"
+                        wire:target="checkDomainDns({{ $index }}),checkAllDns"
+                        class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
+                        <x-reicon name="refresh" class="size-3.5" />
+                    </button>
+                    @if ($isSuggested && ! $labelsAreWritable)
                         @if ($row['needs_force_add'] ?? false)
                             <x-forms.button wire:click="addSuggestedDomain({{ $index }})" isError class="h-7! px-2! text-[12px]!">
                                 Continue
@@ -148,29 +148,34 @@
                                 Add domain
                             </x-forms.button>
                         @endif
-                    @else
-                        <button type="button"
-                            @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection), @js($row['inherited_port'] ?? null))"
-                            class="icon-button shrink-0"
-                            title="Domain settings" aria-label="Settings for {{ $publicUrl }}">
-                            <x-reicon name="settings" class="size-3.5" />
-                        </button>
-                        <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?" buttonTitle="Remove"
-                            isErrorButton canGate="update" :canResource="$application"
-                            submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
-                                'This domain will be removed from the application.',
-                                'Redeploy or restart may be required for proxy changes.',
-                            ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"
-                            :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Remove domain">
-                            <x-slot:trigger>
-                                <button type="button" class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                    title="Remove domain" aria-label="Remove domain">
-                                    <x-reicon name="trash" class="size-3.5" />
-                                </button>
-                            </x-slot:trigger>
-                        </x-modal-confirmation>
                     @endif
-                @endunless
+                @else
+                    <x-table.row-actions label="Domain actions">
+                        <x-table.row-action wire:click="checkDomainDns({{ $index }})"
+                            wire:loading.attr="disabled"
+                            wire:target="checkDomainDns({{ $index }}),checkAllDns">
+                            Check DNS
+                        </x-table.row-action>
+                        <x-table.row-action
+                            x-on:click="openEditDomain({{ \Illuminate\Support\Js::from($index) }}, {{ \Illuminate\Support\Js::from($row['url']) }}, {{ \Illuminate\Support\Js::from($editingParts) }}, {{ \Illuminate\Support\Js::from($row['service']) }}, {{ \Illuminate\Support\Js::from($isNoindexed ? 'noindex' : 'index') }}, {{ \Illuminate\Support\Js::from($rowDirection) }}, {{ \Illuminate\Support\Js::from($row['inherited_port'] ?? null) }})"
+                            aria-label="Edit {{ $publicUrl }}">
+                            Edit
+                        </x-table.row-action>
+                        <x-slot:danger>
+                            <x-modal-confirmation buttonFullWidth title="Remove domain?" buttonTitle="Remove"
+                                isErrorButton canGate="update" :canResource="$application"
+                                submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
+                                    'This domain will be removed from the application.',
+                                    'Redeploy or restart may be required for proxy changes.',
+                                ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"
+                                :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Remove domain">
+                                <x-slot:trigger>
+                                    <x-table.row-action>Delete</x-table.row-action>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                        </x-slot:danger>
+                    </x-table.row-actions>
+                @endif
             @endcan
         </div>
     </div>

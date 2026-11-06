@@ -384,6 +384,9 @@ class ServerTransferBundle
             self::check($errors, "{$at}.scheduled_tasks.{$i}.command", $task['command'] ?? null, ['required', 'string']);
             self::check($errors, "{$at}.scheduled_tasks.{$i}.container", $task['container'] ?? null, ['nullable', ...ValidationPatterns::containerNameRules()]);
             self::checkCron($errors, "{$at}.scheduled_tasks.{$i}.frequency", $task['frequency'] ?? '');
+            self::check($errors, "{$at}.scheduled_tasks.{$i}.failure_count", $task['failure_count'] ?? null, ['nullable', 'integer', 'min:0']);
+            self::check($errors, "{$at}.scheduled_tasks.{$i}.failing_since", $task['failing_since'] ?? null, ['nullable', 'date']);
+            self::check($errors, "{$at}.scheduled_tasks.{$i}.auto_disabled_at", $task['auto_disabled_at'] ?? null, ['nullable', 'date']);
         }
     }
 

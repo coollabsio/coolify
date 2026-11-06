@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\IntegrationToken;
 use App\Models\Project;
 use App\Models\Server;
@@ -239,9 +240,13 @@ class GlobalSearch extends Component
             return true;
         }
 
+        if ($type === 'source') {
+            return $user->can('create', GithubApp::class);
+        }
+
         // Applications, Databases, Services, and other resources
         if (in_array($type, [
-            'project', 'source',
+            'project',
             // Applications
             'public', 'private-gh-app', 'private-gitea-app', 'private-deploy-key',
             'dockerfile', 'docker-compose-empty', 'docker-image',
@@ -1214,8 +1219,8 @@ class GlobalSearch extends Component
             ]);
         }
 
-        // GitHub Source - can be created if user has createAnyResource permission
-        if ($user->can('createAnyResource')) {
+        // GitHub Source - can be created if user can create a GitHub App
+        if ($user->can('create', GithubApp::class)) {
             $items->push([
                 'name' => 'GitHub App',
                 'description' => 'Connect a GitHub app for source control',
@@ -1470,6 +1475,9 @@ class GlobalSearch extends Component
 
     public function loadServers()
     {
+        if (! auth()->user()->can('createAnyResource')) {
+            return;
+        }
         $this->loadingServers = true;
         $servers = Server::isUsable()->get()->sortBy('name');
         $this->availableServers = $servers->map(fn ($s) => [
@@ -1496,6 +1504,9 @@ class GlobalSearch extends Component
 
     public function loadDestinations()
     {
+        if (! auth()->user()->can('createAnyResource')) {
+            return;
+        }
         $this->loadingDestinations = true;
         $server = Server::ownedByCurrentTeam()->find($this->selectedServerId);
 

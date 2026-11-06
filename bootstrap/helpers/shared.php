@@ -715,14 +715,14 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     // Read the local versions.json, which CheckForUpdatesJob refreshes every hour. Do not ask the CDN for each server.
-    return data_get(get_versions_data(), 'coolify.sentinel.version') ?? '0.0.0';
+    return data_get(get_versions_data(), 'sentinel.version') ?? '0.0.0';
 }
 function get_latest_version_of_coolify(): string
 {
     try {
         $versions = get_versions_data();
 
-        return data_get($versions, 'coolify.v4.version', '0.0.0');
+        return data_get($versions, 'coolify.version', '0.0.0');
     } catch (Throwable $e) {
 
         return '0.0.0';
@@ -4760,11 +4760,12 @@ function wireNavigate(): string
  * Registers a resource menu that the main sidebar and the mobile drawer show in place of their main menu
  * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
  * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
+ * The main menu then shows a row (labelled with $name) that opens the deepest resource menu again.
  */
-function registerMainNavContext(int $depth, string $label, string $backTitle): void
+function registerMainNavContext(int $depth, string $label, string $backTitle, ?string $name = null): void
 {
     $levels = request()->attributes->get('mainNavContext', []);
-    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle];
+    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle, 'name' => $name];
     ksort($levels);
 
     request()->attributes->set('mainNavContext', $levels);
@@ -5579,6 +5580,63 @@ function dockerComposeEnvironmentVariableInfo(?string $dockerCompose, string $ke
     ];
 }
 
+/**
+ * Docker Compose gives a bare $VAR or ${VAR} reference no default, and the service parser does not store
+ * defaults. So `/$POSTGRES_DB` next to `${POSTGRES_DB:-umami}` in another service resolves to an empty value.
+ * For new variables, store the default when the Compose file has a bare reference and exactly one default.
+ *
+ * @param  Collection<int, string>  $existingKeys
+ */
+function fillDockerComposeDefaultsForBareReferences(Service $resource, Collection $existingKeys): void
+{
+    $dockerCompose = $resource->docker_compose_raw;
+    if (blank($dockerCompose)) {
+        return;
+    }
+
+    $resource->environment_variables()
+        ->whereNull('value')
+        ->whereNotIn('key', $existingKeys)
+        ->get()
+        ->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
+            $default = dockerComposeBareReferenceDefault($dockerCompose, $environmentVariable->key);
+            // A nested default (`${A:-${B}}`) must stay with Compose: stored, it would be escaped to a literal.
+            if (filled($default) && ! str_contains($default, '$')) {
+                $environmentVariable->update(['value' => $default]);
+            }
+        });
+}
+
+/** The single default of a variable that the Compose file also references without a default, otherwise null. */
+function dockerComposeBareReferenceDefault(string $dockerCompose, string $key): ?string
+{
+    $quotedKey = preg_quote($key, '/');
+    if (preg_match('/(?<!\$)\$(?:'.$quotedKey.'(?![A-Za-z0-9_])|\{'.$quotedKey.'\})/', $dockerCompose) !== 1) {
+        return null;
+    }
+
+    $defaults = [];
+    $offset = 0;
+    while (($referenceStart = strpos($dockerCompose, '${'.$key, $offset)) !== false) {
+        $offset = $referenceStart + 2;
+        if ($referenceStart > 0 && $dockerCompose[$referenceStart - 1] === '$') {
+            continue;
+        }
+
+        $reference = extractBalancedBraceContent(substr($dockerCompose, $referenceStart));
+        $split = $reference === null ? null : splitOnOperatorOutsideNested($reference['content']);
+        if ($split === null || $split['variable'] !== $key) {
+            continue;
+        }
+        if (str_contains($split['operator'], '?')) {
+            return null;
+        }
+        $defaults[$split['default']] = true;
+    }
+
+    return count($defaults) === 1 ? (string) array_key_first($defaults) : null;
+}
+
 function dockerComposeEnvironmentVariableIsRequired(?string $dockerCompose, string $key): bool
 {
     if (blank($dockerCompose)) {
@@ -5602,6 +5660,54 @@ function dockerComposeEnvironmentVariableShouldBeUnset(?string $dockerCompose, s
     }
 
     return extractDockerComposeEnvironmentVariableReferences($dockerCompose)->contains($key);
+}
+
+/**
+ * Variables whose stored value the Compose parser before v4.5.0 wrote straight into the `environment:`
+ * list, so their containers got the value without the old .env escaping: references with a default or
+ * under another name (`FOO=${FOO:-}`, `BAR=${FOO}`, `BAR=$FOO`) and references in such a default.
+ * A plain `FOO=${FOO}` reference kept reading the escaped .env value.
+ *
+ * @return Collection<int, string>
+ */
+function dockerComposeVariablesWithStoredValueBeforeExactEscaping(?string $dockerCompose): Collection
+{
+    static $cache = [];
+    if (blank($dockerCompose)) {
+        return collect();
+    }
+
+    $cacheKey = hash('xxh128', $dockerCompose);
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
+
+    $keys = collect();
+    foreach (extractHardcodedEnvironmentVariables($dockerCompose) as $assignment) {
+        $value = $assignment['value'] ?? null;
+        if (! is_string($value) || ! str_starts_with($value, '$') || replaceVariables($value)->value() === (string) $assignment['key']) {
+            continue;
+        }
+
+        $reference = extractBalancedBraceContent($value, 0);
+        if ($reference === null) {
+            if (preg_match('/\A\$([A-Za-z_][A-Za-z0-9_]*)\z/', $value, $match) === 1) {
+                $keys->push($match[1]);
+            }
+
+            continue;
+        }
+
+        $split = splitOnOperatorOutsideNested($reference['content']);
+        $keys->push($split === null ? $reference['content'] : $split['variable']);
+        if ($split !== null) {
+            $keys = $keys->concat(extractDockerComposeEnvironmentVariableReferences($split['default']));
+        }
+    }
+
+    $cache = [$cacheKey => $keys->reject(fn (string $key): bool => str_starts_with($key, 'SERVICE_'))->unique()->values()];
+
+    return $cache[$cacheKey];
 }
 
 /** @param Collection<int, EnvironmentVariable> $environmentVariables */

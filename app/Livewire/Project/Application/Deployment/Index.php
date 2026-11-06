@@ -6,7 +6,6 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Traits\ListensToTeamChannel;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -14,9 +13,28 @@ class Index extends Component
 {
     use ListensToTeamChannel;
 
-    public Application $application;
+    /**
+     * The history list never loads logs or configuration payloads.
+     */
+    public const HISTORY_COLUMNS = [
+        'id',
+        'application_id',
+        'deployment_uuid',
+        'pull_request_id',
+        'status',
+        'commit',
+        'commit_message',
+        'is_webhook',
+        'is_api',
+        'rollback',
+        'server_id',
+        'server_name',
+        'created_at',
+        'updated_at',
+        'finished_at',
+    ];
 
-    public ?Collection $deployments;
+    public Application $application;
 
     public int $deployments_count = 0;
 
@@ -31,10 +49,7 @@ class Index extends Component
         $this->defaultTake = max(1, min(100, $this->defaultTake));
 
         $this->skip = 0;
-        $this->loadDeployments();
     }
-
-    public bool $showNext = false;
 
     public bool $showPrev = false;
 
@@ -107,47 +122,24 @@ class Index extends Component
         }
         $this->loadPullRequestOptions();
         $this->loadDeploymentFilterOptions();
-        ['deployments' => $deployments, 'count' => $count] = $application->deployments(
-            search: $this->search,
-            filters: $this->deploymentFilters,
-            sort: $this->deploymentSort,
-            take: $this->defaultTake,
-            pullRequestId: $this->pull_request_id,
-        );
-        $this->deployments = $deployments;
-        $this->deployments_count = $count;
         $this->current_url = route('project.application.deployment.index', [
             'project_uuid' => $project->uuid,
             'environment_uuid' => $environment->uuid,
             'application_uuid' => $application->uuid,
         ]);
         $this->updateCurrentPage();
-        $this->showMore();
     }
 
-    private function showMore()
-    {
-        if ($this->deployments->count() !== 0) {
-            $this->showNext = true;
-            if ($this->deployments->count() < $this->defaultTake) {
-                $this->showNext = false;
-            }
-
-            return;
-        }
-    }
-
-    public function reloadDeployments()
-    {
-        $this->loadDeployments();
-    }
+    /**
+     * Polling target. The list is loaded again on every render.
+     */
+    public function reloadDeployments(): void {}
 
     public function previousPage(): void
     {
         $this->skip = max(0, $this->skip - $this->defaultTake);
         $this->showPrev = $this->skip > 0;
         $this->updateCurrentPage();
-        $this->loadDeployments();
     }
 
     public function nextPage(): void
@@ -162,27 +154,11 @@ class Index extends Component
         $this->skip = ($page - 1) * $this->defaultTake;
         $this->showPrev = $page > 1;
         $this->updateCurrentPage();
-        $this->loadDeployments();
-    }
-
-    public function loadDeployments()
-    {
-        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments(
-            skip: $this->skip,
-            take: $this->defaultTake,
-            pullRequestId: $this->pull_request_id,
-            search: $this->search,
-            filters: $this->deploymentFilters,
-            sort: $this->deploymentSort,
-        );
-        $this->deployments = $deployments;
-        $this->deployments_count = $count;
-        $this->showMore();
     }
 
     public function updatedSearch(): void
     {
-        $this->resetPaginationAndLoad();
+        $this->resetPagination();
     }
 
     public function toggleDeploymentFilter(string $filter): void
@@ -204,7 +180,7 @@ class Index extends Component
         }
 
         $this->pull_request_id = null;
-        $this->resetPaginationAndLoad();
+        $this->resetPagination();
     }
 
     public function setPullRequestFilter(string $pullRequestId): void
@@ -217,7 +193,7 @@ class Index extends Component
 
         $this->pull_request_id = $pullRequestId === '' ? null : $pullRequestId;
         $this->deploymentFilters = [];
-        $this->resetPaginationAndLoad();
+        $this->resetPagination();
     }
 
     public function setDeploymentSort(string $sort): void
@@ -227,7 +203,7 @@ class Index extends Component
         }
 
         $this->deploymentSort = $sort;
-        $this->resetPaginationAndLoad();
+        $this->resetPagination();
     }
 
     public function updatedPullRequestId($value)
@@ -248,14 +224,14 @@ class Index extends Component
         }
 
         $this->deploymentFilters = [];
-        $this->resetPaginationAndLoad();
+        $this->resetPagination();
     }
 
     public function clearFilter()
     {
         $this->pull_request_id = null;
         $this->deploymentFilters = [];
-        $this->resetPaginationAndLoad();
+        $this->resetPagination();
     }
 
     private function updateCurrentPage()
@@ -367,16 +343,30 @@ class Index extends Component
             ->all();
     }
 
-    private function resetPaginationAndLoad(): void
+    private function resetPagination(): void
     {
         $this->skip = 0;
         $this->showPrev = false;
         $this->updateCurrentPage();
-        $this->loadDeployments();
     }
 
+    /**
+     * The list is not a public property: Livewire would restore it with SELECT * on every request.
+     */
     public function render()
     {
-        return view('livewire.project.application.deployment.index');
+        ['deployments' => $deployments, 'count' => $this->deployments_count] = $this->application->deployments(
+            skip: $this->skip,
+            take: $this->defaultTake,
+            pullRequestId: $this->pull_request_id,
+            search: $this->search,
+            filters: $this->deploymentFilters,
+            sort: $this->deploymentSort,
+            columns: self::HISTORY_COLUMNS,
+        );
+
+        return view('livewire.project.application.deployment.index', [
+            'deployments' => $deployments,
+        ]);
     }
 }

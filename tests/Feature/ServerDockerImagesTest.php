@@ -130,3 +130,52 @@ it('paginates images and returns to the first page when the search changes', fun
         ->assertSee('1–5 of 9')
         ->assertDontSee('app-06');
 });
+
+it('sorts images by the chosen column and ignores unknown sort values', function () {
+    fakeRemoteProcesses([
+        '*docker image ls*' => Process::result(output: implode("\n", [
+            json_encode(['Repository' => 'beta', 'Tag' => 'latest', 'ID' => 'sha256:'.str_repeat('1', 64), 'Size' => '9MB', 'CreatedAt' => '2024-03-01 10:00:00 +0000 UTC', 'CreatedSince' => '7 months ago']),
+            json_encode(['Repository' => 'alpha', 'Tag' => 'latest', 'ID' => 'sha256:'.str_repeat('2', 64), 'Size' => '100MB', 'CreatedAt' => '2024-01-01 10:00:00 +0000 UTC', 'CreatedSince' => '9 months ago']),
+            json_encode(['Repository' => 'gamma', 'Tag' => 'latest', 'ID' => 'sha256:'.str_repeat('3', 64), 'Size' => '1.2GB', 'CreatedAt' => '2024-02-01 10:00:00 +0000 UTC', 'CreatedSince' => '8 months ago']),
+        ])),
+        '*docker ps -a*' => Process::result(output: ''),
+        '*docker system df*' => Process::result(output: ''),
+    ]);
+
+    Livewire::test(DockerImages::class, ['server_uuid' => $this->server->uuid])
+        ->call('load')
+        ->assertSeeInOrder(['beta', 'alpha', 'gamma'])
+        ->call('setSort', 'repository_asc')
+        ->assertSet('sort', 'repository_asc')
+        ->assertSeeInOrder(['alpha', 'beta', 'gamma'])
+        ->call('setSort', 'size_asc')
+        ->assertSeeInOrder(['9MB', '100MB', '1.2GB'])
+        ->call('setSort', 'size_desc')
+        ->assertSeeInOrder(['1.2GB', '100MB', '9MB'])
+        ->call('setSort', 'created_desc')
+        ->assertSeeInOrder(['beta', 'gamma', 'alpha'])
+        ->call('setSort', 'containers_desc')
+        ->assertSet('sort', 'created_desc')
+        ->assertSeeInOrder(['beta', 'gamma', 'alpha']);
+});
+
+it('returns to the first page when the sort changes', function () {
+    fakeRemoteProcesses([
+        '*docker image ls*' => Process::result(output: collect(range(1, 12))
+            ->map(fn (int $i) => json_encode([
+                'Repository' => sprintf('app-%02d', $i), 'Tag' => 'latest', 'ID' => 'sha256:'.str_repeat(dechex($i), 64),
+                'Size' => '1MB', 'CreatedSince' => '1 day ago',
+            ]))
+            ->implode("\n")),
+        '*docker ps -a*' => Process::result(output: ''),
+        '*docker system df*' => Process::result(output: ''),
+    ]);
+
+    Livewire::test(DockerImages::class, ['server_uuid' => $this->server->uuid])
+        ->call('load')
+        ->call('nextPage')
+        ->call('setSort', 'repository_desc')
+        ->assertSee('1–10 of 12')
+        ->assertSee('app-12')
+        ->assertDontSee('app-02');
+});

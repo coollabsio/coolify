@@ -258,19 +258,7 @@ class DatabasesController extends Controller
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        $payload = serializeApiResponse($database);
-
-        // A locked password variable is never shown again, also not inside the connection URLs.
-        if (request()->attributes->get('can_read_sensitive', false) === true
-            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
-            foreach (['internal_db_url', 'external_db_url'] as $key) {
-                if ($payload->has($key)) {
-                    $payload->put($key, null);
-                }
-            }
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($database, serializeApiResponse($database));
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void
@@ -3081,7 +3069,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3217,7 +3205,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -5011,7 +4999,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         $storageUuid = $request->route('storage_uuid');
 

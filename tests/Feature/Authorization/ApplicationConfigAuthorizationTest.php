@@ -220,8 +220,9 @@ test('member cannot load application environment variable values', function () {
         'type' => 'application',
     ])
         ->call('loadValues')
-        ->assertForbidden()
+        ->assertOk()
         ->assertSet('valuesLoaded', false)
+        ->assertSet('isValueHidden', true)
         ->assertSet('value', null);
 });
 

@@ -87,6 +87,7 @@ trait ExecuteRemoteCommand
             $command_hidden = data_get($single_command, 'command_hidden', false);
             $skip_command_log = data_get($single_command, 'skip_command_log', false);
             $input = data_get($single_command, 'input');
+            $skip_cancellation_check = data_get($single_command, 'skip_cancellation_check', false);
             $this->save = data_get($single_command, 'save');
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
@@ -96,8 +97,8 @@ trait ExecuteRemoteCommand
                 }
             }
 
-            // Check for cancellation before executing commands
-            if (isset($this->application_deployment_queue)) {
+            // Check for cancellation before executing commands. Cleanup commands must also run after a cancel.
+            if (! $skip_cancellation_check && isset($this->application_deployment_queue)) {
                 $this->application_deployment_queue->refresh();
                 if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
                     throw new \RuntimeException('Deployment cancelled by user', 69420);
@@ -126,9 +127,11 @@ trait ExecuteRemoteCommand
                             $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
 
                             // Check for cancellation during retry wait
-                            $this->application_deployment_queue->refresh();
-                            if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
-                                throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                            if (! $skip_cancellation_check) {
+                                $this->application_deployment_queue->refresh();
+                                if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                                    throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                                }
                             }
                         }
 

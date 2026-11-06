@@ -51,7 +51,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
             ->name('cleanup:ssh-mux')
             ->hourly()
-            ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
+            ->when(fn () => config('constants.ssh.mux_enabled'));
         // Every cloud node reads its own versions.json, so each node refreshes it (no onOneServer).
         $this->scheduleInstance->call(fn () => refresh_versions_file())
             ->name('versions:refresh-local')

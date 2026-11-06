@@ -42,6 +42,10 @@ class Show extends Component
     #[Locked]
     public ?array $deploymentsPerTagPerServer = null;
 
+    /** Sort of the active deployments table, such as `resource-asc`; null keeps them grouped by server. */
+    #[Locked]
+    public ?string $deploymentSort = null;
+
     /** The "Connect to resources" modal on small screens, where the tags canvas is not shown. */
     public bool $connectResourcesOpen = false;
 
@@ -101,6 +105,37 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function setDeploymentSort(string $sort): void
+    {
+        if (! in_array($sort, ['resource-asc', 'resource-desc', 'server-asc', 'server-desc', 'status-asc', 'status-desc'], true)) {
+            return;
+        }
+
+        $this->deploymentSort = $sort;
+    }
+
+    /**
+     * The active deployments as one list, in the order of the chosen table sort.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function activeDeployments(): Collection
+    {
+        $deployments = collect($this->deploymentsPerTagPerServer ?? [])->flatten(1);
+        if ($this->deploymentSort === null) {
+            return $deployments->values();
+        }
+
+        [$column, $direction] = explode('-', $this->deploymentSort, 2);
+        $field = ['resource' => 'application_name', 'server' => 'server_name', 'status' => 'status'][$column];
+        $order = $direction === 'desc' ? -1 : 1;
+
+        return $deployments
+            ->sort(fn (array $left, array $right): int => ($order * strcasecmp((string) $left[$field], (string) $right[$field]))
+                ?: $left['id'] <=> $right['id'])
+            ->values();
     }
 
     public function redeployAll()
@@ -193,6 +228,7 @@ class Show extends Component
                 ];
             })->values()->toArray(),
             'connectableResources' => $this->connectableResources(),
+            'activeDeployments' => $this->activeDeployments(),
         ]);
     }
 

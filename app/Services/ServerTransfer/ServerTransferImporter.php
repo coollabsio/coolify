@@ -1702,6 +1702,9 @@ class ServerTransferImporter
                 'container' => data_get($task, 'container'),
                 'timeout' => data_get($task, 'timeout'),
                 'enabled' => (bool) data_get($task, 'enabled', true),
+                'failure_count' => (int) data_get($task, 'failure_count', 0),
+                'failing_since' => data_get($task, 'failing_since'),
+                'auto_disabled_at' => data_get($task, 'auto_disabled_at'),
                 'team_id' => $teamId,
             ];
 
@@ -1711,7 +1714,7 @@ class ServerTransferImporter
                 $payload['service_id'] = $resource->id;
             }
 
-            ScheduledTask::create($payload);
+            ScheduledTask::forceCreate($payload);
         }
     }
 
@@ -1869,6 +1872,7 @@ class ServerTransferImporter
             'contents' => data_get($payload, 'contents'),
             'metadata' => data_get($payload, 'metadata'),
             'pull_requests' => data_get($payload, 'pull_requests'),
+            'deployments' => data_get($payload, 'deployments'),
             'administration' => data_get($payload, 'administration'),
             'organization_self_hosted_runners' => data_get($payload, 'organization_self_hosted_runners'),
             'actions' => data_get($payload, 'actions'),

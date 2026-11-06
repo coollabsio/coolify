@@ -48,15 +48,21 @@
                             : 'Images pulled or built on this server will appear here.'" icon-name="layers" />
                     </div>
                 @else
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-images-table-grid">
-                            <span>Repository</span>
-                            <span>Tag</span>
-                            <span>Image ID</span>
-                            <span>Created</span>
-                            <span>Size</span>
-                            <span>Used by</span>
-                            <span>Actions</span>
+                            <x-table.sort-header label="Repository" asc="repository_asc" desc="repository_desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Tag" asc="tag_asc" desc="tag_desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Image ID" asc="id_asc" desc="id_desc" action="setSort"
+                                :current="$sort" />
+                            <x-table.sort-header label="Created" asc="created_asc" desc="created_desc" first="desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Size" asc="size_asc" desc="size_desc" first="desc"
+                                action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Used by" asc="used_asc" desc="used_desc" action="setSort"
+                                :current="$sort" />
+                            <span class="text-right">Actions</span>
                         </div>
                         @foreach ($visibleImages as $image)
                             <div wire:key="image-{{ $image['reference'] }}"
@@ -88,10 +94,10 @@
                                         </span>
                                     @endif
                                 </div>
-                                <div>
+                                <div class="flex justify-end">
                                     @if ($image['containers'] === [])
                                         @can('update', $server)
-                                            <x-modal-confirmation title="Delete Docker Image?" buttonTitle="Delete"
+                                            <x-modal-confirmation title="Delete Docker Image?"
                                                 submitAction="delete({{ $image['reference'] }})" :actions="[
                                                     'Delete ' . $image['reference'] . ' from this server.',
                                                     'It has to be pulled or built again before it can be used.',
@@ -99,7 +105,15 @@
                                                 confirmationText="{{ $image['reference'] }}"
                                                 confirmationLabel="Confirm by entering the image reference"
                                                 shortConfirmationLabel="Image" step2ButtonText="Delete Image"
-                                                isErrorButton :confirmWithPassword="false" />
+                                                :confirmWithPassword="false">
+                                                <x-slot:trigger>
+                                                    <button type="button"
+                                                        class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                        title="Delete image" aria-label="Delete {{ $image['reference'] }}">
+                                                        <x-reicon name="trash" class="size-3.5" />
+                                                    </button>
+                                                </x-slot:trigger>
+                                            </x-modal-confirmation>
                                         @endcan
                                     @endif
                                 </div>

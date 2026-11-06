@@ -1,0 +1,93 @@
+name: Merge forward
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: merge-forward
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  merge:
+    name: Merge forward
+    permissions:
+      contents: write # push the merges
+      pull-requests: write # open a pull request when a merge conflicts
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Merge main into the release branches and next, and each release branch into next
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          push() {
+            if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$1")" ]; then
+              awk 'NR > 1 && /^#/ && previous != "" { print "" } { print; previous = $0 }' CHANGELOG.md > "$RUNNER_TEMP/CHANGELOG.md"
+              cp "$RUNNER_TEMP/CHANGELOG.md" CHANGELOG.md
+              git diff --quiet || git commit --quiet --amend --no-edit --all
+            fi
+            git push --quiet origin "HEAD:$2"
+          }
+          merge() {
+            local head="chore/merge-${1//\//-}-into-${2//\//-}" tag title conflicts pull_request
+            git switch --quiet --detach "origin/$2"
+            if git merge-base --is-ancestor "origin/$1" HEAD; then
+              echo "$2 contains $1 already"
+              return
+            fi
+            tag="$(git tag --points-at "origin/$1" | sed -n 1p)"
+            title="chore: merge ${tag:-$1} into $2"
+            if git merge --quiet --no-edit --message "$title" "origin/$1"; then
+              push "$1" "$2"
+              return
+            fi
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            git merge --abort
+            if [ "$conflicts" = release.json ] && git merge --quiet --no-edit --strategy-option ours --message "$title" "origin/$1"; then
+              push "$1" "$2"
+              return
+            fi
+            if git rev-parse --verify --quiet "origin/$head" > /dev/null && ! git merge-base --is-ancestor "origin/$head" "origin/$1"; then
+              echo "::notice::$head has commits of its own, $1 follows once its pull request is merged"
+              return
+            fi
+            git push --quiet origin "origin/$1:refs/heads/$head"
+            pull_request="$(gh pr list --head "$head" --base "$2" --json url --jq '.[0].url')"
+            if [ -n "$pull_request" ]; then
+              gh pr edit "$pull_request" --title "$title"
+              return
+            fi
+            cat > "$RUNNER_TEMP/body.md" <<BODY
+          $1 and $2 have conflicts. Resolve them and merge this PR.
+
+          > [!IMPORTANT]
+          > Merge this PR with a merge commit, not a squash merge, so the next merge forward does not conflict again.
+          BODY
+            gh pr create --base "$2" --head "$head" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          }
+          releases="$(git branch --remotes --list 'origin/release/*' --format='%(refname:lstrip=3)' | grep -vE '\.0$' | sort -V || true)"
+          for release in $releases; do
+            merge main "$release"
+          done
+          for release in $releases; do
+            merge "$release" next
+          done
+          merge main next

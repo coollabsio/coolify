@@ -249,7 +249,7 @@
                                             </div>
                                         @endif
                                 </div>
-                                @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                                @if ($this->application->supportsWatchPaths())
                                     <div class="pt-4">
                                         <x-forms.textarea
                                             helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
@@ -272,7 +272,7 @@
                                     @endif
                                 @endif
                             </x-forms.repository-paths>
-                            @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                            @if ($this->application->supportsWatchPaths())
                                 <div class="pb-4">
                                     <x-forms.textarea
                                         helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."

@@ -1148,14 +1148,7 @@ class Server extends BaseModel
                                     0 => 'http',
                                 ],
                                 'service' => 'coolify-reverb',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                            ],
-                            'coolify-reverb-api' => [
-                                'entryPoints' => [
-                                    0 => 'http',
-                                ],
-                                'service' => 'coolify-reverb',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/app/`)",
                             ],
                             'coolify-terminal-ws' => [
                                 'entryPoints' => [
@@ -1218,15 +1211,7 @@ class Server extends BaseModel
                             0 => 'https',
                         ],
                         'service' => 'coolify-reverb',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                        'tls' => $tls,
-                    ];
-                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
-                        'entryPoints' => [
-                            0 => 'https',
-                        ],
-                        'service' => 'coolify-reverb',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/app/`)",
                         'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
@@ -1266,9 +1251,6 @@ class Server extends BaseModel
 $siteAddress {
     encode zstd gzip
     handle /app/* {
-        reverse_proxy coolify:6001
-    }
-    handle /apps* {
         reverse_proxy coolify:6001
     }
     handle /terminal/ws {

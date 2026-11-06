@@ -222,7 +222,7 @@ class BackupEdit extends Component
     public function delete($password, $selectedActions = [])
     {
         $database = $this->backup->database;
-        $this->authorize('manageBackups', $database);
+        $this->authorize('delete', $database);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';

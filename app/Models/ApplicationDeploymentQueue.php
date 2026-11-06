@@ -4,12 +4,14 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Services\Access\AccessResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
@@ -100,6 +102,22 @@ class ApplicationDeploymentQueue extends Model
         });
 
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if (! $deployment->wasChanged('status')) {
+                return;
+            }
+
+            // A failed GitHub sync must not stop the status transition or the deployment queue.
+            try {
+                SyncGithubDeploymentJob::dispatchFor($deployment);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to queue the GitHub deployment sync.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
             if (! auth()->check()
                 || ! $deployment->wasChanged('status')
                 || $deployment->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
@@ -184,13 +202,23 @@ class ApplicationDeploymentQueue extends Model
      */
     public function scopeOwnedByTeam(Builder $query, int $teamId): Builder
     {
-        // application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
-        $applicationIds = Application::withTrashed()
+        return $query->whereIn('application_id', self::applicationIdsOwnedByTeam($teamId));
+    }
+
+    /**
+     * IDs of the team's applications, deleted ones included, as strings to match application_id.
+     *
+     * application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
+     *
+     * @return Collection<int, string>
+     */
+    public static function applicationIdsOwnedByTeam(int $teamId): Collection
+    {
+        return Application::withTrashed()
+            ->withoutGlobalScope('withRelations')
             ->whereRelation('environment.project.team', 'id', $teamId)
             ->pluck('id')
             ->map(fn ($id) => (string) $id);
-
-        return $query->whereIn('application_id', $applicationIds);
     }
 
     public function server(): Attribute

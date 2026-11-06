@@ -872,6 +872,45 @@ test('audit log page only shows events for the current team', function () {
         ->assertDontSee('Private app deleted');
 });
 
+test('audit log sorts by the chosen column and ignores unknown sort values', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Zoe',
+        'description' => 'Older event by Zoe',
+        'created_at' => now()->subHour(),
+    ]);
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Adam',
+        'description' => 'Newer event by Adam',
+        'created_at' => now(),
+    ]);
+
+    Livewire::test(AuditLog::class)
+        ->assertSeeInOrder(['Newer event by Adam', 'Older event by Zoe'])
+        ->call('setSort', 'time-asc')
+        ->assertSet('sort', 'time-asc')
+        ->assertSeeInOrder(['Older event by Zoe', 'Newer event by Adam'])
+        ->call('setSort', 'actor-desc')
+        ->assertSeeInOrder(['Older event by Zoe', 'Newer event by Adam'])
+        ->call('setSort', 'activity-asc')
+        ->assertSeeInOrder(['Newer event by Adam', 'Older event by Zoe'])
+        ->call('setSort', 'resource_uuid-asc')
+        ->assertSet('sort', 'activity-asc')
+        ->call('setSort', 'time-sideways')
+        ->assertSet('sort', 'activity-asc');
+});
+
+test('changing the audit log sort returns to the first page', function () {
+    AuditEvent::factory()->count(11)->create(['team_id' => $this->team->id]);
+
+    Livewire::test(AuditLog::class)
+        ->set('perPage', 10)
+        ->call('setPage', 2)
+        ->call('setSort', 'time-asc')
+        ->assertSet('paginators.page', 1);
+});
+
 test('audit log expands encrypted model changes for team admins and owners', function () {
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,
@@ -1134,6 +1173,9 @@ test('critical operational events persist with their source action and actor', f
     'ui.database.restore_started',
     'ui.scheduled_task.executed',
     'ui.api_token.created',
+    'ui.api_token.updated',
+    'ui.api_token.paused',
+    'ui.api_token.resumed',
     'ui.api_token.revoked',
     'ui.team_member.role_updated',
     'ui.team_member.removed',

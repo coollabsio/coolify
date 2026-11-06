@@ -20,7 +20,6 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
-use App\Rules\SafeWebhookUrl;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -169,6 +168,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // The container name is validated above, so it is a safe folder name. Keep the folder of earlier releases.
                 $this->directory_name = $serviceName.'-'.$this->container_name;
                 $escapedContainerName = escapeshellarg($this->container_name);
+                $configuredDatabases = $this->configuredDatabasesToBackup();
                 if (str($databaseType)->contains('postgres')) {
                     $commands[] = "docker exec {$escapedContainerName} env | grep -E '^(POSTGRES|PGUSER=)'";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
@@ -180,7 +180,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         return str($env)->startsWith('POSTGRES_DB=');
                     })->first();
 
-                    if ($db) {
+                    if (filled($configuredDatabases)) {
+                        $databasesToBackup = $configuredDatabases;
+                    } elseif ($db) {
                         $databasesToBackup = str($db)->after('POSTGRES_DB=')->value();
                     } else {
                         $databasesToBackup = $this->database->postgres_user;
@@ -207,15 +209,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         return str($env)->startsWith('MYSQL_DATABASE=');
                     })->first();
 
-                    if ($db) {
+                    if (filled($configuredDatabases)) {
+                        $databasesToBackup = $configuredDatabases;
+                    } elseif ($db) {
                         $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
                     } else {
-                        $databasesToBackup = $this->configuredDatabasesToBackup();
-                        if (blank($databasesToBackup)) {
-                            $this->recordUndeterminedDatabases('MYSQL_DATABASE');
+                        $this->recordUndeterminedDatabases('MYSQL_DATABASE');
 
-                            return;
-                        }
+                        return;
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $commands[] = "docker exec {$escapedContainerName} env";
@@ -235,27 +236,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     }
 
-                    $db = $envs->filter(function ($env) {
-                        return str($env)->startsWith('MARIADB_DATABASE=');
-                    })->first();
+                    $db = $envs->first(fn ($env) => str($env)->startsWith('MARIADB_DATABASE='))
+                        ?? $envs->first(fn ($env) => str($env)->startsWith('MYSQL_DATABASE='));
 
-                    if ($db) {
-                        $databasesToBackup = str($db)->after('MARIADB_DATABASE=')->value();
+                    if (filled($configuredDatabases)) {
+                        $databasesToBackup = $configuredDatabases;
+                    } elseif ($db) {
+                        $databasesToBackup = str($db)->after('=')->value();
                     } else {
-                        $db = $envs->filter(function ($env) {
-                            return str($env)->startsWith('MYSQL_DATABASE=');
-                        })->first();
+                        $this->recordUndeterminedDatabases('MARIADB_DATABASE or MYSQL_DATABASE');
 
-                        if ($db) {
-                            $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
-                        } else {
-                            $databasesToBackup = $this->configuredDatabasesToBackup();
-                            if (blank($databasesToBackup)) {
-                                $this->recordUndeterminedDatabases('MARIADB_DATABASE or MYSQL_DATABASE');
-
-                                return;
-                            }
-                        }
+                        return;
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
@@ -942,10 +933,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
-            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $s3->trustedInternalHosts()))
-                ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
-                ->implode(' ');
-            $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
+            $resolveOptions = $s3->minioClientResolveOptions($this->server, $fullImageName, $network);
 
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
@@ -1104,7 +1092,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Databases picked on the backup, for service databases whose container does not name one.
+     * Databases picked in the backup settings of a service database. They take priority over the
+     * database that the container env names, as for standalone databases.
      *
      * @return string|array<int, string>|null
      */

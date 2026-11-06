@@ -66,6 +66,8 @@ class GiteaPrivateRepository extends Component
 
     private function getGiteaApp(): GiteaApp
     {
+        $this->authorize('useTeamCredentials');
+
         return GiteaApp::private()->where('id', $this->gitea_app_id)->firstOrFail();
     }
 
@@ -165,6 +167,7 @@ class GiteaPrivateRepository extends Component
     {
         try {
             $this->authorize('create', Application::class);
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 
             $validator = validator([
                 'selected_repository_path' => $this->selected_repository_path,

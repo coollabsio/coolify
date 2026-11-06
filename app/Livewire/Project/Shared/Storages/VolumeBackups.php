@@ -246,7 +246,7 @@ class VolumeBackups extends Component
 
     public function delete(?string $password = null, array $selectedActions = []): bool|string
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -282,7 +282,7 @@ class VolumeBackups extends Component
 
     public function cleanupFailed(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         $deletedCount = $this->backup?->executions()
             ->where('status', 'failed')
@@ -301,7 +301,7 @@ class VolumeBackups extends Component
 
     public function cleanupDeleted(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         $deletedCount = $this->backup?->executions()
             ->where('local_storage_deleted', true)
@@ -369,7 +369,7 @@ class VolumeBackups extends Component
 
     public function deleteBackup(int $executionId, string $password, array $selectedActions = []): bool|string
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';

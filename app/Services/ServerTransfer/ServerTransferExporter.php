@@ -3,6 +3,7 @@
 namespace App\Services\ServerTransfer;
 
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
 use App\Models\DnsProviderZone;
@@ -437,6 +438,16 @@ class ServerTransferExporter
         });
         if ($usesSystemWideGitea) {
             $warnings[] = 'Some applications use a system-wide Gitea App, which is not exported. On import, Coolify will re-link to a matching system-wide Gitea App on the target instance (by UUID) if one exists.';
+        }
+
+        $hasActivePreviewGithubDeployments = ApplicationDeploymentQueue::query()
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->where('pull_request_id', '!=', 0)
+            ->whereNotNull('github_deployment_id')
+            ->where(fn ($query) => $query->whereNull('github_deployment_state')->orWhere('github_deployment_state', '!=', 'inactive'))
+            ->exists();
+        if ($hasActivePreviewGithubDeployments) {
+            $warnings[] = 'Deployment history is not transferred, so the target instance cannot mark the GitHub Deployments of current preview deployments as inactive when their pull requests close. Mark them as inactive on GitHub, or redeploy the previews on the target instance.';
         }
 
         if ($dependencies['s3_storages']->isNotEmpty()) {
@@ -1337,6 +1348,9 @@ class ServerTransferExporter
                 'container' => $task->container,
                 'timeout' => $task->timeout,
                 'enabled' => (bool) ($task->enabled ?? true),
+                'failure_count' => (int) $task->failure_count,
+                'failing_since' => $task->failing_since?->toIso8601String(),
+                'auto_disabled_at' => $task->auto_disabled_at?->toIso8601String(),
             ];
         }
 
@@ -1417,6 +1431,7 @@ class ServerTransferExporter
             'contents' => $app->contents,
             'metadata' => $app->metadata,
             'pull_requests' => $app->pull_requests,
+            'deployments' => $app->deployments,
             'administration' => $app->administration,
             'organization_self_hosted_runners' => $app->organization_self_hosted_runners,
             'actions' => $app->actions,

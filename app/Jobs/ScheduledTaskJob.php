@@ -11,6 +11,7 @@ use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Team;
+use App\Notifications\ScheduledTask\TaskAutoDisabled;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
 use App\Services\ScheduledJobDeliveryService;
@@ -199,6 +200,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                         'status' => 'success',
                         'message' => $this->task_output,
                     ]);
+                    $this->task->recordRunSuccess();
 
                     $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
 
@@ -346,5 +348,15 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
         // Notify team about permanent failure
         $this->team?->notify(new TaskFailed($this->task, $safeErrorMessage));
+
+        if ($this->task->recordRunFailure()) {
+            auditLog('scheduled_task.auto_disabled', [
+                'team_id' => $this->task->team_id,
+                'scheduled_task_uuid' => $this->task->uuid,
+                'scheduled_task_name' => $this->task->name,
+                'failure_count' => $this->task->failure_count,
+            ], 'warning');
+            $this->team?->notify(new TaskAutoDisabled($this->task));
+        }
     }
 }

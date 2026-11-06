@@ -42,6 +42,8 @@ class NotificationsController extends Controller
                     'smtp_ehlo_domain' => ['sometimes', 'nullable', 'string', 'max:255', new ValidHostname],
                     'resend_enabled' => 'sometimes|boolean',
                     'resend_api_key' => 'sometimes|nullable|string|max:255',
+                    'resend_from_address' => 'sometimes|nullable|email',
+                    'resend_from_name' => 'sometimes|nullable|string|max:255',
                     'use_instance_email_settings' => 'sometimes|boolean',
                     'deployment_success_email_notifications' => 'sometimes|boolean',
                     'deployment_failure_email_notifications' => 'sometimes|boolean',

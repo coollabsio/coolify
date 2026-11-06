@@ -8,7 +8,7 @@
 
 Open source & free forever, backed by our [philosophy](https://coolify.io/philosophy).
 
-![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
+![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=stable.coolify.version&style=for-the-badge
 )
 
 [Website](https://coolify.io) · [Documentation](https://coolify.io/docs) · [Cloud](https://app.coolify.io) · [Discord](https://coollabs.io/discord) · [Community](https://github.com/coollabsio/coolify/discussions)
@@ -71,7 +71,6 @@ Thank you so much!
 
 ### Huge Sponsors
 
-* [Context.dev](https://www.context.dev/) - Web scraping API for AI agents
 * [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
 * [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
 * [MVPS](https://www.mvps.net) - Cheap VPS servers at the highest possible quality
@@ -137,7 +136,6 @@ Thank you so much!
 <a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://cdn.coollabs.io/sponsors/piloterr.svg"/></a>
 <a href="https://yoxel.com/?utm_source=coolify.io"><img width="60px" alt="Alexey Panteleev" src="https://github.com/aspantel.png"/></a>
 <a href="https://summyt.app?utm_source=coolify.io"><img width="60px" alt="SummYT - YouTube Summarizer" src="https://summyt.app/logo.svg"/></a>
-<a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
 <a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="Xaman" src="https://github.com/XamanApp.png"/></a>
 <a href="https://monadical.com/?utm_source=coolify.io"><img width="60px" alt="Monadical" src="https://github.com/Monadical-SAS.png"/></a>
 <a href="https://maas.engineering/?utm_source=coolify.io"><img width="60px" alt="Magic as a Service" src="https://github.com/magicasaservice.png"/></a>
@@ -164,6 +162,7 @@ Thank you so much!
 <a href="https://interviewpal.com"><img width="60px" alt="InterviewPal" src="https://cdn.coollabs.io/sponsors/interviewpal.svg"/></a>
 <a href="https://decidable.no?utm_source=coolify.io"><img width="60px" alt="Decidable" src="https://github.com/Decidable-AS.png"/></a>
 <a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
+<a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 

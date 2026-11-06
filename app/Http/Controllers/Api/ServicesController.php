@@ -18,6 +18,7 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -78,12 +79,7 @@ class ServicesController extends Controller
             $service->makeHidden(['value', 'real_value']);
         }
 
-        $payload = serializeApiResponse($service);
-        if ($service instanceof Service && filled(data_get($payload, 'docker_compose'))) {
-            $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $service);
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($service, serializeApiResponse($service));
     }
 
     /**
@@ -1342,6 +1338,7 @@ class ServicesController extends Controller
         }
         // URLs of some containers can be saved before a later container fails, so release before any error response.
         $this->queueReleaseOfRemovedServiceHostnames($service, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($service, array_merge(...array_values($previousDnsHostnames)));
         if ($urlResult !== null) {
             if (isset($urlResult['errors'])) {
                 return response()->json([
@@ -1487,7 +1484,6 @@ class ServicesController extends Controller
                         properties: [
                             'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
-                            'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
@@ -1631,7 +1627,6 @@ class ServicesController extends Controller
                                     properties: [
                                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
-                                        'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
@@ -1764,7 +1759,6 @@ class ServicesController extends Controller
                     properties: [
                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
-                        'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
@@ -3046,7 +3040,7 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $this->authorize('update', $service);
+        $this->authorize('delete', $service);
 
         $storageUuid = $request->route('storage_uuid');
 

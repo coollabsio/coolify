@@ -54,13 +54,13 @@
                 wire:loading.attr="inert" wire:target="search">
             @if ($activeTab === 'managed')
                 @if ($resources->total() > 0)
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-resources-managed-table-grid">
-                            <span>Name</span>
-                            <span>Project</span>
-                            <span>Environment</span>
-                            <span>Type</span>
-                            <span>Status</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Project" asc="project_asc" desc="project_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Environment" asc="environment_asc" desc="environment_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="setSort" :current="$sort" />
                         </div>
                         @foreach ($resources as $resource)
                             @php($resourceStatus = (string) data_get($resource, 'status', 'unknown'))
@@ -111,12 +111,12 @@
                 @endif
             @else
                 @if ($resources->total() > 0)
-                    <div class="data-table">
+                    <div class="data-table transition-opacity" wire:loading.class="opacity-50 pointer-events-none" wire:target="setSort">
                         <div class="data-table-header server-resources-unmanaged-table-grid">
-                            <span>Name</span>
-                            <span>Image</span>
-                            <span>Status</span>
-                            <span>Actions</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Image" asc="image_asc" desc="image_desc" action="setSort" :current="$sort" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="setSort" :current="$sort" />
+                            <span class="text-right">Actions</span>
                         </div>
                         @foreach ($resources as $resource)
                             @php($containerState = (string) data_get($resource, 'State', 'unknown'))
@@ -134,30 +134,39 @@
                                             ? 'success'
                                             : ($containerState === 'exited' ? 'error' : 'warning')" />
                                 </div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    @if ($containerState === 'running')
-                                        <x-forms.button canGate="update" :canResource="$server"
-                                            wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                            wire:key="restart-{{ data_get($resource, 'ID') }}">
-                                            Restart
-                                        </x-forms.button>
-                                        <x-forms.button canGate="update" :canResource="$server" isError
-                                            wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                            wire:key="stop-{{ data_get($resource, 'ID') }}">
-                                            Stop
-                                        </x-forms.button>
-                                    @elseif ($containerState === 'exited')
-                                        <x-forms.button canGate="update" :canResource="$server"
-                                            wire:click="startUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                            wire:key="start-{{ data_get($resource, 'ID') }}">
-                                            Start
-                                        </x-forms.button>
-                                    @elseif ($containerState === 'restarting')
-                                        <x-forms.button canGate="update" :canResource="$server"
-                                            wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                            wire:key="stop-restarting-{{ data_get($resource, 'ID') }}">
-                                            Stop
-                                        </x-forms.button>
+                                <div class="flex justify-end">
+                                    @if (in_array($containerState, ['running', 'exited', 'restarting'], true))
+                                        @can('update', $server)
+                                            @if ($containerState === 'running')
+                                                <x-table.row-actions label="Container actions">
+                                                    <x-table.row-action
+                                                        wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                        wire:key="restart-{{ data_get($resource, 'ID') }}">
+                                                        Restart
+                                                    </x-table.row-action>
+                                                    <x-table.row-action
+                                                        wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                        wire:key="stop-{{ data_get($resource, 'ID') }}">
+                                                        Stop
+                                                    </x-table.row-action>
+                                                </x-table.row-actions>
+                                            @elseif ($containerState === 'exited')
+                                                <button type="button" class="icon-button shrink-0"
+                                                    wire:click="startUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                    wire:key="start-{{ data_get($resource, 'ID') }}"
+                                                    title="Start container" aria-label="Start container">
+                                                    <x-reicon name="play-circle" class="size-3.5" />
+                                                </button>
+                                            @else
+                                                <button type="button"
+                                                    class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                    wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                    wire:key="stop-restarting-{{ data_get($resource, 'ID') }}"
+                                                    title="Stop container" aria-label="Stop container">
+                                                    <x-reicon name="stop-circle" class="size-3.5" />
+                                                </button>
+                                            @endif
+                                        @endcan
                                     @endif
                                 </div>
                             </div>

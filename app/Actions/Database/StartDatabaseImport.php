@@ -19,6 +19,7 @@ use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -32,6 +33,8 @@ class StartDatabaseImport
     public const MAX_BYTES = 10 * 1024 * 1024 * 1024;
 
     public const LOCK_SECONDS = 1800;
+
+    public const OWN_BACKUPS_ONLY_MESSAGE = 'You can import only backups of this database. Importing other files needs write access on the whole team.';
 
     /**
      * Added to the SSH command timeout, so the remote restore ends (or times out) before the job.
@@ -57,6 +60,32 @@ class StartDatabaseImport
     public static function lockKey(string $resourceUuid): string
     {
         return "database-import:{$resourceUuid}";
+    }
+
+    /**
+     * True when the server path or S3 key can be imported into the database. Without write access on the whole
+     * team, a user can import only the backups of this database, not the files of other resources.
+     */
+    public static function allowsSourcePath(Model $resource, string $path): bool
+    {
+        if (Gate::allows('useTeamCredentials', $resource)) {
+            return true;
+        }
+
+        $teamId = $resource->team()?->id;
+        if ($teamId === null) {
+            return false;
+        }
+
+        // Same folders as DatabaseBackupJob. S3 keys are the local backup path without the leading slash.
+        // The folder names end with the team ID and the database container name, so a rename keeps old backups.
+        $directorySuffix = $resource instanceof ServiceDatabase
+            ? $resource->name.'-'.$resource->service?->uuid
+            : $resource->uuid;
+        $pattern = '#^'.preg_quote(backup_dir().'/databases/', '#').'[^/]*-'.preg_quote((string) $teamId, '#')
+            .'/[^/]*-'.preg_quote((string) $directorySuffix, '#').'/[^/]+$#';
+
+        return preg_match($pattern, '/'.ltrim($path, '/')) === 1;
     }
 
     public function handle(Model $resource, DatabaseImportSource $source, int $teamId): Activity
@@ -139,6 +168,9 @@ class StartDatabaseImport
             $cleanup['serverTmpPath'] = $serverPath;
         } elseif ($source->type === 'server') {
             $this->assertServerPath($source->path);
+            if (! self::allowsSourcePath($resource, $source->path)) {
+                throw new DatabaseImportException(self::OWN_BACKUPS_ONLY_MESSAGE, 403);
+            }
             $size = (int) trim((string) instant_remote_process(['stat -c %s -- '.escapeshellarg($source->path)], $server));
             if ($size < 1 || $size > self::MAX_BYTES) {
                 throw new DatabaseImportException('The backup file is empty or exceeds the 10 GiB limit.');
@@ -154,15 +186,18 @@ class StartDatabaseImport
             }
             $key = ltrim((string) $source->path, '/');
             $this->assertS3Path($key);
+            if (! self::allowsSourcePath($resource, $key)) {
+                throw new DatabaseImportException(self::OWN_BACKUPS_ONLY_MESSAGE, 403);
+            }
             $disk = $storage->filesystem();
             if (! $disk->exists($key) || $disk->size($key) > self::MAX_BYTES) {
                 throw new DatabaseImportException('The S3 backup was not found or exceeds the 10 GiB limit.');
             }
             $helper = "s3-restore-{$operation}";
-            $this->startS3Helper($storage, $server, $helper, $network);
+            $resolveOptions = $this->startS3Helper($storage, $server, $helper, $network);
             $sourceArg = escapeshellarg("s3temp/{$storage->bucket}/{$key}");
             $commandList = [
-                'docker exec '.escapeshellarg($helper).' mc cp '.$sourceArg.' /tmp/restore',
+                'docker exec '.escapeshellarg($helper).' mc cp'.$resolveOptions.' '.$sourceArg.' /tmp/restore',
                 ...$this->streamFromHelper($helper, $container, $containerPath),
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
             ];
@@ -294,10 +329,12 @@ class StartDatabaseImport
      * Starts the S3 restore helper and sets its `s3temp` mc alias. The S3 keys go to mc through the
      * stdin of a separate SSH process, so they are not in the arguments of any process on Coolify or
      * on the server. The helper is removed when either step fails.
+     *
+     * @return string The mc `--resolve` option that pins the endpoint host.
      */
-    private function startS3Helper(S3Storage $storage, Server $server, string $helper, string $network): void
+    private function startS3Helper(S3Storage $storage, Server $server, string $helper, string $network): string
     {
-        $image = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+        $image = coolifyHelperImage().':'.getHelperVersion();
 
         try {
             instant_remote_process([
@@ -305,9 +342,12 @@ class StartDatabaseImport
                 'docker run -d --network '.escapeshellarg($network)
                     .' --name '.escapeshellarg($helper)
                     .' '.$storage->minioClientRegionOption()
-                    .' '.$image.' sleep 86400',
+                    .' '.escapeshellarg($image).' sleep 86400',
             ], $server);
-            $this->setMinioClientAlias($storage, $server, $helper);
+            $resolveOptions = $storage->minioClientResolveOptions($server, $image, $network);
+            $this->setMinioClientAlias($storage, $server, $helper, $resolveOptions);
+
+            return $resolveOptions;
         } catch (Throwable) {
             instant_remote_process(['docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true'], $server, throwError: false);
 
@@ -315,10 +355,10 @@ class StartDatabaseImport
         }
     }
 
-    private function setMinioClientAlias(S3Storage $storage, Server $server, string $helper): void
+    private function setMinioClientAlias(S3Storage $storage, Server $server, string $helper, string $resolveOptions): void
     {
         $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($helper)
-            .' mc alias set'.$storage->minioClientAliasOptions().' s3temp '.escapeshellarg((string) $storage->endpoint).' >/dev/null';
+            .' mc alias set'.$resolveOptions.$storage->minioClientAliasOptions().' s3temp '.escapeshellarg((string) $storage->endpoint).' >/dev/null';
         $timeout = (int) config('constants.ssh.command_timeout');
 
         SshRetryHandler::retry(

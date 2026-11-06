@@ -9,13 +9,27 @@
         'name' => strtolower($backup->targetName()),
         'type' => strtolower($backup->targetType()),
         'frequency' => strtolower($backup->frequency),
-        'createdAt' => $backup->created_at?->timestamp ?? 0,
+        'status' => match ($backup->latestExecution?->status) {
+            'running' => 'in progress',
+            'success' => 'success',
+            'failed' => 'failed',
+            default => $backup->enabled ? 'waiting' : 'disabled',
+        },
+        's3' => $backup->save_s3 ? ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId)->count() : -1,
+        'lastRunAt' => $backup->latestExecution?->finished_at?->timestamp ?? ($backup->latestExecution?->status === 'running' ? now()->timestamp : 0),
     ])->concat($databaseBackups->map(fn ($backup) => [
         'id' => 'database:'.$backup->id,
         'name' => strtolower($backup->database->human_name ?: $backup->database->name),
         'type' => 'database',
         'frequency' => strtolower($backup->frequency),
-        'createdAt' => $backup->created_at?->timestamp ?? 0,
+        'status' => match ($backup->latest_log?->status) {
+            'running' => 'in progress',
+            'success' => 'success',
+            'failed' => 'failed',
+            default => $backup->enabled ? 'waiting' : 'disabled',
+        },
+        's3' => $backup->save_s3 ? ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId)->count() : -1,
+        'lastRunAt' => $backup->latest_log?->finished_at?->timestamp ?? ($backup->latest_log?->status === 'running' ? now()->timestamp : 0),
     ]))->values()),
     filterOptions: @js(collect([['value' => 'all', 'label' => 'All targets']])->merge(
         $backups->map(fn ($backup) => [
@@ -23,12 +37,6 @@
             'label' => $backup->targetType(),
         ])->push(['value' => 'database', 'label' => 'Database'])->unique('value')->values()
     )->values()),
-    sortOptions: [
-        { value: 'target_asc', label: 'Target A–Z' },
-        { value: 'target_desc', label: 'Target Z–A' },
-        { value: 'newest', label: 'Newest first' },
-        { value: 'oldest', label: 'Oldest first' },
-    ],
     get filteredBackups() {
         const query = this.search.toLowerCase();
         const filtered = this.backups.filter((backup) => {
@@ -36,11 +44,22 @@
             const matchesType = this.typeFilter === 'all' || backup.type === this.typeFilter;
             return matchesSearch && matchesType;
         });
+        const [column, direction] = this.sortBy.split('_');
+        const sortValues = {
+            target: (backup) => backup.name,
+            type: (backup) => backup.type,
+            schedule: (backup) => backup.frequency,
+            status: (backup) => backup.status,
+            s3: (backup) => backup.s3,
+            lastrun: (backup) => backup.lastRunAt,
+        };
+        const sortValue = sortValues[column] || sortValues.target;
+        const order = direction === 'desc' ? -1 : 1;
         return filtered.sort((left, right) => {
-            if (this.sortBy === 'target_desc') return right.name.localeCompare(left.name);
-            if (this.sortBy === 'newest') return right.createdAt - left.createdAt;
-            if (this.sortBy === 'oldest') return left.createdAt - right.createdAt;
-            return left.name.localeCompare(right.name);
+            const leftValue = sortValue(left);
+            const rightValue = sortValue(right);
+            return order * (typeof leftValue === 'number' ? leftValue - rightValue : leftValue.localeCompare(rightValue)) ||
+                left.name.localeCompare(right.name);
         });
     },
     isVisible(id) {
@@ -191,32 +210,10 @@
                     </button></x-slot:trigger>
                         <template x-for="option in filterOptions" :key="option.value">
                             <button type="button"
-                                class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                class="listbox-option"
                                 x-on:click="typeFilter = option.value; close()">
                                 <span class="flex-1" x-text="option.label"></span>
                                 <svg x-show="typeFilter === option.value" class="size-3.5 text-black dark:text-fg"
-                                    viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                        </template>
-                </x-table.dropdown>
-
-                <x-table.dropdown panel-class="w-48!">
-                    <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
-                        <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3" stroke="currentColor"
-                                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        Sort
-                    </button></x-slot:trigger>
-                        <template x-for="option in sortOptions" :key="option.value">
-                            <button type="button"
-                                class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                x-on:click="sortBy = option.value; close()">
-                                <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
                                     viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                     <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                         stroke-linecap="round" stroke-linejoin="round" />
@@ -241,12 +238,12 @@
                 <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
                     <div class="flex min-w-[64rem] flex-col">
                     <div class="data-table-header backup-table-grid service-backup-table-grid">
-                        <span>Target</span>
-                        <span>Type</span>
-                        <span>Schedule</span>
-                        <span>Status</span>
-                        <span>S3</span>
-                        <span>Last run</span>
+                        <x-table.sort-header label="Target" asc="target_asc" desc="target_desc" />
+                        <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" />
+                        <x-table.sort-header label="Schedule" asc="schedule_asc" desc="schedule_desc" />
+                        <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" />
+                        <x-table.sort-header label="S3" asc="s3_asc" desc="s3_desc" />
+                        <x-table.sort-header label="Last run" asc="lastrun_asc" desc="lastrun_desc" first="desc" />
                         <span class="text-right">Actions</span>
                     </div>
 
@@ -279,7 +276,12 @@
                             <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg">
                                 {{ $databaseBackup->database->human_name ?: $databaseBackup->database->name }}
                             </span>
-                            <span>Database</span>
+                            <span class="min-w-0">
+                                <button type="button" class="table-filter-value"
+                                    title="Filter by Database"
+                                    x-on:click.stop="typeFilter = typeFilter === 'database' ? 'all' : 'database'"
+                                    x-on:keydown.enter.stop>Database</button>
+                            </span>
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
@@ -288,18 +290,17 @@
                                     :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
-                            <span class="flex justify-end gap-2" x-on:keydown.enter.stop>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    :disabled="! str($databaseBackup->database->status)->startsWith('running')"
-                                    :tooltip="! str($databaseBackup->database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
-                                    wire:click.stop="backupNow('database', '{{ $databaseBackup->uuid }}')"
-                                    wire:target="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-forms.button>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
-                                    title="Edit backup schedule" aria-label="Edit backup schedule"
-                                    wire:click.stop="openSchedule('{{ $databaseBackup->uuid }}')">
-                                    <x-reicon name="settings" class="size-4" />
-                                </x-forms.button>
+                            <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
+                                @can('update', $service)
+                                    <x-table.row-actions label="Backup schedule actions">
+                                        <x-table.row-action
+                                            :disabled="! str($databaseBackup->database->status)->startsWith('running')"
+                                            :title="! str($databaseBackup->database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
+                                            wire:click="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-table.row-action>
+                                        <x-table.row-action
+                                            wire:click="openSchedule('{{ $databaseBackup->uuid }}')">Edit</x-table.row-action>
+                                    </x-table.row-actions>
+                                @endcan
                             </span>
                         </div>
                     @endforeach
@@ -333,7 +334,12 @@
                                 title="{{ $backup->targetName() }}">
                                 {{ $backup->targetName() }}
                             </span>
-                            <span>{{ $backup->targetType() }}</span>
+                            <span class="min-w-0">
+                                <button type="button" class="table-filter-value"
+                                    title="Filter by {{ $backup->targetType() }}"
+                                    x-on:click.stop="typeFilter = typeFilter === @js(strtolower($backup->targetType())) ? 'all' : @js(strtolower($backup->targetType()))"
+                                    x-on:keydown.enter.stop>{{ $backup->targetType() }}</button>
+                            </span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
@@ -344,16 +350,15 @@
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
-                            <span class="flex justify-end gap-2" x-on:keydown.enter.stop>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    wire:click.stop="backupNow('storage', '{{ $backup->uuid }}')"
-                                    wire:target="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-forms.button>
-                                <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
-                                    title="Edit backup schedule" aria-label="Edit backup schedule"
-                                    wire:click.stop="openSchedule('{{ $backup->uuid }}')">
-                                    <x-reicon name="settings" class="size-4" />
-                                </x-forms.button>
+                            <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
+                                @can('update', $service)
+                                    <x-table.row-actions label="Backup schedule actions">
+                                        <x-table.row-action
+                                            wire:click="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-table.row-action>
+                                        <x-table.row-action
+                                            wire:click="openSchedule('{{ $backup->uuid }}')">Edit</x-table.row-action>
+                                    </x-table.row-actions>
+                                @endcan
                             </span>
                         </div>
                     @endforeach

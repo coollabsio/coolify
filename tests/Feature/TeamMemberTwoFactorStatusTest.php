@@ -91,7 +91,6 @@ test('the member row renders a disabled badge when two factor is not configured'
 
     Livewire::test(Member::class, ['member' => $memberWithoutTwoFactor])
         ->assertSee('Two-factor authentication is disabled')
-        ->assertSeeHtml('M18.4697 19.5303')
         ->assertDontSee('Two-factor authentication is enabled');
 });
 
@@ -142,4 +141,22 @@ test('the summary confirms when every member has two factor authentication', fun
     Livewire::test(Index::class)
         ->assertSee('All members have two-factor authentication enabled')
         ->assertDontSee('do not have two-factor authentication enabled');
+});
+
+test('the members table sorts by role rank and only sends two factor status to member managers', function () {
+    $owner = createTeamMember($this->team, 'owner', twoFactorEnabled: true);
+    $member = createTeamMember($this->team, 'member');
+
+    actAsTeamMember($owner, $this->team);
+    Livewire::test(Index::class)
+        ->assertSee('Sort by role', false)
+        ->assertSee('Sort by 2fa', false)
+        ->assertSee('\\u0022roleRank\\u0022:3', false)
+        ->assertSee('\\u0022twoFactor\\u0022:true', false);
+
+    actAsTeamMember($member, $this->team);
+    Livewire::test(Index::class)
+        ->assertDontSee('Sort by 2fa', false)
+        ->assertSee('\\u0022twoFactor\\u0022:null', false)
+        ->assertDontSee('\\u0022twoFactor\\u0022:true', false);
 });

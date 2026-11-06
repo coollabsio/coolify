@@ -53,7 +53,7 @@ class Create extends Component
     public function createGitHubApp()
     {
         try {
-            $this->authorize('createAnyResource');
+            $this->authorize('create', GithubApp::class);
 
             $this->organization = normalizeGithubOrganization($this->organization);
             $this->api_url = filled($this->api_url)

@@ -261,6 +261,7 @@ class AccessResolver
 
     /**
      * Layers of the authenticated user (and token) in their current team, for list queries.
+     * The token team comes first: the canvas API runs with the session, but its token is for the canvas team.
      *
      * @return list<AccessGrants>
      */
@@ -275,7 +276,7 @@ class AccessResolver
             return [];
         }
 
-        $teamId = data_get(session('currentTeam'), 'id') ?? data_get($user->currentAccessToken(), 'team_id');
+        $teamId = data_get($user->currentAccessToken(), 'team_id') ?? data_get(session('currentTeam'), 'id');
         if ($teamId === null || ! $this->isMember($user, (int) $teamId)) {
             return [];
         }

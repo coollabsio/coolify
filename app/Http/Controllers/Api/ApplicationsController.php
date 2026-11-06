@@ -27,6 +27,7 @@ use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
@@ -154,12 +155,7 @@ class ApplicationsController extends Controller
             $application->settings?->makeHidden(['id', 'application_id', 'created_at', 'updated_at']);
         }
 
-        $payload = serializeApiResponse($application);
-        if ($application instanceof Application && filled(data_get($payload, 'docker_compose'))) {
-            $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $application);
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($application, serializeApiResponse($application));
     }
 
     private function applicationSettingsFromRequest(Request $request): array
@@ -219,6 +215,19 @@ class ApplicationsController extends Controller
         return response()->json([
             'message' => 'Validation failed.',
             'errors' => ['custom_internal_name' => ['Set is_consistent_container_name_enabled to true to use custom_internal_name. Coolify ignores the custom internal name while consistent container naming is turned off.']],
+        ], 422);
+    }
+
+    private function sharedImageNameValidationResponse(Application $application): ?JsonResponse
+    {
+        $otherApplication = $application->otherApplicationBuildingSameImage();
+        if (! $otherApplication) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['docker_registry_image_name' => [$application->sharedImageNameMessage($otherApplication)]],
         ], 422);
     }
 
@@ -1687,6 +1696,9 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             if (isset($isStatic)) {
@@ -1947,6 +1959,9 @@ class ApplicationsController extends Controller
             $application->source_id = $githubApp->id;
             $application->repository_project_id = $repository_project_id;
 
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
@@ -2176,6 +2191,9 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
@@ -2324,6 +2342,9 @@ class ApplicationsController extends Controller
 
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
             $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
@@ -3564,6 +3585,10 @@ class ApplicationsController extends Controller
         if ($prefixValidation = $this->containerNamePrefixValidationResponse($applicationSettings, $application->destination->server, $application)) {
             return $prefixValidation;
         }
+        $requestedImage = (clone $application)->fill($request->only(['docker_registry_image_name', 'build_pack']));
+        if ($requestedImage->isDirty(['docker_registry_image_name', 'build_pack']) && $imageNameValidation = $this->sharedImageNameValidationResponse($requestedImage)) {
+            return $imageNameValidation;
+        }
         if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
             return $internalNameValidation;
         }
@@ -3843,6 +3868,7 @@ class ApplicationsController extends Controller
             $application->parseHealthcheckFromDockerfile($application->dockerfile);
         }
         $dnsCleanup->queueReleaseOfRemovedHostnames($application, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($application, $previousDnsHostnames);
 
         auditLog('api.application.updated', [
             'team_id' => $teamId,
@@ -5058,20 +5084,25 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
-        // Validate ports_mappings
-        if ($request->has('ports_mappings')) {
-            $ports = [];
+        // Validate that each host binding (IP, port, protocol) of ports_mappings is unique
+        if (is_string($request->ports_mappings)) {
+            $hostBindings = [];
             foreach (explode(',', $request->ports_mappings) as $portMapping) {
-                $port = explode(':', $portMapping);
-                if (in_array($port[0], $ports)) {
+                // The container port is after the last ":", an empty host port makes Docker pick a free port
+                $hostBinding = preg_replace('#/(tcp|udp|sctp)#', '', substr($portMapping, 0, (int) strrpos($portMapping, ':')));
+                if ($hostBinding === '' || str_ends_with($hostBinding, ':')) {
+                    continue;
+                }
+                $protocol = preg_match('#/(udp|sctp)#', $portMapping, $matches) === 1 ? $matches[1] : 'tcp';
+                if (in_array("{$hostBinding}/{$protocol}", $hostBindings, true)) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
-                            'ports_mappings' => 'The first number before : should be unique between mappings.',
+                            'ports_mappings' => 'Each host IP, port, and protocol can only be used once.',
                         ],
                     ], 422);
                 }
-                $ports[] = $port[0];
+                $hostBindings[] = "{$hostBinding}/{$protocol}";
             }
         }
         // Validate custom_labels
@@ -5740,7 +5771,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $this->authorize('update', $application);
+        $this->authorize('delete', $application);
 
         $storageUuid = $request->route('storage_uuid');
 

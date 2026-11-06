@@ -222,10 +222,6 @@
                     : null,
                 ['id' => 'preview-deployments-section', 'label' => 'Deployments'],
             ])),
-            'project.application.healthcheck' => [
-                ['id' => 'healthcheck-configuration-section', 'label' => 'Configuration'],
-                ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
-            ],
             'project.application.resource-operations' => [
                 ['id' => 'clone-resource-section', 'label' => 'Clone resource'],
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
@@ -238,7 +234,7 @@
 
 @php
     // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
-    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu', $application->name);
 @endphp
 
 {{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.

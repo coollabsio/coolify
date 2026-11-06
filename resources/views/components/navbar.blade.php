@@ -110,6 +110,10 @@
                 // Members limited to some projects only see project pages; team-level pages return 403 for them.
                 $teamWide = app(App\Services\Access\AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
                 $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
+                // Project and environment variables need read access there; opening a parent of a granted resource is not enough.
+                $readableProjects = $teamWide ? null : App\Models\Project::ownedByCurrentTeamCached();
+                $canReadProjectVariables = $teamWide || $readableProjects->contains(fn ($project) => auth()->user()->can('viewSharedVariables', $project));
+                $canReadEnvironmentVariables = $teamWide || $readableProjects->contains(fn ($project) => $project->environments->contains(fn ($environment) => auth()->user()->can('viewSharedVariables', $environment)));
                 // An entry with children opens a submenu in place of the main menu (back button + its pages).
                 $navSections = collect([
                     'Workspace' => [
@@ -134,8 +138,8 @@
                         ['label' => 'Shared Variables', 'icon' => 'variables', 'children' => [
                             ['label' => 'Overview', 'icon' => 'dashboard', 'href' => route('shared-variables.index'), 'active' => request()->is('shared-variables'), 'visible' => $teamWide],
                             ['label' => 'Team', 'icon' => 'teams', 'href' => route('shared-variables.team.index'), 'active' => request()->is('shared-variables/team*'), 'visible' => $teamWide],
-                            ['label' => 'Projects', 'icon' => 'projects', 'href' => route('shared-variables.project.index'), 'active' => request()->is('shared-variables/projects', 'shared-variables/project/*')],
-                            ['label' => 'Environments', 'icon' => 'layers', 'href' => route('shared-variables.environment.index'), 'active' => request()->is('shared-variables/environments*')],
+                            ['label' => 'Projects', 'icon' => 'projects', 'href' => route('shared-variables.project.index'), 'active' => request()->is('shared-variables/projects', 'shared-variables/project/*'), 'visible' => $canReadProjectVariables],
+                            ['label' => 'Environments', 'icon' => 'layers', 'href' => route('shared-variables.environment.index'), 'active' => request()->is('shared-variables/environments*'), 'visible' => $canReadEnvironmentVariables],
                             ['label' => 'Servers', 'icon' => 'servers', 'href' => route('shared-variables.server.index'), 'active' => request()->is('shared-variables/servers', 'shared-variables/server/*'), 'visible' => $teamWide],
                         ]],
                     ],
@@ -158,10 +162,10 @@
                         ]],
                         ['label' => 'Keys & Tokens', 'icon' => 'keys', 'children' => [
                             ['label' => 'Private Keys', 'icon' => 'keys', 'href' => route('security.private-key.index'), 'active' => request()->is('security/private-key*'), 'visible' => $teamWide],
-                            ['label' => 'Cloud Tokens', 'icon' => 'cloud', 'href' => route('security.cloud-tokens'), 'active' => request()->is('security/cloud-tokens*'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class)],
-                            ['label' => 'Integration Tokens', 'icon' => 'network', 'href' => route('security.integration-tokens'), 'active' => request()->is('security/integration-tokens'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\IntegrationToken::class)],
-                            ['label' => 'Cloud-Init Scripts', 'icon' => 'file-content', 'href' => route('security.cloud-init-scripts'), 'active' => request()->is('security/cloud-init-scripts*'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\CloudInitScript::class)],
                             ['label' => 'API Tokens', 'icon' => 'code', 'href' => route('security.api-tokens'), 'active' => request()->is('security/api-tokens')],
+                            ['label' => 'Cloud Tokens', 'icon' => 'cloud', 'href' => route('security.cloud-tokens'), 'active' => request()->is('security/cloud-tokens*'), 'sectionStart' => true, 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class)],
+                            ['label' => 'Integration Tokens', 'icon' => 'network', 'href' => route('security.integration-tokens'), 'active' => request()->is('security/integration-tokens'), 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\IntegrationToken::class)],
+                            ['label' => 'Cloud-Init Scripts', 'icon' => 'file-content', 'href' => route('security.cloud-init-scripts'), 'active' => request()->is('security/cloud-init-scripts*'), 'sectionStart' => true, 'visible' => $teamWide && auth()->user()?->can('viewAny', App\Models\CloudInitScript::class)],
                         ]],
                         ['label' => 'Subscription', 'icon' => 'subscription', 'href' => isCloud() ? route('subscription.show') : '', 'active' => request()->is('subscription*'), 'visible' => $teamWide && isCloud() && auth()->user()->isAdmin()],
                         ['label' => 'Tags', 'icon' => 'tags', 'href' => route('tags.show'), 'active' => request()->is('tags*', 'canvas/tags'), 'visible' => $teamWide],
@@ -183,14 +187,19 @@
                         }
                         $children = array_values(array_filter($item['children'], fn (array $child): bool => (bool) ($child['visible'] ?? true)));
 
-                        return [...$item, 'children' => $children, 'href' => $children[0]['href'], 'active' => collect($children)->contains('active', true)];
+                        return [...$item, 'children' => $children, 'href' => $children[0]['href'] ?? null, 'active' => collect($children)->contains('active', true)];
                     })
-                    ->all());
+                    // A parent whose children are all hidden has nothing to open.
+                    ->reject(fn (array $item): bool => isset($item['children']) && $item['children'] === [])
+                    ->values()
+                    ->all())
+                    ->reject(fn (array $items): bool => $items === []);
                 $activeSubmenu = $navSections->flatten(1)->first(fn (array $item): bool => isset($item['children']) && $item['active']);
                 // Resource menus by depth, registered by registerMainNavContext() (e.g. from
                 // components/main-nav-menu.blade.php). Each one teleports itself into #main-nav-context-{depth}
                 // (the desktop sidebar); the mobile drawer moves it into its own slot while it shows (see init).
                 $navContext = request()->attributes->get('mainNavContext', []);
+                $navContextName = collect($navContext)->pluck('name')->filter()->last() ?? 'Resource menu';
             @endphp
             {{-- On a resource page the deepest resource menu replaces the main menu. Back shows the
                  menu one depth lower, and then the main menu (or its submenu), without leaving the page. --}}
@@ -269,6 +278,20 @@
             @endforeach
             <li x-show="navLevel === -1 && !submenu" @if ($activeSubmenu || $navContext) x-cloak @endif class="contents">
                 <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
+                    @if ($navContext)
+                        {{-- On a resource page the main menu opens the deepest resource menu again. --}}
+                        <li class="mb-1">
+                            <button type="button" @click="navLevel = {{ array_key_last($navContext) }}; navSwap = 'forward'"
+                                title="Back to the {{ $navContextName }} menu" aria-label="Back to the {{ $navContextName }} menu"
+                                class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
+                                <span class="flex-1 truncate pl-6 text-center font-medium text-black dark:text-fg"
+                                    :class="collapsed && 'lg:hidden'">{{ $navContextName }}</span>
+                                <span class="menu-back-icon flex shrink-0 items-center justify-center">
+                                    <x-reicon name="chevron-down" class="size-3 -rotate-90 text-coollabs dark:text-fg-dim" />
+                                </span>
+                            </button>
+                        </li>
+                    @endif
             @foreach ($navSections as $sectionLabel => $sectionItems)
                 {{-- The first section needs no title. --}}
                 @unless ($loop->first)

@@ -498,7 +498,11 @@ class CloudflareDnsProvider
     {
         $resourceType = $resource ? str(class_basename($resource))->snake()->value() : 'dns_record';
 
-        $source = auth()->check() ? 'ui' : 'system';
+        $source = match (true) {
+            auth()->user()?->currentAccessToken() !== null => 'api',
+            auth()->check() => 'ui',
+            default => 'system',
+        };
         auditLog("{$source}.dns_record.{$action}", [
             'team_id' => $zone->integrationToken->team_id,
             'resource' => $resourceType,

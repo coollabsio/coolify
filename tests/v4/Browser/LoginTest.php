@@ -110,6 +110,28 @@ it('submits the automatic two factor challenge only once', function () {
         ->screenshot(filename: 'login-two-factor-enter-single-submission');
 });
 
+it('shows the two factor code as separate digits', function () {
+    config(['app.maintenance.driver' => 'file']);
+
+    $user = createRootUser();
+    $user->forceFill([
+        'two_factor_secret' => Fortify::currentEncrypter()->encrypt('JBSWY3DPEHPK3PXP'),
+        'two_factor_confirmed_at' => now(),
+    ])->save();
+
+    $page = visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertPathIs('/two-factor-challenge')
+        ->screenshot(filename: 'login-two-factor-digits-empty');
+
+    $page->type('code', '123')
+        ->assertScript("[...document.querySelectorAll('[data-code-digit]')].map((box) => box.textContent).join(',')", '1,2,3,,,')
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'login-two-factor-digits-partial');
+});
+
 /**
  * Create the root user (id 0) with known credentials for browser login tests.
  */

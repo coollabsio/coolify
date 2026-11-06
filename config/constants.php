@@ -1,12 +1,15 @@
 <?php
 
+$release = json_decode(file_get_contents(dirname(__DIR__).'/release.json'), true);
+$upstream = json_decode(file_get_contents(dirname(__DIR__).'/upstream.json'), true);
+
 // 0 or an invalid value would remove the time limit of every remote command.
 $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.5.4',
-        'helper_version' => '1.0.19',
+        'version' => env('COOLIFY_VERSION') ?: $release['stable']['coolify'],
+        'helper_version' => $upstream['helper']['version'],
         'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -19,7 +22,6 @@ return [
         'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
-        'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
@@ -147,11 +149,6 @@ return [
     'webhooks' => [
         'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
         'dev_webhook' => env('SERVEO_URL'),
-    ],
-
-    'cloudflare' => [
-        'api_token' => env('CLOUDFLARE_API_TOKEN'),
-        'zone_id' => env('CLOUDFLARE_ZONE_ID'),
     ],
 
     'server_checks' => [

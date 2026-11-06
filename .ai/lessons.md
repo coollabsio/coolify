@@ -21,7 +21,6 @@
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
 - Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors. `click()` also hung on a button far down the long `/analytics` page; click it with `$page->script("document.querySelector('...').click()")` there.
 - A new worktree has no `vendor/` or `public/build/`. Run `composer install --ignore-platform-req=ext-zip` on the host and copy `public/build` from the main checkout before page-rendering tests; otherwise they fail with a Vite manifest error.
-- A running dev instance mounts the checkout, and its scheduled `CheckForUpdatesJob` writes the CDN data to `base_path('versions.json')`. Check `git diff versions.json` before you commit a version change.
 - A dev deployment that stays `in_progress` with no log lines and no `horizon_job_id` is waiting in a queue that Horizon does not serve. With `SELF_HOSTED=false` in `.env`, deployments go to the cloud `deployments` queue; run `./scripts/dev exec php artisan queue:work redis --queue=deployments --once` or fix the env.
 - Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
 - The helper image runs `docker compose` for deployments and for the Coolify upgrade itself. Before you bump its Docker CLI or Compose, test them against the oldest supported Docker Engine (for example a `docker:<version>-dind` container); newer clients can reject data from older daemons.
@@ -39,6 +38,8 @@
 - SQLite does not enforce `varchar(255)` lengths, while Postgres rejects a longer value (`SQLSTATE[22001]`). Tests cannot show a too-long name, so assert the length or the exact value of generated strings.
 
 - The Compose parsers (`parse()`, `applicationParser`, `serviceParser`) run on page mounts, refreshes, and deployments. Do not dispatch jobs or run server commands from them; let the caller that changes data start the work. Code that only needs the service names reads `docker_compose_raw` (`Application::composeServicesWithoutParse()`).
+
+- MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
@@ -156,3 +157,9 @@
 
 ## Validate input safely
 - In PCRE, `$` also matches before a final `\n`. In validation regexes, use `\z` or reject control characters first, or a trailing newline passes.
+
+## Application queries carry hidden counts
+- `Application` has a global scope `withRelations` that adds two `withCount` subqueries and `applications.*`, also to `pluck('id')` and eager loads. For ID lookups and lean eager loads, call `withoutGlobalScope('withRelations')`.
+
+## Measure database reads end to end
+- On PostgreSQL 15, `EXPLAIN (ANALYZE, BUFFERS)` does not detoast or send the selected columns, so a wide `jsonb`/`json`/`text` column does not show in it. Time the full fetch (`psql \timing` with `-o /dev/null`, or PDO `fetchAll`) as well before you blame or rule out an index.

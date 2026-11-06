@@ -190,7 +190,7 @@ function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker 
     $database = new StandaloneSqlite;
     $database->uuid = new_public_id();
     $database->name = 'sqlite-database-'.$database->uuid;
-    $database->image = 'peakimages/sqlite:3.53.4-v0.1.0';
+    $database->image = 'peakimages/sqlite:3.54.1-v0.2.0';
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

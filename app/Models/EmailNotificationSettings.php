@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasSmtpServers;
 use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 
 class EmailNotificationSettings extends Model
 {
-    use TracksDeliveryFailures;
+    use HasSmtpServers, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -28,6 +29,8 @@ class EmailNotificationSettings extends Model
 
         'resend_enabled',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
 
         'use_instance_email_settings',
 
@@ -58,6 +61,8 @@ class EmailNotificationSettings extends Model
         'smtp_username',
         'smtp_password',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
     ];
 
     protected $casts = [
@@ -73,6 +78,8 @@ class EmailNotificationSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
 
         'use_instance_email_settings' => 'boolean',
 
@@ -98,7 +105,7 @@ class EmailNotificationSettings extends Model
 
     public function isEnabled()
     {
-        return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
+        return filled(enabled_email_provider($this)) || $this->use_instance_email_settings;
     }
 
     public function notificationChannelName(): string

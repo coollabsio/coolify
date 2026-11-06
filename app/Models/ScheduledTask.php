@@ -20,6 +20,9 @@ use OpenApi\Attributes as OA;
         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.'],
+        'failure_count' => ['type' => 'integer', 'description' => 'The number of failed runs in a row.'],
+        'failing_since' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time of the first failed run in the current series of failures.'],
+        'auto_disabled_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time when Coolify disabled the task because it kept failing.'],
         'created_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the scheduled task was created.'],
         'updated_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'The date and time when the scheduled task was last updated.'],
     ],
@@ -42,6 +45,31 @@ class ScheduledTask extends BaseModel
         'service_id',
     ];
 
+    /**
+     * A task is disabled automatically when it has failed at least this many times in a row...
+     */
+    public const AUTO_DISABLE_MIN_FAILURES = 5;
+
+    /**
+     * ...and has not had a successful run for at least this many days. Both limits must be
+     * reached, so a short outage does not disable a task that runs every minute.
+     */
+    public const AUTO_DISABLE_MIN_DAYS = 3;
+
+    /**
+     * A task that is enabled again starts with a clean failure series.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $task) {
+            if ($task->isDirty('enabled') && $task->enabled) {
+                $task->failure_count = 0;
+                $task->failing_since = null;
+                $task->auto_disabled_at = null;
+            }
+        });
+    }
+
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
         return static::where('team_id', $teamId)->orderBy('created_at', 'desc');
@@ -52,7 +80,42 @@ class ScheduledTask extends BaseModel
         return [
             'enabled' => 'boolean',
             'timeout' => 'integer',
+            'failure_count' => 'integer',
+            'failing_since' => 'datetime',
+            'auto_disabled_at' => 'datetime',
         ];
+    }
+
+    public function recordRunSuccess(): void
+    {
+        if ($this->failure_count > 0 || $this->failing_since !== null) {
+            $this->failure_count = 0;
+            $this->failing_since = null;
+            $this->save();
+        }
+    }
+
+    /**
+     * Count a failed run and disable the task when it keeps failing.
+     *
+     * @return bool True when this failure disabled the task.
+     */
+    public function recordRunFailure(): bool
+    {
+        $this->refresh();
+        $this->increment('failure_count', 1, ['failing_since' => $this->failing_since ?? now()]);
+
+        if (! $this->enabled
+            || $this->failure_count < self::AUTO_DISABLE_MIN_FAILURES
+            || $this->failing_since->gt(now()->subDays(self::AUTO_DISABLE_MIN_DAYS))) {
+            return false;
+        }
+
+        $this->enabled = false;
+        $this->auto_disabled_at = now();
+        $this->save();
+
+        return true;
     }
 
     public function service()

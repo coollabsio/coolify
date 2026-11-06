@@ -17,7 +17,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 it('shows patch and minor upgrade warnings on the first proxy render', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.13',
             'v3.6' => '3.6.25',
@@ -50,7 +50,7 @@ it('shows patch and minor upgrade warnings on the first proxy render', function 
 });
 
 it('shows a warning from the saved image before version detection finishes', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => ['v3.7' => '3.7.13', 'v3.6' => '3.6.25'],
     ]);
 
@@ -96,7 +96,7 @@ it('does not treat an unapplied image as the running Traefik version', function 
 });
 
 it('ignores stale minor upgrade information for the detected Traefik version', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.8',
             'v3.6' => '3.6.23',
@@ -121,7 +121,7 @@ it('ignores stale minor upgrade information for the detected Traefik version', f
 });
 
 it('does not offer the Traefik branch already configured on a running proxy', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.8',
             'v3.6' => '3.6.23',
@@ -154,7 +154,7 @@ YAML;
 });
 
 it('still offers a newer Traefik branch than the configured image', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.8',
             'v3.6' => '3.6.23',
@@ -321,7 +321,7 @@ it('clears Traefik version state when the proxy changes', function () {
 
 it('cleans stale Traefik version state while selecting servers to check', function () {
     Bus::fake();
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => ['v3.7' => '3.7.8'],
     ]);
 

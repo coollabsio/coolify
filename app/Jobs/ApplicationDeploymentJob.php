@@ -235,6 +235,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?DeploymentImageScan $imageScan = null;
 
+    /**
+     * Build-time variables that the helper container has in its environment for build secrets.
+     *
+     * @var array<int, string>
+     */
+    private array $helperBuildSecretEnvironmentKeys = [];
+
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -374,6 +381,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $this->validateDeploymentEnvironmentVariableKeys();
             $this->ensureRegistryImageForMultipleServers();
+            $this->ensureRegistryImageIsNotShared();
             $this->warnAboutVolumesOnMultipleServers();
             $this->warnAboutMixedProxiesOnMultipleServers();
         } catch (Exception $e) {
@@ -511,7 +519,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->build_server = $buildServers->random();
-        $this->application_deployment_queue->build_server_id = $this->build_server->id;
+        // Saved now: the cancel action looks for the helper container on this server.
+        $this->application_deployment_queue->update(['build_server_id' => $this->build_server->id]);
         $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
         $this->use_build_server = true;
     }
@@ -1096,7 +1105,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $command = serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
         } else {
             $workdir = $this->workdir;
-            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}");
+            $command = executeInDocker($this->deployment_uuid, $this->withoutHelperBuildSecretEnvironment("{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}"));
         }
 
         $this->execute_remote_command([
@@ -1147,7 +1156,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 try {
                     $this->execute_remote_command(
-                        [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$start_command}"), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
+                        [executeInDocker($this->deployment_uuid, $this->withoutHelperBuildSecretEnvironment("cd {$this->workdir} && {$start_command}")), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
                 } catch (\RuntimeException $e) {
                     if (str_contains($e->getMessage(), "matching `'") || str_contains($e->getMessage(), 'unexpected EOF')) {
@@ -1192,7 +1201,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     );
                 } else {
                     $this->execute_remote_command(
-                        [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$start_command}"), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
+                        [executeInDocker($this->deployment_uuid, $this->withoutHelperBuildSecretEnvironment("cd {$this->basedir} && {$start_command}")), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
                 }
             } else {
@@ -1211,7 +1220,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $command .= " --env-file {$this->workdir}/.env";
                     $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
                     $this->execute_remote_command(
-                        [executeInDocker($this->deployment_uuid, $command), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
+                        [executeInDocker($this->deployment_uuid, $this->withoutHelperBuildSecretEnvironment($command)), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
                     $this->write_deployment_configurations();
                 }
@@ -1950,22 +1959,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
-                $domains = collect(json_decode($this->application->docker_compose_domains ?: '[]', true) ?: []);
-
-                // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
-                // Env keys always use underscore-normalized names so hyphen/dot storage keys stay valid.
-                foreach ($domains as $forServiceName => $domain) {
-                    $parsedDomain = composeDomainEntryString($domain);
-                    if (filled($parsedDomain)) {
-                        $parsedDomain = str($parsedDomain)->explode(',')->first();
-                        $coolifyUrl = Url::fromString($parsedDomain);
-                        $coolifyScheme = $coolifyUrl->getScheme();
-                        $coolifyFqdn = $coolifyUrl->getHost();
-                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
-                        $envs->push('SERVICE_URL_'.$serviceEnvKey.'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.$serviceEnvKey.'='.$coolifyFqdn);
-                    }
+                foreach ($this->composeServiceUrlVariables($this->application->docker_compose_domains) as $key => $value) {
+                    $envs->push($key.'='.$value);
                 }
 
                 // Generate SERVICE_NAME for dockercompose services from processed compose
@@ -2027,21 +2022,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             // Generate SERVICE_ variables first for dockercompose preview
             if ($this->build_pack === 'dockercompose') {
-                $domains = collect(json_decode(data_get($this->preview, 'docker_compose_domains') ?: '[]', true) ?: []);
-
-                // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
-                foreach ($domains as $forServiceName => $domain) {
-                    $parsedDomain = composeDomainEntryString($domain);
-                    if (filled($parsedDomain)) {
-                        $parsedDomain = str($parsedDomain)->explode(',')->first();
-                        $coolifyUrl = Url::fromString($parsedDomain);
-                        $coolifyScheme = $coolifyUrl->getScheme();
-                        $coolifyFqdn = $coolifyUrl->getHost();
-                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
-                        $envs->push('SERVICE_URL_'.$serviceEnvKey.'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.$serviceEnvKey.'='.$coolifyFqdn);
-                    }
+                foreach ($this->composeServiceUrlVariables(data_get($this->preview, 'docker_compose_domains')) as $key => $value) {
+                    $envs->push($key.'='.$value);
                 }
 
                 // Generate SERVICE_NAME for dockercompose services
@@ -2122,6 +2104,38 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $resolvedValue,
             allowInterpolation: $this->application->environmentVariableAllowsInterpolation($environmentVariable, $resolvedValue),
         );
+    }
+
+    /**
+     * SERVICE_URL_* and SERVICE_FQDN_* values from the compose domains. Port-suffixed variables
+     * that the parser stored (SERVICE_URL_APP_3000) get the same value with the port appended.
+     *
+     * @return array<string, string>
+     */
+    private function composeServiceUrlVariables(?string $domainsJson): array
+    {
+        $storedKeys = $this->application->environment_variables()->pluck('key');
+        $variables = [];
+        foreach (json_decode($domainsJson ?: '[]', true) ?: [] as $forServiceName => $domain) {
+            $parsedDomain = composeDomainEntryString($domain);
+            if (blank($parsedDomain)) {
+                continue;
+            }
+            $url = Url::fromString(str($parsedDomain)->explode(',')->first())->withPort(null);
+            $values = ['URL' => $url->__toString(), 'FQDN' => $url->getHost()];
+            $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper()->value();
+            foreach ($values as $type => $value) {
+                $variables["SERVICE_{$type}_{$serviceEnvKey}"] = $value;
+            }
+            $pattern = '/^SERVICE_(URL|FQDN)_'.preg_quote($serviceEnvKey, '/').'_(\d+)$/';
+            foreach ($storedKeys as $key) {
+                if (preg_match($pattern, $key, $matches)) {
+                    $variables[$key] = "{$values[$matches[1]]}:{$matches[2]}";
+                }
+            }
+        }
+
+        return $variables;
     }
 
     private function isGeneratedDockerComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool
@@ -2345,19 +2359,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
-                $domains = collect(json_decode($this->application->docker_compose_domains ?: '[]', true) ?: []);
-                foreach ($domains as $forServiceName => $domain) {
-                    $parsedDomain = composeDomainEntryString($domain);
-                    if (filled($parsedDomain)) {
-                        $parsedDomain = str($parsedDomain)->explode(',')->first();
-                        $coolifyUrl = Url::fromString($parsedDomain);
-                        $coolifyScheme = $coolifyUrl->getScheme();
-                        $coolifyFqdn = $coolifyUrl->getHost();
-                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
-                        $envs_dict['SERVICE_URL_'.$serviceEnvKey] = escapeBashEnvValue($coolifyUrl->__toString());
-                        $envs_dict['SERVICE_FQDN_'.$serviceEnvKey] = escapeBashEnvValue($coolifyFqdn);
-                    }
+                foreach ($this->composeServiceUrlVariables($this->application->docker_compose_domains) as $key => $value) {
+                    $envs_dict[$key] = escapeBashEnvValue($value);
                 }
             } else {
                 // Generate SERVICE_NAME for preview deployments
@@ -2368,19 +2371,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
-                $domains = collect(json_decode(data_get($this->preview, 'docker_compose_domains') ?: '[]', true) ?: []);
-                foreach ($domains as $forServiceName => $domain) {
-                    $parsedDomain = composeDomainEntryString($domain);
-                    if (filled($parsedDomain)) {
-                        $parsedDomain = str($parsedDomain)->explode(',')->first();
-                        $coolifyUrl = Url::fromString($parsedDomain);
-                        $coolifyScheme = $coolifyUrl->getScheme();
-                        $coolifyFqdn = $coolifyUrl->getHost();
-                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
-                        $envs_dict['SERVICE_URL_'.$serviceEnvKey] = escapeBashEnvValue($coolifyUrl->__toString());
-                        $envs_dict['SERVICE_FQDN_'.$serviceEnvKey] = escapeBashEnvValue($coolifyFqdn);
-                    }
+                foreach ($this->composeServiceUrlVariables(data_get($this->preview, 'docker_compose_domains')) as $key => $value) {
+                    $envs_dict[$key] = escapeBashEnvValue($value);
                 }
             }
         }
@@ -2602,6 +2594,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         throw new DeploymentException('Before deploying to multiple servers, you must set a Docker image in the General tab. More information: https://coolify.io/docs/knowledge-base/server/multiple-servers');
+    }
+
+    /**
+     * Two applications that build the same Docker image name overwrite each other's image tags.
+     */
+    private function ensureRegistryImageIsNotShared(): void
+    {
+        $otherApplication = $this->application->otherApplicationBuildingSameImage();
+        if ($otherApplication) {
+            throw new DeploymentException($this->application->sharedImageNameMessage($otherApplication));
+        }
     }
 
     /**
@@ -5278,8 +5281,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $timeout = $this->application->settings->deploymentStopGracePeriodSeconds();
 
             if ($skipRemove) {
+                // The helper container (started with --rm) must also stop when the deployment was cancelled.
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true, 'skip_cancellation_check' => true]
                 );
             } else {
                 $this->execute_remote_command(
@@ -5517,6 +5521,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_docker_env_flags_for_secrets()
     {
+        $this->helperBuildSecretEnvironmentKeys = [];
+
         // Only generate env flags if build secrets are enabled and the deployment builds an image
         if (! $this->application->settings->use_build_secrets || ! $this->deploymentPassesBuildtimeVariables()) {
             return '';
@@ -5540,24 +5546,49 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return '';
         }
 
-        // Get database env vars to check for multiline flag
-        $env_vars = $this->pull_request_id === 0
-            ? $this->application->environment_variables()->where('is_buildtime', true)->get()
-            : $this->application->environment_variables_preview()->where('is_buildtime', true)->get();
-
-        // Map to simple array format for the helper function
-        $vars_array = $variables->map(function ($value, $key) use ($env_vars) {
-            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build secret environment');
-            $env = $env_vars->firstWhere('key', $key);
-
-            return [
-                'key' => $key,
-                'value' => $value,
-                'is_multiline' => $env ? $env->is_multiline : false,
-            ];
-        });
+        $vars_array = $this->withRawBuildSecretValues($variables)->map(fn ($value, $key): array => [
+            'key' => $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build secret environment'),
+            'value' => $value,
+        ]);
+        $this->helperBuildSecretEnvironmentKeys = $vars_array->keys()->map(fn ($key): string => (string) $key)->values()->all();
 
         return generateDockerEnvFlags($vars_array);
+    }
+
+    /**
+     * The build-time values are escaped or quoted for .env files and shell build arguments, where the
+     * shell removes the escapes again. A build secret gets its value from the helper container as it
+     * is, so it gets the raw value of each variable instead.
+     *
+     * @param  Collection<string, mixed>  $variables
+     * @return Collection<string, mixed>
+     */
+    private function withRawBuildSecretValues(Collection $variables): Collection
+    {
+        $environmentVariables = $this->pull_request_id === 0
+            ? $this->application->environment_variables()
+            : $this->application->environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues());
+        $rawValues = $environmentVariables
+            ->where('is_buildtime', true)
+            ->whereIn('key', $variables->keys()->all())
+            ->get()
+            ->mapWithKeys(fn (EnvironmentVariable $env): array => [$env->key => $this->resolve_environment_variable_raw($env)]);
+
+        return $variables->map(fn ($value, $key) => $rawValues->get($key, $value));
+    }
+
+    /**
+     * Docker Compose prefers the process environment over `--env-file`. A command in the helper container
+     * that pulls or starts services must not see the build-time values that the container holds for build
+     * secrets, so the services get the values of the runtime .env file.
+     */
+    private function withoutHelperBuildSecretEnvironment(string $command): string
+    {
+        if ($this->helperBuildSecretEnvironmentKeys === []) {
+            return $command;
+        }
+
+        return 'unset '.implode(' ', $this->helperBuildSecretEnvironmentKeys)."; {$command}";
     }
 
     private function generate_build_secrets(Collection $variables)
@@ -5577,7 +5608,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ->implode(' ');
 
         // Docker ignores secret values for the build cache, so the hash goes in as a build arg
-        $this->build_secrets .= ' --build-arg '.escapeshellarg('COOLIFY_BUILD_SECRETS_HASH='.$this->generate_secrets_hash($variables));
+        $this->build_secrets .= ' --build-arg '.escapeshellarg('COOLIFY_BUILD_SECRETS_HASH='.$this->generate_secrets_hash($this->withRawBuildSecretValues($variables)));
     }
 
     private function generate_secrets_hash($variables)
@@ -6108,7 +6139,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'environment' => $key,
             ];
         }
-        $secretsHash = $this->generate_secrets_hash($variables);
+        $secretsHash = $this->generate_secrets_hash($this->withRawBuildSecretValues($variables));
 
         $services = data_get($composeFile, 'services', []);
         foreach ($services as $serviceName => &$service) {
@@ -6552,6 +6583,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     public function failed(Throwable $exception): void
     {
         $this->failDeployment();
+        // A failed remote command can store the failed status with a query update, which fires no model event.
+        try {
+            SyncGithubDeploymentJob::dispatchFor($this->application_deployment_queue->refresh());
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Queueing the GitHub deployment sync failed', $e);
+        }
 
         // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
         // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written

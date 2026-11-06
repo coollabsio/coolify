@@ -14,6 +14,13 @@
 
     <form x-show="activeSection === 'general'" wire:submit="submit" class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit" />
+        @if (! $isEnabled && $task->auto_disabled_at)
+            <x-callout type="danger" title="Disabled automatically" class="mb-4">
+                Coolify disabled this task on {{ $task->auto_disabled_at->toDayDateTimeString() }} UTC after
+                {{ $task->failure_count }} failed runs in a row since {{ $task->failing_since?->toDayDateTimeString() }} UTC.
+                Check the executions, fix the task, and enable it again.
+            </x-callout>
+        @endif
         <x-application.settings-section id="task-configuration-section" title="Task configuration"
             helper="Configure when this task runs and which command Coolify executes.">
             <x-slot:actions>
