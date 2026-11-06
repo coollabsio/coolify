@@ -67,7 +67,7 @@ class GithubApp extends BaseModel
      */
     private ?array $installationTokenInMemory = null;
 
-    public function installationToken(): string
+    public function installationToken(?int $timeout = null): string
     {
         $credentials = implode('|', [$this->api_url, $this->app_id, $this->installation_id, $this->private_key_id]);
         $cached = $this->installationTokenInMemory;
@@ -76,7 +76,7 @@ class GithubApp extends BaseModel
             return $cached['token'];
         }
 
-        $token = generateGithubToken($this, 'installation');
+        $token = generateGithubToken($this, 'installation', $timeout);
 
         // GitHub installation tokens expire after one hour; renew them well before that.
         $this->installationTokenInMemory = [

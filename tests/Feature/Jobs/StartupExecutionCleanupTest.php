@@ -1,7 +1,13 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -269,4 +275,50 @@ test('cleanup does not send notifications even when team has notification settin
 
     // Assert NO notifications were sent despite team having notification settings
     Notification::assertNothingSent();
+});
+
+test('app:init queues a GitHub deployment sync for each interrupted deployment', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $githubApp = GithubApp::create([
+        'name' => 'Private GitHub App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'app_id' => 12345,
+        'installation_id' => 67890,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+        'is_public' => false,
+        'deployments' => 'write',
+        'team_id' => $team->id,
+    ]);
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => $project->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'source_type' => GithubApp::class,
+        'source_id' => $githubApp->id,
+    ]);
+    $deploy = fn (ApplicationDeploymentStatus $status): ApplicationDeploymentQueue => ApplicationDeploymentQueue::create([
+        'application_id' => $application->id,
+        'deployment_uuid' => (string) Str::uuid(),
+        'pull_request_id' => 0,
+        'commit' => 'HEAD',
+        'status' => $status->value,
+        'server_id' => $server->id,
+    ]);
+    $inProgress = $deploy(ApplicationDeploymentStatus::IN_PROGRESS);
+    $queued = $deploy(ApplicationDeploymentStatus::QUEUED);
+    $finished = $deploy(ApplicationDeploymentStatus::FINISHED);
+
+    Artisan::call('app:init');
+
+    expect($inProgress->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
+        ->and($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
+        ->and($finished->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value);
+    Queue::assertPushed(SyncGithubDeploymentJob::class, 2);
+    foreach ([$inProgress, $queued] as $failed) {
+        Queue::assertPushed(SyncGithubDeploymentJob::class, fn (SyncGithubDeploymentJob $job): bool => $job->deploymentQueueId === $failed->id);
+    }
 });

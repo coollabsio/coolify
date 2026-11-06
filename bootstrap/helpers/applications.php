@@ -5,6 +5,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\CancelPreviousDeployments;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\CancelSupersededDeploymentJob;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -126,6 +127,12 @@ function queue_application_deployment(Application $application, string $deployme
     foreach ($admission['superseded'] as $kind => $cancelled) {
         foreach ($cancelled as $old) {
             $old->addLogEntry("Deployment cancelled: the newer deployment {$deployment_uuid} (commit {$commit}) replaces it.", 'stderr');
+            // The cancel is a query update, which fires no model event.
+            try {
+                SyncGithubDeploymentJob::dispatchFor($old);
+            } catch (Throwable $e) {
+                Log::warning("Failed to queue the GitHub deployment sync of superseded deployment {$old->deployment_uuid}: {$e->getMessage()}");
+            }
             if ($kind !== 'building') {
                 continue;
             }
@@ -364,6 +371,12 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
     Log::warning("Deployment {$deployment->deployment_uuid} could not be started: {$exception->getMessage()}");
 
     $deployment->refresh();
+    // The query update above fires no model event.
+    try {
+        SyncGithubDeploymentJob::dispatchFor($deployment);
+    } catch (Throwable $e) {
+        Log::warning("Failed to queue the GitHub deployment sync of deployment {$deployment->deployment_uuid}: {$e->getMessage()}");
+    }
     $deployment->addLogEntry('========================================', 'stderr');
     $deployment->addLogEntry("Deployment could not be started: {$exception->getMessage()}", 'stderr');
     $deployment->addLogEntry('========================================', 'stderr');

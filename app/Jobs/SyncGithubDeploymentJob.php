@@ -33,13 +33,25 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public $backoff = 10;
 
+    /**
+     * Seconds that one request waits for GitHub. A slow GitHub must not hold a queue worker.
+     */
+    public const HTTP_TIMEOUT_SECONDS = 10;
+
+    /**
+     * Longer than the worst case of all requests with their retries, shorter than the lock
+     * expiry, so the per-deployment lock is held while the job runs.
+     */
+    public $timeout = 100;
+
     private const LOCK_EXPIRES_AFTER = 120;
 
     private const LOCK_RELEASE_DELAY = 5;
 
     public function __construct(public int $deploymentQueueId, public bool $deactivate = false)
     {
-        $this->onQueue('high');
+        // Not the deployment queue: a slow GitHub must not delay deployments.
+        $this->onQueue('default');
     }
 
     /**
@@ -136,7 +148,7 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'description' => $this->description($state),
             'log_url' => $this->logUrl($deployment, $application),
             'environment_url' => $state === 'success' ? $this->environmentUrl($deployment, $application) : null,
-        ]));
+        ]), timeout: self::HTTP_TIMEOUT_SECONDS);
 
         ApplicationDeploymentQueue::whereKey($deployment->id)->update(['github_deployment_state' => $state]);
     }
@@ -174,7 +186,7 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'required_contexts' => [],
             'transient_environment' => $isPreview,
             'production_environment' => ! $isPreview,
-        ]);
+        ], timeout: self::HTTP_TIMEOUT_SECONDS);
 
         return (int) $response['data']->get('id');
     }
@@ -190,7 +202,7 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $commit = filled($deployment->commit) && $deployment->commit !== 'HEAD' ? $deployment->commit : null;
 
         if ($deployment->pull_request_id !== 0) {
-            $pullRequest = githubApi($source, "repos/{$repository}/pulls/{$deployment->pull_request_id}")['data'];
+            $pullRequest = githubApi($source, "repos/{$repository}/pulls/{$deployment->pull_request_id}", timeout: self::HTTP_TIMEOUT_SECONDS)['data'];
             $headRepository = (string) data_get($pullRequest, 'head.repo.full_name', '');
             $baseRepository = (string) data_get($pullRequest, 'base.repo.full_name', $repository);
             $headBranch = data_get($pullRequest, 'head.ref');

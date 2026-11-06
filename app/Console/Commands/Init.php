@@ -6,6 +6,7 @@ use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\PullChangelog;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -106,15 +107,23 @@ class Init extends Command
             echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
         }
         try {
-            $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
+            $stuckDeployments = ApplicationDeploymentQueue::whereIn('status', [
                 ApplicationDeploymentStatus::IN_PROGRESS->value,
                 ApplicationDeploymentStatus::QUEUED->value,
-            ])->update([
+            ])->get(['id', 'application_id', 'parent_deployment_uuid']);
+            $updatedCount = ApplicationDeploymentQueue::whereKey($stuckDeployments->modelKeys())->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
             ]);
 
             if ($updatedCount > 0) {
                 echo "Marked {$updatedCount} stuck deployments as failed\n";
+            }
+
+            // The query update above fires no model event, so GitHub would show them in progress forever.
+            try {
+                $stuckDeployments->each(fn (ApplicationDeploymentQueue $deployment) => SyncGithubDeploymentJob::dispatchFor($deployment));
+            } catch (\Throwable $e) {
+                echo "Could not queue the GitHub deployment sync of stuck deployments: {$e->getMessage()}\n";
             }
         } catch (\Throwable $e) {
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";

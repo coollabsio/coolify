@@ -19,6 +19,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -115,6 +116,33 @@ it('queues a sync when the status of a deployment changes', function () {
     Queue::assertPushed(SyncGithubDeploymentJob::class, fn (SyncGithubDeploymentJob $job): bool => $job->deploymentQueueId === $deployment->id);
 });
 
+it('queues the sync on the default queue, not on the deployment queue', function () {
+    $deployment = githubDeployment($this->application, ['status' => ApplicationDeploymentStatus::QUEUED->value]);
+
+    $deployment->update(['status' => ApplicationDeploymentStatus::IN_PROGRESS->value]);
+
+    Queue::assertPushedOn('default', SyncGithubDeploymentJob::class);
+    expect(deployment_queue())->not->toBe('default');
+});
+
+it('gives up on a slow GitHub request after a short timeout', function () {
+    $timeouts = [];
+    Http::fake(function (Request $request, array $options) use (&$timeouts) {
+        $timeouts[$request->url()] = [$options['timeout'] ?? null, $options['connect_timeout'] ?? null];
+
+        return null;
+    });
+
+    syncGithubDeployment(githubDeployment($this->application));
+
+    expect($timeouts)->not->toBeEmpty();
+    foreach ($timeouts as $url => [$timeout, $connectTimeout]) {
+        expect($timeout)->toBeLessThanOrEqual(SyncGithubDeploymentJob::HTTP_TIMEOUT_SECONDS, $url)
+            ->and($connectTimeout)->toBeLessThanOrEqual(SyncGithubDeploymentJob::HTTP_TIMEOUT_SECONDS, $url);
+    }
+    expect((new SyncGithubDeploymentJob(1))->timeout)->toBeLessThan(120);
+});
+
 it('does not queue a sync when the GitHub App has no deployments permission', function () {
     $this->githubApp->update(['deployments' => null]);
     $deployment = githubDeployment($this->application, ['status' => ApplicationDeploymentStatus::QUEUED->value]);
@@ -133,6 +161,31 @@ it('does not queue a sync for the deployment to an additional server', function 
     $deployment->update(['status' => ApplicationDeploymentStatus::IN_PROGRESS->value]);
 
     Queue::assertNotPushed(SyncGithubDeploymentJob::class);
+});
+
+it('queues a sync for a deployment that fails because its job cannot be queued', function () {
+    Notification::fake();
+    $deployment = githubDeployment($this->application);
+
+    fail_undispatchable_deployment($deployment, new RuntimeException('queue connection refused'));
+
+    expect($deployment->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value);
+    Queue::assertPushed(SyncGithubDeploymentJob::class, fn (SyncGithubDeploymentJob $job): bool => $job->deploymentQueueId === $deployment->id);
+});
+
+it('queues a sync for the deployments that a newer webhook deployment cancels', function () {
+    Queue::fake();
+    $this->application->settings->update(['is_auto_cancel_building_deployments_enabled' => true]);
+    $building = githubDeployment($this->application, ['is_webhook' => true]);
+    $queued = githubDeployment($this->application, ['is_webhook' => true, 'status' => ApplicationDeploymentStatus::QUEUED->value]);
+
+    queue_application_deployment($this->application, 'newer-webhook-deployment', commit: 'ddd444', is_webhook: true);
+
+    expect($building->fresh()->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value)
+        ->and($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
+    foreach ([$building, $queued] as $cancelled) {
+        Queue::assertPushed(SyncGithubDeploymentJob::class, fn (SyncGithubDeploymentJob $job): bool => $job->deploymentQueueId === $cancelled->id);
+    }
 });
 
 it('creates one GitHub deployment for the branch and sends each status', function () {
