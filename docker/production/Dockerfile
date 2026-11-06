@@ -56,10 +56,7 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
-# Temporary: the node:24.22.1 multi-arch manifest is not published yet, pull the per-arch image instead
-FROM amd64/node:${NODE_VERSION}-alpine3.24 AS nodejs-amd64
-FROM arm64v8/node:${NODE_VERSION}-alpine3.24 AS nodejs-arm64
-FROM nodejs-${TARGETARCH} AS nodejs
+FROM node:${NODE_VERSION}-alpine3.24 AS nodejs
 
 # =================================================================
 # Stage 2: Frontend assets compilation
