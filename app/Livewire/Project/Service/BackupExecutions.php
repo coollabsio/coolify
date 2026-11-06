@@ -179,11 +179,11 @@ class BackupExecutions extends Component
     private function formatExecutions(Collection $rows): Collection
     {
         $databaseExecutions = ScheduledDatabaseBackupExecution::query()
-            ->with(['scheduledDatabaseBackup.database', 'scheduledDatabaseBackup.s3', 'scheduledDatabaseBackup.s3Storages', 's3Replicas'])
+            ->with(['scheduledDatabaseBackup.database', 's3Replicas.s3'])
             ->whereIn('id', $rows->where('type', 'database')->pluck('id'))
             ->get()->keyBy('id');
         $volumeExecutions = ScheduledVolumeBackupExecution::query()
-            ->with(['scheduledVolumeBackup.backupable.resource', 's3', 's3Replicas'])
+            ->with(['scheduledVolumeBackup.backupable.resource', 's3Replicas.s3'])
             ->whereIn('id', $rows->where('type', 'storage')->pluck('id'))
             ->get()->keyBy('id');
 
@@ -193,21 +193,11 @@ class BackupExecutions extends Component
             $isDatabase = $row->type === 'database';
             $execution = $isDatabase ? $databaseExecutions->get($row->id) : $volumeExecutions->get($row->id);
             $schedule = $isDatabase ? $execution->scheduledDatabaseBackup : $execution->scheduledVolumeBackup;
-            $storages = match (true) {
-                ! $isDatabase => collect([$execution->s3]),
-                ! $schedule->save_s3 => collect(),
-                $schedule->s3Storages->isNotEmpty() => $schedule->s3Storages,
-                default => collect([$schedule->s3]),
-            };
-            $storageLabel = $storages
-                ->filter(fn ($storage) => $storage?->team_id === $serviceTeamId)
-                ->map(fn ($storage) => $storage->name.' (bucket: '.$storage->bucket.')')
-                ->implode(', ') ?: 'Unavailable';
-            if ($isDatabase && ! $schedule->save_s3) {
-                $storageLabel = 'Not configured';
-            } elseif (! $isDatabase && ! $execution->s3_storage_id && ! $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
-                $storageLabel = 'No destination recorded';
-            }
+            $s3Storages = $execution->s3Replicas
+                ->map(fn ($replica) => $replica->s3?->team_id === $serviceTeamId
+                    ? $replica->s3->name.' (bucket: '.$replica->s3->bucket.')'
+                    : 'Unavailable')
+                ->implode(', ');
 
             return [
                 'id' => $row->type.':'.$execution->id,
@@ -215,7 +205,7 @@ class BackupExecutions extends Component
                 'target' => $isDatabase ? ($schedule->database->human_name ?: $schedule->database->name) : $schedule->targetName(),
                 'type' => $isDatabase ? 'Database' : $schedule->targetType(),
                 'schedule' => $schedule->frequency,
-                's3_tooltip' => ($isDatabase ? 'Current schedule S3 storage: ' : 'S3 storage: ').$storageLabel,
+                's3_tooltip' => $s3Storages === '' ? null : 'S3 storage: '.$s3Storages,
                 'status' => $execution->status,
                 'started_at' => $execution->created_at,
                 'size' => $execution->size,

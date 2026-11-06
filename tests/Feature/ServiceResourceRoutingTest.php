@@ -635,7 +635,7 @@ test('service backup lists identify the configured S3 storage without extra colu
     }
 });
 
-test('execution tooltips distinguish current database storage from the recorded storage destination', function () {
+test('execution tooltips show the S3 storage of each run and no icon for local-only runs', function () {
     $original = S3Storage::create(['key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'endpoint' => 'https://s3.example.com', 'team_id' => $this->teamA->id, 'name' => 'Cloudflare R2', 'bucket' => 'original']);
     $current = S3Storage::create(['key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'endpoint' => 'https://s3.example.com', 'team_id' => $this->teamA->id, 'name' => 'Railway S3', 'bucket' => 'current']);
     $databaseSchedule = ScheduledDatabaseBackup::create([
@@ -646,7 +646,9 @@ test('execution tooltips distinguish current database storage from the recorded 
         'save_s3' => true,
         's3_storage_id' => $current->id,
     ]);
-    $databaseSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true]);
+    $databaseSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true])
+        ->s3Replicas()->create(['s3_storage_id' => $original->id, 's3_uploaded' => true]);
+    $databaseSchedule->executions()->create(['status' => 'success']);
     $volume = LocalPersistentVolume::create([
         'name' => 'service-data',
         'mount_path' => '/data',
@@ -659,24 +661,17 @@ test('execution tooltips distinguish current database storage from the recorded 
         'save_s3' => true,
         's3_storage_id' => $current->id,
     ]);
-    $volumeSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true, 's3_storage_id' => $original->id]);
+    $volumeSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true, 's3_storage_id' => $original->id])
+        ->s3Replicas()->create(['s3_storage_id' => $original->id, 's3_uploaded' => true]);
+    $volumeSchedule->executions()->create(['status' => 'success']);
 
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->assertSeeHtml('data-tooltip="Current schedule S3 storage: Railway S3 (bucket: current)"')
-        ->assertSeeHtml('data-tooltip="S3 storage: Cloudflare R2 (bucket: original)"');
+    $html = Livewire::test(BackupExecutions::class, ['service' => $this->ownService])->html();
+    expect(substr_count($html, 'data-tooltip="S3 storage: Cloudflare R2 (bucket: original)"'))->toBe(2)
+        ->and(substr_count($html, 'data-tooltip="S3 storage:'))->toBe(2)
+        ->and($html)->not->toContain('Railway S3');
 
-    $current->update(['team_id' => $this->teamB->id]);
-    Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])
-        ->assertDontSee('Railway S3')
-        ->assertSeeHtml('data-tooltip="S3 storage: Unavailable"');
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->assertDontSee('Railway S3')
-        ->assertSeeHtml('data-tooltip="Current schedule S3 storage: Unavailable"');
-
-    $databaseSchedule->update(['save_s3' => false]);
-    $original->delete();
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->assertSeeHtml('data-tooltip="Current schedule S3 storage: Not configured"')
-        ->assertDontSeeHtml('data-tooltip="S3 storage: Cloudflare R2 (bucket: original)"')
-        ->assertSeeHtml('data-tooltip="S3 storage: Unavailable"');
+    $original->update(['team_id' => $this->teamB->id]);
+    $html = Livewire::test(BackupExecutions::class, ['service' => $this->ownService])->html();
+    expect(substr_count($html, 'data-tooltip="S3 storage: Unavailable"'))->toBe(2)
+        ->and($html)->not->toContain('Cloudflare R2');
 });
