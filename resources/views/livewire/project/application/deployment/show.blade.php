@@ -310,6 +310,11 @@
                                 'queued', 'in_progress' => 'warning',
                                 default => 'neutral',
                             };
+                            if ($application_deployment_queue->isImageScanBlocked()) {
+                                $deploymentStatusLabel = 'Blocked';
+                                $deploymentStatusType = 'error';
+                            }
+                            $imageScanGate = $this->imageScanGate;
                         @endphp
                         <div class="logs-viewer-toolbar-controls">
                             <div class="logs-viewer-primary">
@@ -344,6 +349,7 @@
                                     </svg>
                                 </button>
                                 </div>
+                                @if (! data_get($imageScanGate, 'blocked'))
                                 <span class="flex shrink-0 items-center gap-1.5 text-xs font-medium text-neutral-600 dark:text-fg-dim">
                                     @if ($deploymentStatus === 'in_progress')
                                         <x-loading compact />
@@ -358,6 +364,17 @@
                                     @endif
                                     {{ $deploymentStatusLabel }}
                                 </span>
+                                @endif
+                                @if ($imageScanGate)
+                                    <x-image-scan.gate-status class="shrink-0" :result="$imageScanGate['result']"
+                                        :vulnerabilities-url="route('project.application.vulnerabilities', [
+                                            'project_uuid' => $application->environment->project->uuid,
+                                            'environment_uuid' => $application->environment->uuid,
+                                            'application_uuid' => $application->uuid,
+                                        ])"
+                                        :show-deploy-anyway="true" :can-deploy-anyway="auth()->user()->can('update', $application)"
+                                        :action="$imageScanGate['action']" />
+                                @endif
                             </div>
                             <div class="logs-viewer-end">
                                 <livewire:project.application.deployment-navbar

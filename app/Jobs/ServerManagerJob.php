@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Models\Team;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -88,7 +89,38 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
             // Process server-specific scheduled tasks
             $this->processScheduledTasks($servers);
+
+            $this->dispatchImageScanDigests($servers);
         }
+    }
+
+    /**
+     * One image vulnerability digest per team and day, for teams with a server that scans images (spec 8).
+     */
+    private function dispatchImageScanDigests(Collection $servers): void
+    {
+        if (! $this->settings->is_image_scanning_allowed) {
+            return;
+        }
+
+        $servers->filter(fn (Server $server): bool => (bool) $server->settings?->is_image_scan_enabled && ! $server->isTransferredAway())
+            ->pluck('team_id')
+            ->unique()
+            ->each(function ($teamId): void {
+                try {
+                    if (shouldRunCronNow(self::imageScanDigestCron((int) $teamId), $this->instanceTimezone, "image-scan-digest:{$teamId}", $this->executionTime)) {
+                        $team = Team::find($teamId);
+                        if ($team instanceof Team) {
+                            ImageScanDigestJob::dispatch($team);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::channel('scheduled-errors')->error('Failed to dispatch ImageScanDigestJob', [
+                        'team_id' => $teamId,
+                        'error' => get_class($e).': '.$e->getMessage(),
+                    ]);
+                }
+            });
     }
 
     /**
@@ -228,6 +260,15 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             ServerPatchCheckJob::dispatch($server);
         }
 
+        // Daily image rescan, staggered per server. The cron is read only for servers that can be scanned, so a
+        // server that comes back catches up a missed day.
+        if ($server->settings?->is_image_scan_enabled
+            && ImageRescanJob::canRunOn($server)
+            && shouldRunCronNow(self::imageRescanCron($server), $serverTimezone, "image-rescan:{$server->id}", $this->executionTime)
+        ) {
+            ImageRescanJob::dispatch($server);
+        }
+
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
     }
 
@@ -256,6 +297,25 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $slot = $server->id % (20 * 60);
 
         return sprintf('%d %d * * 0', $slot % 60, 4 + intdiv($slot, 60));
+    }
+
+    /**
+     * Daily image rescan at a stable per-server time between 02:00 and 04:59 (spec 4.5).
+     */
+    public static function imageRescanCron(Server $server): string
+    {
+        return sprintf('%d %d * * *', $server->id % 60, 2 + intdiv($server->id % 180, 60));
+    }
+
+    /**
+     * Daily image vulnerability digest at a stable per-team time between 06:00 and 07:59, after the rescans of
+     * 02:00 to 04:59 (spec 8).
+     */
+    public static function imageScanDigestCron(int $teamId): string
+    {
+        $slot = $teamId % 120;
+
+        return sprintf('%d %d * * *', $slot % 60, 6 + intdiv($slot, 60));
     }
 
     /**

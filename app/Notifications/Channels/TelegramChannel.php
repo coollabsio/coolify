@@ -12,6 +12,8 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupMissing;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Notifications\ImageScan\ExploitedProblemFound;
+use App\Notifications\ImageScan\VulnerabilityDigest;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
 use App\Notifications\Server\DockerCleanupFailed;
@@ -66,6 +68,8 @@ class TelegramChannel
             Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
             ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
             TraefikVersionOutdated::class => $settings->telegram_notifications_traefik_outdated_thread_id,
+            VulnerabilityDigest::class,
+            ExploitedProblemFound::class => $settings->telegram_notifications_image_vulnerabilities_thread_id,
             default => null,
         };
 

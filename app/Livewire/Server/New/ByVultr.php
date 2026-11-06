@@ -4,6 +4,7 @@ namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
 use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -23,6 +24,7 @@ use Livewire\Component;
 class ByVultr extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     public int $current_step = 1;
 
@@ -471,6 +473,7 @@ class ByVultr extends Component
                 $server->proxy->set('status', 'exited');
                 $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
                 $server->save();
+                $this->applyImageScanning($server);
 
                 return $server;
             });

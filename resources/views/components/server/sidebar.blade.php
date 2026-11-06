@@ -193,6 +193,10 @@
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
             'warning' => filled($server->settings->ssh_host_key_pending),
+            'children' => [
+                ['label' => 'Overview', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
+                ['label' => 'Image Scanning', 'route' => 'server.security.image-scanning', 'active' => $activeSubMenu === 'image-scanning', 'icon' => 'shield-alert', 'visible' => $server->isFunctional()],
+            ],
         ],
         [
             'label' => 'Transfer',

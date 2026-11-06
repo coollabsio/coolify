@@ -52,6 +52,8 @@ class ServerTransferBundle
         'dns_zones' => 1000,
         'managed_dns_records' => 10000,
         'ssl_certificates' => 10000,
+        'image_scan_policies' => 10000,
+        'image_scan_ignores' => 20000,
         'warnings' => 1000,
         'post_transfer_checklist' => 1000,
     ];

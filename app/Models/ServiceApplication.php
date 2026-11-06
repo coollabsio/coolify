@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Traits\HasImageScans;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasRestartLimit;
 use App\Traits\ReleasesManagedDnsRecords;
@@ -14,7 +15,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 
 class ServiceApplication extends BaseModel
 {
-    use HasFactory, HasNoindexDomains, HasRestartLimit, ReleasesManagedDnsRecords, SoftDeletes;
+    use HasFactory, HasImageScans, HasNoindexDomains, HasRestartLimit, ReleasesManagedDnsRecords, SoftDeletes;
 
     protected $appends = ['url'];
 

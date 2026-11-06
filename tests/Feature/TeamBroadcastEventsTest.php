@@ -24,6 +24,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -119,4 +120,13 @@ it('announces a stopped database proxy to the team that owns the server', functi
     StopDatabaseProxy::run($database);
 
     Event::assertDispatched(DatabaseProxyStopped::class, fn (DatabaseProxyStopped $event) => $event->teamId === $this->team->id);
+});
+
+it('broadcasts every event under its class name, the name that Echo listeners without a leading dot listen for', function () {
+    $events = collect(glob(app_path('Events/*.php')))
+        ->map(fn (string $file): string => 'App\\Events\\'.basename($file, '.php'))
+        ->filter(fn (string $class): bool => is_subclass_of($class, ShouldBroadcast::class));
+
+    expect($events)->not->toBeEmpty()
+        ->and($events->filter(fn (string $class): bool => method_exists($class, 'broadcastAs'))->values()->all())->toBe([]);
 });

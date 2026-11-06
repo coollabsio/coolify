@@ -20,6 +20,7 @@ trait TogglesNotificationEvents
         'serverUnreachable',
         'serverPatch',
         'traefikOutdated',
+        'imageVulnerabilities',
     ];
 
     public function toggleEvent(string $property): void

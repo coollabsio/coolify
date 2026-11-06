@@ -5,6 +5,7 @@
     x: 0,
     y: 0,
     below: false,
+    wrap: false,
     activeTarget: null,
     isIconAction(target) {
         if (target.matches('[data-icon-tooltip-ignore]')) return false;
@@ -34,6 +35,8 @@
         if (!text) return;
         this.activeTarget = target;
         this.text = text;
+        {{-- Long sentences opt in to wrapping with data-tooltip-wrap; short labels stay on one line. --}}
+        this.wrap = target.hasAttribute('data-tooltip-wrap');
         this.positioned = false;
         this.visible = true;
         const rect = target.getBoundingClientRect();
@@ -74,7 +77,7 @@
         x-transition:leave="transition-opacity ease-in duration-75"
         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
         :style="`left: ${x}px; top: ${y}px;`"
-        :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible']"
-        class="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-dropdown dark:border-white/10 dark:bg-raised">
+        :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible', wrap ? 'max-w-xs whitespace-normal' : 'whitespace-nowrap']"
+        class="pointer-events-none fixed z-[10000] rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-dropdown dark:border-white/10 dark:bg-raised">
     </div>
 </div>
