@@ -108,8 +108,7 @@ class StartRedis
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
                         'CMD-SHELL',
-                        'redis-cli',
-                        'ping',
+                        $this->healthCheckCommand(),
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -338,6 +337,20 @@ class StartRedis
             && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
 
         return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
+    }
+
+    /**
+     * The healthcheck pings with the server password and requires PONG, because redis-cli exits 0 on
+     * error replies (NOAUTH, LOADING). A custom redis.conf with its own requirepass has a password that
+     * Coolify does not know, so that check only requires that the server replies.
+     */
+    private function healthCheckCommand(): string
+    {
+        if (str_contains((string) $this->database->redis_conf, 'requirepass')) {
+            return "redis-cli ping | grep -qE 'PONG|NOAUTH'";
+        }
+
+        return 'redis-cli -a '.$this->requirePassArgument().' --no-auth-warning ping | grep -q PONG';
     }
 
     private function add_custom_redis()
