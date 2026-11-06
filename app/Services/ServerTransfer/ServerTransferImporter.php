@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\BackupStorageType;
 use App\Enums\GithubRunnerDockerMode;
 use App\Enums\ServerRole;
 use App\Jobs\ValidateAndInstallServerJob;
@@ -2005,6 +2006,11 @@ class ServerTransferImporter
      */
     private function importS3Storage(array $payload, int $teamId, bool $preserveUuids): S3Storage
     {
+        $privateKeyUuid = (string) data_get($payload, 'private_key_uuid');
+        if ($privateKeyUuid !== '' && ! isset($this->privateKeyMap[$privateKeyUuid])) {
+            throw new RuntimeException('Backup storage private key is missing.');
+        }
+
         $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
@@ -2013,14 +2019,21 @@ class ServerTransferImporter
         if ($existing) {
             return $existing;
         }
-        // Reuse by endpoint+bucket+key if already present for team
-        $byIdentity = S3Storage::query()
-            ->where('team_id', $teamId)
-            ->where('endpoint', data_get($payload, 'endpoint'))
-            ->where('bucket', data_get($payload, 'bucket'))
-            ->first();
-        if ($byIdentity) {
-            return $byIdentity;
+        // Bundles of older instances have no type: they only had S3 storages.
+        $type = BackupStorageType::tryFrom((string) data_get($payload, 'type')) ?? BackupStorageType::S3;
+        // An S3 storage of the team with the same bucket and access key is the same storage. Other types match by UUID
+        // only: several logins can use one host, and the key column is encrypted, so it is compared after loading.
+        if ($type === BackupStorageType::S3) {
+            $sameS3Storage = S3Storage::query()
+                ->s3Only()
+                ->where('team_id', $teamId)
+                ->where('endpoint', data_get($payload, 'endpoint'))
+                ->where('bucket', data_get($payload, 'bucket'))
+                ->get()
+                ->first(fn (S3Storage $storage): bool => $storage->key === data_get($payload, 'key'));
+            if ($sameS3Storage) {
+                return $sameS3Storage;
+            }
         }
         if (S3Storage::where('uuid', $uuid)->exists()) {
             $uuid = new_public_id();
@@ -2029,6 +2042,7 @@ class ServerTransferImporter
         $storage = new S3Storage;
         $storage->forceFill([
             'team_id' => $teamId,
+            'type' => $type,
             'name' => data_get($payload, 'name') ?: 'Imported S3',
             'description' => data_get($payload, 'description'),
             'region' => data_get($payload, 'region'),
@@ -2036,7 +2050,12 @@ class ServerTransferImporter
             'secret' => data_get($payload, 'secret'),
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
+            // After the endpoint: a new endpoint removes the host key.
+            'sftp_host_key' => data_get($payload, 'sftp_host_key'),
             'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
+            'private_key_id' => isset($this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')])
+                ? $this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')]->id
+                : null,
             'skip_tls_verification' => (bool) data_get($payload, 'skip_tls_verification', false),
             'is_usable' => (bool) data_get($payload, 'is_usable', true),
         ]);

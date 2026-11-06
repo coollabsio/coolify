@@ -1,11 +1,14 @@
 <?php
 
+use App\Enums\BackupStorageType;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
@@ -600,4 +603,132 @@ describe('POST /api/v1/s3-storages/{uuid}/validate', function () {
         ])->postJson("/api/v1/s3-storages/{$storage->uuid}/validate")
             ->assertOk();
     });
+});
+
+test('rejects an array storage type with 422', function () {
+    $response = $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/s3-storages', validS3StoragePayload(['type' => ['sftp']]));
+
+    $response->assertStatus(422);
+    $this->assertDatabaseCount('s3_storages', 0);
+});
+
+test('SFTP updates preserve the saved password for blank secrets', function ($secret) {
+    $storage = createS3StorageForTeam($this->team, [
+        'type' => BackupStorageType::Sftp,
+        'endpoint' => 'sftp://backup.example.com/backups',
+        'secret' => 'saved-password',
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->patchJson('/api/v1/s3-storages/'.$storage->uuid, ['secret' => $secret])
+        ->assertOk();
+
+    expect($storage->fresh()->secret)->toBe('saved-password');
+})->with([null, '', '   ']);
+
+function sftpStoragePayload(array $overrides = []): array
+{
+    return array_merge([
+        'type' => 'sftp',
+        'name' => 'SFTP Storage',
+        'endpoint' => 'sftp://1.1.1.1/backups',
+        'key' => 'backup',
+        'secret' => 'example-password',
+    ], $overrides);
+}
+
+test('rejects a username or password in the storage endpoint', function (array $payload) {
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/s3-storages', $payload)
+        ->assertStatus(422)
+        ->assertJsonPath('errors.endpoint.0', 'The endpoint must not contain a username or password. Enter the credentials in their own fields.');
+
+    $this->assertDatabaseCount('s3_storages', 0);
+})->with([
+    'sftp user and password' => [fn () => sftpStoragePayload(['endpoint' => 'sftp://user:secret@1.1.1.1/backups'])],
+    'sftp user only' => [fn () => sftpStoragePayload(['endpoint' => 'sftp://user@1.1.1.1'])],
+    'webdav user and password' => [fn () => sftpStoragePayload(['type' => 'webdav', 'endpoint' => 'https://user:secret@1.1.1.1/remote.php'])],
+    's3 user and password' => [fn () => validS3StoragePayload(['endpoint' => 'https://user:secret@s3.amazonaws.com'])],
+]);
+
+test('updates a saved storage whose endpoint already has a username and password', function () {
+    $storage = createS3StorageForTeam($this->team, ['endpoint' => 'https://user:secret@s3.amazonaws.com']);
+
+    $this->withToken($this->bearerToken)
+        ->patchJson('/api/v1/s3-storages/'.$storage->uuid, ['name' => 'Renamed'])
+        ->assertOk();
+
+    expect($storage->fresh()->name)->toBe('Renamed');
+});
+
+test('rejects control characters in the storage endpoint path', function (string $endpoint) {
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/s3-storages', sftpStoragePayload(['endpoint' => $endpoint]))
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['endpoint']);
+
+    $this->assertDatabaseCount('s3_storages', 0);
+})->with([
+    'encoded line feed' => 'sftp://1.1.1.1/a%0Ab',
+    'encoded null byte' => 'sftp://1.1.1.1/a%00b',
+    'encoded delete' => 'sftp://1.1.1.1/a%7Fb',
+]);
+
+test('the base path of a storage never contains control characters', function () {
+    $storage = new S3Storage;
+    $storage->setRawAttributes(['type' => 'sftp', 'endpoint' => 'sftp://1.1.1.1/a%0Ab']);
+
+    expect(fn () => $storage->basePath())->toThrow(RuntimeException::class);
+});
+
+test('rejects a git-related private key of the team for an SFTP storage', function () {
+    $gitKey = PrivateKey::factory()->create(['team_id' => $this->team->id, 'is_git_related' => true]);
+
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/s3-storages', sftpStoragePayload(['secret' => null, 'private_key_uuid' => $gitKey->uuid]))
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['private_key_uuid']);
+
+    $this->assertDatabaseCount('s3_storages', 0);
+});
+
+test('an SFTP storage does not log in with a git-related private key', function () {
+    $gitKey = PrivateKey::factory()->create(['team_id' => $this->team->id, 'is_git_related' => true]);
+    $storage = createS3StorageForTeam($this->team, [
+        'type' => BackupStorageType::Sftp,
+        'endpoint' => 'sftp://1.1.1.1/backups',
+        'private_key_id' => $gitKey->id,
+        'secret' => '',
+    ]);
+
+    expect(fn () => $storage->sftpPrivateKey())->toThrow(RuntimeException::class);
+});
+
+test('lists SFTP storages without a query per storage', function () {
+    $readToken = $this->user->createToken('read-token', ['read'])->plainTextToken;
+    $listQueryCount = function () use ($readToken): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->withToken($readToken)->getJson('/api/v1/s3-storages')->assertOk();
+        DB::disableQueryLog();
+
+        return count(DB::getQueryLog());
+    };
+    $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+    $createSftpStorage = fn () => createS3StorageForTeam($this->team, [
+        'type' => BackupStorageType::Sftp,
+        'endpoint' => 'sftp://1.1.1.1/backups',
+        'private_key_id' => $privateKey->id,
+        'secret' => '',
+    ]);
+
+    $createSftpStorage();
+    $listQueryCount();
+    $queriesWithOneStorage = $listQueryCount();
+    $createSftpStorage();
+    $createSftpStorage();
+    $listQueryCount();
+
+    expect($listQueryCount())->toBe($queriesWithOneStorage);
 });

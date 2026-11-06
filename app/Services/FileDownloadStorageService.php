@@ -39,7 +39,7 @@ class FileDownloadStorageService
             return null;
         }
 
-        return S3Storage::query()->whereTeamId(0)->where('is_usable', true)->find($storageId);
+        return S3Storage::query()->s3Only()->whereTeamId(0)->where('is_usable', true)->find($storageId);
     }
 
     public static function newObjectKey(): string

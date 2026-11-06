@@ -650,11 +650,11 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Only storages of the team that owns the database can serve the copy.
-            $s3DownloadUrl = is_null($execution_team_id)
+            $s3Download = is_null($execution_team_id)
                 ? null
-                : $execution->s3DownloadUrl($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
-            if ($s3DownloadUrl) {
-                return redirect()->away($s3DownloadUrl);
+                : $execution->s3Download($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
+            if ($s3Download) {
+                return $s3Download;
             }
 
             if ($execution->scheduledDatabaseBackup->disable_local_backup && $execution->scheduledDatabaseBackup->save_s3) {
@@ -693,9 +693,9 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Only storages of the team that owns the backup can serve the copy.
-            $s3DownloadUrl = $execution->s3DownloadUrl($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
-            if ($s3DownloadUrl) {
-                return redirect()->away($s3DownloadUrl);
+            $s3Download = $execution->s3Download($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
+            if ($s3Download) {
+                return $s3Download;
             }
 
             if (! $execution->local_storage_deleted && ! $server) {

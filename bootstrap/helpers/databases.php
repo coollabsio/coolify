@@ -18,7 +18,10 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Services\Access\AccessResolver;
+use App\Support\DeletesEmptyDirectories;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
@@ -276,6 +279,12 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         $filenames = [$filenames];
     }
 
+    if (! $s3->isS3()) {
+        deleteBackupsFromFileStorage($filenames, $s3);
+
+        return;
+    }
+
     $disk = Storage::build([
         'driver' => 's3',
         'key' => $s3->key,
@@ -297,6 +306,52 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
 
     if (! $deleted) {
         throw new RuntimeException('One or more S3 backup files could not be deleted.');
+    }
+}
+
+/**
+ * Deletes backup files from an SFTP, FTPS, or WebDAV storage. A file that is gone already counts as deleted, as on S3.
+ *
+ * @param  array<int, string>  $filenames
+ */
+function deleteBackupsFromFileStorage(array $filenames, S3Storage $storage): void
+{
+    try {
+        $disk = $storage->filesystem();
+        foreach ($filenames as $filename) {
+            if ($disk->exists($filename) && ! $disk->delete($filename)) {
+                throw new RuntimeException("{$filename} could not be deleted.");
+            }
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('One or more backup files could not be deleted from the '.$storage->type->label().' storage.', previous: $exception);
+    }
+
+    deleteEmptyFileStorageDirectories($disk, $filenames);
+}
+
+/**
+ * Deletes the directories of deleted backup files that are empty now, and their empty parents, below the base path of
+ * the storage. The server refuses a directory with content, so a file that another backup writes now stays.
+ *
+ * @param  array<int, string>  $filenames
+ */
+function deleteEmptyFileStorageDirectories(FilesystemAdapter $disk, array $filenames): void
+{
+    $adapter = $disk->getAdapter();
+    if (! $adapter instanceof DeletesEmptyDirectories) {
+        return;
+    }
+
+    $directories = collect($filenames)->map(fn (string $filename): string => dirname(trim($filename, '/')))->unique();
+    foreach ($directories as $directory) {
+        try {
+            while ($directory !== '.' && $directory !== '' && $adapter->deleteEmptyDirectory($directory)) {
+                $directory = dirname($directory);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Could not delete an empty backup directory: '.$exception->getMessage());
+        }
     }
 }
 
