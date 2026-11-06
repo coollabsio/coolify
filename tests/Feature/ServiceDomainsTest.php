@@ -755,7 +755,7 @@ YAML,
         ->assertDispatched('success');
 });
 
-it('saves after confirming both a domain conflict and a missing required port', function () {
+it('saves after confirming both a domain conflict and a different port', function () {
     $this->service->update([
         'docker_compose_raw' => <<<'YAML'
 services:
@@ -770,7 +770,9 @@ YAML,
 
     $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)
-        ->set('newDomain', 'https://api.example.com')
+        ->set('newDomainParts.host', 'api.example.com')
+        ->set('newDomainParts.port', '3000')
+        ->set('newDomainPartsChanged', true)
         ->call('addDomain')
         ->assertSet('showDomainConflictModal', true)
         ->call('confirmDomainUsage')
@@ -778,8 +780,8 @@ YAML,
         ->assertSet('showPortWarningModal', true)
         ->assertSet('forceSaveDomains', true)
         ->assertSee('Use a different port?')
-        ->assertSee('Keep required port')
-        ->assertSee('Use this port anyway');
+        ->assertSee('Keep port 8000')
+        ->assertSee('Use port 3000 anyway');
 
     $component
         ->call('confirmRemovePort')
@@ -790,7 +792,28 @@ YAML,
         ->assertDispatched('success');
 
     expect(explode(',', (string) $this->webApp->fresh()->fqdn))
-        ->toBe(['https://api.example.com']);
+        ->toBe(['https://api.example.com'])
+        ->and($this->webApp->fresh()->domain_port_overrides)->toBe(['https://api.example.com' => 3000]);
+});
+
+it('does not warn about the port when a domain with an empty port is renamed', function () {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n    environment:\n      - SERVICE_URL_API_8080\n  web:\n    image: nginx:alpine\n",
+    ]);
+    $this->apiApp->update(['fqdn' => 'https://api.example.com']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'renamed.example.com')
+        ->set('editingDomainParts.port', '')
+        ->set('editingDomainPartsChanged', true)
+        ->call('updateDomain')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    $this->apiApp->refresh();
+    expect($this->apiApp->fqdn)->toBe('https://renamed.example.com')
+        ->and($this->apiApp->domain_port_overrides)->toBeNull();
 });
 
 it('loads persisted dns status for service applications', function () {

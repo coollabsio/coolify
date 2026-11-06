@@ -336,18 +336,18 @@
                         <div class="application-settings-section-body">
                             <x-callout type="warning" title="Port requirement" class="mb-4">
                                 This service requires port <strong>{{ $requiredPort }}</strong> to function correctly.
-                                One or more of your domains use a different port, or none.
+                                One or more of your domains use port <strong>{{ $requestedPort }}</strong>.
                             </x-callout>
 
                             <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                <x-forms.button type="button" wire:click="confirmRemovePort"
+                                    @click="modalOpen = false" isError>
+                                    Use port {{ $requestedPort }} anyway
+                                </x-forms.button>
                                 <x-forms.button type="button"
                                     wire:click="cancelRemovePort"
                                     @click="modalOpen = false">
-                                    Keep required port
-                                </x-forms.button>
-                                <x-forms.button type="button" wire:click="confirmRemovePort"
-                                    @click="modalOpen = false" isError>
-                                    Use this port anyway
+                                    Keep port {{ $requiredPort }}
                                 </x-forms.button>
                             </div>
                         </div>

@@ -112,6 +112,8 @@ class Domains extends Component
 
     public ?int $requiredPort = null;
 
+    public ?int $requestedPort = null;
+
     public bool $isCheckingDns = false;
 
     #[Locked]
@@ -1603,10 +1605,10 @@ class Domains extends Component
         if ($checkPorts && ! $this->forceRemovePort) {
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null && $domainString) {
-                $previousFqdn = $app->getOriginal('fqdn');
                 foreach ($this->splitDomains($domainString) as $fqdn) {
-                    if ($app->portRequiresConfirmation($fqdn, $requiredPort, is_string($previousFqdn) ? $previousFqdn : null)) {
+                    if ($app->portRequiresConfirmation($fqdn, $requiredPort)) {
                         $this->requiredPort = $requiredPort;
+                        $this->requestedPort = ServiceApplication::extractPortFromUrl($fqdn);
                         $this->showPortWarningModal = true;
                         $app->refresh();
 
