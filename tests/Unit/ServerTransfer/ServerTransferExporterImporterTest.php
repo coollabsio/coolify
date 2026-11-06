@@ -39,6 +39,7 @@ use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use phpseclib3\Crypt\RSA;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -85,6 +87,7 @@ beforeEach(function () {
         'git_branch' => 'main',
         'build_pack' => 'nixpacks',
         'ports_exposes' => '3000',
+        'git_ssh_known_hosts' => '[git.example.com]:2222 ssh-ed25519 AAAA',
         'fqdn' => 'https://app.example.com',
         'status' => 'running:healthy',
     ]);
@@ -193,6 +196,7 @@ beforeEach(function () {
         'service_id' => $this->service->id,
         'team_id' => $this->team->id,
         'enabled' => true,
+        'use_shell' => false,
     ]);
 
     $this->exporter = app(ServerTransferExporter::class);
@@ -238,7 +242,8 @@ test('export includes server applications databases and secrets in plaintext', f
     $service = $environment['services'][0];
     expect($service['uuid'])->toBe($this->service->uuid)
         ->and($service['scheduled_tasks'])->toHaveCount(1)
-        ->and($service['scheduled_tasks'][0]['name'])->toBe('service-ping');
+        ->and($service['scheduled_tasks'][0]['name'])->toBe('service-ping')
+        ->and($service['scheduled_tasks'][0]['use_shell'])->toBeFalse();
 });
 
 test('export refuses localhost coolify host', function () {
@@ -310,6 +315,7 @@ test('round trip import preserves uuids secrets and related resources after sour
     expect($app)->not->toBeNull()
         ->and($app->name)->toBe('my-app')
         ->and($app->fqdn)->toBe('https://app.example.com')
+        ->and($app->git_ssh_known_hosts)->toBe('[git.example.com]:2222 ssh-ed25519 AAAA')
         ->and($app->environment_variables()->where('key', 'APP_SECRET')->first()?->value)->toBe('super-secret-value')
         ->and($app->persistentStorages)->toHaveCount(1)
         ->and($app->scheduled_tasks)->toHaveCount(1)
@@ -337,7 +343,8 @@ test('round trip import preserves uuids secrets and related resources after sour
     expect($serviceTask)->not->toBeNull()
         ->and($serviceTask->service_id)->toBe($service->id)
         ->and($serviceTask->name)->toBe('service-ping')
-        ->and($serviceTask->command)->toBe('echo ping');
+        ->and($serviceTask->command)->toBe('echo ping')
+        ->and($serviceTask->use_shell)->toBeFalse();
 
     $shared = SharedEnvironmentVariable::query()
         ->where('server_id', $server->id)
@@ -631,6 +638,28 @@ test('import into another team creates its own key when the same key exists in a
         ->and($server->privateKey->team_id)->toBe($targetTeam->id)
         ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
         ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
+});
+
+test('a server with a weak legacy key moves, and the export warns to rotate the key', function () {
+    $weakKey = (string) RSA::createKey(1024)->toString('PKCS1');
+    $this->privateKey->private_key = $weakKey;
+    $this->privateKey->saveQuietly();
+    $bundle = $this->exporter->export($this->server->refresh());
+    $targetTeam = Team::factory()->create();
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->private_key)->toBe(formatPrivateKey($weakKey))
+        ->and(implode(' ', $bundle['warnings']))->toContain('SSH key transfer-key: RSA keys must have at least 2048 bits.')
+        ->and(collect(app(TransferFinishChecklist::class)->of($server)['items'])->firstWhere('type', 'previous_ssh_key')['hint'])
+        ->toContain('The key is also weak: RSA keys must have at least 2048 bits.');
 });
 
 test('system-wide github apps are not exported and re-link on import by uuid', function () {
@@ -1885,7 +1914,7 @@ test('the GitHub runner config moves disabled with its GitHub App and the bundle
             'On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to {target_url}/webhooks/source/github/events, the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.',
             'In GitLab, open Settings > Webhooks of every project that uses GitLab App Team GitLab, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.',
             'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. Enabling them stops runners that another Coolify instance started on this server.',
-            'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, then remove the old public key from ~/.ssh/authorized_keys on the server.',
+            'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.',
         ])
         ->and(implode(' ', $bundle['warnings']))->not->toContain('webhook URL')
         ->and(implode(' ', $bundle['warnings']))->not->toContain('runner');
@@ -2194,4 +2223,47 @@ test('an ignore that the import created before is not created again', function (
 
     expect(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
         ->and($result['created']['image_scan_ignores'])->toBe(2);
+});
+
+test('import clears trust metadata when the host key normalizes to null', function (?string $hostKey) {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importServer');
+    $server = $method->invoke($this->importer, [
+        'name' => 'imported-server',
+        'ip' => '10.55.0.99',
+        'settings' => [
+            'ssh_host_key' => $hostKey,
+            'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        ],
+    ], $this->privateKey, $this->team->id, false, false);
+
+    expect($server->settings->fresh())
+        ->ssh_host_key->toBeNull()
+        ->ssh_host_key_source->toBeNull()
+        ->ssh_host_key_trusted_at->toBeNull();
+})->with([null, '', '# comment only', 'invalid key']);
+
+test('the pinned host key moves with the server', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I';
+    $this->server->settings->forceFill([
+        'ssh_host_key' => $hostKey,
+        'ssh_host_key_source' => 'tofu',
+        'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        'ssh_host_key_pending' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjaL3Lqt0tZl4iVZw8x1v2b9fM8r6Yq0nH0bUq3dQ0h',
+        'is_ssh_host_key_check_disabled' => true,
+    ])->save();
+    $bundle = json_decode(json_encode($this->exporter->export($this->server->fresh())), true);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->firstOrFail()->settings;
+    expect($settings)
+        ->ssh_host_key->toBe($hostKey)
+        ->ssh_host_key_source->toBe('transfer')
+        ->ssh_host_key_pending->toBeNull()
+        ->is_ssh_host_key_check_disabled->toBeTrue()
+        ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
 });

@@ -1365,6 +1365,7 @@ class Domains extends Component
             $this->pendingAction = null;
             $this->dispatch('success', 'Domain updated.');
             $this->refreshDomains();
+            $urlsToCheck = $this->configureDnsAfterDomainEdit($urlsToCheck, $previousDnsHostnames);
             if ($urlsToCheck !== []) {
                 $this->queueUrlsDns($urlsToCheck, $app);
             }

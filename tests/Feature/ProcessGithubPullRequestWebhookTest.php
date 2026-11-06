@@ -383,9 +383,6 @@ it('uses one GitHub App installation token for all GitHub API calls of a pull re
     $firstPage = collect(range(1, 100))->map(fn (int $i): array => ['filename' => ".github/workflows/workflow-{$i}.yml"])->all();
 
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
             'token' => 'fake-installation-token',
         ], 201),

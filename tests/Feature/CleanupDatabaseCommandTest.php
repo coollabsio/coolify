@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
@@ -33,4 +34,21 @@ it('deletes all activities older than the retention and keeps newer ones', funct
 
     expect(Activity::query()->pluck('id')->sort()->values()->all())
         ->toBe($this->recent->pluck('id')->sort()->values()->all());
+});
+
+it('deletes sessions older than the session lifetime', function () {
+    config(['session.lifetime' => 10080]);
+    $insertSession = fn (string $id, int $ageInMinutes) => DB::table('sessions')->insert([
+        'id' => $id,
+        'payload' => '',
+        'last_activity' => now()->subMinutes($ageInMinutes)->timestamp,
+    ]);
+    $insertSession('expired', 10080 + 60);
+    $insertSession('active', 10080 - 60);
+
+    $this->artisan('cleanup:database --yes')
+        ->expectsOutputToContain('Delete 1 entries from sessions.')
+        ->assertSuccessful();
+
+    expect(DB::table('sessions')->pluck('id')->all())->toBe(['active']);
 });

@@ -32,7 +32,7 @@ return [
 
     'cloud' => [
         // Days after a subscription ends (or after a never-paid team was created) before cloud:cleanup-unsubscribed-teams deletes the team's data.
-        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 30),
+        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 60),
     ],
 
     'urls' => [
@@ -110,6 +110,8 @@ return [
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
         'retry_multiplier' => env('SSH_RETRY_MULTIPLIER', 2),
+        // SSH host key check of managed servers: warn (connect, report a changed key), enforce (refuse a changed key), off.
+        'host_key_checking' => strtolower(trim((string) env('SSH_HOST_KEY_CHECKING', 'warn'))),
     ],
 
     'invitation' => [

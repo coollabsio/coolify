@@ -70,9 +70,10 @@
             ],
             [
                 'label' => 'Security',
-                'route' => 'server.security.patches',
-                'active' => request()->routeIs('server.security.*'),
-                'visible' => $server->isFunctional() && auth()->user()?->can('update', $server),
+                'route' => 'server.security',
+                'active' => request()->routeIs('server.security'),
+                // Also for a server that is not functional: a changed host key stops the connection, and the page to trust the new key is here.
+                'visible' => auth()->user()?->can('update', $server),
             ],
         ];
 
@@ -90,6 +91,7 @@
             && $server->isSentinelEnabled()
             && auth()->user()?->can('viewSentinel', $server);
         $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
+        $showProxyActions = $currentRoute === 'server.proxy' || str_starts_with((string) $currentRoute, 'server.proxy.');
     @endphp
 
     @if ($this->hasPendingProxyConfiguration)
@@ -168,7 +170,7 @@
                     <div class="flex w-full min-w-0 items-center gap-2">
                         <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
                             :show-sentinel-status="$showSentinelStatus" />
-                        @if ($traefikDashboardAvailable)
+                        @if ($showProxyActions && $traefikDashboardAvailable)
                             <a target="_blank" href="http://{{ formatHostForUrl((string) $serverIp) }}:8080" title="Open Traefik dashboard"
                                 class="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white">
                                 <x-reicon name="external-link" class="size-3" />
@@ -183,6 +185,7 @@
             <div class="ml-auto shrink-0">
                 @if ($server->proxySet())
                     @can('manageProxy', $server)
+                        @if ($showProxyActions)
                         <x-split-action id="server-mobile-actions">
                             @if ($proxyCanBeStopped)
                                 <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
@@ -208,9 +211,10 @@
                                 Refresh Proxy Status
                             </button>
                         </x-split-action>
+                        @endif
 
-                        {{-- Programmatic open only (clicked from the Actions menu). Keep fully
-                             display:none so the modal shells never reserve a layout row. --}}
+                        {{-- Programmatic open only (proxy actions menu and the pending-changes warning).
+                             Keep fully display:none so the modal shells never reserve a layout row. --}}
                         <div class="hidden" aria-hidden="true">
                             <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
                                 submitAction="restart" :actions="[
@@ -261,7 +265,7 @@
         @php
             $canManageProxy = auth()->user()?->can('manageProxy', $server) ?? false;
         @endphp
-        @if ($server->proxySet() && ($canManageProxy || $traefikDashboardAvailable))
+        @if ($showProxyActions && $server->proxySet() && ($canManageProxy || $traefikDashboardAvailable))
         {{-- Teleport only with content: a filled slot renders as a floating panel. --}}
         @teleport('#resource-action-hud-slot')
         <div class="hidden xl:flex xl:w-auto xl:items-center">

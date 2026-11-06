@@ -177,7 +177,10 @@ services:
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_MAILPIT_PORT:-1025}:1025"
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
-      - coolify
+      coolify:
+        # The seeded instance SMTP settings (InstanceSettingsSeeder) use coolify-mail:1025.
+        aliases:
+          - coolify-mail
 
   minio:
     profiles: ["minio"]

@@ -2,14 +2,20 @@
 
 namespace App\Notifications\Database;
 
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BackupSuccessWithS3Warning extends CustomEmailNotification
+/**
+ * Sent on the first failed S3 upload, then at most once a day until a run of the backup has no problem again.
+ */
+class BackupSuccessWithS3Warning extends CustomEmailNotification implements ThrottledNotification
 {
     public string $name;
 
@@ -17,7 +23,7 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
 
     public ?string $s3_storage_url = null;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name, public $s3_error)
+    public function __construct(public ScheduledDatabaseBackup $backup, public $database, public $database_name, public $s3_error)
     {
         $this->onQueue('high');
 
@@ -27,6 +33,16 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
         if ($backup->s3) {
             $this->s3_storage_url = base_url().'/storages/'.$backup->s3->uuid;
         }
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->backup;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
     }
 
     public function via(object $notifiable): array

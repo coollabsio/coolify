@@ -2133,6 +2133,26 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     padding: 1rem;
 }
 
+/* Sections inside a modal well: the modal is already the card, so show each
+   section flat (title row and fields) with a divider between sections. */
+.modal-flat-sections .application-settings-section,
+.modal-flat-sections .application-settings-section-body {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+.modal-flat-sections .application-settings-section > :is(header, .application-settings-section-header) {
+    padding-inline: 0;
+}
+
+.modal-flat-sections .application-settings-section ~ .application-settings-section {
+    border-top: 1px solid var(--well-border);
+    padding-top: 1.5rem;
+}
+
 /* The dark well is darker than the canvas, so controls inside it use a darker,
    translucent fill and border (like haruvo) instead of the global opaque ones. */
 .dark .application-settings-section-body {
@@ -3950,9 +3970,9 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-executions-table-grid {
-    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 10rem 5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: 6.5rem minmax(6rem, 0.7fr) minmax(10rem, 1.6fr) 9.5rem 4.5rem minmax(6rem, 0.8fr) 4rem;
     gap: 0.75rem;
-    min-width: 67.5rem;
+    min-width: 52rem;
 }
 
 .backup-executions-table-scroll {
@@ -3961,10 +3981,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Match the grid width so the log output spans the full scrolled row. */
 .backup-execution-row {
-    min-width: 67.5rem;
+    min-width: 52rem;
 }
 
-.backup-execution-row:last-child > .data-table-row {
+.backup-execution-row:last-child {
     border-bottom: 0;
 }
 
@@ -4025,7 +4045,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 10rem minmax(8rem, 1fr) 5rem;
+        grid-template-columns: 6.5rem minmax(6rem, 0.7fr) minmax(10rem, 1.6fr) 9.5rem minmax(6rem, 0.8fr) 4rem;
     }
 
     .backup-executions-table-grid > :nth-child(5) {

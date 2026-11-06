@@ -46,11 +46,7 @@ class Destination extends Component
         $all_networks = $all_networks->push($this->resource->destination);
         $all_networks = $all_networks->merge($this->resource->additional_networks);
 
-        $this->networks = $this->resourceServers()
-            ->whereRelation('settings', 'is_reachable', true)
-            ->whereRelation('settings', 'is_usable', true)
-            ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereRelation('settings', 'force_disabled', false)
+        $this->networks = $this->usableResourceServers()
             ->get()
             ->filter(fn (Server $server) => $server->canHostResources())
             ->map(function ($server) {
@@ -77,11 +73,44 @@ class Destination extends Component
             ->orderBy('name');
     }
 
+    private function usableResourceServers(): Builder
+    {
+        return $this->resourceServers()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
+    /**
+     * Find a server of the resource team that can take a deployment.
+     * Shows an error toast and returns null when the server is not usable right now.
+     */
+    private function findUsableServer(int $serverId, string $title): ?Server
+    {
+        $server = $this->resourceServers()->findOrFail($serverId);
+        $settings = $server->settings;
+
+        if (! $settings->is_reachable || ! $settings->is_usable) {
+            $this->dispatch('error', $title, "The server {$server->name} is not reachable. Check the connection on the server page and try again.");
+
+            return null;
+        }
+
+        if ($settings->force_disabled || $settings->is_swarm_worker || ! $server->canHostResources()) {
+            $this->dispatch('error', $title, "The server {$server->name} cannot host resources.");
+
+            return null;
+        }
+
+        return $server;
+    }
+
     public function stop($serverId)
     {
         try {
             $this->authorize('deploy', $this->resource);
-            $server = $this->resourceServers()->findOrFail($serverId);
+            $server = $this->resourceServers()->findOrFail((int) $serverId);
             StopApplicationOneServer::run($this->resource, $server);
             auditLog('ui.application.destination_stopped', [
                 'team_id' => $this->resource->team()?->id,
@@ -105,8 +134,11 @@ class Destination extends Component
 
                 return;
             }
+            $server = $this->findUsableServer($server_id, 'Failed to deploy.');
+            if (! $server) {
+                return;
+            }
             $deployment_uuid = new_public_id();
-            $server = $this->resourceServers()->findOrFail($server_id);
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
             $result = queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
@@ -141,9 +173,15 @@ class Destination extends Component
     public function promote(int $network_id, int $server_id)
     {
         try {
-            $server = $this->resourceServers()->findOrFail($server_id);
-            $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
+            $server = $this->findUsableServer($server_id, 'Failed to promote.');
+            if (! $server) {
+                return;
+            }
+            $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
+            if (! $this->resource->additional_networks()->wherePivot('server_id', $server->id)->whereKey($network->id)->exists()) {
+                abort(404);
+            }
             $this->resource->getConnection()->transaction(function () use ($network, $server) {
                 $mainDestination = $this->resource->destination;
                 $this->resource->update([
@@ -172,9 +210,12 @@ class Destination extends Component
     public function addServer(int $network_id, int $server_id)
     {
         try {
-            $server = $this->resourceServers()->findOrFail($server_id);
-            $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
+            $server = $this->findUsableServer($server_id, 'Failed to add server.');
+            if (! $server) {
+                return;
+            }
+            $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
             $reason = $this->resource instanceof Application
                 ? $this->resource->additionalServersUnavailableReason($server)
                 : 'Only applications can use multiple servers.';

@@ -104,13 +104,21 @@
                         </x-forms.button>
                     </div>
                 </x-slot:actions>
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
-                        required label="Coolify URL"
-                        helper="Public URL used by Sentinel to reach this Coolify instance." />
-                    <x-forms.input canGate="update" :canResource="$server" type="password"
-                        id="sentinelToken" label="Sentinel token" required
-                        helper="Authentication token used by Sentinel." />
+                <div class="flex flex-col gap-4">
+                    @if ($this->isPushUrlInsecure())
+                        <x-callout type="warning" title="Sentinel reports over plain HTTP">
+                            Sentinel sends its token with every report. Over HTTP, the token and the server data are not
+                            encrypted on the network. Set an HTTPS Coolify URL.
+                        </x-callout>
+                    @endif
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
+                            required label="Coolify URL"
+                            helper="Public URL used by Sentinel to reach this Coolify instance." />
+                        <x-forms.input canGate="update" :canResource="$server" type="password"
+                            id="sentinelToken" label="Sentinel token" required
+                            helper="Authentication token used by Sentinel." />
+                    </div>
                 </div>
             </x-application.settings-section>
 

@@ -293,3 +293,45 @@ test('the terminal command passes the fix option to the reconciliation action', 
         ->expectsOutput('Skipped for manual review: 1')
         ->assertSuccessful();
 });
+
+test('a paid row without a subscription ID is ended when the customer has no live Stripe subscription', function () {
+    $this->subscription->update(['stripe_subscription_id' => null]);
+
+    $stripe = Mockery::mock(StripeClient::class);
+    $subscriptions = Mockery::mock(SubscriptionService::class);
+    $customers = Mockery::mock(CustomerService::class);
+    $stripe->subscriptions = $subscriptions;
+    $stripe->customers = $customers;
+
+    $subscriptions->shouldReceive('all')->twice()->andReturn(stripeSubscriptionCollection());
+    $customers->shouldReceive('retrieve')->with('cus_stale')->andReturn((object) ['email' => null]);
+
+    $this->instance(StripeClient::class, $stripe);
+
+    $result = SyncStripeSubscriptions::run(fix: true);
+
+    expect($result['discrepancies'])->toHaveCount(1)
+        ->and($result['discrepancies'][0]['resolution'])->toBe('end_subscription')
+        ->and($this->subscription->fresh()->stripe_invoice_paid)->toBeFalsy();
+});
+
+test('a paid row without a subscription ID is linked to the live Stripe subscription of its customer', function () {
+    $this->subscription->update(['stripe_subscription_id' => null]);
+
+    $stripe = Mockery::mock(StripeClient::class);
+    $subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions = $subscriptions;
+
+    $subscriptions->shouldReceive('all')->with(['status' => 'active', 'limit' => 100])
+        ->andReturn(stripeSubscriptionCollection([['id' => 'sub_live', 'customer' => 'cus_stale']]));
+    $subscriptions->shouldReceive('all')->with(['status' => 'past_due', 'limit' => 100])
+        ->andReturn(stripeSubscriptionCollection());
+
+    $this->instance(StripeClient::class, $stripe);
+
+    $result = SyncStripeSubscriptions::run(fix: true);
+
+    expect($result['discrepancies'][0]['resolution'])->toBe('link_subscription')
+        ->and($this->subscription->fresh()->stripe_subscription_id)->toBe('sub_live')
+        ->and($this->subscription->fresh()->stripe_invoice_paid)->toBeTruthy();
+});

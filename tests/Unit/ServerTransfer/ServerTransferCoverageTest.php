@@ -26,6 +26,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -240,6 +241,8 @@ test('every exported value arrives unchanged on the target', function () {
     ];
     $values = [
         Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test']],
+        // The import accepts only valid host key lines.
+        ServerSetting::class => ['ssh_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I'],
         Application::class => ['fqdn' => 'https://fuzz-a.example.test,https://fuzz-b.example.test', 'domain_port_overrides' => null, 'noindex_domains' => ['https://fuzz-b.example.test']],
         ApplicationPreview::class => ['fqdn' => 'https://pr-fuzz.example.test', 'domain_port_overrides' => null],
         ServiceApplication::class => ['fqdn' => 'https://fuzz-service.example.test', 'domain_port_overrides' => null, 'noindex_domains' => []],
@@ -297,6 +300,7 @@ test('every exported value arrives unchanged on the target', function () {
     $changedOnPurpose = [
         'last_online_at' => 'The import sets the status, which sets the time.',
         'GithubRunnerConfig.is_enabled' => 'The target disables the runners until the user enables them.',
+        'ServerSetting.ssh_host_key_source' => 'The import marks a moved host key as transfer.',
     ];
     expect(ServerTransferSnapshot::diff($before, ServerTransferSnapshot::take($this->server->uuid), $changedOnPurpose)['unexplained'])->toBe([]);
 });

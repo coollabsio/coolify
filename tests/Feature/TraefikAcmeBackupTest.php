@@ -104,7 +104,7 @@ function filePermissions(string $path): string
 }
 
 it('backs up acme.json before a certificate is deleted', function () {
-    DeleteTraefikCertificate::run($this->server, GetTraefikCertificates::run($this->server)[0]['id']);
+    DeleteTraefikCertificate::run($this->server, [GetTraefikCertificates::run($this->server)[0]['id']]);
 
     $backups = acmeBackupFiles($this->proxyDirectory);
     expect($backups)->toHaveCount(1)

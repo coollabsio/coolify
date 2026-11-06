@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\Application\Deployment;
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
@@ -69,7 +71,7 @@ class Show extends Component
         $this->application_deployment_queue = $application_deployment_queue;
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
-        $this->is_debug_enabled = auth()->user()->isMember()
+        $this->is_debug_enabled = ! auth()->user()->can('update', $this->application)
             ? false
             : $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
@@ -232,6 +234,24 @@ class Show extends Component
             $this->deploymentFinishedDispatched = true;
             $this->dispatch('deploymentFinished');
         }
+    }
+
+    /**
+     * The Source page URL when a git command of Coolify failed because the Git host sent another SSH host key.
+     * Only failed deployments are checked, so the logs are not searched on each poll of a running deployment.
+     */
+    public function getHostKeyChangedSourceUrlProperty(): ?string
+    {
+        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+            || ! str_contains((string) $this->application_deployment_queue->logs, ApplicationDeploymentJob::GIT_HOST_KEY_CHANGED_HINT)) {
+            return null;
+        }
+
+        return route('project.application.source', [
+            'project_uuid' => $this->application->environment->project->uuid,
+            'environment_uuid' => $this->application->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ]);
     }
 
     public function getLogLinesProperty()

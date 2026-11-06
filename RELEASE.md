@@ -169,6 +169,7 @@ The pull request workflow builds every pull request and publishes the image of a
 | `nightly` | `/coolify/nightly/` | the nightly workflow after every nightly, pushed to main  |
 
 - The preview channel takes betas and release candidates, alphas reach the nightly channel only
+- The stable channel opens a pull request from `sync/stable-v<version>`, squash merge it. A new sync of the same version updates it, a sync of a newer version closes it
 - `CDN_TOKEN` in the environment `release` is a fine-grained token for `coollabsio/coollabs-cdn` alone, with read and write access to contents and pull requests
 - `/coolify/versions.json` has a `stable`, `preview` and `nightly` block, each with the Coolify version of its channel and the helper, Sentinel and Traefik versions of the `upstream.json` it was synced from. An instance takes the newest version of its channel and the more stable ones
 - Every stable sync also sets the `coolify` and `traefik` keys, which older instances read, to the stable versions, so older instances upgrade to a version that reads the blocks

@@ -75,3 +75,11 @@ it('reports CloudWatch as an enabled drain that does not use Fluent Bit', functi
         ->and($axiom->isLogDrainEnabled())->toBeTrue()
         ->and($axiom->isFluentBitLogDrainEnabled())->toBeTrue();
 });
+
+it('sends the Coolify labels with fluentd, so containers without the default variables are identified', function () {
+    $server = serverWithLogDrainSettings(['is_logdrain_custom_enabled' => true]);
+
+    expect(generate_log_drain_configuration($server)['options'])
+        ->toHaveKey('env', 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME')
+        ->toHaveKey('labels', 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName');
+});

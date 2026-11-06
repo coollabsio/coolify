@@ -175,5 +175,5 @@ it('changes the configuration version when the generated files change', function
     });
 
     expect([StartLogDrain::CONFIG_VERSION, hash('sha256', $hashes->implode("\0"))])
-        ->toBe(['1', '11916cd1142514c158a6fbe812ce468e3fe80fc79428cef6ba2654c86aa384ba']);
+        ->toBe(['2', '4f4ceaf642f0de8009e256b54f2bbe2f842190297bbf2da92f2b31dd0a9baf3d']);
 });

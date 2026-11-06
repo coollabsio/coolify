@@ -50,6 +50,8 @@ class ApplicationsController extends Controller
         'is_git_submodules_enabled',
         'is_git_lfs_enabled',
         'is_git_shallow_clone_enabled',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
         'disable_build_cache',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
@@ -81,6 +83,8 @@ class ApplicationsController extends Controller
         'is_git_submodules_enabled',
         'is_git_lfs_enabled',
         'is_git_shallow_clone_enabled',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
         'disable_build_cache',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
@@ -464,6 +468,8 @@ class ApplicationsController extends Controller
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
                             'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
@@ -674,6 +680,8 @@ class ApplicationsController extends Controller
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
                             'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
@@ -884,6 +892,8 @@ class ApplicationsController extends Controller
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
                             'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
@@ -1064,6 +1074,8 @@ class ApplicationsController extends Controller
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
                             'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
@@ -1240,6 +1252,8 @@ class ApplicationsController extends Controller
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
                             'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
@@ -1754,6 +1768,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2017,6 +2032,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2249,6 +2265,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2388,6 +2405,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -2523,6 +2541,7 @@ class ApplicationsController extends Controller
             if ($tagNames !== []) {
                 $this->attachTagsToResource($application, $tagNames, $teamId);
             }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
@@ -3294,6 +3313,8 @@ class ApplicationsController extends Controller
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
                             'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
                             'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
                             'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
@@ -4017,7 +4038,7 @@ class ApplicationsController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -4170,7 +4191,7 @@ class ApplicationsController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4360,7 +4381,7 @@ class ApplicationsController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                     ],
                 ),
             ),

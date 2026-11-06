@@ -28,9 +28,6 @@ class SettingsBackup extends Component
     #[Locked]
     public $s3s;
 
-    #[Locked]
-    public $executions = [];
-
     #[Validate(['nullable'])]
     public ?string $description = null;
 
@@ -58,7 +55,6 @@ class SettingsBackup extends Component
                 $this->backup->enabled = false;
                 $this->backup->save();
             }
-            $this->executions = $this->backup?->executions ?? [];
         }
         $this->settings = $settings;
         $this->is_backup_before_update_enabled = $settings->is_backup_before_update_enabled;
@@ -112,7 +108,6 @@ class SettingsBackup extends Component
             $this->s3s = S3Storage::whereTeamId(0)->get();
 
             $this->description = $this->database->description;
-            $this->executions = $this->backup->executions;
 
         } catch (\Exception $e) {
             return handleError($e, $this);

@@ -74,3 +74,27 @@ it('tells the user to check the bot token when Telegram does not find the bot', 
         ->assertDispatched('error', 'Telegram rejected the test notification.', 'The Bot API token is not valid. Copy it again from @BotFather.')
         ->assertNotDispatched('success');
 });
+
+it('sends the dashboard link as text when Telegram rejects the button URL', function () {
+    Http::fakeSequence('api.telegram.org/*')
+        ->push(['ok' => false, 'error_code' => 400, 'description' => 'Bad Request: BUTTON_URL_INVALID'], 400)
+        ->push(['ok' => true, 'result' => []]);
+
+    Livewire::test(TelegramNotification::class)
+        ->call('sendTestNotification')
+        ->assertDispatched('success', 'Test notification sent.');
+
+    $requests = Http::recorded();
+    expect($requests)->toHaveCount(2)
+        ->and($requests[0][0]->data())->toHaveKey('reply_markup')
+        ->and($requests[1][0]->data())->not->toHaveKey('reply_markup')
+        ->and($requests[1][0]['text'])->toBe("Coolify: This is a test Telegram notification from Coolify.\n\nGo to your dashboard: ".base_url());
+});
+
+it('does not resend a notification that Telegram rejects for another reason', function () {
+    Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Bad Request: chat not found'], 400)]);
+
+    Livewire::test(TelegramNotification::class)->call('sendTestNotification');
+
+    Http::assertSentCount(1);
+});

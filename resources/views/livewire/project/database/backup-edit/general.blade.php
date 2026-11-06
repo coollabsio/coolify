@@ -101,7 +101,7 @@
                     helper="Uses the deployment server timezone, or the instance timezone when none is configured."
                     required />
                 <x-forms.input label="Timeout" id="timeout" type="number" min="60"
-                    helper="Maximum backup runtime in seconds." required />
+                    helper="Maximum runtime in seconds of the complete backup run: the dumps and S3 uploads of all databases." required />
                 <x-forms.input label="Missing backup alert after" id="missingBackupNotificationDays" type="number"
                     min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
                     helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />

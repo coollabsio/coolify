@@ -9,6 +9,7 @@ use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -48,9 +49,8 @@ class Import extends Component
         ];
     }
 
-    public function mount(): void
+    public function mount(Model $resource): void
     {
-        $resource = $this->resolveResourceFromRoute();
         $this->authorize('view', $resource);
 
         $this->resourceId = $resource->id;
@@ -72,57 +72,14 @@ class Import extends Component
 
     public function render(): View
     {
-        return view('livewire.project.database.import');
+        return view('livewire.project.database.import', [
+            'resource' => $this->resolveStoredResource(),
+        ]);
     }
 
-    private function resolveResourceFromRoute(): object
+    private function resolveStoredResource(): Model
     {
-        $parameters = get_route_parameters();
-        $teamId = data_get(Auth::user()?->currentTeam(), 'id');
-        $databaseUuid = data_get($parameters, 'database_uuid');
-        $stackServiceUuid = data_get($parameters, 'stack_service_uuid');
-
-        if ($databaseUuid) {
-            $resource = getResourceByUuid($databaseUuid, $teamId);
-            if ($resource) {
-                return $resource;
-            }
-
-            abort(404);
-        }
-
-        if ($stackServiceUuid) {
-            $project = currentTeam()
-                ->projects()
-                ->select('id', 'uuid', 'team_id')
-                ->where('uuid', data_get($parameters, 'project_uuid'))
-                ->firstOrFail();
-            $environment = $project->environments()
-                ->select('id', 'uuid', 'name', 'project_id')
-                ->where('uuid', data_get($parameters, 'environment_uuid'))
-                ->firstOrFail();
-            $service = $environment->services()->whereUuid(data_get($parameters, 'service_uuid'))->firstOrFail();
-            $resource = $service->databases()->whereUuid($stackServiceUuid)->first();
-            if ($resource) {
-                return $resource;
-            }
-        }
-
-        abort(404);
-    }
-
-    private function resolveStoredResource(): object
-    {
-        if ($this->resourceId === null || $this->resourceType === null) {
-            return $this->resolveResourceFromRoute();
-        }
-
-        $resource = $this->resourceType::find($this->resourceId);
-        if ($resource) {
-            return $resource;
-        }
-
-        abort(404);
+        return $this->resourceType::find($this->resourceId) ?? abort(404);
     }
 
     private function isUnsupportedResource(object $resource): bool

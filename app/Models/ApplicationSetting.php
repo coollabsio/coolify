@@ -107,6 +107,8 @@ class ApplicationSetting extends Model
         'disable_build_cache' => 'boolean',
         'is_image_scan_enabled' => 'boolean',
         'image_builds_by_team' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
     ];
 
     protected $fillable = [
@@ -154,6 +156,8 @@ class ApplicationSetting extends Model
         'docker_images_to_keep',
         'stop_grace_period',
         'rolling_update_drain_seconds',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
     ];
 
     /**

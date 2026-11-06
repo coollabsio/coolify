@@ -1,3 +1,4 @@
+import { copyTextToClipboard } from './clipboard.js';
 import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeNumberStepperComponent } from './number-stepper.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
@@ -39,6 +40,8 @@ window.vulnerabilitySearchItem = vulnerabilitySearchItem;
 // Used by the dashboard security callout (dashboard.blade.php).
 window.securityCallout = securityCallout;
 window.dismissSecurityCallout = dismissSecurityCallout;
+// Used by the log viewers to copy logs that a Livewire call still loads.
+window.copyTextToClipboard = copyTextToClipboard;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);

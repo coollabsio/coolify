@@ -194,10 +194,8 @@ class StartDatabaseImport
                 throw new DatabaseImportException('The S3 backup was not found or exceeds the 10 GiB limit.');
             }
             $helper = "s3-restore-{$operation}";
-            $resolveOptions = $this->startS3Helper($storage, $server, $helper, $network);
-            $sourceArg = escapeshellarg("s3temp/{$storage->bucket}/{$key}");
             $commandList = [
-                'docker exec '.escapeshellarg($helper).' mc cp'.$resolveOptions.' '.$sourceArg.' /tmp/restore',
+                $this->startS3Helper($storage, $server, $helper, $network, $key),
                 ...$this->streamFromHelper($helper, $container, $containerPath),
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
             ];
@@ -326,13 +324,13 @@ class StartDatabaseImport
     }
 
     /**
-     * Starts the S3 restore helper and sets its `s3temp` mc alias. The S3 keys go to mc through the
-     * stdin of a separate SSH process, so they are not in the arguments of any process on Coolify or
-     * on the server. The helper is removed when either step fails.
+     * Starts the S3 restore helper and sets its `s3temp` mc alias, or the curl config for endpoints with a path.
+     * The S3 keys go to mc through the stdin of a separate SSH process, so they are not in the arguments of any
+     * process on Coolify or on the server. The helper is removed when either step fails.
      *
-     * @return string The mc `--resolve` option that pins the endpoint host.
+     * @return string The command that downloads $key to /tmp/restore in the helper.
      */
-    private function startS3Helper(S3Storage $storage, Server $server, string $helper, string $network): string
+    private function startS3Helper(S3Storage $storage, Server $server, string $helper, string $network, string $key): string
     {
         $image = coolifyHelperImage().':'.getHelperVersion();
 
@@ -341,13 +339,16 @@ class StartDatabaseImport
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
                 'docker run -d --network '.escapeshellarg($network)
                     .' --name '.escapeshellarg($helper)
-                    .' '.$storage->minioClientRegionOption()
+                    .' '.$storage->minioClientEnvOptions()
                     .' '.escapeshellarg($image).' sleep 86400',
             ], $server);
+            if ($storage->usesCurlTransfer()) {
+                return $storage->prepareCurlDownload($server, $helper, $key, '/tmp/restore');
+            }
             $resolveOptions = $storage->minioClientResolveOptions($server, $image, $network);
             $this->setMinioClientAlias($storage, $server, $helper, $resolveOptions);
 
-            return $resolveOptions;
+            return 'docker exec '.escapeshellarg($helper).' mc cp'.$resolveOptions.' '.escapeshellarg("s3temp/{$storage->bucket}/{$key}").' /tmp/restore';
         } catch (Throwable) {
             instant_remote_process(['docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true'], $server, throwError: false);
 

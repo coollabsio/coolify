@@ -188,6 +188,8 @@ test('maps Coolify statuses to tones', () => {
     'running:unknown': 'ok',
     running: 'ok',
     'running (healthy)': 'ok',
+    'running:starting': 'busy',
+    'running (starting)': 'busy',
     'running:unhealthy': 'warn',
     'degraded:unhealthy': 'warn',
     'exited:unhealthy': 'bad',

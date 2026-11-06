@@ -95,7 +95,7 @@ describe('on a reachable server', function () {
         $this->application = $this->application->fresh();
     });
 
-    function fakeRollbackServer(Application $application, array $containers): void
+    function fakeRollbackServer(Application $application, array $containers, ?array $images = null): void
     {
         $uuid = $application->uuid;
         $ps = collect($containers)->map(fn (array $container) => json_encode([
@@ -105,7 +105,7 @@ describe('on a reachable server', function () {
             'State' => $container['state'] ?? 'running',
             'Labels' => "coolify.applicationUuid={$uuid},coolify.pullRequestId=".($container['pr'] ?? 0).',coolify.managed=true',
         ]))->implode(PHP_EOL);
-        $images = implode(PHP_EOL, ["{$uuid}#aaaaaaa#2026-10-01 10:00:00", "{$uuid}#bbbbbbb#2026-10-02 10:00:00"]);
+        $images = implode(PHP_EOL, $images ?? ["{$uuid}#aaaaaaa#2026-10-01 10:00:00", "{$uuid}#bbbbbbb#2026-10-02 10:00:00"]);
 
         Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'docker images') ? $images : $ps));
     }
@@ -142,5 +142,36 @@ describe('on a reachable server', function () {
         ]);
 
         expect(GetRollbackImages::run($this->application)['current'])->toBeNull();
+    });
+
+    it('lists the commit images of Docker Compose services once per commit', function () {
+        $uuid = $this->application->uuid;
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  app:\n    build: .\n  worker:\n    build: ./worker\n  db:\n    image: postgres:16\n",
+        ]);
+        fakeRollbackServer($this->application, [
+            ['name' => "app-{$uuid}", 'image' => "{$uuid}_app:bbbbbbb"],
+            ['name' => "worker-{$uuid}", 'image' => "{$uuid}_worker:bbbbbbb"],
+            ['name' => "db-{$uuid}", 'image' => 'postgres:16'],
+        ], [
+            "{$uuid}_app#bbbbbbb#2026-10-02 10:00:05",
+            "{$uuid}_worker#bbbbbbb#2026-10-02 10:00:00",
+            "{$uuid}_app#aaaaaaa#2026-10-01 10:00:00",
+            "{$uuid}_worker#aaaaaaa#2026-10-01 10:00:00",
+            // Not a service of this application, the application image itself, or another application.
+            "{$uuid}_other#ccccccc#2026-10-03 10:00:00",
+            "{$uuid}#ddddddd#2026-10-03 10:00:00",
+            "{$uuid}x_app#eeeeeee#2026-10-03 10:00:00",
+            'postgres#16#2026-09-01 10:00:00',
+        ]);
+
+        $result = GetRollbackImages::run($this->application->fresh());
+
+        expect($result['current'])->toBe('bbbbbbb')
+            ->and($result['images'])->toBe([
+                ['tag' => 'bbbbbbb', 'created_at' => '2026-10-02 10:00:05', 'is_current' => true, 'source' => 'local'],
+                ['tag' => 'aaaaaaa', 'created_at' => '2026-10-01 10:00:00', 'is_current' => false, 'source' => 'local'],
+            ]);
     });
 });

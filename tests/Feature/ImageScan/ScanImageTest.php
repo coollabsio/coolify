@@ -386,7 +386,8 @@ it('removes a leftover scanner container at the start of every command batch', f
 
     $firstRemoteLine = fn (string $command) => explode(PHP_EOL, $command)[1] ?? '';
     Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-'), 7);
-    Process::assertDidntRun(fn ($process) => ! str_starts_with($firstRemoteLine(remoteProcessScript($process)), 'docker rm -f coolify-scan-'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-')
+        && ! str_starts_with($firstRemoteLine(remoteProcessScript($process)), 'docker rm -f coolify-scan-'));
 });
 
 it('runs nothing and saves nothing when scanning is off on the server', function () {

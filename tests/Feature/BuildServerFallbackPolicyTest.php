@@ -23,7 +23,7 @@ afterEach(function () {
     Server::flushIdentityMap();
 });
 
-function makeBuildServerSelectionJob(Team $team, Server $deploymentServer, array $applicationAttributes = [], bool $buildServerEnabled = true, bool $restartOnly = false): array
+function makeBuildServerSelectionJob(Team $team, Server $deploymentServer, array $applicationAttributes = [], bool $buildServerEnabled = true, bool $restartOnly = false, ?int $reservedBuildServerId = null): array
 {
     $project = new Project;
     $project->setRelation('team', $team);
@@ -40,6 +40,7 @@ function makeBuildServerSelectionJob(Team $team, Server $deploymentServer, array
     $application->setRelation('settings', $settings);
 
     $deploymentQueue = Mockery::mock(ApplicationDeploymentQueue::class);
+    $deploymentQueue->shouldReceive('getAttribute')->with('build_server_id')->andReturn($reservedBuildServerId)->byDefault();
     $job = (new ReflectionClass(ApplicationDeploymentJob::class))->newInstanceWithoutConstructor();
 
     foreach ([
@@ -500,4 +501,55 @@ test('the selected build server is saved on the deployment so a cancel finds the
 
     expect($deployment->build_server_id)->toBe($buildServer->id)
         ->and(ApplicationDeploymentQueue::query()->find($deployment->id)->build_server_id)->toBe($buildServer->id);
+});
+
+function makeAvailableBuildServer(Team $team, int $concurrentBuilds = 1): Server
+{
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'server_role' => 'build',
+        'is_build_server' => true,
+        'concurrent_builds' => $concurrentBuilds,
+    ]);
+
+    return $server;
+}
+
+test('the job builds on the build server that admission reserved', function () {
+    $team = Team::factory()->create();
+    $deploymentServer = Server::factory()->create(['team_id' => $team->id]);
+    makeAvailableBuildServer($team);
+    $reserved = makeAvailableBuildServer($team);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, reservedBuildServerId: $reserved->id);
+
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $reserved->id])->once()->andReturnTrue();
+    $deploymentQueue->shouldReceive('addLogEntry')->once();
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($reserved))->toBeTrue();
+});
+
+test('a force-started job without a reservation builds on a build server with a free build slot', function () {
+    $team = Team::factory()->create();
+    $deploymentServer = Server::factory()->create(['team_id' => $team->id]);
+    $full = makeAvailableBuildServer($team);
+    $free = makeAvailableBuildServer($team);
+    ApplicationDeploymentQueue::create([
+        'application_id' => 1,
+        'deployment_uuid' => 'running-on-full-build-server',
+        'status' => 'in_progress',
+        'server_id' => $deploymentServer->id,
+        'build_server_id' => $full->id,
+    ]);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer);
+
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $free->id])->once()->andReturnTrue();
+    $deploymentQueue->shouldReceive('addLogEntry')->once();
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($free))->toBeTrue();
 });

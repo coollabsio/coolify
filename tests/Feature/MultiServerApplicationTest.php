@@ -475,6 +475,8 @@ test('file storages of an application belong to all of its servers', function ()
 describe('adding a server in the UI', function () {
     beforeEach(function () {
         $this->application->additional_networks()->detach();
+        $this->extraServer->settings->update(['is_reachable' => true, 'is_usable' => true]);
+        Server::flushIdentityMap();
         $this->actingAs($this->user);
         session(['currentTeam' => $this->team]);
     });

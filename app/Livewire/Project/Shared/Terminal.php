@@ -86,6 +86,8 @@ class Terminal extends Component
 
     /**
      * Resolve the effective terminal mode. Falls back to shell whenever attach is not available.
+     *
+     * @return 'shell'|'attach'
      */
     public function resolveMode(?string $requestedMode): string
     {
@@ -114,7 +116,7 @@ class Terminal extends Component
             return;
         }
 
-        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled() || $server->isTransferredAway()) {
             $this->failTerminalSession('Terminal access is disabled on this server.');
 
             return;
@@ -159,7 +161,7 @@ class Terminal extends Component
             $mode = $this->terminalMode = 'shell';
         }
 
-        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode);
+        $token = app(TerminalSessionService::class)->issue(auth()->user(), $server, $isContainer ? $identifier : null, $mode, client_ip(request()), request()->userAgent());
         $this->dispatch('send-terminal-token', $token);
     }
 

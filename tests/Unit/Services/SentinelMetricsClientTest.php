@@ -172,13 +172,30 @@ it('rounds the range start to the minute so history responses are cacheable', fu
     Carbon::setTestNow();
 });
 
-it('does not substitute another mount when root disk history is absent', function () {
+it('does not guess between several other mounts when root disk history is absent', function () {
     $client = fakeMetricsClient();
     $client->bodies = ['/disk/history' => json_encode([
         ['time' => 1700000000000, 'mount' => '/boot', 'usedPercent' => 90],
+        ['time' => 1700000000000, 'mount' => '/home', 'usedPercent' => 20],
     ])];
 
     expect($client->history('disk', '24h'))->toBe([]);
+});
+
+it('uses the only reported disk when Sentinel names it by another host mount point', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/summary' => json_encode(['disk' => [
+            ['mount' => '/home', 'used' => 19, 'total' => 100, 'usedPercent' => 19.02],
+        ]]),
+        '/disk/history' => json_encode([
+            ['time' => 1700000000000, 'mount' => '/home', 'usedPercent' => 19],
+            ['time' => 1700000300000, 'mount' => '/home', 'usedPercent' => 21],
+        ]),
+    ];
+
+    expect($client->summary()['diskPercent'])->toBe(19.02)
+        ->and($client->history('disk', '24h'))->toBe([[1699999800000, 19.0], [1700000100000, 21.0]]);
 });
 
 it('supports disk history without mount fields', function () {
@@ -190,10 +207,11 @@ it('supports disk history without mount fields', function () {
     expect($client->history('disk', '24h'))->toBe([[1699999800000, 40.0]]);
 });
 
-it('does not substitute another disk mount in the summary', function () {
+it('does not guess between several other disk mounts in the summary', function () {
     $client = fakeMetricsClient();
     $client->bodies = ['/summary' => json_encode(['disk' => [
         ['mount' => '/boot', 'used' => 90, 'total' => 100, 'usedPercent' => 90],
+        ['mount' => '/home', 'used' => 20, 'total' => 100, 'usedPercent' => 20],
     ]])];
 
     expect($client->summary()['diskPercent'])->toBeNull();
