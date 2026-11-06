@@ -112,7 +112,7 @@ class ServerTransferController extends Controller
         auditLog('api.server.migrate', [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
-            'target_url' => data_get($server->server_metadata, 'migration.target_url'),
+            'target_url' => auditUrl(data_get($server->server_metadata, 'migration.target_url')),
         ]);
 
         return response()->json([

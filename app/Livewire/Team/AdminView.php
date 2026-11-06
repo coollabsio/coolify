@@ -89,9 +89,7 @@ class AdminView extends Component
             auditLog('ui.user.deleted', [
                 'team_id' => currentTeam()?->id,
                 'resource' => 'user',
-                'user_name' => $user->name,
                 'deleted_user_id' => $user->id,
-                'deleted_user_email' => $user->email,
             ]);
             $this->resetPage();
 

@@ -255,7 +255,7 @@ class DockerRegistryLogins
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
             'team_id' => $server->team_id,
-            'registry' => $registry,
+            'registry' => preg_replace('#^[^/]*@#', '', $registry),
             'outcome' => $succeeded ? 'success' : 'failed',
         ], $succeeded ? 'info' : 'warning');
     }

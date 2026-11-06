@@ -122,7 +122,6 @@ class Access extends Component
             'team_id' => $this->teamId,
             'member_id' => $member->id,
             'member_name' => $member->name,
-            'member_email' => $member->email,
             'access' => Grant::listToArray($grants),
         ]);
 

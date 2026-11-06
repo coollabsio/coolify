@@ -125,7 +125,7 @@ class Patches extends Component
             try {
                 RebootServer::run($this->server);
             } catch (\Throwable $e) {
-                $this->auditPatchAction('reboot_requested', ['result' => 'failed', 'error' => $e->getMessage()], 'error');
+                $this->auditPatchAction('reboot_requested', ['result' => 'failed', 'error' => class_basename($e)], 'error');
 
                 throw $e;
             }
@@ -212,7 +212,7 @@ class Patches extends Component
         try {
             ConfigureAutomaticSecurityUpdates::run($this->server, $packageManager, $enabled, $time);
         } catch (\Throwable $e) {
-            $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'failed', 'error' => $e->getMessage()], 'error');
+            $this->auditPatchAction('auto_security_updates_updated', [...$auditContext, 'result' => 'failed', 'error' => class_basename($e)], 'error');
 
             throw $e;
         }

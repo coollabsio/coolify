@@ -53,6 +53,27 @@ if (! function_exists('auditLog')) {
     }
 }
 
+if (! function_exists('auditUrl')) {
+    /**
+     * Scheme, host, port and path of a URL, without user info, query string or fragment.
+     */
+    function auditUrl(mixed $url): ?string
+    {
+        if (! is_string($url) || $url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return '[invalid-url]';
+        }
+
+        return $parts['scheme'].'://'.$parts['host']
+            .(isset($parts['port']) ? ':'.$parts['port'] : '')
+            .($parts['path'] ?? '');
+    }
+}
+
 if (! function_exists('auditChangedFields')) {
     /**
      * Names of the attributes that the next save() will really change, without timestamps.

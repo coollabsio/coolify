@@ -186,6 +186,8 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
                 }
             });
         });
+
+        static::deleted(fn (User $user) => AuditEvent::anonymizeUser($user));
     }
 
     /**

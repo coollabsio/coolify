@@ -279,7 +279,6 @@ class Controller extends BaseController
             'already_member' => $alreadyMember,
             'member_id' => $user->id,
             'member_name' => $user->name,
-            'member_email' => $user->email,
             'actor_id' => $user->id,
             'actor_name' => $user->name,
             'actor_email' => $user->email,
