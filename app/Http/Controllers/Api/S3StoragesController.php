@@ -44,7 +44,7 @@ class S3StoragesController extends Controller
     private function connectionFields(BackupStorageType $type): array
     {
         return match ($type) {
-            BackupStorageType::S3 => ['endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint'],
+            BackupStorageType::S3 => ['endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'skip_tls_verification'],
             BackupStorageType::Sftp => ['endpoint', 'key', 'secret', 'private_key_uuid'],
             default => ['endpoint', 'key', 'secret'],
         };
@@ -171,6 +171,7 @@ class S3StoragesController extends Controller
                                     'bucket' => ['type' => 'string', 'nullable' => true, 'description' => 'S3 only. Null for the other types.'],
                                     'region' => ['type' => 'string', 'description' => 'S3 only. The other types have a placeholder value.'],
                                     'use_path_style_endpoint' => ['type' => 'boolean'],
+                                    'skip_tls_verification' => ['type' => 'boolean'],
                                     'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of the private key used to log in. Null with a password login.'],
                                     'sftp_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the pinned host key of the server, as "<key type> <base64>". Saved by the first successful connection test.'],
                                     'is_usable' => ['type' => 'boolean'],
@@ -239,6 +240,7 @@ class S3StoragesController extends Controller
                                 'bucket' => ['type' => 'string', 'nullable' => true, 'description' => 'S3 only. Null for the other types.'],
                                 'region' => ['type' => 'string', 'description' => 'S3 only. The other types have a placeholder value.'],
                                 'use_path_style_endpoint' => ['type' => 'boolean'],
+                                'skip_tls_verification' => ['type' => 'boolean'],
                                 'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of the private key used to log in. Null with a password login.'],
                                 'sftp_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the pinned host key of the server, as "<key type> <base64>". Saved by the first successful connection test.'],
                                 'is_usable' => ['type' => 'boolean'],
@@ -303,6 +305,7 @@ class S3StoragesController extends Controller
                         'bucket' => ['type' => 'string', 'example' => 'my-bucket', 'description' => 'S3 bucket name. Required for S3, not allowed for the other types.'],
                         'region' => ['type' => 'string', 'example' => 'us-east-1', 'description' => 'S3 region. Required for S3, not allowed for the other types.'],
                         'use_path_style_endpoint' => ['type' => 'boolean', 'description' => 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints.'],
+                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
                         'key' => ['type' => 'string', 'description' => 'S3: the access key. Other types: the username.'],
                         'secret' => ['type' => 'string', 'description' => 'S3: the secret key. Other types: the password. SFTP: not needed with private_key_uuid.'],
                         'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of a private key of your team to log in with instead of a password.'],
@@ -366,6 +369,7 @@ class S3StoragesController extends Controller
             'description' => ValidationPatterns::descriptionRules(),
             ...$this->connectionRules($type ?? BackupStorageType::S3, $teamId),
             'use_path_style_endpoint' => 'sometimes|boolean',
+            'skip_tls_verification' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
         ]);
         if ($validationError instanceof JsonResponse) {
@@ -388,6 +392,7 @@ class S3StoragesController extends Controller
             'secret' => $body['secret'] ?? '',
             ...$login,
             'use_path_style_endpoint' => $isS3 ? ($body['use_path_style_endpoint'] ?? S3Storage::detectPathStyleEndpoint($body['endpoint'])) : true,
+            'skip_tls_verification' => $isS3 && ($body['skip_tls_verification'] ?? false),
             'is_usable' => $body['is_usable'] ?? false,
         ]);
 
@@ -428,6 +433,7 @@ class S3StoragesController extends Controller
                         'bucket' => ['type' => 'string', 'description' => 'S3 bucket name. Only for S3 storages.'],
                         'region' => ['type' => 'string', 'description' => 'S3 region. Only for S3 storages.'],
                         'use_path_style_endpoint' => ['type' => 'boolean', 'description' => 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS.'],
+                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
                         'key' => ['type' => 'string', 'description' => 'S3: the access key. Other types: the username.'],
                         'secret' => ['type' => 'string', 'description' => 'S3: the secret key. Other types: the password. SFTP: sending a password switches the login to the password.'],
                         'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of a private key of your team to log in with. Null switches the login to the saved password.'],
@@ -491,6 +497,7 @@ class S3StoragesController extends Controller
             'description' => ValidationPatterns::descriptionRules(),
             ...$this->connectionRules($storage->type, $teamId, partial: true, trustedInternalHosts: $storage->trustedInternalHosts(), savedEndpoint: $storage->endpoint),
             'use_path_style_endpoint' => 'sometimes|boolean',
+            'skip_tls_verification' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
         ]);
         if ($validationError instanceof JsonResponse) {

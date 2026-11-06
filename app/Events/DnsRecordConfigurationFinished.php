@@ -19,6 +19,8 @@ class DnsRecordConfigurationFinished implements ShouldBroadcastNow
         public bool $successful,
         public string $credential,
         public string $message,
+        /** @var array{zone_id: int, record_id: string, current: string, proposed: string}|null The record that blocked the create. */
+        public ?array $conflict = null,
     ) {}
 
     public function broadcastOn(): array
@@ -41,6 +43,7 @@ class DnsRecordConfigurationFinished implements ShouldBroadcastNow
             'successful' => $this->successful,
             'credential' => $this->credential,
             'message' => $this->message,
+            'conflict' => $this->conflict,
         ])];
     }
 }

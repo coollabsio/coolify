@@ -2,24 +2,40 @@
 
 namespace App\Notifications\Database;
 
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BackupFailed extends CustomEmailNotification
+/**
+ * Sent on the first failure, then at most once a day until a run of the backup succeeds again.
+ */
+class BackupFailed extends CustomEmailNotification implements ThrottledNotification
 {
     public string $name;
 
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
+    public function __construct(public ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
     {
         $this->onQueue('high');
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->backup;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
     }
 
     public function via(object $notifiable): array
@@ -36,6 +52,7 @@ class BackupFailed extends CustomEmailNotification
             'database_name' => $this->database_name,
             'frequency' => $this->frequency,
             'output' => $this->output,
+            'reminder' => NotificationThrottle::FAILURE_REMINDER_TEXT,
         ]);
 
         return $mail;

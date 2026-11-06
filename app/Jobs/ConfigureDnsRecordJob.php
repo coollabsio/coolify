@@ -3,8 +3,12 @@
 namespace App\Jobs;
 
 use App\Events\DnsRecordConfigurationFinished;
+use App\Exceptions\DnsRecordConflictException;
 use App\Models\DnsProviderZone;
+use App\Models\ManagedDnsRecord;
+use App\Models\ManagedDnsRecordReference;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,6 +38,10 @@ class ConfigureDnsRecordJob implements ShouldQueue
         public string $content,
     ) {}
 
+    /**
+     * A record with another value blocks the create. Coolify replaces it only when it is a record that Coolify created
+     * and that no other resource uses. Otherwise the conflict goes to the UI, where the user can replace it.
+     */
     public function handle(CloudflareDnsProvider $provider): void
     {
         $zone = DnsProviderZone::query()
@@ -48,8 +56,24 @@ class ConfigureDnsRecordJob implements ShouldQueue
             return;
         }
 
+        $resource = $this->resource();
         try {
-            $provider->createRecord($zone, $this->hostname, $this->content, $this->resource());
+            try {
+                $provider->createRecord($zone, $this->hostname, $this->content, $resource);
+                $message = "DNS record added for {$this->hostname}.";
+            } catch (DnsRecordConflictException $conflict) {
+                if (! $this->isUnusedCoolifyRecord($zone, $conflict, $resource)) {
+                    $this->finished($zone, false, $conflict->getMessage(), [
+                        'zone_id' => $zone->id, 'record_id' => $conflict->providerRecordId,
+                        'current' => $conflict->currentValue, 'proposed' => $conflict->proposedValue,
+                    ]);
+
+                    return;
+                }
+
+                $provider->replaceRecord($zone, $conflict->providerRecordId, $this->hostname, $this->content, $resource, $conflict->currentValue);
+                $message = "DNS record replaced for {$this->hostname}. It pointed to {$conflict->currentValue}, which no other resource uses.";
+            }
         } catch (LockTimeoutException) {
             if ($this->attempts() < $this->tries) {
                 $this->release(10 * $this->attempts());
@@ -66,10 +90,36 @@ class ConfigureDnsRecordJob implements ShouldQueue
             return;
         }
 
-        $this->finished($zone, true, "DNS record added for {$this->hostname}.");
+        $this->finished($zone, true, $message);
     }
 
-    private function finished(DnsProviderZone $zone, bool $successful, string $message): void
+    /**
+     * True when Coolify created the record (owned, and the provider comment still proves it) and no resource other
+     * than this one references the record or uses the hostname.
+     */
+    private function isUnusedCoolifyRecord(DnsProviderZone $zone, DnsRecordConflictException $conflict, ?Model $resource): bool
+    {
+        if ($resource === null) {
+            return false;
+        }
+
+        $record = ManagedDnsRecord::query()->with('references.resource')
+            ->where('dns_provider_zone_id', $zone->id)
+            ->where('provider_record_id', $conflict->providerRecordId)
+            ->first();
+        if ($record === null || ! $record->owned || $conflict->currentComment !== $record->ownershipComment()) {
+            return false;
+        }
+
+        $resourceKey = $resource->getMorphClass().'|'.$resource->getKey();
+        $usedByOtherResource = $record->references->contains(fn (ManagedDnsRecordReference $reference): bool => $reference->resource !== null
+            && $reference->resource_type.'|'.$reference->resource_id !== $resourceKey);
+
+        return ! $usedByOtherResource && app(ManagedDnsRecordCleanup::class)->resourcesUsingHostname($this->hostname, [$resourceKey])->isEmpty();
+    }
+
+    /** @param  array{zone_id: int, record_id: string, current: string, proposed: string}|null  $conflict */
+    private function finished(DnsProviderZone $zone, bool $successful, string $message, ?array $conflict = null): void
     {
         DnsRecordConfigurationFinished::dispatch(
             $this->teamId,
@@ -79,6 +129,7 @@ class ConfigureDnsRecordJob implements ShouldQueue
             $successful,
             $zone->integrationToken->name,
             $message,
+            $conflict,
         );
     }
 

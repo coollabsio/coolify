@@ -92,6 +92,24 @@ function fakeMultiDestinationS3Disks(): void
     Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
 }
 
+it('sizes the upload parts of a large archive for providers that allow only 1000 parts', function () {
+    [$backup] = createMultiDestinationVolumeBackup();
+    fakeMultiDestinationS3Disks();
+    fakeRemoteProcesses([
+        '*du -b*' => (string) (19 * 1024 * 1024 * 1024),
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    expect(ScheduledVolumeBackupExecution::query()->sole()->s3_uploaded)->toBeTrue();
+    foreach (['first-bucket', 'second-bucket'] as $bucket) {
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker exec -e MC_UPLOAD_MULTIPART_SIZE='.(20 * 1024 * 1024).' ')
+            && str_contains(remoteProcessScript($process), ' mc cp ')
+            && str_contains(remoteProcessScript($process), "temporary/{$bucket}/"));
+    }
+});
+
 it('archives locally and uploads to every destination instead of streaming', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
     fakeMultiDestinationS3Disks();

@@ -98,3 +98,45 @@ it('keeps the error of a dump that reports its own failure', function () {
     expect($this->backup->executions()->latest('id')->firstOrFail()->message)
         ->toBe('Failed: error connecting to db server: server returned error on SASL authentication step');
 });
+
+it('runs a dump only once when its SSH connection closes', function () {
+    config(['constants.ssh.max_retries' => 3]);
+    $dumps = 0;
+    Process::fake(function ($process) use (&$dumps) {
+        if (str_contains(remoteProcessScript($process), 'mongodump')) {
+            $dumps++;
+
+            return Process::result(exitCode: 255);
+        }
+
+        return Process::result(output: '');
+    });
+
+    (new DatabaseBackupJob($this->backup))->handle();
+
+    expect($dumps)->toBe(1)
+        ->and($this->backup->executions()->sole()->status)->toBe('failed');
+});
+
+it('fails the next database inside the job when the backup timeout of the run has passed', function () {
+    $this->backup->update(['databases_to_backup' => 'first|second', 'timeout' => 600]);
+    $dumpTimeouts = [];
+    Process::fake(function ($process) use (&$dumpTimeouts) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'mongodump')) {
+            preg_match('/^timeout (\d+) ssh /', $script, $match);
+            $dumpTimeouts[] = (int) $match[1];
+            $this->travel(601)->seconds();
+        }
+
+        return Process::result(output: str_contains($script, 'du -b') ? '128' : '');
+    });
+
+    (new DatabaseBackupJob($this->backup))->handle();
+
+    $executions = $this->backup->executions()->get()->sortBy('id')->values();
+    expect($dumpTimeouts)->toBe([600])
+        ->and($executions->pluck('status')->all())->toBe(['success', 'failed'])
+        ->and($executions[1]->message)->toStartWith('The backup stopped with exit code 124: it did not finish within the backup timeout of 600 seconds.')
+        ->and($executions[1]->finished_at)->not->toBeNull();
+});

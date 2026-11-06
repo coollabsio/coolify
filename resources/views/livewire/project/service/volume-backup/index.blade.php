@@ -79,20 +79,15 @@
         @php
             $selectedSchedule = $selectedDatabaseBackup ?: $selectedVolumeBackup;
         @endphp
-        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight
+        <x-modal-input :title="'Edit backup schedule'"
+            :subtitle="($selectedDatabaseBackup
+                ? ($selectedDatabaseBackup->database->human_name ?: $selectedDatabaseBackup->database->name)
+                : $selectedVolumeBackup->targetName()).' · '.$selectedSchedule->frequency.' schedule'"
+            wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight
             canGate="update" :canResource="$service">
             <x-slot:content><span></span></x-slot:content>
 
-            <div x-data="{ activeSection: 'general' }" class="flex min-w-0 flex-col gap-6">
-                <div>
-                    <h2 class="text-base font-semibold text-neutral-950 dark:text-fg">
-                        {{ $selectedDatabaseBackup
-                            ? ($selectedDatabaseBackup->database->human_name ?: $selectedDatabaseBackup->database->name)
-                            : $selectedVolumeBackup->targetName() }}
-                    </h2>
-                    <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">{{ $selectedSchedule->frequency }} schedule</p>
-                </div>
-
+            <div x-data="{ activeSection: 'general' }" class="modal-flat-sections flex min-w-0 flex-col gap-6">
                 <x-backup-tabs context="service-schedule" :parameters="$parameters" section="general" />
 
                 @foreach (['general', 'danger'] as $modalSection)
@@ -123,6 +118,10 @@
             helper="Manage database, persistent volume, and directory backup schedules for this service.">
             @can('update', $service)
                 <x-slot:actions>
+                    <x-modal-input title="Import backup" buttonTitle="Import backup">
+                        <livewire:project.service.import-backup :service="$service"
+                            wire:key="service-import-backup-{{ $service->id }}" />
+                    </x-modal-input>
                     <div x-data="{ dropdownOpen: false }">
                         <div class="relative" @click.outside="dropdownOpen = false">
                             <x-forms.button class="button-highlighted" @click="dropdownOpen = !dropdownOpen"

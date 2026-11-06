@@ -294,6 +294,7 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'endpoint' => $s3->endpoint,
         'use_path_style_endpoint' => $s3->usesPathStyleEndpoint(),
         'aws_url' => $s3->awsUrl(),
+        'http' => ['verify' => ! $s3->skip_tls_verification],
         'throw' => true,
     ]);
 

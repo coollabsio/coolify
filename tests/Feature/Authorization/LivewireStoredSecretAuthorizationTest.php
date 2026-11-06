@@ -39,11 +39,13 @@ it('does not serialize a private key for a member who cannot update it', functio
 
     Livewire::test(PrivateKeyShow::class, ['private_key_uuid' => $privateKey->uuid])
         ->assertSuccessful()
-        ->assertSet('privateKeyValue', '')
-        ->assertDontSee($privateKeyValue);
+        ->assertSet('newPrivateKey', '', strict: true)
+        ->assertDontSee($privateKeyValue)
+        ->call('revealPrivateKey', 'password')
+        ->assertReturned(null);
 });
 
-it('keeps a private key available to an owner who can update it', function () {
+it('does not serialize a private key for an owner until it is revealed', function () {
     $privateKeyValue = PrivateKey::generateNewKeyPair('ed25519')['private_key'];
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,
@@ -55,7 +57,10 @@ it('keeps a private key available to an owner who can update it', function () {
 
     Livewire::test(PrivateKeyShow::class, ['private_key_uuid' => $privateKey->uuid])
         ->assertSuccessful()
-        ->assertSet('privateKeyValue', $privateKeyValue);
+        ->assertSet('newPrivateKey', '', strict: true)
+        ->assertDontSee($privateKeyValue)
+        ->call('revealPrivateKey', 'password')
+        ->assertReturned($privateKeyValue);
 });
 
 it('does not serialize GitHub App secrets for a member who cannot update it', function () {

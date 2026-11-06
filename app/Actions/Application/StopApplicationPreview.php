@@ -3,6 +3,7 @@
 namespace App\Actions\Application;
 
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\ApplicationPreview;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -14,6 +15,7 @@ class StopApplicationPreview
     {
         $application = $preview->application;
         $server = $application->destination->server;
+        NotifyResourceStoppedJob::expectStop($preview, $application->settings->stopGracePeriodSeconds());
         $containers = getCurrentApplicationContainerStatus($server, $application, $preview->pull_request_id);
 
         foreach ($containers->pluck('Names') as $containerName) {

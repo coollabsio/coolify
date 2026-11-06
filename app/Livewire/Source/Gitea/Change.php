@@ -152,11 +152,14 @@ class Change extends Component
             $this->isConnected = $this->gitea_app->isConnected();
             $this->fqdn = $settings->fqdn;
 
-            if ($settings->public_ipv4) {
-                $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
-            }
-            if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+            // On cloud, the instance IPs are the addresses of the Coolify hosts. Do not send them to the browser.
+            if (! isCloud()) {
+                if ($settings->public_ipv4) {
+                    $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
+                }
+                if ($settings->public_ipv6) {
+                    $this->ipv6 = 'http://'.$settings->public_ipv6.':'.config('app.port');
+                }
             }
 
             $this->parameters = get_route_parameters();
@@ -281,7 +284,7 @@ class Change extends Component
 
             $this->syncData(true);
             $this->gitea_app->save();
-            $this->dispatch('success', 'Gitea App updated.');
+            $this->dispatch('success', 'Gitea / Forgejo App updated.');
             $this->dispatch('name-changed', uuid: $this->gitea_app->uuid, name: $this->gitea_app->name);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -298,7 +301,7 @@ class Change extends Component
 
             $this->gitea_app->is_system_wide = $this->isSystemWide;
             $this->gitea_app->save();
-            $this->dispatch('success', 'Gitea App updated.');
+            $this->dispatch('success', 'Gitea / Forgejo App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -310,7 +313,7 @@ class Change extends Component
             $this->authorize('view', $this->gitea_app);
 
             if (! $this->gitea_app->isConnected()) {
-                $this->dispatch('error', 'Gitea App is not connected. Please complete the OAuth flow first.');
+                $this->dispatch('error', 'Gitea / Forgejo App is not connected. Please complete the OAuth flow first.');
 
                 return;
             }

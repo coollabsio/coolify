@@ -158,6 +158,29 @@ test('identically named repositories on different git hosts deploy only the appl
         ->and(manualLookupDeployed($githubApplication))->toBeFalse();
 });
 
+test('applications of one repository deploy only when the delivery branch and secret are theirs', function (string $provider) {
+    $staging = manualLookupApplication('https://gitlab.com/acme/app.git', 'main');
+    $production = manualLookupApplication('https://gitlab.com/acme/app.git', 'production');
+    $productionSecret = $production->{"manual_webhook_secret_{$provider}"};
+
+    // A push to the default branch (what GitLab's "Test" button sends) signed with
+    // the production secret matches only staging, so it deploys nothing.
+    sendManualLookupPush($this, $provider, $productionSecret, branch: 'main')
+        ->assertOk()
+        ->assertExactJson([['status' => 'failed', 'message' => 'No matching application or invalid signature.']]);
+    expect(manualLookupDeployed($staging))->toBeFalse()
+        ->and(manualLookupDeployed($production))->toBeFalse();
+
+    // When both applications track the pushed branch, the other secret does not fail the delivery.
+    $staging->update(['git_branch' => 'production']);
+    $response = sendManualLookupPush($this, $provider, $productionSecret, branch: 'production')->assertOk();
+
+    expect($response->json())->toHaveCount(1)
+        ->and($response->json('0.status'))->toBe('success')
+        ->and(manualLookupDeployed($production))->toBeTrue()
+        ->and(manualLookupDeployed($staging))->toBeFalse();
+})->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
 test('an underscore in the repository name matches only an underscore', function () {
     $application = manualLookupApplication('https://github.com/acme/my_app');
     $wildcardMatch = manualLookupApplication('https://github.com/acme/myXapp');

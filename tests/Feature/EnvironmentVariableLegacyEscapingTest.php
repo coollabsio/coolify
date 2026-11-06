@@ -129,6 +129,19 @@ test('legacy literal and multiline variables with a single quote get a line that
         ->and($this->service->legacyEscapingChangesValue($literal))->toBeFalse();
 });
 
+test('legacy multiline json variables get a line that docker compose can read', function (array $flags) {
+    $json = "{\n  \"type\": \"service_account\"\n}";
+    $multiline = legacyVariable($this->service, ['key' => 'GOOGLE_CREDENTIALS_JSON', 'value' => $json, ...$flags]);
+    $singleLine = legacyVariable($this->service, ['key' => 'SINGLE_LINE_JSON', 'value' => '{"a":"b"}', ...$flags]);
+
+    expect($this->service->composeEnvironmentFileLine($multiline))->toBe("GOOGLE_CREDENTIALS_JSON=\"{\n  \\\"type\\\": \\\"service_account\\\"\n}\"")
+        ->and($this->service->composeEnvironmentFileLine($singleLine))->toBe('SINGLE_LINE_JSON={"a":"b"}')
+        ->and($this->service->legacyEscapingChangesValue($multiline))->toBeFalse();
+})->with([
+    'multiline' => [['is_multiline' => true]],
+    'plain' => [[]],
+]);
+
 test('legacy database variables keep the old compose environment format', function () {
     $database = StandalonePostgresql::forceCreate([
         'uuid' => 'postgres-legacy-test',

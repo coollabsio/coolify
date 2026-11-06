@@ -139,7 +139,12 @@ class Controller extends BaseController
 
             $user->forceFill([
                 'password' => Hash::make(Str::random(64)),
-            ])->save();
+            ]);
+            // Only an emailed token proves the address. A copied link can be used by the inviting admin.
+            if ($invitation->via === 'email' && ! $user->hasVerifiedEmail()) {
+                $user->forceFill(['email_verified_at' => now()]);
+            }
+            $user->save();
             $invitation->delete();
 
             return [$user, $team, $invitation, $alreadyMember];
@@ -224,6 +229,11 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
@@ -247,6 +257,11 @@ class Controller extends BaseController
 
         if (Auth::id() !== $user->id) {
             abort(400, 'You are not allowed to accept this invitation.');
+        }
+
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
         }
 
         if (! $invitation->isValid()) {

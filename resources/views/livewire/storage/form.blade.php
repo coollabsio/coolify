@@ -45,6 +45,9 @@
             <x-forms.checkbox canGate="update" :canResource="$storage" id="usePathStyleEndpoint"
                 label="Use path-style URLs"
                 helper="Turn this off for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Coolify turns it off for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS, and when the provider rejects path-style URLs." />
+            <x-forms.checkbox canGate="update" :canResource="$storage" id="skipTlsVerification"
+                label="Skip TLS certificate verification"
+                helper="Turn this on only for an endpoint with a self-signed or private CA certificate. Coolify and the backup helper then accept any certificate, so an attacker on the network path can read or change your backups. Browsers that download files from this storage must still trust the certificate." />
             @else
                 <div class="lg:col-span-2">
                     @if ($storage->type === App\Enums\BackupStorageType::Webdav)

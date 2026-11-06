@@ -4,8 +4,10 @@ namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Events\ServiceStartFinished;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -30,6 +32,9 @@ class StartService
         // Fetch remote secrets before stopping: if the secret manager fails, the service keeps running.
         // saveComposeConfigs() below reuses the fetched secrets.
         $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
+        // Compose recreates the containers, so a status check can find them stopped for a moment.
+        $service->applications()->get()->concat($service->databases()->get())
+            ->each(fn (ServiceApplication|ServiceDatabase $part) => NotifyResourceStoppedJob::expectStop($part));
         if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
             StopService::run(service: $service, dockerCleanup: false);
         }
@@ -59,6 +64,7 @@ class StartService
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         }
+        $commands = array_merge($commands, self::removeContainersWithRemovedVolumesCommands($service));
         $commands[] = 'echo Starting service.';
         if (data_get($service, 'connect_to_docker_network')) {
             // Connect the created containers to the predefined network before they start. A container
@@ -104,6 +110,41 @@ class StartService
         $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
 
         return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
+    }
+
+    /**
+     * Removes the containers that `docker compose up` would give a volume that the user deleted
+     * in Coolify (see composeContainersWithRemovedVolumes()).
+     *
+     * @param  string|null  $composeServiceName  only this Compose service, when `up` starts only it
+     * @return list<string>
+     */
+    public static function removeContainersWithRemovedVolumesCommands(Service $service, ?string $composeServiceName = null): array
+    {
+        $server = $service->server;
+        $projectMounts = (string) instant_remote_process([composeProjectMountsCommand($service->uuid)], $server, false, maxAttempts: 1);
+        if (trim($projectMounts) === '') {
+            return [];
+        }
+        $services = data_get(parseDockerComposeYaml((string) $service->docker_compose), 'services');
+        $services = is_array($services) ? $services : [];
+        if ($composeServiceName !== null) {
+            $services = array_intersect_key($services, [$composeServiceName => true]);
+        }
+        $storageNames = LocalPersistentVolume::query()
+            ->where(fn ($query) => $query->where('resource_type', (new ServiceApplication)->getMorphClass())->whereIn('resource_id', $service->applications()->select('id')))
+            ->orWhere(fn ($query) => $query->where('resource_type', (new ServiceDatabase)->getMorphClass())->whereIn('resource_id', $service->databases()->select('id')))
+            ->pluck('name')
+            ->all();
+        $commands = [];
+        foreach (composeContainersWithRemovedVolumes($projectMounts, $services, $service->uuid, $storageNames) as $containerName => $volumeName) {
+            $commands[] = 'echo '.escapeshellarg("Removing container {$containerName}, so that it does not keep the deleted volume {$volumeName}.");
+            // Without --time, Docker waits the stop_grace_period of the Compose file, as Compose does.
+            $commands[] = 'docker stop '.escapeshellarg($containerName).' || true';
+            $commands[] = dockerRemoveCommand($containerName);
+        }
+
+        return $commands;
     }
 
     /**

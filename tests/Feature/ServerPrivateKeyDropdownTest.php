@@ -145,3 +145,19 @@ describe('after the user switches the session team', function () {
             ->and($keys->pluck('id'))->toContain($this->currentPrivateKey->id);
     });
 });
+
+test('shows the SSH error when the new key cannot connect and keeps the old key', function () {
+    Process::fake(['*' => Process::result(errorOutput: 'root@host.docker.internal: Permission denied (publickey,password).', exitCode: 255)]);
+    Storage::fake('ssh-mux');
+    $newKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('setPrivateKey', $newKey->id)
+        ->assertDispatched('error', fn (string $event, array $params): bool => str_contains($params[0], 'Permission denied (publickey,password).')
+            && str_contains($params[0], 'https://coolify.io/docs/knowledge-base/server/openssh'));
+
+    expect($this->server->fresh()->private_key_id)->toBe($this->currentPrivateKey->id);
+});

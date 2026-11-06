@@ -46,6 +46,8 @@ class Form extends Component
 
     public bool $usePathStyleEndpointChanged = false;
 
+    public bool $skipTlsVerification = false;
+
     public string $key;
 
     /**
@@ -72,6 +74,7 @@ class Form extends Component
             'description' => ValidationPatterns::descriptionRules(),
             ...$connectionRules,
             'usePathStyleEndpoint' => 'boolean',
+            'skipTlsVerification' => 'boolean',
         ];
     }
 
@@ -122,6 +125,7 @@ class Form extends Component
             'bucket' => 'Bucket',
             'endpoint' => $isS3 ? 'Endpoint' : 'Server',
             'usePathStyleEndpoint' => 'Use path-style URLs',
+            'skipTlsVerification' => 'Skip TLS certificate verification',
             'privateKeyId' => 'Private key',
         ];
     }
@@ -154,6 +158,7 @@ class Form extends Component
             $this->storage->bucket = $this->bucket;
             $this->storage->region = $this->region;
             $this->storage->use_path_style_endpoint = $this->usePathStyleEndpoint;
+            $this->storage->skip_tls_verification = $this->storage->isS3() && $this->skipTlsVerification;
             $this->storage->key = $this->key;
             $this->storage->private_key_id = $this->storage->type === BackupStorageType::Sftp ? $this->selectedPrivateKeyId() : null;
             $this->storage->secret = $this->storage->private_key_id ? '' : $this->secretToUse();
@@ -171,6 +176,7 @@ class Form extends Component
             $this->usePathStyleEndpoint = $this->storage->usesPathStyleEndpoint();
             // A saved style that detection would not pick is a user choice, so keep it when the endpoint changes.
             $this->usePathStyleEndpointChanged = $this->usePathStyleEndpoint !== S3Storage::detectPathStyleEndpoint($this->endpoint);
+            $this->skipTlsVerification = (bool) $this->storage->skip_tls_verification;
             $canSeeCredentials = auth()->user()?->can('update', $this->storage) ?? false;
             $this->key = $canSeeCredentials ? $this->storage->key : '';
             $this->secret = '';
@@ -219,6 +225,7 @@ class Form extends Component
             $testedStorage->bucket = $this->bucket;
             $testedStorage->region = $this->region;
             $testedStorage->use_path_style_endpoint = $this->usePathStyleEndpoint;
+            $testedStorage->skip_tls_verification = $testedStorage->isS3() && $this->skipTlsVerification;
             $testedStorage->key = $this->key;
             $testedStorage->private_key_id = $testedStorage->type === BackupStorageType::Sftp ? $this->selectedPrivateKeyId() : null;
             $testedStorage->secret = $testedStorage->private_key_id ? '' : $this->secretToUse();

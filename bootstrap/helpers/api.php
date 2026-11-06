@@ -237,6 +237,8 @@ function sharedDataApplications(?Application $application = null): array
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
         'disable_build_cache' => 'boolean',
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
@@ -522,6 +524,8 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_git_submodules_enabled');
     $request->offsetUnset('is_git_lfs_enabled');
     $request->offsetUnset('is_git_shallow_clone_enabled');
+    $request->offsetUnset('is_auto_cancel_queued_deployments_enabled');
+    $request->offsetUnset('is_auto_cancel_building_deployments_enabled');
     $request->offsetUnset('disable_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');

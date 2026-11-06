@@ -105,9 +105,6 @@ function sendGithubAppMergePush(TestCase $test, string $before = PUSH_WATCH_PATH
 function fakeGithubAppPushApi(array $compareResponse): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
             'token' => 'fake-installation-token',
         ], 201),

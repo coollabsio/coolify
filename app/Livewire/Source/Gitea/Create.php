@@ -13,7 +13,15 @@ class Create extends Component
 {
     use AuthorizesRequests;
 
+    /** @var array<string, string> Hosted instances that the provider choice fills in. */
+    public const HOSTED_PROVIDERS = [
+        'gitea.com' => 'https://gitea.com',
+        'codeberg.org' => 'https://codeberg.org',
+    ];
+
     public string $name;
+
+    public string $provider = 'gitea.com';
 
     public string $html_url = 'https://gitea.com';
 
@@ -32,6 +40,20 @@ class Create extends Component
     public function mount()
     {
         $this->name = substr(generate_random_name(), 0, 30);
+    }
+
+    public function selectProvider(string $provider): void
+    {
+        $this->provider = $provider;
+
+        if (! isset(self::HOSTED_PROVIDERS[$provider])) {
+            return;
+        }
+
+        $this->html_url = self::HOSTED_PROVIDERS[$provider];
+        $this->api_url = $this->giteaApiUrlFromHtmlUrl($this->html_url);
+        $this->custom_user = 'git';
+        $this->custom_port = 22;
     }
 
     public function updatingHtmlUrl(): void

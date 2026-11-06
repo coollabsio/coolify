@@ -95,7 +95,7 @@ it('removes rclone containers of ended jobs, and keeps those of running jobs', f
     'non-root' => ['ubuntu', 'sudo docker'],
 ]);
 
-it('keeps the helper containers of backups and imports', function () {
+it('keeps the helper containers of running backups and imports and removes orphaned backup uploads', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id,
@@ -132,5 +132,7 @@ it('keeps the helper containers of backups and imports', function () {
 
     (new CleanupHelperContainersJob($server))->handle();
 
-    expect(collect($scripts)->contains(fn (string $script): bool => str_contains($script, 'docker container rm -f')))->toBeFalse();
+    $removals = collect($scripts)->filter(fn (string $script): bool => str_contains($script, 'docker container rm -f'))->values();
+    expect($removals)->toHaveCount(1)
+        ->and($removals->first())->toContain("docker container rm -f 'orphan'");
 });

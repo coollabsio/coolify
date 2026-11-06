@@ -89,7 +89,7 @@ it('treats IPv6 notations as the same IP when adding a server', function () {
         ->set('ip', '2001:0DB8::1')
         ->set('private_key_id', $this->privateKey->id)
         ->call('submit')
-        ->assertDispatched('error', 'A server with this IP/Domain already exists.');
+        ->assertDispatched('error', 'A server with this IP/Domain and SSH port already exists.');
 
     expect(Server::query()->where('ip', '2001:db8::1')->count())->toBe(1);
 });

@@ -369,6 +369,90 @@ it('hides the helper container command when build secrets are passed as environm
     expect((string) $queue->fresh()->logs)->not->toContain(SENSITIVE_FAILURE_SECRET);
 });
 
+it('starts the helper with its own DOCKER_CONFIG after build secret HOME and DOCKER_CONFIG variables', function () {
+    [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob([
+        ['key' => 'HOME', 'value' => '/app', 'is_runtime' => false],
+        ['key' => 'DOCKER_CONFIG', 'value' => '/app/.docker', 'is_runtime' => false],
+    ]);
+    $application->settings()->update(['use_build_secrets' => true]);
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, [
+        'application' => $application->fresh(),
+        'destination' => $server->standaloneDockers()->firstOrFail(),
+    ]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands) {
+        if (str_contains(remoteProcessScript($process), 'docker run -d')) {
+            $helperCommands[] = remoteProcessScript($process);
+        }
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
+
+    // docker run uses the last -e value of a variable, so the helper Docker CLI keeps /root/.docker/cli-plugins.
+    expect($helperCommands)->toHaveCount(1)
+        ->and($helperCommands[0])->toContain('/app/.docker')
+        ->and(strrpos($helperCommands[0], '-e DOCKER_CONFIG=/root/.docker'))->toBeGreaterThan(strpos($helperCommands[0], '/app/.docker'));
+});
+
+it('mounts the server CA bundle into the helper so the Docker CLI can fetch registry tokens', function (string $detectedBundle, ?string $expectedMount) {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands, $detectedBundle) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'docker run -d')) {
+            $helperCommands[] = $script;
+        }
+
+        return Process::result(output: match (true) {
+            str_contains($script, 'echo $HOME') => '/root',
+            str_contains($script, 'for f in /etc/ssl/certs/ca-certificates.crt') => $detectedBundle,
+            default => 'NOK',
+        });
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
+
+    expect($helperCommands)->toHaveCount(1);
+    if ($expectedMount === null) {
+        expect($helperCommands[0])->not->toContain('coolify-host-ca-certificates.crt');
+    } else {
+        expect($helperCommands[0])->toContain($expectedMount);
+    }
+})->with([
+    'Debian and Ubuntu bundle' => ['/etc/ssl/certs/ca-certificates.crt', '--mount type=bind,source=/etc/ssl/certs/ca-certificates.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
+    'RHEL bundle' => ['/etc/pki/tls/certs/ca-bundle.crt', '--mount type=bind,source=/etc/pki/tls/certs/ca-bundle.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
+    'no bundle' => ['', null],
+    'unknown output' => ['/root:/x -v /', null],
+]);
+
+it('shows the helper container command when no build secrets are passed', function () {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
+
+    Process::fake(function (PendingProcess $process) {
+        if (str_contains(remoteProcessScript($process), 'docker run -d')) {
+            return Process::result(errorOutput: 'docker: Error response from daemon: network not found.', exitCode: 125);
+        }
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    $exception = captureDeploymentException(fn () => invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image'));
+
+    expect($exception->getMessage())
+        ->toContain('docker run -d')
+        ->not->toContain('-e DOCKER_CONFIG=')
+        ->not->toContain('[command hidden because it contains sensitive data]');
+});
+
 it('hides the Railpack prepare command that passes build-time values', function () {
     [$job, $reflection, $queue, $application] = makeSensitiveCommandFailureJob([
         ['key' => 'BUILD_SECRET', 'value' => SENSITIVE_FAILURE_SECRET, 'is_runtime' => false],
@@ -607,4 +691,27 @@ it('mounts the seccomp profile from custom docker options into the helper contai
     expect($helperCommands)->toHaveCount(1)
         ->and($helperCommands[0])->toContain('type=bind,source=/etc/docker/seccomp-profile.json,target=/etc/docker/seccomp-profile.json,readonly')
         ->and($exception->getMessage())->toContain('bind source path does not exist: /etc/docker/seccomp-profile.json');
+});
+
+it('removes the old helper synchronously before it starts the helper again with the same name', function () {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
+
+    $commands = [];
+    Process::fake(function (PendingProcess $process) use (&$commands) {
+        $commands[] = remoteProcessScript($process);
+
+        return Process::result(output: str_contains(remoteProcessScript($process), 'echo $HOME') ? '/root' : 'NOK');
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'restart_builder_container_with_actual_commit');
+
+    $runIndex = collect($commands)->search(fn (string $command) => str_contains($command, 'docker run -d'));
+    $beforeRun = collect($commands)->take($runIndex);
+
+    // "docker stop" lets the --rm auto-removal hold the name after it returns; "docker rm -f" frees the name before it returns.
+    expect($runIndex)->toBeInt()
+        ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker rm -f') && str_contains($command, 'sensitive-failure-deployment')))->toBeTrue()
+        ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker stop')))->toBeFalse();
 });

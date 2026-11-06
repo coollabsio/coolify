@@ -16,6 +16,13 @@ use Throwable;
  */
 class NotificationThrottle extends Model
 {
+    /**
+     * While a scheduled job keeps failing, its failure notification is sent again at most this often.
+     */
+    public const FAILURE_REMINDER_INTERVAL_MINUTES = 24 * 60;
+
+    public const FAILURE_REMINDER_TEXT = 'While it keeps failing, you get at most one notification each day.';
+
     public $timestamps = false;
 
     protected $fillable = [

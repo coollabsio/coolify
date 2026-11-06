@@ -38,6 +38,8 @@ class Create extends Component
 
     public bool $usePathStyleEndpointChanged = false;
 
+    public bool $skipTlsVerification = false;
+
     public array $endpointParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
     public bool $endpointPartsChanged = false;
@@ -59,6 +61,7 @@ class Create extends Component
             'description' => ValidationPatterns::descriptionRules(),
             ...$this->withSftpLoginRules(S3Storage::connectionRules($this->storageType(), teamId: currentTeam()->id)),
             'usePathStyleEndpoint' => 'boolean',
+            'skipTlsVerification' => 'boolean',
         ];
     }
 
@@ -100,6 +103,7 @@ class Create extends Component
             'bucket' => 'Bucket',
             'endpoint' => $isS3 ? 'Endpoint' : 'Server',
             'usePathStyleEndpoint' => 'Use path-style URLs',
+            'skipTlsVerification' => 'Skip TLS certificate verification',
             'privateKeyId' => 'Private key',
         ];
     }
@@ -124,6 +128,7 @@ class Create extends Component
             if ($type !== BackupStorageType::S3) {
                 $this->bucket = '';
                 $this->region = 'us-east-1';
+                $this->skipTlsVerification = false;
             }
             $this->storage->name = $this->name;
             $this->storage->description = $this->description ?? null;
@@ -133,6 +138,7 @@ class Create extends Component
             $this->storage->secret = $this->storage->private_key_id ? '' : $this->secret;
             $this->storage->bucket = $this->bucket;
             $this->storage->use_path_style_endpoint = $this->usePathStyleEndpoint;
+            $this->storage->skip_tls_verification = $this->skipTlsVerification;
             if (empty($this->endpoint)) {
                 $this->storage->endpoint = "https://s3.{$this->region}.amazonaws.com";
             } else {

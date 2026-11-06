@@ -19,6 +19,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Activity;
 
 class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
@@ -52,21 +53,25 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
     }
 
     /**
-     * Removes helper containers of finished deployments. Backups, imports, and file browsers also run in
-     * helper containers, so a container is removed only when its name is the UUID of a deployment that
-     * is not queued or in progress.
+     * Removes helper containers of finished deployments and the S3 upload containers (`backup-of-<execution uuid>`)
+     * of database backups that are not running. Imports and file browsers also run in helper containers, so
+     * other containers stay.
      */
     public function handle(): void
     {
         try {
-            $this->removeFinishedDeploymentHelperContainers();
-            $this->removeOrphanedRcloneContainers($this->activeTransferOwners());
+            $activeTransfers = $this->activeTransferOwners();
+            $this->removeOrphanedHelperContainers($activeTransfers);
+            $this->removeOrphanedRcloneContainers($activeTransfers);
         } catch (\Throwable $e) {
             send_internal_notification('CleanupHelperContainersJob failed with error: '.$e->getMessage());
         }
     }
 
-    private function removeFinishedDeploymentHelperContainers(): void
+    /**
+     * @param  Collection<int, string>  $activeTransfers
+     */
+    private function removeOrphanedHelperContainers(Collection $activeTransfers): void
     {
         $containers = instant_remote_process_with_timeout([self::helperContainersCommand()], $this->server, false);
         $helperContainers = collect(json_decode((string) $containers, true) ?: [])
@@ -86,11 +91,15 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
             ->all();
 
         foreach ($helperContainers as $container) {
-            if (! in_array($container['Names'], $finishedDeploymentUuids, true)) {
+            $isFinishedDeployment = in_array($container['Names'], $finishedDeploymentUuids, true);
+            // A worker that is killed during the upload never removes its upload container.
+            $isOrphanedBackupUpload = str_starts_with($container['Names'], 'backup-of-')
+                && ! $activeTransfers->contains(Str::after($container['Names'], 'backup-of-'));
+            if (! $isFinishedDeployment && ! $isOrphanedBackupUpload) {
                 continue;
             }
 
-            \Log::info('CleanupHelperContainersJob - Removing orphaned deployment helper container', [
+            \Log::info('CleanupHelperContainersJob - Removing orphaned helper container', [
                 'container' => $container['Names'],
                 'id' => $container['ID'],
             ]);

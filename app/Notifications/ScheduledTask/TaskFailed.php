@@ -2,26 +2,28 @@
 
 namespace App\Notifications\ScheduledTask;
 
-use App\Models\Application;
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class TaskFailed extends CustomEmailNotification
+/**
+ * Sent on the first failure of a streak, then at most once a day until the task succeeds again.
+ * With $disabled, it tells that Coolify disabled the task, and it is always sent.
+ */
+class TaskFailed extends CustomEmailNotification implements ThrottledNotification
 {
     public ?string $url = null;
 
-    public function __construct(public ScheduledTask $task, public string $output)
+    public function __construct(public ScheduledTask $task, public string $output, public bool $disabled = false)
     {
         $this->onQueue('high');
-        $resource = $task->application ?? $task->service;
-        if ($resource) {
-            $type = $resource instanceof Application ? 'application' : 'service';
-            $this->url = base_url().'/project/'.data_get($resource, 'environment.project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/{$type}/{$resource->uuid}/tasks/{$task->uuid}";
-        }
+        $this->url = $task->url();
     }
 
     public function via(object $notifiable): array
@@ -29,14 +31,52 @@ class TaskFailed extends CustomEmailNotification
         return $notifiable->getEnabledChannels('scheduled_task_failure');
     }
 
+    public function throttleSubject(): ?Model
+    {
+        return $this->disabled ? null : $this->task;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
+    }
+
+    public function title(): string
+    {
+        return $this->disabled
+            ? "Scheduled task ({$this->task->name}) was disabled because it keeps failing."
+            : "Scheduled task ({$this->task->name}) failed.";
+    }
+
+    /**
+     * Tells how long the task fails, and what happens next.
+     */
+    public function streakSummary(): string
+    {
+        if ($this->disabled) {
+            return ($this->task->disabled_reason ?? 'Disabled automatically.').' Fix the task, then enable it again.';
+        }
+
+        $failures = (int) $this->task->consecutive_failures;
+        $summary = $failures > 1 && $this->task->failing_since
+            ? "It failed {$failures} times in a row since {$this->task->failing_since->toDateTimeString()} UTC. "
+            : '';
+
+        return $summary.'While it keeps failing, you get at most one notification each day. After '
+            .ScheduledTask::AUTO_DISABLE_AFTER_FAILURES.' failures in a row over more than '
+            .ScheduledTask::AUTO_DISABLE_AFTER_HOURS.' hours, Coolify disables the task.';
+    }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Scheduled task ({$this->task->name}) failed.");
+        $mail->subject("Coolify: [ACTION REQUIRED] {$this->title()}");
         $mail->view('emails.scheduled-task-failed', [
             'task' => $this->task,
             'url' => $this->url,
             'output' => $this->output,
+            'title' => $this->title(),
+            'summary' => $this->streakSummary(),
         ]);
 
         return $mail;
@@ -45,8 +85,8 @@ class TaskFailed extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: ':cross_mark: Scheduled task failed',
-            description: "Scheduled task ({$this->task->name}) failed.",
+            title: $this->disabled ? ':cross_mark: Scheduled task disabled' : ':cross_mark: Scheduled task failed',
+            description: $this->title()."\n\n".$this->streakSummary(),
             color: DiscordMessage::errorColor(),
         );
 
@@ -59,7 +99,7 @@ class TaskFailed extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Scheduled task ({$this->task->name}) failed with output: {$this->output}";
+        $message = "Coolify: {$this->title()}\n\n{$this->streakSummary()}\n\nOutput: {$this->output}";
         if ($this->url) {
             $buttons[] = [
                 'text' => 'Open task in Coolify',
@@ -74,7 +114,7 @@ class TaskFailed extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        $message = "Scheduled task ({$this->task->name}) failed<br/>";
+        $message = "{$this->title()}<br/>{$this->streakSummary()}<br/>";
 
         if ($this->output) {
             $message .= "<br/><b>Error Output:</b>{$this->output}";
@@ -89,7 +129,7 @@ class TaskFailed extends CustomEmailNotification
         }
 
         return new PushoverMessage(
-            title: 'Scheduled task failed',
+            title: $this->disabled ? 'Scheduled task disabled' : 'Scheduled task failed',
             level: 'error',
             message: $message,
             buttons: $buttons,
@@ -98,8 +138,8 @@ class TaskFailed extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        $title = 'Scheduled task failed';
-        $description = "Scheduled task ({$this->task->name}) failed.";
+        $title = $this->disabled ? 'Scheduled task disabled' : 'Scheduled task failed';
+        $description = $this->title()."\n\n".$this->streakSummary();
 
         if ($this->output) {
             $description .= "\n\n*Error Output:* {$this->output}";
@@ -120,11 +160,12 @@ class TaskFailed extends CustomEmailNotification
     {
         $data = [
             'success' => false,
-            'message' => 'Scheduled task failed',
-            'event' => 'task_failed',
+            'message' => $this->disabled ? 'Scheduled task disabled' : 'Scheduled task failed',
+            'event' => $this->disabled ? 'task_disabled' : 'task_failed',
             'task_name' => $this->task->name,
             'task_uuid' => $this->task->uuid,
             'output' => $this->output,
+            'consecutive_failures' => (int) $this->task->consecutive_failures,
         ];
 
         if ($this->task->application) {

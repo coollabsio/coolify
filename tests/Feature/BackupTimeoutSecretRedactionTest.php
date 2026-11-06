@@ -45,7 +45,8 @@ function backupRedactionServer(Team $team): Server
 {
     $server = Server::factory()->create(['team_id' => $team->id]);
     $server->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id]);
-    $server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    // The test counts ssh attempts; the host key check would add a key scan.
+    $server->settings()->update(['is_reachable' => true, 'is_usable' => true, 'is_ssh_host_key_check_disabled' => true]);
 
     return $server->fresh();
 }
@@ -109,7 +110,9 @@ it('does not put database credentials into the backup execution or the failure n
 
     $execution = $backup->executions()->latest('id')->firstOrFail();
     expect($execution->status)->toBe('failed')
-        ->and($execution->message)->toBe('The command on the server timed out after 600 seconds.');
+        ->and($execution->message)->toStartWith('The backup stopped with exit code 124: it did not finish within the backup timeout of 600 seconds.')
+        ->and($execution->message)->toEndWith('The command on the server timed out after 600 seconds.')
+        ->and($execution->message)->not->toContain('TopSecretPass');
     Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => ! str_contains((string) $notification->output, 'TopSecretPass')
         && str_contains((string) $notification->output, 'timed out after 600 seconds'));
 });

@@ -70,7 +70,7 @@ function teamKey(Team $team): PrivateKey
 
 function assertMuxStops(Server $server, int $times): void
 {
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -O stop')
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop')
         && str_contains($process->command, 'mux_'.$server->uuid), $times);
 }
 
@@ -143,7 +143,7 @@ test('changing the key content refreshes each server connection once', function 
     $newKey = PrivateKey::generateNewKeyPair('ed25519')['private_key'];
 
     Livewire::test(Show::class, ['private_key_uuid' => $this->privateKey->uuid])
-        ->set('privateKeyValue', $newKey)
+        ->set('newPrivateKey', $newKey)
         ->call('changePrivateKey')
         ->assertDispatched('success');
 
@@ -158,7 +158,7 @@ test('a team member cannot change a key used by servers', function () {
     $this->actingAs($member);
 
     Livewire::test(Show::class, ['private_key_uuid' => $this->privateKey->uuid])
-        ->set('privateKeyValue', PrivateKey::generateNewKeyPair('ed25519')['private_key'])
+        ->set('newPrivateKey', PrivateKey::generateNewKeyPair('ed25519')['private_key'])
         ->call('changePrivateKey');
 
     expect($this->privateKey->fresh()->private_key)->toBe($this->privateKey->private_key);

@@ -83,17 +83,23 @@
                                 }
                             @endphp
                             <div wire:key="{{ data_get($execution, 'id') }}"
-                                class="backup-execution-row">
-                                <div class="data-table-row backup-executions-table-grid min-h-14 border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.06]">
+                                class="backup-execution-row border-b border-neutral-200 dark:border-white/[0.06]">
+                                <div class="data-table-row backup-executions-table-grid min-h-14 px-4 py-2.5">
                                     <div class="flex items-center gap-2">
                                         <x-status-badge :status="$executionStatusLabel"
                                             :type="$executionStatusType" :pulse="$executionStatus === 'running'" />
                                     </div>
                                     <div class="truncate text-[12px] font-medium text-black dark:text-fg">
-                                        {{ data_get($execution, 'database_name', 'N/A') }}
+                                        {{ data_get($execution, 'database_name') ?: ($backup->dump_all ? 'All databases' : '-') }}
                                     </div>
-                                    <div class="min-w-0">
-                                        <x-forms.copy-input :text="data_get($execution, 'filename') ?? 'No archive name'" />
+                                    <div class="flex min-w-0 items-center gap-1">
+                                        @if (filled(data_get($execution, 'filename')))
+                                            <span class="truncate font-mono text-[12px] text-black dark:text-fg"
+                                                title="{{ data_get($execution, 'filename') }}">{{ basename(data_get($execution, 'filename')) }}</span>
+                                            <x-copy-button :value="data_get($execution, 'filename')" label="Copy archive path" />
+                                        @else
+                                            <span class="text-neutral-500 dark:text-fg-faint">-</span>
+                                        @endif
                                     </div>
                                     <div class="text-[11px] text-neutral-500 dark:text-fg-faint"
                                         title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $server) }}@if ($executionStatus !== 'running')&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}@endif">
@@ -163,9 +169,12 @@
                                     </div>
                                 </div>
                                 @if (data_get($execution, 'message'))
-                                    <div class="border-t border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/[0.06] dark:bg-white/[0.02]">
-                                        <pre
-                                            class="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-neutral-100 p-3 font-mono text-xs leading-5 text-neutral-700 dark:bg-black/20 dark:text-fg-dim">{{ data_get($execution, 'message') }}</pre>
+                                    <div class="px-4 pb-3">
+                                        <pre @class([
+                                            'max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5',
+                                            'text-red-600 dark:text-red-400' => $executionStatus === 'failed',
+                                            'text-neutral-500 dark:text-fg-faint' => $executionStatus !== 'failed',
+                                        ])>{{ data_get($execution, 'message') }}</pre>
                                     </div>
                                 @endif
                             </div>

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\BackupStorageType;
+use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
 use App\Support\FtpsFilesystemAdapter;
@@ -50,6 +52,26 @@ class S3Storage extends BaseModel
     private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
 
     /**
+     * The most parts that an upload with the MinIO client uses. Most providers accept 10000 parts, but some, like
+     * Scaleway, accept only 1000. The MinIO client sizes the parts for 10000 parts (16 MiB for files up to about
+     * 156 GiB), so without a part size, files larger than about 15.6 GiB fail on these providers.
+     */
+    private const MINIO_CLIENT_MAX_UPLOAD_PARTS = 1000;
+
+    /**
+     * The smallest part size of an upload with the MinIO client. It is also the default part size of the MinIO client.
+     */
+    private const MINIO_CLIENT_MIN_PART_SIZE_BYTES = 16 * 1024 * 1024;
+
+    /**
+     * How long the presigned URL of a curl transfer is valid. S3 checks it when the request starts, so it must
+     * cover the wait for the earlier transfers and the retries of the backup job.
+     */
+    private const CURL_TRANSFER_URL_TTL_HOURS = 24;
+
+    private const CURL_TRANSFER_CONFIG_PATH = '/tmp/s3-transfer.curl';
+
+    /**
      * The exception code of runSshProcess() when a remote command times out.
      */
     private const REMOTE_COMMAND_TIMEOUT_EXIT_CODE = 124;
@@ -82,6 +104,7 @@ class S3Storage extends BaseModel
         'endpoint',
         'use_path_style_endpoint',
         'private_key_id',
+        'skip_tls_verification',
         'is_usable',
         'unusable_email_sent',
     ];
@@ -99,6 +122,7 @@ class S3Storage extends BaseModel
         'type' => BackupStorageType::class,
         'is_usable' => 'boolean',
         'use_path_style_endpoint' => 'boolean',
+        'skip_tls_verification' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
@@ -541,7 +565,7 @@ class S3Storage extends BaseModel
                     // Get admins directly from the pivot relationship for this specific team
                     $users = $team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
                     foreach ($users as $user) {
-                        send_user_an_email($mail, $user->email);
+                        send_user_an_email($mail, $user->email, asNotification: true);
                     }
                     $this->unusable_email_sent = true;
                 } catch (\Throwable $emailException) {
@@ -621,7 +645,7 @@ class S3Storage extends BaseModel
             'bucket' => $this['bucket'],
             'endpoint' => $this['endpoint'],
             'use_path_style_endpoint' => $this->usesPathStyleEndpoint(),
-            'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint'], $this->trustedInternalHosts()), [
+            'http' => array_merge($this->httpClientOptions(), [
                 'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                 'timeout' => self::REQUEST_TIMEOUT_SECONDS,
             ]),
@@ -629,12 +653,42 @@ class S3Storage extends BaseModel
     }
 
     /**
-     * The `docker run` option that makes the MinIO client sign requests for the storage region, as filesystem() does.
-     * Without it, mc signs for us-east-1, and providers that enforce the region reject the requests.
+     * The Guzzle options of every request from Coolify to the endpoint: the DNS pin of SafeWebhookUrl, and the TLS
+     * certificate check, which a storage with a self-signed or private CA certificate can turn off.
+     *
+     * @return array<string, mixed>
      */
-    public function minioClientRegionOption(): string
+    public function httpClientOptions(): array
     {
-        return '-e '.escapeshellarg('MC_REGION='.$this->region);
+        return array_merge(SafeWebhookUrl::httpClientOptions((string) $this->endpoint, $this->trustedInternalHosts()), [
+            'verify' => ! $this->skip_tls_verification,
+        ]);
+    }
+
+    /**
+     * The `docker run` options of the MinIO client helper. `MC_REGION` makes mc sign requests for the storage region,
+     * as filesystem() does. Without it, mc signs for us-east-1, and providers that enforce the region reject the
+     * requests. `MC_INSECURE` turns off the TLS certificate check, as httpClientOptions() does.
+     */
+    public function minioClientEnvOptions(): string
+    {
+        return '-e '.escapeshellarg('MC_REGION='.$this->region)
+            .($this->skip_tls_verification ? ' -e MC_INSECURE=true' : '');
+    }
+
+    /**
+     * The `docker exec` option that makes `mc cp` upload a file of $fileSize bytes in at most 1000 parts.
+     * `mc cp` has no part size flag, but it reads the part size from MC_UPLOAD_MULTIPART_SIZE.
+     */
+    public static function minioClientPartSizeOption(int $fileSize): string
+    {
+        $mebibyte = 1024 * 1024;
+        $partSize = max(
+            self::MINIO_CLIENT_MIN_PART_SIZE_BYTES,
+            (int) ceil($fileSize / self::MINIO_CLIENT_MAX_UPLOAD_PARTS / $mebibyte) * $mebibyte,
+        );
+
+        return '-e MC_UPLOAD_MULTIPART_SIZE='.$partSize;
     }
 
     /**
@@ -701,6 +755,80 @@ class S3Storage extends BaseModel
     public function minioClientAliasOptions(): string
     {
         return ' --api S3v4'.($this->usesPathStyleEndpoint() ? '' : ' --path off');
+    }
+
+    /**
+     * The MinIO client accepts only `scheme://host[:port]` endpoints. Providers like Supabase Storage need a path
+     * (`/storage/v1/s3`), so transfers to these endpoints use curl with a presigned URL instead.
+     */
+    public function usesCurlTransfer(): bool
+    {
+        return $this->isS3() && trim((string) parse_url((string) $this->endpoint, PHP_URL_PATH), '/') !== '';
+    }
+
+    /**
+     * Prepares the upload of $localPath in $container to $key and returns the command that runs it.
+     */
+    public function prepareCurlUpload(Server $server, string $container, string $localPath, string $key): string
+    {
+        $url = $this->filesystem()->temporaryUploadUrl($key, now()->addHours(self::CURL_TRANSFER_URL_TTL_HOURS))['url'];
+
+        // An S3 error is an XML body. Write it to stderr, so it becomes the error message of the backup.
+        return $this->prepareCurlTransfer($server, $container, $url, ['upload-file = '.self::curlConfigValue($localPath), 'fail-with-body', 'output = "/dev/stderr"']);
+    }
+
+    /**
+     * Prepares the download of $key to $localPath in $container and returns the command that runs it.
+     */
+    public function prepareCurlDownload(Server $server, string $container, string $key, string $localPath): string
+    {
+        $url = $this->filesystem()->temporaryUrl($key, now()->addHours(self::CURL_TRANSFER_URL_TTL_HOURS));
+
+        return $this->prepareCurlTransfer($server, $container, $url, ['output = '.self::curlConfigValue($localPath), 'fail']);
+    }
+
+    /**
+     * Writes the curl config of a transfer into $container through the stdin of the SSH process. The config holds
+     * the presigned URL, so the URL is not in the arguments of any process, and the S3 keys never reach the server.
+     * The `resolve` line pins the endpoint host to its validated IPs, as minioClientResolveOptions() does for mc.
+     *
+     * @param  array<int, string>  $options
+     */
+    private function prepareCurlTransfer(Server $server, string $container, string $url, array $options): string
+    {
+        $entries = SafeWebhookUrl::minioClientResolveOptions((string) $this->endpoint, $this->trustedInternalHosts());
+        $config = collect(['url = '.self::curlConfigValue($url), 'silent', 'show-error', ...$options])
+            ->when($entries !== [], fn ($lines) => $lines->push('resolve = '.self::curlConfigValue(
+                str($entries[0])->beforeLast('=')->toString().':'.collect($entries)
+                    ->map(fn (string $entry): string => str($entry)->afterLast('=')->toString())
+                    ->map(fn (string $ip): string => str_contains($ip, ':') ? "[{$ip}]" : $ip)
+                    ->implode(',')
+            )))
+            ->when($this->skip_tls_verification, fn ($lines) => $lines->push('insecure'))
+            ->implode("\n")."\n";
+
+        $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
+            .' sh -c '.escapeshellarg('umask 077 && cat > '.self::CURL_TRANSFER_CONFIG_PATH);
+        $timeout = (int) config('constants.ssh.command_timeout');
+
+        SshRetryHandler::retry(
+            function () use ($server, $remoteCommand, $config, $timeout) {
+                $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+                $process = runSshProcess($sshCommand, $timeout, $config);
+
+                if ($process->exitCode() !== 0) {
+                    excludeCertainErrors($process->errorOutput(), $process->exitCode());
+                }
+            },
+            ['server' => $server->ip, 'function' => 'prepareCurlTransfer'],
+        );
+
+        return 'docker exec '.escapeshellarg($container).' curl --config '.self::CURL_TRANSFER_CONFIG_PATH;
+    }
+
+    private static function curlConfigValue(string $value): string
+    {
+        return '"'.addcslashes($value, '"\\').'"';
     }
 
     /**

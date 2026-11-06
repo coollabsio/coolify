@@ -171,6 +171,7 @@ class Navbar extends Component
         }
 
         try {
+            $this->authorize('manageProxy', $this->server);
             $this->isChecking = true;
             CheckProxy::run($this->server, true);
         } catch (\Throwable $e) {

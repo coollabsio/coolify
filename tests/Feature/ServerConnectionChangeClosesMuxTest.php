@@ -20,7 +20,7 @@ beforeEach(function () {
 
 function closesServerMux(Server $server): Closure
 {
-    return fn ($process) => str_contains($process->command, 'ssh -O stop') && str_contains($process->command, "mux_{$server->uuid}");
+    return fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop') && str_contains($process->command, "mux_{$server->uuid}");
 }
 
 it('closes the multiplexed SSH connection when the connection details change', function (array $changes) {

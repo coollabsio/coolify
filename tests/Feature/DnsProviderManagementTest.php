@@ -486,6 +486,40 @@ describe('domain DNS configuration after add', function () {
         Queue::assertNotPushed(CheckDomainDnsJob::class);
     });
 
+    test('service domains queues a dns record job when a generated domain is edited to a managed zone', function () {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+        $webApp = ServiceApplication::create([
+            'uuid' => (string) Str::uuid(),
+            'service_id' => $service->id,
+            'name' => 'web',
+            'human_name' => 'Web',
+            'image' => 'nginx:alpine',
+            'fqdn' => 'https://web-generated.203.0.113.10.sslip.io',
+        ]);
+
+        Livewire::test(ServiceDomains::class, ['service' => $service->fresh(['applications', 'server'])])
+            ->call('startEdit', 0)
+            ->set('editingDomainParts.host', 'app.example.com')
+            ->call('updateDomain')
+            ->assertHasNoErrors()
+            ->assertDispatched('success', 'Domain updated.')
+            ->assertDispatched('info', 'Adding DNS record for app.example.com.');
+
+        expect($webApp->fresh()->fqdn)->toBe('https://app.example.com');
+        Queue::assertPushed(ConfigureDnsRecordJob::class, 1);
+        Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'app.example.com'
+            && $job->content === '203.0.113.10'
+            && $job->zoneId === $this->zone->id
+            && (string) $job->resourceId === (string) $webApp->id);
+        Queue::assertNotPushed(CheckDomainDnsJob::class);
+    });
+
     test('private server addresses are never queued as dns records', function (string $address) {
         $this->server->update(['ip' => $address]);
         $application = Application::factory()->create([

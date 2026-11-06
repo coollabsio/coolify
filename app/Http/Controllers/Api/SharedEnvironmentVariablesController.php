@@ -22,7 +22,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'value', type: 'string', nullable: true),
         new OA\Property(property: 'is_literal', type: 'boolean'),
         new OA\Property(property: 'is_multiline', type: 'boolean'),
-        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
+        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'),
         new OA\Property(property: 'comment', type: 'string', maxLength: 256, nullable: true),
     ],
 )]
@@ -35,7 +35,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'value', type: 'string', nullable: true),
         new OA\Property(property: 'is_literal', type: 'boolean'),
         new OA\Property(property: 'is_multiline', type: 'boolean'),
-        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
+        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'),
         new OA\Property(property: 'comment', type: 'string', maxLength: 256, nullable: true),
     ],
 )]

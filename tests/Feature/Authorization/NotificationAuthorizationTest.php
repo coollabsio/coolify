@@ -270,70 +270,6 @@ test('member cannot update resend email transport directly', function () {
         ->assertForbidden();
 });
 
-test('member cannot copy instance email settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-});
-
-test('team admin cannot copy instance email credentials', function () {
-    InstanceSettings::query()->findOrFail(0)->update([
-        'smtp_password' => 'instance-smtp-secret',
-        'resend_api_key' => 'instance-resend-secret',
-    ]);
-
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->assertSet('smtpPassword', null)
-        ->assertSet('resendApiKey', null)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-
-    expect($this->team->emailNotificationSettings->fresh()->smtp_password)->toBeNull();
-    expect($this->team->emailNotificationSettings->fresh()->resend_api_key)->toBeNull();
-});
-
-test('instance admin can copy instance email credentials to an authorized team', function () {
-    $rootTeam = Team::factory()->create(['id' => 0]);
-    $this->admin->teams()->attach($rootTeam, ['role' => 'admin']);
-
-    InstanceSettings::query()->findOrFail(0)->update([
-        'smtp_from_address' => 'instance@example.com',
-        'smtp_from_name' => 'Instance',
-        'smtp_password' => 'instance-smtp-secret',
-        'resend_api_key' => 'instance-resend-secret',
-    ]);
-
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertHasNoErrors()
-        ->assertSet('smtpPassword', 'instance-smtp-secret')
-        ->assertSet('resendApiKey', 'instance-resend-secret');
-
-    expect($this->team->emailNotificationSettings->fresh()->smtp_password)->toBe('instance-smtp-secret');
-    expect($this->team->emailNotificationSettings->fresh()->resend_api_key)->toBe('instance-resend-secret');
-});
-
-test('instance admin cannot copy credentials to a team they cannot update', function () {
-    $rootTeam = Team::factory()->create(['id' => 0]);
-    $this->member->teams()->attach($rootTeam, ['role' => 'admin']);
-
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-});
-
 test('admin can update email notification settings', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
@@ -360,11 +296,8 @@ test('admin can save team smtp settings without a resend api key when resend is 
     session(['currentTeam' => $this->team]);
 
     Livewire::test(EmailNotification::class)
-        ->set('smtpFromAddress', 'alerts@example.com')
-        ->set('smtpFromName', 'Coolify')
-        ->set('smtpHost', 'smtp.example.com')
-        ->set('smtpPort', '587')
-        ->set('smtpEncryption', 'starttls')
+        ->set('resendFromAddress', 'alerts@example.com')
+        ->set('resendFromName', 'Coolify')
         ->set('resendEnabled', false)
         ->set('resendApiKey', null)
         ->call('submitResend')
@@ -486,9 +419,9 @@ test('member cannot send test on any notification channel', function () {
     expect($this->member->can('sendTest', $this->team->webhookNotificationSettings))->toBeFalse();
 });
 
-test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
+test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets, array $state = []) {
     $settings = $this->team->{$settingsRelation};
-    $settings->update($secrets);
+    $settings->update([...$secrets, ...$state]);
 
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -525,7 +458,7 @@ test('member cannot view notification secrets', function (string $component, str
     'email credentials' => [EmailNotification::class, 'emailNotificationSettings', [
         'smtp_password' => 'smtp-secret-password',
         'resend_api_key' => 'resend-secret-api-key',
-    ]],
+    ], ['smtp_enabled' => true]],
 ]);
 
 test('admin can view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
