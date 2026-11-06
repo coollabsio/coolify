@@ -162,7 +162,7 @@ class BackupExecutions extends Component
             };
             $storageLabel = $storages
                 ->filter(fn ($storage) => $storage?->team_id === $serviceTeamId)
-                ->map(fn ($storage) => $storage->name.' (bucket: '.$storage->bucket.')')
+                ->map(fn ($storage) => $storage->name.' ('.($storage->isS3() ? 'bucket: '.$storage->bucket : $storage->type->label()).')')
                 ->implode(', ') ?: 'Unavailable';
             if ($isDatabase && ! $schedule->save_s3) {
                 $storageLabel = 'Not configured';

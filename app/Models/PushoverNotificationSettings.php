@@ -34,6 +34,7 @@ class PushoverNotificationSettings extends Model
         'server_unreachable_pushover_notifications',
         'server_patch_pushover_notifications',
         'traefik_outdated_pushover_notifications',
+        'image_vulnerabilities_pushover_notifications',
     ];
 
     protected $hidden = [
@@ -60,6 +61,7 @@ class PushoverNotificationSettings extends Model
         'server_unreachable_pushover_notifications' => 'boolean',
         'server_patch_pushover_notifications' => 'boolean',
         'traefik_outdated_pushover_notifications' => 'boolean',
+        'image_vulnerabilities_pushover_notifications' => 'boolean',
     ];
 
     public function team()

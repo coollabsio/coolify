@@ -186,7 +186,7 @@ class StartDragonfly
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = serverDockerConfigPrefix($this->database->destination->server)."docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }

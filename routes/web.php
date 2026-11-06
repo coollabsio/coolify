@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\SharedVariableCanvasController;
 use App\Http\Controllers\Api\TagCanvasController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FileBrowserDownloadController;
+use App\Http\Controllers\ImageScanSbomController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
@@ -39,6 +40,10 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\ImageScan\FleetVulnerabilities;
+use App\Livewire\ImageScan\InstanceImageScanning;
+use App\Livewire\ImageScan\ServerImageScanning;
+use App\Livewire\ImageScan\TeamImageScanning;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
@@ -210,6 +215,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('two-factor.required.switch-team');
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    // Members limited to some projects see the resources they have access to.
+    Route::get('/vulnerabilities', FleetVulnerabilities::class)->name('vulnerabilities');
     Route::middleware('access.team-wide')->group(function () {
         Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
         Route::get('/analytics', Analytics::class)->name('analytics');
@@ -284,6 +291,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', SettingsIndex::class)->name('settings.index');
         Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
         Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+        Route::get('/settings/image-scanning', InstanceImageScanning::class)->name('settings.image-scanning');
 
         Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
         Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
@@ -339,6 +347,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index')->middleware('access.team-wide');
         Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
         Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log')->middleware('access.team-wide');
+        Route::get('/image-scanning', TeamImageScanning::class)->name('team.image-scanning')->middleware('access.team-wide');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view')->middleware('access.team-wide');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone')->middleware('access.team-wide');
     });
@@ -437,6 +446,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
+        Route::get('/vulnerabilities', ApplicationConfiguration::class)->name('project.application.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.application.vulnerabilities.sbom');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -460,6 +471,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
         Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
         Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/vulnerabilities', DatabaseConfiguration::class)->name('project.database.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.database.vulnerabilities.sbom');
         Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
@@ -479,6 +492,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
+        Route::get('/vulnerabilities', ServiceConfiguration::class)->name('project.service.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.service.vulnerabilities.sbom');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
         // Import opens in a modal on the backups page; keep old links working.
@@ -547,6 +562,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
             Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
             Route::get('/security', ServerSecurityIndex::class)->name('server.security')->middleware('can.update.resource');
+            Route::get('/security/image-scanning', ServerImageScanning::class)->name('server.security.image-scanning')->middleware('can.update.resource');
             // Old sub pages. Links in sent notifications still use them.
             foreach (['patches' => 'server-patching-overview-section', 'terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
                 Route::get("/security/{$page}", fn (string $server_uuid) => redirect(route('server.security', ['server_uuid' => $server_uuid]).'#'.$section))
@@ -634,11 +650,11 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Only storages of the team that owns the database can serve the copy.
-            $s3DownloadUrl = is_null($execution_team_id)
+            $s3Download = is_null($execution_team_id)
                 ? null
-                : $execution->s3DownloadUrl($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
-            if ($s3DownloadUrl) {
-                return redirect()->away($s3DownloadUrl);
+                : $execution->s3Download($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
+            if ($s3Download) {
+                return $s3Download;
             }
 
             if ($execution->scheduledDatabaseBackup->disable_local_backup && $execution->scheduledDatabaseBackup->save_s3) {
@@ -677,9 +693,9 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Only storages of the team that owns the backup can serve the copy.
-            $s3DownloadUrl = $execution->s3DownloadUrl($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
-            if ($s3DownloadUrl) {
-                return redirect()->away($s3DownloadUrl);
+            $s3Download = $execution->s3Download($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
+            if ($s3Download) {
+                return $s3Download;
             }
 
             if (! $execution->local_storage_deleted && ! $server) {

@@ -37,7 +37,7 @@ const storedPositions = graph => (graph?.positions && !Array.isArray(graph.posit
 export function estimateNodeHeight(node) {
   let height = 58; // padding + icon/name row
   if (node?.urls?.length) height += 20;
-  if (node?.extra_zones?.length) height += 28;
+  if (node?.extra_zones?.length || node?.security?.text) height += 28;
   const children = node?.children?.length || 0;
   if (children) height += 12 + Math.min(children, MAX_CHILDREN) * 20 + (children > MAX_CHILDREN ? 20 : 0);
   return height;
@@ -763,6 +763,7 @@ export const ICONS = {
   search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'M20 20l-4-4'],
   tag: ['M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z', 'M7.5 7.5h.01'],
   info: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v5', 'M12 8h.01'],
+  shieldAlert: ['M12 3 5 5.5v5.6c0 4.4 2.9 8.2 7 9.9 4.1-1.7 7-5.5 7-9.9V5.5z', 'M12 8v4', 'M12 15.5h.01'],
 };
 
 /** A saved { x, y, z } canvas view, or null when it is missing or not valid. */

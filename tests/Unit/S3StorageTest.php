@@ -56,6 +56,7 @@ test('S3Storage model fillable attributes are configured correctly', function ()
 
     expect($s3Storage->getFillable())->toBe([
         'team_id',
+        'type',
         'name',
         'description',
         'region',
@@ -64,10 +65,11 @@ test('S3Storage model fillable attributes are configured correctly', function ()
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'private_key_id',
         'skip_tls_verification',
         'is_usable',
         'unusable_email_sent',
-    ]);
+    ])->not->toContain('sftp_host_key');
 });
 
 test('S3Storage connection validation uses short s3 client timeouts', function () {
@@ -322,4 +324,15 @@ test('S3Storage uses curl transfers only for endpoints with a path, which the Mi
     'host only' => ['https://s3.amazonaws.com', false],
     'host with trailing slash' => ['https://s3.amazonaws.com/', false],
     'host with port' => ['http://coolify-minio:9000', false],
+]);
+
+test('storages of the other types never use the S3 curl transfer, also with a path in the endpoint', function (string $type, string $endpoint) {
+    $storage = new S3Storage;
+    $storage->setRawAttributes(['type' => $type, 'endpoint' => $endpoint]);
+
+    expect($storage->usesCurlTransfer())->toBeFalse();
+})->with([
+    'WebDAV' => ['webdav', 'https://cloud.example.com/remote.php/dav/files/user/backups'],
+    'SFTP' => ['sftp', 'sftp://backup.example.com:22/backups'],
+    'FTPS' => ['ftps', 'ftps://backup.example.com:21/backups'],
 ]);

@@ -16,6 +16,7 @@ use App\Models\VolumeBackupS3Replica;
 use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
+use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -90,9 +91,10 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $filename = str($this->backup->targetType())->lower().'-'.str($this->backup->targetName())->slug().'-'.Carbon::now()->timestamp.'.tar.gz';
         $backupLocation = $backupDirectory.'/'.$filename;
         $this->execution->update(['filename' => $backupLocation]);
-        // Streaming writes no local archive, so it can upload to one destination only. A curl upload needs the size
-        // of the file before it starts, so it cannot stream.
-        $streamToS3 = $this->backup->disable_local_backup && $destinations->count() === 1 && ! $destinations->first()->usesCurlTransfer();
+        // Streaming writes no local archive, so it can upload to one destination only. Only S3 storages stream, and a
+        // curl upload needs the size of the file before it starts, so it cannot stream.
+        $streamToS3 = $this->backup->disable_local_backup && $destinations->count() === 1
+            && $destinations->first()->isS3() && ! $destinations->first()->usesCurlTransfer();
 
         try {
             $source = $this->backup->sourcePath();
@@ -174,7 +176,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->execution->refreshS3Summary();
                 $this->execution->update(['s3_cleanup_pending' => false]);
             } elseif ($this->backup->save_s3 && $destinations->isEmpty()) {
-                $warning = 'S3 upload failed: The selected S3 storage no longer exists.';
+                $warning = 'Storage upload failed: The selected backup storage no longer exists.';
             } elseif ($this->backup->save_s3) {
                 $s3CleanupPending = true;
                 $this->execution->update(['s3_cleanup_pending' => true]);
@@ -184,14 +186,14 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 if ($s3Uploaded) {
                     $s3CleanupPending = false;
                 } else {
-                    $warning = 'S3 upload failed: '.implode(' ', $uploadErrors);
+                    $warning = 'Storage upload failed: '.implode(' ', $uploadErrors);
 
                     try {
                         VolumeBackupRecoveryJob::cleanupS3Upload($this->execution);
                         $s3CleanupPending = false;
                     } catch (Throwable $cleanupException) {
                         VolumeBackupRecoveryJob::dispatch($this->execution);
-                        $warning .= ' Partial S3 upload cleanup failed: '.$cleanupException->getMessage();
+                        $warning .= ' Partial storage upload cleanup failed: '.$cleanupException->getMessage();
                     }
                 }
 
@@ -200,7 +202,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                         deleteBackupsLocally($backupLocation, $server, throwError: true);
                         $localStorageDeleted = true;
                     } catch (Throwable $exception) {
-                        $warning = 'S3 upload succeeded, but the local archive could not be deleted: '.$exception->getMessage();
+                        $warning = 'Storage upload succeeded, but the local archive could not be deleted: '.$exception->getMessage();
                     }
                 }
             }
@@ -447,7 +449,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             /** @var VolumeBackupS3Replica $replica */
             try {
                 if (! $replica->s3) {
-                    throw new \RuntimeException('The selected S3 storage no longer exists.');
+                    throw new \RuntimeException('The selected backup storage no longer exists.');
                 }
 
                 $this->uploadToS3($replica->s3, $backupLocation, $size, $backupDirectory, $server);
@@ -468,6 +470,17 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
+        if (! $s3->isS3()) {
+            $transfer = new RcloneTransfer($s3, $server, $containerName);
+            try {
+                $transfer->start([$backupLocation.':'.$backupLocation.':ro'], timeout: $this->timeout);
+                $transfer->upload($backupLocation, $backupLocation, $this->timeout);
+            } finally {
+                instant_remote_process([$transfer->removeCommand()], $server, throwError: false, disableMultiplexing: true);
+            }
+
+            return;
+        }
         $image = coolifyHelperImage().':'.getHelperVersion();
 
         try {

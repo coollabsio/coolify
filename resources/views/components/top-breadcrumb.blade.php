@@ -93,7 +93,7 @@
         request()->routeIs('source.*') => 'Sources',
         request()->routeIs('destination.*') => 'Destinations',
         request()->routeIs('registries.*') => 'Registries',
-        request()->routeIs('storage.*') => 'S3 Storage',
+        request()->routeIs('storage.*') => 'Storage',
         request()->routeIs('shared-variables.*') => 'Shared Variables',
         request()->routeIs('team.*') => 'Team',
         request()->routeIs('notifications.*') => 'Notifications',
@@ -135,7 +135,7 @@
     @endif
 
     @if ($currentStorage)
-        <x-breadcrumb-switcher title="S3 Storage" :label="$currentStorage->name" :uuid="$currentStorage->uuid" :items="$storages->map(fn ($storage) => [
+        <x-breadcrumb-switcher title="Storage" :label="$currentStorage->name" :uuid="$currentStorage->uuid" :items="$storages->map(fn ($storage) => [
             'label' => $storage->name,
             'uuid' => $storage->uuid,
             'href' => route('storage.show', ['storage_uuid' => $storage->uuid]),

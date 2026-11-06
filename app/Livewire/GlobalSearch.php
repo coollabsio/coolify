@@ -818,6 +818,20 @@ class GlobalSearch extends Component
                 'link' => route('team.audit-log'),
                 'search_text' => 'team audit log activity history events',
             ] : null,
+            instanceSettings()->is_image_scanning_allowed ? [
+                'name' => 'Security',
+                'type' => 'navigation',
+                'description' => 'What each resource of your team needs, from its last image scan',
+                'link' => route('vulnerabilities'),
+                'search_text' => 'vulnerabilities cve ghsa image scanning fixable packages security',
+            ] : null,
+            instanceSettings()->is_image_scanning_allowed ? [
+                'name' => 'Team Image Scanning',
+                'type' => 'navigation',
+                'description' => 'Scan rules and ignored vulnerabilities of the team',
+                'link' => route('team.image-scanning'),
+                'search_text' => 'team image scanning vulnerabilities cve scan rules alert block deploys ignored security',
+            ] : null,
             isInstanceAdmin() ? [
                 'name' => 'Team Admin View',
                 'type' => 'navigation',
@@ -929,6 +943,13 @@ class GlobalSearch extends Component
                     'search_text' => 'settings updates auto update upgrade version frequency',
                 ],
                 [
+                    'name' => 'Image Scanning Settings',
+                    'type' => 'navigation',
+                    'description' => 'Allow image scanning, the vulnerability database, and default scan rules',
+                    'link' => route('settings.image-scanning'),
+                    'search_text' => 'settings image scanning vulnerabilities cve scan rules grype database mirror alert block deploys security',
+                ],
+                [
                     'name' => 'Instance Backup',
                     'type' => 'navigation',
                     'description' => 'Back up the Coolify instance database',
@@ -961,6 +982,7 @@ class GlobalSearch extends Component
                 route('profile'),
                 route('profile.appearance'),
                 route('security.api-tokens'),
+                route('vulnerabilities'),
             ];
             $navigation = $navigation->whereIn('link', $projectPages)->values();
         }
@@ -1176,8 +1198,8 @@ class GlobalSearch extends Component
         // Storage - can be created if user is admin or owner
         if ($user->isAdmin() || $user->isOwner()) {
             $items->push([
-                'name' => 'S3 Storage',
-                'description' => 'Add S3 storage for backups and file uploads',
+                'name' => 'Storage',
+                'description' => 'Add S3, SFTP, FTPS, or WebDAV storage for backups',
                 'quickcommand' => '(type: new storage)',
                 'type' => 'storage',
                 'category' => 'Quick Actions',

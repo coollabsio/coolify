@@ -92,7 +92,7 @@ it('lets admins and owners check files', function (string $role) {
         ->call('checkFile')
         ->assertDispatched('error', 'Invalid file path. Path must be absolute and contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).')
         ->call('checkS3File')
-        ->assertDispatched('error', 'Please select an S3 storage.');
+        ->assertDispatched('error', 'Please select a storage.');
 })->with(['admin', 'owner']);
 
 it('does nothing when an admin checks an empty server path', function () {

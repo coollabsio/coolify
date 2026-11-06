@@ -4,6 +4,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Dashboard\TrafficAnalytics;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -59,6 +60,7 @@ function fakeDashboardTrafficResponses(int $requests = 1000): array
 }
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);

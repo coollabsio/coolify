@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
@@ -278,6 +279,7 @@ class Server extends BaseModel
             SshMultiplexingHelper::deleteStaleKnownHostsFiles($server->uuid, null);
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
+            ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->delete();
         });
 
         static::deleted(function (Server $server) {
@@ -710,6 +712,16 @@ class Server extends BaseModel
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);
+    }
+
+    public function imageScans(): HasMany
+    {
+        return $this->hasMany(ImageScan::class);
+    }
+
+    public function imageSboms(): HasMany
+    {
+        return $this->hasMany(ImageSbom::class);
     }
 
     public function dockerCleanupExecutions()

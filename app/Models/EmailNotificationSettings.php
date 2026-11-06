@@ -50,6 +50,7 @@ class EmailNotificationSettings extends Model
         'server_unreachable_email_notifications',
         'server_patch_email_notifications',
         'traefik_outdated_email_notifications',
+        'image_vulnerabilities_email_notifications',
     ];
 
     protected $hidden = [
@@ -94,6 +95,7 @@ class EmailNotificationSettings extends Model
         'server_disk_usage_email_notifications' => 'boolean',
         'server_patch_email_notifications' => 'boolean',
         'traefik_outdated_email_notifications' => 'boolean',
+        'image_vulnerabilities_email_notifications' => 'boolean',
     ];
 
     public function team()

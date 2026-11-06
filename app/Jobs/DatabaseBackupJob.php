@@ -22,6 +22,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Notifications\ScheduledJobRecovered;
+use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
@@ -519,8 +520,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                     if ($s3UploadError) {
                         $message = $message
-                            ? $message."\n\nWarning: S3 upload failed: ".$s3UploadError
-                            : 'Warning: S3 upload failed: '.$s3UploadError;
+                            ? $message."\n\nWarning: Storage upload failed: ".$s3UploadError
+                            : 'Warning: Storage upload failed: '.$s3UploadError;
                     }
 
                     $this->backup_log->update([
@@ -904,7 +905,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 's3_storage_id' => null,
             ]);
 
-            throw new \Exception('S3 storage configuration is missing or has been deleted (S3 storage ID: '.($previousS3StorageId ?? 'null').'). S3 backup has been disabled for this schedule.');
+            throw new \Exception('Backup storage configuration is missing or has been deleted (storage ID: '.($previousS3StorageId ?? 'null').'). Uploads to a backup storage are disabled for this schedule.');
         }
 
         $failures = [];
@@ -947,6 +948,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $network = $this->database->destination->network;
             }
+            if (! $s3->isS3()) {
+                $this->uploadWithRclone($s3, $network);
+
+                return;
+            }
             $safeNetwork = escapeshellarg($network);
 
             $fullImageName = $this->getFullImageName();
@@ -979,6 +985,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $command = dockerRemoveCommand("backup-of-{$this->backup_log_uuid}");
             instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
+    }
+
+    /**
+     * Uploads the backup file to an SFTP, FTPS, or WebDAV storage. The caller removes the container.
+     */
+    private function uploadWithRclone(S3Storage $storage, string $network): void
+    {
+        $transfer = new RcloneTransfer($storage, $this->server, "backup-of-{$this->backup_log_uuid}");
+        $transfer->start([$this->backupMountSource().':'.$this->backup_location.':ro'], $network, $this->commandTimeout());
+        $transfer->upload($this->backup_location, $this->backup_location, $this->commandTimeout());
     }
 
     /**
