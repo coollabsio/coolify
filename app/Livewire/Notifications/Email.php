@@ -244,10 +244,12 @@ class Email extends Component
         try {
             $this->resetErrorBag();
             if (! $this->useInstanceEmailSettings) {
-                $this->validateEnabledEmailProvider();
+                $this->enableSelectedEmailProvider();
             }
             $this->saveModel();
         } catch (\Throwable $e) {
+            $this->restoreSavedEmailProvider();
+
             return handleError($e, $this);
         }
     }
@@ -258,11 +260,8 @@ class Email extends Component
      */
     public function selectEmailProvider()
     {
-        $this->smtpEnabled = $this->emailProvider === 'smtp';
-        $this->resendEnabled = $this->emailProvider === 'resend';
-
         try {
-            $this->validateEnabledEmailProvider();
+            $this->enableSelectedEmailProvider();
         } catch (ValidationException) {
             // Not complete yet: show the fields of the provider and the "Not active yet" notice, without an error.
             $this->resetErrorBag();
@@ -280,6 +279,30 @@ class Email extends Component
     public function activeEmailProvider(): string
     {
         return enabled_email_provider($this->settings) ?? 'none';
+    }
+
+    /**
+     * Turn on the provider selected in the provider list. When its settings are not valid, the saved
+     * provider stays on, so that a later save of another field cannot turn off the working provider.
+     */
+    private function enableSelectedEmailProvider(): void
+    {
+        $this->smtpEnabled = $this->emailProvider === 'smtp';
+        $this->resendEnabled = $this->emailProvider === 'resend';
+
+        try {
+            $this->validateEnabledEmailProvider();
+        } catch (ValidationException $e) {
+            $this->restoreSavedEmailProvider();
+
+            throw $e;
+        }
+    }
+
+    private function restoreSavedEmailProvider(): void
+    {
+        $this->smtpEnabled = (bool) $this->settings->getOriginal('smtp_enabled');
+        $this->resendEnabled = (bool) $this->settings->getOriginal('resend_enabled');
     }
 
     private function validateEnabledEmailProvider(): void
@@ -483,8 +506,8 @@ class Email extends Component
         $this->validate([
             'resendEnabled' => 'boolean',
             'resendApiKey' => $this->resendEnabled ? 'required|string' : 'nullable|string',
-            'resendFromAddress' => 'required|email',
-            'resendFromName' => 'required|string',
+            'resendFromAddress' => $this->resendEnabled ? 'required|email' : 'nullable|email',
+            'resendFromName' => $this->resendEnabled ? 'required|string' : 'nullable|string',
         ], [
             'resendApiKey.required' => 'Resend API Key is required.',
             'resendFromAddress.required' => 'From Address is required.',

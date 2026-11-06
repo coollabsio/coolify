@@ -52,24 +52,29 @@ function enabled_email_provider(?object $settings): ?string
 function mail_from_identity(object $settings, bool $asNotification = false): array
 {
     // Each provider has its own sender, because each one sends from its own verified domain.
-    $prefix = data_get($settings, 'resend_enabled') ? 'resend' : 'smtp';
+    // Resend uses the SMTP sender when it has none, as before the Resend sender fields existed.
+    $usesResend = (bool) data_get($settings, 'resend_enabled');
+    $providerSender = static function (string $field) use ($settings, $usesResend): string {
+        $value = trim((string) ($usesResend ? data_get($settings, "resend_{$field}") : ''));
+
+        return $value !== '' ? $value : trim((string) data_get($settings, "smtp_{$field}"));
+    };
 
     if ($asNotification && filled(data_get($settings, 'notification_from_address'))) {
         $address = (string) data_get($settings, 'notification_from_address');
         $name = trim((string) data_get($settings, 'notification_from_name', ''));
     } else {
-        $address = data_get($settings, "{$prefix}_from_address");
+        $address = $providerSender('from_address');
 
-        if (blank($address)) {
+        if ($address === '') {
             throw new InvalidArgumentException('Transactional email sender address is not configured.');
         }
 
-        $address = (string) $address;
         $name = '';
     }
 
     if ($name === '') {
-        $name = trim((string) data_get($settings, "{$prefix}_from_name", ''));
+        $name = $providerSender('from_name');
     }
 
     return [

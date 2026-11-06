@@ -38,12 +38,20 @@
                     </form>
                 </x-modal-input>
                 @if (count($settings->savedSmtpServers()) > 0)
-                    <button type="button" wire:click="deleteSmtpServer"
-                        class="icon-button mb-0.5 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                        title="Delete server" aria-label="Delete SMTP server {{ $settings->smtpServerName() }}"
-                        wire:confirm="Delete the SMTP server {{ $settings->smtpServerName() }}? Coolify then uses the next server in the list.">
-                        <x-reicon name="trash" class="size-3.5" />
-                    </button>
+                    {{-- Keyed by the server name, so that the ignored modal shows the server in use after a switch. --}}
+                    <x-modal-confirmation wire:key="delete-smtp-server-{{ md5($settings->smtpServerName()) }}"
+                        title="Delete SMTP server?" submitAction="deleteSmtpServer"
+                        :actions="['The SMTP server ' . $settings->smtpServerName() . ' is deleted. Coolify then uses the next server in the list.']"
+                        :confirmWithText="false" :confirmWithPassword="false"
+                        step2ButtonText="Delete server">
+                        <x-slot:trigger>
+                            <button type="button"
+                                class="icon-button mb-0.5 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                title="Delete server" aria-label="Delete SMTP server {{ $settings->smtpServerName() }}">
+                                <x-reicon name="trash" class="size-3.5" />
+                            </button>
+                        </x-slot:trigger>
+                    </x-modal-confirmation>
                 @endif
                 <x-modal-input title="Add SMTP server">
                     <x-slot:content>

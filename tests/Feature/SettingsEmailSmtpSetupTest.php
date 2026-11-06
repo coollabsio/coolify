@@ -110,8 +110,7 @@ test('enabling smtp delivery does not require a resend api key when resend is di
 
     Livewire::test(SettingsEmail::class)
         ->fill(smtpSetupPayload())
-        ->set('smtpEnabled', true)
-        ->call('instantSaveSmtp')
+        ->call('toggleSmtp')
         ->assertHasNoErrors()
         ->assertNotDispatched('error');
 
