@@ -1,4 +1,10 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($server, 'name')->limit(10) }} > Patching | Coolify
+    </x-slot>
+
+    <livewire:server.navbar :server="$server" />
+
     <x-process-dialog @startupdate.window="processDialogOpen = true" closeWithX size="xl">
         <x-slot:title>Package Update Logs</x-slot:title>
         <x-slot:content>
@@ -9,10 +15,6 @@
     </x-process-dialog>
 
     @php
-        $updates = collect(data_get($result, 'updates', []))
-            ->sortBy(fn ($update) => [data_get($update, 'security') ? 0 : 1, filled(data_get($update, 'risk')) ? 0 : 1, data_get($update, 'package')])
-            ->values()
-            ->all();
         $totalUpdates = count($updates);
         $heldUpdates = collect(data_get($result, 'held_updates', []))->sortBy('package')->values()->all();
         $packageManager = data_get($result, 'package_manager');
@@ -24,12 +26,40 @@
     @endphp
 
 
-    <div class="application-settings-form flex w-full flex-col gap-6">
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="security" activeSubMenu="patches" />
+
+    <div class="application-settings-form flex w-full min-w-0 flex-col gap-6">
+        @if (! $server->isFunctional())
+            <x-empty size="sm" icon-name="shield-alert" title="Coolify cannot reach {{ $server->name }}."
+                description="Patching runs commands on the server. Validate the server first." />
+        @else
         <form wire:submit="submit">
             <x-unsaved-bar action="submit" />
 
             <x-application.settings-section id="server-patching-overview-section" title="Server patching"
                 helper="Discover and apply operating system package updates.">
+                <x-slot:badges>
+                    @if ($checking)
+                        <x-status-badge status="Checking…" type="neutral" spinning />
+                    @elseif ($error)
+                        <x-status-badge status="Check failed" type="error" />
+                    @elseif ($checkedAt)
+                        @if ($totalUpdates === 0)
+                            <x-status-badge status="Up to date" type="success" />
+                        @elseif ($securityUpdates > 0)
+                            <x-status-badge :status="$securityUpdates . ' ' . Str::plural('security update', $securityUpdates)" type="error" />
+                        @else
+                            <x-status-badge :status="$totalUpdates . ' ' . Str::plural('update', $totalUpdates)" type="warning" />
+                        @endif
+                        @if ($rebootRequired)
+                            <x-status-badge status="Reboot required" type="warning" />
+                        @endif
+                    @else
+                        <x-status-badge status="Not checked yet" type="neutral" />
+                    @endif
+                </x-slot:badges>
                 <x-slot:actions>
                     <x-beta-badge />
                     @if (isDev())
@@ -68,17 +98,6 @@
                                 never
                             @endif
                         </span>
-                        @if ($checkedAt && ! $error)
-                            @if ($totalUpdates === 0)
-                                <x-status-badge status="Up to date" type="success" />
-                            @endif
-                            @if ($securityUpdates > 0)
-                                <x-status-badge :status="$securityUpdates . ' ' . Str::plural('security update', $securityUpdates)" type="error" />
-                            @endif
-                            @if ($rebootRequired)
-                                <x-status-badge status="Reboot required" type="warning" />
-                            @endif
-                        @endif
                     </div>
 
                     @php
@@ -170,15 +189,18 @@
                 </x-application.settings-section>
             </div>
         @elseif ($error)
-            <x-application.settings-section title="Package updates"
+            <x-application.settings-section id="server-package-updates-section" title="Package updates"
                 helper="Available operating system updates for this server.">
                 <x-callout type="danger" title="Could not check for updates">
                     {{ $error }}
                 </x-callout>
             </x-application.settings-section>
         @elseif ($checkedAt && $totalUpdates === 0)
-            <x-application.settings-section title="Package updates"
+            <x-application.settings-section id="server-package-updates-section" title="Package updates"
                 helper="Available operating system updates for this server.">
+                <x-slot:badges>
+                    <x-status-badge status="Up to date" type="success" />
+                </x-slot:badges>
                 <x-empty size="sm" title="Server is up to date"
                     description="No package updates are currently available." icon-name="check-circle" />
             </x-application.settings-section>
@@ -186,8 +208,15 @@
             <x-application.settings-section id="server-package-updates-section" title="Package updates"
                 helper="{{ $totalUpdates }} {{ Str::plural('update', $totalUpdates) }} available{{ $securityUpdates !== null ? ', ' . $securityUpdates . ' of them security ' . Str::plural('update', $securityUpdates) : '' }}."
                 flush>
-                @can('update', $server)
-                    <x-slot:actions>
+                <x-slot:badges>
+                    <x-status-badge :status="$totalUpdates . ' ' . Str::plural('update', $totalUpdates)" :type="$securityUpdates > 0 ? 'error' : 'warning'" />
+                </x-slot:badges>
+                <x-slot:actions>
+                    <div class="w-56">
+                        <x-table.search placeholder="Search packages" loading-target="search"
+                            wire:model.live.debounce.300ms="search" />
+                    </div>
+                    @can('update', $server)
                         <x-modal-confirmation title="Confirm package update?" buttonTitle="Update all packages"
                             isHighlightedButton submitAction="updateAllPackages" :actions="[
                                 'All packages will be updated to their latest available versions.',
@@ -199,8 +228,8 @@
                             confirmationLabel="Confirm by entering the text below"
                             shortConfirmationLabel="Confirmation" :confirmWithPassword="false"
                             step2ButtonText="Update All Packages" />
-                    </x-slot:actions>
-                @endcan
+                    @endcan
+                </x-slot:actions>
 
                 @if ($fullUpgradeOnly)
                     <div class="px-4 pt-4">
@@ -210,13 +239,19 @@
                     </div>
                 @endif
 
+                @if ($shownUpdates->isEmpty())
+                    <div class="p-6">
+                        <x-empty size="sm" title="No matching updates"
+                            description="Try another package name, or clear the search." icon-name="search" />
+                    </div>
+                @else
                 <div class="data-table">
                     <div class="data-table-header package-updates-table-grid">
                         <span>Package</span>
                         <span>New version</span>
                         <span class="text-right">Action</span>
                     </div>
-                    @foreach ($updates as $update)
+                    @foreach ($shownUpdates as $update)
                         <div wire:key="package-update-{{ data_get($update, 'package') }}-{{ data_get($update, 'architecture') }}"
                             class="data-table-row package-updates-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
                             <div class="flex min-w-0 items-center gap-2">
@@ -255,11 +290,17 @@
                             </div>
                         </div>
                     @endforeach
-                    <div
-                        class="flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                        {{ $totalUpdates }} {{ Str::plural('package update', $totalUpdates) }}
-                    </div>
+                    <x-table-pagination :from="$shownUpdates->firstItem() ?? 0" :to="$shownUpdates->lastItem() ?? 0"
+                        :total="$shownUpdates->total()" :current-page="$shownUpdates->currentPage()"
+                        :last-page="$shownUpdates->lastPage()" wire-target="previousPage,nextPage,perPage"
+                        previous-action="previousPage" next-action="nextPage">
+                        <x-slot:pageSize>
+                            <x-page-size-select model="perPage" livewire
+                                storage-key="coolify.page-size.server-package-updates" />
+                        </x-slot:pageSize>
+                    </x-table-pagination>
                 </div>
+                @endif
             </x-application.settings-section>
         @endif
 
@@ -267,6 +308,9 @@
             <x-application.settings-section id="server-held-updates-section" title="Held back updates"
                 helper="The package manager does not install these updates. Phased rollout: Ubuntu releases the update to a part of all servers at a time, and this server gets it in a later phase. Held: a package hold (apt-mark hold) or a version pin (/etc/apk/world) on the server blocks the update."
                 flush>
+                <x-slot:badges>
+                    <x-status-badge :status="count($heldUpdates) . ' held'" type="warning" />
+                </x-slot:badges>
                 <div class="data-table">
                     <div class="data-table-header package-updates-table-grid">
                         <span>Package</span>
@@ -295,5 +339,8 @@
                 </div>
             </x-application.settings-section>
         @endif
+
+        @endif
+    </div>
     </div>
 </div>

@@ -39,6 +39,7 @@ function scannerCommandLists(ScannerCommands $commands): array
         'diskFree' => $commands->diskFree(),
         'diskUsage' => $commands->diskUsage(),
         'sbomFromLocal' => $commands->sbomFromLocal('nginx', SCANNER_TEST_HEX),
+        'sbomFromHost' => $commands->sbomFromHost(),
         'sbomFromRegistry' => $commands->sbomFromRegistry('ghcr.io/a/b@sha256:'.str_repeat('ab', 32), 'linux/amd64', 'cand-'.SCANNER_TEST_HEX, null),
         'sbomFromRegistry with auth' => $commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/arm64/v8', 'cand-1', $auth),
         'grype' => $commands->grype(SCANNER_TEST_HEX),
@@ -141,13 +142,13 @@ it('runs every scanner container with each hardening flag exactly once', functio
         }
     }
 
-    expect($runs)->toBe(12);
+    expect($runs)->toBe(13);
 });
 
 it('cuts the network only for runs that do not need a registry or the database download', function () {
     $lists = scannerCommandLists($this->commands);
 
-    foreach (['dbStatus', 'sbomFromLocal', 'grype', 'packages'] as $name) {
+    foreach (['dbStatus', 'sbomFromLocal', 'sbomFromHost', 'grype', 'packages'] as $name) {
         expect(scannerDockerRuns($lists[$name]))->each->toContain('--network none ');
     }
     foreach (['dbUpdate', 'sbomFromRegistry', 'tags', 'digest'] as $name) {
@@ -521,4 +522,25 @@ it('keeps the volume setup as one sudo shell line for a non-root SSH user', func
     $parsed = parseCommandsByLineForSudo(collect([$setup]), $this->server);
 
     expect($parsed)->toBe(['sudo '.$setup]);
+});
+
+it('copies only the package databases of the host and scans the copy with the OS catalogers', function () {
+    $script = implode("\n", scannerUnwrapped($this->commands->sbomFromHost()));
+
+    expect($script)
+        ->toContain("cp -RL '/var/lib/dpkg/status' '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/in/host/var/lib/dpkg/status'")
+        ->toContain("[ -e '/var/lib/rpm' ] && [ ! -L '/var/lib/rpm' ]")
+        ->toContain("'scan' 'dir:/in/host' '--override-default-catalogers' 'dpkg-db-cataloger,rpm-db-cataloger,apk-db-cataloger,alpm-db-cataloger'")
+        ->toContain('type=bind,src=/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID.'/in,dst=/in,readonly')
+        ->toContain("mv -f '/data/coolify/image-scans/sboms/host.json.tmp-".SCANNER_TEST_RUN_ID."' '/data/coolify/image-scans/sboms/host.json'")
+        ->toContain("echo 'coolify-scan-exit copy 1'")
+        ->not->toContain('src=/,');
+});
+
+it('keeps one line per vulnerability and drops the problems that the distribution will not fix only from the host scan output', function () {
+    $host = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
+
+    expect($host)->toContain('grep -v -F \'"fix":"wont-fix"\'')
+        ->toContain('if (seen[k]++) next')
+        ->and(implode("\n", scannerUnwrapped($this->commands->grype(SCANNER_TEST_HEX))))->not->toContain('grep -v')->not->toContain('seen[k]');
 });

@@ -133,6 +133,8 @@ class ServerImageScanning extends Component
                 ->unique()
                 ->implode(', '),
             'diskUsed' => is_int($diskUsed) ? formatBytes($diskUsed, 1) : null,
+            // Setup state or a measured disk use: both are removed with the data, and the daily rescan measures it again.
+            'hasScannerData' => is_string($state) || (is_int($diskUsed) && $diskUsed > 0),
             'toolVersions' => collect(['syft' => 'Syft', 'grype' => 'Grype', 'regctl' => 'regctl'])
                 ->map(fn (string $name, string $tool) => $name.' '.config("constants.image_scan.images.{$tool}.version"))
                 ->implode(', '),

@@ -3978,6 +3978,10 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 6rem;
 }
 
+.host-vulnerabilities-table-grid {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 6rem;
+}
+
 .scheduled-backups-table-grid {
     grid-template-columns: minmax(10rem, 1.25fr) 8rem minmax(9rem, 1fr) 6rem 5rem;
 }
@@ -4129,6 +4133,15 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .package-updates-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .host-vulnerabilities-table-grid {
+        grid-template-columns: minmax(0, 1fr) 6rem;
+    }
+
+    .host-vulnerabilities-table-grid > :nth-child(2),
+    .host-vulnerabilities-table-grid > :nth-child(3) {
         display: none;
     }
 

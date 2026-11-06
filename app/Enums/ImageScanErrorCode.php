@@ -17,6 +17,7 @@ enum ImageScanErrorCode: string
     case ImageMissing = 'image_missing';
     case PullFailed = 'pull_failed';
     case Truncated = 'truncated';
+    case NoPackageDatabase = 'no_package_database';
     case Unknown = 'unknown';
 
     /**
@@ -43,6 +44,7 @@ enum ImageScanErrorCode: string
             self::ImageMissing => "The image is not on {$server}. Click Scan now to pull and scan it. An image that Coolify builds needs a new deploy.",
             self::PullFailed => "Coolify could not pull the image to {$server}. Check the image name, and log in to its registry on {$server} if it is private.",
             self::Truncated => 'The scan result was too large to read completely.',
+            self::NoPackageDatabase => "Coolify found no package database of a supported package manager (dpkg, rpm, apk, pacman) on {$server}.",
             self::Unknown => 'The scan could not run.',
         };
     }

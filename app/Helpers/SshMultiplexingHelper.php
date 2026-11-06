@@ -570,7 +570,8 @@ class SshMultiplexingHelper
             return 'off';
         }
 
-        return $mode === 'enforce' ? 'enforce' : 'warn';
+        // A team can make its own server stricter than the instance, never weaker than an instance "off".
+        return $mode === 'enforce' || data_get($server, 'settings.is_ssh_host_key_check_enforced') ? 'enforce' : 'warn';
     }
 
     /**

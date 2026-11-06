@@ -11,14 +11,17 @@ use App\Notifications\Server\ServerPatchCheck;
 use App\Traits\ListensToTeamChannel;
 use Cron\CronExpression;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Patches extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use WithPagination;
 
     public Server $server;
 
@@ -40,6 +43,21 @@ class Patches extends Component
     public bool $autoSecurityUpdates = false;
 
     public string $autoSecurityUpdatesTime = '03:00';
+
+    public int $perPage = 10;
+
+    public string $search = '';
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+        $this->resetPage();
+    }
 
     public function getListeners()
     {
@@ -324,6 +342,29 @@ class Patches extends Component
 
     public function render()
     {
-        return view('livewire.server.security.patches');
+        $updates = collect(data_get($this->result, 'updates', []))
+            ->sortBy(fn ($update) => [data_get($update, 'security') ? 0 : 1, filled(data_get($update, 'risk')) ? 0 : 1, data_get($update, 'package')])
+            ->values();
+        $search = trim($this->search);
+        $matchingUpdates = $search === '' ? $updates : $updates
+            ->filter(fn ($update) => str(data_get($update, 'package'))->contains($search, ignoreCase: true))
+            ->values();
+
+        $this->perPage = max(1, min(100, $this->perPage));
+        $lastPage = max(1, (int) ceil($matchingUpdates->count() / $this->perPage));
+        $page = max(1, min((int) $this->getPage(), $lastPage));
+        if ($page !== $this->getPage()) {
+            $this->setPage($page);
+        }
+
+        return view('livewire.server.security.patches', [
+            'updates' => $updates->all(),
+            'shownUpdates' => new LengthAwarePaginator(
+                $matchingUpdates->forPage($page, $this->perPage)->values(),
+                $matchingUpdates->count(),
+                $this->perPage,
+                $page,
+            ),
+        ]);
     }
 }
