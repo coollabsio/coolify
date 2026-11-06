@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledVolumeBackup;
@@ -14,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -26,7 +29,19 @@ class BackupExecutions extends Component
 
     public Service $service;
 
+    private const SORT_COLUMNS = [
+        'target' => 'sort_target',
+        'type' => 'sort_type',
+        'schedule' => 'sort_schedule',
+        'status' => 'status',
+        'started' => 'created_at',
+        'size' => 'sort_size',
+    ];
+
     public int $perPage = 10;
+
+    #[Locked]
+    public string $sortBy = 'started_desc';
 
     public bool $executionModalOpen = false;
 
@@ -52,6 +67,16 @@ class BackupExecutions extends Component
     public function updatedPerPage(): void
     {
         $this->perPage = max(1, min(100, $this->perPage));
+        $this->resetPage('executionsPage');
+    }
+
+    public function sortExecutions(string $sortBy): void
+    {
+        [$column, $direction] = array_pad(explode('_', $sortBy, 2), 2, null);
+        if (! array_key_exists($column, self::SORT_COLUMNS) || ! in_array($direction, ['asc', 'desc'], true)) {
+            return;
+        }
+        $this->sortBy = $sortBy;
         $this->resetPage('executionsPage');
     }
 
@@ -119,19 +144,33 @@ class BackupExecutions extends Component
             ->forService($this->service)
             ->select('id');
 
+        $fileVolumeType = (new LocalFileVolume)->getMorphClass();
+        $persistentVolumeType = (new LocalPersistentVolume)->getMorphClass();
+
         $databaseExecutions = ScheduledDatabaseBackupExecution::query()
-            ->select('id', 'uuid', 'created_at')
+            ->select('id', 'uuid', 'created_at', 'status')
             ->selectRaw("'database' as type")
+            ->selectRaw("CAST(NULLIF(size, '') AS BIGINT) as sort_size")
+            ->selectRaw("(SELECT LOWER(COALESCE(NULLIF(service_databases.human_name, ''), service_databases.name)) FROM scheduled_database_backups JOIN service_databases ON service_databases.id = scheduled_database_backups.database_id WHERE scheduled_database_backups.id = scheduled_database_backup_executions.scheduled_database_backup_id) as sort_target")
+            ->selectRaw("'Database' as sort_type")
+            ->selectRaw('(SELECT frequency FROM scheduled_database_backups WHERE scheduled_database_backups.id = scheduled_database_backup_executions.scheduled_database_backup_id) as sort_schedule')
             ->whereIn('scheduled_database_backup_id', $databaseScheduleIds)
             ->when($uuid !== null, fn ($query) => $query->where('uuid', $uuid));
         $volumeExecutions = ScheduledVolumeBackupExecution::query()
-            ->select('id', 'uuid', 'created_at')
+            ->select('id', 'uuid', 'created_at', 'status')
             ->selectRaw("'storage' as type")
+            ->selectRaw('size as sort_size')
+            ->selectRaw('(SELECT LOWER(COALESCE((SELECT fs_path FROM local_file_volumes WHERE local_file_volumes.id = scheduled_volume_backups.backupable_id AND scheduled_volume_backups.backupable_type = ?), (SELECT name FROM local_persistent_volumes WHERE local_persistent_volumes.id = scheduled_volume_backups.backupable_id AND scheduled_volume_backups.backupable_type = ?))) FROM scheduled_volume_backups WHERE scheduled_volume_backups.id = scheduled_volume_backup_executions.scheduled_volume_backup_id) as sort_target', [$fileVolumeType, $persistentVolumeType])
+            ->selectRaw("(SELECT CASE WHEN backupable_type = ? THEN 'Directory' ELSE 'Volume' END FROM scheduled_volume_backups WHERE scheduled_volume_backups.id = scheduled_volume_backup_executions.scheduled_volume_backup_id) as sort_type", [$fileVolumeType])
+            ->selectRaw('(SELECT frequency FROM scheduled_volume_backups WHERE scheduled_volume_backups.id = scheduled_volume_backup_executions.scheduled_volume_backup_id) as sort_schedule')
             ->whereIn('scheduled_volume_backup_id', $volumeScheduleIds)
             ->when($uuid !== null, fn ($query) => $query->where('uuid', $uuid));
 
+        [$sortColumn, $sortDirection] = explode('_', $this->sortBy, 2);
+
         return $databaseExecutions->toBase()
             ->unionAll($volumeExecutions->toBase())
+            ->orderBy(self::SORT_COLUMNS[$sortColumn], $sortDirection)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->orderBy('type');
