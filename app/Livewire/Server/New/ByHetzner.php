@@ -5,6 +5,7 @@ namespace App\Livewire\Server\New;
 use App\Enums\ProxyTypes;
 use App\Exceptions\CloudProviderApiException;
 use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -16,6 +17,7 @@ use App\Services\HetznerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -23,6 +25,7 @@ use Livewire\Component;
 class ByHetzner extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     // Step tracking
     public int $current_step = 1;
@@ -182,7 +185,7 @@ class ByHetzner extends Component
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ];
 
         if ($this->current_step === 2) {
@@ -205,7 +208,7 @@ class ByHetzner extends Component
                 'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
-                'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
+                'selected_cloud_init_script_id' => ['nullable', 'integer', Rule::exists('cloud_init_scripts', 'id')->where('team_id', currentTeam()->id)],
             ]);
         }
 
@@ -271,7 +274,7 @@ class ByHetzner extends Component
     {
         // Validate step 1 - just need a token selected
         $this->validate([
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         try {
@@ -750,6 +753,7 @@ class ByHetzner extends Component
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
+            $this->applyImageScanning($server);
 
             if ($this->enable_backups) {
                 try {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasSmtpServers;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Once;
@@ -9,11 +10,16 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
+    use HasSmtpServers;
+
     protected $attributes = [
         'is_dashboard_force_https_enabled' => true,
+        'is_image_scanning_allowed' => true,
     ];
 
     protected $fillable = [
+        'is_image_scanning_allowed',
+        'image_scan_db_url',
         'public_ipv4',
         'public_ipv6',
         'fqdn',
@@ -22,6 +28,8 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_backup_before_update_enabled',
+        'auto_update_target_version',
+        'auto_update_started_at',
         'is_registration_enabled',
         'disable_registration_when_oauth_enabled',
         'next_channel',
@@ -40,6 +48,8 @@ class InstanceSettings extends Model
         'smtp_ehlo_domain',
         'resend_enabled',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
         'is_dns_validation_enabled',
         'custom_dns_servers',
         'domain_connect_private_key',
@@ -79,6 +89,8 @@ class InstanceSettings extends Model
         'smtp_username',
         'smtp_password',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
         'domain_connect_private_key',
         'sentinel_token',
     ];
@@ -98,11 +110,14 @@ class InstanceSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
         'domain_connect_private_key' => 'encrypted',
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
         'is_backup_before_update_enabled' => 'boolean',
+        'auto_update_started_at' => 'datetime',
         'is_registration_enabled' => 'boolean',
         'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
@@ -113,6 +128,7 @@ class InstanceSettings extends Model
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
         'is_dashboard_force_https_enabled' => 'boolean',
+        'is_image_scanning_allowed' => 'boolean',
         'is_passkey_enabled' => 'boolean',
         'server_validation_rate_limit_seconds' => 'integer',
         'server_validation_max_failures_per_ip' => 'integer',

@@ -187,15 +187,15 @@
         ],
         [
             'label' => 'Security',
-            'route' => 'server.security.patches',
+            'route' => 'server.security',
             'active' => $activeMenu === 'security',
             'icon' => 'shield-alert',
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
-            'disabled' => ! $server->isFunctional(),
+            'warning' => filled($server->settings->ssh_host_key_pending),
             'children' => [
-                ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage', 'beta' => true],
-                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
+                ['label' => 'Overview', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
+                ['label' => 'Image Scanning', 'route' => 'server.security.image-scanning', 'active' => $activeSubMenu === 'image-scanning', 'icon' => 'shield-alert', 'visible' => $server->isFunctional()],
             ],
         ],
         [

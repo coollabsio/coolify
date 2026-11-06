@@ -12,7 +12,35 @@ function is_transactional_emails_enabled(): bool
 {
     $settings = instanceSettings();
 
-    return $settings->smtp_enabled || $settings->resend_enabled;
+    return filled(enabled_email_provider($settings));
+}
+
+/**
+ * Labels of the email providers, in the order that the provider selectors show them.
+ *
+ * @return array<'none'|'smtp'|'resend', string>
+ */
+function email_provider_labels(): array
+{
+    return [
+        'none' => 'None',
+        'smtp' => 'SMTP',
+        'resend' => 'Resend',
+    ];
+}
+
+/**
+ * Get the email provider that is turned on. Only one provider can be on at a time.
+ *
+ * @return 'resend'|'smtp'|null
+ */
+function enabled_email_provider(?object $settings): ?string
+{
+    return match (true) {
+        (bool) data_get($settings, 'resend_enabled') => 'resend',
+        (bool) data_get($settings, 'smtp_enabled') => 'smtp',
+        default => null,
+    };
 }
 
 /**
@@ -23,20 +51,30 @@ function is_transactional_emails_enabled(): bool
  */
 function mail_from_identity(object $settings, bool $asNotification = false): array
 {
-    if ($asNotification && filled($settings->notification_from_address ?? null)) {
-        $address = (string) $settings->notification_from_address;
-        $name = trim((string) ($settings->notification_from_name ?? ''));
+    // Each provider has its own sender, because each one sends from its own verified domain.
+    // Resend uses the SMTP sender when it has none, as before the Resend sender fields existed.
+    $usesResend = (bool) data_get($settings, 'resend_enabled');
+    $providerSender = static function (string $field) use ($settings, $usesResend): string {
+        $value = trim((string) ($usesResend ? data_get($settings, "resend_{$field}") : ''));
+
+        return $value !== '' ? $value : trim((string) data_get($settings, "smtp_{$field}"));
+    };
+
+    if ($asNotification && filled(data_get($settings, 'notification_from_address'))) {
+        $address = (string) data_get($settings, 'notification_from_address');
+        $name = trim((string) data_get($settings, 'notification_from_name', ''));
     } else {
-        if (blank($settings->smtp_from_address ?? null)) {
+        $address = $providerSender('from_address');
+
+        if ($address === '') {
             throw new InvalidArgumentException('Transactional email sender address is not configured.');
         }
 
-        $address = (string) $settings->smtp_from_address;
         $name = '';
     }
 
     if ($name === '') {
-        $name = trim((string) ($settings->smtp_from_name ?? ''));
+        $name = $providerSender('from_name');
     }
 
     return [
@@ -131,20 +169,13 @@ function set_transanctional_email_settings($settings = null)
     if (! $settings) {
         $settings = instanceSettings();
     }
-    if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
+    $provider = enabled_email_provider($settings);
+    if (blank($provider)) {
         return null;
     }
 
     $configRepository = app('App\Services\ConfigurationRepository'::class);
     $configRepository->updateMailConfig($settings);
 
-    if (data_get($settings, 'resend_enabled')) {
-        return 'resend';
-    }
-
-    if (data_get($settings, 'smtp_enabled')) {
-        return 'smtp';
-    }
-
-    return null;
+    return $provider;
 }

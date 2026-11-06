@@ -2,9 +2,11 @@
 
 namespace App\Actions\Server;
 
+use App\Exceptions\UpgradeAlreadyRunningException;
 use App\Jobs\DatabaseBackupJob;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Services\AutoUpdateNotifier;
 use App\Services\CoolifyUpgradeStatus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
@@ -40,6 +42,7 @@ class UpdateCoolify
             if ($manual_update && filled($settings->update_custom_tag)) {
                 $this->latestVersion = $settings->update_custom_tag;
                 $this->backupDatabase();
+                $this->ensureNoUpgradeIsRunning();
                 $this->update(registryUrl: 'ghcr.io');
             }
 
@@ -127,7 +130,15 @@ class UpdateCoolify
         }
 
         $this->backupDatabase();
+        // Check the lock before the attempt is saved, so a running upgrade keeps its own saved attempt.
+        $this->ensureNoUpgradeIsRunning();
+        if (! $manual_update) {
+            AutoUpdateNotifier::saveAttempt((string) $this->latestVersion);
+        }
         $this->update();
+        if (! $manual_update) {
+            AutoUpdateNotifier::started((string) $this->currentVersion, (string) $this->latestVersion);
+        }
         $settings->new_version_available = false;
         $settings->save();
     }
@@ -151,8 +162,6 @@ class UpdateCoolify
 
     private function update(?string $registryUrl = null)
     {
-        $this->ensureNoUpgradeIsRunning();
-
         $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = $this->upgradeScriptUrl ?? config('constants.coolify.upgrade_script_url');
         $registryUrl ??= coolifyRegistryUrl();
@@ -175,10 +184,7 @@ class UpdateCoolify
                 'target_version' => $this->latestVersion,
                 'status' => $status,
             ]);
-            throw new \Exception(
-                'Another Coolify upgrade is already running. Wait for it to finish. '.
-                'If it has stopped, you can upgrade again '.CoolifyUpgradeStatus::RUNNING_LOCK_EXPIRES_AFTER_MINUTES.' minutes after its last status update.'
-            );
+            throw new UpgradeAlreadyRunningException;
         }
     }
 

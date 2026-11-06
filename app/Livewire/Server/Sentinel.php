@@ -202,6 +202,19 @@ class Sentinel extends Component
         }
     }
 
+    /**
+     * Sentinel sends its token in the Authorization header of every push. Over plain HTTP the token
+     * is readable on the network. Only the known local internal endpoint stays on the coolify Docker network.
+     */
+    public function isPushUrlInsecure(): bool
+    {
+        if (($this->server->isLocalhost() && $this->sentinelCustomUrl === 'http://coolify:8080') || ! str_starts_with(strtolower((string) $this->sentinelCustomUrl), 'http://')) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function render()
     {
         return view('livewire.server.sentinel');

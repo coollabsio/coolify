@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Services\Access\AccessResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
@@ -106,6 +107,22 @@ class ApplicationDeploymentQueue extends Model
         });
 
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if (! $deployment->wasChanged('status')) {
+                return;
+            }
+
+            // A failed GitHub sync must not stop the status transition or the deployment queue.
+            try {
+                SyncGithubDeploymentJob::dispatchFor($deployment);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to queue the GitHub deployment sync.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
             if (! auth()->check()
                 || ! $deployment->wasChanged('status')
                 || $deployment->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
@@ -155,6 +172,8 @@ class ApplicationDeploymentQueue extends Model
         'horizon_job_id',
         'horizon_job_worker',
         'finished_at',
+        'scan_gate_result',
+        'scan_gate_bypassed_by',
         'deploy_started_at',
     ];
 
@@ -175,6 +194,7 @@ class ApplicationDeploymentQueue extends Model
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
+        'scan_gate_result' => 'array',
         'deploy_started_at' => 'datetime',
         'configuration_snapshot' => EncryptedArrayCast::class,
         'configuration_diff' => EncryptedArrayCast::class,
@@ -248,6 +268,22 @@ class ApplicationDeploymentQueue extends Model
             'unknown' => $this->updated_at?->gt(now()->subSeconds($this->server?->settings?->dynamic_timeout ?? 3600)) ?? false,
             default => false,
         };
+    }
+
+    /**
+     * The image scan gate stopped this deployment. The status stays failed, the UI shows "Blocked".
+     */
+    public function isImageScanBlocked(): bool
+    {
+        return (bool) data_get($this->scan_gate_result, 'blocked', false);
+    }
+
+    /**
+     * The image scan could not run and the deployment went on without it.
+     */
+    public function isImageScanSkipped(): bool
+    {
+        return ! $this->isImageScanBlocked() && filled(data_get($this->scan_gate_result, 'error'));
     }
 
     public function commitMessage()

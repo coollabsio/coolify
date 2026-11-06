@@ -1,7 +1,7 @@
 @props([
     'label' => null,
     'status' => null,
-    'type' => 'neutral',
+    'type' => 'neutral', // neutral|success|warning|error|severity-critical|severity-high|severity-medium|severity-low
     'as' => 'span',
     'dynamic' => false,
     'pulse' => false, // ping the dot for a state that is still in progress
@@ -15,6 +15,10 @@
         'success' => 'bg-emerald-500',
         'warning' => 'bg-warning',
         'error' => 'bg-red-500',
+        'severity-critical' => 'bg-error',
+        'severity-high' => 'bg-severity-high',
+        'severity-medium' => 'bg-severity-medium',
+        'severity-low' => 'bg-neutral-400 dark:bg-neutral-500',
     ];
 
     $sizeClasses = [

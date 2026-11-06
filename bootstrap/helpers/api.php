@@ -264,6 +264,7 @@ function sharedDataApplications(?Application $application = null): array
             }
         }],
         'is_consistent_container_name_enabled' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
         'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
         'preview_url_template' => 'string',
@@ -551,6 +552,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('gpu_device_ids');
     $request->offsetUnset('gpu_options');
     $request->offsetUnset('is_consistent_container_name_enabled');
+    $request->offsetUnset('is_image_scan_enabled');
     $request->offsetUnset('custom_internal_name');
     $request->offsetUnset('custom_container_name_prefix');
     $request->offsetUnset('docker_compose_raw');

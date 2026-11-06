@@ -17,7 +17,7 @@ class ServerPatchCheck extends CustomEmailNotification
     public function __construct(public Server $server, public array $patchData)
     {
         $this->onQueue('high');
-        $this->serverUrl = base_url().'/server/'.$this->server->uuid.'/security/patches';
+        $this->serverUrl = base_url().'/server/'.$this->server->uuid.'/security#server-patching-overview-section';
     }
 
     public function via(object $notifiable): array

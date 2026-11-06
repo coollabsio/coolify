@@ -147,7 +147,7 @@
 
             <section class="border-t border-neutral-200 pt-6 dark:border-white/[0.06]">
                 <h3 class="text-sm font-semibold text-black dark:text-fg">Backup source</h3>
-                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Choose a local file or an object stored in S3.</p>
+                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Choose a local file or a file in a backup storage.</p>
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     <button type="button" @click="restoreType = 'file'"
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
@@ -176,9 +176,9 @@
                                 <x-reicon name="storages" class="size-4" />
                             </span>
                             <span>
-                                <span class="block text-[13px] font-semibold">S3 storage</span>
+                                <span class="block text-[13px] font-semibold">Storage</span>
                                 <span class="mt-0.5 block text-[11px] text-neutral-500 dark:text-fg-faint">Download
-                                    a backup from an S3 bucket.</span>
+                                    a backup from a backup storage.</span>
                             </span>
                         </button>
                 @endif
@@ -240,7 +240,7 @@
                 </div>
             @endcan
 
-            {{-- S3 Restore Section --}}
+            {{-- Storage Restore Section --}}
             @if (count($availableS3Storages) > 0)
                 @can('update', $this->resource)
                     @php
@@ -256,11 +256,11 @@
                     <div x-cloak x-show="restoreType === 's3'"
                         class="mt-4">
                         <div class="grid gap-4 sm:grid-cols-2">
-                            <x-forms.listbox id="s3StorageId" label="S3 storage" :options="$s3StorageOptions"
+                            <x-forms.listbox id="s3StorageId" label="Storage" :options="$s3StorageOptions"
                                 placeholder="Select storage" live />
 
                             <x-forms.input label="File path"
-                                helper="Path to the backup file in your S3 bucket, e.g., /backups/database-2025-01-15.gz"
+                                helper="Path to the backup file in the storage, e.g., /backups/database-2025-01-15.gz"
                                 placeholder="/backups/database-backup.gz" wire:model.blur="s3Path"
                                 wire:keydown.enter="checkS3File" canGate="update"
                                 :canResource="$this->resource" />
@@ -282,14 +282,14 @@
                                         {{ formatBytes($s3FileSize ?? 0) }}</p>
                                 </div>
                                 <div class="shrink-0">
-                                        <x-modal-confirmation title="Restore Database from S3?" buttonTitle="Restore from S3"
+                                        <x-modal-confirmation title="Restore Database from Storage?" buttonTitle="Restore from storage"
                                             submitAction="restoreFromS3" isErrorButton>
                                             <x-slot:button-title>
-                                            Restore from S3
+                                            Restore from storage
                                             </x-slot:button-title>
                                         This will:
                                             <ul class="list-disc list-inside pt-2">
-                                                <li>Download backup from S3 storage</li>
+                                                <li>Download backup from the storage</li>
                                                 <li>Copy file into database container</li>
                                                 <li>Execute restore command</li>
                                             </ul>

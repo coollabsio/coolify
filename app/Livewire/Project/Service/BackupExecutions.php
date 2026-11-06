@@ -195,7 +195,7 @@ class BackupExecutions extends Component
             $schedule = $isDatabase ? $execution->scheduledDatabaseBackup : $execution->scheduledVolumeBackup;
             $s3Storages = $execution->s3Replicas
                 ->map(fn ($replica) => $replica->s3?->team_id === $serviceTeamId
-                    ? $replica->s3->name.' (bucket: '.$replica->s3->bucket.')'
+                    ? $replica->s3->name.' ('.($replica->s3->isS3() ? 'bucket: '.$replica->s3->bucket : $replica->s3->type->label()).')'
                     : 'Unavailable')
                 ->implode(', ');
 

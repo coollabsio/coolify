@@ -12,13 +12,15 @@
     'wireIgnore' => true,
     // Optional Livewire bool property to entangle open state (survives Livewire re-renders).
     'wireOpen' => null,
+    // Livewire event sent when the modal closes. A modal inside another modal sets it to false.
+    'closeEvent' => 'modalClosed',
     'contentClicks' => true,
     'isLarge' => false,
     'fixedHeight' => false,
 ])
 
 <div x-data="{ modalOpen: @if ($wireOpen) $wire.entangle(@js($wireOpen)) @else false @endif }"
-    x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
+    @if ($closeEvent) x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch(@js($closeEvent)) } })" @endif
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     {{ $attributes->class(['relative', $isFullWidth ? 'h-full w-full' : 'h-auto w-auto']) }}
     @close-modal.window="modalOpen=false" @if ($wireIgnore) wire:ignore @endif>

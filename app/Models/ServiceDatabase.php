@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasImageScans;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasImageScans, SoftDeletes;
 
     protected $fillable = [
         'service_id',

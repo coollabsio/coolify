@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\BackupStorageType;
 use App\Http\Controllers\Controller;
+use App\Models\PrivateKey;
 use App\Models\S3Storage;
-use App\Rules\SafeWebhookUrl;
-use App\Rules\ValidS3BucketName;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 
 class S3StoragesController extends Controller
@@ -17,7 +18,12 @@ class S3StoragesController extends Controller
     {
         $storage->makeHidden([
             'id',
+            'private_key_id',
+            'privateKey',
         ]);
+        if ($storage->type === BackupStorageType::Sftp) {
+            $storage->setAttribute('private_key_uuid', $storage->privateKey?->uuid);
+        }
 
         if (request()->attributes->get('can_read_sensitive', false) === true) {
             $storage->makeVisible([
@@ -30,12 +36,78 @@ class S3StoragesController extends Controller
     }
 
     /**
+     * The request fields of a storage type. S3 has a bucket, a region, and a URL style; the other types have a URL,
+     * a username (key), and a password (secret).
+     *
+     * @return array<int, string>
+     */
+    private function connectionFields(BackupStorageType $type): array
+    {
+        return match ($type) {
+            BackupStorageType::S3 => ['endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'skip_tls_verification'],
+            BackupStorageType::Sftp => ['endpoint', 'key', 'secret', 'private_key_uuid'],
+            default => ['endpoint', 'key', 'secret'],
+        };
+    }
+
+    /**
+     * connectionRules() with the private key as a UUID of the team, as the API sends it.
+     *
+     * @return array<string, mixed>
+     */
+    private function connectionRules(BackupStorageType $type, int $teamId, bool $partial = false, array $trustedInternalHosts = [], ?string $savedEndpoint = null): array
+    {
+        $rules = S3Storage::connectionRules($type, $partial, $trustedInternalHosts, $teamId, $savedEndpoint);
+        if (array_key_exists('private_key_id', $rules)) {
+            unset($rules['private_key_id']);
+            $rules['private_key_uuid'] = ['nullable', 'string', Rule::exists('private_keys', 'uuid')->where('team_id', $teamId)->where(fn ($query) => $query->where('is_git_related', false))];
+            if (! $partial) {
+                $rules['secret'] = ['required_without:private_key_uuid', 'nullable', 'string', 'max:255'];
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
+     * The login columns of an SFTP storage from the request: a private key UUID logs in with that key, a password
+     * logs in with the password. Empty when the request changes neither.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array{private_key_id?: int|null, secret?: string}|JsonResponse
+     */
+    private function sftpLoginAttributes(array $body, int $teamId, ?string $currentSecret = null): array|JsonResponse
+    {
+        if (filled($body['private_key_uuid'] ?? null)) {
+            return [
+                'private_key_id' => PrivateKey::query()->where('team_id', $teamId)->where('is_git_related', false)->where('uuid', $body['private_key_uuid'])->value('id'),
+                'secret' => '',
+            ];
+        }
+        if (filled($body['secret'] ?? null)) {
+            return ['private_key_id' => null, 'secret' => $body['secret']];
+        }
+        if (array_key_exists('private_key_uuid', $body)) {
+            if (blank($currentSecret)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['secret' => ['Send a password (secret) to log in without a private key.']],
+                ], 422);
+            }
+
+            return ['private_key_id' => null];
+        }
+
+        return [];
+    }
+
+    /**
      * @return array{valid: bool, error: string|null}
      */
     private function validateStorageConnection(S3Storage $storage): array
     {
         try {
-            $storage->testConnection(shouldSave: true);
+            $storage->testConnection(shouldSave: true, acceptNewHostKey: true);
 
             return ['valid' => true, 'error' => null];
         } catch (\Throwable $e) {
@@ -72,7 +144,7 @@ class S3StoragesController extends Controller
 
     #[OA\Get(
         summary: 'List S3 Storages',
-        description: 'List all S3 storages for the authenticated team.',
+        description: 'List all backup storages (S3, SFTP, FTPS, and WebDAV) for the authenticated team.',
         path: '/s3-storages',
         operationId: 'list-s3-storages',
         security: [
@@ -92,13 +164,16 @@ class S3StoragesController extends Controller
                                 type: 'object',
                                 properties: [
                                     'uuid' => ['type' => 'string'],
+                                    'type' => ['type' => 'string', 'enum' => ['s3', 'sftp', 'ftps', 'webdav']],
                                     'name' => ['type' => 'string'],
                                     'description' => ['type' => 'string', 'nullable' => true],
                                     'endpoint' => ['type' => 'string'],
-                                    'bucket' => ['type' => 'string'],
-                                    'region' => ['type' => 'string'],
+                                    'bucket' => ['type' => 'string', 'nullable' => true, 'description' => 'S3 only. Null for the other types.'],
+                                    'region' => ['type' => 'string', 'description' => 'S3 only. The other types have a placeholder value.'],
                                     'use_path_style_endpoint' => ['type' => 'boolean'],
                                     'skip_tls_verification' => ['type' => 'boolean'],
+                                    'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of the private key used to log in. Null with a password login.'],
+                                    'sftp_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the pinned host key of the server, as "<key type> <base64>". Saved by the first successful connection test.'],
                                     'is_usable' => ['type' => 'boolean'],
                                     'team_id' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -126,6 +201,7 @@ class S3StoragesController extends Controller
         }
 
         $storages = S3Storage::ownedByCurrentTeamAPI($teamId)
+            ->with('privateKey:id,uuid')
             ->get()
             ->map(function ($storage) {
                 return $this->removeSensitiveData($storage);
@@ -157,13 +233,16 @@ class S3StoragesController extends Controller
                             type: 'object',
                             properties: [
                                 'uuid' => ['type' => 'string'],
+                                'type' => ['type' => 'string', 'enum' => ['s3', 'sftp', 'ftps', 'webdav']],
                                 'name' => ['type' => 'string'],
                                 'description' => ['type' => 'string', 'nullable' => true],
                                 'endpoint' => ['type' => 'string'],
-                                'bucket' => ['type' => 'string'],
-                                'region' => ['type' => 'string'],
+                                'bucket' => ['type' => 'string', 'nullable' => true, 'description' => 'S3 only. Null for the other types.'],
+                                'region' => ['type' => 'string', 'description' => 'S3 only. The other types have a placeholder value.'],
                                 'use_path_style_endpoint' => ['type' => 'boolean'],
                                 'skip_tls_verification' => ['type' => 'boolean'],
+                                'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of the private key used to log in. Null with a password login.'],
+                                'sftp_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the pinned host key of the server, as "<key type> <base64>". Saved by the first successful connection test.'],
                                 'is_usable' => ['type' => 'boolean'],
                                 'team_id' => ['type' => 'integer'],
                                 'created_at' => ['type' => 'string'],
@@ -217,17 +296,19 @@ class S3StoragesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['name', 'endpoint', 'bucket', 'region', 'key', 'secret'],
+                    required: ['name', 'endpoint', 'key'],
                     properties: [
+                        'type' => ['type' => 'string', 'enum' => ['s3', 'sftp', 'ftps', 'webdav'], 'default' => 's3', 'description' => 'The storage protocol. It cannot change later.'],
                         'name' => ['type' => 'string', 'example' => 'My S3 Storage', 'description' => 'A friendly name for the storage.'],
                         'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Optional description.'],
-                        'endpoint' => ['type' => 'string', 'example' => 'https://s3.us-east-1.amazonaws.com', 'description' => 'S3-compatible endpoint URL.'],
-                        'bucket' => ['type' => 'string', 'example' => 'my-bucket', 'description' => 'S3 bucket name.'],
-                        'region' => ['type' => 'string', 'example' => 'us-east-1', 'description' => 'S3 region.'],
+                        'endpoint' => ['type' => 'string', 'example' => 'https://s3.us-east-1.amazonaws.com', 'description' => 'S3: the S3-compatible endpoint URL. SFTP and FTPS: sftp://host:port/directory or ftps://host:port/directory (explicit TLS); the directory is an absolute path, and without one the login directory is used. WebDAV: the https URL of the backup directory.'],
+                        'bucket' => ['type' => 'string', 'example' => 'my-bucket', 'description' => 'S3 bucket name. Required for S3, not allowed for the other types.'],
+                        'region' => ['type' => 'string', 'example' => 'us-east-1', 'description' => 'S3 region. Required for S3, not allowed for the other types.'],
                         'use_path_style_endpoint' => ['type' => 'boolean', 'description' => 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint). Default: false for Alibaba Cloud OSS, Tencent Cloud COS, and Volcengine TOS endpoints, true for all other endpoints.'],
-                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
-                        'key' => ['type' => 'string', 'description' => 'Access key.'],
-                        'secret' => ['type' => 'string', 'description' => 'Secret key.'],
+                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
+                        'key' => ['type' => 'string', 'description' => 'S3: the access key. Other types: the username.'],
+                        'secret' => ['type' => 'string', 'description' => 'S3: the secret key. Other types: the password. SFTP: not needed with private_key_uuid.'],
+                        'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of a private key of your team to log in with instead of a password.'],
                         'is_usable' => ['type' => 'boolean', 'description' => 'Whether the storage is marked usable.'],
                     ],
                 ),
@@ -264,7 +345,6 @@ class S3StoragesController extends Controller
     )]
     public function store(Request $request)
     {
-        $allowedFields = ['name', 'description', 'endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'skip_tls_verification', 'is_usable'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -278,15 +358,16 @@ class S3StoragesController extends Controller
         }
 
         $body = $request->json()->all();
+        $rawType = $body['type'] ?? 's3';
+        $type = is_string($rawType) ? BackupStorageType::tryFrom($rawType) : null;
+        $isS3 = $type === BackupStorageType::S3;
+        $connectionFields = $this->connectionFields($type ?? BackupStorageType::S3);
 
-        $validationError = $this->validateBody($body, $allowedFields, [
+        $validationError = $this->validateBody($body, ['type', 'name', 'description', 'is_usable', ...$connectionFields], [
+            'type' => ['sometimes', Rule::enum(BackupStorageType::class)],
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'endpoint' => ['required', 'string', 'max:255', new SafeWebhookUrl],
-            'bucket' => ['required', new ValidS3BucketName],
-            'region' => 'required|string|max:255',
-            'key' => 'required|string|max:255',
-            'secret' => 'required|string|max:255',
+            ...$this->connectionRules($type ?? BackupStorageType::S3, $teamId),
             'use_path_style_endpoint' => 'sometimes|boolean',
             'skip_tls_verification' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
@@ -294,18 +375,24 @@ class S3StoragesController extends Controller
         if ($validationError instanceof JsonResponse) {
             return $validationError;
         }
+        $login = $type === BackupStorageType::Sftp ? $this->sftpLoginAttributes($body, $teamId) : [];
+        if ($login instanceof JsonResponse) {
+            return $login;
+        }
 
         $storage = S3Storage::create([
             'team_id' => $teamId,
+            'type' => $type,
             'name' => $body['name'],
             'description' => $body['description'] ?? null,
             'endpoint' => $body['endpoint'],
-            'bucket' => $body['bucket'],
-            'region' => $body['region'],
+            'bucket' => $isS3 ? $body['bucket'] : null,
+            'region' => $isS3 ? $body['region'] : 'us-east-1',
             'key' => $body['key'],
-            'secret' => $body['secret'],
-            'use_path_style_endpoint' => $body['use_path_style_endpoint'] ?? S3Storage::detectPathStyleEndpoint($body['endpoint']),
-            'skip_tls_verification' => $body['skip_tls_verification'] ?? false,
+            'secret' => $body['secret'] ?? '',
+            ...$login,
+            'use_path_style_endpoint' => $isS3 ? ($body['use_path_style_endpoint'] ?? S3Storage::detectPathStyleEndpoint($body['endpoint'])) : true,
+            'skip_tls_verification' => $isS3 && ($body['skip_tls_verification'] ?? false),
             'is_usable' => $body['is_usable'] ?? false,
         ]);
 
@@ -322,7 +409,7 @@ class S3StoragesController extends Controller
 
     #[OA\Patch(
         summary: 'Update S3 Storage',
-        description: 'Update S3 storage by UUID.',
+        description: 'Update S3 storage by UUID. The type cannot change, and only the fields of the storage type are accepted.',
         path: '/s3-storages/{uuid}',
         operationId: 'update-s3-storage-by-uuid',
         security: [
@@ -342,13 +429,14 @@ class S3StoragesController extends Controller
                     properties: [
                         'name' => ['type' => 'string', 'description' => 'A friendly name for the storage.'],
                         'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Optional description.'],
-                        'endpoint' => ['type' => 'string', 'description' => 'S3-compatible endpoint URL.'],
-                        'bucket' => ['type' => 'string', 'description' => 'S3 bucket name.'],
-                        'region' => ['type' => 'string', 'description' => 'S3 region.'],
+                        'endpoint' => ['type' => 'string', 'description' => 'The endpoint URL, in the format of the storage type (see Create S3 Storage).'],
+                        'bucket' => ['type' => 'string', 'description' => 'S3 bucket name. Only for S3 storages.'],
+                        'region' => ['type' => 'string', 'description' => 'S3 region. Only for S3 storages.'],
                         'use_path_style_endpoint' => ['type' => 'boolean', 'description' => 'Use path-style URLs (endpoint/bucket). Set to false for providers that only accept virtual-hosted-style URLs (bucket.endpoint), such as Alibaba Cloud OSS.'],
-                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
-                        'key' => ['type' => 'string', 'description' => 'Access key.'],
-                        'secret' => ['type' => 'string', 'description' => 'Secret key.'],
+                        'skip_tls_verification' => ['type' => 'boolean', 'description' => 'S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false.'],
+                        'key' => ['type' => 'string', 'description' => 'S3: the access key. Other types: the username.'],
+                        'secret' => ['type' => 'string', 'description' => 'S3: the secret key. Other types: the password. SFTP: sending a password switches the login to the password.'],
+                        'private_key_uuid' => ['type' => 'string', 'nullable' => true, 'description' => 'SFTP only: the UUID of a private key of your team to log in with. Null switches the login to the saved password.'],
                         'is_usable' => ['type' => 'boolean', 'description' => 'Whether the storage is marked usable.'],
                     ],
                 ),
@@ -385,8 +473,6 @@ class S3StoragesController extends Controller
     )]
     public function update(Request $request)
     {
-        $allowedFields = ['name', 'description', 'endpoint', 'bucket', 'region', 'key', 'secret', 'use_path_style_endpoint', 'skip_tls_verification', 'is_usable'];
-
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -399,14 +485,17 @@ class S3StoragesController extends Controller
 
         $body = $request->json()->all();
 
+        $storage = S3Storage::ownedByCurrentTeamAPI($teamId)->whereUuid($request->route('uuid'))->first();
+        if (! $storage) {
+            return response()->json(['message' => 'S3 storage not found.'], 404);
+        }
+        $this->authorize('update', $storage);
+
+        $allowedFields = ['name', 'description', 'is_usable', ...$this->connectionFields($storage->type)];
         $validationError = $this->validateBody($body, $allowedFields, [
             'name' => ValidationPatterns::nameRules(required: false),
             'description' => ValidationPatterns::descriptionRules(),
-            'endpoint' => ['sometimes', 'string', 'max:255', new SafeWebhookUrl],
-            'bucket' => ['sometimes', new ValidS3BucketName],
-            'region' => 'sometimes|string|max:255',
-            'key' => 'sometimes|string|max:255',
-            'secret' => 'sometimes|string|max:255',
+            ...$this->connectionRules($storage->type, $teamId, partial: true, trustedInternalHosts: $storage->trustedInternalHosts(), savedEndpoint: $storage->endpoint),
             'use_path_style_endpoint' => 'sometimes|boolean',
             'skip_tls_verification' => 'sometimes|boolean',
             'is_usable' => 'sometimes|boolean',
@@ -414,14 +503,17 @@ class S3StoragesController extends Controller
         if ($validationError instanceof JsonResponse) {
             return $validationError;
         }
-
-        $storage = S3Storage::ownedByCurrentTeamAPI($teamId)->whereUuid($request->route('uuid'))->first();
-        if (! $storage) {
-            return response()->json(['message' => 'S3 storage not found.'], 404);
+        $login = $storage->type === BackupStorageType::Sftp ? $this->sftpLoginAttributes($body, $teamId, $storage->secret) : [];
+        if ($login instanceof JsonResponse) {
+            return $login;
         }
-        $this->authorize('update', $storage);
 
-        $storage->update(array_intersect_key($body, array_flip($allowedFields)));
+        $attributes = array_intersect_key($body, array_flip($allowedFields));
+        unset($attributes['private_key_uuid']);
+        if ($storage->type === BackupStorageType::Sftp && blank($attributes['secret'] ?? null)) {
+            unset($attributes['secret']);
+        }
+        $storage->update([...$attributes, ...$login]);
 
         auditLog('api.s3_storage.updated', [
             'team_id' => $teamId,
@@ -513,7 +605,7 @@ class S3StoragesController extends Controller
 
     #[OA\Post(
         summary: 'Validate S3 Storage',
-        description: 'Validate an S3 storage connection using ListObjectsV2.',
+        description: 'Validate a storage connection. S3: lists the bucket (ListObjectsV2). SFTP, FTPS, and WebDAV: lists the backup directory; for SFTP, the first successful validation pins the host key of the server.',
         path: '/s3-storages/{uuid}/validate',
         operationId: 'validate-s3-storage-by-uuid',
         security: [
@@ -574,7 +666,7 @@ class S3StoragesController extends Controller
 
         return response()->json([
             'valid' => $validation['valid'],
-            'message' => $validation['valid'] ? 'S3 storage connection is valid.' : $validation['error'],
+            'message' => $validation['valid'] ? $storage->storageType()->label().' storage connection is valid.' : $validation['error'],
         ]);
     }
 }

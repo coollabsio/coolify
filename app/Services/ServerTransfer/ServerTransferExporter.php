@@ -3,6 +3,7 @@
 namespace App\Services\ServerTransfer;
 
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
 use App\Models\DnsProviderZone;
@@ -12,6 +13,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -29,7 +32,9 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ProjectIconStorageService;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +73,11 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // The daily candidate scan counter of the source; the target counts its own.
+        'image_candidate_scans_today',
+        'image_candidate_scans_date',
+        // A host key that did not match; the target reads the key again over its own connection.
+        'ssh_host_key_pending',
     ];
 
     /**
@@ -150,6 +160,9 @@ class ServerTransferExporter
 
         $warnings = $this->buildWarnings($applications, $dependencies);
         $warnings = array_merge($warnings, $managedDns['warnings'], $projectWarnings);
+        if (ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNull('resource_type')->exists()) {
+            $warnings[] = 'Team-wide vulnerability ignores stay on this instance.';
+        }
         if ($leftOutLinks > 0) {
             $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
                 .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
@@ -176,6 +189,8 @@ class ServerTransferExporter
             'dns_zones' => $managedDns['records']->pluck('zone')->unique('id')->map(fn (DnsProviderZone $zone) => $this->exportDnsZone($zone))->values()->all(),
             'managed_dns_records' => $managedDns['records']->map(fn (ManagedDnsRecord $record) => $this->exportManagedDnsRecord($record, $managedDns['resource_keys']))->values()->all(),
             'ssl_certificates' => $this->exportSslCertificates($server),
+            'image_scan_policies' => $this->exportImageScanPolicies($server, $applications),
+            'image_scan_ignores' => $this->exportImageScanIgnores($server, $applications, $databases, $services),
             'volume_backups' => $this->exportVolumeBackups($applications, $databases, $services),
             'server' => $this->exportServer($server),
             'destinations' => $this->exportDestinations($server),
@@ -324,12 +339,20 @@ class ServerTransferExporter
             $cloudTokens->push($this->findTeamRecord(CloudProviderToken::class, $server->cloud_provider_token_id, $teamId, 'cloud provider token'));
         }
 
+        $s3Storages = $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId);
+        // An SFTP storage that logs in with a private key needs that key on the target.
+        foreach ($s3Storages as $storage) {
+            if ($storage->private_key_id !== null) {
+                $privateKeys->push($this->findTeamRecord(PrivateKey::class, $storage->private_key_id, $teamId, 'private key'));
+            }
+        }
+
         return [
             'private_keys' => $privateKeys->unique('id')->values(),
             'github_apps' => $githubApps->unique('id')->values(),
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
             'gitea_apps' => $giteaApps->unique('id')->values(),
-            's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
+            's3_storages' => $s3Storages,
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
     }
@@ -391,6 +414,17 @@ class ServerTransferExporter
     {
         $warnings = [];
 
+        foreach ($dependencies['private_keys'] as $key) {
+            try {
+                $error = PrivateKey::validationError($key->private_key);
+            } catch (Throwable) {
+                continue; // exportPrivateKey() reports a key that cannot be decrypted.
+            }
+            if ($error) {
+                $warnings[] = "SSH key {$key->name}: {$error} The key moves unchanged. Rotate it to an Ed25519 key after the transfer.";
+            }
+        }
+
         $usesSystemWideGithub = $applications->contains(function (Application $app) {
             if ($app->source_type !== GithubApp::class || $app->source_id === null) {
                 return false;
@@ -425,6 +459,16 @@ class ServerTransferExporter
         });
         if ($usesSystemWideGitea) {
             $warnings[] = 'Some applications use a system-wide Gitea App, which is not exported. On import, Coolify will re-link to a matching system-wide Gitea App on the target instance (by UUID) if one exists.';
+        }
+
+        $hasActivePreviewGithubDeployments = ApplicationDeploymentQueue::query()
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->where('pull_request_id', '!=', 0)
+            ->whereNotNull('github_deployment_id')
+            ->where(fn ($query) => $query->whereNull('github_deployment_state')->orWhere('github_deployment_state', '!=', 'inactive'))
+            ->exists();
+        if ($hasActivePreviewGithubDeployments) {
+            $warnings[] = 'Deployment history is not transferred, so the target instance cannot mark the GitHub Deployments of current preview deployments as inactive when their pull requests close. Mark them as inactive on GitHub, or redeploy the previews on the target instance.';
         }
 
         if ($dependencies['s3_storages']->isNotEmpty()) {
@@ -564,8 +608,8 @@ class ServerTransferExporter
             $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
                 .'Enabling them stops runners that another Coolify instance started on this server.';
         }
-        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, '
-            .'then remove the old public key from ~/.ssh/authorized_keys on the server.';
+        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys '
+            .'and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.';
 
         return $steps;
     }
@@ -1407,6 +1451,7 @@ class ServerTransferExporter
             'contents' => $app->contents,
             'metadata' => $app->metadata,
             'pull_requests' => $app->pull_requests,
+            'deployments' => $app->deployments,
             'administration' => $app->administration,
             'organization_self_hosted_runners' => $app->organization_self_hosted_runners,
             'actions' => $app->actions,
@@ -1484,6 +1529,7 @@ class ServerTransferExporter
     {
         return [
             'uuid' => $storage->uuid,
+            'type' => $storage->type->value,
             'name' => $storage->name,
             'description' => $storage->description,
             'region' => $storage->region,
@@ -1492,6 +1538,8 @@ class ServerTransferExporter
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
+            'private_key_uuid' => $storage->privateKey?->uuid,
+            'sftp_host_key' => $storage->sftp_host_key,
             'skip_tls_verification' => (bool) $storage->skip_tls_verification,
             'is_usable' => (bool) $storage->is_usable,
         ];
@@ -1622,6 +1670,103 @@ class ServerTransferExporter
                 'is_ca_certificate' => (bool) $cert->is_ca_certificate,
                 'resource_kind' => $resourceKind,
                 'resource_uuid' => $resourceUuid,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Scan rules of the server and of its applications. Team and instance rules stay on the source, but a rule the
+     * server inherits from its team is exported as a rule of the server (where the server has no value of its own),
+     * so the gate is not weaker on the target. Instance defaults are not copied: the target has its own.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @return list<array<string, mixed>>
+     */
+    private function exportImageScanPolicies(Server $server, Collection $applications): array
+    {
+        $fromTeam = collect(ImageScanPolicyResolver::inheritedFor($server))
+            ->filter(fn (array $field): bool => $field['source'] === 'team')
+            ->map(fn (array $field): string|bool => $field['value'] instanceof BackedEnum ? $field['value']->value : $field['value'])
+            ->all();
+        $serverExported = false;
+        $out = [];
+        $policies = ImageScanPolicy::query()
+            ->where(fn ($query) => $query
+                ->where(fn ($query) => $query->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id))
+                ->orWhere(fn ($query) => $query->where('scope_type', (new Application)->getMorphClass())->whereIn('scope_id', $applications->pluck('id')->all())))
+            ->orderBy('id')
+            ->get();
+        foreach ($policies as $policy) {
+            $isServer = $policy->scope_type === $server->getMorphClass();
+            $scope = $isServer ? $server : $applications->firstWhere('id', $policy->scope_id);
+            if ($scope === null) {
+                continue;
+            }
+            $out[] = [
+                'scope_kind' => $isServer ? 'server' : 'application',
+                'scope_uuid' => $scope->uuid,
+                'gate_mode' => $policy->gate_mode?->value ?? ($isServer ? ($fromTeam['gate_mode'] ?? null) : null),
+                'on_scan_error' => $policy->on_scan_error?->value ?? ($isServer ? ($fromTeam['on_scan_error'] ?? null) : null),
+                'count_medium' => $policy->count_medium ?? ($isServer ? ($fromTeam['count_medium'] ?? null) : null),
+            ];
+            $serverExported = $serverExported || $isServer;
+        }
+
+        if (! $serverExported && $fromTeam !== []) {
+            array_unshift($out, [
+                'scope_kind' => 'server',
+                'scope_uuid' => $server->uuid,
+                'gate_mode' => $fromTeam['gate_mode'] ?? null,
+                'on_scan_error' => $fromTeam['on_scan_error'] ?? null,
+                'count_medium' => $fromTeam['count_medium'] ?? null,
+            ]);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Ignores of the resources on the server. Team-wide ignores stay on the source.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $databases
+     * @param  Collection<int, Service>  $services
+     * @return list<array<string, mixed>>
+     */
+    private function exportImageScanIgnores(Server $server, Collection $applications, Collection $databases, Collection $services): array
+    {
+        $resources = [];
+        foreach ($applications as $application) {
+            $resources[$application->getMorphClass().':'.$application->id] = ['application', $application->uuid];
+        }
+        foreach ($databases as $database) {
+            $resources[$database->getMorphClass().':'.$database->id] = ['database', $database->uuid];
+        }
+        foreach ($services as $service) {
+            foreach ($service->applications as $serviceApplication) {
+                $resources[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['service_application', $serviceApplication->uuid];
+            }
+            foreach ($service->databases as $serviceDatabase) {
+                $resources[$serviceDatabase->getMorphClass().':'.$serviceDatabase->id] = ['service_database', $serviceDatabase->uuid];
+            }
+        }
+
+        $out = [];
+        $ignores = ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNotNull('resource_type')->orderBy('id')->get();
+        foreach ($ignores as $ignore) {
+            [$kind, $uuid] = $resources[$ignore->resource_type.':'.$ignore->resource_id] ?? [null, null];
+            if ($kind === null) {
+                continue;
+            }
+            $out[] = [
+                'resource_kind' => $kind,
+                'resource_uuid' => $uuid,
+                'vulnerability_id' => $ignore->vulnerability_id,
+                'package' => $ignore->package,
+                'reason' => $ignore->reason,
+                'expires_at' => $ignore->expires_at?->toIso8601String(),
             ];
         }
 

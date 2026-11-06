@@ -9,6 +9,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
@@ -37,6 +39,7 @@ use App\Services\ServerTransfer\ServerTransferBundle;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +47,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use phpseclib3\Crypt\RSA;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -83,6 +87,7 @@ beforeEach(function () {
         'git_branch' => 'main',
         'build_pack' => 'nixpacks',
         'ports_exposes' => '3000',
+        'git_ssh_known_hosts' => '[git.example.com]:2222 ssh-ed25519 AAAA',
         'fqdn' => 'https://app.example.com',
         'status' => 'running:healthy',
     ]);
@@ -310,6 +315,7 @@ test('round trip import preserves uuids secrets and related resources after sour
     expect($app)->not->toBeNull()
         ->and($app->name)->toBe('my-app')
         ->and($app->fqdn)->toBe('https://app.example.com')
+        ->and($app->git_ssh_known_hosts)->toBe('[git.example.com]:2222 ssh-ed25519 AAAA')
         ->and($app->environment_variables()->where('key', 'APP_SECRET')->first()?->value)->toBe('super-secret-value')
         ->and($app->persistentStorages)->toHaveCount(1)
         ->and($app->scheduled_tasks)->toHaveCount(1)
@@ -363,6 +369,18 @@ test('an imported application and service keep their compose parser version and 
     expect($application->compose_parsing_version)->toBe('3')
         ->and(Service::where('uuid', $serviceUuid)->value('compose_parsing_version'))->toBe('3')
         ->and($application->environment_variables()->where('key', 'NIXPACKS_NODE_VERSION')->pluck('value')->all())->toBe(['18']);
+});
+
+test('an imported Compose app keeps the image overrides of its security updates', function () {
+    $overrides = ['web' => ['from' => 'nginx:1.27', 'to' => 'nginx:1.29']];
+    $this->application->forceFill(['build_pack' => 'dockercompose', 'docker_compose_image_overrides' => $overrides])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Application::where('uuid', $applicationUuid)->firstOrFail()->docker_compose_image_overrides)->toBe($overrides);
 });
 
 test('a static application keeps the port that the user set after turning on static', function () {
@@ -620,6 +638,28 @@ test('import into another team creates its own key when the same key exists in a
         ->and($server->privateKey->team_id)->toBe($targetTeam->id)
         ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
         ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
+});
+
+test('a server with a weak legacy key moves, and the export warns to rotate the key', function () {
+    $weakKey = (string) RSA::createKey(1024)->toString('PKCS1');
+    $this->privateKey->private_key = $weakKey;
+    $this->privateKey->saveQuietly();
+    $bundle = $this->exporter->export($this->server->refresh());
+    $targetTeam = Team::factory()->create();
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->private_key)->toBe(formatPrivateKey($weakKey))
+        ->and(implode(' ', $bundle['warnings']))->toContain('SSH key transfer-key: RSA keys must have at least 2048 bits.')
+        ->and(collect(app(TransferFinishChecklist::class)->of($server)['items'])->firstWhere('type', 'previous_ssh_key')['hint'])
+        ->toContain('The key is also weak: RSA keys must have at least 2048 bits.');
 });
 
 test('system-wide github apps are not exported and re-link on import by uuid', function () {
@@ -1474,6 +1514,7 @@ test('transfer keeps preview, backup, GitHub App runner fields and canvas positi
         'organization' => 'acme',
         'organization_self_hosted_runners' => 'write',
         'actions' => 'read',
+        'deployments' => 'write',
         'webhook_events' => ['workflow_job', 'push'],
         'runner_group_id' => 12,
     ]);
@@ -1534,6 +1575,7 @@ test('transfer keeps preview, backup, GitHub App runner fields and canvas positi
         ->and($importedGithubApp)->toBeInstanceOf(GithubApp::class)
         ->and($importedGithubApp->organization_self_hosted_runners)->toBe('write')
         ->and($importedGithubApp->actions)->toBe('read')
+        ->and($importedGithubApp->deployments)->toBe('write')
         ->and($importedGithubApp->webhook_events)->toBe(['workflow_job', 'push'])
         ->and($importedGithubApp->runner_group_id)->toBe(12)
         ->and($application->uuid)->not->toBe($this->application->uuid)
@@ -1872,7 +1914,7 @@ test('the GitHub runner config moves disabled with its GitHub App and the bundle
             'On GitHub, open the settings of GitHub App Runner App. Set the Webhook URL to {target_url}/webhooks/source/github/events, the Setup URL to {target_url}/webhooks/source/github/install, and the Callback URL to {target_url}/login/github/app.',
             'In GitLab, open Settings > Webhooks of every project that uses GitLab App Team GitLab, and set the webhook URL to {target_url}/webhooks/source/gitlab/events.',
             'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. Enabling them stops runners that another Coolify instance started on this server.',
-            'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, then remove the old public key from ~/.ssh/authorized_keys on the server.',
+            'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.',
         ])
         ->and(implode(' ', $bundle['warnings']))->not->toContain('webhook URL')
         ->and(implode(' ', $bundle['warnings']))->not->toContain('runner');
@@ -1987,4 +2029,377 @@ test('an application with a system-wide GitHub App that the target lacks is list
     expect(data_get($bundle, 'projects.0.environments.0.applications.0.source.system_wide'))->toBeTrue()
         ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
+});
+
+/**
+ * Moves the beforeEach server to a new team after the source forgot its scan rules.
+ *
+ * @param  array<string, mixed>  $bundle
+ * @return array{result: array<string, mixed>, team: Team}
+ */
+function importScanRulesBundle(object $test, array $bundle): array
+{
+    // The source instance no longer manages the rules of the moved server and applications.
+    ImageScanPolicy::query()->whereIn('scope_type', [$test->server->getMorphClass(), $test->application->getMorphClass()])->delete();
+    ImageScanIgnore::query()->delete();
+    $test->service->forceDelete();
+    $test->application->forceDelete();
+    $test->database->forceDelete();
+    $test->server->forceDelete();
+
+    $team = Team::factory()->create();
+
+    return ['result' => $test->importer->import($bundle, teamId: $team->id), 'team' => $team];
+}
+
+test('scan rules and ignores of the server and its applications move, linked by uuid, and the opt-ins move', function () {
+    $user = User::factory()->create();
+    $this->server->settings->forceFill(['is_image_scan_enabled' => true, 'image_candidate_scans_today' => 7, 'image_candidate_scans_date' => '2031-02-03'])->saveQuietly();
+    $this->application->settings->forceFill(['is_image_scan_enabled' => false, 'image_builds_by_team' => true])->saveQuietly();
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'on', 'count_medium' => false]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->application->getMorphClass(), 'scope_id' => $this->application->id, 'on_scan_error' => 'block', 'count_medium' => true]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict']);
+    ImageScanIgnore::factory()->create([
+        'team_id' => $this->team->id, 'resource_type' => $this->application->getMorphClass(), 'resource_id' => $this->application->id,
+        'vulnerability_id' => 'CVE-2024-12345', 'package' => 'openssl', 'reason' => 'Not reachable', 'expires_at' => '2031-06-01 00:00:00', 'created_by' => $user->id,
+    ]);
+    ImageScanIgnore::factory()->create([
+        'team_id' => $this->team->id, 'resource_type' => $this->database->getMorphClass(), 'resource_id' => $this->database->id, 'vulnerability_id' => null, 'package' => 'libpq',
+    ]);
+    $teamWide = ImageScanIgnore::factory()->create(['team_id' => $this->team->id]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['warnings'])->toContain('Team-wide vulnerability ignores stay on this instance.')
+        ->and(data_get($bundle, 'server.settings.is_image_scan_enabled'))->toBeTrue()
+        ->and(data_get($bundle, 'server.settings'))->not->toHaveKeys(['image_candidate_scans_today', 'image_candidate_scans_date'])
+        ->and($bundle['image_scan_policies'])->toHaveCount(2)
+        ->and($bundle['image_scan_ignores'])->toHaveCount(2)
+        ->and(json_encode($bundle['image_scan_ignores']))->not->toContain($teamWide->vulnerability_id);
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $app = Application::query()->where('name', 'my-app')->firstOrFail();
+    $database = StandalonePostgresql::query()->where('name', 'app-db')->firstOrFail();
+
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    $appPolicy = ImageScanPolicy::query()->where('scope_type', $app->getMorphClass())->where('scope_id', $app->id)->firstOrFail();
+    $ignore = ImageScanIgnore::query()->where('resource_type', $app->getMorphClass())->where('resource_id', $app->id)->firstOrFail();
+
+    expect($server->settings->is_image_scan_enabled)->toBeTrue()
+        ->and($server->settings->image_candidate_scans_today)->toBe(0)
+        ->and($server->settings->image_candidate_scans_date)->toBeNull()
+        ->and($app->settings->is_image_scan_enabled)->toBeFalse()
+        ->and($app->settings->image_builds_by_team)->toBeTrue()
+        ->and($serverPolicy->gate_mode->value)->toBe('on')
+        ->and($serverPolicy->on_scan_error)->toBeNull()
+        ->and($appPolicy->on_scan_error->value)->toBe('block')
+        ->and($appPolicy->gate_mode)->toBeNull()
+        ->and($serverPolicy->count_medium)->toBeFalse()
+        ->and($appPolicy->count_medium)->toBeTrue()
+        ->and($ignore->team_id)->toBe($team->id)
+        ->and($ignore->created_by)->toBeNull()
+        ->and($ignore->vulnerability_id)->toBe('CVE-2024-12345')
+        ->and($ignore->package)->toBe('openssl')
+        ->and($ignore->reason)->toBe('Not reachable')
+        ->and($ignore->expires_at->format('Y-m-d'))->toBe('2031-06-01')
+        ->and(ImageScanIgnore::query()->where('resource_type', $database->getMorphClass())->where('resource_id', $database->id)->where('package', 'libpq')->exists())->toBeTrue()
+        ->and(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
+        ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(3);
+});
+
+test('team scan rules that the server inherits move as rules of the server, so the gate is not weaker on the target', function () {
+    ImageScanPolicy::factory()->create(['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'on', 'on_scan_error' => null]);
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict', 'on_scan_error' => 'block', 'count_medium' => true]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect(collect($bundle['image_scan_policies'])->firstWhere('scope_kind', 'server'))
+        ->toMatchArray(['scope_uuid' => $this->server->uuid, 'gate_mode' => 'on', 'on_scan_error' => 'block', 'count_medium' => true]);
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    expect($serverPolicy->gate_mode->value)->toBe('on')
+        ->and($serverPolicy->on_scan_error->value)->toBe('block')
+        ->and($serverPolicy->count_medium)->toBeTrue();
+});
+
+test('team scan rules move as rules of the server also when the server has none of its own', function () {
+    ImageScanPolicy::factory()->create(['scope_type' => $this->team->getMorphClass(), 'scope_id' => $this->team->id, 'gate_mode' => 'strict', 'on_scan_error' => null, 'count_medium' => false]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['image_scan_policies'])->toBe([
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'gate_mode' => 'strict', 'on_scan_error' => null, 'count_medium' => false],
+    ]);
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    expect($serverPolicy->gate_mode->value)->toBe('strict')
+        ->and($serverPolicy->on_scan_error)->toBeNull()
+        ->and($serverPolicy->count_medium)->toBeFalse();
+});
+
+test('scan rules of a bundle from an older version map Block deploys on to strict and drop the alert level', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $appUuid = $this->application->uuid;
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'high', 'gate_enabled' => true, 'on_scan_error' => 'block'],
+        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'alert_level' => 'medium', 'gate_enabled' => false, 'on_scan_error' => null],
+    ];
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    $server = Server::where('uuid', $result['server_uuid'])->firstOrFail();
+    $app = Application::query()->where('name', 'my-app')->firstOrFail();
+    $serverPolicy = ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->firstOrFail();
+    $appPolicy = ImageScanPolicy::query()->where('scope_type', $app->getMorphClass())->where('scope_id', $app->id)->firstOrFail();
+
+    expect($serverPolicy->gate_mode->value)->toBe('strict')
+        ->and($serverPolicy->on_scan_error->value)->toBe('block')
+        ->and($appPolicy->gate_mode->value)->toBe('off')
+        ->and($serverPolicy->count_medium)->toBeNull()
+        ->and($appPolicy->getAttributes())->not->toHaveKeys(['alert_level', 'gate_enabled'])
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(0);
+});
+
+test('scan rules of an older bundle with a Block deploys value that is not a boolean are dropped with a warning', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'alert_level' => 'high', 'gate_enabled' => 'yes', 'on_scan_error' => 'block'],
+    ];
+
+    ['result' => $result] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanPolicy::query()->whereNotNull('scope_type')->count())->toBe(0)
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules of the server were not imported')))->toHaveCount(1);
+});
+
+test('no team-wide ignore warning is exported when the team has none', function () {
+    ImageScanIgnore::factory()->create(['team_id' => $this->team->id, 'resource_type' => $this->application->getMorphClass(), 'resource_id' => $this->application->id]);
+
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    expect($bundle['warnings'])->not->toContain('Team-wide vulnerability ignores stay on this instance.');
+});
+
+test('scan rules that fail the validation of the UI or point to nothing in the bundle are dropped with a warning', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $appUuid = $this->application->uuid;
+    $ignore = fn (array $fields): array => ['resource_kind' => 'application', 'resource_uuid' => $appUuid, 'vulnerability_id' => 'CVE-2024-1', 'package' => null, 'reason' => 'ok', 'expires_at' => null, ...$fields];
+    $bundle['image_scan_policies'] = [
+        ['scope_kind' => 'server', 'scope_uuid' => $this->server->uuid, 'gate_mode' => 'always', 'on_scan_error' => null],
+        ['scope_kind' => 'application', 'scope_uuid' => $appUuid, 'gate_mode' => 'strict', 'on_scan_error' => 'deploy'],
+        ['scope_kind' => 'application', 'scope_uuid' => 'missing-app', 'gate_mode' => 'on', 'on_scan_error' => null],
+    ];
+    $bundle['image_scan_ignores'] = [
+        $ignore(['vulnerability_id' => 'bad id; rm -rf /']),
+        $ignore(['vulnerability_id' => null, 'package' => null]),
+        $ignore(['reason' => str_repeat('a', 501)]),
+        $ignore(['reason' => '']),
+        $ignore(['resource_uuid' => 'missing-app']),
+        $ignore(['vulnerability_id' => 'GHSA-abcd-1234']),
+    ];
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanIgnore::query()->where('team_id', $team->id)->pluck('vulnerability_id')->all())->toBe(['GHSA-abcd-1234'])
+        ->and(ImageScanPolicy::query()->whereNotNull('scope_type')->pluck('gate_mode')->map(fn ($mode) => $mode?->value)->all())->toBe(['strict'])
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'vulnerability ignore')))->toHaveCount(5)
+        ->and(collect($result['warnings'])->filter(fn (string $warning) => str_contains($warning, 'scan rules')))->toHaveCount(2);
+});
+
+test('an ignore that the import created before is not created again', function () {
+    $bundle = $this->exporter->export($this->server->fresh());
+    $entry = ['resource_kind' => 'application', 'resource_uuid' => $this->application->uuid, 'vulnerability_id' => 'CVE-2024-7', 'package' => null, 'reason' => 'Not reachable', 'expires_at' => null];
+    $bundle['image_scan_ignores'] = [$entry, $entry, [...$entry, 'vulnerability_id' => null, 'package' => 'openssl'], [...$entry, 'vulnerability_id' => null, 'package' => 'openssl']];
+
+    ['result' => $result, 'team' => $team] = importScanRulesBundle($this, $bundle);
+
+    expect(ImageScanIgnore::query()->where('team_id', $team->id)->count())->toBe(2)
+        ->and($result['created']['image_scan_ignores'])->toBe(2);
+});
+
+test('import keeps distinct storage UUIDs separate at the same endpoint', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $payload = [
+        'uuid' => 'storage-one',
+        'region' => 'us-east-1',
+        'bucket' => '/backups',
+        'type' => 'sftp',
+        'endpoint' => 'sftp://backup.example.test',
+        'key' => 'first-user',
+        'secret' => 'first-password',
+    ];
+
+    $first = $method->invoke($this->importer, $payload, $this->team->id, true);
+    $second = $method->invoke($this->importer, array_replace($payload, [
+        'uuid' => 'storage-two',
+        'key' => 'second-user',
+        'secret' => 'second-password',
+    ]), $this->team->id, true);
+    $repeated = $method->invoke($this->importer, $payload, $this->team->id, true);
+
+    expect($second->id)->not->toBe($first->id);
+    expect($second->key)->toBe('second-user');
+    expect($second->secret)->toBe('second-password');
+    expect($repeated->id)->toBe($first->id);
+});
+
+it('rejects backup storage with an unresolved private key', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $importer = new ServerTransferImporter;
+
+    expect(fn () => $method->invoke($importer, [
+        'private_key_uuid' => 'missing-key',
+        'key' => 'user',
+        'secret' => 'password',
+        'region' => 'us-east-1',
+        'endpoint' => 'sftp://backup.test',
+        'bucket' => '/backups',
+    ], $this->team->id, false))->toThrow(RuntimeException::class, 'Backup storage private key is missing.');
+    expect(S3Storage::where('endpoint', 'sftp://backup.test')->exists())->toBeFalse();
+});
+
+it('imports password authenticated backup storage without a private key', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $storage = $method->invoke(new ServerTransferImporter, [
+        'type' => 'sftp',
+        'region' => 'us-east-1',
+        'endpoint' => 'sftp://backup.test',
+        'bucket' => '/backups',
+        'key' => 'backup-user',
+        'secret' => 'backup-password',
+    ], $this->team->id, false);
+
+    expect($storage->private_key_id)->toBeNull()
+        ->and((bool) $storage->is_usable)->toBeTrue()
+        ->and($storage->secret)->toBe('backup-password');
+});
+
+it('moves the saved SFTP host key with the backup storage', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILhw/KsYTF9TQOwQX1EAM3gI5oxDS9Daz5nNuCixSRXT';
+    $storage = S3Storage::create([
+        'type' => 'sftp',
+        'name' => 'SFTP backups',
+        'region' => 'us-east-1',
+        'key' => 'backup',
+        'secret' => 'password',
+        'endpoint' => 'sftp://93.184.216.34:2222/backups',
+        'team_id' => $this->team->id,
+    ]);
+    $storage->forceFill(['sftp_host_key' => $hostKey])->save();
+    $this->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+
+    $bundle = $this->exporter->export($this->server);
+    removeTransferSourceResources($this);
+    $storage->forceDelete();
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(S3Storage::where('endpoint', 'sftp://93.184.216.34:2222/backups')->sole()->sftp_host_key)->toBe($hostKey);
+});
+
+/**
+ * Exports the server with a database backup to a storage, then imports it with new UUIDs into a team that already
+ * has `$existing`. Returns the storage of the imported backup and the number of storages of the target team.
+ *
+ * @param  array<string, mixed>  $source
+ * @param  array<string, mixed>  $existing
+ * @return array{0: S3Storage, 1: S3Storage, 2: int}
+ */
+function transferBackupStorageIntoTeamWith(object $test, array $source, array $existing): array
+{
+    $defaults = ['name' => 'Backups', 'region' => 'us-east-1', 'secret' => 'secret', 'team_id' => $test->team->id];
+    $storage = S3Storage::create([...$defaults, ...$source]);
+    $test->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+    $bundle = $test->exporter->export($test->server);
+    removeTransferSourceResources($test);
+    $storage->forceDelete();
+
+    $target = Team::factory()->create();
+    $existingStorage = S3Storage::create([...$defaults, ...$existing, 'name' => 'Existing', 'team_id' => $target->id]);
+    $result = $test->importer->import($bundle, teamId: $target->id, preserveUuids: false, adoptMode: false);
+    $importedStorage = Server::where('uuid', $result['server_uuid'])->firstOrFail()
+        ->databases()->sole()->scheduledBackups()->sole()->s3;
+
+    return [$importedStorage, $existingStorage, S3Storage::where('team_id', $target->id)->count()];
+}
+
+test('a transfer with new UUIDs reuses the S3 storage of the target team with the same endpoint, bucket and key', function () {
+    $s3 = ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIASAME'];
+
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this, $s3, $s3);
+
+    expect($imported->id)->toBe($existing->id)->and($count)->toBe(1);
+});
+
+test('a transfer does not reuse an S3 storage with another key', function () {
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this,
+        ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIASOURCE'],
+        ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIATARGET'],
+    );
+
+    expect($imported->id)->not->toBe($existing->id)
+        ->and($imported->key)->toBe('AKIASOURCE')
+        ->and($count)->toBe(2);
+});
+
+test('a transfer does not merge SFTP storages on the same host', function (string $existingKey) {
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this,
+        ['type' => 'sftp', 'endpoint' => 'sftp://93.184.216.34/backups', 'key' => 'source-user'],
+        ['type' => 'sftp', 'endpoint' => 'sftp://93.184.216.34/backups', 'key' => $existingKey],
+    );
+
+    expect($imported->id)->not->toBe($existing->id)
+        ->and($imported->key)->toBe('source-user')
+        ->and($count)->toBe(2);
+})->with(['another login' => ['target-user'], 'the same login' => ['source-user']]);
+
+test('import clears trust metadata when the host key normalizes to null', function (?string $hostKey) {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importServer');
+    $server = $method->invoke($this->importer, [
+        'name' => 'imported-server',
+        'ip' => '10.55.0.99',
+        'settings' => [
+            'ssh_host_key' => $hostKey,
+            'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        ],
+    ], $this->privateKey, $this->team->id, false, false);
+
+    expect($server->settings->fresh())
+        ->ssh_host_key->toBeNull()
+        ->ssh_host_key_source->toBeNull()
+        ->ssh_host_key_trusted_at->toBeNull();
+})->with([null, '', '# comment only', 'invalid key']);
+
+test('the pinned host key moves with the server', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I';
+    $this->server->settings->forceFill([
+        'ssh_host_key' => $hostKey,
+        'ssh_host_key_source' => 'tofu',
+        'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
+        'ssh_host_key_pending' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjaL3Lqt0tZl4iVZw8x1v2b9fM8r6Yq0nH0bUq3dQ0h',
+        'is_ssh_host_key_check_disabled' => true,
+    ])->save();
+    $bundle = json_decode(json_encode($this->exporter->export($this->server->fresh())), true);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->firstOrFail()->settings;
+    expect($settings)
+        ->ssh_host_key->toBe($hostKey)
+        ->ssh_host_key_source->toBe('transfer')
+        ->ssh_host_key_pending->toBeNull()
+        ->is_ssh_host_key_check_disabled->toBeTrue()
+        ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
 });

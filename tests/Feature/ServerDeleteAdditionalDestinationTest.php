@@ -112,6 +112,7 @@ test('a server with only additional-destination applications is deleted without 
 test('an application promoted to another server survives the deletion of its old server', function () {
     $application = ($this->makeApplication)($this->destinationToDelete, 'ref-admin');
     $application->additional_networks()->attach($this->otherDestination->id, ['server_id' => $this->otherServer->id]);
+    $this->otherServer->settings()->update(['is_reachable' => true, 'is_usable' => true]);
     StopApplicationOneServer::shouldRun()->once();
 
     $this->actingAs($this->user);

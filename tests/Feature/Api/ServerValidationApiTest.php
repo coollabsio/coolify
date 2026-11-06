@@ -57,3 +57,19 @@ it('rejects an invalid install option', function () {
 
     $response->assertUnprocessable()->assertJsonValidationErrors('install');
 });
+
+it('rejects non-string SSH host keys with 422', function (string $endpoint) {
+    $settingsBefore = $this->server->settings->getAttributes();
+    $serverCount = Server::count();
+
+    $this->withHeaders(serverValidationHeaders())
+        ->postJson($endpoint === 'create' ? '/api/v1/servers' : "/api/v1/servers/{$this->server->uuid}/host-key/reset", [
+            'ssh_host_key' => ['x'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ssh_host_key');
+
+    expect(Server::count())->toBe($serverCount);
+    expect($this->server->settings->fresh()->getAttributes())->toBe($settingsBefore);
+    Queue::assertNothingPushed();
+})->with(['create', 'reset']);

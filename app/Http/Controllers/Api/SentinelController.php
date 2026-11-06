@@ -34,7 +34,12 @@ class SentinelController extends Controller
         }
         $naked_token = str_replace('Bearer ', '', $token);
         try {
-            $decrypted = decrypt($naked_token);
+            // Tokens are encrypt(json) values, so the payload is a serialized string.
+            // Unserialize it without classes: the endpoint has no login yet.
+            $decrypted = unserialize(decrypt($naked_token, false), ['allowed_classes' => false]);
+            if (! is_string($decrypted)) {
+                throw new Exception('Sentinel token payload is not a string.');
+            }
             $decrypted_token = json_decode($decrypted, true);
         } catch (Exception $e) {
             auditLogWebhookFailure('sentinel', 'decrypt_failed');
@@ -83,7 +88,7 @@ class SentinelController extends Controller
             return response()->json(['message' => 'Server is not functional'], 401, ['Retry-After' => 300]);
         }
 
-        if ($server->settings->sentinel_token !== $naked_token) {
+        if (! hash_equals((string) $server->settings->sentinel_token, (string) $naked_token)) {
             auditLogWebhookFailure('sentinel', 'token_mismatch', [
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,

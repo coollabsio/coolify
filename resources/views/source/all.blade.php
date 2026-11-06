@@ -44,12 +44,12 @@
                             </x-slot:content>
                             <livewire:source.gitlab.create />
                         </x-modal-input>
-                        <x-modal-input title="New Gitea App" :closeOutside="false">
+                        <x-modal-input title="New Gitea / Forgejo App" :closeOutside="false">
                             <x-slot:content>
                                 <button type="button" @click="dropdownOpen = false"
                                     class="listbox-option justify-start! gap-2.5!" role="menuitem">
                                     <x-git-icon class="size-3.5 shrink-0 opacity-70" git="App\Models\GiteaApp" />
-                                    Gitea App
+                                    Gitea / Forgejo App
                                 </button>
                             </x-slot:content>
                             <livewire:source.gitea.create />
@@ -71,7 +71,7 @@
                         'name' => $source->name,
                         'provider' => match ($source->getMorphClass()) {
                             'App\\Models\\GithubApp' => 'GitHub',
-                            'App\\Models\\GiteaApp' => 'Gitea',
+                            'App\\Models\\GiteaApp' => 'Gitea / Forgejo',
                             default => 'GitLab',
                         },
                         'organization' => $isGitlab ? $source->group_name : $source->organization,
@@ -143,7 +143,7 @@
                             </div>
                         </a>
                     @elseif ($source->getMorphClass() === 'App\Models\GiteaApp')
-                        <a x-show="matches(@js([$source->name, 'Gitea', $source->organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
+                        <a x-show="matches(@js([$source->name, 'Gitea', 'Forgejo', $source->organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}
                             href="{{ route('source.gitea.show', ['gitea_app_uuid' => data_get($source, 'uuid')]) }}">
                             <div class="flex items-start gap-3">

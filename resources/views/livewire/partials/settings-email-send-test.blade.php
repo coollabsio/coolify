@@ -19,4 +19,11 @@
             </div>
         </form>
     </x-modal-input>
+@else
+    {{-- Always show the button, so that admins know a test is possible once a provider is saved. --}}
+    <button type="button" class="button" disabled
+        title="{{ is_transactional_emails_enabled() ? 'Only admins can send a test email.' : 'Save an email provider first.' }}">
+        <x-reicon name="notifications" class="size-3.5" />
+        Send test
+    </button>
 @endif

@@ -36,6 +36,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Disk usage notification | threshold 70, check frequency `*/30 * * * *`, interval 12 h |
 | ✅ | Security > Patches | check frequency `daily`, automatic security updates on at `04:30` (the last check result is not moved; the target shows "never" until its first check) |
 | ✅ | Terminal | terminal access off |
+| ➕ | Security > SSH host key | a trusted host key (shown by fingerprint), and "host key check" disabled on one server. Expected: the target shows the same fingerprint with source `transfer` and connects without a new trust step |
 | ✅ | Image retention | "disable application image retention" on |
 | ✅ | Labels / Traefik | generate exact labels on, Traefik certificate resolver `custom` |
 | ✅ | Backup compression | CPU percentage 50 |
@@ -54,6 +55,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Second standalone destination | extra Docker network, one resource on it |
 | ✅ | Server shared variables | 2 variables, one multiline, one literal, one with a comment |
 | ✅ | SSL certificates | CA certificate (created automatically) + a database with SSL on (creates a server certificate) |
+| ✅ | Image vulnerability scanning | server opt-in on, server scan rules (block deploys `strict`, count medium problems: yes), application scan rules (if the scan cannot run: block, count medium problems: no), one ignore of a vulnerability on an application, one team-wide ignore (stays on the source, the export warns), application scan switch off and "images built by team" on. A scan, its SBOM, and the daily candidate scan counter are not moved: the next rescan rebuilds them |
 | ✅ | GitHub runner config | labels, max runners 2, docker mode `dind`, image, CPU/memory limits, 3 timeouts, PR jobs off, dedicated on, uses the team GitHub App (see 4). Expected: on the target it is **disabled** and the checklist says to enable it |
 
 ## 4. Team credentials the server uses
@@ -65,6 +67,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | GitHub App (team, not system-wide) | with runner fields (`organization_self_hosted_runners`, `actions`, `webhook_events`, `runner_group_id`). Expected: checklist step for Webhook/Setup/Callback URL |
 | ✅ | GitLab App (team) | used by one application. Expected: checklist step for the webhook URL |
 | ✅ | S3 storage | the dev MinIO service (the VM must reach it), used by a database backup and a volume backup |
+| ➕ | SFTP, FTPS, or WebDAV storage | a storage of another type (`type` column), used by a backup; an SFTP storage that logs in with a private key (`private_key_id`), with a saved host key (`sftp_host_key`) |
 | ✅ | Cloudflare integration token | for DNS zones and the tunnel |
 | ✅ | Secret manager token | Infisical, Doppler, or Vault |
 | ⚠️ | Cloud provider token | only with a real cloud server |
@@ -90,7 +93,9 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | Nixpacks app, public GitHub repo | Expected: checklist step for manual webhooks |
 | ✅ | Static app (`is_static`, `is_spa`) | |
 | ➕ | Docker Compose app | raw compose on, one variable with an empty value (`preserve_compose_null`) |
+| ➕ | Docker Compose app with a security update | an image override from the Security page (`docker_compose_image_overrides`); the target deploys the new image |
 | ➕ | App with GitHub App source, app with GitLab App source, app with deploy key | |
+| ➕ | Saved SSH host keys | app with a deploy key on a self-hosted Git host, deployed once, so Source → SSH host keys has a line. Expected: the same line on the target |
 | ✅ | Domains | 2 domains, noindex domains, domain port overrides, preview URL template |
 | ✅ | Health check | custom path, port, method, return code, interval, retries, start period |
 | ✅ | Limits | memory, swap, swappiness, reservation, CPUs, cpuset, CPU shares |

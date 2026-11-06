@@ -2,19 +2,24 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\ManagesSmtpServers;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\TransactionalEmails\Test;
 use App\Rules\ValidHostname;
+use App\Support\SmtpPresets;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsEmail extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, ManagesSmtpServers;
 
     public InstanceSettings $settings;
 
@@ -67,6 +72,15 @@ class SettingsEmail extends Component
     public ?string $resendApiKey = null;
 
     #[Validate(['nullable', 'email'])]
+    public ?string $resendFromAddress = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $resendFromName = null;
+
+    #[Validate(['required', 'in:none,smtp,resend'])]
+    public string $emailProvider = 'none';
+
+    #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
 
     public bool $testUsesNotificationSender = false;
@@ -88,21 +102,15 @@ class SettingsEmail extends Component
             $this->validate();
             $this->validate(['smtpEhloDomain' => ['nullable', 'string', new ValidHostname]]);
             $this->settings->smtp_enabled = $this->smtpEnabled;
-            $this->settings->smtp_host = $this->smtpHost;
-            $this->settings->smtp_port = $this->smtpPort;
-            $this->settings->smtp_encryption = $this->smtpEncryption;
-            $this->settings->smtp_username = $this->smtpUsername;
-            $this->settings->smtp_password = $this->smtpPassword;
-            $this->settings->smtp_timeout = $this->smtpTimeout;
-            $this->settings->smtp_ehlo_domain = $this->smtpEhloDomain;
-            $this->settings->smtp_from_address = $this->smtpFromAddress;
-            $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->fillSmtpServerSettings();
             $this->settings->notification_from_address = $this->notificationFromAddress;
             $this->settings->notification_from_name = $this->notificationFromName;
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
-            $this->saveAndAudit();
+            $this->settings->resend_from_address = $this->resendFromAddress;
+            $this->settings->resend_from_name = $this->resendFromName;
+            $this->saveEmailSettings();
         } else {
             $this->smtpEnabled = $this->settings->smtp_enabled;
             $this->smtpHost = $this->settings->smtp_host;
@@ -118,8 +126,23 @@ class SettingsEmail extends Component
             $this->notificationFromName = $this->settings->notification_from_name;
 
             $this->resendEnabled = $this->settings->resend_enabled;
+            $this->resendFromAddress = $this->settings->resend_from_address;
+            $this->resendFromName = $this->settings->resend_from_name;
             $this->resendApiKey = $this->settings->resend_api_key;
+
+            $this->smtpServerName = $this->settings->smtp_server_name;
+            $this->selectedSmtpServer = 'active';
+            $this->emailProvider = $this->activeEmailProvider();
         }
+    }
+
+    /**
+     * The provider that sends email now. It differs from $emailProvider until the selected provider is saved.
+     */
+    #[Computed]
+    public function activeEmailProvider(): string
+    {
+        return enabled_email_provider($this->settings) ?? 'none';
     }
 
     public function submit()
@@ -127,49 +150,65 @@ class SettingsEmail extends Component
         try {
             $this->authorize('update', $this->settings);
             $this->resetErrorBag();
+            $this->enableSelectedEmailProvider();
             $this->syncData(true);
             $this->dispatch('success', 'Transactional email settings updated.');
         } catch (\Throwable $e) {
+            $this->restoreSavedEmailProvider();
+
             return handleError($e, $this);
         }
     }
 
-    public function instantSave(string $type)
+    /**
+     * Turn on the provider selected in the provider list and save. When a required field of the
+     * provider is empty, nothing is saved and the page only shows the fields to fill in.
+     */
+    public function selectEmailProvider()
     {
         try {
-            $this->authorize('update', $this->settings);
-            $currentSmtpEnabled = $this->settings->smtp_enabled;
-            $currentResendEnabled = $this->settings->resend_enabled;
+            $this->enableSelectedEmailProvider();
+        } catch (ValidationException) {
+            // Not complete yet: show the fields of the provider and the "Not active yet" notice, without an error.
             $this->resetErrorBag();
 
-            if ($type === 'SMTP') {
-                $this->submitSmtp();
-                $this->resendEnabled = $this->settings->resend_enabled = false;
-            } elseif ($type === 'Resend') {
-                $this->submitResend();
-                $this->smtpEnabled = $this->settings->smtp_enabled = false;
-            }
-            $this->saveAndAudit();
+            return null;
+        }
 
-        } catch (\Throwable $e) {
-            if ($type === 'SMTP') {
-                $this->smtpEnabled = $currentSmtpEnabled;
-            } elseif ($type === 'Resend') {
-                $this->resendEnabled = $currentResendEnabled;
-            }
+        return $this->submit();
+    }
 
-            return handleError($e, $this);
+    /**
+     * Turn on the provider selected in the provider list. When its settings are not valid, the saved
+     * provider stays on, so that a later save of another field cannot turn off the working provider.
+     */
+    private function enableSelectedEmailProvider(): void
+    {
+        $this->smtpEnabled = $this->emailProvider === 'smtp';
+        $this->resendEnabled = $this->emailProvider === 'resend';
+
+        try {
+            $this->validateEnabledEmailProvider();
+        } catch (ValidationException $e) {
+            $this->restoreSavedEmailProvider();
+
+            throw $e;
         }
     }
 
-    public function instantSaveSmtp(): void
+    private function restoreSavedEmailProvider(): void
     {
-        $this->instantSave('SMTP');
+        $this->smtpEnabled = (bool) $this->settings->getOriginal('smtp_enabled');
+        $this->resendEnabled = (bool) $this->settings->getOriginal('resend_enabled');
     }
 
-    public function instantSaveResend(): void
+    private function validateEnabledEmailProvider(): void
     {
-        $this->instantSave('Resend');
+        match (true) {
+            $this->smtpEnabled => $this->validateSmtpSettings(),
+            $this->resendEnabled => $this->validateResendSettings(),
+            default => null,
+        };
     }
 
     public function toggleSmtp()
@@ -185,7 +224,6 @@ class SettingsEmail extends Component
             } else {
                 $this->validateSmtpSettings();
                 $this->smtpEnabled = true;
-                $this->resendEnabled = false;
                 $this->submitSmtp();
             }
         } catch (\Throwable $e) {
@@ -208,7 +246,6 @@ class SettingsEmail extends Component
             } else {
                 $this->validateResendSettings();
                 $this->resendEnabled = true;
-                $this->smtpEnabled = false;
                 $this->submitResend();
             }
         } catch (\Throwable $e) {
@@ -225,21 +262,13 @@ class SettingsEmail extends Component
             $this->validateSmtpSettings();
 
             if ($this->smtpEnabled) {
-                $this->settings->resend_enabled = $this->resendEnabled = false;
+                $this->disableEmailProvidersExcept('smtp');
             }
 
             $this->settings->smtp_enabled = $this->smtpEnabled;
-            $this->settings->smtp_host = $this->smtpHost;
-            $this->settings->smtp_port = $this->smtpPort;
-            $this->settings->smtp_encryption = $this->smtpEncryption;
-            $this->settings->smtp_username = $this->smtpUsername;
-            $this->settings->smtp_password = $this->smtpPassword;
-            $this->settings->smtp_timeout = $this->smtpTimeout;
-            $this->settings->smtp_ehlo_domain = $this->smtpEhloDomain;
-            $this->settings->smtp_from_address = $this->smtpFromAddress;
-            $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->fillSmtpServerSettings();
 
-            $this->saveAndAudit();
+            $this->saveEmailSettings();
 
             $this->dispatch('success', 'SMTP settings updated.');
         } catch (\Throwable $e) {
@@ -256,15 +285,15 @@ class SettingsEmail extends Component
             $this->validateResendSettings();
 
             if ($this->resendEnabled) {
-                $this->settings->smtp_enabled = $this->smtpEnabled = false;
+                $this->disableEmailProvidersExcept('resend');
             }
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
-            $this->settings->smtp_from_address = $this->smtpFromAddress;
-            $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->resend_from_address = $this->resendFromAddress;
+            $this->settings->resend_from_name = $this->resendFromName;
 
-            $this->saveAndAudit();
+            $this->saveEmailSettings();
 
             $this->dispatch('success', 'Resend settings updated.');
         } catch (\Throwable $e) {
@@ -275,12 +304,26 @@ class SettingsEmail extends Component
     }
 
     /**
+     * Turn off every email provider except the given one, so only one provider sends email.
+     */
+    private function disableEmailProvidersExcept(string $provider): void
+    {
+        if ($provider !== 'smtp') {
+            $this->settings->smtp_enabled = $this->smtpEnabled = false;
+        }
+        if ($provider !== 'resend') {
+            $this->settings->resend_enabled = $this->resendEnabled = false;
+        }
+    }
+
+    /**
      * Save the instance email settings and record the changed field names (never their values).
      */
-    private function saveAndAudit(): void
+    protected function saveEmailSettings(): void
     {
         $changedFields = auditChangedFields($this->settings);
         $this->settings->save();
+        $this->emailProvider = $this->activeEmailProvider();
 
         if ($changedFields === []) {
             return;
@@ -294,17 +337,23 @@ class SettingsEmail extends Component
         ]);
     }
 
+    protected function loadEmailSettings(): void
+    {
+        $this->syncData();
+    }
+
     private function validateSmtpSettings(): void
     {
         $this->validate([
             'smtpEnabled' => 'boolean',
+            'smtpServerName' => 'nullable|string|max:255',
             'smtpFromAddress' => 'required|email',
             'smtpFromName' => 'required|string',
             'smtpHost' => 'required|string',
             'smtpPort' => 'required|numeric',
             'smtpEncryption' => 'required|string|in:starttls,tls,none',
-            'smtpUsername' => 'nullable|string',
-            'smtpPassword' => 'nullable|string',
+            'smtpUsername' => [Rule::requiredIf(SmtpPresets::requiresLogin($this->smtpHost)), 'nullable', 'string'],
+            'smtpPassword' => [Rule::requiredIf(SmtpPresets::requiresLogin($this->smtpHost)), 'nullable', 'required_with:smtpUsername', 'string'],
             'smtpTimeout' => 'nullable|numeric',
             'smtpEhloDomain' => ['nullable', 'string', new ValidHostname],
         ], [
@@ -314,6 +363,9 @@ class SettingsEmail extends Component
             'smtpHost.required' => 'SMTP Host is required.',
             'smtpPort.required' => 'SMTP Port is required.',
             'smtpPort.numeric' => 'SMTP Port must be a number.',
+            'smtpUsername.required' => 'This provider needs a username.',
+            'smtpPassword.required' => 'This provider needs a password.',
+            'smtpPassword.required_with' => 'Enter the password for this username.',
             'smtpEncryption.required' => 'Encryption type is required.',
         ]);
     }
@@ -323,13 +375,13 @@ class SettingsEmail extends Component
         $this->validate([
             'resendEnabled' => 'boolean',
             'resendApiKey' => $this->resendEnabled ? 'required|string' : 'nullable|string',
-            'smtpFromAddress' => 'required|email',
-            'smtpFromName' => 'required|string',
+            'resendFromAddress' => $this->resendEnabled ? 'required|email' : 'nullable|email',
+            'resendFromName' => $this->resendEnabled ? 'required|string' : 'nullable|string',
         ], [
             'resendApiKey.required' => 'Resend API Key is required.',
-            'smtpFromAddress.required' => 'From Address is required.',
-            'smtpFromAddress.email' => 'Please enter a valid email address.',
-            'smtpFromName.required' => 'From Name is required.',
+            'resendFromAddress.required' => 'From Address is required.',
+            'resendFromAddress.email' => 'Please enter a valid email address.',
+            'resendFromName.required' => 'From Name is required.',
         ]);
     }
 
@@ -339,24 +391,27 @@ class SettingsEmail extends Component
             $this->authorize('update', $this->settings);
             $this->validate([
                 'testEmailAddress' => 'required|email',
-                'smtpFromAddress' => 'required|email',
-                'smtpFromName' => 'required|string',
                 'notificationFromAddress' => $this->testUsesNotificationSender ? 'required|email' : 'nullable|email',
                 'notificationFromName' => 'nullable|string|max:255',
             ], [
                 'notificationFromAddress.required' => 'Notification from address is required to test the notification sender.',
                 'testEmailAddress.required' => 'Test email address is required.',
                 'testEmailAddress.email' => 'Please enter a valid email address.',
-                'smtpFromAddress.required' => 'From Address is required.',
-                'smtpFromAddress.email' => 'Please enter a valid email address.',
-                'smtpFromName.required' => 'From Name is required.',
             ]);
 
-            $this->settings->smtp_from_address = $this->smtpFromAddress;
-            $this->settings->smtp_from_name = $this->smtpFromName;
+            // Send with the sender on the page, so that a changed sender can be tested before Save.
+            if ($this->settings->resend_enabled) {
+                $this->validateResendSettings();
+                $this->settings->resend_from_address = $this->resendFromAddress;
+                $this->settings->resend_from_name = $this->resendFromName;
+            } else {
+                $this->validateSmtpSettings();
+                $this->settings->smtp_from_address = $this->smtpFromAddress;
+                $this->settings->smtp_from_name = $this->smtpFromName;
+            }
             $this->settings->notification_from_address = $this->notificationFromAddress;
             $this->settings->notification_from_name = $this->notificationFromName;
-            $this->saveAndAudit();
+            $this->saveEmailSettings();
 
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,

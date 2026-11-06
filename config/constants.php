@@ -22,6 +22,8 @@ return [
         'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
+        // https://hub.docker.com/r/rclone/rclone/tags (also on ghcr.io with the same digest): copies backups to SFTP, FTPS, and WebDAV storages on the servers.
+        'rclone_image' => env('RCLONE_IMAGE', env('REGISTRY_URL', 'docker.io').'/rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5'),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
@@ -84,6 +86,16 @@ return [
         'stop_timeout_flag_since' => '28.0.0',
     ],
 
+    // Scanner images run on managed servers, pinned by digest. Change them only with a Coolify release.
+    'image_scan' => [
+        'images' => [
+            'syft' => ['repo' => 'anchore/syft', 'version' => '1.55.0', 'digest' => 'sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a'],
+            'grype' => ['repo' => 'anchore/grype', 'version' => '0.121.0', 'digest' => 'sha256:621d56d1d68106b787022c81546f7e0a36202a25d1239f0c20195fab8c16f7ea'],
+            'regctl' => ['repo' => 'regclient/regctl', 'version' => '0.11.7', 'digest' => 'sha256:45b57933c2b67bb1e280b4baaa220ef1ab212c81268ab19589fa1e83719c7c82'],
+            'init' => ['repo' => 'alpine', 'version' => '3.22.7', 'digest' => 'sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f'],
+        ],
+    ],
+
     'ssh' => [
         'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),
@@ -100,6 +112,8 @@ return [
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
         'retry_multiplier' => env('SSH_RETRY_MULTIPLIER', 2),
+        // SSH host key check of managed servers: warn (connect, report a changed key), enforce (refuse a changed key), off.
+        'host_key_checking' => strtolower(trim((string) env('SSH_HOST_KEY_CHECKING', 'warn'))),
     ],
 
     'invitation' => [

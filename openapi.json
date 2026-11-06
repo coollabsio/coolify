@@ -944,6 +944,10 @@
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
                                     },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -1611,6 +1615,10 @@
                                     "is_consistent_container_name_enabled": {
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
+                                    },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
                                     "custom_internal_name": {
                                         "type": "string",
@@ -2280,6 +2288,10 @@
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
                                     },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -2948,6 +2960,10 @@
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
                                     },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -3506,6 +3522,10 @@
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
                                     },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -4043,6 +4063,10 @@
                                     "is_consistent_container_name_enabled": {
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
+                                    },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
                                     "custom_internal_name": {
                                         "type": "string",
@@ -4860,6 +4884,10 @@
                                     "is_consistent_container_name_enabled": {
                                         "type": "boolean",
                                         "description": "Use a consistent container name across deployments."
+                                    },
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean",
+                                        "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
                                     "custom_internal_name": {
                                         "type": "string",
@@ -7250,6 +7278,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     }
@@ -7327,6 +7358,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
@@ -7397,6 +7431,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
@@ -7444,6 +7481,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -7512,6 +7552,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
@@ -7568,6 +7611,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can manage cloud provider tokens."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -16484,7 +16530,7 @@
                     "S3 Storages"
                 ],
                 "summary": "List S3 Storages",
-                "description": "List all S3 storages for the authenticated team.",
+                "description": "List all backup storages (S3, SFTP, FTPS, and WebDAV) for the authenticated team.",
                 "operationId": "list-s3-storages",
                 "responses": {
                     "200": {
@@ -16498,6 +16544,15 @@
                                             "uuid": {
                                                 "type": "string"
                                             },
+                                            "type": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "s3",
+                                                    "sftp",
+                                                    "ftps",
+                                                    "webdav"
+                                                ]
+                                            },
                                             "name": {
                                                 "type": "string"
                                             },
@@ -16509,16 +16564,29 @@
                                                 "type": "string"
                                             },
                                             "bucket": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "S3 only. Null for the other types."
                                             },
                                             "region": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "description": "S3 only. The other types have a placeholder value."
                                             },
                                             "use_path_style_endpoint": {
                                                 "type": "boolean"
                                             },
                                             "skip_tls_verification": {
                                                 "type": "boolean"
+                                            },
+                                            "private_key_uuid": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "SFTP only: the UUID of the private key used to log in. Null with a password login."
+                                            },
+                                            "sftp_host_key": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "SFTP only: the pinned host key of the server, as \"<key type> <base64>\". Saved by the first successful connection test."
                                             },
                                             "is_usable": {
                                                 "type": "boolean"
@@ -16568,12 +16636,20 @@
                                 "required": [
                                     "name",
                                     "endpoint",
-                                    "bucket",
-                                    "region",
-                                    "key",
-                                    "secret"
+                                    "key"
                                 ],
                                 "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "s3",
+                                            "sftp",
+                                            "ftps",
+                                            "webdav"
+                                        ],
+                                        "default": "s3",
+                                        "description": "The storage protocol. It cannot change later."
+                                    },
                                     "name": {
                                         "type": "string",
                                         "example": "My S3 Storage",
@@ -16587,17 +16663,17 @@
                                     "endpoint": {
                                         "type": "string",
                                         "example": "https:\/\/s3.us-east-1.amazonaws.com",
-                                        "description": "S3-compatible endpoint URL."
+                                        "description": "S3: the S3-compatible endpoint URL. SFTP and FTPS: sftp:\/\/host:port\/directory or ftps:\/\/host:port\/directory (explicit TLS); the directory is an absolute path, and without one the login directory is used. WebDAV: the https URL of the backup directory."
                                     },
                                     "bucket": {
                                         "type": "string",
                                         "example": "my-bucket",
-                                        "description": "S3 bucket name."
+                                        "description": "S3 bucket name. Required for S3, not allowed for the other types."
                                     },
                                     "region": {
                                         "type": "string",
                                         "example": "us-east-1",
-                                        "description": "S3 region."
+                                        "description": "S3 region. Required for S3, not allowed for the other types."
                                     },
                                     "use_path_style_endpoint": {
                                         "type": "boolean",
@@ -16605,15 +16681,20 @@
                                     },
                                     "skip_tls_verification": {
                                         "type": "boolean",
-                                        "description": "Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
+                                        "description": "S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
                                     },
                                     "key": {
                                         "type": "string",
-                                        "description": "Access key."
+                                        "description": "S3: the access key. Other types: the username."
                                     },
                                     "secret": {
                                         "type": "string",
-                                        "description": "Secret key."
+                                        "description": "S3: the secret key. Other types: the password. SFTP: not needed with private_key_uuid."
+                                    },
+                                    "private_key_uuid": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "SFTP only: the UUID of a private key of your team to log in with instead of a password."
                                     },
                                     "is_usable": {
                                         "type": "boolean",
@@ -16689,6 +16770,15 @@
                                         "uuid": {
                                             "type": "string"
                                         },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "s3",
+                                                "sftp",
+                                                "ftps",
+                                                "webdav"
+                                            ]
+                                        },
                                         "name": {
                                             "type": "string"
                                         },
@@ -16700,16 +16790,29 @@
                                             "type": "string"
                                         },
                                         "bucket": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "S3 only. Null for the other types."
                                         },
                                         "region": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "description": "S3 only. The other types have a placeholder value."
                                         },
                                         "use_path_style_endpoint": {
                                             "type": "boolean"
                                         },
                                         "skip_tls_verification": {
                                             "type": "boolean"
+                                        },
+                                        "private_key_uuid": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "SFTP only: the UUID of the private key used to log in. Null with a password login."
+                                        },
+                                        "sftp_host_key": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "SFTP only: the pinned host key of the server, as \"<key type> <base64>\". Saved by the first successful connection test."
                                         },
                                         "is_usable": {
                                             "type": "boolean"
@@ -16795,7 +16898,7 @@
                     "S3 Storages"
                 ],
                 "summary": "Update S3 Storage",
-                "description": "Update S3 storage by UUID.",
+                "description": "Update S3 storage by UUID. The type cannot change, and only the fields of the storage type are accepted.",
                 "operationId": "update-s3-storage-by-uuid",
                 "parameters": [
                     {
@@ -16826,15 +16929,15 @@
                                     },
                                     "endpoint": {
                                         "type": "string",
-                                        "description": "S3-compatible endpoint URL."
+                                        "description": "The endpoint URL, in the format of the storage type (see Create S3 Storage)."
                                     },
                                     "bucket": {
                                         "type": "string",
-                                        "description": "S3 bucket name."
+                                        "description": "S3 bucket name. Only for S3 storages."
                                     },
                                     "region": {
                                         "type": "string",
-                                        "description": "S3 region."
+                                        "description": "S3 region. Only for S3 storages."
                                     },
                                     "use_path_style_endpoint": {
                                         "type": "boolean",
@@ -16842,15 +16945,20 @@
                                     },
                                     "skip_tls_verification": {
                                         "type": "boolean",
-                                        "description": "Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
+                                        "description": "S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
                                     },
                                     "key": {
                                         "type": "string",
-                                        "description": "Access key."
+                                        "description": "S3: the access key. Other types: the username."
                                     },
                                     "secret": {
                                         "type": "string",
-                                        "description": "Secret key."
+                                        "description": "S3: the secret key. Other types: the password. SFTP: sending a password switches the login to the password."
+                                    },
+                                    "private_key_uuid": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "SFTP only: the UUID of a private key of your team to log in with. Null switches the login to the saved password."
                                     },
                                     "is_usable": {
                                         "type": "boolean",
@@ -16901,7 +17009,7 @@
                     "S3 Storages"
                 ],
                 "summary": "Validate S3 Storage",
-                "description": "Validate an S3 storage connection using ListObjectsV2.",
+                "description": "Validate a storage connection. S3: lists the bucket (ListObjectsV2). SFTP, FTPS, and WebDAV: lists the backup directory; for SFTP, the first successful validation pins the host key of the server.",
                 "operationId": "validate-s3-storage-by-uuid",
                 "parameters": [
                     {
@@ -19400,6 +19508,167 @@
                 ]
             }
         },
+        "\/servers\/{uuid}\/image-scanning": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Get image scanning settings",
+                "description": "Get the image vulnerability scanning settings of a server owned by the authenticated team, and the state of the scanner on the server. Needs a team admin or owner.",
+                "operationId": "get-server-image-scanning",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Image scanning settings.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "is_image_scanning_allowed": {
+                                            "description": "Whether the Coolify instance allows image scanning.",
+                                            "type": "boolean",
+                                            "readOnly": true
+                                        },
+                                        "is_image_scan_enabled": {
+                                            "description": "Whether the server scans the images of its resources.",
+                                            "type": "boolean"
+                                        },
+                                        "scanner_state": {
+                                            "description": "State of the scanner on the server. Null when unknown.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "enum": [
+                                                "pulling",
+                                                "updating_database",
+                                                "ready",
+                                                "failed"
+                                            ]
+                                        },
+                                        "scanner_failed_step": {
+                                            "description": "The step that failed when scanner_state is failed.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "scanner_built_at": {
+                                            "description": "Time of the vulnerability database on the server.",
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "format": "date-time"
+                                        },
+                                        "scanner_disk_used_bytes": {
+                                            "description": "Disk space that the scanner uses on the server.",
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "Needs a team admin or owner."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Update image scanning settings",
+                "description": "Turn image vulnerability scanning of a server owned by the authenticated team on or off. Turning it on gets the scanner on the server in the background.",
+                "operationId": "update-server-image-scanning",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "is_image_scan_enabled"
+                                ],
+                                "properties": {
+                                    "is_image_scan_enabled": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated image scanning settings."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "Needs a team admin or owner."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "The instance does not allow image scanning, or another Coolify instance manages the server."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/servers\/{uuid}\/log-drains": {
             "get": {
                 "tags": [
@@ -20677,6 +20946,11 @@
                                         ],
                                         "example": "traefik",
                                         "description": "The proxy type."
+                                    },
+                                    "ssh_host_key": {
+                                        "type": "string",
+                                        "example": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...",
+                                        "description": "The SSH host key(s) of the server, as public key lines (for example the content of \/etc\/ssh\/ssh_host_ed25519_key.pub) or known_hosts lines. Without it, Coolify trusts the key that the server sends on the first connection."
                                     }
                                 },
                                 "type": "object"
@@ -20799,6 +21073,16 @@
                         "name": "delete_from_provider",
                         "in": "query",
                         "description": "Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone. Needs the deploy permission.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "remove_ssh_key",
+                        "in": "query",
+                        "description": "Remove the public key of the server's SSH key from ~\/.ssh\/authorized_keys on the server before the server is deleted. The server must have no resources. If the key cannot be removed, the server is not deleted.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
@@ -21194,6 +21478,87 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/host-key\/reset": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Reset host key",
+                "description": "Remove the trusted SSH host key of the server, or trust the given key. Without ssh_host_key, Coolify trusts the key that the server sends on the next connection.",
+                "operationId": "reset-server-host-key-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "ssh_host_key": {
+                                        "description": "The SSH host key(s) to trust, as public key lines or known_hosts lines.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Host key reset.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Host key reset."
+                                        },
+                                        "ssh_host_key_fingerprints": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Only team admins and owners can reset the host key."
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
@@ -25617,13 +25982,15 @@
                     "content": {
                         "application\/json": {
                             "schema": {
-                                "required": [
-                                    "is_build_server_fallback_enabled"
-                                ],
+                                "minProperties": 1,
                                 "properties": {
                                     "is_build_server_fallback_enabled": {
                                         "type": "boolean",
                                         "description": "Whether deployments can fall back to the deployment server when no usable dedicated build server is available."
+                                    },
+                                    "scan_images_on_new_servers": {
+                                        "type": "boolean",
+                                        "description": "Whether image scanning is turned on for servers added to the team from now on."
                                     }
                                 },
                                 "type": "object"
@@ -26220,6 +26587,314 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/vulnerabilities": {
+            "get": {
+                "tags": [
+                    "Vulnerabilities"
+                ],
+                "summary": "List vulnerabilities",
+                "description": "List the applications, services, and databases of the authenticated team with their stored security status from image scanning.",
+                "operationId": "list-vulnerabilities",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Comma-separated statuses to return.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "update_now,update_available"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Resources with their security status, worst first.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "is_image_scanning_allowed": {
+                                            "type": "boolean"
+                                        },
+                                        "resources": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "uuid": {
+                                                        "type": "string"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "database"
+                                                        ]
+                                                    },
+                                                    "project_uuid": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "environment_uuid": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "server_uuid": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "images": {
+                                                        "properties": {
+                                                            "update": {
+                                                                "type": "integer"
+                                                            },
+                                                            "total": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "security": {
+                                                        "$ref": "#\/components\/schemas\/SecurityStatus"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/vulnerabilities": {
+            "get": {
+                "tags": [
+                    "Vulnerabilities"
+                ],
+                "summary": "Get application vulnerabilities",
+                "description": "Get the security status, the scanned images, and the vulnerabilities of an application.",
+                "operationId": "get-application-vulnerabilities",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Application UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityState"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilitySeverity"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityImage"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilitySearch"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityPage"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityPerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scan results.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceVulnerabilities"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/vulnerabilities": {
+            "get": {
+                "tags": [
+                    "Vulnerabilities"
+                ],
+                "summary": "Get service vulnerabilities",
+                "description": "Get the security status, the scanned images, and the vulnerabilities of the applications and databases of a service.",
+                "operationId": "get-service-vulnerabilities",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Service UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityState"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilitySeverity"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityImage"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilitySearch"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityPage"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityPerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scan results.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceVulnerabilities"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/vulnerabilities": {
+            "get": {
+                "tags": [
+                    "Vulnerabilities"
+                ],
+                "summary": "Get database vulnerabilities",
+                "description": "Get the security status, the scanned image, and the vulnerabilities of a standalone database.",
+                "operationId": "get-database-vulnerabilities",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Database UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityState"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilitySeverity"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityImage"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilitySearch"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityPage"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/VulnerabilityPerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scan results.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceVulnerabilities"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -26949,6 +27624,305 @@
                 },
                 "type": "object"
             },
+            "SecurityStatus": {
+                "description": "Security status of a resource from image scanning.",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "update_now",
+                            "update_available",
+                            "no_fix",
+                            "check_needed",
+                            "ok",
+                            "not_checked"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "description": "What to do, as the UI shows it.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "check_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "problem_count": {
+                        "type": "integer"
+                    },
+                    "exploited_count": {
+                        "type": "integer"
+                    },
+                    "any_exploited": {
+                        "type": "boolean"
+                    },
+                    "critical_count": {
+                        "type": "integer"
+                    },
+                    "high_count": {
+                        "type": "integer"
+                    },
+                    "medium_count": {
+                        "type": "integer"
+                    },
+                    "eol": {
+                        "description": "The end-of-life OS of the image.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "checked_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "actions": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "type": {
+                                    "type": "string"
+                                },
+                                "sentence": {
+                                    "type": "string"
+                                },
+                                "target": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "copy": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "image": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "ref": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ResourceVulnerabilities": {
+                "description": "Image scan results of a resource.",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "application",
+                            "service",
+                            "database"
+                        ]
+                    },
+                    "off_reason": {
+                        "description": "Why the resource is not scanned. Null when it is scanned.",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "instance",
+                            "server",
+                            "application"
+                        ]
+                    },
+                    "security": {
+                        "oneOf": [
+                            {
+                                "$ref": "#\/components\/schemas\/SecurityStatus"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "scan_uuid": {
+                                    "type": "string"
+                                },
+                                "owner_uuid": {
+                                    "description": "The application, database, or service application or database that runs the image.",
+                                    "type": "string"
+                                },
+                                "image_ref": {
+                                    "type": "string"
+                                },
+                                "scan_status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "queued",
+                                        "running",
+                                        "completed",
+                                        "failed"
+                                    ]
+                                },
+                                "error_code": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "scanned_at": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "format": "date-time"
+                                },
+                                "truncated": {
+                                    "type": "boolean"
+                                },
+                                "security_status": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "findings": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "display_id": {
+                                    "type": "string"
+                                },
+                                "aliases": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "severity": {
+                                    "type": "string",
+                                    "enum": [
+                                        "critical",
+                                        "high",
+                                        "medium",
+                                        "low",
+                                        "unknown"
+                                    ]
+                                },
+                                "package": {
+                                    "type": "string"
+                                },
+                                "version": {
+                                    "type": "string"
+                                },
+                                "package_type": {
+                                    "type": "string"
+                                },
+                                "fixed_in": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "state": {
+                                    "description": "fixed: a fix is available upstream.",
+                                    "type": "string",
+                                    "enum": [
+                                        "fixed",
+                                        "no_fix",
+                                        "ignored"
+                                    ]
+                                },
+                                "ignore": {
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
+                                },
+                                "kev": {
+                                    "description": "Listed in the CISA Known Exploited Vulnerabilities catalog.",
+                                    "type": "boolean"
+                                },
+                                "epss": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "risk": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "cvss_score": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "advisory_url": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "image_ref": {
+                                    "type": "string"
+                                },
+                                "owner_uuid": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "pagination": {
+                        "properties": {
+                            "page": {
+                                "type": "integer"
+                            },
+                            "per_page": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
             "ApplicationPreview": {
                 "properties": {
                     "uuid": {
@@ -27632,6 +28606,11 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Git full URL."
+                    },
+                    "git_ssh_known_hosts": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "SSH host keys (known_hosts lines) of self-hosted Git hosts that git over SSH accepts. Saved on the first deployment."
                     },
                     "git_https_username": {
                         "type": "string",
@@ -28699,6 +29678,50 @@
                     "is_reachable": {
                         "type": "boolean"
                     },
+                    "ssh_host_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Pinned SSH host key(s) of the server, one \"type base64\" line per key."
+                    },
+                    "ssh_host_key_source": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tofu",
+                            "upgrade",
+                            "transfer",
+                            "manual"
+                        ]
+                    },
+                    "ssh_host_key_trusted_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "ssh_host_key_pending": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Host key that the server sent when it did not match the pinned key."
+                    },
+                    "is_ssh_host_key_check_disabled": {
+                        "type": "boolean"
+                    },
+                    "ssh_host_key_fingerprints": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true,
+                        "description": "SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them."
+                    },
+                    "ssh_host_key_pending_fingerprints": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "readOnly": true,
+                        "description": "SHA256 fingerprints of the host key that did not match."
+                    },
                     "is_sentinel_enabled": {
                         "type": "boolean"
                     },
@@ -28979,6 +30002,10 @@
                         "type": "boolean",
                         "description": "Whether deployments can fall back to the deployment server when no usable dedicated build server is available."
                     },
+                    "scan_images_on_new_servers": {
+                        "type": "boolean",
+                        "description": "Whether image scanning is turned on for servers added to the team from now on."
+                    },
                     "members": {
                         "description": "The members of the team.",
                         "type": "array",
@@ -29170,6 +30197,65 @@
                 }
             }
         },
+        "parameters": {
+            "VulnerabilityState": {
+                "name": "state",
+                "in": "query",
+                "description": "Comma-separated finding states: fixed, no_fix, ignored. All when not sent.",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "VulnerabilitySeverity": {
+                "name": "severity",
+                "in": "query",
+                "description": "Comma-separated severities: critical, high, medium, low, unknown.",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "VulnerabilityImage": {
+                "name": "image",
+                "in": "query",
+                "description": "Only the findings of this scanned image ref.",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "VulnerabilitySearch": {
+                "name": "search",
+                "in": "query",
+                "description": "Text in the vulnerability ID, an alias, the package, or the version.",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "VulnerabilityPage": {
+                "name": "page",
+                "in": "query",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 1,
+                    "minimum": 1
+                }
+            },
+            "VulnerabilityPerPage": {
+                "name": "per_page",
+                "in": "query",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 50,
+                    "maximum": 200,
+                    "minimum": 1
+                }
+            }
+        },
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
@@ -29298,6 +30384,10 @@
         {
             "name": "Teams",
             "description": "Teams"
+        },
+        {
+            "name": "Vulnerabilities",
+            "description": "Vulnerabilities"
         },
         {
             "name": "Vultr",

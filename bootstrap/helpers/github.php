@@ -5,6 +5,7 @@ use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -199,7 +200,10 @@ function githubAppPrivateKey(GithubApp $source): ?PrivateKey
     return $privateKey?->team_id === $source->team_id ? $privateKey : null;
 }
 
-function generateGithubToken(GithubApp $source, string $type)
+/**
+ * @param  int|null  $timeout  Seconds for each request to GitHub. Null keeps the HTTP client default.
+ */
+function generateGithubToken(GithubApp $source, string $type, ?int $timeout = null)
 {
     $privateKey = githubAppPrivateKey($source) ?? throw new RuntimeException('Private key not found for this GitHub App.');
 
@@ -218,8 +222,8 @@ function generateGithubToken(GithubApp $source, string $type)
 
     return match ($type) {
         'jwt' => $jwt,
-        'installation' => (function () use ($source, $jwt) {
-            $response = Http::GitSource($source->api_url)->withHeaders([
+        'installation' => (function () use ($source, $jwt, $timeout) {
+            $response = githubRequestTimeout(Http::GitSource($source->api_url), $timeout)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
             ])->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false)->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
@@ -239,9 +243,17 @@ function generateGithubToken(GithubApp $source, string $type)
     };
 }
 
-function generateGithubInstallationToken(GithubApp $source)
+function generateGithubInstallationToken(GithubApp $source, ?int $timeout = null)
 {
-    return $source->installationToken();
+    return $source->installationToken($timeout);
+}
+
+/**
+ * Limits how long a request waits for GitHub, both to connect and for the whole answer.
+ */
+function githubRequestTimeout(PendingRequest $request, ?int $timeout): PendingRequest
+{
+    return $timeout === null ? $request : $request->connectTimeout($timeout)->timeout($timeout);
 }
 
 function generateGithubJwt(GithubApp $source)
@@ -249,7 +261,7 @@ function generateGithubJwt(GithubApp $source)
     return generateGithubToken($source, 'jwt');
 }
 
-function githubApi(?GithubApp $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
+function githubApi(?GithubApp $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true, ?int $timeout = null)
 {
     if (is_null($source)) {
         throw new Exception('Source is required for API calls');
@@ -259,9 +271,9 @@ function githubApi(?GithubApp $source, string $endpoint, string $method = 'get',
         throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
-    $request = $source->is_public
+    $request = githubRequestTimeout($source->is_public
         ? Http::GitHub($source->api_url)
-        : Http::GitHub($source->api_url, generateGithubInstallationToken($source));
+        : Http::GitHub($source->api_url, generateGithubInstallationToken($source, $timeout)), $timeout);
 
     // Only reads are retried: a repeated POST could create a second pull request comment.
     if (strtolower($method) === 'get') {

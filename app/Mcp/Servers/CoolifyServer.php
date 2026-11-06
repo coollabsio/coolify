@@ -34,6 +34,7 @@ use App\Mcp\Tools\GetServerResources;
 use App\Mcp\Tools\GetService;
 use App\Mcp\Tools\GetServiceApplication;
 use App\Mcp\Tools\GetServiceDatabase;
+use App\Mcp\Tools\GetVulnerabilities;
 use App\Mcp\Tools\ListApplicationPreviews;
 use App\Mcp\Tools\ListApplications;
 use App\Mcp\Tools\ListAuditEvents;
@@ -70,6 +71,7 @@ use App\Mcp\Tools\ManageDestination;
 use App\Mcp\Tools\ManageDns;
 use App\Mcp\Tools\ManageEnv;
 use App\Mcp\Tools\ManageGitSource;
+use App\Mcp\Tools\ManageImageScanning;
 use App\Mcp\Tools\ManageIntegrationTokens;
 use App\Mcp\Tools\ManageNotifications;
 use App\Mcp\Tools\ManagePreview;
@@ -118,6 +120,7 @@ Then: list_*/get_* for details. Debug is DB-first:
 - list_deployments → get_deployment(include_log_summary=true)
 - list_env_keys / list_shared_env_keys (names only, never values)
 - get_logs only if status is running; on failure use reason + next_tools (do not loop)
+- get_vulnerabilities — image vulnerability scan results (list for the team, resource for one app/service/database); manage_image_scanning turns scanning on or off
 
 Lifecycle (requires token ability **deploy**):
 - control (start|stop|restart; stop needs confirm=true)
@@ -128,7 +131,7 @@ Changes (requires token ability **write**, or **delete** for delete actions): ma
 Prompts: troubleshoot_application, explain_failed_deploy.
 Resources: coolify://overview, coolify://application/{uuid}.
 
-Responses: `{ data, _actions?, _pagination? }`. Private keys, S3 secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
+Responses: `{ data, _actions?, _pagination? }`. Private keys, storage secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
 MD;
 
     /**
@@ -218,6 +221,8 @@ MD;
         ManageNotifications::class,
         ListAuditEvents::class,
         GetServerMetrics::class,
+        GetVulnerabilities::class,
+        ManageImageScanning::class,
     ];
 
     /**
@@ -244,6 +249,7 @@ MD;
         ManageTags::class,
         ManageServer::class,
         ManageProxy::class,
+        ManageImageScanning::class,
         ManageCloudflareTunnel::class,
         DockerCleanup::class,
         ManageDestination::class,

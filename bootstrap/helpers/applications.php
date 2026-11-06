@@ -5,6 +5,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\CancelPreviousDeployments;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\CancelSupersededDeploymentJob;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -16,11 +17,13 @@ use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Services\Dns\ResourceDnsRecords;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null)
 {
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $commit = validateGitRef($commit, 'deployment commit');
@@ -43,7 +46,7 @@ function queue_application_deployment(Application $application, string $deployme
     $is_mcp = $is_mcp || request()->attributes->get('mcp_rest_bridge') === true;
     $is_api = $is_api && ! $is_mcp;
 
-    $admission = DB::transaction(function () use ($application, $application_id, $cancel_previous, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_mcp, $is_webhook, $no_questions_asked, $only_this_server, $parent_deployment_uuid, $pull_request_id, $restart_only, $rollback, $server_id, $server_name) {
+    $admission = DB::transaction(function () use ($application, $application_id, $cancel_previous, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_mcp, $is_webhook, $no_questions_asked, $only_this_server, $parent_deployment_uuid, $pull_request_id, $restart_only, $rollback, $scan_gate_bypassed_by, $scan_gate_pinned_image, $server_id, $server_name) {
         // Lock stable rows because an empty deployment queue has no row to lock.
         Application::query()->whereKey($application_id)->lockForUpdate()->firstOrFail();
         $serverForQueueCheck = Server::query()->whereKey($server_id)->lockForUpdate()->firstOrFail();
@@ -95,6 +98,9 @@ function queue_application_deployment(Application $application, string $deployme
             'git_type' => $git_type,
             'only_this_server' => $only_this_server,
             'parent_deployment_uuid' => $parent_deployment_uuid,
+            'scan_gate_bypassed_by' => $scan_gate_bypassed_by,
+            // "Deploy anyway" of a Docker image starts the blocked image by its digest.
+            'scan_gate_result' => $scan_gate_pinned_image !== null ? ['repo_digest' => $scan_gate_pinned_image] : null,
         ]);
 
         $superseded = cancel_superseded_deployments($deployment, $application, $cancel_previous);
@@ -121,6 +127,12 @@ function queue_application_deployment(Application $application, string $deployme
     foreach ($admission['superseded'] as $kind => $cancelled) {
         foreach ($cancelled as $old) {
             $old->addLogEntry("Deployment cancelled: the newer deployment {$deployment_uuid} (commit {$commit}) replaces it.", 'stderr');
+            // The cancel is a query update, which fires no model event.
+            try {
+                SyncGithubDeploymentJob::dispatchFor($old);
+            } catch (Throwable $e) {
+                Log::warning("Failed to queue the GitHub deployment sync of superseded deployment {$old->deployment_uuid}: {$e->getMessage()}");
+            }
             if ($kind !== 'building') {
                 continue;
             }
@@ -359,6 +371,12 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
     Log::warning("Deployment {$deployment->deployment_uuid} could not be started: {$exception->getMessage()}");
 
     $deployment->refresh();
+    // The query update above fires no model event.
+    try {
+        SyncGithubDeploymentJob::dispatchFor($deployment);
+    } catch (Throwable $e) {
+        Log::warning("Failed to queue the GitHub deployment sync of deployment {$deployment->deployment_uuid}: {$e->getMessage()}");
+    }
     $deployment->addLogEntry('========================================', 'stderr');
     $deployment->addLogEntry("Deployment could not be started: {$exception->getMessage()}", 'stderr');
     $deployment->addLogEntry('========================================', 'stderr');
@@ -665,12 +683,286 @@ function clone_application(Application $source, $destination, array $overrides =
 }
 
 /**
- * The SSH command that git uses to reach a repository.
+ * The published SSH host keys of the large git hosts, also for their SSH endpoints on port 443.
+ * ssh.github.com also serves the GitHub keys on port 22, where a `Port 443` in the SSH config ends because
+ * gitSshCommand() passes the port of the repository URL.
+ * Git over SSH to these hosts accepts only these keys. Update this list when a provider changes its host keys.
+ * GitLab.com does not publish its keys over HTTPS, so for gitlab.com an application also accepts the keys that are saved on its Source page.
+ *
+ * @see https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+ * @see https://api.github.com/meta (ssh_keys)
+ * @see https://docs.gitlab.com/user/gitlab_com/#ssh-known_hosts-entries
+ * @see https://bitbucket.org/site/ssh
+ * @see https://docs.github.com/en/authentication/troubleshooting-ssh/using-ssh-over-the-https-port
+ */
+const GIT_PINNED_HOST_KEYS = [
+    'github.com,ssh.github.com,[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl',
+    'github.com,ssh.github.com,[ssh.github.com]:443 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=',
+    'github.com,ssh.github.com,[ssh.github.com]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=',
+    'gitlab.com,[altssh.gitlab.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf',
+    'gitlab.com,[altssh.gitlab.com]:443 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFSMqzJeV9rUzU4kWitGjeR4PWSa29SPqJ1fVkhtj3Hw9xjLVXVYrU9QlYWrOLXBpQ6KWjbjTDTdDkoohFzgbEY=',
+    'gitlab.com,[altssh.gitlab.com]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsj2bNKTBSpIYDEGk9KxsGh3mySTRgMtXL583qmBpzeQ+jqCMRgBqB98u3z++J1sKlXHWfM9dyhSevkMwSbhoR8XIq/U0tCNyokEi/ueaBMCvbcTHhO7FcwzY92WK4Yt0aGROY5qX2UKSeOvuP4D6TPqKF1onrSzH9bx9XUf2lEdWT/ia1NEKjunUqu1xOB/StKDHMoX4/OKyIzuS0q/T1zOATthvasJFoPrAjkohTyaDUz2LN5JoH839hViyEG82yB+MjcFV5MU3N1l1QL3cVUCh93xSaua1N85qivl+siMkPGbO5xR/En4iEY6K2XPASUEMaieWVNTRCtJ4S8H+9',
+    'bitbucket.org,[altssh.bitbucket.org]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIazEu89wgQZ4bqs3d63QSMzYVa0MuJ2e2gKTKqu+UUO',
+    'bitbucket.org,[altssh.bitbucket.org]:443 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBPIQmuzMBuKdWeF4+a2sjSSpBK0iqitSQ+5BM9KhpexuGt20JpTVM7u5BDZngncgrqDMbWdxMWWOGtZ9UgbqgZE=',
+    'bitbucket.org,[altssh.bitbucket.org]:443 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDQeJzhupRu0u0cdegZIa8e86EG2qOCsIsD1Xw0xSeiPDlCr7kq97NLmMbpKTX6Esc30NuoqEEHCuc7yWtwp8dI76EEEB1VqY9QJq6vk+aySyboD5QF61I/1WeTwu+deCbgKMGbUijeXhtfbxSxm6JwGrXrhBdofTsbKRUsrN1WoNgUa8uqN1Vx6WAJw1JHPhglEGGHea6QICwJOAr/6mrui/oB7pkaWKHj3z7d1IC4KWLtY47elvjbaTlkN04Kc/5LFEirorGYVbt15kAUlqGM65pk6ZBxtaO3+30LVlORZkxOh+LKL/BvbZ/iRNhItLqNyieoQj/uh/7Iv4uyH/cV/0b4WDSd3DptigWq84lJubb9t/DnZlrJazxyDCulTmKdOR7vs9gMTo+uoIrPSb8ScTtvw65+odKAlBj59dhnVp9zd7QUojOpXlL62Aw56U4oO+FALuevvMjiWeavKhJqlR7i5n9srYcrNV7ttmDw7kf/97P5zauIhxcjX+xHv4M=',
+];
+
+/**
+ * The providers that publish their SSH host keys over HTTPS. "Fetch current host key" on the Source page reads
+ * them (fetchGitProviderHostKeys()), so deployments follow a key change without a Coolify release.
+ * GitLab publishes its keys only in its docs. The key is the host list of the provider's lines in GIT_PINNED_HOST_KEYS.
+ */
+const GIT_PROVIDER_HOST_KEY_SOURCES = [
+    'github.com,ssh.github.com,[ssh.github.com]:443' => 'https://api.github.com/meta',
+    'bitbucket.org,[altssh.bitbucket.org]:443' => 'https://bitbucket.org/site/ssh',
+];
+
+function gitProviderHostKeysCacheKey(string $hosts): string
+{
+    return 'git-provider-host-keys:'.$hosts;
+}
+
+/**
+ * The key of GIT_PROVIDER_HOST_KEY_SOURCES whose host list contains $host, or null.
+ */
+function gitProviderHostKeySource(string $host): ?string
+{
+    foreach (array_keys(GIT_PROVIDER_HOST_KEY_SOURCES) as $hosts) {
+        if (in_array(strtolower($host), gitKnownHostsLineHosts($hosts), true)) {
+            return $hosts;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Reads the host keys that a provider publishes over HTTPS and saves them for gitProviderHostKeys().
+ *
+ * @return list<string>
+ *
+ * @throws RuntimeException When the provider does not answer with valid keys. The saved keys do not change.
+ */
+function fetchGitProviderHostKeys(string $hosts): array
+{
+    $url = GIT_PROVIDER_HOST_KEY_SOURCES[$hosts];
+    $response = Http::timeout(10)->get($url);
+    if (! $response->successful()) {
+        throw new RuntimeException("Could not read the published host keys from {$url} (HTTP {$response->status()}).");
+    }
+    $keys = $hosts === array_key_first(GIT_PROVIDER_HOST_KEY_SOURCES)
+        ? (array) $response->json('ssh_keys')
+        : collect(preg_split('/\R/', $response->body()))
+            ->map(fn (string $line) => preg_split('/\s+/', trim($line)))
+            ->filter(fn (array $parts) => count($parts) >= 3 && $parts[0] === explode(',', $hosts)[0])
+            ->map(fn (array $parts) => "{$parts[1]} {$parts[2]}")
+            ->all();
+    $lines = collect($keys)
+        ->filter(fn ($key) => is_string($key))
+        ->map(fn (string $key) => $hosts.' '.trim($key))
+        ->unique()
+        ->values();
+    if ($lines->isEmpty() || $lines->contains(fn (string $line) => ! isValidGitKnownHostsLine($line))) {
+        throw new RuntimeException("The answer from {$url} has no valid host keys.");
+    }
+    Cache::forever(gitProviderHostKeysCacheKey($hosts), $lines->all());
+
+    return $lines->all();
+}
+
+/**
+ * GIT_PINNED_HOST_KEYS, with the lines of a provider replaced by the keys that it published last.
+ * A replaced list also drops a key that the provider withdrew.
+ *
+ * @return list<string>
+ */
+function gitProviderHostKeys(): array
+{
+    $lines = GIT_PINNED_HOST_KEYS;
+    foreach (array_keys(GIT_PROVIDER_HOST_KEY_SOURCES) as $hosts) {
+        $published = Cache::get(gitProviderHostKeysCacheKey($hosts));
+        if (is_array($published) && $published !== []) {
+            $lines = [...array_filter($lines, fn (string $line) => explode(' ', $line, 2)[0] !== $hosts), ...$published];
+        }
+    }
+
+    return array_values($lines);
+}
+
+function gitSshConfigFile(string $uuid): string
+{
+    return "/root/.ssh/coolify_git_{$uuid}.config";
+}
+
+function gitKnownHostsFile(string $uuid): string
+{
+    return "/root/.ssh/coolify_git_{$uuid}.known_hosts";
+}
+
+/**
+ * A known_hosts line without markers, hashed host names, or comments: `host[,host] key-type key`.
+ * A host with a custom SSH port is written as `[host]:port`.
+ */
+function isValidGitKnownHostsLine(string $line): bool
+{
+    $host = '(?:[A-Za-z0-9._:-]+|\[[A-Za-z0-9._:-]+\]:[0-9]{1,5})';
+    $keyType = '(?:ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)';
+
+    return preg_match("/\\A{$host}(?:,{$host})* {$keyType} [A-Za-z0-9+\/]+={0,2}\\z/", $line) === 1;
+}
+
+/**
+ * The host names of a known_hosts line, without brackets and ports.
+ *
+ * @return list<string>
+ */
+function gitKnownHostsLineHosts(string $line): array
+{
+    return array_map(
+        fn (string $host) => strtolower(preg_replace('/\A\[(.+)\]:[0-9]+\z/', '$1', $host)),
+        explode(',', strtok($line, ' ')),
+    );
+}
+
+/**
+ * The host names in GIT_PINNED_HOST_KEYS.
+ *
+ * @return list<string>
+ */
+function gitPinnedHosts(): array
+{
+    return array_values(array_unique(array_merge(...array_map(gitKnownHostsLineHosts(...), GIT_PINNED_HOST_KEYS))));
+}
+
+/**
+ * The host names of the providers in GIT_PROVIDER_HOST_KEY_SOURCES. Coolify reads their keys over HTTPS, so the
+ * keys that are saved for an application are not used for these hosts.
+ *
+ * @return list<string>
+ */
+function gitHostsWithPublishedKeys(): array
+{
+    return array_values(array_unique(array_merge(...array_map(gitKnownHostsLineHosts(...), array_keys(GIT_PROVIDER_HOST_KEY_SOURCES)))));
+}
+
+/**
+ * Whether a known_hosts line names a host of gitHostsWithPublishedKeys(). Deployments ignore such lines.
+ */
+function gitKnownHostsLineHasHostWithPublishedKeys(string $line): bool
+{
+    return array_intersect(gitKnownHostsLineHosts($line), gitHostsWithPublishedKeys()) !== [];
+}
+
+/**
+ * The valid known_hosts lines of a text, without blank lines, duplicates, and lines of gitHostsWithPublishedKeys().
+ *
+ * @return list<string>
+ */
+function gitKnownHostsLines(?string $text): array
+{
+    return collect(preg_split('/\R/', (string) $text))
+        ->map(fn (string $line) => preg_replace('/\s+/', ' ', trim($line)))
+        ->filter(fn (string $line) => isValidGitKnownHostsLine($line) && ! gitKnownHostsLineHasHostWithPublishedKeys($line))
+        ->unique()
+        ->values()
+        ->all();
+}
+
+/**
+ * The saved known_hosts lines, with the lines of the hosts in $fetchedLines replaced by $fetchedLines.
+ * A saved line belongs to a fetched host when one of its host entries has the same host and port.
+ *
+ * @param  list<string>  $fetchedLines
+ * @return list<string>
+ */
+function gitKnownHostsReplaceHostKeys(?string $saved, array $fetchedLines): array
+{
+    $entries = fn (string $line) => array_map(
+        fn (string $host) => strtolower(preg_match('/\A\[(.+)\]:([0-9]+)\z/', $host, $match) ? "{$match[1]}:{$match[2]}" : "{$host}:22"),
+        explode(',', strtok($line, ' ')),
+    );
+    $fetchedEntries = array_merge(...array_map($entries, $fetchedLines));
+    $otherLines = array_filter(gitKnownHostsLines($saved), fn (string $line) => array_intersect($entries($line), $fetchedEntries) === []);
+
+    return [...array_values($otherLines), ...$fetchedLines];
+}
+
+/**
+ * The host, key type, and SHA256 fingerprint of a known_hosts line, in the format that `ssh-keygen -lf` shows.
+ *
+ * @return array{host: string, type: string, fingerprint: string}
+ */
+function gitKnownHostFingerprint(string $line): array
+{
+    [$host, $type, $key] = explode(' ', $line);
+
+    return [
+        'host' => $host,
+        'type' => $type,
+        'fingerprint' => 'SHA256:'.rtrim(base64_encode(hash('sha256', (string) base64_decode($key), true)), '='),
+    ];
+}
+
+/**
+ * A shell command that writes the SSH config and known_hosts file that gitSshCommand() uses.
+ * Run it in the place where git runs (the helper container or the server) before git uses SSH.
+ *
+ * The hosts in GIT_PINNED_HOST_KEYS must show one of their published keys (gitProviderHostKeys()), or for gitlab.com also
+ * a key in $knownHosts. Other hosts are trusted on
+ * first use: SSH adds the key of a new host to the known_hosts file and rejects a changed key of a known
+ * host. $knownHosts are the keys that earlier deployments saved (Application::$git_ssh_known_hosts).
+ * The config of the SSH user is read after these rules, so it cannot change StrictHostKeyChecking or
+ * UserKnownHostsFile. Root on the server can still add trusted keys (for example with KnownHostsCommand
+ * or GlobalKnownHostsFile), which is trusted by design. `~` in the Include is resolved from $HOME.
+ *
+ * With $onServer, the command first tests whether the ssh of the server supports accept-new (OpenSSH 7.6+,
+ * which also has Include). An older ssh rejects the whole config, so there every host is checked strictly
+ * against the pinned and saved keys, with no trust on first use, and the config of root and the system
+ * config are appended to the file instead of included.
+ */
+function gitSshSetupCommand(string $uuid, ?string $knownHosts = null, bool $onServer = false): string
+{
+    $knownHostsFile = gitKnownHostsFile($uuid);
+    $pinnedHosts = implode(' ', gitPinnedHosts());
+    $config = implode("\n", [
+        "Host {$pinnedHosts}",
+        '    StrictHostKeyChecking yes',
+        'Host *',
+        '    StrictHostKeyChecking accept-new',
+        "    UserKnownHostsFile {$knownHostsFile}",
+        '    HashKnownHosts no',
+        '    Include ~/.ssh/config /etc/ssh/ssh_config',
+    ])."\n";
+    $knownHostsContent = implode("\n", [...gitProviderHostKeys(), ...gitKnownHostsLines($knownHosts)])."\n";
+    $write = fn (string $content, string $file) => "echo '".base64_encode($content)."' | base64 -d | tee {$file} > /dev/null";
+    $setup = 'mkdir -p /root/.ssh && '.$write($knownHostsContent, $knownHostsFile).' && ';
+    if (! $onServer) {
+        return $setup.$write($config, gitSshConfigFile($uuid));
+    }
+
+    $strictConfig = implode("\n", [
+        'Host *',
+        '    StrictHostKeyChecking yes',
+        "    UserKnownHostsFile {$knownHostsFile}",
+        '    HashKnownHosts no',
+    ])."\n";
+
+    return $setup.'if ssh -F /dev/null -G -o StrictHostKeyChecking=accept-new localhost > /dev/null 2>&1; then '.$write($config, gitSshConfigFile($uuid))
+        ."; else { echo '".base64_encode($strictConfig)."' | base64 -d; cat /root/.ssh/config /etc/ssh/ssh_config 2> /dev/null; } | tee ".gitSshConfigFile($uuid).' > /dev/null; fi';
+}
+
+/**
+ * The SSH command that git uses to reach a repository. Run gitSshSetupCommand() with the same $uuid first.
+ * Without a port, SSH uses the port of the repository URL.
  * The keepalive options stop a stalled connection after about one minute; without them git waits until the deployment timeout.
  */
-function gitSshCommand(int|string $port, ?string $identityFile = null, bool $identitiesOnly = true): string
+function gitSshCommand(string $uuid, int|string|null $port = null, ?string $identityFile = null, bool $identitiesOnly = true): string
 {
-    $command = "ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p {$port} -o Port={$port} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+    $command = 'ssh -F '.gitSshConfigFile($uuid).' -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4';
+    if ($port !== null) {
+        $command .= " -p {$port} -o Port={$port}";
+    }
+    $command .= ' -o LogLevel=ERROR';
 
     if ($identityFile !== null) {
         $command .= " -i {$identityFile}".($identitiesOnly ? ' -o IdentitiesOnly=yes' : '');

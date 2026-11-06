@@ -627,6 +627,7 @@ describe('GitHub App runner permissions', function () {
                 'permissions' => ['contents' => 'read', 'metadata' => 'read', 'organization_self_hosted_runners' => 'write', 'actions' => 'read'],
                 'events' => ['push', 'workflow_job'],
             ]),
+            "https://api.github.com/app/installations/{$this->githubApp->installation_id}" => Http::response(['permissions' => []]),
         ]);
 
         GithubAppPermissionJob::dispatchSync($this->githubApp);

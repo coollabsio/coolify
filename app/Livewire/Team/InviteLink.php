@@ -3,6 +3,7 @@
 namespace App\Livewire\Team;
 
 use App\Enums\AccessScope;
+use App\Enums\Role;
 use App\Livewire\Team\Member\Access;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -13,6 +14,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -24,17 +26,20 @@ class InviteLink extends Component
 
     public string $role = 'member';
 
+    protected function rules(): array
+    {
+        return [
+            'email' => 'required|email',
+            'role' => ['required', Rule::enum(Role::class)],
+        ];
+    }
+
     /**
      * Grants for an invited member, set by the access editor. Checked again on invite.
      *
      * @var list<array{scope: string, uuid: string|null, levels: list<string>}>
      */
     public array $grants = [];
-
-    protected $rules = [
-        'email' => 'required|email',
-        'role' => 'required|string',
-    ];
 
     public function mount()
     {
@@ -78,11 +83,11 @@ class InviteLink extends Component
             $this->validate();
 
             // Prevent privilege escalation: users cannot invite someone with higher privileges
-            $userRole = auth()->user()->role();
-            if (is_null($userRole) || ($userRole === 'member' && in_array($this->role, ['admin', 'owner']))) {
+            $userRole = Role::tryFrom((string) auth()->user()->role());
+            if (is_null($userRole) || ($userRole === Role::MEMBER && Role::from($this->role)->gt(Role::MEMBER))) {
                 throw new \Exception('Members cannot invite admins or owners.');
             }
-            if ($userRole === 'admin' && $this->role === 'owner') {
+            if ($userRole === Role::ADMIN && Role::from($this->role) === Role::OWNER) {
                 throw new \Exception('Admins cannot invite owners.');
             }
 
@@ -121,7 +126,7 @@ class InviteLink extends Component
             $user = User::whereEmail($this->email)->first();
 
             // A user who never set a password cannot log in, so they get a magic link with a new temporary password.
-            if (is_null($user) || $user->isUnusedInvitedAccount()) {
+            if (is_null($user) || $user->canReceiveInvitationLoginFrom(currentTeam()->id)) {
                 $password = Str::password();
                 if (is_null($user)) {
                     $user = User::create([

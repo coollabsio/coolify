@@ -41,7 +41,7 @@ test('send test is available when transactional email is enabled', function () {
         ->assertSee('Send test');
 });
 
-test('send test is not rendered when transactional email is disabled', function () {
+test('send test is disabled when transactional email is disabled', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     InstanceSettings::forceCreate([
         'id' => 0,
@@ -58,5 +58,6 @@ test('send test is not rendered when transactional email is disabled', function 
 
     Livewire::test(SettingsEmail::class)
         ->assertOk()
-        ->assertDontSee('Send test');
+        ->assertSee('Save an email provider first.')
+        ->assertDontSee('Send Test Email');
 });

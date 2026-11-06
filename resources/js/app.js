@@ -8,6 +8,8 @@ import './traffic-table.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
+import { dismissSecurityCallout, securityCallout } from './security-callout.js';
+import { vulnerabilitySearchItem } from './vulnerability-search.js';
 
 // The canvases (Svelte, Svelte Flow) load only on pages that have one. After the
 // import, each canvas mounts itself, also after later Livewire SPA navigation.
@@ -31,6 +33,13 @@ document.addEventListener('livewire:navigated', loadCanvases);
 
 // Used by the modal-confirmation Blade component to call its submitAction.
 window.parseModalSubmitAction = parseSubmitAction;
+
+// Used by the command palette (global-search.blade.php) for vulnerability IDs.
+window.vulnerabilitySearchItem = vulnerabilitySearchItem;
+
+// Used by the dashboard security callout (dashboard.blade.php).
+window.securityCallout = securityCallout;
+window.dismissSecurityCallout = dismissSecurityCallout;
 
 // Used by the log viewers to copy logs that a Livewire call still loads.
 window.copyTextToClipboard = copyTextToClipboard;

@@ -264,7 +264,7 @@
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
                             $databaseS3s = ($databaseBackup->s3Storages->isNotEmpty() ? $databaseBackup->s3Storages : collect([$databaseBackup->s3])->filter())->where('team_id', $serviceTeamId);
-                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3s->isNotEmpty() ? 'S3 storage: '.$databaseS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
+                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3s->isNotEmpty() ? 'S3 storage: '.$databaseS3s->map(fn ($s3) => $s3->name.' ('.($s3->isS3() ? 'bucket: '.$s3->bucket : $s3->type->label()).')')->join(', ') : 'S3 storage: Unavailable');
                         @endphp
                         <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
                             x-show="isVisible(@js($databaseBackupId))"
@@ -306,7 +306,7 @@
                         @php
                             $latestExecution = $backup->latestExecution;
                             $volumeS3s = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId);
-                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3s->isNotEmpty() ? 'S3 storage: '.$volumeS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
+                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3s->isNotEmpty() ? 'S3 storage: '.$volumeS3s->map(fn ($s3) => $s3->name.' ('.($s3->isS3() ? 'bucket: '.$s3->bucket : $s3->type->label()).')')->join(', ') : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {
                                 'running' => 'In progress',

@@ -67,6 +67,7 @@ function expectPrivateKeyMaterializationCommandsSkipLogging(array|Collection|str
  * ephemeral container, so it needs no cleanup.
  */
 $keyPath = '/root/.ssh/id_rsa_coolify_test-deployment-uuid';
+$gitSshFiles = '/root/.ssh/coolify_git_test-deployment-uuid.config /root/.ssh/coolify_git_test-deployment-uuid.known_hosts';
 
 it('skips logging the docker deploy key materialization command before ls-remote', function () {
     $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
@@ -118,7 +119,7 @@ it('supports skipping command log entries without adding a hidden command entry'
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $command));
 });
 
-it('writes a deploy key to a per-deployment path and cleans it up for ls-remote on the host', function () use ($keyPath) {
+it('writes a deploy key to a per-deployment path and cleans it up for ls-remote on the host', function () use ($keyPath, $gitSshFiles) {
     $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
     $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
 
@@ -132,7 +133,7 @@ it('writes a deploy key to a per-deployment path and cleans it up for ls-remote 
 
     expectCommandListToContain($result['commands'], "tee {$keyPath}");
     expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
-    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT"); // removed when the shell exits
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT"); // removed when the shell exits
     expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >'); // never overwrites the host root's own key
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
@@ -156,7 +157,7 @@ it('writes a deploy key to a per-deployment path for ls-remote inside docker wit
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
-it('writes a GitLab source private key to a per-deployment path with cleanup on the host', function () use ($keyPath) {
+it('writes a GitLab source private key to a per-deployment path with cleanup on the host', function () use ($keyPath, $gitSshFiles) {
     $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
     $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
 
@@ -178,12 +179,12 @@ it('writes a GitLab source private key to a per-deployment path with cleanup on 
 
     expectCommandListToContain($result['commands'], "tee {$keyPath}");
     expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
-    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT");
     expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
-it('writes a deploy key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath) {
+it('writes a deploy key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath, $gitSshFiles) {
     $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
     $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
 
@@ -205,12 +206,12 @@ it('writes a deploy key to a per-deployment path and cleans it up when cloning o
 
     expectCommandListToContain($result['commands'], "tee {$keyPath}");
     expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
-    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT");
     expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
-it('writes a GitLab source private key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath) {
+it('writes a GitLab source private key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath, $gitSshFiles) {
     $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
     $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
 
@@ -238,7 +239,7 @@ it('writes a GitLab source private key to a per-deployment path and cleans it up
 
     expectCommandListToContain($result['commands'], "tee {$keyPath}");
     expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
-    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath}' EXIT");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT");
     expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
@@ -262,8 +263,9 @@ it('uses the per-deployment deploy key for pull request fetches', function () us
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
 
-    expectCommandListToContain($result['commands'], "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify");
-    expectCommandListNotToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListToContain($result['commands'], "GIT_SSH_COMMAND=\"ssh -F /root/.ssh/coolify_git_test-deployment-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify");
+    expectCommandListNotToContain($result['commands'], '-i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListNotToContain($result['commands'], 'StrictHostKeyChecking=no');
     expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
 });
 
@@ -282,6 +284,7 @@ it('does not force a missing per-deployment key for other repository pull reques
 
     $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
 
-    expectCommandListToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -F /root/.ssh/coolify_git_test-deployment-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
     expectCommandListNotToContain($result['commands'], $keyPath);
+    expectCommandListNotToContain($result['commands'], 'StrictHostKeyChecking=no');
 });

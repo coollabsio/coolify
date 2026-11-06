@@ -36,7 +36,7 @@
 - In tests, turning on `is_metrics_enabled` (and other Sentinel settings) with `save()`/`update()` runs the settings hook, which starts Sentinel over a real SSH connection on the sync queue. Use `saveQuietly()` or `Queue::fake()`.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 - The root team (id 0) has `personal_team = true`, so `personal_team` does not identify a user's own team. To clean up test users, detach them from shared teams and then delete the user; never delete a team selected by a filter. A Team delete revokes the team's API tokens and deletes its private keys before any guard can stop it.
-- SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely.
+- SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely. `Rule::exists()->where('column', false)` sends `false` as `""`, which Postgres rejects for a boolean column; use a closure (`->where(fn ($query) => $query->where('column', false))`).
 - SQLite does not enforce `varchar(255)` lengths, while Postgres rejects a longer value (`SQLSTATE[22001]`). Tests cannot show a too-long name, so assert the length or the exact value of generated strings.
 
 - `docker compose up` gives a recreated container the old mount at each path that the image declares with `VOLUME`, also a named volume or bind mount that the Compose file no longer has. Remove the old container first when a mount must go (`composeContainersWithRemovedVolumes()`); do not use `--renew-anon-volumes`, because it deletes the data of anonymous volumes.
@@ -46,6 +46,9 @@
 - MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
 
 - To prove BuildKit cache behavior, use a new Dockerfile with a unique step for each experiment and repeat each build. Old cache records can make a changed input look cached. BuildKit keys `RUN` steps on the `--add-host` names and their order, but not on the IPs.
+
+## Add dependencies through the trust gate
+- `composer require` stops until `vendor/bin/vet` records the new packages in `vet.json`. Read the package source first, then record it with `vendor/bin/vet` in a terminal (it needs a TTY). Prefer the existing dependencies (Guzzle, curl, Flysystem) over a package with a large dependency tree.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
@@ -169,3 +172,4 @@
 
 ## Measure database reads end to end
 - On PostgreSQL 15, `EXPLAIN (ANALYZE, BUFFERS)` does not detoast or send the selected columns, so a wide `jsonb`/`json`/`text` column does not show in it. Time the full fetch (`psql \timing` with `-o /dev/null`, or PDO `fetchAll`) as well before you blame or rule out an index.
+- Do not put a required write (audit rows, state that matches a committed change) or required cleanup in `defer()` or `dispatch()->afterResponse()`. Both run in the terminate phase, which PHP-FPM skips when the client or proxy closes the connection (`ignore_user_abort` is off) or the script hits a fatal error. Write it in `DB::afterCommit()`, or queue the job normally, instead. `afterResponse()` also runs a queued job on the `sync` connection in the web worker.

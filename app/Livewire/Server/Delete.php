@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Server;
@@ -25,6 +26,8 @@ class Delete extends Component
 
     public bool $force_delete_resources = false;
 
+    public bool $remove_ssh_key = false;
+
     public function mount(string $server_uuid)
     {
         try {
@@ -46,6 +49,7 @@ class Delete extends Component
             $this->delete_from_digitalocean = in_array('delete_from_digitalocean', $selectedActions);
             $this->delete_from_hostinger = in_array('delete_from_hostinger', $selectedActions);
             $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
+            $this->remove_ssh_key = in_array('remove_ssh_key', $selectedActions);
         }
         // Another Coolify instance manages a transferred server. This instance deletes only its own records:
         // never the VM, and never the containers that the other instance runs.
@@ -56,6 +60,7 @@ class Delete extends Component
             $this->delete_from_digitalocean = false;
             $this->delete_from_hostinger = false;
             $this->force_delete_resources = true;
+            $this->remove_ssh_key = false;
         }
         try {
             $this->authorize('delete', $this->server);
@@ -68,6 +73,10 @@ class Delete extends Component
             if ($resources->isNotEmpty() && ! $this->force_delete_resources) {
                 $this->dispatch('error', 'Server has defined resources. Please delete them first or select "Delete all resources".');
 
+                return;
+            }
+
+            if ($this->remove_ssh_key && ! $this->deletesCloudServer() && ! $this->removeSshKey()) {
                 return;
             }
 
@@ -104,6 +113,42 @@ class Delete extends Component
         }
     }
 
+    private function deletesCloudServer(): bool
+    {
+        return $this->delete_from_hetzner || $this->delete_from_vultr || $this->delete_from_digitalocean || $this->delete_from_hostinger;
+    }
+
+    /**
+     * The key is removed before the server record, while the connection still works.
+     * Resources must be deleted first, because their delete jobs need the connection.
+     */
+    private function removeSshKey(): bool
+    {
+        if ($this->server->definedResources()->isNotEmpty()) {
+            $this->dispatch('error', 'Delete the resources of the server first, then delete the server and remove the SSH key.');
+
+            return false;
+        }
+
+        $context = [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'private_key_uuid' => $this->server->privateKey?->uuid,
+        ];
+        try {
+            $removed = AuthorizedKeys::remove($this->server, $this->server->privateKey);
+        } catch (\Throwable $e) {
+            auditLog('ui.server.ssh_key_removed', [...$context, 'result' => 'failed'], 'warning');
+            $this->dispatch('error', 'The SSH key was not removed from the server, so the server was not deleted. Clear the option to delete the server without removing the key.<br><br>Error: '.htmlspecialchars(remove_iip($e->getMessage()), ENT_QUOTES, 'UTF-8'));
+
+            return false;
+        }
+        auditLog('ui.server.ssh_key_removed', [...$context, 'result' => $removed ? 'removed' : 'kept_for_other_server']);
+
+        return true;
+    }
+
     public function render()
     {
         $checkboxes = [];
@@ -120,6 +165,14 @@ class Delete extends Component
         }
 
         $canDeleteFromProvider = ! $this->server->isTransferredAway();
+
+        if ($canDeleteFromProvider && $this->server->definedResources()->isEmpty() && AuthorizedKeys::canRunOn($this->server)) {
+            $checkboxes[] = [
+                'id' => 'remove_ssh_key',
+                'label' => 'Remove the public key of this server\'s SSH key from ~/.ssh/authorized_keys on the server',
+                'default_warning' => 'The public key stays on the server, so this SSH key can still log in.',
+            ];
+        }
 
         if ($canDeleteFromProvider && $this->server->hetzner_server_id) {
             $checkboxes[] = [

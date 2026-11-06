@@ -76,7 +76,7 @@
                     </div>
                     {{-- Page toolbars (the canvases) dock here on desktop. --}}
                     <div id="page-toolbar-slot" class="flex shrink-0 items-center empty:hidden"></div>
-                    <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
+                    <div id="configuration-warning-hud-slot" class="relative flex shrink-0 items-center gap-1"></div>
                     <livewire:deployments-indicator variant="topbar" />
                     {{-- Resource actions dock here on desktop. --}}
                     <div id="resource-action-hud-slot" x-ref="resourceActions" class="hidden shrink-0 items-center xl:flex"></div>

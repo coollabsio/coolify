@@ -105,7 +105,7 @@
                                                 confirmationText="{{ $image['reference'] }}"
                                                 confirmationLabel="Confirm by entering the image reference"
                                                 shortConfirmationLabel="Image" step2ButtonText="Delete Image"
-                                                :confirmWithPassword="false">
+                                                isErrorButton :confirmWithPassword="false">
                                                 <x-slot:trigger>
                                                     <button type="button"
                                                         class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"

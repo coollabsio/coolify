@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Services\RcloneTransfer;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
@@ -181,7 +182,7 @@ class StartDatabaseImport
             $storage = S3Storage::ownedByCurrentTeamAPI($teamId)
                 ->where(fn ($query) => $query->whereUuid($source->s3StorageUuid)->orWhere('id', ctype_digit((string) $source->s3StorageUuid) ? (int) $source->s3StorageUuid : -1))
                 ->where('is_usable', true)->first();
-            if (! $storage || ! ValidationPatterns::isValidS3BucketName($storage->bucket)) {
+            if (! $storage || ($storage->isS3() && ! ValidationPatterns::isValidS3BucketName($storage->bucket))) {
                 throw new DatabaseImportException('S3 storage was not found or has an invalid bucket.');
             }
             $key = ltrim((string) $source->path, '/');
@@ -194,8 +195,22 @@ class StartDatabaseImport
                 throw new DatabaseImportException('The S3 backup was not found or exceeds the 10 GiB limit.');
             }
             $helper = "s3-restore-{$operation}";
+            if ($storage->isS3()) {
+                $downloadCommand = $this->startS3Helper($storage, $server, $helper, $network, $key);
+            } else {
+                // The rclone image has the BusyBox tools that streamFromHelper() needs.
+                $transfer = new RcloneTransfer($storage, $server, $helper);
+                try {
+                    $transfer->start(network: $network);
+                } catch (Throwable) {
+                    instant_remote_process([$transfer->removeCommand()], $server, throwError: false);
+
+                    throw new DatabaseImportException('Unable to start the restore helper.');
+                }
+                $downloadCommand = $transfer->downloadCommand($key, '/tmp/restore');
+            }
             $commandList = [
-                $this->startS3Helper($storage, $server, $helper, $network, $key),
+                $downloadCommand,
                 ...$this->streamFromHelper($helper, $container, $containerPath),
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
             ];

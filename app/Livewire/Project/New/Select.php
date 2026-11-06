@@ -190,8 +190,8 @@ class Select extends Component
             ],
             [
                 'id' => 'private-gitea-app',
-                'name' => 'Git Repository (with Gitea App)',
-                'description' => 'Deploy public or private Gitea repositories through a Gitea App, with automatic webhooks and pull request previews.',
+                'name' => 'Git Repository (with Gitea / Forgejo App)',
+                'description' => 'Deploy public or private Gitea, Forgejo, or Codeberg repositories through a Gitea / Forgejo App, with automatic webhooks and pull request previews.',
                 'logo' => asset('svgs/gitea.svg'),
             ],
         ];

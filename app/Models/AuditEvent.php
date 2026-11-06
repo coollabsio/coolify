@@ -135,17 +135,21 @@ class AuditEvent extends Model
         try {
             $attributes = self::attributesFor($event, $context, $changes, $level);
 
+            // Write at commit, not with defer(): PHP skips the terminate phase when it stops a
+            // request early (client abort, fatal error), and the committed change would have no row.
             DB::afterCommit(function () use ($attributes): void {
-                defer(function () use ($attributes): void {
+                try {
+                    self::query()->create($attributes);
+                } catch (Throwable $exception) {
                     try {
-                        self::query()->create($attributes);
-                    } catch (Throwable $exception) {
                         Log::warning('Audit event persistence failed', [
                             'event' => $attributes['event'],
                             'exception' => $exception::class,
                         ]);
+                    } catch (Throwable) {
+                        // Audit failures must not interrupt the action.
                     }
-                })->always();
+                }
             });
         } catch (Throwable $exception) {
             Log::warning('Audit event preparation failed', [
@@ -203,10 +207,12 @@ class AuditEvent extends Model
             'resource_name' => $resourceName,
             'description' => data_get($context, 'audit_description')
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
-            'metadata' => self::redact(Arr::except($context, ['audit_changes', 'actor_email'])),
+            'metadata' => self::redact(Arr::except($context, ['audit_changes', 'actor_email', 'actor_ip', 'actor_user_agent'])),
             'changes' => $changes,
-            'ip_address' => app()->bound('request') ? (client_ip(request()) ?: null) : null,
-            'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
+            'ip_address' => data_get($context, 'actor_ip')
+                ?? (app()->bound('request') ? (client_ip(request()) ?: null) : null),
+            'user_agent' => Str::limit((string) (data_get($context, 'actor_user_agent')
+                ?? (app()->bound('request') ? request()->userAgent() : null)), 200, '') ?: null,
         ];
     }
 

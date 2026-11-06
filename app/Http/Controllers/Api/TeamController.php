@@ -238,11 +238,15 @@ class TeamController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['is_build_server_fallback_enabled'],
+                    minProperties: 1,
                     properties: [
                         'is_build_server_fallback_enabled' => [
                             'type' => 'boolean',
                             'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.',
+                        ],
+                        'scan_images_on_new_servers' => [
+                            'type' => 'boolean',
+                            'description' => 'Whether image scanning is turned on for servers added to the team from now on.',
                         ],
                     ],
                 ),
@@ -269,9 +273,10 @@ class TeamController extends Controller
 
         $this->authorize('update', $team);
 
-        $allowedFields = ['is_build_server_fallback_enabled'];
+        $allowedFields = ['is_build_server_fallback_enabled', 'scan_images_on_new_servers'];
         $validator = customApiValidator($request->all(), [
-            'is_build_server_fallback_enabled' => ['required', 'boolean'],
+            'is_build_server_fallback_enabled' => ['required_without:scan_images_on_new_servers', 'boolean'],
+            'scan_images_on_new_servers' => ['required_without:is_build_server_fallback_enabled', 'boolean'],
         ]);
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {

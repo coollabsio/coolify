@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Add fake records around debian-root on A (tokens, DNS, secret manager link, tunnel token, GitHub App + runner config,
-# resource links, canvas positions, team variable, maintenance mode, proxy error page, project icon, and an app of the
+# image scan opt-in, rules and an ignore, resource links, canvas positions, team variable, maintenance mode, proxy error page, project icon, and an app of the
 # same project on the other VM), transfer debian-root to B through the Transfer page, and check them on B and A.
 # Run reset.sh before and after.
 source "$(dirname "$0")/lib.sh"

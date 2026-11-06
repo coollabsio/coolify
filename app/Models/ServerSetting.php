@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
+use App\Helpers\SshMultiplexingHelper;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -43,6 +44,13 @@ use OpenApi\Attributes as OA;
         'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
         'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
+        'ssh_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'Pinned SSH host key(s) of the server, one "type base64" line per key.'],
+        'ssh_host_key_source' => ['type' => 'string', 'nullable' => true, 'enum' => ['tofu', 'upgrade', 'transfer', 'manual']],
+        'ssh_host_key_trusted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+        'ssh_host_key_pending' => ['type' => 'string', 'nullable' => true, 'description' => 'Host key that the server sent when it did not match the pinned key.'],
+        'is_ssh_host_key_check_disabled' => ['type' => 'boolean'],
+        'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'],
+        'ssh_host_key_pending_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the host key that did not match.'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
@@ -101,6 +109,9 @@ class ServerSetting extends Model
 
     protected $fillable = [
         'server_id',
+        'is_image_scan_enabled',
+        'image_candidate_scans_today',
+        'image_candidate_scans_date',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -183,6 +194,8 @@ class ServerSetting extends Model
      */
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
+        'is_image_scan_enabled' => false,
+        'image_candidate_scans_today' => 0,
     ];
 
     protected $casts = [
@@ -215,6 +228,11 @@ class ServerSetting extends Model
         'patch_checked_at' => 'datetime',
         'is_auto_security_updates_enabled' => 'boolean',
         'is_logdrain_cloudwatch_enabled' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
+        'image_candidate_scans_today' => 'integer',
+        'image_candidate_scans_date' => 'date',
+        'ssh_host_key_trusted_at' => 'datetime',
+        'is_ssh_host_key_check_disabled' => 'boolean',
     ];
 
     /**
@@ -251,6 +269,13 @@ class ServerSetting extends Model
             }
         });
         static::updated(function ($settings) {
+            // A save that sets the key too (a transfer import) already has the key of the new address.
+            if ($settings->wasChanged('is_cloudflare_tunnel') && ! $settings->wasChanged('ssh_host_key')) {
+                $settings->forgetSshHostKey('cloudflare_tunnel_changed');
+            }
+            if ($settings->wasChanged('ssh_host_key') && $settings->server) {
+                SshMultiplexingHelper::deleteStaleKnownHostsFiles($settings->server->uuid, $settings->ssh_host_key);
+            }
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
@@ -502,5 +527,97 @@ class ServerSetting extends Model
             'error' => filled($this->patch_check_error) ? $this->patch_check_error : null,
             'checked_at' => $this->patch_checked_at,
         ];
+    }
+
+    /**
+     * Remove the pinned and the pending host key after the address of the server changed, so that the next
+     * connection trusts the key of the new address. Only an admin can change the address.
+     */
+    public function forgetSshHostKey(string $reason): void
+    {
+        if (blank($this->ssh_host_key) && blank($this->ssh_host_key_pending)) {
+            return;
+        }
+        $previousFingerprints = self::sshHostKeyFingerprints($this->ssh_host_key);
+        $cleared = [
+            'ssh_host_key' => null,
+            'ssh_host_key_source' => null,
+            'ssh_host_key_trusted_at' => null,
+            'ssh_host_key_pending' => null,
+        ];
+        // A query update, so that other unsaved changes stay unsaved and the model events do not run again.
+        self::query()->whereKey($this->getKey())->update($cleared);
+        $this->forceFill($cleared)->syncOriginalAttributes(array_keys($cleared));
+        if ($this->server) {
+            SshMultiplexingHelper::deleteStaleKnownHostsFiles($this->server->uuid, null);
+        }
+
+        auditLog('server.ssh_host_key.forgotten', [
+            'team_id' => $this->server?->team_id,
+            'server_uuid' => $this->server?->uuid,
+            'reason' => $reason,
+            'previous_fingerprints' => $previousFingerprints,
+        ]);
+    }
+
+    /**
+     * Read SSH host keys from public key lines ("type base64 [comment]") or known_hosts lines
+     * ("host type base64"). Returns the keys as "type base64" lines, or null when there is no valid key.
+     */
+    public static function normalizeSshHostKeys(?string $input): ?string
+    {
+        $keys = [];
+        foreach (preg_split('/\R/', (string) $input) as $line) {
+            $fields = preg_split('/\s+/', trim($line), -1, PREG_SPLIT_NO_EMPTY);
+            if ($fields === [] || str_starts_with($fields[0], '#') || str_starts_with($fields[0], '@')) {
+                continue;
+            }
+            if (! self::isSshHostKeyType($fields[0])) {
+                array_shift($fields);
+            }
+            [$type, $blob] = [$fields[0] ?? '', $fields[1] ?? ''];
+            if (self::isSshHostKeyType($type) && self::sshKeyBlobType($blob) === $type) {
+                $keys[] = "{$type} {$blob}";
+            }
+        }
+
+        return $keys === [] ? null : implode("\n", array_values(array_unique($keys)));
+    }
+
+    /**
+     * The SHA256 fingerprints of host key lines, in the format of `ssh-keygen -lf`.
+     *
+     * @return list<string>
+     */
+    public static function sshHostKeyFingerprints(?string $keys): array
+    {
+        return collect(explode("\n", (string) $keys))
+            ->filter()
+            ->map(function (string $line) {
+                [$type, $blob] = explode(' ', $line, 2);
+
+                return 'SHA256:'.rtrim(base64_encode(hash('sha256', base64_decode($blob), true)), '=')." ({$type})";
+            })
+            ->values()
+            ->all();
+    }
+
+    private static function isSshHostKeyType(string $type): bool
+    {
+        return preg_match('/^(ssh-(ed25519|rsa|dss)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)$/', $type) === 1;
+    }
+
+    /**
+     * The key type that is encoded in the first field of an SSH public key blob.
+     */
+    private static function sshKeyBlobType(string $blob): ?string
+    {
+        $decoded = base64_decode($blob, true);
+        if ($decoded === false || strlen($decoded) < 4) {
+            return null;
+        }
+        $length = unpack('N', substr($decoded, 0, 4))[1];
+
+        return strlen($decoded) >= 4 + $length ? substr($decoded, 4, $length) : null;
     }
 }
