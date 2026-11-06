@@ -4,12 +4,15 @@ namespace App\Listeners;
 
 use App\Enums\ProcessStatus;
 use App\Events\ServerPackagesUpdateFinished;
+use App\Jobs\ImageRescanJob;
+use App\Jobs\ScanHostPackagesJob;
 use App\Jobs\ServerPatchCheckJob;
 use App\Models\Server;
 use Spatie\Activitylog\Models\Activity;
 
 /**
- * Records the result of a package update in the audit log and checks the server again.
+ * Records the result of a package update in the audit log, then checks the updates and the OS package
+ * vulnerabilities of the server again.
  */
 class FinishServerPackagesUpdate
 {
@@ -39,5 +42,8 @@ class FinishServerPackagesUpdate
         ], $status === ProcessStatus::FINISHED->value ? 'info' : 'error');
 
         ServerPatchCheckJob::dispatchManual($server);
+        if (ImageRescanJob::canRunOn($server)) {
+            ScanHostPackagesJob::dispatchManual($server);
+        }
     }
 }

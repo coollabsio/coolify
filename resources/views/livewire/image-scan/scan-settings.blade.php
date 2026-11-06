@@ -34,6 +34,10 @@
                 </x-application.settings-subsection>
             @endif
         </x-application.settings-section>
+    @elseif ($embedded)
+        <x-application.settings-subsection id="image-scan-rules-section" title="Rules" :helper="$rulesHelper" first>
+            @include('livewire.image-scan.partials.scan-rules')
+        </x-application.settings-subsection>
     @else
         <x-application.settings-section id="image-scan-rules-section" title="Rules" :helper="$rulesHelper">
             @include('livewire.image-scan.partials.scan-rules')

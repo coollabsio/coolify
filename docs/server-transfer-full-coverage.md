@@ -36,7 +36,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Disk usage notification | threshold 70, check frequency `*/30 * * * *`, interval 12 h |
 | ✅ | Security > Patches | check frequency `daily`, automatic security updates on at `04:30` (the last check result is not moved; the target shows "never" until its first check) |
 | ✅ | Terminal | terminal access off |
-| ➕ | Security > SSH host key | a trusted host key (shown by fingerprint), and "host key check" disabled on one server. Expected: the target shows the same fingerprint with source `transfer` and connects without a new trust step |
+| ➕ | Security > SSH host key | a trusted host key (shown by fingerprint), "host key check" disabled on one server, and "Enforce" on another server. Expected: the target shows the same fingerprint with source `transfer`, keeps both per-server settings, and connects without a new trust step |
 | ✅ | Image retention | "disable application image retention" on |
 | ✅ | Labels / Traefik | generate exact labels on, Traefik certificate resolver `custom` |
 | ✅ | Backup compression | CPU percentage 50 |

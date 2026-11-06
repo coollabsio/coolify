@@ -49,6 +49,7 @@ use OpenApi\Attributes as OA;
         'ssh_host_key_trusted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
         'ssh_host_key_pending' => ['type' => 'string', 'nullable' => true, 'description' => 'Host key that the server sent when it did not match the pinned key.'],
         'is_ssh_host_key_check_disabled' => ['type' => 'boolean'],
+        'is_ssh_host_key_check_enforced' => ['type' => 'boolean', 'description' => 'Refuse a changed host key on this server, also when the instance only warns.'],
         'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'],
         'ssh_host_key_pending_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the host key that did not match.'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
@@ -233,6 +234,7 @@ class ServerSetting extends Model
         'image_candidate_scans_date' => 'date',
         'ssh_host_key_trusted_at' => 'datetime',
         'is_ssh_host_key_check_disabled' => 'boolean',
+        'is_ssh_host_key_check_enforced' => 'boolean',
     ];
 
     /**

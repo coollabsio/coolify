@@ -101,27 +101,38 @@ describe('server image scanning page', function () {
     it('shows the off state with the turn on button', function () {
         imageScanningPage()
             ->assertSee('Image scanning is off for '.$this->server->name.'.')
-            ->assertSee('Turn on image scanning');
+            ->assertSee('Enable image scanning?');
     });
 
-    it('shows the progress of the scanner preparation', function () {
+    it('shows only the title row and the database build time in the helper when the scanner is ready', function () {
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
         Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
         Cache::put(PrepareImageScannerJob::builtAtCacheKey($this->server), now()->subDay()->toIso8601ZuluString());
 
         imageScanningPage()
-            ->assertSee('Get scanner')
-            ->assertSee('Update database')
-            ->assertSee('Database built')
-            ->assertSee('Turn off image scanning')
+            ->assertSee('Database built 1 day ago')
+            ->assertSee('Coolify downloads the latest vulnerability database every day')
+            ->assertDontSee('Update database')
+            ->assertDontSee('Get scanner')
+            ->assertSee('Disable image scanning?')
             ->assertSee('Delete scanner data');
+    });
+
+    it('shows the progress of the scanner preparation', function () {
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'updating_database');
+
+        imageScanningPage()
+            ->assertSee('Get scanner')
+            ->assertSee('Downloading the vulnerability database.')
+            ->assertDontSee('Database built');
     });
 
     it('refuses to turn on a server that another instance manages', function () {
         Queue::fake();
         $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
 
-        imageScanningPage()->call('enable')->assertDispatched('error', 'This server is managed by another Coolify instance.');
+        imageScanningPage()->call('enable')->assertDispatched('error', message: 'This server is managed by another Coolify instance.');
 
         expect($this->server->settings->fresh()->is_image_scan_enabled)->toBeFalse();
         Queue::assertNothingPushed();
@@ -133,7 +144,7 @@ describe('server image scanning page', function () {
 
         imageScanningPage()
             ->assertSee('Image scanning is turned off for this Coolify instance.')
-            ->assertDontSee('Turn on image scanning')
+            ->assertDontSee('Enable image scanning?')
             ->call('enable')
             ->assertDispatched('error', message: 'Image scanning is turned off for this Coolify instance.');
 
@@ -175,6 +186,19 @@ describe('server image scanning page', function () {
             ->assertSee('Grype '.config('constants.image_scan.images.grype.version'))
             ->assertSee('regctl '.config('constants.image_scan.images.regctl.version'))
             ->assertSee('Disk used by scanner data: 1.1 GB');
+    });
+
+    it('offers to delete scanner data only when the server has some', function () {
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+
+        imageScanningPage()->assertDontSee('Delete scanner data');
+
+        Cache::put(PrepareImageScannerJob::diskUsedCacheKey($this->server), 1181116006);
+        imageScanningPage()->assertSee('Delete scanner data');
+
+        Cache::forget(PrepareImageScannerJob::diskUsedCacheKey($this->server));
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
+        imageScanningPage()->assertSee('Delete scanner data');
     });
 
     it('shows no disk usage before the job has stored it', function () {

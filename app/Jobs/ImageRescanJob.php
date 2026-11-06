@@ -164,6 +164,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         if ($listing === null) {
             self::recordRescanResult($server, false);
             $this->forgetProgress();
+            ScanHostPackagesJob::dispatch($server);
 
             return;
         }
@@ -198,6 +199,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         if (! $listing['truncated']) {
             $this->cleanUp($server, $commands, $targets, $runningRefs);
         }
+        ScanHostPackagesJob::dispatch($server);
     }
 
     /**

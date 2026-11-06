@@ -10,7 +10,18 @@
     @endif
 
     <x-application.settings-section id="server-host-key-section" title="SSH host key"
-        helper="Coolify trusts the first host key of the server. Later, a different key is reported (warn mode) or refused (enforce mode).">
+        helper="Coolify trusts the first host key of the server. Later, a different key is reported (warn mode, the default) or refused (enforce mode). The setting below sets enforce mode for this server only.<br><br>An instance admin sets the mode for all servers with <code>SSH_HOST_KEY_CHECKING=enforce</code> (or <code>warn</code>, <code>off</code>) in <code>/data/coolify/source/.env</code>, then restarts Coolify.">
+        <x-slot:badges>
+            @if (count($pendingFingerprints) > 0)
+                <x-status-badge status="Key changed" type="error" />
+            @elseif ($mode === 'off')
+                <x-status-badge status="Check off" type="warning" />
+            @elseif (count($fingerprints) > 0)
+                <x-status-badge :status="'Trusted, ' . $mode . ' mode'" type="success" />
+            @else
+                <x-status-badge status="No key yet" type="neutral" />
+            @endif
+        </x-slot:badges>
         <x-slot:actions>
             @can('update', $server)
                 <div class="flex flex-wrap items-center gap-2"
@@ -69,7 +80,13 @@
                     @endforelse
                     <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
                         @if (count($fingerprints) > 0)
-                            Source: {{ $server->settings->ssh_host_key_source }}
+                            {{ match ($server->settings->ssh_host_key_source) {
+                                'tofu' => 'Saved on the first connection',
+                                'upgrade' => 'Saved on the first connection after the Coolify upgrade',
+                                'transfer' => 'Moved with the server transfer',
+                                'manual' => 'Saved by a user',
+                                default => 'Saved',
+                            } }}
                             @if ($server->settings->ssh_host_key_trusted_at)
                                 &middot; Trusted {{ $server->settings->ssh_host_key_trusted_at->toDateTimeString() }} UTC
                             @endif
@@ -77,15 +94,23 @@
                         @else
                             Saved on the next connection &middot;
                         @endif
-                        Mode: {{ $mode }}
+                        Mode: {{ $mode }}{{ $mode === 'enforce' && $instanceMode !== 'enforce' ? ' (set for this server)' : '' }}
                     </p>
                 </div>
             </div>
 
-            <details class="text-xs text-neutral-500 dark:text-fg-dim">
-                <summary class="cursor-pointer">Compare on the server</summary>
-                <code class="mt-1 block break-all">for key in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf "$key"; done</code>
-            </details>
+            {{-- The choice only changes something when the instance warns; an instance "enforce" or "off" decides alone. --}}
+            @if ($instanceMode !== 'enforce' && $instanceMode !== 'off' && ! $server->settings->is_ssh_host_key_check_disabled)
+                <div class="max-w-sm">
+                    <x-forms.listbox id="checkMode" label="When the host key changes" onChange="setHostKeyCheckMode"
+                        :onChangeArgs="[]" canGate="update" :canResource="$server"
+                        helper="Warn: Coolify connects and reports the new key. Enforce: Coolify refuses to connect until you trust or reset the new key, so deployments, backups, and checks on this server stop. A reinstall of the server also changes the key."
+                        :options="[
+                            ['value' => 'warn', 'label' => 'Warn and connect'],
+                            ['value' => 'enforce', 'label' => 'Refuse to connect (enforce)'],
+                        ]" />
+                </div>
+            @endif
         </div>
     </x-application.settings-section>
 </div>

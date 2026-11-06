@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
@@ -722,6 +723,11 @@ class Server extends BaseModel
     public function imageSboms(): HasMany
     {
         return $this->hasMany(ImageSbom::class);
+    }
+
+    public function hostScan(): HasOne
+    {
+        return $this->hasOne(ServerHostScan::class);
     }
 
     public function dockerCleanupExecutions()
