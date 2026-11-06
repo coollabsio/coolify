@@ -48,7 +48,7 @@ class Gitea extends Controller
 
             // Only users who may administer the source can complete OAuth and store tokens.
             if (! $request->user()->can('update', $giteaApp)) {
-                return redirect()->route('source.all')->with('error', 'You are not authorized to connect this Gitea App.');
+                return redirect()->route('source.all')->with('error', 'You are not authorized to connect this Gitea / Forgejo App.');
             }
 
             $baseUrl = rtrim($giteaApp->html_url, '/');
@@ -85,7 +85,7 @@ class Gitea extends Controller
     {
         try {
             $return_payloads = collect([]);
-            $x_gitea_event = Str::lower((string) $request->header('X-Gitea-Event'));
+            $x_gitea_event = Str::lower((string) ($request->header('X-Gitea-Event') ?? $request->header('X-Forgejo-Event')));
 
             if ($x_gitea_event === 'ping') {
                 return response('pong');
@@ -98,7 +98,7 @@ class Gitea extends Controller
                 ]);
             }
 
-            $signature = (string) $request->header('X-Gitea-Signature');
+            $signature = (string) ($request->header('X-Gitea-Signature') ?? $request->header('X-Forgejo-Signature'));
             if ($signature === '') {
                 $signature = Str::after((string) $request->header('X-Hub-Signature-256'), 'sha256=');
             }
@@ -365,8 +365,8 @@ class Gitea extends Controller
     {
         try {
             $return_payloads = collect([]);
-            $x_gitea_delivery = request()->header('X-Gitea-Delivery');
-            $x_gitea_event = Str::lower((string) $request->header('X-Gitea-Event'));
+            $x_gitea_delivery = $request->header('X-Gitea-Delivery') ?? $request->header('X-Forgejo-Delivery');
+            $x_gitea_event = Str::lower((string) ($request->header('X-Gitea-Event') ?? $request->header('X-Forgejo-Event')));
             $x_hub_signature_256 = Str::after((string) $request->header('X-Hub-Signature-256'), 'sha256=');
             $content_type = $request->header('Content-Type');
             $payload = $request->collect();

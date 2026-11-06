@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Server\Sentinel;
 use App\Livewire\Server\Show;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -276,3 +277,18 @@ describe('generated sentinel tokens are valid', function () {
         expect($settings->fresh()->sentinel_token)->toBe($returned);
     });
 });
+
+it('warns for public HTTP Sentinel endpoints even on localhost', function (int $serverId, string $url, bool $insecure) {
+    $component = new Sentinel;
+    $component->server = new Server;
+    $component->server->id = $serverId;
+    $component->sentinelCustomUrl = $url;
+
+    expect($component->isPushUrlInsecure())->toBe($insecure);
+})->with([
+    'local public HTTP' => [0, 'http://public.example.com', true],
+    'local internal HTTP' => [0, 'http://coolify:8080', false],
+    'local HTTPS' => [0, 'https://public.example.com', false],
+    'remote HTTP' => [1, 'http://public.example.com', true],
+    'remote internal address' => [1, 'http://coolify:8080', true],
+]);

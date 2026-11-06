@@ -69,6 +69,8 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // A host key that did not match; the target reads the key again over its own connection.
+        'ssh_host_key_pending',
     ];
 
     /**
@@ -392,6 +394,17 @@ class ServerTransferExporter
     {
         $warnings = [];
 
+        foreach ($dependencies['private_keys'] as $key) {
+            try {
+                $error = PrivateKey::validationError($key->private_key);
+            } catch (Throwable) {
+                continue; // exportPrivateKey() reports a key that cannot be decrypted.
+            }
+            if ($error) {
+                $warnings[] = "SSH key {$key->name}: {$error} The key moves unchanged. Rotate it to an Ed25519 key after the transfer.";
+            }
+        }
+
         $usesSystemWideGithub = $applications->contains(function (Application $app) {
             if ($app->source_type !== GithubApp::class || $app->source_id === null) {
                 return false;
@@ -575,8 +588,8 @@ class ServerTransferExporter
             $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
                 .'Enabling them stops runners that another Coolify instance started on this server.';
         }
-        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, '
-            .'then remove the old public key from ~/.ssh/authorized_keys on the server.';
+        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys '
+            .'and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.';
 
         return $steps;
     }
@@ -1335,7 +1348,9 @@ class ServerTransferExporter
                 'frequency' => $task->frequency,
                 'container' => $task->container,
                 'timeout' => $task->timeout,
+                'use_shell' => (bool) ($task->use_shell ?? true),
                 'enabled' => (bool) ($task->enabled ?? true),
+                'disabled_reason' => $task->disabled_reason,
             ];
         }
 
@@ -1502,6 +1517,7 @@ class ServerTransferExporter
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
+            'skip_tls_verification' => (bool) $storage->skip_tls_verification,
             'is_usable' => (bool) $storage->is_usable,
         ];
     }

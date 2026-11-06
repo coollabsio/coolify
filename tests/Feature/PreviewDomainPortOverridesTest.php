@@ -1205,3 +1205,33 @@ it('replaces a custom preview domain when the generate action runs', function ()
 
     expect($preview->fresh()->fqdn)->toBe('https://6540.app.example.com');
 });
+
+it('routes every generated compose preview domain when a service has more than one domain', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '3',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n",
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://dev.example.com,https://www.dev.example.com'],
+        ]),
+    ]);
+    $preview = createPreviewForPortTests($this->application->fresh(), 92, [
+        'docker_compose_domains' => $this->application->docker_compose_domains,
+    ]);
+
+    $preview->generate_preview_fqdn_compose();
+    $preview->refresh();
+
+    expect(json_decode($preview->docker_compose_domains, true)['frontend']['domain'])
+        ->toBe('https://92.dev.example.com,https://92.www.dev.example.com');
+
+    $labels = collect(data_get(applicationParser($this->application->fresh(), 92, $preview->id), 'services.frontend-pr-92.labels'));
+    $routerRules = $labels->filter(fn (string $label): bool => str_contains($label, '.rule='))->values();
+
+    expect($routerRules)->not->toBeEmpty()
+        ->and($routerRules->every(fn (string $label): bool => preg_match('/\.rule=Host\(`[a-z0-9.]+`\)( && PathPrefix\(`\/[^`]*`\))?$/', $label) === 1))->toBeTrue()
+        ->and($routerRules->contains(fn (string $label): bool => str_contains($label, 'Host(`92.dev.example.com`)')))->toBeTrue()
+        ->and($routerRules->contains(fn (string $label): bool => str_contains($label, 'Host(`92.www.dev.example.com`)')))->toBeTrue();
+});

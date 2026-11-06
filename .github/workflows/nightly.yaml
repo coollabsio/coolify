@@ -2,7 +2,7 @@ name: Nightly
 
 on:
   schedule:
-    - cron: "10 9,21 * * *"
+    - cron: "10 8,16 * * *"
   workflow_dispatch:
 
 permissions: {}

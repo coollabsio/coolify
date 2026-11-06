@@ -70,7 +70,9 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck servers: {$e->getMessage()}\n";
         }
         try {
-            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()->lazyById();
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()
+                ->select(['id', 'application_id'])
+                ->lazyById();
             foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
                 if (is_null($applicationDeploymentQueue->application)) {
                     echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";

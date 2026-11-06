@@ -297,7 +297,7 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 
 [`RELEASE.md`](RELEASE.md) is the source of truth for releases. Read it before you do a release, a backport, or a major version, and before you change `upstream.json`, `scripts/release.sh`, `scripts/plan-version.sh`, `scripts/sync-cdn.sh`, or the release, nightly, pull request, or merge forward workflows.
 
-- Describe each change that users can see under `## [Unreleased]` in `CHANGELOG.md`. The release notes come from these entries.
+- Do not edit `CHANGELOG.md`.
 - A push that changes `release.json` publishes a release.
 - NEVER edit `release.json` by hand. `scripts/release.sh` changes it.
 - `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly.

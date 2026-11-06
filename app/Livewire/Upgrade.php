@@ -130,7 +130,8 @@ class Upgrade extends Component
 
         return CoolifyUpgradeStatus::fromFile(
             content: $content,
-            runningVersion: $this->currentVersion !== '' ? $this->currentVersion : (string) config('constants.coolify.version'),
+            // The version of the container that answers, not $currentVersion: after the restart, that is still the old version of the page.
+            runningVersion: (string) config('constants.coolify.version'),
             targetVersion: $this->latestVersion !== '' ? $this->latestVersion : get_latest_version_of_coolify(),
         );
     }

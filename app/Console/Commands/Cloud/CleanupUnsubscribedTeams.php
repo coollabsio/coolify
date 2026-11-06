@@ -12,8 +12,11 @@ use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Stripe\Subscription as StripeSubscription;
@@ -25,7 +28,12 @@ class CleanupUnsubscribedTeams extends Command
                             {--days= : Days since the subscription ended or the never-paid team was created (default: constants.cloud.data_retention_days)}
                             {--yes : Delete eligible teams instead of running a dry run}';
 
-    protected $description = 'Delete teams that stopped paying or never paid, with their servers, resources, projects, and users without another team. A personal team of a member of another team keeps only the team and its members';
+    /**
+     * File on the backups disk that collects every deleted user, in the cloud:export-users format.
+     */
+    public const DELETED_USERS_CSV = 'cloud-deleted-users.csv';
+
+    protected $description = 'Delete teams that stopped paying or never paid, with their servers, resources, projects, and users without another team (their emails are saved first). A personal team of a member of another team keeps only the team and its members';
 
     public function handle(): int
     {
@@ -129,6 +137,9 @@ class CleanupUnsubscribedTeams extends Command
         }
 
         $this->info("Deleted {$deletedTeamCount} ".Str::plural('team', $deletedTeamCount)." and {$deletedUserCount} ".Str::plural('user', $deletedUserCount).'.');
+        if ($deletedUserCount > 0) {
+            $this->info('Saved the deleted users to '.Storage::disk('backups')->path(self::DELETED_USERS_CSV).'.');
+        }
         if ($keptTeamCount > 0) {
             $this->info("Removed the data of {$keptTeamCount} personal ".Str::plural('team', $keptTeamCount).' and kept '.($keptTeamCount === 1 ? 'the team' : 'the teams').'.');
         }
@@ -146,8 +157,6 @@ class CleanupUnsubscribedTeams extends Command
         }
 
         return $failedTeams ? self::FAILURE : self::SUCCESS;
-
-        return self::SUCCESS;
     }
 
     /**
@@ -173,12 +182,48 @@ class CleanupUnsubscribedTeams extends Command
             $counts = app(DeleteTeamData::class)->handle($team);
 
             $teamlessMembers = User::query()->whereKey($memberIds)->whereKeyNot(0)->whereDoesntHave('teams')->get();
+            $this->saveDeletedUsers($teamlessMembers);
             foreach ($teamlessMembers as $user) {
                 app(DeleteTeamlessUser::class)->handle($user);
             }
 
             return [...$counts, 'users' => $teamlessMembers->count(), 'kept_team' => false];
         });
+    }
+
+    /**
+     * Appends the users to DELETED_USERS_CSV before they are deleted, so the email platform can
+     * reach them later. A failed write throws and rolls back the deletion.
+     *
+     * @param  EloquentCollection<int, User>  $users
+     */
+    private function saveDeletedUsers(EloquentCollection $users): void
+    {
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        $path = Storage::disk('backups')->path(self::DELETED_USERS_CSV);
+        File::ensureDirectoryExists(dirname($path));
+        $isNewFile = ! file_exists($path) || filesize($path) === 0;
+        $output = fopen($path, 'ab');
+        if ($output === false) {
+            throw new RuntimeException("Unable to open {$path} for writing.");
+        }
+
+        try {
+            if ($isNewFile) {
+                ExportUsers::writeCsvRow($output, ExportUsers::CSV_HEADER);
+            }
+            foreach ($users as $user) {
+                ExportUsers::writeCsvRow($output, ExportUsers::csvRow($user));
+            }
+            if (! fflush($output)) {
+                throw new RuntimeException("Unable to write {$path}.");
+            }
+        } finally {
+            fclose($output);
+        }
     }
 
     /**

@@ -206,7 +206,7 @@ jobs:
           gh auth setup-git
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          jq -r '{stable: .latest, preview: .preview} | to_entries[] | select(.value) | "\(.key) \(.value)"' <<< "$TAGS" | while read -r channel release; do
+          jq -r '{preview: .preview, stable: .latest} | to_entries[] | select(.value) | "\(.key) \(.value)"' <<< "$TAGS" | while read -r channel release; do
             git switch --quiet --detach "$release"
             scripts/sync-cdn.sh "--$channel" "${release#v}"
           done

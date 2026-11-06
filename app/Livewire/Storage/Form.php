@@ -37,6 +37,8 @@ class Form extends Component
 
     public bool $usePathStyleEndpointChanged = false;
 
+    public bool $skipTlsVerification = false;
+
     public string $key;
 
     public string $secret;
@@ -57,6 +59,7 @@ class Form extends Component
             'bucket' => ['required', new ValidS3BucketName],
             'endpoint' => ['required', 'max:255', new SafeWebhookUrl],
             'usePathStyleEndpoint' => 'boolean',
+            'skipTlsVerification' => 'boolean',
         ];
     }
 
@@ -88,6 +91,7 @@ class Form extends Component
         'bucket' => 'Bucket',
         'endpoint' => 'Endpoint',
         'usePathStyleEndpoint' => 'Use path-style URLs',
+        'skipTlsVerification' => 'Skip TLS certificate verification',
     ];
 
     /**
@@ -105,6 +109,7 @@ class Form extends Component
             $this->storage->bucket = $this->bucket;
             $this->storage->region = $this->region;
             $this->storage->use_path_style_endpoint = $this->usePathStyleEndpoint;
+            $this->storage->skip_tls_verification = $this->skipTlsVerification;
             $this->storage->key = $this->key;
             $this->storage->secret = $this->secret;
             $this->storage->is_usable = $this->isUsable;
@@ -120,6 +125,7 @@ class Form extends Component
             $this->usePathStyleEndpoint = $this->storage->usesPathStyleEndpoint();
             // A saved style that detection would not pick is a user choice, so keep it when the endpoint changes.
             $this->usePathStyleEndpointChanged = $this->usePathStyleEndpoint !== S3Storage::detectPathStyleEndpoint($this->endpoint);
+            $this->skipTlsVerification = (bool) $this->storage->skip_tls_verification;
             $canSeeCredentials = auth()->user()?->can('update', $this->storage) ?? false;
             $this->key = $canSeeCredentials ? $this->storage->key : '';
             $this->secret = $canSeeCredentials ? $this->storage->secret : '';
@@ -153,6 +159,7 @@ class Form extends Component
             $testedStorage->bucket = $this->bucket;
             $testedStorage->region = $this->region;
             $testedStorage->use_path_style_endpoint = $this->usePathStyleEndpoint;
+            $testedStorage->skip_tls_verification = $this->skipTlsVerification;
             $testedStorage->key = $this->key;
             $testedStorage->secret = $this->secret;
 

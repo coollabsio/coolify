@@ -17,8 +17,13 @@ class DeleteTraefikCertificate
         private TraefikAcmeService $acmeService,
     ) {}
 
-    /** @return array{id: string, resolver: string, main_domain: string, sans: array<int, string>, store: ?string, expires_at: ?string} */
-    public function handle(Server $server, string $certificateId): array
+    /**
+     * Deletes the certificates in one write, so acme.json gets one backup.
+     *
+     * @param  array<int, string>  $certificateIds
+     * @return array<int, array{id: string, resolver: string, main_domain: string, sans: array<int, string>, store: ?string, expires_at: ?string}>
+     */
+    public function handle(Server $server, array $certificateIds): array
     {
         if ($server->proxyType() !== ProxyTypes::TRAEFIK->value) {
             throw new RuntimeException('TLS certificates can only be managed for Traefik proxies.');
@@ -29,24 +34,17 @@ class DeleteTraefikCertificate
             throw new RuntimeException('The Traefik ACME file could not be found.');
         }
 
-        $certificate = collect($this->acmeService->certificates($contents))
-            ->firstWhere('id', $certificateId);
-        if ($certificate === null) {
-            throw new RuntimeException('The selected certificate could not be found.');
-        }
+        $certificates = collect($this->acmeService->certificates($contents))
+            ->whereIn('id', $certificateIds)
+            ->values()
+            ->all();
 
-        $updatedContents = $this->acmeService->deleteCertificate(
-            $contents,
-            $certificate['resolver'],
-            $certificateId,
-        );
-
-        SaveTraefikAcmeFile::run($server, $updatedContents);
+        SaveTraefikAcmeFile::run($server, $this->acmeService->deleteCertificates($contents, $certificateIds));
 
         // Traefik keeps loaded certificates in memory until it restarts.
         $server->proxy->certificates_restart_required = true;
         $server->save();
 
-        return $certificate;
+        return $certificates;
     }
 }

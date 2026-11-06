@@ -34,6 +34,7 @@ class ServiceDatabase extends BaseModel
 
     protected $casts = [
         'exclude_from_status' => 'boolean',
+        'is_removed_from_compose' => 'boolean',
         'is_public' => 'boolean',
         'is_log_drain_enabled' => 'boolean',
         'is_include_timestamps' => 'boolean',

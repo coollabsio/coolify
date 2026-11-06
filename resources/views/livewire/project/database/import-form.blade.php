@@ -7,67 +7,79 @@
     s3FileSize: $wire.entangle('s3FileSize'),
     s3StorageId: $wire.entangle('s3StorageId'),
     s3Path: $wire.entangle('s3Path'),
-    restoreType: null
-}">
-    <script type="text/javascript" src="{{ URL::asset('js/dropzone.js') }}"></script>
-    @script
-    <script data-navigate-once>
-        Dropzone.options.myDropzone = {
-            chunking: true,
-            method: "POST",
-            maxFilesize: 1000000000,
-            chunkSize: 10000000,
-            createImageThumbnails: false,
-            disablePreviews: true,
-            parallelChunkUploads: false,
-            init: function () {
-                let button = this.element.querySelector('button');
-                button.innerText = 'Select or drop a backup file here.'
-                this.on('sending', function (file, xhr, formData) {
-                    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                    formData.append("_token", token);
-                });
-                this.on("addedfile", file => {
-                    $wire.isUploading = true;
-                    $wire.customLocation = '';
-                });
-                this.on('uploadprogress', function (file, progress, bytesSent) {
-                    $wire.progress = progress;
-                });
-                this.on('complete', function (file) {
-                    $wire.filename = file.name;
-                    if (file.status === Dropzone.SUCCESS) {
-                        $wire.selectUploadedFile(file.name);
-                    }
-                    $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
-                    $wire.isUploading = false;
-                });
-                this.on('error', function (file, message) {
-                    $wire.error = true;
-                    $wire.$dispatch('error', message.error)
-                });
+    restoreType: null,
+    {{-- Dropzone attaches here, not by auto-discovery: the form can render after page load (in a modal, or when the database starts). --}}
+    mountDropzone(element) {
+        const wire = this.$wire;
+        const attach = () => {
+            window.Dropzone.autoDiscover = false;
+            if (element.dropzone) {
+                return;
             }
+            new window.Dropzone(element, {
+                chunking: true,
+                method: 'POST',
+                maxFilesize: 1000000000,
+                chunkSize: 10000000,
+                createImageThumbnails: false,
+                disablePreviews: true,
+                parallelChunkUploads: false,
+                dictDefaultMessage: 'Select or drop a backup file here.',
+                init() {
+                    this.on('sending', (file, xhr, formData) => {
+                        formData.append('_token', document.querySelector('meta[name=csrf-token]').getAttribute('content'));
+                    });
+                    this.on('addedfile', () => {
+                        wire.isUploading = true;
+                        wire.customLocation = '';
+                    });
+                    this.on('uploadprogress', (file, progress) => {
+                        wire.progress = progress;
+                    });
+                    this.on('complete', (file) => {
+                        wire.filename = file.name;
+                        if (file.status === window.Dropzone.SUCCESS) {
+                            wire.selectUploadedFile(file.name);
+                        }
+                        wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
+                        wire.isUploading = false;
+                    });
+                    this.on('error', (file, message) => {
+                        wire.error = true;
+                        wire.$dispatch('error', message.error);
+                    });
+                },
+            });
         };
-    </script>
-    @endscript
-        <div class="application-settings-workspace flex flex-col gap-6">
+        if (window.Dropzone) {
+            attach();
+            return;
+        }
+        let script = document.querySelector('script[data-dropzone]');
+        if (! script) {
+            script = document.createElement('script');
+            script.src = @js(URL::asset('js/dropzone.js'));
+            script.dataset.dropzone = '';
+            document.head.appendChild(script);
+        }
+        script.addEventListener('load', attach, { once: true });
+    },
+}">
+        <div class="flex flex-col gap-6">
             <x-callout type="danger" title="Restoring a backup changes database data">
                 Review the source and import command before continuing. Existing objects can cause the import to fail unless replacement is enabled.
             </x-callout>
 
-            <x-application.settings-section title="Restore configuration"
-                description="Configure how the selected backup is applied to this database.">
-                <div class="space-y-4">
+            <section>
+                <h3 class="text-sm font-semibold text-black dark:text-fg">Restore configuration</h3>
+                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Configure how the selected backup is applied to this database.</p>
+                <div class="mt-4 space-y-4">
             @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
                             <x-callout type="warning" title="Full restore runs as a superuser">
                                 Restoring all databases needs a PostgreSQL superuser (it recreates databases and roles), so Coolify cannot restrict it. Only use a backup you trust.
                                 <span class="mt-1 block">The backup also replaces PostgreSQL administrator role passwords, including the destination administrator password. If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
                             </x-callout>
             @endif
-                            <x-forms.textarea rows="10" readonly label="Import command"
-                                helper="Coolify detects the backup format (SQL, archive, gzip, bz2, xz, zip, or tar) before it changes the database."
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
                     @if ($resourceDbType !== 'standalone-sqlite')
                     <div class="max-w-sm">
                         <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
@@ -116,12 +128,27 @@
                                 canGate="update" :canResource="$this->resource" />
                         </div>
                     @endif
+                    <div x-data="{ showCommand: false }">
+                        <button type="button" @click="showCommand = !showCommand" :aria-expanded="showCommand"
+                            class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
+                            <x-reicon name="chevron-down" class="size-3.5 transition-transform"
+                                ::class="showCommand ? '' : '-rotate-90'" />
+                            <span x-text="showCommand ? 'Hide import command' : 'Show import command'">Show import command</span>
+                        </button>
+                        <div x-cloak x-show="showCommand" class="mt-3">
+                            <x-forms.textarea rows="10" readonly label="Import command"
+                                helper="Coolify detects the backup format (SQL, archive, gzip, bz2, xz, zip, or tar) before it changes the database."
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
+                        </div>
+                    </div>
                 </div>
-            </x-application.settings-section>
+            </section>
 
-            <x-application.settings-section title="Backup source"
-                description="Choose a local file or an object stored in S3.">
-                <div class="grid gap-3 sm:grid-cols-2">
+            <section class="border-t border-neutral-200 pt-6 dark:border-white/[0.06]">
+                <h3 class="text-sm font-semibold text-black dark:text-fg">Backup source</h3>
+                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Choose a local file or an object stored in S3.</p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     <button type="button" @click="restoreType = 'file'"
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
@@ -160,7 +187,7 @@
             {{-- File Restore Section --}}
             @can('update', $this->resource)
                 <div x-cloak x-show="restoreType === 'file'"
-                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
+                    class="mt-4">
                     <form class="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div class="min-w-0 flex-1">
                             <x-forms.input label="File path on the server"
@@ -180,7 +207,7 @@
 
                     <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
                         class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
-                        id="my-dropzone" wire:ignore>
+                        x-init="mountDropzone($el)" wire:ignore>
                         @csrf
                     </form>
                     <div x-show="isUploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
@@ -227,7 +254,7 @@
                             ->all();
                     @endphp
                     <div x-cloak x-show="restoreType === 's3'"
-                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
+                        class="mt-4">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.listbox id="s3StorageId" label="S3 storage" :options="$s3StorageOptions"
                                 placeholder="Select storage" live />
@@ -274,7 +301,7 @@
                     </div>
                 @endcan
             @endif
-            </x-application.settings-section>
+            </section>
         </div>
 
             <x-process-dialog @databaserestore.window="processDialogOpen = true" closeWithX size="xl">

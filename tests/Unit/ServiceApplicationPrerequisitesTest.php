@@ -78,6 +78,28 @@ it('applies appwrite stripprefix prerequisite correctly', function () {
     }
 });
 
+it('keeps the /api prefix for the rybbit backend', function () {
+    $application = new class
+    {
+        public $is_stripprefix_enabled = true;
+
+        public function save() {}
+    };
+
+    $query = Mockery::mock();
+    $query->shouldReceive('whereName')->with('rybbit_backend')->once()->andReturnSelf();
+    $query->shouldReceive('first')->once()->andReturn($application);
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->name = 'rybbit-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3';
+    $service->id = 1;
+    $service->shouldReceive('applications')->once()->andReturn($query);
+
+    applyServiceApplicationPrerequisites($service);
+
+    expect($application->is_stripprefix_enabled)->toBeFalse();
+});
+
 it('handles missing applications gracefully', function () {
     $query = Mockery::mock();
     $query->shouldReceive('whereName')

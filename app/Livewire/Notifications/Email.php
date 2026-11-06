@@ -7,6 +7,7 @@ use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeSmtpHost;
 use App\Rules\ValidHostname;
 use App\Support\SmtpPresets;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -154,6 +155,9 @@ class Email extends Component
         if ($toModel) {
             $this->validate();
             $this->validate(['smtpEhloDomain' => ['nullable', 'string', new ValidHostname]]);
+            if ($this->smtpHost !== $this->settings->smtp_host) {
+                $this->validate(['smtpHost' => ['nullable', 'string', new SafeSmtpHost]]);
+            }
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_recipients = $this->smtpRecipients;
             $this->fillSmtpServerSettings();
@@ -447,7 +451,8 @@ class Email extends Component
             'smtpServerName' => 'nullable|string|max:255',
             'smtpFromAddress' => 'required|email',
             'smtpFromName' => 'required|string',
-            'smtpHost' => 'required|string',
+            // A stored host is checked again at send time, so an unchanged host must not block saving other fields.
+            'smtpHost' => $this->smtpHost === $this->settings->smtp_host ? ['required', 'string'] : ['required', 'string', new SafeSmtpHost],
             'smtpPort' => 'required|numeric',
             'smtpEncryption' => 'required|string|in:starttls,tls,none',
             'smtpUsername' => [Rule::requiredIf(SmtpPresets::requiresLogin($this->smtpHost)), 'nullable', 'string'],

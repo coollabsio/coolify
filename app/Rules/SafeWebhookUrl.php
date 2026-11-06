@@ -3,6 +3,7 @@
 namespace App\Rules;
 
 use App\Models\InstanceSettings;
+use App\Services\Dns\DnsResolver;
 use Closure;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Psr7\UriComparator;
@@ -11,21 +12,27 @@ use Illuminate\Support\Facades\Log;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
-use PurplePixie\PhpDns\DNSTypes;
 use Throwable;
 
 class SafeWebhookUrl implements ValidationRule
 {
+    /** @var (Closure(string): array<int, string>)|null */
+    private static ?Closure $fakeResolver = null;
+
     /**
      * @param  (Closure(string): array<int, string>)|null  $resolver
      * @param  array<int, string>  $trustedInternalHosts
      * @param  bool  $allowPrivateNetworks  Allow private, CGNAT, and unique local addresses and internal hostnames.
      *                                      Loopback, link-local (cloud metadata), and reserved targets stay blocked.
+     * @param  bool  $preferSystemDns  Ask the system resolver before the custom DNS servers.
+     * @param  int  $customDnsTimeout  Seconds to wait for each custom DNS server query.
      */
     public function __construct(
         private ?Closure $resolver = null,
         private array $trustedInternalHosts = [],
         private bool $allowPrivateNetworks = false,
+        private bool $preferSystemDns = false,
+        private int $customDnsTimeout = 5,
     ) {}
 
     /**
@@ -35,6 +42,31 @@ class SafeWebhookUrl implements ValidationRule
     public static function forGitSource(): static
     {
         return new static(allowPrivateNetworks: self::gitSourcesMayUsePrivateNetworks());
+    }
+
+    /**
+     * SMTP hosts get the targets of git sources. They are often internal names (split-horizon DNS,
+     * Docker networks), so the system resolver answers first, and a send does not wait long for
+     * custom DNS servers.
+     */
+    public static function forSmtpHost(): static
+    {
+        return new static(
+            allowPrivateNetworks: self::gitSourcesMayUsePrivateNetworks(),
+            preferSystemDns: true,
+            customDnsTimeout: 2,
+        );
+    }
+
+    /**
+     * Resolve hosts with the given callback instead of DNS in every rule without its own
+     * resolver, so tests never send DNS queries. Pass null to reset.
+     *
+     * @param  (Closure(string): array<int, string>)|null  $resolver
+     */
+    public static function resolveHostsUsing(?Closure $resolver): void
+    {
+        self::$fakeResolver = $resolver;
     }
 
     public static function gitSourcesMayUsePrivateNetworks(): bool
@@ -219,6 +251,40 @@ class SafeWebhookUrl implements ValidationRule
         return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
     }
 
+    /**
+     * Resolve and check a host for a connection that is not HTTP (for example SMTP).
+     * The caller checks the host syntax first. "ips" has the checked addresses, or is empty
+     * when the host is an IP address.
+     *
+     * @return array{status: 'allowed'|'blocked'|'link_local'|'unresolved', ips: array<int, string>}
+     */
+    public function checkConnectionHost(string $host): array
+    {
+        $host = rtrim($this->normalizeHostForIpCheck(strtolower($host)), '.');
+
+        if ($this->isBlockedHostname($host) && ! $this->isAllowedHostname($host)) {
+            $this->logBlockedHost('connection host', $host);
+
+            return ['status' => 'blocked', 'ips' => []];
+        }
+
+        $isIp = filter_var($host, FILTER_VALIDATE_IP) !== false;
+        $ips = $isIp ? [$host] : $this->resolveHost($host);
+        if ($ips === []) {
+            return ['status' => 'unresolved', 'ips' => []];
+        }
+
+        foreach ($ips as $ip) {
+            if (! $this->isAllowedIp($ip, $host)) {
+                $this->logBlockedIp('connection host', $host, $ip);
+
+                return ['status' => $this->isLinkLocalIp($ip) ? 'link_local' : 'blocked', 'ips' => []];
+            }
+        }
+
+        return ['status' => 'allowed', 'ips' => $isIp ? [] : $ips];
+    }
+
     public static function redactedUrlForLog(string $url): string
     {
         $scheme = parse_url($url, PHP_URL_SCHEME);
@@ -297,12 +363,22 @@ class SafeWebhookUrl implements ValidationRule
      */
     private function resolveHost(string $host): array
     {
-        if ($this->resolver instanceof Closure) {
-            return array_values(array_filter(($this->resolver)($host), fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false));
+        $resolver = $this->resolver ?? self::$fakeResolver;
+        if ($resolver instanceof Closure) {
+            return array_values(array_filter($resolver($host), fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false));
         }
 
         if ($host === 'localhost') {
             return ['127.0.0.1', '::1'];
+        }
+
+        if ($this->preferSystemDns) {
+            $systemResolvedIps = $this->resolveHostWithSystemDns($host);
+            $customDnsServers = $this->customDnsServers();
+
+            return $systemResolvedIps !== [] || $customDnsServers === []
+                ? $systemResolvedIps
+                : $this->resolveHostWithCustomDnsServers($host, $customDnsServers);
         }
 
         $customDnsServers = $this->customDnsServers();
@@ -359,9 +435,9 @@ class SafeWebhookUrl implements ValidationRule
         $ips = [];
 
         foreach ($dnsServers as $dnsServer) {
-            foreach ([DNSTypes::NAME_A, DNSTypes::NAME_AAAA] as $type) {
+            foreach ([DnsResolver::TYPE_A, DnsResolver::TYPE_AAAA] as $type) {
                 try {
-                    $records = queryDnsServer($dnsServer, $host, $type);
+                    $records = queryDnsServer($dnsServer, $host, $type, $this->customDnsTimeout);
 
                     if ($records === false) {
                         continue;

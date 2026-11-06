@@ -167,7 +167,7 @@
         </div>
         @if ($selectedPrivateKeyUuid)
             <div wire:loading.remove wire:target="openEditor">
-                <livewire:security.private-key.show :private_key_uuid="$selectedPrivateKeyUuid" :modalMode="true"
+                <livewire:security.private-key.show :private_key_uuid="$selectedPrivateKeyUuid"
                     :key="'private-key-editor-'.$selectedPrivateKeyUuid" />
             </div>
         @endif

@@ -57,7 +57,7 @@ it('generates url using base_url instead of APP_URL', function () {
     $notification = new ServerPatchCheck($mockServer, $patchData);
 
     // The URL should use the FQDN from InstanceSettings, not APP_URL
-    expect($notification->serverUrl)->toBe('https://coolify.example.com/server/test-server-uuid/security/patches');
+    expect($notification->serverUrl)->toBe('https://coolify.example.com/server/test-server-uuid/security#server-patching-overview-section');
 });
 
 it('falls back to public_ipv4 with port when fqdn is not set', function () {
@@ -76,7 +76,7 @@ it('falls back to public_ipv4 with port when fqdn is not set', function () {
     $notification = new ServerPatchCheck($mockServer, $patchData);
 
     // The URL should use public IPv4 with default port 8000
-    expect($notification->serverUrl)->toBe('http://192.168.1.100:8000/server/test-server-uuid/security/patches');
+    expect($notification->serverUrl)->toBe('http://192.168.1.100:8000/server/test-server-uuid/security#server-patching-overview-section');
 });
 
 it('includes server url in all notification channels', function () {
@@ -103,23 +103,23 @@ it('includes server url in all notification channels', function () {
 
     // Check Discord
     $discord = $notification->toDiscord();
-    expect($discord->description)->toContain('https://coolify.test/server/abc-123/security/patches');
+    expect($discord->description)->toContain('https://coolify.test/server/abc-123/security#server-patching-overview-section');
 
     // Check Telegram
     $telegram = $notification->toTelegram();
-    expect($telegram['buttons'][0]['url'])->toBe('https://coolify.test/server/abc-123/security/patches');
+    expect($telegram['buttons'][0]['url'])->toBe('https://coolify.test/server/abc-123/security#server-patching-overview-section');
 
     // Check Pushover
     $pushover = $notification->toPushover();
-    expect($pushover->buttons[0]['url'])->toBe('https://coolify.test/server/abc-123/security/patches');
+    expect($pushover->buttons[0]['url'])->toBe('https://coolify.test/server/abc-123/security#server-patching-overview-section');
 
     // Check Slack
     $slack = $notification->toSlack();
-    expect($slack->description)->toContain('https://coolify.test/server/abc-123/security/patches');
+    expect($slack->description)->toContain('https://coolify.test/server/abc-123/security#server-patching-overview-section');
 
     // Check Webhook
     $webhook = $notification->toWebhook();
-    expect($webhook['url'])->toBe('https://coolify.test/server/abc-123/security/patches');
+    expect($webhook['url'])->toBe('https://coolify.test/server/abc-123/security#server-patching-overview-section');
 });
 
 it('uses correct url in error notifications', function () {
@@ -137,10 +137,10 @@ it('uses correct url in error notifications', function () {
 
     // Check error Discord notification
     $discord = $notification->toDiscord();
-    expect($discord->description)->toContain('https://coolify.production.com/server/error-server-uuid/security/patches');
+    expect($discord->description)->toContain('https://coolify.production.com/server/error-server-uuid/security#server-patching-overview-section');
 
     // Check error webhook
     $webhook = $notification->toWebhook();
-    expect($webhook['url'])->toBe('https://coolify.production.com/server/error-server-uuid/security/patches')
+    expect($webhook['url'])->toBe('https://coolify.production.com/server/error-server-uuid/security#server-patching-overview-section')
         ->and($webhook['event'])->toBe('server_patch_check_error');
 });

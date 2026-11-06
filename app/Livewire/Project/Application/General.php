@@ -10,6 +10,7 @@ use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use Exception;
@@ -995,6 +996,7 @@ class General extends Component
             $this->application->refresh();
             $this->dispatch('name-changed', uuid: $this->application->uuid, name: $this->application->name);
             $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($this->application, $previousDnsHostnames);
             $this->syncData();
             if ($oldPortsExposes !== $this->application->ports_exposes || $oldCustomNetworkAliases !== $this->application->custom_network_aliases) {
                 $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);

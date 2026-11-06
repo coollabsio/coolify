@@ -149,6 +149,25 @@ test('a scheduled task in a service quotes the container name', function (bool $
     expect($task->executions()->sole()->status)->toBe('success');
 })->with(['root' => [false, ''], 'non-root' => [true, 'sudo ']]);
 
+test('a scheduled task without a shell runs the command arguments directly', function (bool $nonRoot, string $sudo) {
+    if ($nonRoot) {
+        quotingUseNonRootUser();
+    }
+    $task = ScheduledTask::factory()->create([
+        'team_id' => $this->team->id,
+        'service_id' => $this->service->id,
+        'container' => QUOTING_HOSTILE_NAME,
+        'command' => '/surreal export --conn "http://localhost:8000" $HOME;id',
+        'use_shell' => false,
+    ]);
+
+    (new ScheduledTaskJob($task))->handle();
+
+    quotingAssertCommandRan("{$sudo}docker exec {$this->containerName} '/surreal' 'export' '--conn' 'http://localhost:8000' '\$HOME;id' 2>&1 |");
+    quotingAssertNoUnquotedName();
+    expect($task->executions()->sole()->status)->toBe('success');
+})->with(['root' => [false, ''], 'non-root' => [true, 'sudo ']]);
+
 /**
  * `docker ps` returns one container for the application.
  */

@@ -17,6 +17,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsHostnameLock;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\DnsRecordHints;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -490,6 +491,75 @@ describe('automatic dns on api domain changes', function () {
         Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'shop.example.com'
             && $job->resourceId === $serviceApplication->id);
         Queue::assertNotPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'web.example.com');
+    });
+
+    test('an application created through the api queues a record for its domain', function () {
+        Queue::fake([CheckDomainDnsJob::class, ConfigureDnsRecordJob::class]);
+        $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
+        $uuid = $this->withToken(dnsApiToken($this->user, $this->team))
+            ->postJson('/api/v1/applications/dockerimage', [
+                'project_uuid' => $this->environment->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'server_uuid' => $this->server->uuid,
+                'docker_registry_image_name' => 'nginx',
+                'docker_registry_image_tag' => 'latest',
+                'ports_exposes' => '80',
+                'domains' => 'https://api-created.example.com',
+                'instant_deploy' => false,
+            ])
+            ->assertCreated()
+            ->json('uuid');
+
+        Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'api-created.example.com'
+            && $job->content === '203.0.113.10' && $job->resourceId === Application::query()->where('uuid', $uuid)->value('id'));
+    });
+
+    test('a service created through the api queues a record for its domain', function () {
+        Queue::fake([CheckDomainDnsJob::class, ConfigureDnsRecordJob::class]);
+        $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
+        $this->withToken(dnsApiToken($this->user, $this->team))
+            ->postJson('/api/v1/services', [
+                'project_uuid' => $this->environment->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'server_uuid' => $this->server->uuid,
+                'docker_compose_raw' => base64_encode("services:\n  web:\n    image: nginx:alpine\n"),
+                'urls' => [['name' => 'web', 'url' => 'https://web-created.example.com']],
+                'instant_deploy' => false,
+            ])
+            ->assertCreated();
+
+        Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'web-created.example.com'
+            && $job->resourceType === (new ServiceApplication)->getMorphClass());
+    });
+
+    test('a clone queues records only for the domains that the source does not use', function () {
+        Queue::fake([CheckDomainDnsJob::class, ConfigureDnsRecordJob::class]);
+        $this->application->settings()->update(['is_container_label_readonly_enabled' => false]);
+        $this->application->update(['fqdn' => 'https://app.example.com,https://cloned.example.com']);
+        $source = $this->application->fresh();
+
+        $clone = clone_application($source, $this->destination, ['fqdn' => 'https://app.example.com,https://clone-only.example.com']);
+
+        Queue::assertPushed(ConfigureDnsRecordJob::class, 1);
+        Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'clone-only.example.com'
+            && $job->resourceId === $clone->id);
+    });
+
+    test('a cloned service queues records for its generated domains', function () {
+        Queue::fake([CheckDomainDnsJob::class, ConfigureDnsRecordJob::class]);
+        $this->server->settings()->update(['wildcard_domain' => 'https://example.com']);
+        $source = dnsApiService($this, 'https://web.example.com')->service;
+        $source->update(['docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    environment:\n      - SERVICE_FQDN_WEB\n"]);
+
+        $clone = clone_service($source->fresh(), $this->destination);
+
+        $cloneHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($clone));
+        expect($cloneHostnames)->not->toBeEmpty()->not->toContain('web.example.com');
+        foreach ($cloneHostnames as $hostname) {
+            Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === $hostname);
+        }
     });
 
     test('no record is queued when automatic dns is off', function () {

@@ -5,7 +5,9 @@ namespace App\Jobs;
 use App\Actions\Server\CleanupDocker;
 use App\Events\DockerCleanupDone;
 use App\Models\DockerCleanupExecution;
+use App\Models\NotificationThrottle;
 use App\Models\Server;
+use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\Server\DockerCleanupSuccess;
 use App\Services\ScheduledJobDeliveryService;
@@ -132,7 +134,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'cleanup_log' => $cleanup_log,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
 
                 return;
@@ -154,7 +156,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'cleanup_log' => $cleanup_log,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
 
                 return;
@@ -183,7 +185,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'cleanup_log' => $cleanup_log,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
             } else {
                 $message = 'No cleanup needed for '.$this->server->name;
@@ -193,7 +195,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'message' => $message,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
             }
         } catch (\Throwable $e) {
@@ -283,6 +285,23 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     $execution->server?->team?->notify(new DockerCleanupFailed($execution->server, 'Docker cleanup job failed with the following error: '.self::INTERRUPTED_MESSAGE));
                 }
             });
+    }
+
+    /**
+     * Also tells the team once that a cleanup that failed before works again.
+     */
+    private function notifySuccess(string $message): void
+    {
+        $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+        if (NotificationThrottle::release($this->server, DockerCleanupFailed::class)) {
+            $this->server->team?->notify(new ScheduledJobRecovered(
+                failureEvent: 'docker_cleanup_failure',
+                title: "Docker cleanup job works again on {$this->server->name}.",
+                webhookEvent: 'docker_cleanup_recovered',
+                url: base_url().'/server/'.$this->server->uuid,
+                webhookData: ['server_name' => $this->server->name, 'server_uuid' => $this->server->uuid],
+            ));
+        }
     }
 
     public function failed(?\Throwable $exception): void

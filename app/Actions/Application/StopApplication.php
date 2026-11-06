@@ -5,6 +5,7 @@ namespace App\Actions\Application;
 use App\Actions\Server\CleanupDocker;
 use App\Events\ApplicationStopFailed;
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\Application;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -17,6 +18,7 @@ class StopApplication
 
     public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainers = true): ?string
     {
+        NotifyResourceStoppedJob::expectStop($application, $application->settings->stopGracePeriodSeconds());
         $containerPresent = ! $removeContainers;
         $servers = collect([$application->destination->server]);
         if ($application?->additional_servers?->count() > 0) {

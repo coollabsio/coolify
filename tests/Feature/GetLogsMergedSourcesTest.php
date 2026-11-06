@@ -180,7 +180,7 @@ it('asks each source only for lines after its own timestamp', function () {
     $frankfurt = collect($commands)->first(fn (string $command): bool => str_contains($command, 'web-frankfurt'));
     $helsinki = collect($commands)->first(fn (string $command): bool => str_contains($command, 'web-helsinki'));
 
-    expect($frankfurt)->toContain('--since 2026-09-28T10:00:01.123456789Z')
+    expect($frankfurt)->toContain('--since 2026-09-28T10:00:01.123456789Z -n 50000 -t')
         ->and($helsinki)->toContain('docker logs -n ')
         ->and($helsinki)->not->toContain('--since');
 });

@@ -237,6 +237,7 @@
                                 (bool) data_get($deployment, 'is_webhook') => 'Webhook',
                                 $pullRequestId > 0 => 'Pull request #' . $pullRequestId,
                                 (bool) data_get($deployment, 'rollback') => 'Rollback',
+                                (bool) data_get($deployment, 'is_mcp') => 'MCP',
                                 (bool) data_get($deployment, 'is_api') => 'API',
                                 default => 'Manual',
                             };
@@ -244,6 +245,7 @@
                                 $pullRequestId > 0 => 'pull-request',
                                 (bool) data_get($deployment, 'is_webhook') => 'webhook',
                                 (bool) data_get($deployment, 'rollback') => 'rollback',
+                                (bool) data_get($deployment, 'is_mcp') => 'mcp',
                                 (bool) data_get($deployment, 'is_api') => 'api',
                                 default => 'manual',
                             };

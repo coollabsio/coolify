@@ -13,7 +13,7 @@ const GITEA_PAGE_SIZE = 50;
 function refreshGiteaToken(GiteaApp $source): void
 {
     if (! $source->refresh_token) {
-        throw new RuntimeException('Gitea source has no refresh token. Please reconnect the Gitea app.');
+        throw new RuntimeException('Gitea / Forgejo source has no refresh token. Please reconnect the Gitea / Forgejo App.');
     }
 
     $safetyMargin = 60;

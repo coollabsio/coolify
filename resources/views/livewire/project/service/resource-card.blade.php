@@ -1,6 +1,6 @@
 @php
         [$statusType, $statusLabel] = match (true) {
-            str($resource->status)->contains('running') => ['success', formatContainerStatus($resource->status)],
+            str($resource->status)->contains('running') && ! str($resource->status)->contains('starting') => ['success', formatContainerStatus($resource->status)],
             str($resource->status)->contains(['starting', 'restarting', 'degraded']) => ['warning', formatContainerStatus($resource->status)],
             default => ['error', formatContainerStatus($resource->status)],
         };
@@ -37,11 +37,22 @@
                         {{ $resource->image }}
                     </div>
                 </div>
+                @if ($resource->is_removed_from_compose)
+                <span class="inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 text-xs font-medium leading-none text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
+                    <span class="size-1.5 shrink-0 rounded-full bg-red-500"></span>
+                    <span class="truncate">Not in Compose file</span>
+                </span>
+            @else
                 <x-status-badge :status="$statusLabel" :type="$statusType" />
+            @endif
                 <x-application.restart-limit-warning :application="$resource" />
             </div>
 
-            @if ($resource->configuration_required)
+            @if ($resource->is_removed_from_compose)
+                <p class="mt-2 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                    This resource is not in the Docker Compose file. Add it back to use it again, or delete it in its settings.
+                </p>
+            @elseif ($resource->configuration_required)
                 <div class="mt-2">
                     <x-status-badge status="Configuration required" type="warning" />
                 </div>
@@ -104,8 +115,16 @@
         <div class="truncate font-mono text-xs text-neutral-500 dark:text-fg-faint">
             {{ $resource->image }}
         </div>
-        <div class="flex flex-wrap items-center gap-1">
-            <x-status-badge :status="$statusLabel" :type="$statusType" />
+        <div class="flex flex-wrap items-center gap-1"
+            @if ($resource->is_removed_from_compose) title="Not in the Docker Compose file. Add it back to use it again, or delete it in its settings." @endif>
+            @if ($resource->is_removed_from_compose)
+                <span class="inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 text-xs font-medium leading-none text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
+                    <span class="size-1.5 shrink-0 rounded-full bg-red-500"></span>
+                    <span class="truncate">Not in Compose file</span>
+                </span>
+            @else
+                <x-status-badge :status="$statusLabel" :type="$statusType" />
+            @endif
             <x-application.restart-limit-warning :application="$resource" />
         </div>
         @php
