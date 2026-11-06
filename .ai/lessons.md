@@ -45,6 +45,8 @@
 
 - MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
 
+- To prove BuildKit cache behavior, use a new Dockerfile with a unique step for each experiment and repeat each build. Old cache records can make a changed input look cached. BuildKit keys `RUN` steps on the `--add-host` names and their order, but not on the IPs.
+
 ## Add dependencies through the trust gate
 - `composer require` stops until `vendor/bin/vet` records the new packages in `vet.json`. Read the package source first, then record it with `vendor/bin/vet` in a terminal (it needs a TTY). Prefer the existing dependencies (Guzzle, curl, Flysystem) over a package with a large dependency tree.
 

@@ -54,6 +54,9 @@ class Advanced extends Component
     public bool $includeSourceCommitInBuild = false;
 
     #[Validate(['boolean'])]
+    public bool $includeNetworkHostsInBuild = true;
+
+    #[Validate(['boolean'])]
     public bool $isLogDrainEnabled = false;
 
     #[Validate(['boolean'])]
@@ -148,6 +151,7 @@ class Advanced extends Component
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
             $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
+            $this->application->settings->include_network_hosts_in_build = $this->includeNetworkHostsInBuild;
             $changedFields = array_keys($this->application->settings->getDirty());
             $this->application->settings->save();
             $this->auditSettingsUpdate($changedFields);
@@ -178,6 +182,7 @@ class Advanced extends Component
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
+            $this->includeNetworkHostsInBuild = $this->application->settings->include_network_hosts_in_build ?? true;
             $this->maxRestartCount = $this->application->max_restart_count ?? 0;
         }
 

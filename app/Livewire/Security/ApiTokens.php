@@ -10,7 +10,9 @@ use App\Models\Project;
 use App\Services\Access\AccessResolver;
 use App\Services\Access\Grant;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Computed;
@@ -29,6 +31,14 @@ class ApiTokens extends Component
     public ApiTokenForm $editForm;
 
     public $tokens = [];
+
+    /**
+     * Search text of each listed token. Alpine filters and pages the list with it through $wire, so it must change with $tokens.
+     *
+     * @var list<array{id: string, search: string}>
+     */
+    #[Locked]
+    public array $tokenSearchIndex = [];
 
     public array $expirationOptions = [
         7 => '7 days',
@@ -59,8 +69,16 @@ class ApiTokens extends Component
     public function render()
     {
         return view('livewire.security.api-tokens', [
-            'scopeLabels' => collect($this->scopeOptions)->reject(fn (array $option) => $option['header'] ?? false)->pluck('label', 'value'),
+            'scopeLabels' => $this->scopeLabels(),
         ]);
+    }
+
+    /**
+     * @return Collection<string, string>
+     */
+    private function scopeLabels(): Collection
+    {
+        return collect($this->scopeOptions)->reject(fn (array $option) => $option['header'] ?? false)->pluck('label', 'value');
     }
 
     /**
@@ -149,6 +167,16 @@ class ApiTokens extends Component
             ->where('team_id', currentTeam()->id)
             ->latest()
             ->get();
+
+        $scopeLabels = $this->scopeLabels();
+        $this->tokenSearchIndex = $this->tokens->map(fn (PersonalAccessToken $token) => [
+            'id' => (string) $token->id,
+            'search' => Str::lower(collect([$token->name, ...($token->abilities ?? [])])
+                ->merge($token->scopes === null
+                    ? ['All resources in the team']
+                    : collect($token->scopes)->map(fn ($scope) => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? null)->filter())
+                ->join(' ')),
+        ])->values()->all();
     }
 
     public function addNewToken()

@@ -246,12 +246,9 @@
                                 </template>
                             </div>
                         @endif
-                        <div class="flex items-center gap-2 text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
-                            <span x-show="server.statusType !== 'success'"
-                                class="hidden size-2 shrink-0 rounded-full md:inline-block"
-                                :class="server.statusType === 'warning' ? 'bg-orange-500 dark:bg-warning' : 'bg-red-500 dark:bg-red-400'"></span>
-                            <span x-show="server.statusType === 'success'"
-                                class="hidden size-2 shrink-0 rounded-full bg-green-500 md:inline-block dark:bg-green-400"></span>
+                        <div class="flex items-center gap-1.5 text-[13px] text-neutral-700 dark:text-fg">
+                            <span class="hidden size-1.5 shrink-0 rounded-full md:inline-block"
+                                :class="{ 'bg-emerald-500': server.statusType === 'success', 'bg-warning': server.statusType === 'warning', 'bg-red-500': server.statusType !== 'success' && server.statusType !== 'warning' }"></span>
                             <span x-text="server.status"></span>
                         </div>
                     </a>

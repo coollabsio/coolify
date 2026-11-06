@@ -460,7 +460,10 @@ class Show extends Component
                 ServerReachabilityChanged::dispatch($this->server);
                 $this->server->gatherServerMetadata();
                 $this->server->refresh();
+                $this->dispatch('refreshServerShow')->to(Navbar::class);
             } else {
+                $this->isReachable = $this->server->settings->is_reachable;
+                $this->dispatch('refreshServerShow')->to(Navbar::class);
                 $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
                 return;
@@ -738,10 +741,15 @@ class Show extends Component
         // Refresh server data and only the display-only state that validation produces.
         // Never re-sync text-input properties via syncData() — would clobber any
         // unsaved typing (see coolify#6062 / #6354 / #9695).
+        $wasValidating = $this->isValidating;
         $this->server->refresh();
         $this->server->settings->refresh();
         $this->isValidating = $this->server->is_validating ?? false;
         $this->validationLogs = $this->server->validation_logs;
+        if ($wasValidating && ! $this->isValidating) {
+            // The dialog was opened for a background validation job, which does not drive its checkpoints.
+            $this->dispatch('background-validation-finished');
+        }
         $this->isReachable = $this->server->settings->is_reachable;
         $this->isUsable = $this->server->settings->is_usable;
 

@@ -214,6 +214,15 @@ class Show extends Component
         );
     }
 
+    private function keyBelongsToAnotherVariable(): bool
+    {
+        if ($this->isSharedVariable) {
+            return false;
+        }
+
+        return $this->env->sameKeyVariables(ValidationPatterns::normalizeEnvironmentVariableKey($this->key))->exists();
+    }
+
     private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
@@ -374,6 +383,13 @@ class Show extends Component
 
                     return;
                 }
+            }
+
+            if ($this->keyBelongsToAnotherVariable()) {
+                $this->key = $this->env->key;
+                $this->dispatch('error', 'Environment variable already exists.');
+
+                return;
             }
 
             $submittedValue = $this->env->is_shown_once
@@ -586,8 +602,9 @@ class Show extends Component
         try {
             $this->authorize('delete', $this->env);
 
-            // Check if the variable is used in Docker Compose
-            if ($this->type === 'service' || $this->type === 'application' && $this->env->resourceable?->docker_compose) {
+            // A Compose variable must keep one row, but an extra copy of it can go.
+            $isDuplicate = ! $this->isSharedVariable && $this->env->sameKeyVariables()->exists();
+            if (! $isDuplicate && ($this->type === 'service' || $this->type === 'application' && $this->env->resourceable?->docker_compose)) {
                 [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resourceable?->docker_compose);
 
                 if ($isUsed) {

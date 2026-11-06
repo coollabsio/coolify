@@ -410,7 +410,7 @@ test('audit change preparation failures do not fail model writes', function () {
     $project->update(['description' => 'Persist this description']);
 
     expect(Project::query()->findOrFail($project->id)->description)->toBe('Persist this description')
-        ->and(AuditEvent::query()->sole()->changes)->toBe([]);
+        ->and(AuditEvent::query()->sole()->changes)->toBeNull();
 
     Log::shouldHaveReceived('warning')->once()->with(
         'Audit change preparation failed',

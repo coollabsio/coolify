@@ -244,8 +244,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto">
                             <form wire:submit="updateDomain" class="flex flex-col gap-4">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">

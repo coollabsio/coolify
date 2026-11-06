@@ -110,8 +110,8 @@ class UpdateIntegrationToken
                 'integration_token_uuid' => $integrationToken->uuid,
                 'integration_token_name' => $integrationToken->name,
                 'provider' => $provider,
-                'previous_base_url' => $this->baseUrlForAudit(data_get($storedMetadata, 'base_url')),
-                'base_url' => $this->baseUrlForAudit(data_get($metadata, 'base_url')),
+                'previous_base_url' => auditUrl(data_get($storedMetadata, 'base_url')),
+                'base_url' => auditUrl(data_get($metadata, 'base_url')),
             ], 'warning');
         }
 
@@ -144,25 +144,6 @@ class UpdateIntegrationToken
             $this->connectionFields($provider),
             fn (string $field): bool => (string) data_get($storedMetadata, $field, '') !== (string) data_get($metadata, $field, ''),
         ));
-    }
-
-    /**
-     * Base URL without user info, query, or fragment, which can carry credentials.
-     */
-    private function baseUrlForAudit(mixed $url): ?string
-    {
-        if (! is_string($url) || $url === '') {
-            return null;
-        }
-
-        $parts = parse_url($url);
-        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
-            return '[invalid-url]';
-        }
-
-        return $parts['scheme'].'://'.$parts['host']
-            .(isset($parts['port']) ? ':'.$parts['port'] : '')
-            .($parts['path'] ?? '');
     }
 
     private function reenterSecretMessage(string $provider): string

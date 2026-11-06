@@ -283,6 +283,33 @@ it('does not add the Docker network hint to other failures', function () {
     expect($exception->getMessage())->not->toContain('systemctl restart docker');
 });
 
+it('reports the exit code and explains a lost SSH connection when a command ends with exit code 255', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: '#26 exporting layers', exitCode: 255)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker buildx build .',
+    ]));
+
+    expect($exception->getCode())->toBe(255)
+        ->and($exception->getMessage())
+        ->toContain('exit code 255')
+        ->toContain('SSH connection to the server closed');
+});
+
+it('does not add the SSH connection hint to failures of the remote command', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'build failed', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker buildx build .',
+    ]));
+
+    expect($exception->getMessage())->not->toContain('SSH connection');
+});
+
 it('redacts locked values from the error output of failed commands', function () {
     [$job] = makeSensitiveCommandFailureJob([
         ['key' => 'LOCKED_SECRET', 'value' => SENSITIVE_FAILURE_SECRET, 'is_shown_once' => true],

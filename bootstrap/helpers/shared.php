@@ -742,10 +742,13 @@ function generate_random_name(?string $cuid = null): string
 
     return Str::kebab("{$generator->getName()}-$cuid");
 }
+/**
+ * RSA keys get 4096 bits: GitHub rejects new RSA SSH keys smaller than 3072 bits, and phpseclib makes 2048-bit keys by default.
+ */
 function generateSSHKey(string $type = 'ed25519')
 {
     if ($type === 'rsa') {
-        $key = RSA::createKey();
+        $key = RSA::createKey(4096);
 
         return [
             'private' => $key->toString('PKCS1'),
@@ -1127,6 +1130,18 @@ function maintenance_queue(): string
 function webhooks_queue(): string
 {
     return isCloud() ? 'webhooks' : 'high';
+}
+
+/**
+ * Resolve the queue for PushServerUpdateJob, which processes Sentinel pushes.
+ *
+ * On cloud these jobs run on a dedicated `sentinel` queue, so a burst of pushes from many
+ * servers cannot use the workers of the other queues. Self-hosted returns null, so the jobs
+ * stay on the default queue of the connection, as before.
+ */
+function sentinel_queue(): ?string
+{
+    return isCloud() ? 'sentinel' : null;
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -3457,12 +3472,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                                 $savedService->save();
                             }
-                            EnvironmentVariable::create([
-                                'key' => $key,
-                                'value' => $fqdn,
+                            EnvironmentVariable::firstOrCreate([
+                                'key' => $key->value(),
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                            ], [
+                                'value' => $fqdn,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }
@@ -4456,7 +4472,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
-                        $composeRedirect = data_get($domains, "$serviceName.redirect");
+                        $composeRedirect = data_get($domains, [$serviceName, 'redirect']);
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';
@@ -5136,15 +5152,20 @@ function getJobStatus(?string $jobId = null)
  */
 function dockerfileHealthcheckInstruction(?string $dockerfile, ?string $target = null): ?string
 {
+    $dockerfile = (string) $dockerfile;
+    // The "# escape=`" parser directive (Windows Dockerfiles) is valid only in the comment lines at the top of the file.
+    $escape = preg_match('/\A(?:[ \t]*#[ \t]*[a-z]+[ \t]*=[^\r\n]*\R)*?[ \t]*#[ \t]*escape[ \t]*=[ \t]*([\\\\`])[ \t]*$/im', $dockerfile, $directive)
+        ? $directive[1]
+        : '\\';
     $instructions = [];
     $current = '';
-    foreach (preg_split('/\R/', (string) $dockerfile) as $line) {
+    foreach (preg_split('/\R/', $dockerfile) as $line) {
         $line = trim($line);
         if ($line === '' || str_starts_with($line, '#')) {
             continue;
         }
-        $continues = str_ends_with($line, '\\');
-        $current = trim($current.' '.rtrim($line, '\\ '));
+        $continues = str_ends_with($line, $escape);
+        $current = trim($current.' '.($continues ? substr($line, 0, -1) : $line));
         if (! $continues) {
             $instructions[] = $current;
             $current = '';
@@ -5182,7 +5203,7 @@ function dockerfileHealthcheckInstruction(?string $dockerfile, ?string $target =
     while ($index !== null) {
         $stage = $stages[$index];
         if ($stage['healthcheck'] !== null) {
-            return preg_match('/^HEALTHCHECK\s+NONE$/i', $stage['healthcheck']) ? null : $stage['healthcheck'];
+            return preg_match('/^HEALTHCHECK(?:\s+--\S+)*\s+NONE$/i', $stage['healthcheck']) ? null : $stage['healthcheck'];
         }
         $parentIndex = null;
         foreach ($stages as $i => $candidate) {
@@ -5196,36 +5217,66 @@ function dockerfileHealthcheckInstruction(?string $dockerfile, ?string $target =
     return null;
 }
 
-function parseDockerfileInterval(string $something)
+/**
+ * Read the options of a HEALTHCHECK instruction like Docker does: only the --name=value flags before CMD count.
+ * An option is null when it is missing or not valid. Docker uses its default for a zero interval, timeout, or retries
+ * (30s, 30s, 3), so those are returned instead of 0.
+ *
+ * @return array{interval: ?int, timeout: ?int, start_period: ?int, retries: ?int}
+ */
+function dockerfileHealthcheckOptions(string $instruction): array
 {
-    $value = preg_replace('/[^0-9]/', '', $something);
-    $unit = preg_replace('/[0-9]/', '', $something);
-
-    // Default to seconds if no unit specified
-    $unit = $unit ?: 's';
-
-    // Convert to seconds based on unit
-    $seconds = (int) $value;
-    switch ($unit) {
-        case 'ns':
-            $seconds = (int) ($value / 1000000000);
-            break;
-        case 'us':
-        case 'µs':
-            $seconds = (int) ($value / 1000000);
-            break;
-        case 'ms':
-            $seconds = (int) ($value / 1000);
-            break;
-        case 'm':
-            $seconds = (int) ($value * 60);
-            break;
-        case 'h':
-            $seconds = (int) ($value * 3600);
-            break;
+    preg_match('/^HEALTHCHECK((?:\s+--[a-z-]+=(?:"[^"]*"|\'[^\']*\'|\S+))*)/i', $instruction, $flagsPart);
+    preg_match_all('/--([a-z-]+)=("[^"]*"|\'[^\']*\'|\S+)/i', $flagsPart[1] ?? '', $flags, PREG_SET_ORDER);
+    $values = [];
+    foreach ($flags as [, $name, $value]) {
+        $values[$name] = preg_replace('/^(["\'])(.*)\1$/', '$2', $value);
     }
 
-    return $seconds;
+    $interval = parseDockerfileInterval($values['interval'] ?? '');
+    $timeout = parseDockerfileInterval($values['timeout'] ?? '');
+    $retries = preg_match('/^\+?\d{1,9}$/', $values['retries'] ?? '') ? (int) $values['retries'] : null;
+
+    return [
+        'interval' => $interval === 0 ? 30 : $interval,
+        'timeout' => $timeout === 0 ? 30 : $timeout,
+        'start_period' => parseDockerfileInterval($values['start-period'] ?? ''),
+        'retries' => $retries === 0 ? 3 : $retries,
+    ];
+}
+
+/**
+ * Convert a Dockerfile HEALTHCHECK duration (Go duration syntax, for example "1m30s" or "1.5m") to whole seconds.
+ * A value without a unit is read as seconds. A positive value below one second becomes 1, so it does not read as zero.
+ * Returns null when the value is not a valid duration or does not fit the integer column.
+ */
+function parseDockerfileInterval(string $duration): ?int
+{
+    if (str_starts_with($duration, '+')) {
+        $duration = substr($duration, 1);
+    }
+    if (preg_match('/^\d+$/', $duration)) {
+        return (int) $duration <= 2147483647 ? (int) $duration : null;
+    }
+
+    $unitSeconds = ['ns' => 1e-9, 'us' => 1e-6, 'µs' => 1e-6, 'μs' => 1e-6, 'ms' => 1e-3, 's' => 1, 'm' => 60, 'h' => 3600];
+    preg_match_all('/(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)/u', $duration, $parts, PREG_SET_ORDER);
+    if ($parts === [] || implode('', array_column($parts, 0)) !== $duration) {
+        return null;
+    }
+
+    $seconds = 0.0;
+    foreach ($parts as [, $value, $unit]) {
+        $seconds += (float) $value * $unitSeconds[$unit];
+    }
+    if ($seconds > 0 && $seconds < 1) {
+        return 1;
+    }
+
+    // Round away float noise (0.3m = 17.999...s), then drop the fraction: the columns store whole seconds.
+    $seconds = floor(round($seconds, 6));
+
+    return $seconds <= 2147483647 ? (int) $seconds : null;
 }
 
 function addPreviewDeploymentSuffix(string $name, int $pull_request_id = 0): string

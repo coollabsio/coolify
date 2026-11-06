@@ -116,7 +116,7 @@ class Transfer extends Component
             auditLog('ui.server.migrate', [
                 'team_id' => $this->server->team_id,
                 'server_uuid' => $this->server->uuid,
-                'target_url' => $this->targetUrl,
+                'target_url' => auditUrl($this->targetUrl),
             ]);
 
             $this->server->refresh();
@@ -141,7 +141,7 @@ class Transfer extends Component
             auditLog('ui.server.transfer_back', [
                 'team_id' => $this->server->team_id,
                 'server_uuid' => $this->server->uuid,
-                'from' => $this->managerUrl,
+                'from' => auditUrl($this->managerUrl),
             ]);
 
             $this->server->refresh();

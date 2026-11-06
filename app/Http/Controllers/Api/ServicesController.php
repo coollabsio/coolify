@@ -416,8 +416,8 @@ class ServicesController extends Controller
             'environment_uuid' => 'string|nullable',
             'server_uuid' => 'string|required',
             'destination_uuid' => 'string|nullable',
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'urls' => 'array|nullable',
@@ -431,6 +431,7 @@ class ServicesController extends Controller
             'tags.*' => 'string|min:2',
         ];
         $validationMessages = [
+            ...ValidationPatterns::combinedMessages(),
             'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
         ];
         $validator = Validator::make($request->all(), $validationRules, $validationMessages);
@@ -573,8 +574,7 @@ class ServicesController extends Controller
                             $command = $value->after('SERVICE_')->beforeLast('_');
                             $generatedValue = generateEnvValue($command->value(), $service);
                         }
-                        EnvironmentVariable::create([
-                            'key' => $key,
+                        $service->environment_variables()->updateOrCreate(['key' => $key], [
                             'value' => $generatedValue,
                             'resourceable_id' => $service->id,
                             'resourceable_type' => $service->getMorphClass(),
@@ -641,8 +641,8 @@ class ServicesController extends Controller
                 'environment_uuid' => 'string|nullable',
                 'server_uuid' => 'string|required',
                 'destination_uuid' => 'string',
-                'name' => 'string|max:255',
-                'description' => 'string|nullable',
+                'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+                'description' => ValidationPatterns::descriptionRules(),
                 'instant_deploy' => 'boolean',
                 'connect_to_docker_network' => 'boolean',
                 'docker_compose_raw' => 'string|required',
@@ -657,6 +657,7 @@ class ServicesController extends Controller
                 'tags.*' => 'string|min:2',
             ];
             $validationMessages = [
+                ...ValidationPatterns::combinedMessages(),
                 'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
@@ -1245,8 +1246,8 @@ class ServicesController extends Controller
         $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'redact_all_env_values_in_logs', 'include_coolify_default_variables'];
 
         $validationRules = [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'docker_compose_raw' => 'string|nullable',
@@ -1260,6 +1261,7 @@ class ServicesController extends Controller
             'include_coolify_default_variables' => 'boolean',
         ];
         $validationMessages = [
+            ...ValidationPatterns::combinedMessages(),
             'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
         ];
         $validator = Validator::make($request->all(), $validationRules, $validationMessages);
@@ -1582,14 +1584,19 @@ class ServicesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->save();
+        // One audit row with the service context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.service.env_updated', [
-            'team_id' => $teamId,
-            'service_uuid' => $service->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.service.env_updated', [
+                'team_id' => $teamId,
+                'service_uuid' => $service->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
@@ -3299,9 +3306,9 @@ class ServicesController extends Controller
 
         $validator = customApiValidator($request->all(), [
             'destination_uuid' => 'required|string',
-            'name' => 'string|max:255|nullable',
+            'name' => ValidationPatterns::nameRules(required: false),
             'clone_volumes' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {

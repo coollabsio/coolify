@@ -152,3 +152,35 @@ test('it rejects docker_tag for non docker image applications', function () {
     $response->assertSuccessful();
     $response->assertJsonPath('deployments.0.message', 'docker_tag can only be used with Docker Image applications.');
 });
+
+test('a member without deploy access cannot create or change a docker image preview', function () {
+    $application = createDockerImageApplication($this->environment, $this->destination);
+    ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => '',
+        'docker_registry_image_tag' => 'pr_7',
+    ]);
+
+    $otherProject = Project::factory()->create(['team_id' => $this->team->id]);
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, [
+        'role' => 'member',
+        'access' => json_encode([
+            ['scope' => 'team', 'levels' => ['read']],
+            ['scope' => 'project', 'uuid' => $otherProject->uuid, 'levels' => ['deploy']],
+        ]),
+    ]);
+    $token = $member->createToken('member-deploy', ['read', 'deploy'], null, $this->team->id)->plainTextToken;
+
+    foreach ([[1234, 'pr_1234'], [7, 'attacker']] as [$pullRequestId, $dockerTag]) {
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])->postJson('/api/v1/deploy', [
+            'uuid' => $application->uuid,
+            'pull_request_id' => $pullRequestId,
+            'docker_tag' => $dockerTag,
+        ])->assertForbidden();
+    }
+
+    expect($application->previews()->pluck('docker_registry_image_tag', 'pull_request_id')->all())->toBe([7 => 'pr_7']);
+    expect($application->deployment_queue()->count())->toBe(0);
+});

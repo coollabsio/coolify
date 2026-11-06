@@ -53,6 +53,27 @@ if (! function_exists('auditLog')) {
     }
 }
 
+if (! function_exists('auditUrl')) {
+    /**
+     * Scheme, host, port and path of a URL, without user info, query string or fragment.
+     */
+    function auditUrl(mixed $url): ?string
+    {
+        if (! is_string($url) || $url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return '[invalid-url]';
+        }
+
+        return $parts['scheme'].'://'.$parts['host']
+            .(isset($parts['port']) ? ':'.$parts['port'] : '')
+            .($parts['path'] ?? '');
+    }
+}
+
 if (! function_exists('auditChangedFields')) {
     /**
      * Names of the attributes that the next save() will really change, without timestamps.
@@ -71,18 +92,37 @@ if (! function_exists('auditChangedFields')) {
     }
 }
 
+if (! function_exists('auditSavedFields')) {
+    /**
+     * Names of the attributes that the last save() really changed, without timestamps.
+     * Call it after save(), so changes made by saving hooks are included.
+     *
+     * @return array<int, string>
+     */
+    function auditSavedFields(Model $model): array
+    {
+        return array_values(array_diff(array_keys($model->getChanges()), ['created_at', 'updated_at']));
+    }
+}
+
 if (! function_exists('auditFailureDeduplicationWindow')) {
     /**
-     * Seconds during which repeated unauthenticated failures from one source are recorded once.
+     * Seconds during which repeated unauthenticated or permission failures from one source are recorded once.
      *
      * Failed logins use a short window so an ongoing brute force attempt stays visible
      * (one row per email and source IP each minute, on top of the login rate limit).
+     * Sentinel pushes for a deleted server or an unpaid team fail until someone acts, so one row each hour is enough.
+     *
+     * @param  array<string, mixed>  $context
      */
-    function auditFailureDeduplicationWindow(string $event): ?int
+    function auditFailureDeduplicationWindow(string $event, array $context = []): ?int
     {
         return match (true) {
             $event === 'auth.user.login_failed' => 60,
+            $event === 'webhook.sentinel.signature_failed'
+                && in_array(data_get($context, 'reason'), ['server_not_found', 'subscription_unpaid'], true) => 3600,
             $event === 'api.auth.unauthenticated',
+            preg_match('/^(api|mcp)\.auth\.(ability|scope)_denied$/', $event) === 1,
             preg_match('/^webhook\.[a-z0-9_-]+\.signature_failed$/i', $event) === 1 => 300,
             default => null,
         };
@@ -91,26 +131,30 @@ if (! function_exists('auditFailureDeduplicationWindow')) {
 
 if (! function_exists('shouldRecordAuditEvent')) {
     /**
-     * Keep only the first unauthenticated failure per event, source IP, reason, server and
-     * attempted email in each deduplication window. All other events are always recorded.
+     * Keep only the first failure per event, source IP, reason, server, attempted email, token and
+     * required abilities in each deduplication window. All other events are always recorded.
      *
      * @param  array<string, mixed>  $context
      */
     function shouldRecordAuditEvent(string $event, array $context): bool
     {
-        $window = auditFailureDeduplicationWindow($event);
+        $window = auditFailureDeduplicationWindow($event, $context);
         if ($window === null) {
             return true;
         }
 
         try {
             $request = app()->bound('request') ? request() : null;
+            $tokenId = data_get($context, 'token_id');
             $fingerprint = hash('sha256', json_encode([
                 $event,
-                $request ? client_ip($request) : null,
+                // The token identifies the client, so a token used from many IPs gets one row.
+                $tokenId === null && $request ? client_ip($request) : null,
                 data_get($context, 'reason'),
                 data_get($context, 'server_uuid'),
                 Str::lower(trim((string) data_get($context, 'attempted_email'))),
+                $tokenId,
+                data_get($context, 'required_abilities'),
             ]));
 
             return Cache::add("audit-failure-dedup:{$fingerprint}", true, $window);

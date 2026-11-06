@@ -85,11 +85,11 @@ test('failed logins record one audit event per email and source ip in each windo
         ->toBe(['victim@example.com', 'other@example.com', 'victim@example.com']);
 });
 
-test('events outside the unauthenticated failure set are never deduplicated', function () {
+test('events outside the failure set are never deduplicated', function () {
     auditLog('webhook.github.deployment_queued', ['reason' => 'push']);
     auditLog('webhook.github.deployment_queued', ['reason' => 'push']);
-    auditLog('api.auth.ability_denied', ['reason' => 'missing ability']);
-    auditLog('api.auth.ability_denied', ['reason' => 'missing ability']);
+    auditLog('api.private_key.created', ['reason' => 'created']);
+    auditLog('api.private_key.created', ['reason' => 'created']);
 
     expect(AuditEvent::query()->count())->toBe(4);
 });

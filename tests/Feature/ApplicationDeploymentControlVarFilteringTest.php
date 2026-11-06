@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
@@ -276,7 +277,7 @@ function makeDeploymentControlVarFixture(array $applicationAttributes = []): arr
 
 function createApplicationEnvironmentVariable(Application $application, array $attributes): EnvironmentVariable
 {
-    return EnvironmentVariable::create([
+    $attributes = [
         'resourceable_type' => Application::class,
         'resourceable_id' => $application->id,
         'is_preview' => false,
@@ -285,7 +286,13 @@ function createApplicationEnvironmentVariable(Application $application, array $a
         'is_multiline' => false,
         'is_literal' => false,
         ...$attributes,
-    ]);
+    ];
+
+    // The created hooks of the application already add defaults such as NIXPACKS_NODE_VERSION.
+    return EnvironmentVariable::updateOrCreate(
+        Arr::only($attributes, ['resourceable_type', 'resourceable_id', 'is_preview', 'key']),
+        $attributes,
+    );
 }
 
 function makeControlVarFilteringJob(Application $application, Server $server, array $overrides = []): array
@@ -1138,7 +1145,7 @@ it('creates missing Laravel defaults as preview variables for preview deployment
         ->and($fallbackPath->value)->toBe('/index.php')
         ->and($rootDir->is_preview)->toBeTrue()
         ->and($rootDir->value)->toBe('/app/public')
-        ->and($application->environment_variables()->whereIn('key', $keys)->pluck('value', 'key')->all())->toBe([
+        ->and($application->environment_variables()->whereIn('key', $keys)->pluck('value', 'key')->all())->toEqual([
             'NIXPACKS_PHP_ROOT_DIR' => '/app/web',
             'NIXPACKS_PHP_FALLBACK_PATH' => '/app.php',
         ])

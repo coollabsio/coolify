@@ -19,7 +19,13 @@
                     <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Size</p><p class="mt-1 text-sm font-medium">{{ $selectedExecution['size'] ? formatBytes($selectedExecution['size']) : '-' }}</p></div>
                 </div>
                 @if ($selectedExecution['filename'])
-                    <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Backup path</p><code class="mt-1 block overflow-x-auto rounded-md bg-neutral-100 p-3 text-xs dark:bg-black/20">{{ $selectedExecution['filename'] }}</code></div>
+                    <div>
+                        <p class="text-xs text-neutral-500 dark:text-fg-dim">Backup path</p>
+                        <div class="mt-1 flex items-center gap-2 rounded-md bg-neutral-100 p-3 dark:bg-black/20">
+                            <code class="min-w-0 flex-1 overflow-x-auto text-xs">{{ $selectedExecution['filename'] }}</code>
+                            <x-copy-button :value="$selectedExecution['filename']" label="Copy backup path" />
+                        </div>
+                    </div>
                 @endif
                 @if ($selectedExecution['message'])
                     <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Output</p><pre class="mt-1 max-h-80 overflow-auto rounded-md bg-neutral-100 p-3 font-mono text-xs whitespace-pre-wrap dark:bg-black/20">{{ $selectedExecution['message'] }}</pre></div>
@@ -40,9 +46,16 @@
                 description="Execution history appears here after a backup schedule runs." icon-name="browser-terminal" />
         @else
             <div class="data-table relative w-full overflow-x-auto">
-                <x-table.loading target="previousPage,nextPage,setPage,perPage" text="Loading executions..." />
-                <div class="data-table-header grid min-w-[900px] grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_190px_90px_4.5rem]">
-                    <span>Target</span><span>Type</span><span>Schedule</span><span>Status</span><span>Started</span><span>Size</span><span class="text-right">Actions</span>
+                <x-table.loading target="previousPage,nextPage,setPage,perPage,sortExecutions" text="Loading executions..." />
+                <div class="flex min-w-[64rem] flex-col">
+                <div class="data-table-header service-backup-table-grid">
+                    <x-table.sort-header label="Target" asc="target_asc" desc="target_desc" action="sortExecutions" :current="$sortBy" />
+                    <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" action="sortExecutions" :current="$sortBy" />
+                    <x-table.sort-header label="Schedule" asc="schedule_asc" desc="schedule_desc" action="sortExecutions" :current="$sortBy" />
+                    <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="sortExecutions" :current="$sortBy" />
+                    <x-table.sort-header label="Started" asc="started_asc" desc="started_desc" first="desc" action="sortExecutions" :current="$sortBy" />
+                    <x-table.sort-header label="Size" asc="size_asc" desc="size_desc" first="desc" action="sortExecutions" :current="$sortBy" />
+                    <span class="text-right">Actions</span>
                 </div>
                 @foreach ($executions as $execution)
                     @php
@@ -56,19 +69,19 @@
                     <div wire:key="service-backup-execution-{{ $execution['id'] }}"
                         wire:click="openExecution('{{ $execution['uuid'] }}')"
                         wire:keydown.enter="openExecution('{{ $execution['uuid'] }}')" role="button" tabindex="0"
-                        class="data-table-row grid min-w-[900px] cursor-pointer grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_190px_90px_4.5rem] text-left text-[13px] text-neutral-700 dark:text-fg-dim">
+                        class="data-table-row service-backup-table-grid cursor-pointer text-left text-[13px] text-neutral-700 dark:text-fg-dim">
                         <span class="flex min-w-0 items-center gap-2 font-medium text-neutral-950 dark:text-fg">
                             <span class="truncate" title="{{ $execution['target'] }}">{{ $execution['target'] }}</span>
-                            <span tabindex="0" data-tooltip="{{ $execution['s3_tooltip'] }}"
-                                aria-label="{{ $execution['s3_tooltip'] }}" class="shrink-0 text-neutral-500 dark:text-fg-dim">
-                                <x-reicon name="cloud" class="size-3.5" aria-hidden="true" />
-                            </span>
+                            @if ($execution['s3_tooltip'])
+                                <span tabindex="0" data-tooltip="{{ $execution['s3_tooltip'] }}"
+                                    aria-label="{{ $execution['s3_tooltip'] }}"
+                                    class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">S3</span>
+                            @endif
                         </span>
                         <span>{{ $execution['type'] }}</span><span>{{ $execution['schedule'] }}</span>
                         <span><x-status-badge :status="str($execution['status'])->headline()" :type="$statusType" /></span>
                         <span>
-                            <span class="block">{{ formatDateInServerTimezone($execution['started_at'], $server) }}</span>
-                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint">{{ $execution['started_at']->diffForHumans() }}</span>
+                            <span tabindex="0" data-tooltip="{{ formatDateInServerTimezone($execution['started_at'], $server) }}">{{ $execution['started_at']->diffForHumans() }}</span>
                         </span>
                         <span>{{ $execution['size'] ? formatBytes($execution['size']) : '-' }}</span>
                         <span class="flex justify-end">
@@ -87,6 +100,7 @@
                         </span>
                     </div>
                 @endforeach
+                </div>
                 @if ($executions->hasPages())
                     <x-table-pagination :from="$executions->firstItem()" :to="$executions->lastItem()"
                         :total="$executions->total()" :current-page="$executions->currentPage()" :last-page="$executions->lastPage()"

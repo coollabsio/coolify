@@ -32,6 +32,12 @@
                         ['value' => false, 'label' => 'Runtime only (preserves cache)'],
                         ['value' => true, 'label' => 'Available during build'],
                     ]" :disabled="! $canUpdate" />
+                <x-forms.listbox id="includeNetworkHostsInBuild" label="Network hosts during build" onChange="instantSave"
+                    helper="When added, the build can reach the containers on the destination network by name. Each time a resource on the network is added or removed, the Docker build cache is invalidated. Preview deployments are never added, and no hosts are added on a build server."
+                    :options="[
+                        ['value' => true, 'label' => 'Add network containers as hosts'],
+                        ['value' => false, 'label' => 'Do not add (preserves cache)'],
+                    ]" :disabled="! $canUpdate" />
             </div>
             @if ($application->git_based())
                 <x-application.settings-subsection id="advanced-deployment-section" title="Deployment"

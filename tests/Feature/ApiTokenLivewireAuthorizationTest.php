@@ -27,7 +27,31 @@ test('api token permission flags are locked', function (string $property) {
 })->with([
     'root permission flag' => 'canUseRootPermissions',
     'write permission flag' => 'canUseWritePermissions',
+    'token search index' => 'tokenSearchIndex',
 ]);
+
+test('token search index follows created and revoked tokens', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(ApiTokens::class)
+        ->set('form.description', 'deploy-token')
+        ->set('form.expiresInDays', 30)
+        ->set('form.permissions', ['read'])
+        ->call('addNewToken');
+
+    $token = $owner->tokens()->sole();
+    expect($component->get('tokenSearchIndex'))->toBe([
+        ['id' => (string) $token->id, 'search' => 'deploy-token read all resources in the team'],
+    ]);
+
+    $component->call('revoke', $token->id);
+
+    expect($component->get('tokenSearchIndex'))->toBe([]);
+});
 
 test('member cannot tamper with root permission flag', function () {
     $member = User::factory()->create();

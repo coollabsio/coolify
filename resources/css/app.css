@@ -489,6 +489,18 @@ select,
 /*
 * Base styles
 */
+/* UI scale from the Appearance page. It scales rem sizes only, because CSS zoom breaks the
+   mouse positions in xterm and the canvas. Phones keep 100% so inputs stay at 16px. */
+@media (min-width: 768px) {
+    html[data-ui-scale="90"] {
+        font-size: 90%;
+    }
+
+    html[data-ui-scale="80"] {
+        font-size: 80%;
+    }
+}
+
 html,
 body {
     @apply w-full min-h-full bg-neutral-50 dark:bg-app dark:text-fg-dim;
@@ -1449,21 +1461,24 @@ html[data-theme="custom"] {
     --theme-base-color: oklch(49.65% 0.2709 289.33);
     --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, oklch(100% 0 0));
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
-    /* Accent text/icons sit directly on dark surfaces. Force the lightness into a
-       readable band (and tame chroma) so any picked hue keeps enough contrast. */
-    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.72, l, 0.86) min(c, 0.13) h);
+    /* Accent text and icons on the page. applyCustomTheme() computes a color with
+       4.5:1 contrast on the page surfaces. */
+    --theme-fg-on-surface: var(--theme-accent-text, var(--theme-bright-color));
+    /* The opposite of the text on accent fills. Shades of a fill that carry that
+       text move toward it, so the text never has less contrast than on the fill. */
+    --theme-accent-away: oklch(from var(--theme-accent-foreground) calc(1 - l) 0 0);
     --color-accent: var(--theme-bright-color);
     --color-coollabs: var(--theme-bright-color);
-    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
-    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(0% 0 0));
+    --color-coollabs-100: var(--theme-bright-color);
+    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, var(--theme-accent-away));
     --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, oklch(0% 0 0));
     /* Legacy dark-theme accent utilities use warning as the brand color. */
     --color-warning: var(--theme-bright-color);
     /* Brand fills, tints, and accent text follow the picked color. Text on a
        brand fill uses the computed foreground, so light colors stay readable. */
     --color-brand: var(--theme-bright-color);
-    --color-brand-hover: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
-    --color-brand-press: color-mix(in oklab, var(--theme-bright-color) 85%, oklch(0% 0 0));
+    --color-brand-hover: color-mix(in oklab, var(--theme-bright-color) 92%, var(--theme-accent-away));
+    --color-brand-press: color-mix(in oklab, var(--theme-bright-color) 85%, var(--theme-accent-away));
     --color-brand-depth: color-mix(in oklab, var(--theme-bright-color) 65%, oklch(0% 0 0));
     --color-brand-ring: color-mix(in oklab, var(--theme-bright-color) 75%, oklch(100% 0 0));
     --color-brand-foreground: var(--theme-accent-foreground);
@@ -1474,11 +1489,13 @@ html[data-theme="custom"] {
 
 html[data-theme="custom"]:not(.dark) {
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-base-color) 45%, oklch(60% 0 0));
-    /* Accent text/icons on light surfaces: force lightness into a dark band. */
-    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.30, l, 0.48) min(c, 0.16) h);
 }
 
+/* The sidebar has its own accent text color. --color-brand-light is resolved on
+   <html>, so set it again here. */
 html[data-theme="custom"] :is(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) {
+    --theme-fg-on-surface: var(--theme-sidebar-accent-text, var(--theme-bright-color));
+    --color-brand-light: var(--theme-fg-on-surface);
     --t-bg: var(--theme-sidebar);
     --t-text: var(--theme-sidebar-text);
     --t-light: var(--theme-sidebar-light);
@@ -1638,6 +1655,11 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
 html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]),
 html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
     border-color: var(--coollabs-line) !important;
+}
+
+/* Menu entries (the account menu) follow the sidebar text, not the page scheme. */
+html[data-sidebar-scheme] :where(.app-sidebar, .mobile-sidebar-sheet [role="dialog"]) .listbox-option {
+    color: var(--color-fg);
 }
 
 /* Row and section separators (one-sided borders and divide-y) use the softer
@@ -1964,8 +1986,10 @@ html[data-theme="custom"] textarea:disabled {
     --card-fg-faint: var(--color-fg-faint);
 }
 
+/* The light well uses the theme surface, like the bg-white remap, instead of white. */
 html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .application-settings-section-body, .empty-state) {
     --card-underlay: var(--coollabs-canvas);
+    --well-bg: var(--coollabs-elevated);
 }
 
 /* Top-level cards and wells sit on the page: paint the translucent tint over
@@ -2804,6 +2828,11 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     box-shadow: var(--shadow-dropdown);
 }
 
+/* Geist centers lowercase letters 1px below the line box center. Move the icons to match. */
+.top-user-menu-panel .listbox-option svg {
+    translate: 0 1px;
+}
+
 @media (max-width: 767px) {
     /* The mobile top bar's backdrop filter makes it the containing block for
        fixed descendants. Keep this menu anchored below its trigger instead
@@ -3082,7 +3111,6 @@ input[type="search"]::-webkit-search-results-decoration {
     max-width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .data-table-header {
@@ -3201,11 +3229,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .table-filter-value.table-filter-badge:hover {
     text-decoration-color: transparent;
-    border-color: var(--color-neutral-400);
-}
-
-.dark .table-filter-value.table-filter-badge:hover {
-    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .env-table-grid {
@@ -3253,7 +3276,6 @@ input[type="search"]::-webkit-search-results-decoration {
 .environment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .environment-table-scroll .env-table-grid {
@@ -3563,8 +3585,9 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 50rem;
 }
 
+/* Shared by the Schedules and Executions tables of a service, so their columns line up. */
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 4.5rem;
+    grid-template-columns: minmax(10rem, 1.5fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(11rem, 1.2fr) minmax(6rem, 0.8fr) 4.5rem;
     width: 100%;
 }
 
@@ -3574,16 +3597,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Rows are reordered with CSS order, so dividers must not depend on DOM position. */
 .data-table-row.service-backup-table-grid {
-    background: var(--coollabs-base);
     border-top: 1px solid var(--coollabs-fill);
-}
-
-.data-table-row.service-backup-table-grid:hover {
-    background: color-mix(in srgb, var(--coollabs-base) 98%, black);
-}
-
-.dark .data-table-row.service-backup-table-grid:hover {
-    background: color-mix(in srgb, var(--coollabs-base) 98%, white);
 }
 
 /* Persistent storage volumes: Name | [Source] | Destination | [PR suffix] | Backup | [Actions] */
@@ -3734,7 +3748,6 @@ input[type="search"]::-webkit-search-results-decoration {
 .deployment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .deployment-table-grid {
@@ -4399,7 +4412,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-section-status-badge {
     height: 1.5rem !important;
-    padding-inline: 0.5rem !important;
     font-size: 0.6875rem !important;
 }
 
@@ -4415,7 +4427,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
 }
 
 .logs-viewer-actions::-webkit-scrollbar {
@@ -6780,8 +6791,9 @@ html[data-theme="custom"] .mobile-sidebar-sheet nav.sidebar-nav {
     background-color: transparent !important;
 }
 
-/* The current page in the sidebar uses the Selected color. */
-html[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+/* In the Flat style, the current page in the sidebar uses the Selected color. The 3D style has
+   no row fill, so its label keeps the sidebar text color. */
+html[data-theme="custom"][data-nav-items="flat"] :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
     background-color: var(--theme-selected);
     color: var(--theme-selected-text);
 }

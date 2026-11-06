@@ -40,6 +40,7 @@ window.vulnerabilitySearchItem = vulnerabilitySearchItem;
 // Used by the dashboard security callout (dashboard.blade.php).
 window.securityCallout = securityCallout;
 window.dismissSecurityCallout = dismissSecurityCallout;
+
 // Used by the log viewers to copy logs that a Livewire call still loads.
 window.copyTextToClipboard = copyTextToClipboard;
 
