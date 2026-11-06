@@ -870,7 +870,7 @@
                 </div>
                 <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('supabase/postgres:17.4.1.032'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('supabase/postgres:17.11.0.018'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">Supabase PostgreSQL</div>
@@ -891,7 +891,7 @@
                 </div>
                 <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgis/postgis:17-3.5-alpine'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgis/postgis:18-3.7-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostGIS <span
