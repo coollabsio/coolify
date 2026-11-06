@@ -1,4 +1,7 @@
 <nav class="w-full max-w-none pb-3 lg:pb-0" wire:poll.30s="refreshAgentStatus">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$server" :wire:key="'star-mobile-'.$server->getMorphClass().'-'.$server->uuid" />
+    @endteleport
     <x-process-dialog @startproxy.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
@@ -151,6 +154,7 @@
                     </template>
                 </div>
             </span>
+            <livewire:star-toggle :resource="$server" :wire:key="'star-server-'.$server->uuid" />
             <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
                 :show-sentinel-status="$showSentinelStatus" />
         </div>

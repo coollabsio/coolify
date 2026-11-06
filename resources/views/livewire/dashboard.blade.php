@@ -64,6 +64,88 @@
             </div>
         @endif
 
+        {{-- First on every screen size, so starred resources are one tap away on phones too. --}}
+        @if ($starredResources->isNotEmpty())
+            <section class="@container mb-0! min-w-0">
+                <x-section-heading title="Starred" />
+                {{-- Pointer events, so the same code works for mouse, touch, and pen. The handle has touch-none, so a drag on a phone does not scroll the page. --}}
+                <div class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4"
+                    x-data="{
+                        dragged: null,
+                        lifted: ['z-20', 'scale-[1.02]', 'shadow-lg', 'ring-2', 'ring-coollabs/40', 'dark:ring-brand-light/30', 'cursor-grabbing'],
+                        start(event) {
+                            this.dragged = event.currentTarget.closest('[data-star-id]');
+                            this.dragged.classList.add(...this.lifted);
+                        },
+                        move(event) {
+                            if (!this.dragged) return;
+                            const target = document.elementsFromPoint(event.clientX, event.clientY)
+                                .map((element) => element.closest('[data-star-id]'))
+                                .find((card) => card && card !== this.dragged && $el.contains(card));
+                            {{-- A card that still slides would move away under the pointer and swap back. --}}
+                            if (!target || target.getAnimations().length) return;
+                            const rect = target.getBoundingClientRect();
+                            const after = (event.clientX - rect.left) / rect.width + (event.clientY - rect.top) / rect.height > 1;
+                            const cards = [...$el.querySelectorAll('[data-star-id]')];
+                            const oldRects = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
+                            target.parentNode.insertBefore(this.dragged, after ? target.nextSibling : target);
+                            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                            {{-- FLIP: each card that moved slides from its old place to the new one. --}}
+                            cards.forEach((card) => {
+                                const oldRect = oldRects.get(card);
+                                const newRect = card.getBoundingClientRect();
+                                const dx = oldRect.left - newRect.left;
+                                const dy = oldRect.top - newRect.top;
+                                if (dx || dy) {
+                                    card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+                                }
+                            });
+                        },
+                        end() {
+                            if (!this.dragged) return;
+                            this.dragged.classList.remove(...this.lifted);
+                            this.dragged = null;
+                            $wire.reorderStars([...$el.querySelectorAll('[data-star-id]')].map((card) => Number(card.dataset.starId)));
+                        },
+                    }" x-on:pointermove.window="move($event)" x-on:pointerup.window="end()"
+                    x-on:pointercancel.window="end()">
+                    @foreach ($starredResources as $starred)
+                        <article wire:key="dashboard-star-{{ $starred['star_id'] }}" data-star-id="{{ $starred['star_id'] }}"
+                            class="group relative flex min-h-16 min-w-0 select-none items-center gap-3 rounded-xl [-webkit-touch-callout:none] border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                            <a href="{{ $starred['href'] }}" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                                aria-label="Open {{ $starred['name'] }}"></a>
+                            <button type="button" title="Drag to change the order" aria-label="Move {{ $starred['name'] }}"
+                                x-on:pointerdown.prevent="start($event)"
+                                class="relative z-10 -mx-1.5 flex h-8 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black active:cursor-grabbing dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <x-reicon name="grip-vertical" class="size-4" />
+                            </button>
+                            <div
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
+                                @if ($starred['resource'] instanceof \App\Models\Server)
+                                    <x-reicon name="servers" class="size-4" />
+                                @else
+                                    <x-resource-logo :resource="$starred['resource']" />
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                    {{ $starred['name'] }}
+                                </h3>
+                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $starred['context'] }}
+                                </p>
+                            </div>
+                            <button type="button" wire:click="unstar({{ $starred['star_id'] }})"
+                                title="Remove from the dashboard" aria-label="Unstar {{ $starred['name'] }}"
+                                class="relative z-10 flex size-6.5 shrink-0 items-center justify-center rounded-md text-warning transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.06]">
+                                <x-reicon name="star-filled" class="size-4" />
+                            </button>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         {{-- Wide screens: projects and servers fill the left, activity is a fixed-width column on the right.
              It stays one column while the activity side has no section (no deployments, no traffic). --}}
         <div class="grid min-w-0 gap-8 xl:items-start xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_22rem] 2xl:has-[.dashboard-activity_section]:grid-cols-[minmax(0,1fr)_26rem]">

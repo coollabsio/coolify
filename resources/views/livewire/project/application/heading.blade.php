@@ -1,5 +1,8 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none" x-data
     x-init="@js($loadComposeOnOpen) && $wire.loadComposeFile(true)">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$application" :wire:key="'star-mobile-'.$application->getMorphClass().'-'.$application->uuid" />
+    @endteleport
     <div>
         @if ($application->build_pack === 'nixpacks')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">

@@ -69,6 +69,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Models\Star;
 use App\Models\Subscription;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
@@ -355,6 +356,7 @@ final class ServerTransferCoverage
         OauthIdentity::class => 'User login data of the source instance.',
         PersonalAccessToken::class => 'API tokens of the source instance.',
         UserChangelogRead::class => 'User data of the source instance.',
+        Star::class => 'User data of the source instance: users are not moved with a server.',
         AuditEvent::class => 'Audit log of the source instance.',
         NotificationThrottle::class => 'Runtime state of the source instance.',
         ScheduledJobState::class => 'Scheduler state of the source instance.',
