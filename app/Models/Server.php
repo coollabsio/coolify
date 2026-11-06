@@ -1439,6 +1439,15 @@ $siteAddress {
     }
 
     /**
+     * On self-hosted, only the unreachable cleanup disables a server, so a working connection can enable it again.
+     * On Cloud the flag enforces the plan server limit, and a transferred server stays an archive.
+     */
+    public function canBeReEnabled(): bool
+    {
+        return $this->settings->force_disabled === true && ! isCloud() && ! $this->isTransferredAway();
+    }
+
+    /**
      * Server was migrated away from this Coolify instance (source side).
      * Must not be revalidated or re-enabled as a live managed host.
      */
@@ -2544,6 +2553,11 @@ $siteAddress {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
+        // A validation enables a disabled self-hosted server again, but only when the connection works.
+        $isReEnabling = $this->canBeReEnabled() && ! $this->hasPlaceholderIp();
+        if ($isReEnabling) {
+            $this->forceEnableServer();
+        }
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
@@ -2564,6 +2578,9 @@ $siteAddress {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
+            if ($isReEnabling) {
+                $this->forceDisableServer();
+            }
             $error = $e->getMessage();
             if ($error === SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE && ! $this->recordHostKeyMismatch()) {
                 $error = 'SSH host key verification failed, but the server still sends the trusted host key.';
