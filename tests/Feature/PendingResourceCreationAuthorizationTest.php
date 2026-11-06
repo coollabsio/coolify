@@ -38,7 +38,7 @@ beforeEach(function () {
 });
 
 test('pending creation denies revoked resource team access after switching teams', function (string $role) {
-    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])->test(Create::class);
+    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid, 'database_image' => 'valkey/valkey:9-alpine'])->test(Create::class);
     if ($role === 'removed') {
         $this->user->teams()->detach($this->team);
     } else {
@@ -51,14 +51,14 @@ test('pending creation denies revoked resource team access after switching teams
 })->with(['member', 'removed']);
 
 test('pending creation still allows the resource team admin after a team switch', function () {
-    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])->test(Create::class);
+    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid, 'database_image' => 'valkey/valkey:9-alpine'])->test(Create::class);
     session(['currentTeam' => $this->otherTeam]);
     $component->call('createResource')->assertRedirect();
     expect(StandaloneRedis::where('environment_id', $this->environment->id)->count())->toBe(1);
 });
 
 test('pending creation rejects a destination transferred to another team', function () {
-    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])->test(Create::class);
+    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid, 'database_image' => 'valkey/valkey:9-alpine'])->test(Create::class);
     $this->server->update(['team_id' => $this->otherTeam->id]);
     Server::flushIdentityMap();
     $component->call('createResource')->assertForbidden();
@@ -80,7 +80,7 @@ test('pending creation allows a member with a write grant on the environment onl
         ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['write']],
     ]);
 
-    Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])
+    Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid, 'database_image' => 'valkey/valkey:9-alpine'])
         ->test(Create::class)
         ->call('createResource')
         ->assertRedirect();
@@ -93,7 +93,7 @@ test('pending creation denies a member with only a read grant on the environment
         ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['read']],
     ]);
 
-    Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])
+    Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid, 'database_image' => 'valkey/valkey:9-alpine'])
         ->test(Create::class)
         ->assertForbidden();
 
@@ -104,7 +104,7 @@ test('pending creation denies an environment write grant that was revoked after 
     $member = pendingCreationMemberWithAccess($this->team, [
         ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['write']],
     ]);
-    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid])->test(Create::class);
+    $component = Livewire::withQueryParams(['type' => 'redis', 'destination' => $this->destination->uuid, 'database_image' => 'valkey/valkey:9-alpine'])->test(Create::class);
 
     $member->teams()->updateExistingPivot($this->team->id, ['access' => json_encode([
         ['scope' => 'environment', 'uuid' => $this->environment->uuid, 'levels' => ['read']],

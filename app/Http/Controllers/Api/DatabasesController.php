@@ -1730,8 +1730,8 @@ class DatabasesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Redis)',
-        description: 'Create a new Redis database.',
+        summary: 'Create (Redis / Valkey)',
+        description: 'Create a new Redis or Valkey database. Valkey (valkey/valkey:9-alpine) is the default. Set image to a Redis image (for example redis:8) for Redis.',
         path: '/databases/redis',
         operationId: 'create-database-redis',
         security: [
@@ -1757,7 +1757,7 @@ class DatabasesController extends Controller
                         'redis_conf' => ['type' => 'string', 'description' => 'Redis conf'],
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
-                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker image of the database. Default: valkey/valkey:9-alpine. For Redis, use a Redis image, for example redis:8.'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
                         'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],

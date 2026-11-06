@@ -38,6 +38,12 @@ class Select extends Component
 
     public Collection|array $allServices = [];
 
+    /** Database types that ask for an image before the database is created. */
+    private const DATABASE_IMAGE_STEPS = [
+        'postgresql' => 'select-postgresql-type',
+        'redis' => 'select-redis-type',
+    ];
+
     public bool $isDatabase = false;
 
     public bool $includeSwarm = true;
@@ -49,8 +55,6 @@ class Select extends Component
     public $environments = [];
 
     public ?string $selectedEnvironment = null;
-
-    public string $postgresql_type = 'postgres:18-alpine';
 
     public ?string $existingPostgresqlUrl = null;
 
@@ -72,20 +76,21 @@ class Select extends Component
             $this->environments = $project->environments;
             $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
 
-            // Check if we have all required params for PostgreSQL type selection
+            // Check if we have all required params for the database image step
             // This handles navigation from global search
             $queryType = request()->query('type');
             $queryServerId = request()->query('server_id');
             $queryDestination = request()->query('destination');
+            $imageStep = self::DATABASE_IMAGE_STEPS[$queryType] ?? null;
 
-            if ($queryType === 'postgresql' && $queryServerId !== null && $queryDestination) {
+            if ($imageStep && $queryServerId !== null && $queryDestination) {
                 $server = Server::isUsable()->whereKey($queryServerId)->first();
                 if ($server && $this->findDestination($server, $queryDestination)) {
                     $this->type = $queryType;
                     $this->server_id = $server->id;
                     $this->destination_uuid = $queryDestination;
                     $this->server = $server;
-                    $this->current_step = 'select-postgresql-type';
+                    $this->current_step = $imageStep;
                 }
             }
         } catch (\Exception $e) {
@@ -217,7 +222,7 @@ class Select extends Component
             [
                 'id' => 'postgresql',
                 'name' => 'PostgreSQL',
-                'description' => 'A relational database with strong SQL standards support and extensibility.',
+                'description' => 'An extensible relational database with strong SQL support.',
                 'logo' => resource_logo_url('postgres'),
             ],
             [
@@ -235,9 +240,10 @@ class Select extends Component
             ],
             [
                 'id' => 'redis',
-                'name' => 'Redis',
-                'description' => 'An in-memory key-value store used as a database, cache, and message broker.',
-                'logo' => resource_logo_url('redis'),
+                'name' => 'Redis / Valkey',
+                'description' => 'An in-memory key-value store for caching, queues, and sessions.',
+                'logo' => resource_logo_url('redis-valkey'),
+                'logoDark' => resource_logo_url('redis-valkey-dark'),
             ],
             [
                 'id' => 'keydb',
@@ -256,13 +262,13 @@ class Select extends Component
             [
                 'id' => 'mongodb',
                 'name' => 'MongoDB',
-                'description' => 'A document-oriented NoSQL database that stores JSON-like documents.',
+                'description' => 'A NoSQL database that stores JSON-like documents.',
                 'logo' => resource_logo_url('mongodb'),
             ],
             [
                 'id' => 'clickhouse',
                 'name' => 'ClickHouse',
-                'description' => 'A column-oriented database for real-time analytics over large datasets.',
+                'description' => 'A column-oriented database for real-time analytics.',
                 'logo' => resource_logo_url('clickhouse'),
             ],
             [
@@ -484,24 +490,22 @@ class Select extends Component
         return $server->standaloneDockers->concat($server->swarmDockers)->firstWhere('uuid', $destinationUuid);
     }
 
-    public function setPostgresqlType(string $type)
+    public function setDatabaseImage(string $image)
     {
-        $this->postgresql_type = $type;
-
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_uuid' => $this->parameters['environment_uuid'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
-            'database_image' => $this->postgresql_type,
+            'database_image' => $image,
         ]);
     }
 
     public function whatToDoNext()
     {
-        if ($this->type === 'postgresql') {
-            $this->current_step = 'select-postgresql-type';
+        if (isset(self::DATABASE_IMAGE_STEPS[$this->type])) {
+            $this->current_step = self::DATABASE_IMAGE_STEPS[$this->type];
         } else {
             return redirect()->route('project.resource.create', [
                 'project_uuid' => $this->parameters['project_uuid'],

@@ -51,9 +51,9 @@ class Create extends Component
             }
 
             $isDatabase = in_array($type, DATABASE_TYPES);
-            // PostgreSQL requires database_image to be explicitly set
-            // If not provided, fall through to Select component for version selection
-            if ($isDatabase && $type->value() === 'postgresql' && ! $database_image) {
+            // PostgreSQL and Redis (Redis or Valkey) require database_image to be explicitly set
+            // If not provided, fall through to Select component for image selection
+            if ($isDatabase && in_array($type->value(), ['postgresql', 'redis'], true) && ! $database_image) {
                 $this->type = $type->value();
 
                 return;
@@ -98,7 +98,7 @@ class Create extends Component
                     databaseImage: $this->databaseImage
                 );
             } elseif ($type->value() === 'redis') {
-                $database = create_standalone_redis($environment->id, $destination);
+                $database = create_standalone_redis($environment->id, $destination, ['image' => $this->databaseImage]);
             } elseif ($type->value() === 'mongodb') {
                 $database = create_standalone_mongodb($environment->id, $destination);
             } elseif ($type->value() === 'mysql') {
