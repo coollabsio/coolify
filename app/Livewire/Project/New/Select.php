@@ -50,7 +50,7 @@ class Select extends Component
 
     public ?string $selectedEnvironment = null;
 
-    public string $postgresql_type = 'postgres:16-alpine';
+    public string $postgresql_type = 'postgres:18-alpine';
 
     public ?string $existingPostgresqlUrl = null;
 

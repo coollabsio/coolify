@@ -24,7 +24,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
+function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:18-alpine'): StandalonePostgresql
 {
     $database = new StandalonePostgresql;
     $database->uuid = new_public_id();
