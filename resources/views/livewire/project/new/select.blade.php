@@ -107,7 +107,7 @@
             {{-- A full page load: the canvas uses the minimal layout. --}}
             <a href="{{ route('deploy-canvas', ['project' => data_get($parameters, 'project_uuid'), 'environment' => data_get($parameters, 'environment_uuid')]) }}"
                 x-show="search === ''"
-                class="mt-6 flex items-center gap-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-none dark:hover:border-white/[0.14]">
+                class="mt-6 flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-none dark:hover:border-white/[0.14]">
                 <div
                     class="flex size-11 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                     <x-reicon name="deploy-canvas" class="size-5" />
