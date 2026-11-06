@@ -22,6 +22,7 @@
         ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'webhook'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
+        ['label' => 'Maintenance Mode', 'route' => 'project.service.maintenance', 'icon' => 'bandage'],
         ['label' => 'Security', 'route' => 'project.service.vulnerabilities', 'icon' => 'shield-alert', 'visible' => $imageScanningAllowed,
             'security' => $imageScanningAllowed ? \App\Services\ImageScan\SecurityStatus::stored($service)->status->value : null],
         ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
@@ -40,7 +41,7 @@
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
         'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics', 'Security'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-        'Operations' => ['Resource Operations', 'Tags'],
+        'Operations' => ['Resource Operations', 'Maintenance Mode', 'Tags'],
         'Danger Zone' => ['Danger Zone'],
     ];
 

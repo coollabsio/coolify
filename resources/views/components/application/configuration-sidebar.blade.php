@@ -120,6 +120,11 @@
                 'active' => $currentRoute === 'project.application.resource-operations',
             ],
             [
+                'label' => 'Maintenance Mode',
+                'route' => 'project.application.maintenance',
+                'active' => $currentRoute === 'project.application.maintenance',
+            ],
+            [
                 'label' => 'Metrics',
                 'route' => 'project.application.metrics',
                 'active' => $currentRoute === 'project.application.metrics',
@@ -175,6 +180,7 @@
             'Rollback' => 'time-back',
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
+            'Maintenance Mode' => 'bandage',
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
             'Security' => 'shield-alert',
@@ -188,7 +194,7 @@
             'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
+            'Operations' => ['Resource Operations', 'Maintenance Mode', 'Resource Limits', 'Rollback', 'Tags'],
             'Danger Zone' => ['Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)
