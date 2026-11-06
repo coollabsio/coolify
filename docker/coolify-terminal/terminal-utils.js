@@ -2,8 +2,11 @@ import { parseCookie } from 'cookie';
 
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
-/** A PTY with no input and no output for this long is ended. */
-export const TERMINAL_IDLE_TIMEOUT_SECONDS = 30 * 60;
+/**
+ * A PTY with no input and no output for this long is ended. 0 turns the idle limit off, so a
+ * long command without output (for example a restore) keeps running until the maximum duration.
+ */
+export const TERMINAL_IDLE_TIMEOUT_SECONDS = 0;
 
 /** How often each live PTY checks with Coolify that the user may still use it. */
 export const TERMINAL_SESSION_CHECK_INTERVAL_MS = 60 * 1000;

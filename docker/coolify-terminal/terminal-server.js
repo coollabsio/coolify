@@ -519,7 +519,7 @@ function watchTerminalSession(userSession, ptyProcess, terminalSessionId) {
             return;
         }
 
-        if (Date.now() - userSession.lastActivityAt >= TERMINAL_IDLE_TIMEOUT_SECONDS * 1000) {
+        if (TERMINAL_IDLE_TIMEOUT_SECONDS > 0 && Date.now() - userSession.lastActivityAt >= TERMINAL_IDLE_TIMEOUT_SECONDS * 1000) {
             await endTerminalSession(userSession, ptyProcess, 'idle', `no input or output for ${TERMINAL_IDLE_TIMEOUT_SECONDS / 60} minutes.`);
             return;
         }

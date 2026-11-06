@@ -167,12 +167,10 @@ test('input keeps a session without output alive', async () => {
     assert.deepEqual(session.ends, []);
 });
 
-test('a session with no input and no output ends after the idle timeout', async () => {
+test('a session with no input and no output is not ended as idle by default', async () => {
     const session = await startWatchedSession();
     await session.at(10, session.output);
-    await session.at(39, session.tick);
-    assert.deepEqual(session.ends, []);
+    await session.at(7 * 60, session.tick);
 
-    await session.at(40, session.tick);
-    assert.deepEqual(session.ends, ['idle']);
+    assert.deepEqual(session.ends, []);
 });
