@@ -84,6 +84,11 @@ class Upgrade extends Component
                     UpdateCoolify::run(manual_update: true);
                 } catch (\Throwable $e) {
                     report($e);
+                    try {
+                        CoolifyUpgradeStatus::writeError(Server::findOrFail(0), $e->getMessage());
+                    } catch (\Throwable $statusException) {
+                        report($statusException);
+                    }
                 }
             })->afterResponse();
 

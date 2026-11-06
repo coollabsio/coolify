@@ -15,6 +15,7 @@ use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
+use App\Services\AutoUpdateNotifier;
 use App\Support\ResourceStartActivity;
 use App\Support\RootSetupWindow;
 use Carbon\Carbon;
@@ -73,6 +74,12 @@ class Init extends Command
             $this->sendAliveSignal();
         }
         get_public_ips();
+
+        try {
+            AutoUpdateNotifier::checkResult();
+        } catch (\Throwable $e) {
+            echo "Could not check the automatic update result: {$e->getMessage()}\n";
+        }
 
         // Backward compatibility
         $this->replaceSlashInEnvironmentName();

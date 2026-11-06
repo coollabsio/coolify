@@ -14,6 +14,7 @@ else
 fi
 SKIP_BACKUP=${4:-false}
 STATUS_FILE="/data/coolify/source/.upgrade-status"
+STATUS_LOCK_FILE="/data/coolify/source/.upgrade-status.lock"
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
@@ -32,10 +33,17 @@ log_section() {
 }
 
 # Helper function to write upgrade status for API polling
+# Holds the lock that Coolify takes when it writes an error before an upgrade starts, so neither write is lost.
 write_status() {
-    local step="$1"
-    local message="$2"
-    echo "${step}|${message}|$(date -Iseconds)" > "$STATUS_FILE"
+    local line="${1}|${2}|$(date -Iseconds)"
+    if command -v flock >/dev/null 2>&1; then
+        (
+            flock -w 10 9 || true
+            echo "$line" > "$STATUS_FILE"
+        ) 9>"$STATUS_LOCK_FILE"
+    else
+        echo "$line" > "$STATUS_FILE"
+    fi
 }
 
 # Print the first gateway of a network that Docker reports with a prefix length (fd00::1/64).

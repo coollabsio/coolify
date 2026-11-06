@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\AutoUpdateNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,6 +32,7 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             if (isDev() || isCloud()) {
                 return false;
             }
+            AutoUpdateNotifier::checkResult();
             $versions = refresh_versions_file($this->cdnTries);
             if ($versions === null) {
                 return false;
