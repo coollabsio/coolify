@@ -66,6 +66,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | GitHub App (team, not system-wide) | with runner fields (`organization_self_hosted_runners`, `actions`, `webhook_events`, `runner_group_id`). Expected: checklist step for Webhook/Setup/Callback URL |
 | ✅ | GitLab App (team) | used by one application. Expected: checklist step for the webhook URL |
 | ✅ | S3 storage | the dev MinIO service (the VM must reach it), used by a database backup and a volume backup |
+| ➕ | SFTP, FTPS, or WebDAV storage | a storage of another type (`type` column), used by a backup; an SFTP storage that logs in with a private key (`private_key_id`), with a saved host key (`sftp_host_key`) |
 | ✅ | Cloudflare integration token | for DNS zones and the tunnel |
 | ✅ | Secret manager token | Infisical, Doppler, or Vault |
 | ⚠️ | Cloud provider token | only with a real cloud server |

@@ -91,9 +91,9 @@ class CoolifyHelp extends Tool
             ],
         ],
         'backup_database' => [
-            'description' => 'Back up a database to S3',
+            'description' => 'Back up a database to an S3, SFTP, FTPS, or WebDAV storage',
             'steps' => [
-                ['tool' => 'manage_s3_storage', 'action' => 'create', 'note' => 'Add the S3 storage (the secret is never returned).'],
+                ['tool' => 'manage_s3_storage', 'action' => 'create', 'note' => 'Add the storage with its type (s3, sftp, ftps, webdav; bucket and region only for s3). The secret is never returned.'],
                 ['tool' => 'manage_s3_storage', 'action' => 'validate', 'note' => 'Check the credentials.'],
                 ['tool' => 'manage_backup', 'action' => 'create', 'note' => 'Set frequency, s3_storage_uuid, save_s3=true; backup_now=true runs it at once.'],
                 ['tool' => 'list_backup_executions', 'note' => 'Check the result.'],

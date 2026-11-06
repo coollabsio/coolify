@@ -1176,8 +1176,8 @@ class GlobalSearch extends Component
         // Storage - can be created if user is admin or owner
         if ($user->isAdmin() || $user->isOwner()) {
             $items->push([
-                'name' => 'S3 Storage',
-                'description' => 'Add S3 storage for backups and file uploads',
+                'name' => 'Storage',
+                'description' => 'Add S3, SFTP, FTPS, or WebDAV storage for backups',
                 'quickcommand' => '(type: new storage)',
                 'type' => 'storage',
                 'category' => 'Quick Actions',

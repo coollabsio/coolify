@@ -178,7 +178,7 @@ it('keeps the local archive and cleans the partial upload when one destination f
     $secondReplica = $execution->s3Replicas()->where('s3_storage_id', $second->id)->sole();
     Process::assertNotRan(fn ($process) => preg_match("/rm -f '[^']+\\.tar\\.gz'/", remoteProcessScript($process)) === 1);
     expect($execution->status)->toBe('success')
-        ->and($execution->message)->toContain('S3 upload failed: second storage:')
+        ->and($execution->message)->toContain('Storage upload failed: second storage:')
         ->and($execution->s3_uploaded)->toBeFalse()
         ->and($execution->s3_cleanup_pending)->toBeFalse()
         ->and($execution->local_storage_deleted)->toBeFalse()

@@ -2017,6 +2017,141 @@ test('an application with a system-wide GitHub App that the target lacks is list
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
 });
 
+test('import keeps distinct storage UUIDs separate at the same endpoint', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $payload = [
+        'uuid' => 'storage-one',
+        'region' => 'us-east-1',
+        'bucket' => '/backups',
+        'type' => 'sftp',
+        'endpoint' => 'sftp://backup.example.test',
+        'key' => 'first-user',
+        'secret' => 'first-password',
+    ];
+
+    $first = $method->invoke($this->importer, $payload, $this->team->id, true);
+    $second = $method->invoke($this->importer, array_replace($payload, [
+        'uuid' => 'storage-two',
+        'key' => 'second-user',
+        'secret' => 'second-password',
+    ]), $this->team->id, true);
+    $repeated = $method->invoke($this->importer, $payload, $this->team->id, true);
+
+    expect($second->id)->not->toBe($first->id);
+    expect($second->key)->toBe('second-user');
+    expect($second->secret)->toBe('second-password');
+    expect($repeated->id)->toBe($first->id);
+});
+
+it('rejects backup storage with an unresolved private key', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $importer = new ServerTransferImporter;
+
+    expect(fn () => $method->invoke($importer, [
+        'private_key_uuid' => 'missing-key',
+        'key' => 'user',
+        'secret' => 'password',
+        'region' => 'us-east-1',
+        'endpoint' => 'sftp://backup.test',
+        'bucket' => '/backups',
+    ], $this->team->id, false))->toThrow(RuntimeException::class, 'Backup storage private key is missing.');
+    expect(S3Storage::where('endpoint', 'sftp://backup.test')->exists())->toBeFalse();
+});
+
+it('imports password authenticated backup storage without a private key', function () {
+    $method = new ReflectionMethod(ServerTransferImporter::class, 'importS3Storage');
+    $storage = $method->invoke(new ServerTransferImporter, [
+        'type' => 'sftp',
+        'region' => 'us-east-1',
+        'endpoint' => 'sftp://backup.test',
+        'bucket' => '/backups',
+        'key' => 'backup-user',
+        'secret' => 'backup-password',
+    ], $this->team->id, false);
+
+    expect($storage->private_key_id)->toBeNull()
+        ->and((bool) $storage->is_usable)->toBeTrue()
+        ->and($storage->secret)->toBe('backup-password');
+});
+
+it('moves the saved SFTP host key with the backup storage', function () {
+    $hostKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILhw/KsYTF9TQOwQX1EAM3gI5oxDS9Daz5nNuCixSRXT';
+    $storage = S3Storage::create([
+        'type' => 'sftp',
+        'name' => 'SFTP backups',
+        'region' => 'us-east-1',
+        'key' => 'backup',
+        'secret' => 'password',
+        'endpoint' => 'sftp://93.184.216.34:2222/backups',
+        'team_id' => $this->team->id,
+    ]);
+    $storage->forceFill(['sftp_host_key' => $hostKey])->save();
+    $this->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+
+    $bundle = $this->exporter->export($this->server);
+    removeTransferSourceResources($this);
+    $storage->forceDelete();
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(S3Storage::where('endpoint', 'sftp://93.184.216.34:2222/backups')->sole()->sftp_host_key)->toBe($hostKey);
+});
+
+/**
+ * Exports the server with a database backup to a storage, then imports it with new UUIDs into a team that already
+ * has `$existing`. Returns the storage of the imported backup and the number of storages of the target team.
+ *
+ * @param  array<string, mixed>  $source
+ * @param  array<string, mixed>  $existing
+ * @return array{0: S3Storage, 1: S3Storage, 2: int}
+ */
+function transferBackupStorageIntoTeamWith(object $test, array $source, array $existing): array
+{
+    $defaults = ['name' => 'Backups', 'region' => 'us-east-1', 'secret' => 'secret', 'team_id' => $test->team->id];
+    $storage = S3Storage::create([...$defaults, ...$source]);
+    $test->backup->update(['s3_storage_id' => $storage->id, 'save_s3' => true]);
+    $bundle = $test->exporter->export($test->server);
+    removeTransferSourceResources($test);
+    $storage->forceDelete();
+
+    $target = Team::factory()->create();
+    $existingStorage = S3Storage::create([...$defaults, ...$existing, 'name' => 'Existing', 'team_id' => $target->id]);
+    $result = $test->importer->import($bundle, teamId: $target->id, preserveUuids: false, adoptMode: false);
+    $importedStorage = Server::where('uuid', $result['server_uuid'])->firstOrFail()
+        ->databases()->sole()->scheduledBackups()->sole()->s3;
+
+    return [$importedStorage, $existingStorage, S3Storage::where('team_id', $target->id)->count()];
+}
+
+test('a transfer with new UUIDs reuses the S3 storage of the target team with the same endpoint, bucket and key', function () {
+    $s3 = ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIASAME'];
+
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this, $s3, $s3);
+
+    expect($imported->id)->toBe($existing->id)->and($count)->toBe(1);
+});
+
+test('a transfer does not reuse an S3 storage with another key', function () {
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this,
+        ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIASOURCE'],
+        ['endpoint' => 'https://93.184.216.34', 'bucket' => 'backups', 'key' => 'AKIATARGET'],
+    );
+
+    expect($imported->id)->not->toBe($existing->id)
+        ->and($imported->key)->toBe('AKIASOURCE')
+        ->and($count)->toBe(2);
+});
+
+test('a transfer does not merge SFTP storages on the same host', function (string $existingKey) {
+    [$imported, $existing, $count] = transferBackupStorageIntoTeamWith($this,
+        ['type' => 'sftp', 'endpoint' => 'sftp://93.184.216.34/backups', 'key' => 'source-user'],
+        ['type' => 'sftp', 'endpoint' => 'sftp://93.184.216.34/backups', 'key' => $existingKey],
+    );
+
+    expect($imported->id)->not->toBe($existing->id)
+        ->and($imported->key)->toBe('source-user')
+        ->and($count)->toBe(2);
+})->with(['another login' => ['target-user'], 'the same login' => ['source-user']]);
 test('import clears trust metadata when the host key normalizes to null', function (?string $hostKey) {
     $method = new ReflectionMethod(ServerTransferImporter::class, 'importServer');
     $server = $method->invoke($this->importer, [

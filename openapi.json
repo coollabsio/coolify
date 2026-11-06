@@ -15722,7 +15722,7 @@
                     "S3 Storages"
                 ],
                 "summary": "List S3 Storages",
-                "description": "List all S3 storages for the authenticated team.",
+                "description": "List all backup storages (S3, SFTP, FTPS, and WebDAV) for the authenticated team.",
                 "operationId": "list-s3-storages",
                 "responses": {
                     "200": {
@@ -15736,6 +15736,15 @@
                                             "uuid": {
                                                 "type": "string"
                                             },
+                                            "type": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "s3",
+                                                    "sftp",
+                                                    "ftps",
+                                                    "webdav"
+                                                ]
+                                            },
                                             "name": {
                                                 "type": "string"
                                             },
@@ -15747,16 +15756,29 @@
                                                 "type": "string"
                                             },
                                             "bucket": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "S3 only. Null for the other types."
                                             },
                                             "region": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "description": "S3 only. The other types have a placeholder value."
                                             },
                                             "use_path_style_endpoint": {
                                                 "type": "boolean"
                                             },
                                             "skip_tls_verification": {
                                                 "type": "boolean"
+                                            },
+                                            "private_key_uuid": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "SFTP only: the UUID of the private key used to log in. Null with a password login."
+                                            },
+                                            "sftp_host_key": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "SFTP only: the pinned host key of the server, as \"<key type> <base64>\". Saved by the first successful connection test."
                                             },
                                             "is_usable": {
                                                 "type": "boolean"
@@ -15806,12 +15828,20 @@
                                 "required": [
                                     "name",
                                     "endpoint",
-                                    "bucket",
-                                    "region",
-                                    "key",
-                                    "secret"
+                                    "key"
                                 ],
                                 "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "s3",
+                                            "sftp",
+                                            "ftps",
+                                            "webdav"
+                                        ],
+                                        "default": "s3",
+                                        "description": "The storage protocol. It cannot change later."
+                                    },
                                     "name": {
                                         "type": "string",
                                         "example": "My S3 Storage",
@@ -15825,17 +15855,17 @@
                                     "endpoint": {
                                         "type": "string",
                                         "example": "https:\/\/s3.us-east-1.amazonaws.com",
-                                        "description": "S3-compatible endpoint URL."
+                                        "description": "S3: the S3-compatible endpoint URL. SFTP and FTPS: sftp:\/\/host:port\/directory or ftps:\/\/host:port\/directory (explicit TLS); the directory is an absolute path, and without one the login directory is used. WebDAV: the https URL of the backup directory."
                                     },
                                     "bucket": {
                                         "type": "string",
                                         "example": "my-bucket",
-                                        "description": "S3 bucket name."
+                                        "description": "S3 bucket name. Required for S3, not allowed for the other types."
                                     },
                                     "region": {
                                         "type": "string",
                                         "example": "us-east-1",
-                                        "description": "S3 region."
+                                        "description": "S3 region. Required for S3, not allowed for the other types."
                                     },
                                     "use_path_style_endpoint": {
                                         "type": "boolean",
@@ -15843,15 +15873,20 @@
                                     },
                                     "skip_tls_verification": {
                                         "type": "boolean",
-                                        "description": "Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
+                                        "description": "S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
                                     },
                                     "key": {
                                         "type": "string",
-                                        "description": "Access key."
+                                        "description": "S3: the access key. Other types: the username."
                                     },
                                     "secret": {
                                         "type": "string",
-                                        "description": "Secret key."
+                                        "description": "S3: the secret key. Other types: the password. SFTP: not needed with private_key_uuid."
+                                    },
+                                    "private_key_uuid": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "SFTP only: the UUID of a private key of your team to log in with instead of a password."
                                     },
                                     "is_usable": {
                                         "type": "boolean",
@@ -15927,6 +15962,15 @@
                                         "uuid": {
                                             "type": "string"
                                         },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "s3",
+                                                "sftp",
+                                                "ftps",
+                                                "webdav"
+                                            ]
+                                        },
                                         "name": {
                                             "type": "string"
                                         },
@@ -15938,16 +15982,29 @@
                                             "type": "string"
                                         },
                                         "bucket": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "S3 only. Null for the other types."
                                         },
                                         "region": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "description": "S3 only. The other types have a placeholder value."
                                         },
                                         "use_path_style_endpoint": {
                                             "type": "boolean"
                                         },
                                         "skip_tls_verification": {
                                             "type": "boolean"
+                                        },
+                                        "private_key_uuid": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "SFTP only: the UUID of the private key used to log in. Null with a password login."
+                                        },
+                                        "sftp_host_key": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "SFTP only: the pinned host key of the server, as \"<key type> <base64>\". Saved by the first successful connection test."
                                         },
                                         "is_usable": {
                                             "type": "boolean"
@@ -16033,7 +16090,7 @@
                     "S3 Storages"
                 ],
                 "summary": "Update S3 Storage",
-                "description": "Update S3 storage by UUID.",
+                "description": "Update S3 storage by UUID. The type cannot change, and only the fields of the storage type are accepted.",
                 "operationId": "update-s3-storage-by-uuid",
                 "parameters": [
                     {
@@ -16064,15 +16121,15 @@
                                     },
                                     "endpoint": {
                                         "type": "string",
-                                        "description": "S3-compatible endpoint URL."
+                                        "description": "The endpoint URL, in the format of the storage type (see Create S3 Storage)."
                                     },
                                     "bucket": {
                                         "type": "string",
-                                        "description": "S3 bucket name."
+                                        "description": "S3 bucket name. Only for S3 storages."
                                     },
                                     "region": {
                                         "type": "string",
-                                        "description": "S3 region."
+                                        "description": "S3 region. Only for S3 storages."
                                     },
                                     "use_path_style_endpoint": {
                                         "type": "boolean",
@@ -16080,15 +16137,20 @@
                                     },
                                     "skip_tls_verification": {
                                         "type": "boolean",
-                                        "description": "Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
+                                        "description": "S3 only. Do not check the TLS certificate of the endpoint. Use only for endpoints with a self-signed or private CA certificate. Default: false."
                                     },
                                     "key": {
                                         "type": "string",
-                                        "description": "Access key."
+                                        "description": "S3: the access key. Other types: the username."
                                     },
                                     "secret": {
                                         "type": "string",
-                                        "description": "Secret key."
+                                        "description": "S3: the secret key. Other types: the password. SFTP: sending a password switches the login to the password."
+                                    },
+                                    "private_key_uuid": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "SFTP only: the UUID of a private key of your team to log in with. Null switches the login to the saved password."
                                     },
                                     "is_usable": {
                                         "type": "boolean",
@@ -16139,7 +16201,7 @@
                     "S3 Storages"
                 ],
                 "summary": "Validate S3 Storage",
-                "description": "Validate an S3 storage connection using ListObjectsV2.",
+                "description": "Validate a storage connection. S3: lists the bucket (ListObjectsV2). SFTP, FTPS, and WebDAV: lists the backup directory; for SFTP, the first successful validation pins the host key of the server.",
                 "operationId": "validate-s3-storage-by-uuid",
                 "parameters": [
                     {

@@ -16,6 +16,8 @@ use Throwable;
 
 class SafeWebhookUrl implements ValidationRule
 {
+    private const DEFAULT_PORTS = ['https' => 443, 'http' => 80, 'sftp' => 22, 'ftps' => 21];
+
     /** @var (Closure(string): array<int, string>)|null */
     private static ?Closure $fakeResolver = null;
 
@@ -24,6 +26,7 @@ class SafeWebhookUrl implements ValidationRule
      * @param  array<int, string>  $trustedInternalHosts
      * @param  bool  $allowPrivateNetworks  Allow private, CGNAT, and unique local addresses and internal hostnames.
      *                                      Loopback, link-local (cloud metadata), and reserved targets stay blocked.
+     * @param  array<int, string>  $schemes  The URL schemes to accept, for example sftp for a backup storage.
      * @param  bool  $preferSystemDns  Ask the system resolver before the custom DNS servers.
      * @param  int  $customDnsTimeout  Seconds to wait for each custom DNS server query.
      */
@@ -31,6 +34,7 @@ class SafeWebhookUrl implements ValidationRule
         private ?Closure $resolver = null,
         private array $trustedInternalHosts = [],
         private bool $allowPrivateNetworks = false,
+        private array $schemes = ['http', 'https'],
         private bool $preferSystemDns = false,
         private int $customDnsTimeout = 5,
     ) {}
@@ -91,8 +95,8 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         $scheme = strtolower(parse_url($value, PHP_URL_SCHEME) ?? '');
-        if (! in_array($scheme, ['https', 'http'])) {
-            $fail('The :attribute must use the http or https scheme.');
+        if (! in_array($scheme, $this->schemes, true)) {
+            $fail('The :attribute must use the '.implode(' or ', $this->schemes).' scheme.');
 
             return;
         }
@@ -246,6 +250,34 @@ class SafeWebhookUrl implements ValidationRule
         return array_map(fn (string $ip): string => sprintf('%s:%d=%s', $target['host'], $target['port'], $ip), $ips);
     }
 
+    /**
+     * The address to connect to for an endpoint that is not HTTP (SFTP, FTPS): the validated IP of its host, so a
+     * DNS change after the check cannot send the connection to another address.
+     *
+     * @param  array<int, string>  $schemes
+     * @param  array<int, string>  $trustedInternalHosts
+     */
+    public static function pinnedAddress(string $url, array $schemes, array $trustedInternalHosts = []): string
+    {
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts, schemes: $schemes);
+
+        return $target['ips'] === [] ? $target['host'] : self::preferredIp($target['ips']);
+    }
+
+    /**
+     * @param  non-empty-array<int, string>  $ips
+     */
+    private static function preferredIp(array $ips): string
+    {
+        foreach ($ips as $ip) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                return $ip;
+            }
+        }
+
+        return $ips[0];
+    }
+
     private static function isIpv6(string $ip): bool
     {
         return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
@@ -301,9 +333,9 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @return array{host: string, port: int, ips: array<int, string>}
      */
-    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null, bool $allowPrivateNetworks = false): array
+    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null, bool $allowPrivateNetworks = false, array $schemes = ['http', 'https']): array
     {
-        $rule = new self(resolver: $resolver, trustedInternalHosts: $trustedInternalHosts, allowPrivateNetworks: $allowPrivateNetworks);
+        $rule = new self(resolver: $resolver, trustedInternalHosts: $trustedInternalHosts, allowPrivateNetworks: $allowPrivateNetworks, schemes: $schemes);
         if (! filter_var($url, FILTER_VALIDATE_URL)) {
             throw new \RuntimeException('Webhook URL is invalid.');
         }
@@ -318,11 +350,11 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?? '');
-        if (! in_array($scheme, ['http', 'https'], true)) {
+        if (! in_array($scheme, $schemes, true)) {
             throw new \RuntimeException('Webhook URL scheme is unsafe.');
         }
 
-        $port = parse_url($url, PHP_URL_PORT) ?: ($scheme === 'https' ? 443 : 80);
+        $port = parse_url($url, PHP_URL_PORT) ?: self::DEFAULT_PORTS[$scheme];
         $hostForDns = rtrim($rule->normalizeHostForIpCheck(strtolower($host)), '.');
 
         if (filter_var($hostForDns, FILTER_VALIDATE_IP)) {
