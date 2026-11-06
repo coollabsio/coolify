@@ -186,7 +186,10 @@ final class DeploymentImageScan
         }
         $reused = $image !== null ? $this->completedImageScan($image['id']) : null;
         try {
-            $scan = $reused ?? ScanImage::run($this->job('server'), $this->application, $imageRef, $this->deployment, lockWaitSeconds: ScanImage::GATE_LOCK_WAIT_SECONDS, baseImageRef: $this->baseImageRef, queueCandidateCheck: false);
+            $scan = $reused ?? $this->scanWhenLockFree($imageRef);
+        } catch (DeploymentException $e) {
+            // A cancel while the gate waits for the lock.
+            throw $e;
         } catch (Throwable $e) {
             // An unexpected error is a scan that could not run: "If the scan cannot run" decides, not the error.
             report($e);
@@ -201,6 +204,48 @@ final class DeploymentImageScan
         if ($reused !== null) {
             $this->reusedScans[(int) $reused->id] = true;
         }
+    }
+
+    /**
+     * Scans the image for the gate. A busy server lock is not a scan error: another scan holds it, and background
+     * scans do not start while the gate waits. The gate waits in steps, checks for a cancel between them, and stops
+     * at `gateLockWaitSeconds()`; only then the busy lock follows "If the scan cannot run".
+     */
+    private function scanWhenLockFree(string $imageRef): ImageScan
+    {
+        $server = $this->job('server');
+        $deadline = now()->addSeconds($this->gateLockWaitSeconds());
+        $waitLogged = false;
+
+        while (true) {
+            $wait = (int) max(1, min(ScanImage::GATE_LOCK_WAIT_SECONDS, ceil(now()->diffInSeconds($deadline, false))));
+            $lastTry = now()->addSeconds($wait)->gte($deadline);
+            $scan = ScanImage::run($server, $this->application, $imageRef, $this->deployment, lockWaitSeconds: $wait, baseImageRef: $this->baseImageRef, queueCandidateCheck: false, retryWhenBusy: ! $lastTry);
+
+            if ($lastTry || ! ScanImage::lockWasBusy($scan)) {
+                return $scan;
+            }
+
+            if (! $waitLogged) {
+                $waitLogged = true;
+                $minutes = (int) ceil(now()->diffInSeconds($deadline, false) / 60);
+                $this->deployment->addLogEntry("Another image scan is running on {$server->name}. Waiting up to {$minutes} more minutes for it to finish.");
+            }
+            ($this->checkForCancellation)();
+        }
+    }
+
+    /**
+     * How long the gate waits in total for the server lock: until the lock expires at the latest, and only while the
+     * deployment keeps time for its own scan before its timeout. At least one lock wait.
+     */
+    private function gateLockWaitSeconds(): int
+    {
+        $startedAt = $this->job('started_at');
+        $elapsed = $startedAt === null ? 0 : max(0, now()->getTimestamp() - (int) $startedAt);
+        $left = (int) $this->job('timeout') - $elapsed - ScanImage::GATE_SCAN_RESERVE_SECONDS;
+
+        return max(ScanImage::GATE_LOCK_WAIT_SECONDS, min(ScanImage::LOCK_TTL, $left));
     }
 
     /**

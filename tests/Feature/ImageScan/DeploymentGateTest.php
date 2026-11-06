@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
+use Illuminate\Support\Sleep;
 use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
@@ -642,6 +643,68 @@ it('applies the scan error rule when the scan fails with an unexpected error', f
     'deploy on error' => ['deploy', true],
     'block on error' => ['block', false],
 ]);
+
+/**
+ * Lets ScanImage::run() take the server lock like the real action, and returns a clean scan or a busy lock.
+ */
+function deployGateScanWithServerLock(): void
+{
+    ScanImage::shouldRun()->andReturnUsing(function (Server $server, $resource, $ref, $deployment, int $lockWaitSeconds) {
+        $lock = ScanImage::serverLock($server);
+        if (! ScanImage::acquireServerLock($lock, $server, $lockWaitSeconds)) {
+            return (new ImageScan)->forceFill(['status' => ImageScanStatus::Failed, 'error_code' => ImageScanErrorCode::LockBusy, 'error_context' => ['server' => $server->name]]);
+        }
+        $lock->release();
+
+        return deployGateReturnedScan([]);
+    });
+}
+
+it('waits for a background scan that holds the server lock longer than one lock wait', function () {
+    deployGatePolicy(onScanError: 'block');
+    deployGateScanWithServerLock();
+    $background = ScanImage::serverLock($this->server);
+    expect($background->get())->toBeTrue();
+    $releaseAt = now()->addSeconds(600);
+    Sleep::fake(syncWithCarbon: true);
+    Sleep::whenFakingSleep(function () use ($background, $releaseAt) {
+        if (now()->gte($releaseAt)) {
+            $background->release();
+        }
+    });
+
+    expect(deployGateReachesStart(deployGateJob()))->toBeTrue()
+        ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false, 'error' => null])
+        ->and(deployGateLogs())->toContain('Another image scan is running on main-server.');
+});
+
+it('stops waiting for the server lock before the deployment times out', function () {
+    deployGatePolicy(onScanError: 'block');
+    deployGateScanWithServerLock();
+    expect(ScanImage::serverLock($this->server)->get())->toBeTrue();
+    $startedAt = now();
+    Sleep::fake(syncWithCarbon: true);
+    $job = deployGateJob();
+
+    expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: '.ImageScanErrorCode::LockBusy->message(['server' => 'main-server']))
+        ->and((int) $startedAt->diffInSeconds(now()))->toBeLessThanOrEqual($job->timeout - ScanImage::GATE_SCAN_RESERVE_SECONDS + 1);
+});
+
+it('stops waiting for the server lock when the deployment is cancelled', function () {
+    deployGatePolicy(onScanError: 'block');
+    deployGateScanWithServerLock();
+    expect(ScanImage::serverLock($this->server)->get())->toBeTrue();
+    $cancelAt = now()->addSeconds(300);
+    Sleep::fake(syncWithCarbon: true);
+    Sleep::whenFakingSleep(function () use ($cancelAt) {
+        if (now()->gte($cancelAt)) {
+            test()->queue->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+        }
+    });
+
+    expect(deployGateBlocked(deployGateJob())->getCode())->toBe(69420)
+        ->and(test()->queue->fresh()->scan_gate_result)->toBeNull();
+});
 
 it('pulls a Docker image, pins its digest, and starts it without a compose pull', function () {
     deployGatePolicy();

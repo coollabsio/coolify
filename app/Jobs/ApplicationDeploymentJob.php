@@ -128,6 +128,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 3600;
 
+    /** Unix time when the worker started handle(); the timeout counts from it. */
+    private ?int $handleStartedAt = null;
+
     public static int $batch_counter = 0;
 
     private ApplicationDeploymentQueue $application_deployment_queue;
@@ -445,6 +448,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        $this->handleStartedAt = now()->getTimestamp();
+
         // Check if deployment was cancelled before we even started
         $this->application_deployment_queue->refresh();
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
@@ -3104,7 +3109,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'server', 'mainServer', 'use_build_server', 'deployment_uuid', 'pull_request_id', 'commit', 'rollback',
                 'skip_build', 'is_this_additional_server', 'container_name', 'docker_compose', 'generated_docker_compose',
                 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'workdir',
-                'docker_compose_location', 'saved_outputs' => $this->{$property},
+                'docker_compose_location', 'saved_outputs', 'timeout' => $this->{$property},
+                // Unix time when the worker started the job; null when handle() did not run.
+                'started_at' => $this->handleStartedAt,
                 // Not set before the build server is chosen or the image is named.
                 'build_server', 'production_image_name' => $this->{$property} ?? null,
             },

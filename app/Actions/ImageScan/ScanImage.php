@@ -50,10 +50,24 @@ class ScanImage
 {
     use AsAction;
 
-    public const LOCK_TTL = 2700;
+    /**
+     * The longest run of handle() under the lock: database status, update, and status again, inspect, pull, and
+     * inspect again, Grype on a stored SBOM that is gone, disk check, SBOM, packages, Grype, cleanup. The lock must
+     * not expire under a scan that still runs.
+     */
+    public const LOCK_TTL = 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_DB_UPDATE
+        + 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_PULL
+        + self::TIMEOUT_GRYPE + self::TIMEOUT_DEFAULT + self::TIMEOUT_SBOM + 2 * self::TIMEOUT_GRYPE
+        + self::TIMEOUT_DEFAULT;
 
-    /** A deploy gate waits this long for the server lock (spec 5); background scans never wait. */
+    /**
+     * One wait of a deploy gate for the server lock (spec 5); background scans never wait. The gate waits again while
+     * the lock is busy, see `DeploymentImageScan::gateLockWaitSeconds()`.
+     */
     public const GATE_LOCK_WAIT_SECONDS = 120;
+
+    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
+    public const GATE_SCAN_RESERVE_SECONDS = self::TIMEOUT_SBOM + self::TIMEOUT_GRYPE;
 
     public const LAST_ERROR_TTL_DAYS = 7;
 
