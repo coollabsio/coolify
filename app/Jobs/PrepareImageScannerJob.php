@@ -194,7 +194,9 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
     }
 
     /**
-     * Caches the database build date and the disk use of the scanner data that the server page shows.
+     * Caches the database build date and the disk use of the scanner data that the server page shows. A valid
+     * database proves that the scanner is on the server, so this also marks it as ready, unless a preparation
+     * is running and sets the state itself.
      */
     public static function storeDetails(Server $server, ScannerCommands $commands): void
     {
@@ -207,6 +209,11 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
             $built = is_array($report) && ($report['valid'] ?? false) === true ? ($report['built'] ?? null) : null;
             if (is_string($built)) {
                 Cache::put(self::builtAtCacheKey($server), CarbonImmutable::parse($built)->toIso8601ZuluString(), now()->addDays(7));
+                if (! in_array(Cache::get(self::stateCacheKey($server)), [self::STATE_PULLING, self::STATE_UPDATING_DATABASE], true)) {
+                    Cache::forget(self::failedStepCacheKey($server));
+                    Cache::put(self::stateCacheKey($server), self::STATE_READY, now()->addDays(7));
+                    ImageScanUpdated::dispatch($server->team_id, $server->uuid, self::SCAN_UUID);
+                }
             }
         } catch (\Throwable $e) {
             report($e);

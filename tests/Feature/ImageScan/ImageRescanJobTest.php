@@ -436,6 +436,25 @@ describe('rescan', function () {
             ->and(Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server)))->toBe(1024);
     });
 
+    it('marks the scanner as ready after a database update, so the server page does not ask to get it again', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subHours(3))]);
+        Cache::put(PrepareImageScannerJob::failedStepCacheKey($this->server), 'pulling');
+
+        rescanTestRun();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe(PrepareImageScannerJob::STATE_READY)
+            ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBeNull();
+    });
+
+    it('does not mark the scanner as ready while the scanner is being prepared', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subHours(3))]);
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), PrepareImageScannerJob::STATE_PULLING);
+
+        rescanTestRun();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe(PrepareImageScannerJob::STATE_PULLING);
+    });
+
     it('keeps the results and records the error for each resource when the database is too old', function () {
         rescanTestFake([
             'db-update' => 'coolify-scan-exit db-update 1',

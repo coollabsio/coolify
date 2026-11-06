@@ -41,6 +41,11 @@
                 @if ($allowed)
                     @can('update', $server)
                         <x-slot:actions>
+                            @if ($enabled && ($prepareState === null || $prepareState === 'failed'))
+                                <x-forms.button type="button" wire:click="prepareScanner">
+                                    {{ $prepareState === 'failed' ? 'Try again' : 'Get scanner' }}
+                                </x-forms.button>
+                            @endif
                             @if ($enabled && $hasScannerData)
                                 <x-modal-confirmation title="Delete scanner data?" buttonTitle="Delete scanner data"
                                     isErrorButton submitAction="deleteScannerData" temporaryDisableTwoStepConfirmation
@@ -79,45 +84,36 @@
                         @endcannot
                     </x-empty>
                 @elseif ($prepareState !== 'ready')
-                    <div class="flex flex-col gap-4">
-                        <div class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.08] dark:border-white/[0.08]">
-                            <x-checkpoint-item title="Get scanner" icon="download" :status="$pullState"
-                                :description="match ($pullState) {
-                                    'running' => 'Pulling the scanner images.',
-                                    'success' => 'The scanner images are on this server.',
-                                    'error' => match ($failedStep) {
-                                        'setup' => 'Coolify could not set up the scanner storage on the server. Check that the SSH user can run Docker commands.',
-                                        'connection' => 'Coolify could not connect to the server. Check that the server is reachable, then try again.',
-                                        default => 'Coolify could not pull the scanner images. Check that the server can reach ' . $registries . '.',
-                                    },
-                                    default => 'Not done yet.',
-                                }" />
-                            <x-checkpoint-item title="Update database" icon="database" :status="$databaseState"
-                                :description="match ($databaseState) {
-                                    'running' => 'Downloading the vulnerability database.',
-                                    'success' => $builtAt ? 'Database built ' . $builtAt->diffForHumans() . '.' : 'The vulnerability database is up to date.',
-                                    'error' => 'Coolify could not download the vulnerability database.',
-                                    default => 'Not done yet.',
-                                }" />
-                        </div>
-
-                        @can('update', $server)
-                            @if ($prepareState === null || $prepareState === 'failed')
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <x-forms.button type="button" wire:click="prepareScanner">
-                                        {{ $prepareState === 'failed' ? 'Try again' : 'Get scanner' }}
-                                    </x-forms.button>
-                                </div>
-                            @endif
-                        @endcan
+                    <div class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.08] dark:border-white/[0.08]">
+                        <x-checkpoint-item title="Get scanner" icon="download" :status="$pullState"
+                            :description="match ($pullState) {
+                                'running' => 'Pulling the scanner images.',
+                                'success' => 'The scanner images are on this server.',
+                                'error' => match ($failedStep) {
+                                    'setup' => 'Coolify could not set up the scanner storage on the server. Check that the SSH user can run Docker commands.',
+                                    'connection' => 'Coolify could not connect to the server. Check that the server is reachable, then try again.',
+                                    default => 'Coolify could not pull the scanner images. Check that the server can reach ' . $registries . '.',
+                                },
+                                default => 'Not done yet.',
+                            }" />
+                        <x-checkpoint-item title="Update database" icon="database" :status="$databaseState"
+                            :description="match ($databaseState) {
+                                'running' => 'Downloading the vulnerability database.',
+                                'success' => $builtAt ? 'Database built ' . $builtAt->diffForHumans() . '.' : 'The vulnerability database is up to date.',
+                                'error' => 'Coolify could not download the vulnerability database.',
+                                default => 'Not done yet.',
+                            }" />
+                    </div>
+                @endif
+                @if ($allowed)
+                    <div @class([
+                        'mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]' => ! $enabled || $prepareState !== 'ready',
+                    ])>
+                        <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid" :embedded="true"
+                            :key="'server-image-scan-settings-'.$server->uuid" />
                     </div>
                 @endif
             </x-application.settings-section>
-
-            @if ($allowed)
-                <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid"
-                    :key="'server-image-scan-settings-'.$server->uuid" />
-            @endif
 
             <livewire:server.security.host-vulnerabilities :server_uuid="$server->uuid" :key="'host-vulnerabilities-'.$server->uuid" />
         </div>
