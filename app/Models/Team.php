@@ -36,6 +36,7 @@ use OpenApi\Attributes as OA;
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'is_build_server_fallback_enabled' => ['type' => 'boolean', 'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'],
+        'scan_images_on_new_servers' => ['type' => 'boolean', 'description' => 'Whether image scanning is turned on for servers added to the team from now on.'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',

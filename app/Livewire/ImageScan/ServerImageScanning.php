@@ -2,10 +2,12 @@
 
 namespace App\Livewire\ImageScan;
 
+use App\Actions\ImageScan\SetServerImageScanning;
 use App\Jobs\PrepareImageScannerJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\ImageRef;
+use App\Services\ImageScan\ImageScanningRefused;
 use App\Services\ImageScan\ScannerCommands;
 use App\Traits\ListensToTeamChannel;
 use Carbon\CarbonImmutable;
@@ -47,19 +49,11 @@ class ServerImageScanning extends Component
         $this->authorize('update', $this->server);
 
         try {
-            $this->ensureManagedHere();
-            if (! InstanceSettings::get()->is_image_scanning_allowed) {
-                $this->dispatch('error', message: 'Image scanning is turned off for this Coolify instance.');
-
-                return;
-            }
-
-            $settings = $this->server->settings;
-            $settings->is_image_scan_enabled = true;
-            $settings->save();
+            SetServerImageScanning::run($this->server, true);
             $this->auditImageScanning('image_scanning_enabled');
-            $this->startPreparing();
             $this->dispatch('success', 'Image scanning turned on. Coolify is getting the scanner.');
+        } catch (ImageScanningRefused $e) {
+            $this->dispatch('error', message: $e->getMessage());
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -70,14 +64,14 @@ class ServerImageScanning extends Component
         $this->authorize('update', $this->server);
 
         try {
-            $this->ensureManagedHere();
-            if (! InstanceSettings::get()->is_image_scanning_allowed || ! $this->isEnabled()) {
+            SetServerImageScanning::ensureManagedHere($this->server);
+            if (! InstanceSettings::get()->is_image_scanning_allowed || ! $this->server->settings->refresh()->is_image_scan_enabled) {
                 $this->dispatch('error', message: 'Turn on image scanning first.');
 
                 return;
             }
 
-            $this->startPreparing();
+            SetServerImageScanning::prepareScanner($this->server);
             $this->dispatch('success', 'Coolify is getting the scanner.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -89,10 +83,7 @@ class ServerImageScanning extends Component
         $this->authorize('update', $this->server);
 
         try {
-            $settings = $this->server->settings;
-            $settings->is_image_scan_enabled = false;
-            $settings->save();
-            PrepareImageScannerJob::forget($this->server);
+            SetServerImageScanning::run($this->server, false);
             $this->auditImageScanning('image_scanning_disabled');
             $this->dispatch('success', 'Image scanning turned off.');
         } catch (\Throwable $e) {
@@ -105,7 +96,7 @@ class ServerImageScanning extends Component
         $this->authorize('update', $this->server);
 
         try {
-            $this->ensureManagedHere();
+            SetServerImageScanning::ensureManagedHere($this->server);
             $commands = new ScannerCommands($this->server, Str::lower(Str::random(24)));
             instant_remote_process($commands->deleteScannerData(), $this->server, throwError: true, timeout: 120);
             PrepareImageScannerJob::forget($this->server);
@@ -113,24 +104,6 @@ class ServerImageScanning extends Component
             $this->dispatch('success', 'Scanner data deleted.');
         } catch (\Throwable $e) {
             return handleError($e, $this, 'Could not delete the scanner data.');
-        }
-    }
-
-    private function startPreparing(): void
-    {
-        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), PrepareImageScannerJob::STATE_PULLING, now()->addHour());
-        PrepareImageScannerJob::dispatch($this->server);
-    }
-
-    private function isEnabled(): bool
-    {
-        return (bool) $this->server->settings->refresh()->is_image_scan_enabled;
-    }
-
-    private function ensureManagedHere(): void
-    {
-        if ($this->server->isTransferredAway()) {
-            throw new \RuntimeException('This server is managed by another Coolify instance.');
         }
     }
 

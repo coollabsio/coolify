@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServerCloudflareTunnelController;
 use App\Http\Controllers\Api\ServerDockerCleanupController;
 use App\Http\Controllers\Api\ServerDockerRegistriesController;
+use App\Http\Controllers\Api\ServerImageScanningController;
 use App\Http\Controllers\Api\ServerLogDrainsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
@@ -41,6 +42,7 @@ use App\Http\Controllers\Api\SharedEnvironmentVariablesController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
+use App\Http\Controllers\Api\VulnerabilitiesController;
 use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
 use Illuminate\Support\Facades\Route;
@@ -184,6 +186,9 @@ Route::group([
     Route::get('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'update'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
+    Route::get('/servers/{uuid}/image-scanning', [ServerImageScanningController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/servers/{uuid}/image-scanning', [ServerImageScanningController::class, 'update'])->middleware(['api.ability:write']);
+
     Route::get('/servers/{uuid}/cloudflare-tunnel', [ServerCloudflareTunnelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/cloudflare-tunnel', [ServerCloudflareTunnelController::class, 'update'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/cloudflare-tunnel/enable', [ServerCloudflareTunnelController::class, 'enable'])->middleware(['api.ability:write']);
@@ -248,6 +253,7 @@ Route::group([
     Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
+    Route::get('/vulnerabilities', [VulnerabilitiesController::class, 'index'])->middleware(['api.ability:read']);
 
     Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
     Route::post('/tags', [TagsController::class, 'create'])->middleware(['api.ability:write']);
@@ -263,6 +269,7 @@ Route::group([
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'application'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:delete']);
 
@@ -352,6 +359,7 @@ Route::group([
     Route::post('/databases/sqlite', [DatabasesController::class, 'create_database_sqlite'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/databases/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'database'])->middleware(['api.ability:read']);
     Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:write'])->name('api.databases.imports.upload');
     Route::post('/databases/{uuid}/imports', [DatabasesController::class, 'create_import'])->middleware(['api.ability:write'])->name('api.databases.imports.store');
     Route::get('/databases/{uuid}/imports/{activity_id}', [DatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->whereNumber('activity_id')->name('api.databases.imports.show');
@@ -403,6 +411,7 @@ Route::group([
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/services/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'service'])->middleware(['api.ability:read']);
     Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:delete']);
 
