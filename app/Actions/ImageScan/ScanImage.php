@@ -66,6 +66,8 @@ class ScanImage
 
     private const TIMEOUT_GRYPE = 360;
 
+    private const TIMEOUT_PULL = 660;
+
     private const DB_MAX_AGE_DAYS = 5;
 
     private const DISK_RESERVE_BYTES = 1073741824;
@@ -80,6 +82,8 @@ class ScanImage
 
     private CarbonImmutable $startedAt;
 
+    private bool $pullWhenMissing = false;
+
     /**
      * Never throws for scan problems. Callers such as the deploy gate must use the returned scan: on a failure it is an
      * unsaved scan with status Failed and an error code, and a completed scan row of the same image keeps its results.
@@ -89,10 +93,12 @@ class ScanImage
      * @param  ?string  $baseImageRef  The base image of the final stage of a Dockerfile build (spec 7.4), stored on the scan.
      * @param  bool  $queueCandidateCheck  Queue the check for newer versions; the deploy gate queues it itself.
      * @param  bool  $retryWhenBusy  The caller retries later when the lock is busy: a busy lock is not recorded as the last error.
+     * @param  bool  $pullWhenMissing  Pull an image that is not on the server ("Scan now"). Images that Coolify builds are never pulled.
      */
-    public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null, bool $queueCandidateCheck = true, bool $retryWhenBusy = false): ImageScan
+    public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null, bool $queueCandidateCheck = true, bool $retryWhenBusy = false, bool $pullWhenMissing = false): ImageScan
     {
         $this->runId = Str::lower(Str::random(24));
+        $this->pullWhenMissing = $pullWhenMissing;
         $this->startedAt = CarbonImmutable::now();
         $policy = ImageScanPolicyResolver::for($resource, $server);
         $context = ['server' => (string) $server->name];
@@ -148,7 +154,7 @@ class ScanImage
     {
         try {
             if (RefreshCandidates::shouldRefresh($scan)) {
-                RefreshCandidatesJob::dispatch($scan);
+                RefreshCandidatesJob::queueCheck($scan);
             }
         } catch (Throwable $e) {
             report($e);
@@ -301,7 +307,7 @@ class ScanImage
             $this->progress($resource, 'database');
             $databaseBuiltAt = $this->databaseBuiltAt($commands);
             $this->progress($resource, 'inspect');
-            $image = $this->inspect($commands, $imageRef);
+            $image = $this->inspectOrPull($commands, $resource, $imageRef);
             $this->progress($resource, 'sbom');
             [$sbom, $grype] = $this->sbomAndReport($commands, [$resource], $imageRef, $image);
 
@@ -451,6 +457,32 @@ class ScanImage
         }
 
         return CarbonImmutable::parse($built);
+    }
+
+    /**
+     * Inspects the image. With $pullWhenMissing, an image that is not on the server and that Coolify does not build is
+     * pulled first.
+     *
+     * @return array{id: string, hex: string, repo_digest: ?string, platform: string, size: int}
+     */
+    private function inspectOrPull(ScannerCommands $commands, Model $resource, string $imageRef): array
+    {
+        try {
+            return $this->inspect($commands, $imageRef);
+        } catch (ScanFailed $e) {
+            if ($e->errorCode !== ImageScanErrorCode::ImageMissing || ! $this->pullWhenMissing || self::buildsImage($resource, $imageRef)) {
+                throw $e;
+            }
+        }
+
+        $this->progress($resource, 'pull');
+        $result = $this->runStep($commands->server, $commands->pull($imageRef), 'pull', self::TIMEOUT_PULL);
+        if ($result['code'] !== 0) {
+            throw new ScanFailed(in_array($result['code'], self::EXIT_TIMEOUT, true) ? ImageScanErrorCode::Timeout : ImageScanErrorCode::PullFailed);
+        }
+        $this->progress($resource, 'inspect');
+
+        return $this->inspect($commands, $imageRef);
     }
 
     /**

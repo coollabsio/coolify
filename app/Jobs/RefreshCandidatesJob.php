@@ -3,12 +3,14 @@
 namespace App\Jobs;
 
 use App\Actions\ImageScan\RefreshCandidates;
+use App\Events\ImageScanUpdated;
 use App\Models\ImageScan;
 use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScanNotifications;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -40,6 +42,15 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
         $this->onQueue(isCloud() ? maintenance_queue() : 'default');
     }
 
+    /**
+     * Queues the check and marks it as queued (`RefreshCandidates::isQueued()`).
+     */
+    public static function queueCheck(ImageScan $scan): void
+    {
+        RefreshCandidates::markQueued($scan, (new self($scan))->uniqueFor);
+        self::dispatch($scan);
+    }
+
     public function uniqueId(): string
     {
         return (string) $this->scan->id;
@@ -50,11 +61,14 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
         $scan = $this->scan->fresh();
         // The deploy gate or the daily rescan checked it meanwhile.
         if (! $scan instanceof ImageScan || RefreshCandidates::isFresh($scan)) {
+            RefreshCandidates::forgetQueued($this->scan);
+
             return;
         }
 
         try {
             RefreshCandidates::run($scan, 0, retryWhenBusy: $this->attempts() < $this->tries);
+            RefreshCandidates::forgetQueued($scan);
         } catch (ScanLockBusy) {
             $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
         }
@@ -65,9 +79,17 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
      */
     public function failed(?Throwable $exception): void
     {
+        RefreshCandidates::forgetQueued($this->scan);
         $scan = $this->scan->fresh();
-        if ($scan instanceof ImageScan) {
-            ScanNotifications::reevaluate($scan, checkGaveUp: true);
+        if (! $scan instanceof ImageScan) {
+            return;
+        }
+
+        ScanNotifications::reevaluate($scan, checkGaveUp: true);
+        $resource = $scan->resource;
+        if ($resource instanceof Model) {
+            $teamId = method_exists($resource, 'team') ? $resource->team()?->id : null;
+            ImageScanUpdated::dispatch($teamId, (string) $resource->getAttribute('uuid'), (string) $scan->uuid);
         }
     }
 }

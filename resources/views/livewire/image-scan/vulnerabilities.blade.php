@@ -27,7 +27,7 @@
     @else
         @php
             $isScanning = $progress !== null;
-            $checkNeeded = ($card['status'] ?? null) === 'check_needed';
+            $checkNeeded = ($card['status'] ?? null) === 'check_needed' && ! ($card['checking'] ?? false);
         @endphp
 
         {{-- Main card (spec 15.7, 15.11): the status sentence and the one action first, then the why-list, the
@@ -45,8 +45,8 @@
                         Checked {{ $checkedAt->diffForHumans() }}
                     </span>
                 @endif
-                @if ($canUpdate && ! $checkNeeded && $card !== null)
-                    <x-forms.button class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
+                @if ($canUpdate)
+                    <x-forms.button :isHighlighted="$checkNeeded || ($card === null && ! $isApplication)" class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
                         <x-reicon name="refresh" class="size-3.5" />
                         Scan now
                     </x-forms.button>
@@ -68,17 +68,8 @@
                 @endif
 
                 @if ($card === null)
-                    @unless ($isScanning)
-                        <x-empty size="sm" :title="$isApplication ? 'Not scanned yet. The next deploy scans the image.' : 'Not scanned yet.'">
-                            @if ($canUpdate)
-                                <x-slot:actions>
-                                    <x-forms.button :isHighlighted="! $isApplication" class="normal-case!" wire:click="scanNow">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                        Scan now
-                                    </x-forms.button>
-                                </x-slot:actions>
-                            @endif
-                        </x-empty>
+                    @unless ($isScanning || $errorMessages !== [])
+                        <x-empty size="sm" :title="$isApplication ? 'Not scanned yet. The next deploy scans the image.' : 'Not scanned yet.'" />
                     @endunless
                 @elseif ($card['single'] && count($card['rows']) === 1)
                     {{-- One image: the open row without the list frame and without a second status (spec 15.11). --}}
@@ -86,18 +77,8 @@
                         @include('livewire.image-scan.partials.security-image', ['row' => $card['rows'][0], 'single' => true])
                     </div>
                 @else
-                    @if ($card['header'] !== null || ($checkNeeded && $canUpdate))
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            @if ($card['header'] !== null)
-                                <p class="text-[15px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['header'] }}</p>
-                            @endif
-                            @if ($checkNeeded && $canUpdate)
-                                <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Scan now
-                                </x-forms.button>
-                            @endif
-                        </div>
+                    @if ($card['header'] !== null)
+                        <p class="text-[15px] font-medium leading-6 text-neutral-950 dark:text-fg">{{ $card['header'] }}</p>
                     @endif
 
                     <ul class="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]"
@@ -344,6 +325,13 @@
                         </div>
                     @endif
                 </div>
+
+                @if ($groupedFindingCount !== null && $items->total() > 0)
+                    <p class="border-t border-neutral-200 px-4 py-2.5 {{ $muted }} tabular-nums dark:border-white/[0.08]">
+                        {{ trans_choice('{1} 1 finding|[2,*] :count findings', $groupedFindingCount, ['count' => number_format($groupedFindingCount)]) }}
+                        in {{ trans_choice('{1} 1 package|[2,*] :count packages', $items->total(), ['count' => number_format($items->total())]) }}
+                    </p>
+                @endif
 
                 <x-table-pagination :from="$items->firstItem() ?? 0" :to="$items->lastItem() ?? 0" :total="$items->total()"
                     :current-page="$items->currentPage()" :last-page="$items->lastPage()"

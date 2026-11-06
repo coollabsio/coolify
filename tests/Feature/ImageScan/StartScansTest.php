@@ -5,6 +5,7 @@ use App\Actions\ImageScan\ScanImage;
 use App\Actions\Service\StartService;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
+use App\Events\ImageScanUpdated;
 use App\Jobs\ScanResourceImagesJob;
 use App\Models\Environment;
 use App\Models\ImageScan;
@@ -24,6 +25,7 @@ use Illuminate\Contracts\Queue\Job;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -384,5 +386,59 @@ describe('busy scan lock', function () {
 
         expect(ScanImage::acquireServerLock($lock, $this->server, ScanImage::GATE_LOCK_WAIT_SECONDS))->toBeTrue();
         Cache::shouldNotHaveReceived('put');
+    });
+});
+
+describe('scan now marks', function () {
+    it('marks every scanned owner as queued and hides its last error', function () {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        $db = startScansServiceDatabase($service, 'postgres:16');
+        Cache::put(ScanImage::lastErrorCacheKey($web), ['code' => 'image_missing']);
+
+        ScanResourceImagesJob::markQueued($service);
+
+        foreach ([$web, $db] as $owner) {
+            expect(Cache::get(ScanImage::progressCacheKey($owner))['stage'])->toBe(ScanResourceImagesJob::QUEUED_STAGE);
+        }
+        expect(Cache::has(ScanImage::lastErrorCacheKey($web)))->toBeFalse();
+    });
+
+    it('removes a mark that no scan replaced and tells open pages', function () {
+        Event::fake([ImageScanUpdated::class]);
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        ScanImage::shouldRun()->once()->andReturn(new ImageScan);
+
+        ScanResourceImagesJob::markQueued($service);
+        (new ScanResourceImagesJob($service))->handle();
+
+        expect(Cache::has(ScanImage::progressCacheKey($web)))->toBeFalse();
+        Event::assertDispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->resourceUuid === $web->uuid && $event->final);
+    });
+
+    it('keeps the mark while the job waits for a busy lock', function () {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+
+        ScanResourceImagesJob::markQueued($service);
+        $job = new ScanResourceImagesJob($service);
+        startScansQueuedJob($job, 1)->shouldReceive('release')->once()->with(60);
+        $job->handle();
+        $lock->release();
+
+        expect(Cache::get(ScanImage::progressCacheKey($web))['stage'])->toBe(ScanResourceImagesJob::QUEUED_STAGE);
+    });
+
+    it('removes the marks when the job fails', function () {
+        $service = startScansService();
+        $web = startScansServiceApplication($service, 'nginx:1.27');
+
+        ScanResourceImagesJob::markQueued($service);
+        (new ScanResourceImagesJob($service))->failed(new RuntimeException('boom'));
+
+        expect(Cache::has(ScanImage::progressCacheKey($web)))->toBeFalse();
     });
 });

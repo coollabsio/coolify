@@ -64,7 +64,7 @@ class Vulnerabilities extends Component
     private const CHECKPOINTS = ['Get scanner', 'Update database', 'Read image', 'Find vulnerabilities'];
 
     /** Progress stage of ScanImage => index in CHECKPOINTS. */
-    private const STAGE_CHECKPOINT = ['database' => 1, 'inspect' => 2, 'sbom' => 2, 'vulnerabilities' => 3];
+    private const STAGE_CHECKPOINT = [ScanResourceImagesJob::QUEUED_STAGE => 0, 'database' => 1, 'pull' => 2, 'inspect' => 2, 'sbom' => 2, 'vulnerabilities' => 3];
 
     /** The fix states of the findings table: a fixed version exists (or an action fixes it), or none exists yet. */
     public const FIX_STATES = ['fixed' => 'Fix available upstream', 'no_fix' => 'No fix yet'];
@@ -242,7 +242,11 @@ class Vulnerabilities extends Component
         $started = RateLimiter::attempt(
             "image-scan-now:{$resource->getMorphClass()}:{$resource->getKey()}",
             1,
-            fn () => ScanResourceImagesJob::dispatch($resource, null, $imageRefs),
+            function () use ($resource, $imageRefs): void {
+                // Marked first: a sync queue runs the job inside dispatch().
+                ScanResourceImagesJob::markQueued($resource, $imageRefs);
+                ScanResourceImagesJob::dispatch($resource, null, $imageRefs, pullWhenMissing: true);
+            },
             60,
         );
 
@@ -791,22 +795,6 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * The findings that are not ignored, per scan.
-     *
-     * @param  list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>  $activeRows
-     * @return array<string, int>
-     */
-    private function findingCounts(array $activeRows): array
-    {
-        $counts = $this->currentScans()->mapWithKeys(fn (ImageScan $scan): array => [(string) $scan->uuid => 0])->all();
-        foreach ($activeRows as $row) {
-            $counts[$row['scan']] = ($counts[$row['scan']] ?? 0) + 1;
-        }
-
-        return $counts;
-    }
-
-    /**
      * The IDs of the findings that the current base image of a Dockerfile build has too, from the last base check.
      *
      * @return array<string, true>
@@ -1015,8 +1003,7 @@ class Vulnerabilities extends Component
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
             'errorMessages' => $this->errorMessages($owners),
-            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $this->findingCounts($activeRows), $imageStatuses, fn (Model $owner): RelevanceRules => $this->rulesFor($owner)),
-            'hasSettings' => true,
+            'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $imageStatuses, fn (Model $owner): RelevanceRules => $this->rulesFor($owner)),
             'isApplication' => $resource instanceof Application,
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),
             'truncated' => $scans->contains(fn (ImageScan $scan): bool => (bool) data_get($scan->summary, 'truncated', false)),
@@ -1025,6 +1012,7 @@ class Vulnerabilities extends Component
             'fixStates' => self::FIX_STATES,
             'ignoredCount' => count($ignoredRows),
             'items' => $items,
+            'groupedFindingCount' => ! $this->showIgnored && $this->view === 'package' ? count($listRows) : null,
             'imageOptions' => count($imageOptions) > 1 ? $imageOptions : [],
             'showsImage' => count($imageOptions) > 1,
             'isService' => $resource instanceof Service,

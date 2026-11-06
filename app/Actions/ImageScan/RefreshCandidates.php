@@ -27,6 +27,7 @@ use App\Services\ImageScan\SecurityRules;
 use App\Services\ImageScan\SyftPackageParser;
 use App\Services\ImageScan\TagSelector;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -98,6 +99,36 @@ class RefreshCandidates
     private ?string $error = null;
 
     private bool $retryWhenBusy = false;
+
+    /**
+     * Marks the check of the scan as queued, so the Security page says that Coolify is checking for newer versions
+     * instead of "Check needed" until the check ends.
+     */
+    public static function markQueued(ImageScan $scan, int $seconds): void
+    {
+        Cache::put(self::queuedCacheKey($scan), true, $seconds);
+    }
+
+    /**
+     * A queued or running RefreshCandidatesJob checks the scan for newer versions.
+     */
+    public static function isQueued(ImageScan $scan): bool
+    {
+        return Cache::has(self::queuedCacheKey($scan));
+    }
+
+    /**
+     * The check ended. Called before the page refresh, so the page shows the result.
+     */
+    public static function forgetQueued(ImageScan $scan): void
+    {
+        Cache::forget(self::queuedCacheKey($scan));
+    }
+
+    private static function queuedCacheKey(ImageScan $scan): string
+    {
+        return "image-scan:version-check-queued:{$scan->id}";
+    }
 
     /**
      * @param  int  $lockWaitSeconds  A deploy gate waits for the server lock; 0 tries once (background checks).
@@ -876,6 +907,7 @@ class RefreshCandidates
             report($e);
         }
 
+        self::forgetQueued($fresh);
         $teamId = method_exists($scan->resource, 'team') ? $scan->resource->team()?->id : null;
         ImageScanUpdated::dispatch($teamId, (string) $scan->resource->getAttribute('uuid'), (string) $fresh->uuid);
     }

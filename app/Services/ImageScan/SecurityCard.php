@@ -30,7 +30,7 @@ use InvalidArgumentException;
  * @phpstan-type ButtonData array{label: string, title: string, submit: string, actions: list<string>, warning: string}
  * @phpstan-type ActionData array{key: string, type: string, sentence: string, copy: ?string, button: ?ButtonData}
  * @phpstan-type WhyData array{title: string, display_id: string, link: ?string, score: string, cvss: ?string, cvssNote: ?string, severity: string, signal: ?string, exploited: bool, package: string, version: string}
- * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, badge: ?string, badgeType: string, open: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: int, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, digest: ?string, digestFull: ?string, known: string, findings: ?int, filter: ?string, override: ?array{service: string, from: string, to: string}}
+ * @phpstan-type ImageRow array{key: string, name: ?string, ref: string, status: string, checking: bool, badge: ?string, badgeType: string, open: bool, sentence: string, attackNote: ?string, advice: ?string, lines: list<string>, primary: ?ActionData, mergedWith: ?string, why: list<WhyData>, whyMore: int, provenance: ?string, others: list<ActionData>, moreActions: int, versionNotes: list<array{text: string, link: ?string}>, filter: ?string, override: ?array{service: string, from: string, to: string}}
  */
 final class SecurityCard
 {
@@ -55,21 +55,23 @@ final class SecurityCard
     /**
      * @param  Collection<int, Model>  $owners  The applications and databases of a service, else the resource.
      * @param  Collection<int, ImageScan>  $scans  The current scans of the owners, with their `resource` set.
-     * @param  array<string, int>  $findingCounts  The findings that are not ignored, by scan UUID.
      * @param  array<string, ResourceSecurity>  $imageStatuses  `SecurityStatus::forScan()` of the scans the caller computed, by scan UUID.
      * @param  (Closure(Model): RelevanceRules)|null  $rulesFor  The relevance rules of an owner, when the caller keeps them.
-     * @return array{status: string, badge: ?string, badgeType: string, header: ?string, total: int, single: bool, rows: list<ImageRow>}
+     * @return array{status: string, checking: bool, badge: ?string, badgeType: string, header: ?string, total: int, single: bool, rows: list<ImageRow>}
      */
-    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $rulesFor = null): array
+    public static function for(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $imageStatuses = [], ?Closure $rulesFor = null): array
     {
         $status = $security->status;
-        $rows = self::images($resource, $security, $owners, $scans, $user, $findingCounts, $imageStatuses, $rulesFor);
+        $rows = self::images($resource, $security, $owners, $scans, $user, $imageStatuses, $rulesFor);
         $total = count($rows);
         $needsUpdate = count(array_filter($rows, fn (array $row): bool => in_array($row['status'], ['update_now', 'update_available'], true)));
+        $waiting = array_filter($rows, fn (array $row): bool => $row['status'] === SecurityStatusType::CheckNeeded->value);
+        $checking = $status === SecurityStatusType::CheckNeeded && $waiting !== [] && ! in_array(false, array_column($waiting, 'checking'), true);
 
         return [
             'status' => $status->value,
-            'badge' => SecuritySentences::badge($status),
+            'checking' => $checking,
+            'badge' => $checking ? SecuritySentences::CHECKING_BADGE : SecuritySentences::badge($status),
             'badgeType' => self::badgeType($status),
             'header' => $total > 1 ? SecuritySentences::imagesNeedingUpdate($needsUpdate, $total) : null,
             'total' => $total,
@@ -87,12 +89,11 @@ final class SecurityCard
      *
      * @param  Collection<int, Model>  $owners
      * @param  Collection<int, ImageScan>  $scans
-     * @param  array<string, int>  $findingCounts
      * @param  array<string, ResourceSecurity>  $imageStatuses
      * @param  (Closure(Model): RelevanceRules)|null  $rulesFor
      * @return list<ImageRow>
      */
-    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $findingCounts = [], array $imageStatuses = [], ?Closure $rulesFor = null): array
+    public static function images(Model $resource, ResourceSecurity $security, Collection $owners, Collection $scans, User $user, array $imageStatuses = [], ?Closure $rulesFor = null): array
     {
         $rulesFor ??= fn (Model $owner): RelevanceRules => RelevanceRules::forResource($owner);
         $isService = $resource instanceof Service;
@@ -187,18 +188,20 @@ final class SecurityCard
             $open = $single || (! $opened && in_array($status->value, self::PROBLEM_STATUSES, true));
             $opened = $opened || $open;
             $others = array_slice($actions, 1);
-            $counts = $scan === null ? null : ($findingCounts[(string) $scan->uuid] ?? null);
-            $digestFull = $scan === null ? null : ($scan->repo_digest ?: $scan->image_id);
+            // The scan is done and only the queued version check is missing: say that it runs, not "Check needed".
+            $checking = $status === SecurityStatusType::CheckNeeded && $scan !== null
+                && $imageSecurity->checkReason === SecurityStatus::REASON_VERSIONS_UNCHECKED && RefreshCandidates::isQueued($scan);
 
             $rows[] = [
                 'key' => $entry['key'],
                 'name' => $name,
                 'ref' => $ref,
                 'status' => $status->value,
-                'badge' => SecuritySentences::badge($status),
+                'checking' => $checking,
+                'badge' => $checking ? SecuritySentences::CHECKING_BADGE : SecuritySentences::badge($status),
                 'badgeType' => self::badgeType($status),
                 'open' => $open,
-                'sentence' => SecuritySentences::imageSentence($imageSecurity, $ref, $scan),
+                'sentence' => $checking ? SecuritySentences::versionCheckRunning($ref, $scan) : SecuritySentences::imageSentence($imageSecurity, $ref, $scan),
                 'attackNote' => SecuritySentences::attackNote($imageSecurity),
                 'advice' => SecuritySentences::noFixAdvice($imageSecurity, $noun),
                 'lines' => [...SecuritySentences::lines($imageSecurity), ...self::eolLine($imageSecurity)],
@@ -214,10 +217,6 @@ final class SecurityCard
                 'others' => array_slice($others, 0, self::OTHER_ACTIONS_LIMIT),
                 'moreActions' => max(0, count($others) - self::OTHER_ACTIONS_LIMIT),
                 'versionNotes' => $scan === null ? [] : self::versionCheckNotes(collect([$scan]), $user),
-                'digest' => SecuritySentences::shortDigest($digestFull),
-                'digestFull' => $digestFull,
-                'known' => $counts === null ? '' : self::findingCount($counts),
-                'findings' => $counts,
                 'filter' => $single ? null : $ref,
                 'override' => $name !== null && isset($composeOverrides[$name]) ? ['service' => $name, ...$composeOverrides[$name]] : null,
             ];
@@ -233,14 +232,6 @@ final class SecurityCard
             SecurityStatusType::UpdateAvailable => 'warning',
             default => 'neutral',
         };
-    }
-
-    /**
-     * "1,362 findings": the findings of an image that are not ignored, for the row footer (the expert layer).
-     */
-    public static function findingCount(int $count): string
-    {
-        return number_format($count).' '.($count === 1 ? 'finding' : 'findings');
     }
 
     /**

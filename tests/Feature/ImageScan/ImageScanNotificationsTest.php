@@ -884,7 +884,7 @@ describe('digest', function () {
         $resource = notifySentDigest()->digest['resources'][0];
         expect($resource['status'])->toBe('check_needed')
             ->and($resource['badge'])->toBe('Check needed')
-            ->and($resource['action'])->toBe('Check again: Coolify could not check for newer versions.');
+            ->and($resource['action'])->toBe('Check again: Coolify has not checked for newer versions yet.');
     });
 
     it('reports a stale result once and the new problems after the next check', function () {

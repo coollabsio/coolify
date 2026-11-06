@@ -428,7 +428,7 @@ final class DeploymentImageScan
         try {
             $scan->setRelation('resource', $this->application);
             if ($scan->exists && RefreshCandidates::shouldRefresh($scan)) {
-                RefreshCandidatesJob::dispatch($scan);
+                RefreshCandidatesJob::queueCheck($scan);
             }
         } catch (Throwable $e) {
             report($e);

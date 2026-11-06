@@ -1,10 +1,10 @@
 {{-- The open content of one image of the Security main card (spec 15.11): the sentence, the primary action (one image
-     only; a list shows it in the row header), the attack note, the why-list "Fixed by this update", the provenance, the
-     other fixes, and the footer with the running image and its links. --}}
+     only; a list shows it in the row header), the attack note, the why-list "Fixed by this update", the provenance, and
+     the other fixes. --}}
 @php
     $muted = 'text-[11px] text-neutral-500 dark:text-fg-faint';
     $note = 'text-[13px] leading-5 text-neutral-600 dark:text-fg-dim';
-    $link = 'font-medium text-neutral-800 underline decoration-neutral-400/40 underline-offset-4 transition-colors hover:text-neutral-950 hover:decoration-current dark:text-fg dark:decoration-white/25 dark:hover:decoration-current';
+    $link = 'font-medium text-neutral-800 underline decoration-neutral-400/40 underline-offset-4 transition-colors hover:text-neutral-950 hover:decoration-current dark:text-fg dark:decoration-white/25 dark:hover:text-white dark:hover:decoration-current';
     $motion = 'transition-transform duration-[180ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none';
     $refLength = strlen($row['ref']);
     $startsWithRef = $refLength > 0 && str_starts_with($row['sentence'], $row['ref']);
@@ -12,7 +12,6 @@
     $filter = \Illuminate\Support\Js::from($row['filter'] ?? '');
     // Alpine expressions; the only value in them is the image ref, encoded by Js::from().
     $openFindings = new \Illuminate\Support\HtmlString(($row['filter'] !== null ? "\$wire.showImageFindings({$filter}); " : '')."\$dispatch('open-settings-section', { id: 'all-findings-section' })");
-    $openPackages = new \Illuminate\Support\HtmlString("\$dispatch('security-show-image-packages', { image: {$filter} }); \$dispatch('open-settings-section', { id: 'packages-section' })");
 @endphp
 
 <div class="flex flex-col gap-4">
@@ -26,16 +25,7 @@
         </p>
 
         @if ($single)
-            @if ($row['status'] === 'check_needed')
-                @if ($canUpdate)
-                    <div>
-                        <x-forms.button isHighlighted class="normal-case!" wire:click="scanNow" :disabled="$isScanning">
-                            <x-reicon name="refresh" class="size-3.5" />
-                            Scan now
-                        </x-forms.button>
-                    </div>
-                @endif
-            @elseif ($row['primary'] !== null)
+            @if ($row['status'] !== 'check_needed' && $row['primary'] !== null)
                 @include('livewire.image-scan.partials.security-action', ['action' => $row['primary'], 'primary' => true, 'withSentence' => false, 'keyPrefix' => $row['key']])
             @endif
         @endif
@@ -164,35 +154,5 @@
                 <p class="mt-2 {{ $muted }} text-[12px]!">and {{ number_format($row['moreActions']) }} more</p>
             @endif
         </details>
-    @endif
-
-    @if ($row['digestFull'] !== null)
-        <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-neutral-200 pt-3 text-[12px] text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim">
-            <span class="inline-flex min-w-0 max-w-full items-center gap-1.5">
-                <span>Running</span>
-                <code class="min-w-0 truncate font-mono text-neutral-800 dark:text-fg" title="{{ $row['ref'] }}">{{ $row['ref'] }}</code>
-                @if ($row['digest'] !== null)
-                    <code class="font-mono text-neutral-500 dark:text-fg-faint" title="{{ $row['digestFull'] }}">{{ $row['digest'] }}</code>
-                    <x-copy-button :value="$row['digestFull']" label="Copy the digest of the running image" />
-                @endif
-            </span>
-            @if ($row['known'] !== '')
-                <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span aria-hidden="true">·</span>
-                    <button type="button" class="{{ $link }}" x-on:click="{{ $openFindings }}">{{ $row['known'] }}</button>
-                </span>
-            @endif
-            <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span aria-hidden="true">·</span>
-                <button type="button" class="{{ $link }}" x-on:click="{{ $openPackages }}">Packages and SBOM</button>
-            </span>
-            @if ($hasSettings)
-                <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span aria-hidden="true">·</span>
-                    <button type="button" class="{{ $link }}"
-                        x-on:click="$dispatch('open-settings-section', { id: 'image-scan-settings-section' })">Settings</button>
-                </span>
-            @endif
-        </div>
     @endif
 </div>

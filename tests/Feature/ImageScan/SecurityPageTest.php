@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ImageScan\ScanImage;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Actions\Service\RestartService;
 use App\Enums\ApplicationDeploymentStatus;
@@ -257,7 +258,6 @@ describe('main card', function () {
                 'Fixed by this update',
                 'SQL injection in psql quoting',
                 'How Coolify knows:',
-                '3 findings',
                 'All findings (3)',
             ])
             ->assertDontSee('Top problems')
@@ -388,6 +388,16 @@ describe('main card', function () {
         securityPage($this->admin, $application, 'application')
             ->assertSee('Check needed')
             ->assertSeeText('nginx:1.27 needs another check: the last check was 3 days ago.')
+            ->assertSee('Scan now');
+    });
+
+    it('shows only the error, not Not scanned yet, when the first scan could not run', function () {
+        $database = securityPageDatabase();
+        Cache::put(ScanImage::lastErrorCacheKey($database), ['code' => 'out_of_memory', 'context' => [], 'at' => now()->toIso8601String()], 60);
+
+        securityPage($this->admin, $database, 'database')
+            ->assertSee('The last scan could not run')
+            ->assertDontSee('Not scanned yet')
             ->assertSee('Scan now');
     });
 
@@ -796,7 +806,7 @@ describe('image list', function () {
         return [$service->fresh(), $main, $runners, $postgres];
     }
 
-    it('shows one image open without a list frame: sentence, action, attack note, provenance, and running digest', function () {
+    it('shows one image open without a list frame: sentence, action, attack note, and provenance', function () {
         $database = securityPageDatabase();
         $database->forceFill(['image' => 'postgres:16-alpine'])->save();
         $ids = ['CVE-2026-0001', 'CVE-2026-0002'];
@@ -822,8 +832,7 @@ describe('image list', function () {
             ->assertSee('No known attacks on these problems.')
             ->assertSee('Docker Hub has a newer build of 16-alpine. Coolify scanned it 2 hours ago: it fixes these problems and adds none that attackers use.')
             ->assertSee('Pull latest and restart')
-            ->assertSee('3f1a2b4c5d6e')
-            ->assertSee('3 findings')
+            ->assertDontSee('3f1a2b4c5d6e')
             ->assertDontSee('known issues')
             ->assertDontSee('images need an update')
             ->assertDontSeeHtml('aria-label="Images"');
@@ -894,18 +903,6 @@ describe('image list', function () {
 
         expect($card['rows'][0]['provenance'])
             ->toBe('15.13 is the newest 15.x release on Docker Hub. Coolify scanned it 1 hour ago: it fixes these problems and adds none that attackers use. It has 3 other problems that attackers are not known to use.');
-    });
-
-    it('links the findings, packages, and Settings sections from the footer of every resource page', function () {
-        $application = securityPageApplication();
-        securityPageScan($application, 'nginx:1.27', [securityPageFinding('CVE-2026-0001')]);
-        $database = securityPageDatabase();
-        securityPageScan($database, 'postgres:15.0', [securityPageFinding('CVE-2025-1094')]);
-
-        securityPage($this->admin, $application, 'application')->assertSeeHtml("id: 'image-scan-settings-section'");
-        securityPage($this->admin, $database, 'database')
-            ->assertSeeInOrder(['Running', 'postgres:15.0', '1 finding', 'Packages and SBOM', 'Settings'])
-            ->assertSeeHtml("id: 'image-scan-settings-section'");
     });
 
     it('filters the findings to the image of a row', function () {

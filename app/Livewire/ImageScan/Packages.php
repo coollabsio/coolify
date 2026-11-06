@@ -12,7 +12,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -98,9 +97,8 @@ class Packages extends Component
     }
 
     /**
-     * The "Packages and SBOM" link of an image row on the Security card: the packages of that image only.
+     * The packages of one image only, or of all images for an empty image.
      */
-    #[On('security-show-image-packages')]
     public function showImage(string $image = ''): void
     {
         $this->images = $image === '' ? [] : [$image];

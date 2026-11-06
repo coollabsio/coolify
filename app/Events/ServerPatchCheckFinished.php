@@ -17,11 +17,6 @@ class ServerPatchCheckFinished implements ShouldBroadcast
         $this->teamId = $teamId;
     }
 
-    public function broadcastAs(): string
-    {
-        return 'ServerPatchCheckFinished';
-    }
-
     /**
      * @return array{serverUuid: string|null}
      */

@@ -218,7 +218,19 @@ describe('scan now', function () {
 
         Queue::assertPushed(ScanResourceImagesJob::class, 1);
         Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $job) => $job->resource->is($this->application)
-            && $job->imageRefs === ['nginx:1.27']);
+            && $job->imageRefs === ['nginx:1.27']
+            && $job->pullWhenMissing);
+    });
+
+    it('shows the scan as running right after the click, without the last error', function () {
+        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()]);
+        Cache::put(ScanImage::lastErrorCacheKey($this->application), ['code' => 'image_missing', 'context' => ['server' => 'localhost']]);
+
+        vulnerabilitiesPage($this->admin, $this->application)
+            ->assertSee('The last scan could not run')
+            ->call('scanNow')
+            ->assertSee('Get scanner')
+            ->assertDontSee('The last scan could not run');
     });
 
     it('asks for a deploy when no image of the app is known', function () {
@@ -725,7 +737,7 @@ describe('packages', function () {
 });
 
 describe('packages of one image', function () {
-    it('filters the packages of a service to one image, from the filter and from an image row', function () {
+    it('filters the packages of a service to one image', function () {
         $service = vulnerabilitiesService();
         foreach (['web' => ['nginx:1.27', 'openssl'], 'db' => ['postgres:16', 'libpq']] as $name => [$image, $package]) {
             $owner = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => $name, 'image' => $image]);
@@ -745,11 +757,11 @@ describe('packages of one image', function () {
             ->assertSet('images', ['postgres:16'])
             ->assertSee('libpq')
             ->assertDontSee('openssl')
-            ->dispatch('security-show-image-packages', image: 'nginx:1.27')
+            ->call('showImage', 'nginx:1.27')
             ->assertSet('images', ['nginx:1.27'])
             ->assertSee('openssl')
             ->assertDontSee('libpq')
-            ->dispatch('security-show-image-packages', image: '')
+            ->call('showImage', '')
             ->assertSet('images', [])
             ->call('showImage', 'not-an-image:1')
             ->assertSet('images', [])

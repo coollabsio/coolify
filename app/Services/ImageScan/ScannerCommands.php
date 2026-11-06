@@ -22,7 +22,7 @@ use InvalidArgumentException;
  *   captured (Syft, Grype, regctl) runs without `--rm`: after it stops, Docker's `State.OOMKilled` decides whether the
  *   memory limit stopped it (line `coolify-scan-oom {step}`, before the exit marker), and the container is removed in
  *   the same script. Only that line means "out of memory"; a 137 without it was a `timeout` kill. Steps: `pull-syft`,
- *   `pull-grype`, `pull-regctl` (prepare), `db-update`, `db-status`, `disk-db` and `disk-sboms` (diskUsage, size = bytes), `inspect`, `save` and `sbom`
+ *   `pull-grype`, `pull-regctl` (prepare), `pull` (pull), `db-update`, `db-status`, `disk-db` and `disk-sboms` (diskUsage, size = bytes), `inspect`, `save` and `sbom`
  *   (sbomFromLocal), `sbom` (sbomFromRegistry), `grype`, `packages`, `tags`, `digest`.
  * - A failed run does not stop the batch, and the container and the work directory are still removed.
  * - Methods with a payload print the line `coolify-scan-payload` after the markers, then at most 10485761
@@ -131,6 +131,21 @@ class ScannerCommands
     public function dbStatus(): array
     {
         return $this->capture('db-status', $this->dockerRun('grype', self::TIMEOUT_DB_STATUS, false, $this->grypeDatabaseEnv(), [$this->databaseMount()], ['db', 'status', '-o', 'json']));
+    }
+
+    /**
+     * Pulls an image that is not on the server yet, with the registry login of the server user.
+     *
+     * @return list<string>
+     */
+    public function pull(string $imageRef): array
+    {
+        $ref = escapeshellarg((string) ImageRef::parse($imageRef));
+
+        return [
+            $this->removeContainer(),
+            $this->step('pull', serverDockerConfigPrefix($this->server).'timeout -k 10 '.self::TIMEOUT_PULL." docker pull {$ref} >/dev/null 2>&1"),
+        ];
     }
 
     /**

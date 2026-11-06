@@ -3,6 +3,7 @@
 use App\Actions\Database\RestartDatabase;
 use App\Actions\ImageScan\UpdateResourceImage;
 use App\Actions\Service\RestartService;
+use App\Jobs\RefreshCandidatesJob;
 use App\Livewire\ImageScan\Vulnerabilities;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -769,9 +770,20 @@ describe('main card actions', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [], $status);
 
         updateImagePage($this->admin, $this->database, 'database')
-            ->assertSeeText('postgres:15.0-alpine needs another check: Coolify could not check for newer versions.')
+            ->assertSeeText('postgres:15.0-alpine needs another check: Coolify has not checked for newer versions yet.')
             ->assertDontSeeHtml('updateImage(');
     })->with(['failed']);
+
+    it('says that the version check runs while it is queued, not that a check is needed', function () {
+        $scan = updateImageScan($this->database, 'postgres:15.0-alpine', [], 'failed');
+        RefreshCandidatesJob::queueCheck($scan);
+
+        updateImagePage($this->admin, $this->database, 'database')
+            ->assertSeeText('Coolify is checking for newer versions of postgres:15.0-alpine.')
+            ->assertSee('Checking')
+            ->assertDontSee('Check needed')
+            ->assertDontSee('needs another check');
+    });
 
     it('shows the real status and why no version is offered when the registry needs a login', function () {
         updateImageScan($this->database, 'postgres:15.0-alpine', [], 'auth_required');

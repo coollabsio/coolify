@@ -107,6 +107,7 @@ function scanImageTestCommandKey(string $command): ?string
     return match (true) {
         str_contains($command, 'coolify-scan-exit db-status') => 'db-status',
         str_contains($command, 'coolify-scan-exit db-update') => 'db-update',
+        str_contains($command, 'coolify-scan-exit pull') => 'pull',
         str_contains($command, 'docker image inspect') => 'inspect',
         str_contains($command, 'df -P') => 'disk',
         str_contains($command, 'docker save') => 'sbom',
@@ -438,7 +439,8 @@ it('broadcasts the running and the final state to the resource team', function (
         && $event->resourceUuid === $this->application->uuid);
     Event::assertDispatchedTimes(ImageScanUpdated::class, 5);
     expect(Event::dispatched(ImageScanUpdated::class, fn (ImageScanUpdated $event) => $event->scanUuid === $scan->uuid))->toHaveCount(1);
-    expect((new ImageScanUpdated($this->team->id, 'r', 's'))->broadcastAs())->toBe('ImageScanUpdated');
+    // Echo listens for the class name (App\\Events\\ImageScanUpdated); a custom broadcastAs() name never reaches the page.
+    expect(ImageScanUpdated::class)->not->toHaveMethod('broadcastAs');
 });
 
 it('marks the summary as truncated when the output is over 10 MB', function () {
@@ -623,6 +625,54 @@ it('fails with image missing when the image is not on the server', function () {
 
     expect($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::ImageMissing);
+});
+
+describe('pull when missing', function () {
+    beforeEach(function () {
+        $this->application->forceFill(['build_pack' => 'dockerimage'])->save();
+    });
+
+    function scanImageTestMissingThenPresent(int &$inspectRuns): Closure
+    {
+        $present = "coolify-scan-exit inspect 0\ncoolify-scan-payload\nsha256:".SCAN_TEST_IMAGE_HEX.'|postgres@'.SCAN_TEST_REPO_DIGEST.'|linux/amd64|85000000';
+
+        return function () use (&$inspectRuns, $present) {
+            return ++$inspectRuns === 1 ? "coolify-scan-exit inspect 1\ncoolify-scan-payload\n" : $present;
+        };
+    }
+
+    it('pulls an image that is not on the server, then scans it', function () {
+        $inspectRuns = 0;
+        scanImageTestFake(['inspect' => scanImageTestMissingThenPresent($inspectRuns), 'pull' => 'coolify-scan-exit pull 0']);
+
+        $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', pullWhenMissing: true);
+
+        expect($scan->status)->toBe(ImageScanStatus::Completed)
+            ->and($scan->image_id)->toBe('sha256:'.SCAN_TEST_IMAGE_HEX);
+        Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), "docker pull 'postgres:15.0-alpine'"), 1);
+    });
+
+    it('fails with pull failed when the pull fails', function () {
+        scanImageTestFake(['inspect' => "coolify-scan-exit inspect 1\ncoolify-scan-payload\n", 'pull' => 'coolify-scan-exit pull 1']);
+
+        $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', pullWhenMissing: true);
+
+        expect($scan->status)->toBe(ImageScanStatus::Failed)
+            ->and($scan->error_code)->toBe(ImageScanErrorCode::PullFailed);
+    });
+
+    it('never pulls without the option or for an image that Coolify builds', function (string $buildPack, bool $pullWhenMissing) {
+        $this->application->forceFill(['build_pack' => $buildPack])->save();
+        scanImageTestFake(['inspect' => "coolify-scan-exit inspect 1\ncoolify-scan-payload\n", 'pull' => 'coolify-scan-exit pull 0']);
+
+        $scan = ScanImage::run($this->server, $this->application, 'postgres:15.0-alpine', pullWhenMissing: $pullWhenMissing);
+
+        expect($scan->error_code)->toBe(ImageScanErrorCode::ImageMissing);
+        Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'docker pull'));
+    })->with([
+        'background scan' => ['dockerimage', false],
+        'built by Coolify' => ['dockerfile', true],
+    ]);
 });
 
 it('updates the vulnerability database once when it is missing', function (?string $url) {

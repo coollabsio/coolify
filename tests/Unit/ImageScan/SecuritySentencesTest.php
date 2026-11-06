@@ -266,7 +266,7 @@ it('writes the check_needed headline with each reason', function () {
         ['images_unchecked', ['checked' => 1, 'total' => 3], '1 of 3 images were checked'],
         ['db_outdated', [], 'the vulnerability database is out of date'],
         ['image_changed', [], 'the running image is not the checked image'],
-        ['versions_unchecked', [], 'Coolify could not check for newer versions'],
+        ['versions_unchecked', [], 'Coolify has not checked for newer versions yet'],
     ];
 
     foreach ($cases as [$code, $context, $reason]) {

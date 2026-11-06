@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
+use App\Events\ImageScanUpdated;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageScan;
@@ -47,6 +48,9 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 
     public const START_RETRY_DELAY_SECONDS = 120;
 
+    /** Progress stage of a scan that "Scan now" queued and that has not started yet. */
+    public const QUEUED_STAGE = 'queued';
+
     public $tries = self::MAX_ATTEMPTS;
 
     /** An unexpected error fails the job; only a busy lock or a missing image retry it. */
@@ -61,8 +65,9 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
      * @param  list<string>  $imageRefs  Empty: the images of the resource (imageRefsFor()).
      * @param  bool  $retryWhenImageMissing  A job after a service or database start retries an image that is not pulled yet.
      * @param  ?string  $baseImageRef  The base image of the Dockerfile build of the application.
+     * @param  bool  $pullWhenMissing  "Scan now": pull an image that is not on the server.
      */
-    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [], public bool $retryWhenImageMissing = false, public ?string $baseImageRef = null)
+    public function __construct(public Model $resource, public ?int $deploymentQueueId = null, public array $imageRefs = [], public bool $retryWhenImageMissing = false, public ?string $baseImageRef = null, public bool $pullWhenMissing = false)
     {
         // Self-hosted Horizon works through 'high' first, so scans there would delay deployments.
         $this->onQueue(isCloud() ? maintenance_queue() : 'default');
@@ -86,11 +91,31 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Shows a scan that "Scan now" queued as running at once: marks each scanned owner as queued and hides its last
+     * error. The scan replaces the mark with its progress; the job removes marks that are left when it ends.
+     *
+     * @param  list<string>  $imageRefs
+     */
+    public static function markQueued(Model $resource, array $imageRefs = []): void
+    {
+        foreach (self::markedOwners($resource, $imageRefs) as $owner) {
+            Cache::put(ScanImage::progressCacheKey($owner), [
+                'run_id' => self::QUEUED_STAGE,
+                'stage' => self::QUEUED_STAGE,
+                'started_at' => now()->toIso8601String(),
+            ], ScanImage::LOCK_TTL);
+            Cache::forget(ScanImage::lastErrorCacheKey($owner));
+        }
+    }
+
     public function handle(): void
     {
         $deployment = $this->deployment();
         $server = $this->server($deployment);
         if (! $server instanceof Server) {
+            $this->clearQueuedMarks();
+
             return;
         }
 
@@ -105,7 +130,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
 
             $baseImageRef = $resource === $this->resource && $resource instanceof Application ? $this->baseImageRef : null;
             // Never sleeps on the server lock: a deploy gate may need it. A busy lock retries the job later.
-            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, 0, $baseImageRef, retryWhenBusy: ! $lastAttempt);
+            $scan = ScanImage::run($server, $resource, $imageRef, $deployment, 0, $baseImageRef, retryWhenBusy: ! $lastAttempt, pullWhenMissing: $this->pullWhenMissing);
 
             if (! $lastAttempt && ScanImage::lockWasBusy($scan)) {
                 $this->rememberDoneTargets($done);
@@ -126,6 +151,47 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
         if ($missing !== []) {
             $this->rememberDoneTargets($done);
             $this->release(self::START_RETRY_DELAY_SECONDS);
+
+            return;
+        }
+
+        $this->clearQueuedMarks();
+    }
+
+    public function failed(?Throwable $exception = null): void
+    {
+        $this->clearQueuedMarks();
+    }
+
+    /**
+     * The owners that markQueued() marks: the application, or the scanned applications and databases of a service.
+     *
+     * @param  list<string>  $imageRefs
+     * @return list<Model>
+     */
+    private static function markedOwners(Model $resource, array $imageRefs): array
+    {
+        if ($resource instanceof Application) {
+            return $imageRefs === [] ? [] : [$resource];
+        }
+
+        return array_map(fn (array $target): Model => $target[0], ResourceScans::scanTargets($resource));
+    }
+
+    /**
+     * Removes the queued marks that no scan replaced (for example a scan that could not start), and tells open pages.
+     */
+    private function clearQueuedMarks(): void
+    {
+        foreach (self::markedOwners($this->resource, $this->imageRefs) as $owner) {
+            $key = ScanImage::progressCacheKey($owner);
+            if (data_get(Cache::get($key), 'stage') !== self::QUEUED_STAGE) {
+                continue;
+            }
+
+            Cache::forget($key);
+            $teamId = method_exists($owner, 'team') ? $owner->team()?->id : null;
+            ImageScanUpdated::dispatch($teamId, (string) $owner->getAttribute('uuid'), self::QUEUED_STAGE, true);
         }
     }
 

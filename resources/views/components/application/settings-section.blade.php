@@ -18,13 +18,16 @@
     <header @if ($collapsible) :class="open || 'is-collapsed'" @endif>
         <div @class(['min-w-0 py-0.5', 'flex flex-wrap items-center gap-2' => isset($badges)])>
             @if ($collapsible)
-                <h3>
+                <h3 @class(['flex items-center gap-1.5' => filled($description ?? $helper)])>
                     <button type="button" class="settings-section-toggle" x-on:click="open = ! open"
                         x-bind:aria-expanded="open ? 'true' : 'false'" aria-controls="{{ $bodyId }}">
                         <x-reicon name="chevron-down" class="size-3.5 shrink-0 transition-transform duration-150"
                             ::class="open ? 'rotate-0' : '-rotate-90'" />
                         <span>{{ $title }}</span>
                     </button>
+                    @if (filled($description ?? $helper))
+                        <x-helper :helper="$description ?? $helper" :label="'More information about '.$title" />
+                    @endif
                 </h3>
             @elseif (filled($description ?? $helper))
                 <h3>

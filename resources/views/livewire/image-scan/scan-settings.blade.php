@@ -17,12 +17,9 @@
 
 <div class="flex flex-col gap-6">
     @if ($ignoresOnly)
-        <x-application.settings-section id="image-scan-settings-section" title="Settings" collapsible>
-            <x-application.settings-subsection title="Ignored findings" :helper="$ignoresHelper" first>
-                <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.08]">
-                    @include('livewire.image-scan.partials.scan-ignores')
-                </div>
-            </x-application.settings-subsection>
+        <x-application.settings-section id="image-scan-ignores-section" title="Ignored findings" :helper="$ignoresHelper"
+            collapsible flush>
+            @include('livewire.image-scan.partials.scan-ignores')
         </x-application.settings-section>
     @elseif ($isApplication)
         <x-application.settings-section id="image-scan-settings-section" title="Settings" collapsible :open="! $appScanOn">

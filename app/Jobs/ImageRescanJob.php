@@ -314,7 +314,7 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
                     $uniqueLock->release($job);
                 }
                 if ($busy) {
-                    RefreshCandidatesJob::dispatch($scan);
+                    RefreshCandidatesJob::queueCheck($scan);
                 }
             } catch (Throwable $e) {
                 report($e);

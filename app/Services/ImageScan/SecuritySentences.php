@@ -22,6 +22,9 @@ final class SecuritySentences
         'quay.io' => 'Quay',
     ];
 
+    /** The badge while the queued version check of a scanned image runs. */
+    public const CHECKING_BADGE = 'Checking';
+
     private const CHECK_REASONS = [
         SecurityStatus::REASON_IMAGES_UNCHECKED,
         SecurityStatus::REASON_TRUNCATED,
@@ -88,7 +91,7 @@ final class SecuritySentences
             SecurityStatus::REASON_STALE => 'the last check was '.self::ago($context['time'] ?? null),
             SecurityStatus::REASON_DB_OUTDATED => 'the vulnerability database is out of date',
             SecurityStatus::REASON_IMAGE_CHANGED => 'the running image is not the checked image',
-            SecurityStatus::REASON_VERSIONS_UNCHECKED => 'Coolify could not check for newer versions',
+            SecurityStatus::REASON_VERSIONS_UNCHECKED => 'Coolify has not checked for newer versions yet',
             'instance' => 'Image scanning is off for this Coolify instance.',
             'server' => 'Image scanning is off for this server.',
             'application' => 'Image scanning is off for this app.',
@@ -156,6 +159,16 @@ final class SecuritySentences
                 ? "{$subject} has not been checked yet."
                 : self::checkReason((string) $security->checkReason, $security->checkContext),
         };
+    }
+
+    /**
+     * The sentence of an image row while its queued version check runs.
+     */
+    public static function versionCheckRunning(string $imageRef, ?ImageScan $scan = null): string
+    {
+        $subject = self::builtByCoolify($scan) ? 'this app' : $imageRef;
+
+        return "Coolify is checking for newer versions of {$subject}.";
     }
 
     /**

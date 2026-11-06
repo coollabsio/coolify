@@ -35,6 +35,7 @@ function scannerCommandLists(ScannerCommands $commands): array
         'dbUpdate with url' => $commands->dbUpdate('https://mirror.example.com/grype/databases'),
         'dbStatus' => $commands->dbStatus(),
         'inspect' => $commands->inspect('localhost:5000/team/app:1.2'),
+        'pull' => $commands->pull('localhost:5000/team/app:1.2'),
         'diskFree' => $commands->diskFree(),
         'diskUsage' => $commands->diskUsage(),
         'sbomFromLocal' => $commands->sbomFromLocal('nginx', SCANNER_TEST_HEX),
@@ -371,7 +372,7 @@ it('keeps every command list working for a non-root SSH user', function () {
                 continue;
             }
             if (str_starts_with($original, 'if ')) {
-                expect($line)->toMatch('/^if sudo (timeout -k 10 \d+ docker|docker image inspect) /', $name)
+                expect($line)->toMatch('/^if sudo (DOCKER_CONTEXT=default DOCKER_CONFIG="\$\(.+\)" )?(timeout -k 10 \d+ docker|docker image inspect) /', $name)
                     ->toContain("; then echo 'coolify-scan-exit ")
                     ->toEndWith('$?"; fi', $name);
 
@@ -390,6 +391,12 @@ it('keeps every command list working for a non-root SSH user', function () {
             }
         }
     }
+});
+
+it('pulls with the registry login of the non-root SSH user', function () {
+    $parsed = parseCommandsByLineForSudo(collect($this->commands->pull('ghcr.io/a/b:1')), $this->server);
+
+    expect($parsed[1])->toBe('if sudo DOCKER_CONTEXT=default DOCKER_CONFIG="$(sudo find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" timeout -k 10 600 docker pull \'ghcr.io/a/b:1\' >/dev/null 2>&1; then echo \'coolify-scan-exit pull 0\'; else echo "coolify-scan-exit pull $?"; fi');
 });
 
 it('keeps the docker root lookup inside the disk check for a non-root SSH user', function () {

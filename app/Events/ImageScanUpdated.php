@@ -20,11 +20,6 @@ class ImageScanUpdated implements ShouldBroadcast
         $this->teamId = $teamId;
     }
 
-    public function broadcastAs(): string
-    {
-        return 'ImageScanUpdated';
-    }
-
     /**
      * @return array{resourceUuid: string, scanUuid: string, final: bool}
      */
