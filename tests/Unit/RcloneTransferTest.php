@@ -30,7 +30,7 @@ function rcloneTransferTestServer(string $user = 'root'): Server
 function rcloneTransferTestStorage(): S3Storage
 {
     $storage = new S3Storage;
-    $storage->forceFill(['type' => 'sftp', 'endpoint' => 'sftp://1.1.1.1/backups', 'key' => 'backup', 'secret' => 'password']);
+    $storage->forceFill(['type' => 'sftp', 'endpoint' => 'sftp://1.1.1.1/backups', 'key' => 'backup', 'secret' => 'password', 'sftp_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILhw/KsYTF9TQOwQX1EAM3gI5oxDS9Daz5nNuCixSRXT']);
 
     return $storage;
 }

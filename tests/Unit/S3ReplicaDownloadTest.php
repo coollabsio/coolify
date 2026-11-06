@@ -153,7 +153,7 @@ it('streams an SFTP replica to the response without a temporary copy, at most th
         public function disconnect(): void {}
     });
     $storage = new S3Storage;
-    $storage->forceFill(['type' => 'sftp', 'endpoint' => 'sftp://1.1.1.1/backups', 'key' => 'backup', 'secret' => 'password']);
+    $storage->forceFill(['type' => 'sftp', 'endpoint' => 'sftp://1.1.1.1/backups', 'key' => 'backup', 'secret' => 'password', 'sftp_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILhw/KsYTF9TQOwQX1EAM3gI5oxDS9Daz5nNuCixSRXT']);
 
     $response = replicaDownloadTestExecution([$storage])->s3Download(1, 1);
 

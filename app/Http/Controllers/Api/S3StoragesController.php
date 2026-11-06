@@ -107,7 +107,7 @@ class S3StoragesController extends Controller
     private function validateStorageConnection(S3Storage $storage): array
     {
         try {
-            $storage->testConnection(shouldSave: true);
+            $storage->testConnection(shouldSave: true, acceptNewHostKey: true);
 
             return ['valid' => true, 'error' => null];
         } catch (\Throwable $e) {

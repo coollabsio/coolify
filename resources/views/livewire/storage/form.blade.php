@@ -87,8 +87,8 @@
                 @if ($storage->type === App\Enums\BackupStorageType::Sftp)
                     <div class="flex items-end gap-2 lg:col-span-2">
                         <x-forms.input label="Host key fingerprint" disabled
-                            :value="$storage->sftpHostKeyFingerprint() ?? 'Not saved yet. The next connection test saves it.'"
-                            helper="Coolify saves the host key of the server on the first successful connection, and refuses the server when the key changes. Reset it only when you know why the key changed." />
+                            :value="$storage->sftpHostKeyFingerprint() ?? 'Not saved yet. Validate the connection to save it.'"
+                            helper="Coolify saves the host key of the server when you validate the connection, and refuses the server when the key changes. Backups do not save a new key. Reset it only when you know why the key changed." />
                         @can('update', $storage)
                             @if ($storage->sftp_host_key)
                                 <x-forms.button type="button" wire:click="resetHostKey">Reset host key</x-forms.button>

@@ -612,10 +612,9 @@ class ImportForm extends Component
                 return;
             }
 
-            // Test connection
-            $s3Storage->testConnection();
-
+            // Before testConnection(), which saves the host key of an SFTP storage in memory only.
             $disk = $s3Storage->filesystem();
+            $s3Storage->testConnection();
 
             // Check if file exists
             if (! $disk->exists($cleanPath)) {

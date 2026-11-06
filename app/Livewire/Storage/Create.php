@@ -145,7 +145,7 @@ class Create extends Component
                 $this->storage->endpoint = $this->endpoint;
             }
             $this->storage->team_id = currentTeam()->id;
-            $this->storage->testConnection();
+            $this->storage->testConnection(acceptNewHostKey: true);
             $this->storage->save();
 
             return redirectRoute($this, 'storage.show', [$this->storage->uuid]);

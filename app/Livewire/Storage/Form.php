@@ -230,7 +230,7 @@ class Form extends Component
             $testedStorage->private_key_id = $testedStorage->type === BackupStorageType::Sftp ? $this->selectedPrivateKeyId() : null;
             $testedStorage->secret = $testedStorage->private_key_id ? '' : $this->secretToUse();
 
-            $testedStorage->testConnection();
+            $testedStorage->testConnection(acceptNewHostKey: true);
             $switchedToVirtualHostedStyle = $this->usePathStyleEndpoint && ! $testedStorage->usesPathStyleEndpoint();
             $this->usePathStyleEndpoint = $testedStorage->usesPathStyleEndpoint();
 
@@ -277,7 +277,7 @@ class Form extends Component
                 $this->storage->save();
 
                 // Test connection with new values - if this fails, transaction will rollback
-                $this->storage->testConnection(shouldSave: false);
+                $this->storage->testConnection(shouldSave: false, acceptNewHostKey: true);
 
                 // If we get here, the connection test succeeded
                 $this->storage->is_usable = true;
@@ -303,14 +303,16 @@ class Form extends Component
     }
 
     /**
-     * Removes the saved SFTP host key, for a server whose key changed on purpose. The next connection test saves the
-     * key that the server presents then.
+     * Removes the saved SFTP host key, for a server whose key changed on purpose. The next connection test that an admin
+     * starts (Validate) saves the key that the server presents then; backups do not.
      */
     public function resetHostKey(): void
     {
         $this->authorize('update', $this->storage);
 
-        $this->storage->forceFill(['sftp_host_key' => null])->save();
+        $this->storage->forceFill(['sftp_host_key' => null, 'is_usable' => false])->save();
+        $this->isUsable = false;
+        $this->dispatch('storage-status-changed', isUsable: false);
         $this->dispatch('success', 'Host key removed.', 'Validate the connection to save the current host key of the server.');
     }
 

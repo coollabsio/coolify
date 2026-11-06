@@ -1,11 +1,13 @@
 <?php
 
 use App\Enums\BackupStorageType;
+use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Livewire\Storage\Form;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use League\Flysystem\PhpseclibV3\ConnectionProvider;
 use League\Flysystem\PhpseclibV3\SftpConnectionProvider;
@@ -80,7 +82,7 @@ it('saves the host key on the first successful connection', function () {
     fakeSftpServer('ssh-ed25519 '.explode(' ', SFTP_TEST_HOST_KEY)[1], parameters: $parameters);
     $storage = sftpHostKeyStorage($this->team);
 
-    $storage->testConnection(shouldSave: true);
+    $storage->testConnection(shouldSave: true, acceptNewHostKey: true);
 
     expect($storage->fresh()->sftp_host_key)->toBe(SFTP_TEST_HOST_KEY)
         ->and($storage->sftpHostKeyFingerprint())->toBe(SFTP_TEST_HOST_KEY_FINGERPRINT)
@@ -92,7 +94,7 @@ it('saves the key type of an RSA host key, not the signature algorithm', functio
     fakeSftpServer('rsa-sha2-512 '.$blob);
     $storage = sftpHostKeyStorage($this->team);
 
-    $storage->testConnection(shouldSave: true);
+    $storage->testConnection(shouldSave: true, acceptNewHostKey: true);
 
     expect($storage->fresh()->sftp_host_key)->toBe('ssh-rsa '.$blob);
 });
@@ -123,9 +125,58 @@ it('pins the saved host key in the rclone config', function () {
     $storage = sftpHostKeyStorage($this->team, ['sftp_host_key' => SFTP_TEST_HOST_KEY]);
 
     expect($storage->rcloneConfig())->toContain("\nhost_keys = ".SFTP_TEST_HOST_KEY."\n");
+});
 
-    $storage->forceFill(['sftp_host_key' => null]);
-    expect($storage->rcloneConfig())->not->toContain('host_keys');
+it('refuses to connect to an SFTP storage without a saved host key', function () {
+    fakeSftpServer(SFTP_TEST_HOST_KEY, parameters: $parameters);
+    $storage = sftpHostKeyStorage($this->team);
+
+    expect(fn () => $storage->filesystem()->files())->toThrow(RuntimeException::class, S3Storage::SFTP_HOST_KEY_MISSING_MESSAGE)
+        ->and(fn () => $storage->rcloneConfig())->toThrow(RuntimeException::class, S3Storage::SFTP_HOST_KEY_MISSING_MESSAGE)
+        ->and($parameters)->toBeNull()
+        ->and($storage->fresh()->sftp_host_key)->toBeNull();
+});
+
+it('does not need a host key for other storage types', function (BackupStorageType $type, string $endpoint) {
+    $storage = sftpHostKeyStorage($this->team, ['type' => $type, 'endpoint' => $endpoint]);
+
+    expect($storage->rcloneConfig())->toStartWith('[storage]')
+        ->and($storage->filesystem())->toBeInstanceOf(FilesystemAdapter::class);
+})->with([
+    'ftps' => [BackupStorageType::Ftps, 'ftps://1.1.1.1/backups'],
+    'webdav' => [BackupStorageType::Webdav, 'https://1.1.1.1/backups'],
+]);
+
+it('does not save a host key on an endpoint that changed during the connection test', function () {
+    fakeSftpServer(SFTP_TEST_HOST_KEY);
+    $storage = sftpHostKeyStorage($this->team);
+    S3Storage::query()->whereKey($storage->id)->update(['endpoint' => 'sftp://1.0.0.1:2222/backups']);
+
+    expect(fn () => $storage->testConnection(shouldSave: true, acceptNewHostKey: true))->toThrow(RuntimeException::class);
+
+    $storage = $storage->fresh();
+    expect($storage->sftp_host_key)->toBeNull()
+        ->and($storage->endpoint)->toBe('sftp://1.0.0.1:2222/backups')
+        ->and($storage->is_usable)->toBeFalse();
+});
+
+it('does not replace a host key that was saved during the connection test', function () {
+    fakeSftpServer(SFTP_TEST_HOST_KEY);
+    $storage = sftpHostKeyStorage($this->team);
+    $otherKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l1GbjE';
+    S3Storage::query()->whereKey($storage->id)->update(['sftp_host_key' => $otherKey]);
+
+    expect(fn () => $storage->testConnection(shouldSave: true, acceptNewHostKey: true))->toThrow(RuntimeException::class);
+
+    expect($storage->fresh()->sftp_host_key)->toBe($otherKey);
+});
+
+it('asks for a new connection test when the host key is removed', function () {
+    $storage = sftpHostKeyStorage($this->team, ['sftp_host_key' => SFTP_TEST_HOST_KEY]);
+
+    $storage->update(['endpoint' => 'sftp://1.0.0.1:2222/backups']);
+
+    expect($storage->fresh()->is_usable)->toBeFalse();
 });
 
 it('removes the saved host key when the server host or port changes', function (string $endpoint, bool $keeps) {
@@ -156,10 +207,46 @@ it('lets an admin reset the host key, and the next connection test saves it agai
     session(['currentTeam' => $this->team]);
 
     $component = Livewire::test(Form::class, ['storage' => $storage])->call('resetHostKey');
-    expect($storage->fresh()->sftp_host_key)->toBeNull();
+    expect($storage->fresh()->sftp_host_key)->toBeNull()
+        ->and($storage->fresh()->is_usable)->toBeFalse();
 
     $component->call('testConnection')->assertDispatched('success');
     expect($storage->fresh()->sftp_host_key)->toBe(SFTP_TEST_HOST_KEY);
+});
+
+it('does not save a new host key from a background connection test', function () {
+    fakeSftpServer(SFTP_TEST_HOST_KEY, parameters: $parameters);
+    $storage = sftpHostKeyStorage($this->team);
+
+    expect(fn () => $storage->testConnection(shouldSave: true))
+        ->toThrow(RuntimeException::class, S3Storage::SFTP_HOST_KEY_MISSING_MESSAGE);
+
+    $storage->refresh();
+    expect($parameters)->toBeNull()
+        ->and($storage->sftp_host_key)->toBeNull()
+        ->and($storage->is_usable)->toBeFalse();
+});
+
+it('does not save the host key of an unusable storage when the revalidation job runs', function () {
+    fakeSftpServer(SFTP_TEST_HOST_KEY, parameters: $parameters);
+    $storage = sftpHostKeyStorage($this->team, ['is_usable' => false]);
+
+    (new RevalidateUnusableS3StoragesJob)->handle();
+
+    $storage->refresh();
+    expect($parameters)->toBeNull()
+        ->and($storage->sftp_host_key)->toBeNull()
+        ->and($storage->is_usable)->toBeFalse();
+});
+
+it('still checks a saved host key in a background connection test', function () {
+    fakeSftpServer(SFTP_TEST_HOST_KEY, parameters: $parameters);
+    $storage = sftpHostKeyStorage($this->team, ['sftp_host_key' => SFTP_TEST_HOST_KEY, 'is_usable' => false]);
+
+    $storage->testConnection(shouldSave: true);
+
+    expect($storage->fresh()->is_usable)->toBeTrue()
+        ->and($parameters['hostFingerprint'])->toBe(SFTP_TEST_HOST_KEY_FINGERPRINT);
 });
 
 it('does not let a member reset the host key', function () {

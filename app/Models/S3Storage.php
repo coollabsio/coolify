@@ -81,6 +81,8 @@ class S3Storage extends BaseModel
      */
     public const RCLONE_REMOTE = 'storage';
 
+    public const SFTP_HOST_KEY_MISSING_MESSAGE = 'The SFTP host key of this storage is not saved yet. Validate the connection in the storage settings to save it.';
+
     /**
      * The key of the rclone password obscuring (fs/config/obscure in rclone). It only hides the password from a casual
      * look at the config file; it is not encryption.
@@ -364,7 +366,7 @@ class S3Storage extends BaseModel
         $host = trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]');
         $options = match ($this->storageType()) {
             // host_keys makes rclone refuse another host key, and offer only the algorithm of the saved key.
-            BackupStorageType::Sftp => ['type' => 'sftp', 'host' => $host, 'port' => $this->endpointPort(), 'shell_type' => 'none', ...($this->sftp_host_key ? ['host_keys' => $this->sftp_host_key] : [])],
+            BackupStorageType::Sftp => ['type' => 'sftp', 'host' => $host, 'port' => $this->endpointPort(), 'shell_type' => 'none', 'host_keys' => $this->requireSftpHostKey()],
             BackupStorageType::Ftps => ['type' => 'ftp', 'host' => $host, 'port' => $this->endpointPort(), 'explicit_tls' => 'true'],
             BackupStorageType::Webdav => ['type' => 'webdav', 'url' => $this->endpoint, 'vendor' => 'other'],
             BackupStorageType::S3 => throw new \LogicException('S3 storages use the MinIO client.'),
@@ -471,9 +473,12 @@ class S3Storage extends BaseModel
                 $previous = $attributes['endpoint'] ?? null;
                 $server = fn (?string $endpoint): array => [strtolower(trim((string) parse_url((string) $endpoint, PHP_URL_HOST), '[]')), parse_url((string) $endpoint, PHP_URL_PORT)];
 
-                return $previous !== null && $server($previous) !== $server($value)
-                    ? ['endpoint' => $value, 'sftp_host_key' => null]
-                    : ['endpoint' => $value];
+                if ($previous === null || $server($previous) === $server($value)) {
+                    return ['endpoint' => $value];
+                }
+
+                // Without the host key, the storage needs a new connection test before Coolify uses it.
+                return ['endpoint' => $value, 'sftp_host_key' => null, ...(($attributes['sftp_host_key'] ?? null) !== null ? ['is_usable' => false] : [])];
             },
         );
     }
@@ -506,7 +511,12 @@ class S3Storage extends BaseModel
         );
     }
 
-    public function testConnection(bool $shouldSave = false)
+    /**
+     * @param  bool  $acceptNewHostKey  Only when an admin validates the storage: an SFTP storage without a saved host
+     *                                  key then saves the presented key. Background tests refuse such a storage, so a
+     *                                  reset or changed key is never trusted without the admin.
+     */
+    public function testConnection(bool $shouldSave = false, bool $acceptNewHostKey = false)
     {
         try {
             if ($this->isS3()) {
@@ -538,11 +548,15 @@ class S3Storage extends BaseModel
                     throw new \RuntimeException('Storage settings are not allowed: '.$validator->errors()->first());
                 }
 
-                $disk = $this->filesystem();
+                if ($this->storageType() === BackupStorageType::Sftp && ! $acceptNewHostKey) {
+                    $this->requireSftpHostKey();
+                }
+
+                $disk = $this->storageType() === BackupStorageType::Sftp ? $this->sftpFilesystem() : $this->filesystem();
                 $disk->files();
                 $adapter = $disk->getAdapter();
                 if ($adapter instanceof SftpFilesystemAdapter && $this->sftp_host_key === null) {
-                    $this->sftp_host_key = $adapter->presentedHostKey();
+                    $this->pinSftpHostKey((string) $adapter->presentedHostKey(), $shouldSave);
                 }
             }
 
@@ -584,22 +598,17 @@ class S3Storage extends BaseModel
     /**
      * The files of the storage, as Coolify reads them (connection tests, restores, downloads, retention). SFTP and FTPS
      * connect to the validated IP of the host, and WebDAV pins it, so a DNS change cannot send them to another address.
-     * SFTP also checks the saved host key.
+     * SFTP also checks the saved host key, and refuses to connect before testConnection() saved it.
      */
     public function filesystem(): FilesystemAdapter
     {
+        if ($this->storageType() === BackupStorageType::Sftp) {
+            $this->requireSftpHostKey();
+        }
+
         return match ($this->storageType()) {
             BackupStorageType::S3 => $this->s3Filesystem(),
-            BackupStorageType::Sftp => $this->adapterFilesystem(new SftpFilesystemAdapter(PinnedSftpConnectionProvider::create(
-                host: trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]'),
-                address: $this->pinnedHost(),
-                port: $this->endpointPort(),
-                username: (string) $this->key,
-                password: $this->sftpPrivateKey() ? null : (string) $this->secret,
-                privateKey: $this->sftpPrivateKey()?->private_key,
-                pinnedHostKey: $this->sftp_host_key,
-                timeout: self::CONNECTION_TIMEOUT_SECONDS,
-            ), $this->basePath())),
+            BackupStorageType::Sftp => $this->sftpFilesystem(),
             BackupStorageType::Ftps => $this->adapterFilesystem(new FtpsFilesystemAdapter(
                 host: trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]'),
                 port: $this->endpointPort(),
@@ -610,6 +619,58 @@ class S3Storage extends BaseModel
             )),
             BackupStorageType::Webdav => $this->webdavFilesystem(),
         };
+    }
+
+    /**
+     * Without a saved host key, it accepts any key. Only testConnection() uses it so, to save the presented key.
+     */
+    private function sftpFilesystem(): FilesystemAdapter
+    {
+        return $this->adapterFilesystem(new SftpFilesystemAdapter(PinnedSftpConnectionProvider::create(
+            host: trim((string) parse_url((string) $this->endpoint, PHP_URL_HOST), '[]'),
+            address: $this->pinnedHost(),
+            port: $this->endpointPort(),
+            username: (string) $this->key,
+            password: $this->sftpPrivateKey() ? null : (string) $this->secret,
+            privateKey: $this->sftpPrivateKey()?->private_key,
+            pinnedHostKey: $this->sftp_host_key,
+            timeout: self::CONNECTION_TIMEOUT_SECONDS,
+        ), $this->basePath()));
+    }
+
+    private function requireSftpHostKey(): string
+    {
+        if (blank($this->sftp_host_key)) {
+            throw new \RuntimeException(self::SFTP_HOST_KEY_MISSING_MESSAGE);
+        }
+
+        return $this->sftp_host_key;
+    }
+
+    /**
+     * Saves the host key of the first connection only while the saved storage still has the tested endpoint and no
+     * key, so a test that started before an endpoint change cannot save the key of the old server.
+     */
+    private function pinSftpHostKey(string $hostKey, bool $shouldSave): void
+    {
+        if ($hostKey === '') {
+            throw new \RuntimeException('The SFTP server did not present a host key.');
+        }
+        if ($shouldSave && $this->exists) {
+            $saved = static::query()->whereKey($this->getKey())
+                ->where('endpoint', $this->getAttributes()['endpoint'] ?? null)
+                ->whereNull('sftp_host_key')
+                ->update(['sftp_host_key' => $hostKey]);
+            if ($saved === 0) {
+                throw new \RuntimeException('The storage settings changed during the connection test. Validate the connection again.');
+            }
+            $this->sftp_host_key = $hostKey;
+            $this->syncOriginalAttribute('sftp_host_key');
+
+            return;
+        }
+
+        $this->sftp_host_key = $hostKey;
     }
 
     private function pinnedHost(): string

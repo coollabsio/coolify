@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\BackupStorageType;
 use App\Livewire\Project\Database\ImportForm;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
@@ -11,6 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use League\Flysystem\PhpseclibV3\SftpConnectionProvider;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -101,4 +104,33 @@ it('does nothing when an admin checks an empty server path', function () {
         ->call('checkFile')
         ->assertNotDispatched('error')
         ->assertSet('filename', null);
+});
+
+it('does not check a file on an SFTP storage without a saved host key', function () {
+    $storage = S3Storage::create([
+        'team_id' => $this->team->id,
+        'type' => BackupStorageType::Sftp,
+        'name' => 'SFTP backups',
+        'region' => 'us-east-1',
+        'key' => 'backup',
+        'secret' => 'password',
+        'endpoint' => 'sftp://1.1.1.1:2222/backups',
+        'is_usable' => true,
+    ]);
+    $connected = false;
+    app()->bind(SftpConnectionProvider::class, function () use (&$connected) {
+        $connected = true;
+
+        throw new RuntimeException('Connected.');
+    });
+
+    importFormFileCheckAs($this->team, 'owner')
+        ->set('s3StorageId', $storage->id)
+        ->set('s3Path', 'backups/db.dmp')
+        ->call('checkS3File')
+        ->assertDispatched('error')
+        ->assertSet('s3FileSize', null);
+
+    expect($connected)->toBeFalse()
+        ->and($storage->fresh()->sftp_host_key)->toBeNull();
 });
