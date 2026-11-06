@@ -283,10 +283,8 @@
                             </span>
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>
-                                <x-status-badge :status="$databaseBackup->save_s3 ? match ($databaseS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $databaseS3s->count().' storages' } : 'Not set'"
-                                    :type="$databaseBackup->save_s3 ? ($databaseS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
-                                    :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
+                            <span class="min-w-0">
+                                <x-backup-s3-storage :enabled="$databaseBackup->save_s3" :names="$databaseS3s->pluck('name')" :tooltip="$databaseS3Tooltip" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
                             <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
@@ -341,10 +339,8 @@
                             </span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>
-                                <x-status-badge :status="$backup->save_s3 ? match ($volumeS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $volumeS3s->count().' storages' } : 'Not set'"
-                                    :type="$backup->save_s3 ? ($volumeS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
-                                    :data-tooltip="$volumeS3Tooltip" :aria-label="$volumeS3Tooltip" tabindex="0" />
+                            <span class="min-w-0">
+                                <x-backup-s3-storage :enabled="$backup->save_s3" :names="$volumeS3s->pluck('name')" :tooltip="$volumeS3Tooltip" />
                             </span>
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}

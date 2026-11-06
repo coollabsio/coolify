@@ -447,16 +447,21 @@ Class names below are examples. Keep the values and structure.
 
 ```css
 .badge {
-    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px;
-    border: 1px solid rgb(0 0 0 / 9%); border-radius: 999px; background: rgb(0 0 0 / 4%);
-    font-size: 12px; font-weight: 500; line-height: 1; color: var(--ui-fg-dim);
+    display: inline-flex; align-items: center; gap: 6px; height: 24px;
+    font-size: 13px; line-height: 1; color: var(--ui-fg-dim);
 }
-.dark .badge { border-color: rgb(255 255 255 / 12%); background: rgb(255 255 255 / 7%); color: var(--ui-fg); }
+.dark .badge { color: var(--ui-fg); }
 .badge-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
 ```
 
-- The pill stays neutral. Only the 6px dot has the status color (success,
-  warning, error, neutral). Use a pulsing dot for a state in progress.
+- The badge is bare: a 6px colored dot and plain text, with no border, fill,
+  or padding. Only the dot has the status color (success, warning, error,
+  neutral). Use a pulsing dot for a state in progress.
+- Use the bare form everywhere: table rows, cards, headers, and the top bar.
+  Do not wrap a status in a pill.
+- A clickable badge (a status menu or a link) gets a ghost hover: a subtle
+  rounded background drawn 6px outside the badge, so the dot stays aligned
+  with the text around it.
 
 ### Empty state
 
@@ -1235,7 +1240,7 @@ Collections with many rows should use the Cloudflare-inspired table pattern:
 - filters, sort, view toggles, and Add on the right;
 - 40px header row and roughly 48px data rows;
 - subtle row hover;
-- plain text or the shared status badge rather than large colored chips;
+- plain text or the shared bare status badge rather than pills or colored chips;
 - compact action at the far right;
 - no separate layer card for each item.
 

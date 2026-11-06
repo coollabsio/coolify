@@ -3179,11 +3179,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .table-filter-value.table-filter-badge:hover {
     text-decoration-color: transparent;
-    border-color: var(--color-neutral-400);
-}
-
-.dark .table-filter-value.table-filter-badge:hover {
-    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .env-table-grid {
@@ -4259,7 +4254,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-section-status-badge {
     height: 1.5rem !important;
-    padding-inline: 0.5rem !important;
     font-size: 0.6875rem !important;
 }
 

@@ -142,7 +142,7 @@
             'active' => $storage->uuid === $currentStorage->uuid,
         ])">
             <x-slot:meta>
-                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg"
+                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 text-xs text-neutral-700 dark:text-fg"
                     x-data="{ usable: @js((bool) $currentStorage->is_usable) }"
                     @storage-status-changed.window="usable = $event.detail.isUsable">
                     <span class="size-1.5 rounded-full" :class="usable ? 'bg-[#3fb950]' : 'bg-red-500'"></span>
@@ -169,7 +169,7 @@
             'active' => $source->getMorphClass() === $currentSource->getMorphClass() && $source->uuid === $currentSource->uuid,
         ])">
             <x-slot:meta>
-                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg">
+                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 text-xs text-neutral-700 dark:text-fg">
                 <span @class([
                     'size-1.5 rounded-full',
                     'bg-[#3fb950]' => $sourceConnected,
@@ -189,7 +189,7 @@
             'active' => $destination->getMorphClass() === $currentDestination->getMorphClass() && $destination->uuid === $currentDestination->uuid,
         ])">
             <x-slot:meta>
-                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg">
+                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 text-xs text-neutral-700 dark:text-fg">
                 <span @class([
                     'size-1.5 rounded-full',
                     'bg-[#3fb950]' => $currentDestination->getMorphClass() === 'App\\Models\\StandaloneDocker',

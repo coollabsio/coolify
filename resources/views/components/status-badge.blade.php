@@ -18,15 +18,17 @@
     ];
 
     $sizeClasses = [
-        'sm' => 'h-4 gap-1 px-1.5 text-[10px]',
-        'md' => 'h-6 gap-1.5 px-2 text-xs',
+        'sm' => 'gap-1 text-[11px]',
+        'md' => 'gap-1.5 text-[13px]',
     ];
 
-    $baseClasses = 'inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-100 font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white ' . ($sizeClasses[$size] ?? $sizeClasses['md']);
+    // Bare: a colored dot and text, no pill. Interactive badges draw their hover background outside the box, so the dot stays aligned with plain text.
+    $baseClasses = 'inline-flex max-w-full items-center whitespace-nowrap text-neutral-700 dark:text-fg ' . ($sizeClasses[$size] ?? $sizeClasses['md']);
+    $interactiveClasses = 'relative isolate before:absolute before:-inset-x-1.5 before:-inset-y-1 before:-z-10 before:rounded-md before:transition-colors hover:before:bg-neutral-100 dark:hover:before:bg-white/[0.07]';
 @endphp
 
 @if ($as === 'button')
-    <button {{ $attributes->class([$baseClasses, 'transition-colors'])->merge(['type' => 'button']) }}>
+    <button {{ $attributes->class([$baseClasses, $interactiveClasses])->merge(['type' => 'button']) }}>
         @if ($dynamic)
             {{ $slot }}
         @else
@@ -47,7 +49,7 @@
         @endif
     </button>
 @elseif ($as === 'a')
-    <a {{ $attributes->class([$baseClasses, 'transition-colors']) }}>
+    <a {{ $attributes->class([$baseClasses, $interactiveClasses]) }}>
         @if ($dynamic)
             {{ $slot }}
         @else
