@@ -77,7 +77,7 @@
         </a>
         <a href="{{ route('profile.appearance') }}" {{ wireNavigate() }} class="listbox-option">
             <span class="flex items-center gap-2">
-                <x-reicon name="settings" class="size-4 opacity-80" />
+                <x-reicon name="paintbrush" class="size-4 opacity-80" />
                 Appearance
             </span>
         </a>

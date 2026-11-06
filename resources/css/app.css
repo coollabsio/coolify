@@ -482,6 +482,18 @@ select,
 /*
 * Base styles
 */
+/* UI scale from the Appearance page. It scales rem sizes only, because CSS zoom breaks the
+   mouse positions in xterm and the canvas. Phones keep 100% so inputs stay at 16px. */
+@media (min-width: 768px) {
+    html[data-ui-scale="90"] {
+        font-size: 90%;
+    }
+
+    html[data-ui-scale="80"] {
+        font-size: 80%;
+    }
+}
+
 html,
 body {
     @apply w-full min-h-full bg-neutral-50 dark:bg-app dark:text-fg-dim;
@@ -2781,6 +2793,11 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     border: 1px solid var(--coollabs-line);
     background: var(--coollabs-recessed);
     box-shadow: var(--shadow-dropdown);
+}
+
+/* Geist centers lowercase letters 1px below the line box center. Move the icons to match. */
+.top-user-menu-panel .listbox-option svg {
+    translate: 0 1px;
 }
 
 @media (max-width: 767px) {

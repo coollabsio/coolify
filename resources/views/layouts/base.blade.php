@@ -159,11 +159,13 @@
             }
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme.background);
         };
+        window.storedUiScale = () => ['80', '90', '100'].includes(localStorage.uiScale) ? localStorage.uiScale : '100';
         window.applyStoredTheme = () => {
             const root = document.documentElement;
             const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
             root.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
             root.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
+            root.dataset.uiScale = window.storedUiScale();
             localStorage.theme = theme;
             if (localStorage.themeColor) localStorage.themeColor = window.normalizeThemeColor(localStorage.themeColor);
             if (theme === 'custom') {
@@ -253,6 +255,7 @@
             navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
             navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
             chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
+            uiScale: window.storedUiScale(),
             presets: window.customThemePresets,
             // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
             dialogOpen: false,
@@ -340,6 +343,11 @@
                 this.navItems = style;
                 localStorage.setItem('navItems', style);
                 document.documentElement.dataset.navItems = style;
+            },
+            setUiScale(scale) {
+                this.uiScale = scale;
+                localStorage.setItem('uiScale', scale);
+                document.documentElement.dataset.uiScale = scale;
             },
             setChartTimes(value) {
                 this.chartTimes = value;
