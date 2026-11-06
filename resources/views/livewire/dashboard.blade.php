@@ -395,7 +395,7 @@
                         @endphp
                         <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                             wire:key="dashboard-server-row-{{ $server->uuid }}"
-                            class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] hover:no-underline {{ $tableRow }}">
+                            class="grid {{ $serverTableColumns }} gap-x-4 gap-y-2 @2xl:min-w-[480px] hover:no-underline {{ $tableRow }}">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div
                                     class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
@@ -409,10 +409,14 @@
                                 {{ filled($server->description) ? $server->description : '-' }}
                             </p>
                             @if ($showServerUsage)
-                                <div class="hidden @xl:block">
+                                {{-- Below @xl the usage takes a second line of the row, under the name and status. --}}
+                                <div @class([
+                                    'order-last col-span-full @xl:order-none @xl:col-span-1',
+                                    'hidden @xl:block' => ! $server->isMetricsEnabled(),
+                                ])>
                                     @if ($server->isMetricsEnabled())
                                         {{-- The latest values from the grid card's chart (server-metrics-chart), so the table sends no requests of its own. --}}
-                                        <div class="flex flex-col gap-1 text-[11px] text-neutral-500 tabular-nums dark:text-fg-dim"
+                                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-neutral-500 tabular-nums @xl:grid-cols-1 dark:text-fg-dim"
                                             x-data="{
                                                 cpu: null,
                                                 memory: null,
