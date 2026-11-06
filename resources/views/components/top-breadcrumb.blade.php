@@ -269,8 +269,6 @@
     @if ($currentResource)
         <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :uuid="$currentResource->uuid" :items="$resourceItems">
             <x-slot:meta>
-                <livewire:star-toggle :resource="$currentResource"
-                    :wire:key="'star-'.$currentResource->getMorphClass().'-'.$currentResource->uuid" />
                 {{-- Below xl, the page heading shows the status. --}}
                 <div class="hidden xl:flex">
                     @if ($currentApplication)
@@ -284,6 +282,8 @@
                             :wire:key="'service-status-'.$currentService->uuid" />
                     @endif
                 </div>
+                <livewire:star-toggle :resource="$currentResource"
+                    :wire:key="'star-'.$currentResource->getMorphClass().'-'.$currentResource->uuid" />
             </x-slot:meta>
         </x-breadcrumb-switcher>
     @endif

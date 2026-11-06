@@ -154,9 +154,9 @@
                     </template>
                 </div>
             </span>
-            <livewire:star-toggle :resource="$server" :wire:key="'star-server-'.$server->uuid" />
             <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
                 :show-sentinel-status="$showSentinelStatus" />
+            <livewire:star-toggle :resource="$server" :wire:key="'star-server-'.$server->uuid" />
         </div>
     @endteleport
 
