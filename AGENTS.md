@@ -297,7 +297,13 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 
 [`RELEASE.md`](RELEASE.md) is the source of truth for releases. Read it before you do a release, a backport, or a major version, and before you change `upstream.json`, `scripts/release.sh`, `scripts/plan-version.sh`, `scripts/sync-cdn.sh`, or the release, nightly, pull request, or merge forward workflows.
 
-- Do not edit `CHANGELOG.md`.
+- Do not edit `CHANGELOG.md` unless the user asks. When the user asks you to update it:
+  - Collect the changes since the last release tag (`git log <last tag>..HEAD`, and the PR bodies of squash merges such as `next` into `main`). Check the code when an existing entry or a PR body conflicts with it.
+  - Write under `## [Unreleased]`, with the sections in this order: Breaking Changes, Security, Added, Changed, Fixed, Removed. Leave out empty sections.
+  - Write one entry for each big change: `- **Short title**: one or two short sentences`. Group related fixes in one entry by area, for example **Deployments**, **Backups**, **Cloudflare DNS**, or **Service templates**.
+  - Leave out small changes: UI tweaks, help texts, internal refactors, tests, CI, scripts, and Coolify Cloud internals.
+  - Put the issue and PR links at the end of the entry, for example `([#1234](https://github.com/coollabsio/coolify/issues/1234))`. Do not invent numbers.
+  - Use Simplified Technical English. Security entries describe the protection only, never exploit details or advisory IDs.
 - A push that changes `release.json` publishes a release.
 - NEVER edit `release.json` by hand. `scripts/release.sh` changes it.
 - `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly.
