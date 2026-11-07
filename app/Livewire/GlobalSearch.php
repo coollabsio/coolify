@@ -23,6 +23,7 @@ use App\Models\StandaloneSqlite;
 use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class GlobalSearch extends Component
@@ -1480,7 +1481,7 @@ class GlobalSearch extends Component
             return;
         }
         $this->loadingServers = true;
-        $servers = Server::isUsable()->get()->sortBy('name');
+        $servers = Server::isUsable()->get()->filter(fn (Server $server) => Gate::allows('placeResource', $server))->sortBy('name');
         $this->availableServers = $servers->map(fn ($s) => [
             'id' => $s->id,
             'name' => $s->name,

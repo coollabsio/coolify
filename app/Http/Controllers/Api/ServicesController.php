@@ -488,6 +488,7 @@ class ServicesController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('placeResource', $server);
         if (! $server->canHostResources()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -700,6 +701,7 @@ class ServicesController extends Controller
             if (! $server) {
                 return response()->json(['message' => 'Server not found.'], 404);
             }
+            $this->authorize('placeResource', $server);
             if (! $server->canHostResources()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -3341,6 +3343,7 @@ class ServicesController extends Controller
         if (! $destination || ! $destination->server?->canHostResources()) {
             return response()->json(['message' => 'Destination not found.'], 404);
         }
+        $this->authorize('placeResource', $destination->server);
 
         $uuid = new_public_id();
         $name = $request->filled('name')

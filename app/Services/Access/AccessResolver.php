@@ -9,8 +9,10 @@ use App\Models\Environment;
 use App\Models\PersonalAccessToken;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -19,6 +21,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Models\SwarmDocker;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -225,6 +228,57 @@ class AccessResolver
         }
 
         return $this->isMember($user, $teamId);
+    }
+
+    /**
+     * True when the user (and the current token) has the level on at least one resource that runs on the server,
+     * as its main destination or as an additional server of an application.
+     */
+    public function allowsOnServer(User $user, AccessLevel $level, Server $server): bool
+    {
+        $teamId = (int) $server->team_id;
+        if (! $this->isMember($user, $teamId)) {
+            return false;
+        }
+
+        $layers = $this->layersFor($user, $teamId);
+        if ($layers === []) {
+            return true;
+        }
+
+        $environmentProjects = $this->teamEnvironments($teamId)->pluck('environments.project_id', 'environments.id')->all();
+        if ($environmentProjects === []) {
+            return false;
+        }
+
+        foreach (self::RESOURCE_MODELS as $modelClass) {
+            $resources = $modelClass::withoutGlobalScope(VisibleThroughAccessGrants::class)
+                ->whereIn('environment_id', array_keys($environmentProjects))
+                ->where(function (Builder $query) use ($modelClass, $server) {
+                    $query->whereHasMorph('destination', [StandaloneDocker::class, SwarmDocker::class], fn (Builder $destination) => $destination->where('server_id', $server->id));
+                    if ($modelClass === Application::class) {
+                        $query->orWhereHas('additional_servers', fn (Builder $servers) => $servers->whereKey($server->id));
+                    }
+                })
+                ->get(['uuid', 'environment_id']);
+
+            foreach ($resources as $resource) {
+                $environmentId = (int) $resource->environment_id;
+                $projectId = $environmentProjects[$environmentId];
+                $allowed = true;
+                foreach ($layers as $layer) {
+                    if (! $layer->allows($level, $projectId, $environmentId, $resource->uuid)) {
+                        $allowed = false;
+                        break;
+                    }
+                }
+                if ($allowed) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

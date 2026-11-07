@@ -434,6 +434,7 @@ function migrateResourceToDestination(Request $request, $resource, string $resou
     if (! $destination || ! $destination->server?->canHostResources()) {
         return response()->json(['message' => 'Destination not found.'], 404);
     }
+    Gate::authorize('placeResource', $destination->server);
 
     $sourceDestination = $resource->destination;
     $migrateVolumes = $request->boolean('migrate_volumes', true);

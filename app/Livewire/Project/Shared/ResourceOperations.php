@@ -21,6 +21,7 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use RuntimeException;
@@ -53,7 +54,9 @@ class ResourceOperations extends Component
         $teamId = $this->resourceTeamId();
         $this->projects = Project::query()->where('team_id', $teamId)->orderByRaw('LOWER(name)')->get();
         $servers = Server::query()->where('team_id', $teamId)->get();
-        $this->servers = $servers->reject(fn ($server) => $server->isBuildServer());
+        $this->servers = $servers->reject(fn ($server) => $server->isBuildServer())
+            ->filter(fn ($server) => Gate::allows('placeResource', $server))
+            ->values();
         $this->buildServers = $servers->filter(fn ($server) => $server->isBuildServer());
     }
 
@@ -396,8 +399,12 @@ class ResourceOperations extends Component
         $teamId = $this->resourceTeamId();
         $destination = StandaloneDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first()
             ?? SwarmDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first();
+        if (! $destination?->server?->canHostResources()) {
+            return null;
+        }
+        $this->authorize('placeResource', $destination->server);
 
-        return $destination?->server?->canHostResources() ? $destination : null;
+        return $destination;
     }
 
     public function render()
