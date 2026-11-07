@@ -6,6 +6,7 @@ use App\Enums\AccessLevel;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Access\AccessResolver;
+use Illuminate\Auth\Access\Response;
 
 class ServerPolicy
 {
@@ -39,6 +40,30 @@ class ServerPolicy
     public function create(User $user): bool
     {
         return $user->isAdmin();
+    }
+
+    /**
+     * Determine whether the user can place a resource on the server: create, clone, or migrate one there,
+     * or add the server to an application.
+     *
+     * The Coolify host needs a team admin, which is an instance admin for the localhost server.
+     * Other servers need team-wide write, or write on a resource that already runs there.
+     */
+    public function placeResource(User $user, Server $server): Response
+    {
+        $resolver = app(AccessResolver::class);
+        $teamId = (int) $server->team_id;
+        $teamWideWrite = $resolver->allowsTeamWide($user, AccessLevel::Write, $teamId);
+
+        if ($server->isLocalhost()) {
+            return $teamWideWrite && $user->isAdminOfTeam($teamId)
+                ? Response::allow()
+                : Response::deny('Only an admin can place resources on the server that runs Coolify.');
+        }
+
+        return $teamWideWrite || $resolver->allowsOnServer($user, AccessLevel::Write, $server)
+            ? Response::allow()
+            : Response::deny('You need write access on the whole team, or on a resource that already runs on this server, to place resources on it.');
     }
 
     /**

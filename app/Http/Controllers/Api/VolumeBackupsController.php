@@ -289,6 +289,12 @@ class VolumeBackupsController extends Controller
         string $resourceType,
         Model $resource,
     ): JsonResponse {
+        $existing = $storage->scheduledBackups()->first();
+        $newStorageIds = $existing ? $existing->newS3StorageIds($s3Storages->pluck('id')) : $s3Storages->pluck('id');
+        if ($newStorageIds->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $resource);
+        }
+
         $attributes = [
             'team_id' => $teamId,
             'frequency' => $request->string('frequency')->toString(),

@@ -1752,6 +1752,7 @@ class ApplicationsController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('placeResource', $server);
         if (! $server->canHostResources()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2081,6 +2082,7 @@ class ApplicationsController extends Controller
             if ($return instanceof JsonResponse) {
                 return $return;
             }
+            $this->authorize('useTeamCredentials');
             $sourceRepository = $type === 'private-gh-app'
                 ? $this->githubAppRepository($request->github_app_uuid, $request->git_repository, $teamId)
                 : $this->giteaAppRepository($this->teamSourceByUuid(GiteaApp::class, $request->gitea_app_uuid, $teamId), $request->git_repository);
@@ -2325,6 +2327,7 @@ class ApplicationsController extends Controller
             if (! $privateKey) {
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
+            $this->authorize('useTeamCredentials');
 
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
@@ -3783,6 +3786,9 @@ class ApplicationsController extends Controller
             $newSource = $this->teamSourceByUuid($sourceClass, $request->input($sourceUuidField), $teamId);
             if (! $newSource?->isConnected()) {
                 return response()->json(['message' => $sourceClass === GithubApp::class ? 'Github App not found.' : 'Gitea App not found.'], 404);
+            }
+            if (! $application->source?->is($newSource)) {
+                $this->authorize('useTeamCredentials', $application);
             }
         }
         $giteaRepository = null;
@@ -6476,6 +6482,7 @@ class ApplicationsController extends Controller
         if (! $destination || ! $destination->server?->canHostResources()) {
             return response()->json(['message' => 'Destination not found.'], 404);
         }
+        $this->authorize('placeResource', $destination->server);
 
         $overrides = ['uuid' => new_public_id()];
         if ($request->filled('name')) {
@@ -6790,6 +6797,7 @@ class ApplicationsController extends Controller
         if (! $destination || ! $destination->server?->canHostResources()) {
             return response()->json(['message' => 'Destination not found.'], 404);
         }
+        $this->authorize('placeResource', $destination->server);
 
         if ($application->destination_id === $destination->id && $application->destination_type === $destination->getMorphClass()) {
             return response()->json(['message' => 'Destination is already the primary destination.'], 422);

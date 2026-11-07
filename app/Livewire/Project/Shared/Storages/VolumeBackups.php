@@ -453,6 +453,9 @@ class VolumeBackups extends Component
     private function persistBackup(bool $enabled): ScheduledVolumeBackup
     {
         $backup = $this->storage->scheduledBackups()->firstOrNew();
+        if ($backup->newS3StorageIds($this->selectedS3StorageIds())->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $this->resource);
+        }
         $backup->fill([
             'team_id' => $this->resourceTeamId(),
             'frequency' => $this->frequency,

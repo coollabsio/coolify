@@ -54,6 +54,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -605,6 +606,8 @@ function find_resource_destination_for_current_team(?string $uuid): StandaloneDo
     if (! $destination?->server?->canHostResources()) {
         return null;
     }
+
+    Gate::authorize('placeResource', $destination->server);
 
     return $destination;
 }
