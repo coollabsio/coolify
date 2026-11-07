@@ -1244,6 +1244,7 @@ class DatabasesController extends Controller
         if (! isset($backupData['enabled'])) {
             $backupData['enabled'] = true;
         }
+        $backupData['save_s3'] ??= false;
 
         if ($s3Storages?->isNotEmpty()) {
             $this->authorize('useTeamCredentials', $database);

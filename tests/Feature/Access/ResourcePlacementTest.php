@@ -236,7 +236,8 @@ describe('team credentials in the API', function () {
         ];
 
         placementTestApi($this->developerToken, 'POST', '/api/v1/applications/private-deploy-key', [...$request, 'private_key_uuid' => $privateKey->uuid])
-            ->assertForbidden();
+            ->assertForbidden()
+            ->assertJsonPath('message', 'You need write access on the whole team to use team credentials, such as private keys, git sources, and S3 storages.');
         placementTestApi($this->developerToken, 'POST', '/api/v1/applications/private-github-app', [...$request, 'github_app_uuid' => 'any-github-app'])
             ->assertForbidden();
 
@@ -312,6 +313,26 @@ describe('team S3 storages for backups', function () {
 
         expect($backup->fresh()->s3Storages()->count())->toBe(0)
             ->and((bool) $backup->fresh()->save_s3)->toBeFalse();
+    });
+
+    test('the backup page shows one error when a project-scoped member selects a team S3 storage', function () {
+        $backup = ScheduledDatabaseBackup::create([
+            'frequency' => '0 0 * * *',
+            'save_s3' => false,
+            'database_type' => $this->database->getMorphClass(),
+            'database_id' => $this->database->id,
+            'team_id' => $this->team->id,
+        ]);
+        $this->actingAs($this->developer);
+        session(['currentTeam' => $this->team]);
+
+        $component = Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => collect()])
+            ->set('s3StorageIds', [$this->firstStorage->id]);
+
+        $errors = collect($component->effects['dispatches'] ?? [])->where('name', 'error');
+        expect($errors)->toHaveCount(1)
+            ->and($backup->fresh()->s3Storages()->count())->toBe(0);
+        $component->assertSet('s3StorageIds', [])->assertSet('saveS3', false);
     });
 
     test('a member with team-wide write can send a backup schedule to a team S3 storage', function () {

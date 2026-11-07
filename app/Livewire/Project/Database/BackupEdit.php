@@ -192,6 +192,10 @@ class BackupEdit extends Component
             // The team of the schedule, because the instance database has no environment to read it from.
             if ($this->backup->newS3StorageIds($storageIds)->isNotEmpty()
                 && ! app(AccessResolver::class)->allowsTeamWide(Auth::user(), AccessLevel::Write, (int) $this->backup->team_id)) {
+                $this->backup->refresh();
+                $this->saveS3 = (bool) $this->backup->save_s3;
+                $this->s3StorageIds = $this->backup->selectedS3Storages()->pluck('id')->all();
+
                 throw new AuthorizationException('You need write access on the whole team to add an S3 storage to this backup.');
             }
             $changedFields = auditChangedFields($this->backup);
