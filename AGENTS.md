@@ -184,10 +184,12 @@ Before you rate a vulnerability or write an advisory, find the security boundary
 - Trusted by design (attacks that need these roles are low severity):
   - A team admin or owner, and an API token with `write` or `root` ability, already has root on every server of that team (terminal, any Compose file with host mounts, scheduled commands, all team secrets).
   - An instance admin (admin or owner of the root team) already controls the Coolify instance and its host.
+  - A member with write access on a resource (an access grant) already has root on the server of that resource. In the root team, this includes the Coolify host when the resource runs on localhost.
   - Repository, Dockerfile, and Compose content that a team admin deploys is trusted for that deployment.
 - Real boundaries:
   - No login -> any access.
   - Team member (read-only) -> write, command execution, or secrets in the own team.
+  - Member with access grants -> resources, servers, or credentials outside the grants (use `ServerPolicy::placeResource` for servers and `useTeamCredentials` for team credentials).
   - One team -> another team.
   - Team user -> the Coolify container or the Coolify host, when the user is not an instance admin.
   - Token -> more than its abilities allow.
