@@ -2,7 +2,7 @@
 type: security
 commit: 8011d0d6ab
 ---
-Checked that members with access grants can use the selected server and the team credentials ([#12488](https://github.com/coollabsio/coolify/pull/12488))
+Checked that members with access grants can use the selected server and the team credentials
 
 - A new, cloned or migrated resource needs a server that the member can use, the localhost server needs an instance admin
 - Server lists show only the servers that the member can use
