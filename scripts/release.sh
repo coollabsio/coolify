@@ -3,9 +3,10 @@ set -euo pipefail
 
 OPTION="$*"
 VERSION_FILE=release.json
+CHANGE_DIRECTORY=.changes
+SECTIONS=('Breaking Changes' Security Added Changed Deprecated Removed Fixed Maintenance)
 ARTIFACT=coolify
 UPSTREAM=
-BREAKING_CHANGE='^([a-z]+(\([^)]*\))?!|BREAKING[ -]CHANGE): '
 WORK_DIR="$(mktemp -d)"
 
 BOLD=$'\033[1m' BLUE=$'\033[34m' GREEN=$'\033[32m' YELLOW=$'\033[33m' RED=$'\033[31m' DIM=$'\033[2m' RESET=$'\033[0m'
@@ -38,6 +39,7 @@ main() {
 	select_version
 	heading "Releasing v$new_version"
 	update_changelog
+	update_change_files
 	update_version
 	commit
 	push
@@ -64,9 +66,9 @@ check_repository() {
 	read -r behind ahead <<< "$counts"
 	[ "$behind$ahead" = 00 ] || die "$branch is $ahead commit(s) ahead of and $behind behind origin/$branch, expected it in sync"
 	ok "$branch is clean and in sync with origin/$branch"
-	entries="$(awk '/^## \[Unreleased\]$/ { inside = 1; next } /^## / { inside = 0 } inside && /^- / { count++ } END { print count + 0 }' CHANGELOG.md)"
-	[ "$entries" != 0 ] || die "CHANGELOG.md has no entries under ## [Unreleased], describe the changes first"
-	ok "CHANGELOG.md lists $BOLD$entries$RESET change(s) under [Unreleased], the notes of this release"
+	entries="$(git ls-files "$CHANGE_DIRECTORY" | wc -l | tr -d ' ')"
+	[ "$entries" != 0 ] || die "$CHANGE_DIRECTORY has no change files, describe the changes first with scripts/change.sh"
+	ok "$CHANGE_DIRECTORY lists $BOLD$entries$RESET change(s), the notes of this release"
 }
 
 read_versions() {
@@ -81,19 +83,17 @@ read_versions() {
 }
 
 read_changes() {
-	local tag range hash subject
-	tag="$(git describe --tags --abbrev=0 --match "v${UPSTREAM:+*-v}$stable" 2> /dev/null)" || true
-	range="${tag:+$tag..}HEAD"
+	local file
 	required="patch"
-	if [ -n "$(git log -E --grep="$BREAKING_CHANGE" --format=%h "$range")" ]; then
+	if grep -qx 'breaking: true' "$CHANGE_DIRECTORY"/*.md; then
 		required=major
 		[ "${stable%%.*}" != 0 ] || required=minor
-	elif git log --format=%s "$range" | awk '/^feat(\([^)]*\))?!?: / && !/^feat\(release\): bump / { found = 1 } END { exit !found }'; then
+	elif grep -qxE 'type: (added|changed|deprecated|removed)' "$CHANGE_DIRECTORY"/*.md; then
 		required=minor
 	fi
-	info "the commits since ${tag:-the first commit} need a $BOLD$required$RESET release"
-	git log -E --grep="$BREAKING_CHANGE" --format='%h %s' "$range" | while read -r hash subject; do
-		warn "$DIM$hash$RESET $subject is a breaking change"
+	info "the change files need a $BOLD$required$RESET release"
+	for file in $(grep -lx 'breaking: true' "$CHANGE_DIRECTORY"/*.md || true); do
+		warn "$file is a breaking change"
 	done
 }
 
@@ -152,19 +152,58 @@ select_version() {
 }
 
 update_changelog() {
-	local today
-	if [ "$channel" = preview ]; then
-		info "CHANGELOG.md keeps the entries under [Unreleased] until the stable release dates them"
-		return
-	fi
-	today="$(date +%Y-%m-%d)"
-	awk -v heading="## [v$new_version] - $today" '
-		/^#/ && NR > 1 && previous != "" { print "" }
-		{ print; previous = $0 }
-		/^## \[Unreleased\]$/ { print ""; print heading; previous = heading }
+	local heading=''
+	[ "$channel" = preview ] || heading="## [v$new_version] - $(date +%Y-%m-%d)"
+	print_notes > "$WORK_DIR/notes.md"
+	awk -v heading="$heading" -v notes="$WORK_DIR/notes.md" '
+		/^## / { inside = 0 }
+		/^## \[Unreleased\]$/ {
+			inside = 1
+			print
+			print ""
+			if (heading != "") { print heading; print "" }
+			while ((getline line < notes) > 0) print line
+			next
+		}
+		!inside
 	' CHANGELOG.md > "$WORK_DIR/CHANGELOG.md"
 	cp "$WORK_DIR/CHANGELOG.md" CHANGELOG.md
-	ok "CHANGELOG.md dates the unreleased entries as ${BOLD}v$new_version$RESET, $today"
+	ok "CHANGELOG.md lists the changes under $BOLD${heading:-## [Unreleased]}$RESET"
+}
+
+print_notes() {
+	local section entries
+	for section in "${SECTIONS[@]}"; do
+		entries="$(awk -v section="$section" '
+			FNR == 1 { fences = 0; type = ""; breaking = 0 }
+			fences < 2 {
+				if ($0 == "---") fences++
+				else if ($1 == "type:") type = $2
+				else if ($0 == "breaking: true") breaking = 1
+				next
+			}
+			NF && tolower(section) == (breaking ? "breaking changes" : type) {
+				prefix = /^- / ? "  " : "- "
+				print prefix $0
+			}
+		' "$CHANGE_DIRECTORY"/*.md)"
+		[ -z "$entries" ] || printf '### %s\n\n%s\n\n' "$section" "$entries"
+	done
+}
+
+update_change_files() {
+	local file
+	if [ "$channel" = stable ]; then
+		rm "$CHANGE_DIRECTORY"/*.md
+		ok "$CHANGE_DIRECTORY is empty, CHANGELOG.md lists the changes now"
+		return
+	fi
+	for file in "$CHANGE_DIRECTORY"/*.md; do
+		! grep -q '^version: ' "$file" || continue
+		awk -v version="$new_version" '/^---$/ && ++fences == 2 { print "version: " version } { print }' "$file" > "$WORK_DIR/change.md"
+		cp "$WORK_DIR/change.md" "$file"
+	done
+	ok "$CHANGE_DIRECTORY names ${BOLD}v$new_version$RESET in the change files that had no version"
 }
 
 update_version() {
@@ -174,7 +213,7 @@ update_version() {
 }
 
 commit() {
-	git add "$VERSION_FILE" CHANGELOG.md
+	git add --all -- "$VERSION_FILE" CHANGELOG.md "$CHANGE_DIRECTORY"
 	git commit --quiet -S --message "feat(release): bump $ARTIFACT version to v$new_version"
 	ok "signed commit $DIM$(git rev-parse --short HEAD)$RESET $(git log -1 --format=%s)"
 }

@@ -296,17 +296,53 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 - Merge `next`, `release/v*` branches, and patch branches (`v4.x`, `v4.4.x`) with a merge commit. Never squash merge them, because their commits then come back as conflicts in each later merge.
 - Create `release/v*` and patch branches only when the user asks.
 
+## Change Files
+
+Each change that users of Coolify can see gets a file in `.changes/`, in the same commit as the change. `scripts/release.sh` writes the files into `CHANGELOG.md`, and the release notes come from there.
+
+Write a file with `scripts/change.sh` and its flags:
+
+```bash
+scripts/change.sh --type fixed --summary 'Ignored concurrent build limit of build servers' --detail 'Each build counts on the server that runs it'
+scripts/change.sh --type changed --breaking --summary 'Required the `delete` ability for every delete through the API'
+scripts/change.sh --notes   # the entries of the next release
+```
+
+- Write one file for each change. When a commit changes something that an unreleased change file describes, edit that file instead of adding a second one.
+- Pass `--commit <commit>` only to describe a commit that exists already.
+- Tests, documentation, refactors, and CI, scripts, or release tooling that users do not see need no file. Use `maintenance` only for a change that matters to people who build or release Coolify.
+
+| Type | For | Next release |
+| --- | --- | --- |
+| `added` | Something new for users | minor |
+| `changed` | Existing behavior that works differently | minor |
+| `deprecated` | A feature that is going away | minor |
+| `removed` | A feature that is gone | minor |
+| `fixed` | A bug that users can see | patch |
+| `security` | A closed vulnerability or hardening | patch |
+| `maintenance` | A notable change that only maintainers see | patch |
+
+Add `--breaking` when users must act after the upgrade. The entry moves to `Breaking Changes`, and the next release is a major.
+
+The summary reads as one sentence with the heading of its section, never in the imperative of a commit subject:
+
+| Section | The summary | Example |
+| --- | --- | --- |
+| `Added`, `Changed`, `Deprecated`, `Removed` | What the heading acts on | Added `Automatic cancelling of the older queued webhook deployments` |
+| `Fixed` | The bug, not the fix | Fixed `Ignored concurrent build limit of build servers`, not `Apply the concurrent build limit` |
+| `Breaking Changes`, `Security`, `Maintenance` | Starts with a verb in the past tense | `Compressed the layers with zstd instead of gzip` |
+| A `--detail` under any section | How it works now, in the present tense | `The default is none` |
+
+- Start with a capital letter or a code span, and end without a period. A reason follows after a comma.
+- Write for the person who runs Coolify. Name the page, setting, or API field that changes, not the class or the file.
+- Do not use bold. Put each UI name, such as a page, tab, button, setting, or label, in its own code span, for example `Advanced` > `Deployment`.
+- Do not put exploit details, payloads, or unreleased advisory IDs in a change file.
+
 ## Releases
 
 [`RELEASE.md`](RELEASE.md) is the source of truth for releases. Read it before you do a release, a backport, or a major version, and before you change `upstream.json`, `scripts/release.sh`, `scripts/plan-version.sh`, `scripts/sync-cdn.sh`, or the release, nightly, pull request, or merge forward workflows.
 
-- Do not edit `CHANGELOG.md` unless the user asks. When the user asks you to update it:
-  - Collect the changes since the last release tag (`git log <last tag>..HEAD`, and the PR bodies of squash merges such as `next` into `main`). Check the code when an existing entry or a PR body conflicts with it.
-  - Write under `## [Unreleased]`, with the sections in this order: Breaking Changes, Security, Added, Changed, Fixed, Removed. Leave out empty sections.
-  - Write one entry for each big change: `- **Short title**: one or two short sentences`. Group related fixes in one entry by area, for example **Deployments**, **Backups**, **Cloudflare DNS**, or **Service templates**.
-  - Leave out small changes: UI tweaks, help texts, internal refactors, tests, CI, scripts, and Coolify Cloud internals.
-  - Put the issue and PR links at the end of the entry, for example `([#1234](https://github.com/coollabsio/coolify/issues/1234))`. Do not invent numbers.
-  - Use Simplified Technical English. Security entries describe the protection only, never exploit details or advisory IDs.
+- Do not edit `CHANGELOG.md`. Describe each change in a change file (see [Change Files](#change-files)).
 - A push that changes `release.json` publishes a release.
 - NEVER edit `release.json` by hand. `scripts/release.sh` changes it.
 - `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly.

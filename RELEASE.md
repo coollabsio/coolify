@@ -36,11 +36,12 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > [!NOTE]
 > `next` publishes prereleases only. For its stable version, merge `next` into `main` with a merge commit and create the release on `main`.
 
-1. Describe the changes under `## [Unreleased]` in `CHANGELOG.md`, they become the release notes
-2. Check what the branch releases:
+1. Describe the changes in change files with `scripts/change.sh`, they become the release notes, see [Change files](#change-files)
+2. Check what the branch releases and the entries it lists:
 
     ```sh
     scripts/plan-version.sh
+    scripts/change.sh --notes
     ```
 
 3. Select the stage and the version, the script commits them and asks to push:
@@ -58,6 +59,27 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > ```sh
 > scripts/undo-release.sh
 > ```
+
+## Change files
+
+Every change has a file in `.changes/`, `AGENTS.md` describes the types and the wording:
+
+```markdown
+---
+type: fixed
+commit: e0b94662e9
+---
+Ignored concurrent build limit of build servers
+
+- Each build counts on the server that runs it
+- A freed build server slot starts the waiting deployments of other servers
+```
+
+- `scripts/change.sh` writes a file, it asks for what its flags leave out, and `--notes` prints the entries of the next release
+- `scripts/release.sh` preselects the version the files need and writes them into `CHANGELOG.md`, the release workflow reads its notes from there
+- A prerelease writes the files under `## [Unreleased]`, keeps them and adds its version to the files that have none
+- A stable release writes the files under `## [v4.6.1] - <date>` and removes them
+- `scripts/undo-release.sh` brings the files back as they were
 
 ## Backport a fix
 
