@@ -6,66 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Breaking Changes
-
-- **Queued webhook deployments are cancelled by default**: when a newer push arrives, Coolify cancels the older queued webhook deployments. Turn this off in **Advanced > Deployment**
-- **Cloud provider token API**: only team admins and owners can use it. Other members get `403`
-- **Resend sender**: Resend sends from the new `resend_from_address` and `resend_from_name` fields. A migration copies the current values. API clients must use the new fields
-
-### Security
-
-- **SSH host key pinning**: Coolify trusts the host key of a server on the first connection and notifies the team when it changes (`SSH_HOST_KEY_CHECKING`: `warn`, `enforce`, or `off`). Git hosts are pinned too ([#12418](https://github.com/coollabsio/coolify/pull/12418), [#12421](https://github.com/coollabsio/coolify/pull/12421))
-- **SSH keys**: new keys are Ed25519 (RSA keys are 4096 bits), private keys are validated more strictly, and the browser no longer gets them. **Rotate key** replaces a key on all servers, and a server delete can remove the key from `authorized_keys` ([#12415](https://github.com/coollabsio/coolify/pull/12415), [#12422](https://github.com/coollabsio/coolify/pull/12422), [#12423](https://github.com/coollabsio/coolify/pull/12423))
-- **Hardening**: fixed SSH options on all connections, Sentinel token kept out of process arguments, terminal sessions end when access is lost, SMTP host and DNS checks, stricter team and role checks, API rate limit for clients that keep failing, and no personal data or credentials in audit events ([#12460](https://github.com/coollabsio/coolify/pull/12460))
-
-### Added
-
-- **Container image vulnerability scanning**: opt-in for each server. Syft and Grype run on your server, and no data goes to a third party. Each resource gets one security status, version recommendations, and an optional deploy gate. Includes a team **Security** page, notifications, API endpoints, and MCP tools ([#12377](https://github.com/coollabsio/coolify/pull/12377))
-- **GitHub Deployments sync**: Coolify reports each deployment and preview to GitHub Deployments, with links to the log and the environment. Needs a private GitHub App with **Deployments: write** ([#12451](https://github.com/coollabsio/coolify/pull/12451))
-- **SFTP, FTPS, and WebDAV backup storages**: for database and volume backups, with downloads, retention, and restores ([#12417](https://github.com/coollabsio/coolify/pull/12417))
-- **Email providers**: one provider list (None, SMTP, or Resend), more than one named SMTP server with its own sender, SMTP templates for common providers, and a separate notification sender for the instance ([#12471](https://github.com/coollabsio/coolify/pull/12471))
-- **Cancel superseded deployments**: older queued webhook deployments are cancelled when a newer push arrives, and optionally also running builds. `/api/v1/deploy` and the MCP `deploy` tool accept `cancel_previous` ([#10921](https://github.com/coollabsio/coolify/discussions/10921), [#7678](https://github.com/coollabsio/coolify/discussions/7678))
-- **Forgejo and Codeberg**: connect them with the Gitea App source. The API and MCP get Gitea App endpoints
-- **Valkey**: offered as an image of the Redis database type, and the default for new Redis databases
-- **Automatic update notifications**: the root team gets a notification when an automatic update starts, fails, or finishes ([#12472](https://github.com/coollabsio/coolify/pull/12472))
-- **Unused Traefik certificates**: marked as "Not used", with a **Delete unused** button ([#12447](https://github.com/coollabsio/coolify/issues/12447))
-- **S3 skip TLS verification**: for endpoints with a self-signed or private CA certificate ([#9762](https://github.com/coollabsio/coolify/issues/9762))
-- **Scheduled tasks without a shell**: **Run in a shell** can be turned off for containers without a shell, such as distroless images ([#8244](https://github.com/coollabsio/coolify/issues/8244))
-- **New resource page list view** and a **UI scale** option in the appearance settings
-- **Orbit service template**: a self-hosted workspace for teams with tasks, docs, chat, and an MCP server for AI clients
-
-### Changed
-
-- **Fewer failure notifications**: failing scheduled tasks, backups, and Docker cleanups notify on the first failure, then at most once a day, and once when they work again. A task that failed 10 times in a row for more than 24 hours is disabled automatically
-- **Newer default database images**: PostgreSQL 18, MongoDB 9, MySQL 9.7, MariaDB 12.3, ClickHouse 26.8, and Valkey 9. Existing databases keep their image
-- **Backup import**: moved to an **Import backup** dialog on the **Backups** page ([#11818](https://github.com/coollabsio/coolify/discussions/11818))
-- **Server security page**: patches, terminal access, SSH host key, and image scanning are on one **Security** page
-- **Locked environment variables**: you can replace the value of a locked variable without seeing it ([#6803](https://github.com/coollabsio/coolify/issues/6803))
-- **Same IP, different SSH port**: more than one server can use the same IP when the SSH ports are different ([#7573](https://github.com/coollabsio/coolify/issues/7573))
-- **Maintenance mode**: moved to its own **Maintenance** page of applications and services, and you must confirm the toggle
-
-### Fixed
-
-- **Deployments**: the build server concurrency limit works, the server CA bundle is trusted in the helper container, the Docker build cache is kept when containers on the network change, and Use build secrets, `HOME`, and `DOCKER_CONFIG` no longer break builds ([#7649](https://github.com/coollabsio/coolify/issues/7649), [#7568](https://github.com/coollabsio/coolify/issues/7568), [#12452](https://github.com/coollabsio/coolify/issues/12452), [#9363](https://github.com/coollabsio/coolify/issues/9363), [#9726](https://github.com/coollabsio/coolify/issues/9726))
-- **Docker Compose and previews**: each Compose preview has its own project, service names stay usable as host names, one `COOLIFY_BRANCH` value is used, deleted volumes do not come back, and services removed from the Compose file are marked ([#9014](https://github.com/coollabsio/coolify/issues/9014), [#8030](https://github.com/coollabsio/coolify/issues/8030), [#9572](https://github.com/coollabsio/coolify/issues/9572), [#6875](https://github.com/coollabsio/coolify/issues/6875), [#9591](https://github.com/coollabsio/coolify/issues/9591))
-- **Environment variables**: multiline values keep their trailing newline, duplicate keys are prevented, and server shared variables resolve in Compose files ([#9438](https://github.com/coollabsio/coolify/issues/9438), [#8041](https://github.com/coollabsio/coolify/issues/8041))
-- **Backups**: S3 endpoints with a path (such as Supabase Storage), a 1000-part upload limit (such as Scaleway), the full run stays within its timeout, and the instance database backup uses the localhost server ([#8530](https://github.com/coollabsio/coolify/issues/8530), [#8411](https://github.com/coollabsio/coolify/issues/8411), [#8139](https://github.com/coollabsio/coolify/issues/8139))
-- **Cloudflare DNS**: records are added when you edit or clone domains and when you create resources through the API, conflicts are shown, and the DNS check verifies the real origin behind Cloudflare ([#12436](https://github.com/coollabsio/coolify/issues/12436))
-- **Notifications**: unexpected stops of resources and new Traefik patch versions send notifications, and Telegram messages with rejected button URLs still arrive ([#9493](https://github.com/coollabsio/coolify/issues/9493), [#9727](https://github.com/coollabsio/coolify/issues/9727), [#8269](https://github.com/coollabsio/coolify/issues/8269))
-- **GitHub**: fewer API requests before each deployment, and reads are retried on 5xx errors and timeouts ([#9785](https://github.com/coollabsio/coolify/issues/9785))
-- **MCP deployments**: they queue behind a deployment in progress and are saved with the **MCP** source ([#12442](https://github.com/coollabsio/coolify/issues/12442))
-- **Servers**: fewer SSH logins for the connection check, the Docker install fallback works on Ubuntu derivatives, and deleting a server keeps applications that also run on other servers ([#9148](https://github.com/coollabsio/coolify/issues/9148), [#9455](https://github.com/coollabsio/coolify/issues/9455))
-- **Health checks**: the Redis health check uses the password, Dockerfile `HEALTHCHECK` options are imported as Docker reads them, and containers in the start period show "starting" ([#12455](https://github.com/coollabsio/coolify/issues/12455), [#9411](https://github.com/coollabsio/coolify/issues/9411))
-- **Performance**: the startup cleanup no longer runs out of memory with large deployment logs, backup pages load faster, and log streaming no longer makes dockerd read the full log file ([#12435](https://github.com/coollabsio/coolify/issues/12435), [#7693](https://github.com/coollabsio/coolify/issues/7693))
-- **UI**: **Copy logs** works on iOS, the dark theme stays during page loads, custom theme colors stay readable, Caddy keeps WebSockets open across reloads, and Reverb accepts large cookie headers ([#9408](https://github.com/coollabsio/coolify/issues/9408), [#7866](https://github.com/coollabsio/coolify/issues/7866), [#7942](https://github.com/coollabsio/coolify/issues/7942))
-- **Rollback**: the commit images of Docker Compose applications are listed ([#12446](https://github.com/coollabsio/coolify/issues/12446))
-- **Service templates**: fixes for AppFlowy, Bugsink, Convex, Ente, LiteLLM, Odoo, Outline, Rybbit, Supabase, and Usesend
-- **Service domains**: a domain without a port no longer shows a port warning, because Coolify routes it to the required port
-
-### Removed
-
-- **Copy from instance settings**: removed from the email notification page. Select **Use system-wide settings** instead
-
 ## [v4.6.0] - 2026-11-02
 
 ### Breaking Changes
