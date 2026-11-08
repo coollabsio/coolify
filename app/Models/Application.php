@@ -2627,9 +2627,22 @@ class Application extends BaseModel
             return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved or published key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
         }
 
-        $reason = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->last();
+        $lines = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->values();
+        // Git and SSH print progress, known-hosts and multiplexing notes, and a generic access hint around the real cause.
+        $reasonLines = $lines->reject(fn (string $line) => Str::startsWith($line, [
+            'Cloning into',
+            'Warning: Permanently added',
+            'Control socket connect(',
+            'ControlSocket ',
+            'mux_client_',
+            'Please make sure you have the correct access rights',
+            'and the repository exists.',
+        ]))->take(-10);
+        if ($reasonLines->isEmpty()) {
+            $reasonLines = $lines->take(-1);
+        }
 
-        return $reason ? '<br><br>Reason: '.e(str($reason)->limit(300)->value()) : '';
+        return $reasonLines->isEmpty() ? '' : '<br><br>Reason: '.$reasonLines->map(fn (string $line) => e(str($line)->limit(300)->value()))->implode('<br>');
     }
 
     /**
