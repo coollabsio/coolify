@@ -335,6 +335,7 @@ The summary reads as one sentence with the heading of its section, never in the 
 
 - Start with a capital letter or a code span, and end without a period. A reason follows after a comma.
 - Write for the person who runs Coolify. Name the page, setting, or API field that changes, not the class or the file.
+- Link the issues that a change fixes or closes at the end of the summary, for example `([#1234](https://github.com/coollabsio/coolify/issues/1234))`. Do not link pull requests.
 - Do not use bold. Put each UI name, such as a page, tab, button, setting, or label, in its own code span, for example `Advanced` > `Deployment`.
 - Do not put exploit details, payloads, or unreleased advisory IDs in a change file.
 
