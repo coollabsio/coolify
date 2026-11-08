@@ -124,7 +124,7 @@ class DatabasePolicy
     private function allows(User $user, AccessLevel $level, $database): bool
     {
         if ($this->isInstanceDatabase($database)) {
-            return $user->isAdminOfTeam(0);
+            return $user->isAdminOfTeam(0) && $user->canAccess($level, $database);
         }
 
         return $user->canAccess($level, $database);

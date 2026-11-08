@@ -66,8 +66,27 @@ it('allows team admin to update shared environment variable', function () {
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
 
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->with($user, AccessLevel::Write, 1)->andReturn(true);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
+
     $policy = new SharedEnvironmentVariablePolicy;
     expect($policy->update($user, $model))->toBeTrue();
+});
+
+it('denies team admin whose token does not cover the whole team to read or update a team variable', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
+
+    $model = mockSharedEnvironmentVariable(teamId: 1);
+
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->andReturn(false);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
+
+    $policy = new SharedEnvironmentVariablePolicy;
+    expect($policy->viewSensitive($user, $model))->toBeFalse()
+        ->and($policy->update($user, $model))->toBeFalse();
 });
 
 it('denies team member to update shared environment variable', function () {
@@ -85,6 +104,10 @@ it('allows team admin to delete shared environment variable', function () {
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
+
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->with($user, AccessLevel::Write, 1)->andReturn(true);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
 
     $policy = new SharedEnvironmentVariablePolicy;
     expect($policy->delete($user, $model))->toBeTrue();
@@ -123,6 +146,10 @@ it('allows team admin to manage environment', function () {
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
+
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->with($user, AccessLevel::Write, 1)->andReturn(true);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
 
     $policy = new SharedEnvironmentVariablePolicy;
     expect($policy->manageEnvironment($user, $model))->toBeTrue();

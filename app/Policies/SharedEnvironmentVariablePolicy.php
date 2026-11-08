@@ -8,7 +8,8 @@ use App\Models\User;
 use App\Services\Access\AccessResolver;
 
 /**
- * Team and server variables need team-wide access (owners and admins to change them).
+ * Team and server variables need team-wide access (owners and admins to read their values or change them).
+ * The API token of the request must also cover the whole team, so a token limited to some projects cannot use them.
  * Project and environment variables follow the access level on their project or environment.
  */
 class SharedEnvironmentVariablePolicy
@@ -95,8 +96,11 @@ class SharedEnvironmentVariablePolicy
             return $target !== null && $user->canAccess($level, $target);
         }
 
-        return $level === AccessLevel::Read
-            ? app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $sharedEnvironmentVariable->team_id)
-            : $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
+        $teamId = (int) $sharedEnvironmentVariable->team_id;
+        if ($level !== AccessLevel::Read && ! $user->isAdminOfTeam($teamId)) {
+            return false;
+        }
+
+        return app(AccessResolver::class)->allowsTeamWide($user, $level, $teamId);
     }
 }
