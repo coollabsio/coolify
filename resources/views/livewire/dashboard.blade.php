@@ -36,33 +36,31 @@
             </div>
         @endif
 
-        @if (instanceSettings()->is_image_scanning_allowed)
-            @php
-                $securityCount = count($securityUpdateNow);
-                $securityKey = 'coolify.image-scan.dashboard-update-now-dismissed.'.currentTeam()->id;
-            @endphp
-            {{-- Dismissed until a resource that was not dismissed needs an update now (resources/js/security-callout.js).
-                 It also renders without resources, so the dismissed set is cleared and the next one shows again. --}}
-            <div x-data="{
-                    resources: @js($securityUpdateNow),
-                    key: @js($securityKey),
-                    state: { visible: {{ $securityCount > 0 ? 'true' : 'false' }}, reset: false },
-                    dismiss() {
-                        if (window.dismissSecurityCallout) localStorage.setItem(this.key, window.dismissSecurityCallout(this.resources, localStorage.getItem(this.key)));
-                        this.state.visible = false;
-                    },
-                }"
-                x-init="state = window.securityCallout?.(resources, localStorage.getItem(key)) ?? state; if (state.reset) localStorage.removeItem(key)"
-                x-show="state.visible" x-cloak wire:key="dashboard-security-{{ md5(implode(',', $securityUpdateNow)) }}">
-                @if ($securityCount > 0)
-                    <x-callout type="danger" dismissible :title="\App\Livewire\Dashboard::securityCalloutTitle($securityCount)"
-                        on-dismiss="dismiss()">
-                        <a href="{{ route('vulnerabilities', ['statuses' => ['update_now']]) }}" {{ wireNavigate() }}
-                            class="font-medium underline-offset-2 hover:underline">Review</a>
-                    </x-callout>
-                @endif
-            </div>
-        @endif
+        @php
+            $securityCount = count($securityUpdateNow);
+            $securityKey = 'coolify.image-scan.dashboard-update-now-dismissed.'.currentTeam()->id;
+        @endphp
+        {{-- Dismissed until a resource that was not dismissed needs an update now (resources/js/security-callout.js).
+             It also renders without resources, so the dismissed set is cleared and the next one shows again. --}}
+        <div x-data="{
+                resources: @js($securityUpdateNow),
+                key: @js($securityKey),
+                state: { visible: {{ $securityCount > 0 ? 'true' : 'false' }}, reset: false },
+                dismiss() {
+                    if (window.dismissSecurityCallout) localStorage.setItem(this.key, window.dismissSecurityCallout(this.resources, localStorage.getItem(this.key)));
+                    this.state.visible = false;
+                },
+            }"
+            x-init="state = window.securityCallout?.(resources, localStorage.getItem(key)) ?? state; if (state.reset) localStorage.removeItem(key)"
+            x-show="state.visible" x-cloak wire:key="dashboard-security-{{ md5(implode(',', $securityUpdateNow)) }}">
+            @if ($securityCount > 0)
+                <x-callout type="danger" dismissible :title="\App\Livewire\Dashboard::securityCalloutTitle($securityCount)"
+                    on-dismiss="dismiss()">
+                    <a href="{{ route('vulnerabilities', ['statuses' => ['update_now']]) }}" {{ wireNavigate() }}
+                        class="font-medium underline-offset-2 hover:underline">Review</a>
+                </x-callout>
+            @endif
+        </div>
 
         {{-- First on every screen size, so starred resources are one tap away on phones too. --}}
         @if ($starredResources->isNotEmpty())

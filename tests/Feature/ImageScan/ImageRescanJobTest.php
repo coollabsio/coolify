@@ -51,7 +51,7 @@ beforeEach(function () {
     Server::flushIdentityMap();
     Storage::fake('ssh-keys');
     config(['constants.ssh.mux_enabled' => false, 'constants.ssh.max_retries' => 1]);
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
     $this->server = rescanTestServer($this->team);
@@ -246,7 +246,6 @@ describe('when the job runs', function () {
         Process::assertNothingRan();
     })->with([
         'scanning off' => [fn (Server $server) => $server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly()],
-        'not allowed on the instance' => [fn () => InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false])],
         'unreachable' => [fn (Server $server) => $server->settings->forceFill(['is_reachable' => false])->saveQuietly()],
         'transferred away' => [fn (Server $server) => $server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly()],
     ]);

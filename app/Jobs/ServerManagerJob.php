@@ -99,10 +99,6 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function dispatchImageScanDigests(Collection $servers): void
     {
-        if (! $this->settings->is_image_scanning_allowed) {
-            return;
-        }
-
         $servers->filter(fn (Server $server): bool => (bool) $server->settings?->is_image_scan_enabled && ! $server->isTransferredAway())
             ->pluck('team_id')
             ->unique()

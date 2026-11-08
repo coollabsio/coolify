@@ -11,7 +11,6 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\GrypeReportParser;
@@ -445,10 +444,8 @@ class ScanImage
 
     private function updateDatabase(ScannerCommands $commands): void
     {
-        $url = InstanceSettings::get()->image_scan_db_url;
-
         try {
-            $update = $commands->dbUpdate(is_string($url) && trim($url) !== '' ? trim($url) : null);
+            $update = $commands->dbUpdate();
         } catch (InvalidArgumentException) {
             return;
         }

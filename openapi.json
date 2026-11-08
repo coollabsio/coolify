@@ -19534,11 +19534,6 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "is_image_scanning_allowed": {
-                                            "description": "Whether the Coolify instance allows image scanning.",
-                                            "type": "boolean",
-                                            "readOnly": true
-                                        },
                                         "is_image_scan_enabled": {
                                             "description": "Whether the server scans the images of its resources.",
                                             "type": "boolean"
@@ -26623,9 +26618,6 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "is_image_scanning_allowed": {
-                                            "type": "boolean"
-                                        },
                                         "resources": {
                                             "type": "array",
                                             "items": {
@@ -27748,7 +27740,6 @@
                             "null"
                         ],
                         "enum": [
-                            "instance",
                             "server",
                             "application"
                         ]

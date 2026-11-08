@@ -31,8 +31,7 @@ function scannerCommandLists(ScannerCommands $commands): array
 
     return [
         'prepare' => $commands->prepare(),
-        'dbUpdate' => $commands->dbUpdate(null),
-        'dbUpdate with url' => $commands->dbUpdate('https://mirror.example.com/grype/databases'),
+        'dbUpdate' => $commands->dbUpdate(),
         'dbStatus' => $commands->dbStatus(),
         'inspect' => $commands->inspect('localhost:5000/team/app:1.2'),
         'pull' => $commands->pull('localhost:5000/team/app:1.2'),
@@ -489,7 +488,7 @@ it('refuses to delete an SBOM by an invalid image ID', function (string $imageId
 ])->throws(InvalidArgumentException::class);
 
 it('sets up the database volume inside a container instead of through a host path', function () {
-    foreach (['prepare' => $this->commands->prepare(), 'dbUpdate' => $this->commands->dbUpdate(null)] as $name => $commands) {
+    foreach (['prepare' => $this->commands->prepare(), 'dbUpdate' => $this->commands->dbUpdate()] as $name => $commands) {
         $all = implode("\n", $commands);
         $setup = collect(scannerUnwrapped($commands))->first(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
 

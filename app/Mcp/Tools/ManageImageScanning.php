@@ -14,7 +14,7 @@ class ManageImageScanning extends RestActionTool
     protected function actions(): array
     {
         return [
-            'get_server' => ['method' => 'GET', 'path' => 'servers/{uuid}/image-scanning', 'ability' => 'read', 'description' => 'whether the instance allows scanning, whether the server scans, and the scanner state on the server'],
+            'get_server' => ['method' => 'GET', 'path' => 'servers/{uuid}/image-scanning', 'ability' => 'read', 'description' => 'whether the server scans, and the scanner state on the server'],
             'update_server' => ['method' => 'PATCH', 'path' => 'servers/{uuid}/image-scanning', 'ability' => 'write', 'description' => 'turn scanning of the server on or off (data: is_image_scan_enabled); turning it on gets the scanner on the server'],
             'update_team' => ['method' => 'PATCH', 'path' => 'team', 'ability' => 'write', 'description' => 'turn scanning on or off for servers added to the team from now on (data: scan_images_on_new_servers)'],
         ];

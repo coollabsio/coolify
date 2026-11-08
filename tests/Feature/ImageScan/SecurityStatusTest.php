@@ -38,7 +38,7 @@ beforeEach(function () {
     Once::flush();
     Cache::flush();
     Server::flushIdentityMap();
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->team = Team::factory()->create();

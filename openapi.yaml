@@ -12418,7 +12418,6 @@ paths:
             application/json:
               schema:
                 properties:
-                  is_image_scanning_allowed: { description: 'Whether the Coolify instance allows image scanning.', type: boolean, readOnly: true }
                   is_image_scan_enabled: { description: 'Whether the server scans the images of its resources.', type: boolean }
                   scanner_state: { description: 'State of the scanner on the server. Null when unknown.', type: [string, 'null'], enum: [pulling, updating_database, ready, failed] }
                   scanner_failed_step: { description: 'The step that failed when scanner_state is failed.', type: [string, 'null'] }
@@ -16819,7 +16818,6 @@ paths:
             application/json:
               schema:
                 properties:
-                  is_image_scanning_allowed: { type: boolean }
                   resources: { type: array, items: { properties: { uuid: { type: string }, name: { type: string }, type: { type: string, enum: [application, service, database] }, project_uuid: { type: [string, 'null'] }, environment_uuid: { type: [string, 'null'] }, server_uuid: { type: [string, 'null'] }, images: { properties: { update: { type: integer }, total: { type: integer } }, type: object }, security: { $ref: '#/components/schemas/SecurityStatus' } }, type: object } }
                 type: object
         '401':
@@ -17557,7 +17555,6 @@ components:
             - string
             - 'null'
           enum:
-            - instance
             - server
             - application
         security:

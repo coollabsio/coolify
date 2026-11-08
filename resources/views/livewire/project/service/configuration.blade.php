@@ -111,9 +111,7 @@
                     <div class="flex flex-col gap-6">
                         <livewire:image-scan.vulnerabilities resource-type="service" :resource-uuid="$service->uuid" />
                         <livewire:image-scan.packages resource-type="service" :resource-uuid="$service->uuid" />
-                        @if (instanceSettings()->is_image_scanning_allowed)
-                            <livewire:image-scan.scan-settings scope-type="service" :scope-uuid="$service->uuid" />
-                        @endif
+                        <livewire:image-scan.scan-settings scope-type="service" :scope-uuid="$service->uuid" />
                     </div>
                 @elseif ($currentRoute === 'project.service.tags')
                     <livewire:project.shared.tags :resource="$service" />

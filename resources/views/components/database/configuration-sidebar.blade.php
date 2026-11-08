@@ -7,8 +7,6 @@
         'database_uuid' => $database->uuid,
     ];
 
-    $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
-
     $configurationItems = collect([
         ['label' => 'General', 'route' => 'project.database.configuration', 'icon' => 'settings'],
         ['label' => 'Environment Variables', 'route' => 'project.database.environment-variables', 'icon' => 'variables'],
@@ -23,8 +21,8 @@
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
         ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
-        ['label' => 'Security', 'route' => 'project.database.vulnerabilities', 'icon' => 'shield-alert', 'visible' => $imageScanningAllowed,
-            'security' => $imageScanningAllowed ? \App\Services\ImageScan\SecurityStatus::stored($database)->status->value : null],
+        ['label' => 'Security', 'route' => 'project.database.vulnerabilities', 'icon' => 'shield-alert',
+            'security' => \App\Services\ImageScan\SecurityStatus::stored($database)->status->value],
         ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)

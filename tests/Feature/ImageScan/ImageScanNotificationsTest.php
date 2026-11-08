@@ -52,7 +52,7 @@ beforeEach(function () {
     Cache::flush();
     Server::flushIdentityMap();
     config(['app.url' => 'http://localhost']);
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true, 'fqdn' => 'https://coolify.example.com']);
+    InstanceSettings::forceCreate(['id' => 0, 'fqdn' => 'https://coolify.example.com']);
     Notification::fake();
 
     $this->team = Team::factory()->create();

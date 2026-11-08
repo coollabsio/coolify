@@ -7,8 +7,6 @@
         'service_uuid' => $service->uuid,
     ];
 
-    $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
-
     $configurationItems = collect([
         ['label' => 'General', 'route' => 'project.service.configuration', 'icon' => 'settings'],
         ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
@@ -23,8 +21,8 @@
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'webhook'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Maintenance Mode', 'route' => 'project.service.maintenance', 'icon' => 'bandage'],
-        ['label' => 'Security', 'route' => 'project.service.vulnerabilities', 'icon' => 'shield-alert', 'visible' => $imageScanningAllowed,
-            'security' => $imageScanningAllowed ? \App\Services\ImageScan\SecurityStatus::stored($service)->status->value : null],
+        ['label' => 'Security', 'route' => 'project.service.vulnerabilities', 'icon' => 'shield-alert',
+            'security' => \App\Services\ImageScan\SecurityStatus::stored($service)->status->value],
         ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)

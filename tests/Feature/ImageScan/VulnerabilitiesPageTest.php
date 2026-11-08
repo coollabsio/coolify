@@ -39,7 +39,7 @@ beforeEach(function () {
     Server::flushIdentityMap();
     config(['app.maintenance.store' => 'array']);
     $this->withoutVite();
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->team = Team::factory()->create();
@@ -806,15 +806,4 @@ describe('sidebar', function () {
         ])->assertSee('aria-label="Security: update now"', false);
     });
 
-    it('hides the item when the instance does not allow image scanning', function () {
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-        Cache::flush();
-        $this->actingAs($this->admin);
-        session(['currentTeam' => $this->team]);
-
-        $this->blade('<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />', [
-            'application' => $this->application->fresh(),
-        ])->assertDontSee('menu-item-label">Security<', false);
-    });
 });

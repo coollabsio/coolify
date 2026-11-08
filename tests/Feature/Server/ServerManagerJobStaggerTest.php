@@ -177,7 +177,6 @@ it('does not dispatch the image rescan for a server that cannot be scanned', fun
     Queue::assertNotPushed(ImageRescanJob::class);
 })->with([
     'scanning off' => [fn (Server $server) => $server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly()],
-    'not allowed on the instance' => [fn () => InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false])],
     'unreachable' => [fn (Server $server) => $server->settings->forceFill(['is_reachable' => false])->saveQuietly()],
     'transferred away' => [fn (Server $server) => $server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly()],
 ]);

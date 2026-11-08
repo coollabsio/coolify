@@ -36,7 +36,7 @@ beforeEach(function () {
     Server::flushIdentityMap();
     config(['app.maintenance.store' => 'array']);
     $this->withoutVite();
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->team = Team::factory()->create();
@@ -360,24 +360,6 @@ describe('topbar warning', function () {
 
         Livewire::test(Heading::class, ['application' => $this->application])
             ->assertDontSeeHtml('data-image-scan-gate');
-    });
-
-    it('reads no deployment when the instance does not allow scanning', function () {
-        surfacesDeployment(['scan_gate_result' => surfacesBlockedResult()]);
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-        $this->actingAs($this->admin);
-        session(['currentTeam' => $this->team]);
-        $component = Livewire::test(Heading::class, ['application' => $this->application]);
-
-        DB::enableQueryLog();
-        $gate = $component->instance()->imageScanGate();
-        $queries = collect(DB::getQueryLog())->pluck('query');
-        DB::disableQueryLog();
-
-        expect($gate)->toBeNull()
-            ->and($queries->filter(fn (string $query) => str_contains($query, 'application_deployment_queues')))->toBeEmpty();
-        $component->assertDontSeeHtml('data-image-scan-gate');
     });
 
     it('reads no deployment when the app scan is off', function () {

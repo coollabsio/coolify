@@ -109,7 +109,6 @@
             @php
                 // Members limited to some projects only see project pages; team-level pages return 403 for them.
                 $teamWide = app(App\Services\Access\AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
-                $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
                 // Project and environment variables need read access there; opening a parent of a granted resource is not enough.
                 $readableProjects = $teamWide ? null : App\Models\Project::ownedByCurrentTeamCached();
                 $canReadProjectVariables = $teamWide || $readableProjects->contains(fn ($project) => auth()->user()->can('viewSharedVariables', $project));
@@ -119,11 +118,11 @@
                     'Workspace' => [
                         ['label' => 'Dashboard', 'icon' => 'dashboard', 'href' => '/', 'active' => request()->is('/', 'dashboard/*', 'canvas')],
                         ['label' => 'Projects', 'icon' => 'projects', 'href' => route('project.index'), 'active' => request()->is('projects', 'projects/*', 'project/*')],
-                        ['label' => 'Monitoring', 'icon' => 'graph', 'visible' => $teamWide || $imageScanningAllowed, 'children' => [
+                        ['label' => 'Monitoring', 'icon' => 'graph', 'children' => [
                             ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics'), 'visible' => $teamWide],
                             ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics'), 'visible' => $teamWide],
                             // Members limited to some projects see the resources they have access to.
-                            ['label' => 'Security', 'icon' => 'shield-alert', 'href' => route('vulnerabilities'), 'active' => request()->is('vulnerabilities'), 'visible' => $imageScanningAllowed],
+                            ['label' => 'Security', 'icon' => 'shield-alert', 'href' => route('vulnerabilities'), 'active' => request()->is('vulnerabilities')],
                         ]],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
@@ -148,7 +147,7 @@
                             ['label' => 'General', 'icon' => 'settings', 'href' => route('team.index'), 'active' => request()->is('team')],
                             ['label' => 'Members', 'icon' => 'teams', 'href' => route('team.member.index'), 'active' => request()->is('team/members*')],
                             ['label' => 'Audit log', 'icon' => 'time-back', 'href' => route('team.audit-log'), 'active' => request()->is('team/audit-log'), 'visible' => auth()->user()?->isAdminOfTeam(currentTeam()->id)],
-                            ['label' => 'Image Scanning', 'icon' => 'shield-alert', 'href' => route('team.image-scanning'), 'active' => request()->is('team/image-scanning'), 'visible' => $imageScanningAllowed],
+                            ['label' => 'Image Scanning', 'icon' => 'shield-alert', 'href' => route('team.image-scanning'), 'active' => request()->is('team/image-scanning')],
                             ['label' => 'Admin View', 'icon' => 'admin', 'href' => route('team.admin-view'), 'active' => request()->is('team/admin'), 'visible' => isInstanceAdmin()],
                             ['label' => 'Danger Zone', 'icon' => 'danger', 'href' => route('team.danger-zone'), 'active' => request()->is('team/danger'), 'visible' => auth()->user()?->can('delete', currentTeam()), 'sectionStart' => true],
                         ]],

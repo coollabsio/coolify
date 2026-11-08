@@ -178,12 +178,6 @@ class FleetVulnerabilities extends Component
         $this->normalizeFilters();
         $user = auth()->user();
         $team = currentTeam();
-        $allowed = (bool) instanceSettings()->is_image_scanning_allowed;
-
-        if (! $allowed) {
-            return view('livewire.image-scan.fleet-vulnerabilities', ['allowed' => false]);
-        }
-
         $fleet = $this->fleet($team->id);
         $entries = $fleet->entries;
 
@@ -213,7 +207,6 @@ class FleetVulnerabilities extends Component
         $notScannedServers = $notScanned->pluck('server')->filter()->unique('id')->count();
 
         return view('livewire.image-scan.fleet-vulnerabilities', [
-            'allowed' => true,
             'items' => $this->paginate($rows),
             'searching' => $searching,
             'notScannedLine' => $notScanned->isEmpty() ? null : self::notScannedSentence($notScanned->count(), $notScannedServers),

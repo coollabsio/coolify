@@ -7,8 +7,6 @@
             'application_uuid' => $application->uuid,
         ];
 
-        $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
-
         $configurationMenuItems = [
             [
                 'label' => 'General',
@@ -138,8 +136,7 @@
                 'label' => 'Security',
                 'route' => 'project.application.vulnerabilities',
                 'active' => $currentRoute === 'project.application.vulnerabilities',
-                'visible' => $imageScanningAllowed,
-                'security' => $imageScanningAllowed ? \App\Services\ImageScan\SecurityStatus::stored($application)->status->value : null,
+                'security' => \App\Services\ImageScan\SecurityStatus::stored($application)->status->value,
             ],
             [
                 'label' => 'Tags',

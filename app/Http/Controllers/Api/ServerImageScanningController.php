@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Actions\ImageScan\SetServerImageScanning;
 use App\Http\Controllers\Controller;
 use App\Jobs\PrepareImageScannerJob;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\ImageScanningRefused;
 use Carbon\CarbonImmutable;
@@ -19,7 +18,7 @@ class ServerImageScanningController extends Controller
     private const ALLOWED_FIELDS = ['is_image_scan_enabled'];
 
     /**
-     * @return array{is_image_scanning_allowed: bool, is_image_scan_enabled: bool, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
+     * @return array{is_image_scan_enabled: bool, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
      */
     private function transform(Server $server): array
     {
@@ -29,7 +28,6 @@ class ServerImageScanningController extends Controller
         $diskUsed = Cache::get(PrepareImageScannerJob::diskUsedCacheKey($server));
 
         return [
-            'is_image_scanning_allowed' => (bool) InstanceSettings::get()->is_image_scanning_allowed,
             'is_image_scan_enabled' => (bool) $server->settings->is_image_scan_enabled,
             'scanner_state' => is_string($state) ? $state : null,
             'scanner_failed_step' => is_string($failedStep) ? $failedStep : null,
@@ -61,7 +59,6 @@ class ServerImageScanningController extends Controller
                 description: 'Image scanning settings.',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'is_image_scanning_allowed', type: 'boolean', readOnly: true, description: 'Whether the Coolify instance allows image scanning.'),
                         new OA\Property(property: 'is_image_scan_enabled', type: 'boolean', description: 'Whether the server scans the images of its resources.'),
                         new OA\Property(property: 'scanner_state', type: 'string', nullable: true, enum: ['pulling', 'updating_database', 'ready', 'failed'], description: 'State of the scanner on the server. Null when unknown.'),
                         new OA\Property(property: 'scanner_failed_step', type: 'string', nullable: true, description: 'The step that failed when scanner_state is failed.'),

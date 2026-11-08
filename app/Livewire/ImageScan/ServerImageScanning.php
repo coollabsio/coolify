@@ -4,7 +4,6 @@ namespace App\Livewire\ImageScan;
 
 use App\Actions\ImageScan\SetServerImageScanning;
 use App\Jobs\PrepareImageScannerJob;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanningRefused;
@@ -65,7 +64,7 @@ class ServerImageScanning extends Component
 
         try {
             SetServerImageScanning::ensureManagedHere($this->server);
-            if (! InstanceSettings::get()->is_image_scanning_allowed || ! $this->server->settings->refresh()->is_image_scan_enabled) {
+            if (! $this->server->settings->refresh()->is_image_scan_enabled) {
                 $this->dispatch('error', message: 'Turn on image scanning first.');
 
                 return;
@@ -124,7 +123,6 @@ class ServerImageScanning extends Component
         $diskUsed = Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server));
 
         return view('livewire.image-scan.server-image-scanning', [
-            'allowed' => (bool) InstanceSettings::get()->is_image_scanning_allowed,
             'enabled' => (bool) $this->server->settings->is_image_scan_enabled,
             'prepareState' => is_string($state) ? $state : null,
             'failedStep' => is_string($failedStep) ? $failedStep : null,

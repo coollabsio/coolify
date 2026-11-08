@@ -403,20 +403,16 @@ it('runs nothing and saves nothing when scanning is off on the server', function
     Process::assertNothingRan();
 });
 
-it('runs nothing when the instance does not allow scanning or the app scan is off', function (string $off) {
+it('runs nothing when the app scan is off', function () {
     scanImageTestFake();
-    if ($off === 'instance') {
-        InstanceSettings::get()->forceFill(['is_image_scanning_allowed' => false])->save();
-    } else {
-        $this->application->settings->forceFill(['is_image_scan_enabled' => false])->save();
-    }
+    $this->application->settings->forceFill(['is_image_scan_enabled' => false])->save();
 
     $scan = ScanImage::run($this->server->fresh(), $this->application->fresh(), 'postgres:15.0-alpine');
 
     expect($scan->exists)->toBeFalse()
         ->and($scan->error_code)->toBe(ImageScanErrorCode::ScanningOff);
     Process::assertNothingRan();
-})->with(['instance', 'app']);
+});
 
 it('runs nothing for a server that was transferred to another instance', function () {
     scanImageTestFake();
@@ -676,8 +672,7 @@ describe('pull when missing', function () {
     ]);
 });
 
-it('updates the vulnerability database once when it is missing', function (?string $url) {
-    InstanceSettings::get()->forceFill(['image_scan_db_url' => $url])->save();
+it('updates the vulnerability database once when it is missing', function () {
     $statusRuns = 0;
     $valid = scanImageTestPayload('db-status', json_encode(['built' => now()->subDay()->toIso8601ZuluString(), 'valid' => true]));
     scanImageTestFake(['db-status' => function () use (&$statusRuns, $valid) {
@@ -689,7 +684,7 @@ it('updates the vulnerability database once when it is missing', function (?stri
     expect($scan->status)->toBe(ImageScanStatus::Completed);
     Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'), 1);
     Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'GRYPE_DB_UPDATE_URL'));
-})->with(['no mirror' => [null], 'empty mirror' => ['']]);
+});
 
 it('fails when the vulnerability database is older than 5 days', function () {
     scanImageTestFake(['db-status' => scanImageTestPayload('db-status', json_encode(['built' => now()->subDays(7)->toIso8601ZuluString(), 'valid' => true]))]);

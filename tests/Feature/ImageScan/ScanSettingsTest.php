@@ -151,39 +151,6 @@ describe('instance page', function () {
         Livewire::test(InstanceImageScanning::class)->assertRedirect(route('dashboard'));
     });
 
-    it('turns image scanning off for the instance', function () {
-        $admin = scanSettingsInstanceAdmin();
-        $this->actingAs($admin);
-        session(['currentTeam' => Team::find(0)]);
-
-        Livewire::test(InstanceImageScanning::class)
-            ->set('isImageScanningAllowed', '0')
-            ->assertDispatched('success');
-
-        expect(InstanceSettings::query()->find(0)->is_image_scanning_allowed)->toBeFalse();
-    });
-
-    it('saves an https vulnerability database URL and rejects http and junk', function (string $url, bool $valid) {
-        $admin = scanSettingsInstanceAdmin();
-        $this->actingAs($admin);
-        session(['currentTeam' => Team::find(0)]);
-
-        $component = Livewire::test(InstanceImageScanning::class)
-            ->set('imageScanDbUrl', $url)
-            ->call('saveDatabaseUrl');
-
-        if ($valid) {
-            $component->assertHasNoErrors();
-            expect(InstanceSettings::query()->find(0)->image_scan_db_url)->toBe($url);
-        } else {
-            $component->assertHasErrors('imageScanDbUrl');
-            expect(InstanceSettings::query()->find(0)->image_scan_db_url)->toBeNull();
-        }
-    })->with([
-        'https' => ['https://mirror.example.com/grype/listing.json', true],
-        'http' => ['http://mirror.example.com/grype/listing.json', false],
-        'junk' => ['not a url', false],
-    ]);
 });
 
 describe('team scope', function () {
@@ -668,7 +635,6 @@ describe('count medium problems', function () {
 
     it('refreshes the stored status of an app right away', function () {
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
-        InstanceSettings::query()->find(0)->forceFill(['is_image_scanning_allowed' => true])->save();
         Once::flush();
         $scan = ImageScan::factory()->create([
             'server_id' => $this->server->id,

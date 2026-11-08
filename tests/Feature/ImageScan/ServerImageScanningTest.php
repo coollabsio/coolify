@@ -127,20 +127,6 @@ describe('server image scanning page', function () {
         Queue::assertNothingPushed();
     });
 
-    it('shows the not allowed state and refuses to turn on when the instance does not allow scanning', function () {
-        Queue::fake();
-        InstanceSettings::get()->forceFill(['is_image_scanning_allowed' => false])->save();
-
-        imageScanningPage()
-            ->assertSee('Image scanning is turned off for this Coolify instance.')
-            ->assertDontSee('Turn on image scanning')
-            ->call('enable')
-            ->assertDispatched('error', message: 'Image scanning is turned off for this Coolify instance.');
-
-        expect($this->server->settings->fresh()->is_image_scan_enabled)->toBeFalse();
-        Queue::assertNothingPushed();
-    });
-
     it('deletes the scanner data on the server and forgets the progress', function () {
         Process::fake(fn () => Process::result(output: ''));
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
@@ -304,15 +290,6 @@ describe('prepare image scanner job', function () {
         expect(Cache::has(PrepareImageScannerJob::stateCacheKey($this->server)))->toBeFalse();
     });
 
-    it('uses the database URL of the instance', function () {
-        InstanceSettings::get()->forceFill(['image_scan_db_url' => 'https://mirror.example.com/grype/listing.json'])->save();
-        fakeScannerPreparation();
-
-        (new PrepareImageScannerJob($this->server))->handle();
-
-        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'GRYPE_DB_UPDATE_URL') && str_contains(remoteProcessScript($process), 'mirror.example.com'));
-    });
-
     it('marks a failed pull and stops before the database update', function () {
         fakeScannerPreparation(['prepare' => "coolify-scan-exit pull-syft 0\ncoolify-scan-exit pull-grype 125\ncoolify-scan-exit pull-regctl 0"]);
 
@@ -371,15 +348,6 @@ describe('prepare image scanner job', function () {
 
         Process::assertNothingRan();
         expect(Cache::has(PrepareImageScannerJob::stateCacheKey($this->server)))->toBeFalse();
-    });
-
-    it('runs no command when the instance does not allow scanning', function () {
-        Process::fake();
-        InstanceSettings::get()->forceFill(['is_image_scanning_allowed' => false])->save();
-
-        (new PrepareImageScannerJob($this->server))->handle();
-
-        Process::assertNothingRan();
     });
 
     it('runs no command for a server that another instance manages', function () {
@@ -463,9 +431,4 @@ describe('create server image scanning choice', function () {
         expect(createServerByIp('off')->settings->is_image_scan_enabled)->toBeFalse();
     });
 
-    it('ignores the choice when the instance does not allow scanning', function () {
-        InstanceSettings::get()->forceFill(['is_image_scanning_allowed' => false])->save();
-
-        expect(createServerByIp('on')->settings->is_image_scan_enabled)->toBeFalse();
-    });
 });

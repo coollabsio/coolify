@@ -2,7 +2,6 @@
 
 namespace App\Livewire\ImageScan;
 
-use App\Models\InstanceSettings;
 use App\Models\Team;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
@@ -25,8 +24,6 @@ class TeamImageScanning extends Component
 
     public function render(): View
     {
-        return view('livewire.image-scan.team-image-scanning', [
-            'allowed' => (bool) InstanceSettings::get()->is_image_scanning_allowed,
-        ]);
+        return view('livewire.image-scan.team-image-scanning');
     }
 }

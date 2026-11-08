@@ -29,9 +29,7 @@
         <div class="application-settings-form flex w-full flex-col gap-6">
             <x-application.settings-section id="server-image-scanning-section" title="Image scanning"
                 helper="Scan the images on this server for known vulnerabilities before and after deployments.">
-                @if (! $allowed)
-                    <x-empty size="sm" title="Image scanning is turned off for this Coolify instance." />
-                @elseif (! $enabled)
+                @if (! $enabled)
                     <x-empty size="sm" icon-name="shield-alert" title="Image scanning is off for {{ $server->name }}."
                         description="{{ $costText }}">
                         <x-slot:actions>
@@ -100,10 +98,8 @@
                 @endif
             </x-application.settings-section>
 
-            @if ($allowed)
-                <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid"
-                    :key="'server-image-scan-settings-'.$server->uuid" />
-            @endif
+            <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid"
+                :key="'server-image-scan-settings-'.$server->uuid" />
         </div>
     </div>
 </div>

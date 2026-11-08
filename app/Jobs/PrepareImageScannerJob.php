@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Actions\ImageScan\ScanImage;
 use App\Events\ImageScanUpdated;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\ScannerCommands;
 use Carbon\CarbonImmutable;
@@ -106,13 +105,12 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
             return;
         }
 
-        $settings = InstanceSettings::get();
-        if (! $settings->is_image_scanning_allowed || ! $server->settings?->is_image_scan_enabled) {
+        if (! $server->settings?->is_image_scan_enabled) {
             return;
         }
 
         try {
-            $this->prepare($server, $settings->image_scan_db_url);
+            $this->prepare($server);
         } catch (\Throwable $e) {
             report($e);
             $this->setState($server, self::STATE_FAILED, self::FAILED_CONNECTION);
@@ -124,7 +122,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         $this->setState($this->server, self::STATE_FAILED);
     }
 
-    private function prepare(Server $server, ?string $dbUrl): void
+    private function prepare(Server $server): void
     {
         $commands = new ScannerCommands($server, Str::lower(Str::random(24)));
 
@@ -166,7 +164,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         }
 
         try {
-            $updated = self::run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
+            $updated = self::run($commands->dbUpdate(), $server, self::TIMEOUT_DB_UPDATE);
         } finally {
             $lock->release();
         }

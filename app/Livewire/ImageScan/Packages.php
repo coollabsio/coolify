@@ -147,11 +147,9 @@ class Packages extends Component
     public function render(): View
     {
         $resource = $this->resource();
-        $scans = instanceSettings()->is_image_scanning_allowed
-            ? ResourceScans::current($resource, null, ['id', 'uuid', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_sbom_id', 'image_ref', 'scanned_at'])
-                ->filter(fn (ImageScan $scan): bool => $scan->image_sbom_id !== null)
-                ->values()
-            : collect();
+        $scans = ResourceScans::current($resource, null, ['id', 'uuid', 'resource_type', 'resource_id', 'deployment_queue_id', 'image_sbom_id', 'image_ref', 'scanned_at'])
+            ->filter(fn (ImageScan $scan): bool => $scan->image_sbom_id !== null)
+            ->values();
 
         $sboms = ImageSbom::query()->whereIn('id', $scans->pluck('image_sbom_id')->unique())->get()->keyBy('id');
 

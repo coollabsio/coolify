@@ -36,7 +36,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Server::flushIdentityMap();
     config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Process::fake();
     Queue::fake();
 

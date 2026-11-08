@@ -27,7 +27,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Server::flushIdentityMap();
     Storage::fake('ssh-keys');
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $team = Team::factory()->create();
     $this->server = Server::factory()->create([

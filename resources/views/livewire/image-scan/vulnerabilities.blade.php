@@ -9,10 +9,7 @@
 @endphp
 
 <div class="flex flex-col gap-6">
-    @if ($offState === 'instance')
-        <x-empty title="Image scanning is off for this Coolify instance."
-            description="An instance admin can allow it in Settings." icon-name="shield-alert" />
-    @elseif ($offState === 'server')
+    @if ($offState === 'server')
         <x-empty title="Image scanning is off for {{ $serverName }}."
             :description="$serverUrl === null ? 'Ask a team admin to turn it on.' : null" icon-name="shield-alert">
             @if ($serverUrl !== null)

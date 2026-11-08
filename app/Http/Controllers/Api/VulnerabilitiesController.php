@@ -54,7 +54,6 @@ class VulnerabilitiesController extends Controller
                 description: 'Resources with their security status, worst first.',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'is_image_scanning_allowed', type: 'boolean'),
                         new OA\Property(property: 'resources', type: 'array', items: new OA\Items(
                             properties: [
                                 new OA\Property(property: 'uuid', type: 'string'),
@@ -108,7 +107,6 @@ class VulnerabilitiesController extends Controller
             ->values();
 
         return response()->json([
-            'is_image_scanning_allowed' => (bool) instanceSettings()->is_image_scanning_allowed,
             'resources' => $resources,
         ]);
     }

@@ -107,12 +107,9 @@ class ScannerCommands
     /**
      * @return list<string>
      */
-    public function dbUpdate(?string $dbUrl): array
+    public function dbUpdate(): array
     {
         $env = ['GRYPE_DB_CACHE_DIR' => '/db', 'TMPDIR' => '/db/tmp'];
-        if ($dbUrl !== null) {
-            $env['GRYPE_DB_UPDATE_URL'] = $this->validDatabaseUrl($dbUrl);
-        }
 
         return [
             ...$this->start(['scratch']),
@@ -774,17 +771,5 @@ class ScannerCommands
         if (preg_match('/\A[a-z0-9][a-z0-9-]{0,99}\z/', $name) !== 1) {
             throw new InvalidArgumentException('Invalid SBOM name.');
         }
-    }
-
-    /**
-     * No `&`, `|`, `$`, or quotes: the sudo parser rewrites `&&`, `||`, and `$(` even inside quotes.
-     */
-    private function validDatabaseUrl(string $url): string
-    {
-        if (preg_match('#\Ahttps?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~%/+=-]*)?\z#', $url) !== 1) {
-            throw new InvalidArgumentException('Invalid vulnerability database URL.');
-        }
-
-        return $url;
     }
 }

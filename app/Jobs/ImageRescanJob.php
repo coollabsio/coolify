@@ -12,7 +12,6 @@ use App\Models\ApplicationPreview;
 use App\Models\ImageSbom;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ResourceScans;
@@ -76,12 +75,11 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Scanning is on for the server and allowed on the instance, and this instance can reach the server.
+     * Scanning is on for the server, and this instance can reach the server.
      */
     public static function canRunOn(Server $server): bool
     {
         return (bool) $server->settings?->is_image_scan_enabled
-            && (bool) InstanceSettings::query()->whereKey(0)->value('is_image_scanning_allowed')
             && ! $server->isTransferredAway()
             && $server->isFunctional();
     }
@@ -357,10 +355,8 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             return false;
         }
 
-        $url = InstanceSettings::get()->image_scan_db_url;
-
         try {
-            $output = instant_remote_process($commands->dbUpdate(is_string($url) && trim($url) !== '' ? trim($url) : null), $server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
+            $output = instant_remote_process($commands->dbUpdate(), $server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
             if ((ScannerCommands::parseOutput($output)['exit_codes']['db-update'] ?? null) === 0) {
                 PrepareImageScannerJob::storeDetails($server, $commands);
             }
