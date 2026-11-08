@@ -17,6 +17,7 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 | `v4.4.x`       | backports and hotfixes, cut from the newest tag of v4.4    | stable `4.4.x` versions                |
 
 - `main` takes fixes only. A new minor or major reaches it as a merge of `next` or a release branch
+- Merge `next` or a release branch into `main` only right before you release it, on the same day. To freeze a minor for longer, publish an RC on `next` or cut `release/v4.7`
 - `next` and the release branches publish prereleases only, their stable versions are released on `main`
 - Name a branch after what it changes: `fix/<topic>`, `feat/<topic>`, and `fix/<topic>-v4.4.8` for a backport, after the version that releases it
 - Squash merge pull requests from contributors and pull requests with a single change, such as dependency updates

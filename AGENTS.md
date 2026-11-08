@@ -289,6 +289,7 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 ## Git Workflow
 
 - Production branch: `main`. It takes fixes only. A new minor or major version gets to `main` as a merge of `next` or a release branch.
+- Merge `next` or a release branch into `main` only right before its release, on the same day. To freeze a minor for longer, publish an RC on `next` or cut a `release/v*` branch.
 - Development branch: `next`. It takes features and publishes prereleases only.
 - Fix PRs target `main`. Feature PRs target `next`.
 - Name a branch after its change: `fix/<topic>` or `feat/<topic>`. Name a backport branch after the version that releases it: `fix/<topic>-v4.4.8`.
