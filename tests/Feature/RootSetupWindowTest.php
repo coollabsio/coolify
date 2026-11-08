@@ -52,6 +52,9 @@ it('creates the root user during the setup window', function () {
 });
 
 it('shows how to open the setup window again when it is closed', function () {
+    RootSetupWindow::openIfNoUserExists();
+    $this->travel(RootSetupWindow::MINUTES * 60 + 1)->seconds();
+
     $this->get('/register')
         ->assertOk()
         ->assertSee('docker restart coolify')

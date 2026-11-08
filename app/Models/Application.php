@@ -1820,7 +1820,8 @@ class Application extends BaseModel
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
         $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$deployment_uuid}";
-        $base_command = 'git ls-remote';
+        // `--` ends the options, so a repository value that starts with `-` is not read as a git option.
+        $base_command = 'git ls-remote --';
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
@@ -1969,7 +1970,7 @@ class Application extends BaseModel
             $escapedCustomRepository = escapeshellarg($customRepository);
             $gitConfigOption = $this->gitHttpsCredentialConfigOption();
             if ($gitConfigOption) {
-                $base_command = "git {$gitConfigOption} ls-remote";
+                $base_command = "git {$gitConfigOption} ls-remote --";
             }
             if ($this->gitUsesSsh()) {
                 $sshCommand = gitSshCommand($deployment_uuid, $customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
@@ -2163,9 +2164,10 @@ class Application extends BaseModel
             }
         }
 
-        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
+        // `--` ends the options, so a repository value that starts with `-` is not read as a git option.
+        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch} --";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch} --";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";

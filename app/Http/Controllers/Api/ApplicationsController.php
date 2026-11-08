@@ -3682,6 +3682,10 @@ class ApplicationsController extends Controller
             'ports_exposes' => 'nullable|string|regex:/^(\d+)(,\d+)*$/',
         ];
         $validationRules = array_merge(sharedDataApplications($application), $validationRules);
+        // A change of Gitea source checks the repository against the Gitea instance below.
+        if ($request->input('git_repository') !== $application->git_repository && ! $request->has('gitea_app_uuid')) {
+            $validationRules['git_repository'] = ['string', new ValidGitRepositoryUrl(allowRepositoryPath: true)];
+        }
         $validationMessages = [
             ...ValidationPatterns::combinedMessages(),
             'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
@@ -6584,7 +6588,7 @@ class ApplicationsController extends Controller
             content: new OA\JsonContent(
                 required: ['commit'],
                 properties: [
-                    new OA\Property(property: 'commit', type: 'string', description: 'Image tag / commit to roll back to.'),
+                    new OA\Property(property: 'commit', type: 'string', description: 'Image tag / commit to roll back to. Must be a tag from the rollback images list or the commit of a successful production deployment.'),
                 ]
             )
         ),
@@ -6647,6 +6651,13 @@ class ApplicationsController extends Controller
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => ['commit' => [$e->getMessage()]],
+            ], 422);
+        }
+
+        if (! GetRollbackImages::allows($application, $commit)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['commit' => ['The commit is not a rollback image or a successful deployment of this application.']],
             ], 422);
         }
 

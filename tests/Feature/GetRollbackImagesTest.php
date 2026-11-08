@@ -175,3 +175,12 @@ describe('on a reachable server', function () {
             ]);
     });
 });
+
+it('allows a rollback only to a listed image or a successful production deployment', function () {
+    rollbackDeployment($this->application, 'aaaaaaa', '2026-10-01 10:00:00');
+    rollbackDeployment($this->application, 'bbbbbbb', '2026-10-02 10:00:00', ['pull_request_id' => 3]);
+
+    expect(GetRollbackImages::allows($this->application, 'aaaaaaa'))->toBeTrue()
+        ->and(GetRollbackImages::allows($this->application, 'bbbbbbb'))->toBeFalse()
+        ->and(GetRollbackImages::allows($this->application, str_repeat('f', 40)))->toBeFalse();
+});

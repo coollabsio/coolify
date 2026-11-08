@@ -43,7 +43,8 @@ trait ListensToTeamChannel
         }
 
         try {
-            $payload = decrypt($event['payload']);
+            // The payload comes from the browser: unserialize it without classes.
+            $payload = unserialize(decrypt($event['payload'], false), ['allowed_classes' => false]);
         } catch (DecryptException) {
             return [];
         }

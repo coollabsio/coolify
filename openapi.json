@@ -62,7 +62,7 @@
                     "Applications"
                 ],
                 "summary": "Create Preview Deployment",
-                "description": "Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.",
+                "description": "Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. A token with the deploy permission can only redeploy an existing preview without changes; opening a preview or changing its pull request URL, git type, or docker tag also needs the write permission. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.",
                 "operationId": "create-preview-deployment-by-application-uuid",
                 "parameters": [
                     {
@@ -166,6 +166,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Missing permissions. Opening or changing a preview needs the write permission."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -6649,7 +6652,7 @@
                                 ],
                                 "properties": {
                                     "commit": {
-                                        "description": "Image tag \/ commit to roll back to.",
+                                        "description": "Image tag \/ commit to roll back to. Must be a tag from the rollback images list or the commit of a successful production deployment.",
                                         "type": "string"
                                     }
                                 },
@@ -11645,7 +11648,7 @@
                     {
                         "name": "docker_tag",
                         "in": "query",
-                        "description": "Docker image tag for Docker Image preview deployments. Requires pull_request_id.",
+                        "description": "Docker image tag for Docker Image preview deployments. Requires pull_request_id. Opening a preview or changing its tag also needs the write permission.",
                         "schema": {
                             "type": "string"
                         }

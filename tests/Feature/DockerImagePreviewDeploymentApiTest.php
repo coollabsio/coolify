@@ -184,3 +184,33 @@ test('a member without deploy access cannot create or change a docker image prev
     expect($application->previews()->pluck('docker_registry_image_tag', 'pull_request_id')->all())->toBe([7 => 'pr_7']);
     expect($application->deployment_queue()->count())->toBe(0);
 });
+
+test('a deploy-only token cannot open or retag a docker image preview but can redeploy it', function () {
+    $application = createDockerImageApplication($this->environment, $this->destination);
+    ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => '',
+        'docker_registry_image_tag' => 'pr_7',
+    ]);
+    $token = $this->user->createToken('deploy-only', ['deploy'], null, $this->team->id)->plainTextToken;
+
+    foreach ([[1234, 'pr_1234'], [7, 'other']] as [$pullRequestId, $dockerTag]) {
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])->postJson('/api/v1/deploy', [
+            'uuid' => $application->uuid,
+            'pull_request_id' => $pullRequestId,
+            'docker_tag' => $dockerTag,
+        ])->assertJsonPath('deployments.0.message', 'Missing required permissions: write. Opening a preview or changing its docker tag needs the write permission.');
+    }
+
+    expect($application->previews()->pluck('docker_registry_image_tag', 'pull_request_id')->all())->toBe([7 => 'pr_7'])
+        ->and($application->deployment_queue()->count())->toBe(0);
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token])->postJson('/api/v1/deploy', [
+        'uuid' => $application->uuid,
+        'pull_request_id' => 7,
+        'docker_tag' => 'pr_7',
+    ])->assertSuccessful();
+
+    expect($application->deployment_queue()->latest('id')->first()->docker_registry_image_tag)->toBe('pr_7');
+});

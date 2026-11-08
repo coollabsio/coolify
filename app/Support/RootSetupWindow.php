@@ -13,19 +13,30 @@ class RootSetupWindow
 {
     public const MINUTES = 10;
 
-    private const CACHE_KEY = 'root-setup-window';
+    private const CACHE_KEY = 'root-setup-window-closes-at';
 
+    /**
+     * The key has no TTL: app:init clears the cache before it calls this, so a missing key
+     * means that Coolify has not finished starting, not that the window is closed.
+     */
     public static function openIfNoUserExists(): void
     {
         if (User::query()->exists()) {
             return;
         }
 
-        Cache::put(self::CACHE_KEY, true, now()->addMinutes(self::MINUTES));
+        Cache::forever(self::CACHE_KEY, now()->addMinutes(self::MINUTES)->getTimestamp());
     }
 
     public static function isOpen(): bool
     {
-        return Cache::has(self::CACHE_KEY);
+        $closesAt = Cache::get(self::CACHE_KEY);
+
+        return is_int($closesAt) && now()->getTimestamp() < $closesAt;
+    }
+
+    public static function isPending(): bool
+    {
+        return ! Cache::has(self::CACHE_KEY);
     }
 }

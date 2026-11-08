@@ -20,6 +20,7 @@ use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
+use App\Http\Middleware\RejectPublishedAppKey;
 use App\Http\Middleware\RequirePassword;
 use App\Http\Middleware\RequireTeamTwoFactor;
 use App\Http\Middleware\ThrottleFailedApiRequests;
@@ -57,6 +58,7 @@ class Kernel extends HttpKernel
     protected $middleware = [
         // Outermost so Server-Timing includes the full middleware + app cost.
         AddServerTimingHeaders::class,
+        RejectPublishedAppKey::class,
         TrustProxies::class,
         HandleCors::class,
         ThrottleFailedApiRequests::class,
