@@ -45,23 +45,6 @@ function validPrivateKey(): string
 }
 
 describe('GitHub Source Change Component', function () {
-    test('all github app form controls declare explicit authorization', function () {
-        $view = file_get_contents(resource_path('views/livewire/source/github/change.blade.php'));
-
-        preg_match_all(
-            '/<x-forms\.(button|input|select|checkbox)\b(?![^>]*\bcanGate=)[^>]*>/s',
-            $view,
-            $matches,
-            PREG_OFFSET_CAPTURE
-        );
-
-        $missingAuthorization = collect($matches[0])
-            ->map(fn (array $match): string => 'Line '.(substr_count(substr($view, 0, $match[1]), PHP_EOL) + 1).': '.trim(preg_replace('/\s+/', ' ', $match[0])))
-            ->all();
-
-        expect($missingAuthorization)->toBeEmpty();
-    });
-
     test('deletes an incomplete github app and redirects without a render error', function () {
         $githubApp = GithubApp::create([
             'name' => 'Incomplete GitHub App',

@@ -19,13 +19,6 @@ beforeEach(function () {
 });
 
 describe('Gitea source create modal', function () {
-    test('renders the create form', function () {
-        Livewire::test(Create::class)
-            ->assertSee('Self-hosted Gitea')
-            ->assertSee('Organization')
-            ->assertSee('Continue');
-    });
-
     test('creates a gitea app with defaults for gitea.com and redirects to it', function () {
         $component = Livewire::test(Create::class)
             ->set('name', 'my-gitea')

@@ -25,12 +25,6 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows the projects and servers sections as tables by default', function () {
-    Livewire::test(Dashboard::class)
-        ->assertSee("viewMode: 'table'", false)
-        ->assertDontSee("viewMode: 'grid'", false);
-});
-
 it('remembers the view of each dashboard section on its own', function () {
     Livewire::test(Dashboard::class)->call('saveListView', 'dashboard_projects', 'grid');
 

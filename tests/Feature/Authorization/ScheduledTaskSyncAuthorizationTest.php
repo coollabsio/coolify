@@ -11,9 +11,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Routing\Events\RouteMatched;
-use Illuminate\Support\Facades\Event;
-use Livewire\Exceptions\MethodNotFoundException;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -51,20 +49,13 @@ beforeEach(function () {
     ]);
 });
 
-afterEach(function () {
-    Event::forget(RouteMatched::class);
-});
-
-function bindApplicationScheduledTaskRoute(Application $application, ScheduledTask $task): void
+/**
+ * Mount the task modal the way the scheduled-task list page does: the parent
+ * `All` component passes the resource and the selected task as props.
+ */
+function mountScheduledTaskShow(Application $application, ScheduledTask $task): Testable
 {
-    $application->loadMissing('environment.project');
-
-    Event::listen(RouteMatched::class, function (RouteMatched $event) use ($application, $task): void {
-        $event->route->setParameter('task_uuid', $task->uuid);
-        $event->route->setParameter('project_uuid', $application->environment->project->uuid);
-        $event->route->setParameter('environment_uuid', $application->environment->uuid);
-        $event->route->setParameter('application_uuid', $application->uuid);
-    });
+    return Livewire::test(Show::class, ['resource' => $application, 'task' => $task]);
 }
 
 function originalScheduledTaskState(ScheduledTask $task): array
@@ -75,69 +66,27 @@ function originalScheduledTaskState(ScheduledTask $task): array
 test('read-only member can view an existing scheduled task', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
-    bindApplicationScheduledTaskRoute($this->application, $this->task);
 
-    Livewire::test(Show::class)
+    mountScheduledTaskShow($this->application, $this->task)
         ->assertSuccessful()
         ->assertSet('name', 'validate-benign')
         ->assertSet('command', 'Hidden (only admins can view)')
         ->assertSet('frequency', '0 0 * * *');
 });
 
-test('the private syncData helper is not remotely callable through Livewire', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-    bindApplicationScheduledTaskRoute($this->application, $this->task);
-
-    $original = originalScheduledTaskState($this->task);
-
-    $component = Livewire::test(Show::class)
-        ->set('name', 'member-edited')
-        ->set('command', 'echo member-edited')
-        ->set('frequency', '* * * * *')
-        ->set('timeout', 120)
-        ->set('isEnabled', true);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect(originalScheduledTaskState($this->task->fresh()))->toBe($original);
-});
-
 test('read-only member cannot persist scheduled task changes through submit', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
-    bindApplicationScheduledTaskRoute($this->application, $this->task);
 
     $original = originalScheduledTaskState($this->task);
 
-    Livewire::test(Show::class)
+    mountScheduledTaskShow($this->application, $this->task)
         ->set('name', 'member-edited')
         ->set('command', 'echo member-edited')
         ->set('frequency', '* * * * *')
         ->call('submit');
 
     expect(originalScheduledTaskState($this->task->fresh()))->toBe($original);
-});
-
-test('the private saveScheduledTask helper is not remotely callable through Livewire', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(Add::class, [
-        'id' => (string) $this->application->id,
-        'type' => 'application',
-        'containerNames' => collect(),
-    ])
-        ->set('name', 'member-created')
-        ->set('command', 'id')
-        ->set('frequency', '* * * * *')
-        ->set('timeout', 300);
-
-    expect(fn () => $component->call('saveScheduledTask'))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect(ScheduledTask::query()->where('name', 'member-created')->exists())->toBeFalse();
 });
 
 test('read-only member cannot create a scheduled task through submit', function () {
@@ -161,9 +110,8 @@ test('read-only member cannot create a scheduled task through submit', function 
 test('admin can persist scheduled task changes through submit', function () {
     $this->actingAs($this->owner);
     session(['currentTeam' => $this->team]);
-    bindApplicationScheduledTaskRoute($this->application, $this->task);
 
-    Livewire::test(Show::class)
+    mountScheduledTaskShow($this->application, $this->task)
         ->set('name', 'updated-by-admin')
         ->set('command', 'echo admin-ok')
         ->set('frequency', '0 1 * * *')

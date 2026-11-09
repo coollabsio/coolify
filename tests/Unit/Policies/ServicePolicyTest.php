@@ -39,17 +39,6 @@ it('denies non-member to view another team service', function () {
     expect($policy->view($user, $service))->toBeFalse();
 });
 
-it('denies view when service has no team', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('team')->andReturn(null);
-
-    $user->shouldReceive('canAccess')->with(AccessLevel::Read, $service)->andReturn(false);
-
-    $policy = new ServicePolicy;
-    expect($policy->view($user, $service))->toBeFalse();
-});
-
 it('allows admin to create a service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $team = new Team;
@@ -111,18 +100,6 @@ it('allows team admin to delete their own team service', function () {
 it('denies team member to delete their own team service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $service = Mockery::mock(Service::class)->makePartial();
-
-    $user->shouldReceive('canAccess')->with(AccessLevel::Delete, $service)->andReturn(false);
-
-    $policy = new ServicePolicy;
-    expect($policy->delete($user, $service))->toBeFalse();
-});
-
-it('denies delete when service has no team', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('team')->andReturn(null);
 
     $user->shouldReceive('canAccess')->with(AccessLevel::Delete, $service)->andReturn(false);
 

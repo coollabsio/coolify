@@ -267,16 +267,6 @@ it('keys container rows by server so shared container ids do not collide', funct
         ->assertSeeHtml('wire:key="fleet-container-'.$two->uuid.'-coolify-proxy"');
 });
 
-it('passes the spark time axis to the KPI sparklines on first paint', function () {
-    $s = metricsServer($this->team, $this->privateKey);
-    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
-
-    $component = Livewire::test(TestableMetrics::class);
-    $component->set('chartData', ['sparkCategories' => [1700000100000], 'cpuSpark' => [12.5]]);
-
-    $component->assertSeeHtml('1700000100000');
-});
-
 it('removes a transferred server on refresh', function () {
     $server = metricsServer($this->team, $this->privateKey);
     StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];

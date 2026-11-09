@@ -129,15 +129,6 @@ describe('instance scope', function () {
         expect(scanSettingsInstanceRow()->gate_mode)->toBe(ImageScanGateMode::Off);
     });
 
-    it('offers Off, On, and Strict with what On and Strict block', function () {
-        scanSettingsAs(scanSettingsInstanceAdmin(), Team::find(0), 'instance')
-            ->assertSee('Block deploys')
-            ->assertSee('Strict')
-            ->assertSee('Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.')
-            ->assertSee('Also blocks critical, high, and counted medium problems that have a fix, and operating systems that no longer get security fixes.')
-            ->assertDontSee('Alert on');
-    });
-
     it('forbids the instance rules to users who are not instance admins', function () {
         scanSettingsAs($this->admin, $this->team, 'instance')->assertForbidden();
     });

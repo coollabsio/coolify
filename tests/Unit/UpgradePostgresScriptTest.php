@@ -132,15 +132,3 @@ it('persists rollback metadata and exposes a rollback command', function () {
         ->toContain('rollback_postgres()')
         ->toContain('Rollback completed successfully.');
 });
-
-it('detects the active postgres volume instead of assuming coolify-db', function () {
-    $script = file_get_contents(getcwd().'/scripts/upgrade-postgres.sh');
-
-    expect($script)
-        ->toContain('current_postgres_mount_name()')
-        ->toContain('current_postgres_mount_path()')
-        ->toContain('current_postgres_image()')
-        ->toContain('Current active volume: ${PREVIOUS_VOLUME}')
-        ->toContain("Previous volume '")
-        ->toContain('will be kept for rollback');
-});

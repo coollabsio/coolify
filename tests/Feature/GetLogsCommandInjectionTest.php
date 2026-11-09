@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
-use Livewire\Attributes\Locked;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -43,33 +43,18 @@ beforeEach(function () {
 });
 
 describe('GetLogs locked properties', function () {
-    test('container property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'container');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('server property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'server');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('resource property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'resource');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('servicesubtype property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'servicesubtype');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
+    test('rejects a client update of a locked property', function (string $property, mixed $value) {
+        Livewire::test(GetLogs::class, [
+            'server' => $this->server,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])->set($property, $value);
+    })->with([
+        'container' => ['container', 'container;id'],
+        'server' => ['server', 1],
+        'resource' => ['resource', 1],
+        'servicesubtype' => ['servicesubtype', 1],
+    ])->throws(CannotUpdateLockedPropertyException::class);
 });
 
 describe('GetLogs Livewire action validation', function () {

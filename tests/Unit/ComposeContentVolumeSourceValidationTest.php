@@ -24,9 +24,7 @@ function contentVolumeCompose(string $source, array $extra = ['content' => "key=
 }
 
 it('accepts content volumes with any host path, like Coolify v4.3.23', function (string $source) {
-    validateDockerComposeForInjection(contentVolumeCompose($source));
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection(contentVolumeCompose($source)))->not->toThrow(Exception::class);
 })->with([
     'absolute host file' => ['/etc/myapp/app.conf'],
     'home directory' => ['~/x/app.conf'],
@@ -61,9 +59,7 @@ it('rejects a content volume without a source', function () {
 });
 
 it('does not change bind volumes without content', function (string $compose) {
-    validateDockerComposeForInjection($compose);
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
 })->with([
     'docker socket short syntax' => ["services:\n  app:\n    image: nginx\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n"],
     'docker socket long syntax' => ["services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: /var/run/docker.sock\n        target: /var/run/docker.sock\n"],
@@ -74,9 +70,7 @@ it('does not change bind volumes without content', function (string $compose) {
 ]);
 
 it('ignores content on named volumes because Coolify does not write it', function () {
-    validateDockerComposeForInjection(contentVolumeCompose('app-data', ['type' => 'volume', 'content' => 'x']));
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection(contentVolumeCompose('app-data', ['type' => 'volume', 'content' => 'x'])))->not->toThrow(Exception::class);
 });
 
 it('resolves the directory the parsers use for each resource', function () {
@@ -110,7 +104,5 @@ function composeTemplatesWithContentVolumes(): array
 }
 
 it('accepts every service template with content volumes', function (string $file) {
-    validateDockerComposeForInjection(file_get_contents($file));
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection(file_get_contents($file)))->not->toThrow(Exception::class);
 })->with(composeTemplatesWithContentVolumes());

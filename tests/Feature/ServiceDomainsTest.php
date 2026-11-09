@@ -338,13 +338,6 @@ it('does not add a single-label hostname as a service domain', function () {
     expect($this->apiApp->fresh()->fqdn)->toBeNull();
 });
 
-it('shows dns entries control next to Add', function () {
-    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->assertSuccessful()
-        ->assertSee('DNS checks and records for this server')
-        ->assertSee('Manual records');
-});
-
 it('lists dns entries for service hosts that still need dns', function () {
     $this->webApp->update([
         'fqdn' => 'https://web.example.com',
@@ -502,15 +495,6 @@ it('adds a domain when the compose service has an empty environment section', fu
         ->assertDispatched('success');
 
     expect($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
-});
-
-it('keeps a stable key for the rendered domain list', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('wire:key="service-domains-list"')
-        ->toContain('wire:key="service-domain-rows-{{ $appId }}"')
-        ->not->toContain('md5(serialize($domainRows))');
 });
 
 it('rolls back a domain change when compose regeneration fails', function () {

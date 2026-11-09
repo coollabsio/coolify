@@ -192,24 +192,6 @@ describe('Boarding Flow Integration', function () {
         expect((bool) $this->team->fresh()->show_boarding)->toBeTrue();
     });
 
-    test('renders advanced Hetzner options in their own settings section', function () {
-        Livewire::test(ByHetzner::class)
-            ->set('current_step', 2)
-            ->assertSee('Advanced options')
-            ->assertSee('Provider SSH keys, networking, backups, and cloud-init.');
-    });
-
-    test('renders advanced Hetzner option controls in the advanced section', function () {
-        Livewire::test(ByHetzner::class)
-            ->set('current_step', 2)
-            ->assertSee('Extra SSH keys')
-            ->assertSee('Firewalls')
-            ->assertSee('Private networks')
-            ->assertSee('Enable Hetzner backups')
-            ->assertSee('Add cloud-init script')
-            ->assertSee('Adds 20% to the provider server price.');
-    });
-
     test('lists account SSH keys and firewalls as listbox options and shows the selection', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)

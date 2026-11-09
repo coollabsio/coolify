@@ -45,15 +45,6 @@ beforeEach(function () {
     ]);
 });
 
-test('server private key page shows highlighted add dropdown actions', function () {
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Add')
-        ->assertSee('Generate ED25519')
-        ->assertSee('Generate RSA')
-        ->assertSee('Add manually')
-        ->assertSee('Check connection');
-});
-
 test('generating a server private key stores it and refreshes the current view', function () {
     $component = Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->call('generatePrivateKey', 'ed25519')

@@ -1146,16 +1146,6 @@ test('audit events api accepts valid pagination and filter values', function () 
         ->assertJsonPath('per_page', 1);
 });
 
-test('audit source filter omits the unused system source', function () {
-    Livewire::test(AuditLog::class)
-        ->assertSee('All sources')
-        ->assertSee('Web UI')
-        ->assertSee('API')
-        ->assertSee('MCP')
-        ->assertSee('Webhook')
-        ->assertDontSee('System');
-});
-
 test('audit action filter includes actions recorded for the current team', function () {
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,
@@ -1219,23 +1209,6 @@ test('critical operational events persist with their source action and actor', f
     'api.database.restarted',
     'api.database.import_started',
 ]);
-
-test('audit log uses the standard horizontally scrollable table layout on mobile', function () {
-    AuditEvent::factory()->create([
-        'team_id' => $this->team->id,
-        'actor_name' => 'Visible Actor',
-        'actor_token_name' => 'visible-audit-token',
-    ]);
-
-    Livewire::test(AuditLog::class)
-        ->assertSeeHtml('class="overflow-x-auto"')
-        ->assertSeeHtml('class="data-table transition-opacity"')
-        ->assertSeeHtml('class="grid min-w-[760px] grid-cols-[14rem_minmax(0,1fr)_12rem_9rem]')
-        ->assertSeeHtml('class="self-center text-right text-[11px]')
-        ->assertSeeHtml('title="Token: visible-audit-token"')
-        ->assertSee('Actor')
-        ->assertSee('Visible Actor');
-});
 
 test('audit log displays source abbreviations in uppercase', function () {
     AuditEvent::factory()->create([

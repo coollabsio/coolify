@@ -1,9 +1,28 @@
 <?php
 
+use App\Livewire\Project\Database\InitScript;
+use App\Livewire\Project\Shared\Storages\VolumeBackups;
+use App\Livewire\Storage\Resources as StorageResources;
+use App\Models\Application;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\LocalPersistentVolume;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -51,182 +70,149 @@ it('declares gate attributes on form controls with update permission checks', fu
     }
 });
 
-it('hides resource action menus when the user cannot manage the resource', function (string $path, string $ability, string $resource, string $prefix) {
-    $source = file_get_contents(resource_path($path));
+function actAsMutableComponentUser(User $user): void
+{
+    test()->actingAs($user);
+    session(['currentTeam' => test()->team]);
+}
 
-    foreach (['mobile', 'desktop'] as $viewport) {
-        expect($source)->toMatch(
-            "/@can\\('{$ability}', \\$".$resource."\\)[\\s\\S]*?<x-split-action id=\"{$prefix}-{$viewport}-actions\"/"
-        );
-    }
-})->with([
-    'application actions' => ['views/livewire/project/application/heading.blade.php', 'deploy', 'application', 'application'],
-    'service actions' => ['views/livewire/project/service/heading.blade.php', 'deploy', 'service', 'service'],
-    'database actions' => ['views/livewire/project/database/heading.blade.php', 'manage', 'database', 'database'],
-    'server actions' => ['views/livewire/server/navbar.blade.php', 'manageProxy', 'server', 'server'],
-]);
+describe('mutating Livewire actions', function () {
+    beforeEach(function () {
+        Server::flushIdentityMap();
+        Queue::fake();
+        InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
-it('declares deploy authorization on the application stop confirmation', function () {
-    $source = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+        $this->team = Team::factory()->create();
+        $this->admin = User::factory()->create();
+        $this->admin->teams()->attach($this->team, ['role' => 'admin']);
+        $this->member = User::factory()->create();
+        $this->member->teams()->attach($this->team, ['role' => 'member']);
 
-    expect($source)->toMatch(
-        '/<x-modal-confirmation\s+canGate="deploy" :canResource="\$application"/'
-    );
+        $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+        $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $privateKey->id]);
+        $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+        $project = Project::factory()->create(['team_id' => $this->team->id]);
+        $environment = Environment::factory()->create(['project_id' => $project->id]);
+        $this->application = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ]);
+        $this->volume = LocalPersistentVolume::create([
+            'name' => 'app-data',
+            'mount_path' => '/data',
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+        $this->database = StandalonePostgresql::create([
+            'name' => 'pg',
+            'image' => 'postgres:16-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $environment->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ]);
+        $this->storage = S3Storage::create([
+            'name' => 'Team S3',
+            'region' => 'us-east-1',
+            'key' => 'key',
+            'secret' => 'secret',
+            'bucket' => 'backups',
+            'endpoint' => 'https://s3.example.com',
+            'is_usable' => true,
+            'team_id' => $this->team->id,
+        ]);
+        $this->databaseBackup = ScheduledDatabaseBackup::create([
+            'frequency' => '0 0 * * *',
+            'save_s3' => true,
+            's3_storage_id' => $this->storage->id,
+            'database_type' => $this->database->getMorphClass(),
+            'database_id' => $this->database->id,
+            'team_id' => $this->team->id,
+        ]);
+    });
+
+    it('forbids members from removing an S3 storage from a backup schedule', function () {
+        actAsMutableComponentUser($this->member);
+
+        Livewire::test(StorageResources::class, ['storage' => $this->storage])
+            ->call('disableS3', $this->databaseBackup->id)
+            ->assertForbidden();
+
+        expect($this->databaseBackup->refresh()->save_s3)->toBeTruthy()
+            ->and($this->databaseBackup->s3_storage_id)->toBe($this->storage->id);
+    });
+
+    it('lets admins remove an S3 storage from a backup schedule', function () {
+        actAsMutableComponentUser($this->admin);
+
+        Livewire::test(StorageResources::class, ['storage' => $this->storage])
+            ->call('disableS3', $this->databaseBackup->id)
+            ->assertDispatched('success');
+
+        expect($this->databaseBackup->refresh()->save_s3)->toBeFalsy()
+            ->and($this->databaseBackup->s3_storage_id)->toBeNull();
+    });
+
+    it('forbids users of another team from opening the storage resources', function () {
+        $outsider = User::factory()->create();
+        $otherTeam = Team::factory()->create();
+        $outsider->teams()->attach($otherTeam, ['role' => 'owner']);
+        $this->actingAs($outsider);
+        session(['currentTeam' => $otherTeam]);
+
+        Livewire::test(StorageResources::class, ['storage' => $this->storage])
+            ->assertForbidden();
+    });
+
+    it('does not save or delete a Postgres init script for members', function (string $action) {
+        actAsMutableComponentUser($this->member);
+
+        Livewire::test(InitScript::class, [
+            'database' => $this->database,
+            'script' => ['index' => 0, 'filename' => 'init.sql', 'content' => 'SELECT 1;'],
+        ])
+            ->call($action)
+            ->assertDispatched('error')
+            ->assertNotDispatched('save_init_script')
+            ->assertNotDispatched('delete_init_script');
+    })->with(['submit', 'delete']);
+
+    it('saves and deletes a Postgres init script for admins', function (string $action, string $event) {
+        actAsMutableComponentUser($this->admin);
+
+        Livewire::test(InitScript::class, [
+            'database' => $this->database,
+            'script' => ['index' => 0, 'filename' => 'init.sql', 'content' => 'SELECT 1;'],
+        ])
+            ->call($action)
+            ->assertDispatched($event)
+            ->assertNotDispatched('error');
+    })->with([
+        'submit' => ['submit', 'save_init_script'],
+        'delete' => ['delete', 'delete_init_script'],
+    ]);
+
+    it('forbids members from changing a volume backup schedule', function (string $action) {
+        actAsMutableComponentUser($this->member);
+
+        Livewire::test(VolumeBackups::class, ['storage' => $this->volume, 'resource' => $this->application])
+            ->call($action)
+            ->assertForbidden();
+
+        expect(ScheduledVolumeBackup::count())->toBe(0);
+        Queue::assertNothingPushed();
+    })->with(['save', 'toggleEnabled', 'backupNow']);
+
+    it('lets admins change a volume backup schedule', function (string $action) {
+        actAsMutableComponentUser($this->admin);
+
+        Livewire::test(VolumeBackups::class, ['storage' => $this->volume, 'resource' => $this->application])
+            ->call($action)
+            ->assertSuccessful();
+
+        expect(ScheduledVolumeBackup::count())->toBe(1);
+    })->with(['save', 'toggleEnabled', 'backupNow']);
 });
-
-it('declares deploy authorization on the service container removal confirmation', function () {
-    $source = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-
-    expect($source)->toMatch(
-        '/<x-modal-confirmation(?=[^>]*title="Confirm Container Removal\?")(?=[^>]*canGate="deploy")(?=[^>]*:canResource="\$service")[^>]*>/'
-    );
-});
-
-it('declares update authorization on application and service domain removal confirmations', function () {
-    $applicationRow = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
-    $serviceTable = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($applicationRow)->toMatch(
-        '/<x-modal-confirmation(?=[^>]*title="Remove domain\?")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>/'
-    );
-
-    expect($serviceTable)->toMatch(
-        '/<x-modal-confirmation(?=[^>]*title="Remove domain\?")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
-    );
-});
-
-it('declares update authorization on service backup mutation controls', function () {
-    $importBackupView = file_get_contents(resource_path('views/livewire/project/service/import-backup.blade.php'));
-    $volumeBackupView = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
-
-    expect($importBackupView)->toMatch(
-        '/<x-forms\.listbox(?=[^>]*id="selectedDatabaseUuid")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
-    );
-
-    expect($volumeBackupView)
-        ->toMatch('/<x-modal-input(?=[^>]*:title="\'Edit backup schedule\'")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
-        ->toMatch('/@can\(\'update\', \$service\)\s*<x-table\.row-actions\b(?:(?!@endcan).)*?wire:click="backupNow\(\'database\',/s')
-        ->toMatch('/@can\(\'update\', \$service\)\s*<x-table\.row-actions\b(?:(?!@endcan).)*?wire:click="backupNow\(\'storage\',/s');
-});
-
-it('declares update authorization on application port controls', function () {
-    $domainsView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-    $previewDomainsView = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
-    $generalView = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
-
-    expect($domainsView)
-        ->toMatch('/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>\s*Cancel/s')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="confirmUseUnknownPort")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>/s');
-
-    expect($previewDomainsView)
-        ->toMatch('/<x-forms\.button[^\n]*canGate="update" :canResource="\$preview->application"[\s\S]{0,150}?Cancel/')
-        ->toMatch('/<x-forms\.button[^\n]*wire:click="confirmUseUnknownPort" canGate="update"\s+:canResource="\$preview->application"/');
-
-    $portsExposesControls = str($generalView)
-        ->after("@if (\$isStatic || \$buildPack === 'static')")
-        ->before('<p class="mt-1.5 text-xs');
-
-    expect($portsExposesControls->substrCount('id="portsExposes"'))->toBe(3)
-        ->and($portsExposesControls->substrCount('canGate="update" :canResource="$application"'))->toBe(3);
-});
-
-it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
-    $source = file_get_contents(base_path($path));
-
-    foreach ($requiredNeedles as $needle) {
-        expect($source)->toContain($needle);
-    }
-})->with([
-    'storage resources' => [
-        'app/Livewire/Storage/Resources.php',
-        ['AuthorizesRequests', "authorize('update'", "authorize('view'"],
-    ],
-    'postgres init script editor' => [
-        'app/Livewire/Project/Database/InitScript.php',
-        ['AuthorizesRequests', "authorize('update'"],
-    ],
-    'execute container command' => [
-        'app/Livewire/Project/Shared/ExecuteContainerCommand.php',
-        ['AuthorizesRequests', "authorize('view'", "authorize('canAccessTerminal'"],
-    ],
-    'terminal' => [
-        'app/Livewire/Project/Shared/Terminal.php',
-        ['AuthorizesRequests', "authorize('view'", "authorize('canAccessTerminal'"],
-    ],
-    'volume backup settings' => [
-        'app/Livewire/Project/Shared/Storages/VolumeBackups.php',
-        ['AuthorizesRequests', "authorize('view', \$this->resource)", "authorize('update', \$this->resource)"],
-    ],
-]);
-
-it('authorizes every volume backup form control', function (string $path, array $controlPatterns) {
-    $source = file_get_contents(base_path($path));
-
-    foreach ($controlPatterns as $controlPattern) {
-        expect($source)->toMatch($controlPattern);
-    }
-})->with([
-    'retention controls' => [
-        'resources/views/livewire/project/shared/storages/volume-backups/retention.blade.php',
-        [
-            '/<x-forms\.input(?=[^>]*id="retentionAmountLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionDaysLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionMaxStorageLocally")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionAmountS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionDaysS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
-            '/<x-forms\.input(?=[^>]*id="retentionMaxStorageS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*\/\>/s',
-        ],
-    ],
-    'S3 controls' => [
-        'resources/views/livewire/project/shared/storages/volume-backups/s3.blade.php',
-        [
-            '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*>\s*Enable S3\s*<\/x-forms\.button>/s',
-            '/<x-forms\.button(?=[^>]*wire:click="toggleS3")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$resource")[^>]*>\s*Disable S3\s*<\/x-forms\.button>/s',
-            '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="s3StorageIds"/',
-            '/<x-forms\.listbox canGate="update" :canResource="\$resource" id="disableLocalBackup"[\s\S]*?:disabled="! \$saveToS3 \|\| ! auth\(\)->user\(\)\?->can\(\'update\', \$resource\)"/',
-        ],
-    ],
-    'service domains controls' => [
-        'resources/views/livewire/project/service/domains.blade.php',
-        [
-            '/<x-forms\.listbox(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*id="newServiceApplicationId")[^>]*>/s',
-            '/@can\(\'update\', \$service\)[\s\S]*?<x-modal-input title="Add domain"(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>[\s\S]*?<x-forms\.domain-input id="newDomainParts"[\s\S]*?@endcan/',
-            '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*wire:click="generateDomain")[^>]*>/s',
-            '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*type="submit")[^>]*>/s',
-        ],
-    ],
-    'postgres public access control' => [
-        'resources/views/livewire/project/database/postgresql/general.blade.php',
-        [
-            '/<x-forms\.listbox id="isPublic"[\s\S]*?:disabled="! auth\(\)->user\(\)->can\(\'update\', \$database\)" canGate="update" :canResource="\$database" :options=/',
-        ],
-    ],
-    'redis public access control' => [
-        'resources/views/livewire/project/database/redis/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-    'mongodb public access control' => [
-        'resources/views/livewire/project/database/mongodb/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-    'clickhouse public access control' => [
-        'resources/views/livewire/project/database/clickhouse/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-    'mariadb public access control' => [
-        'resources/views/livewire/project/database/mariadb/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-    'dragonfly public access control' => [
-        'resources/views/livewire/project/database/dragonfly/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-    'mysql public access control' => [
-        'resources/views/livewire/project/database/mysql/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-    'keydb public access control' => [
-        'resources/views/livewire/project/database/keydb/general.blade.php',
-        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
-    ],
-]);

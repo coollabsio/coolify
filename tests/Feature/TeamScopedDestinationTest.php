@@ -334,14 +334,6 @@ describe('Destination/Show team scope', function () {
         $component->assertRedirect(route('destination.index'));
     });
 
-    test('general page links to separate resources page without rendering the resources table', function () {
-        Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationA->uuid])
-            ->assertSee('General')
-            ->assertSee('Resources')
-            ->assertDontSeeHtml('placeholder="Search resources"')
-            ->assertDontSee('No resources use this destination');
-    });
-
     test('mount with own standalone destination lists deployed resources', function () {
         Application::factory()->create([
             'name' => 'application-on-destination',

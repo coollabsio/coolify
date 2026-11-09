@@ -5,7 +5,6 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Attributes\Locked;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
@@ -20,14 +19,18 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
 });
 
-test('api token permission flags are locked', function (string $property) {
-    $property = new ReflectionProperty(ApiTokens::class, $property);
+test('api token permission flags are locked', function (string $property, mixed $value) {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
 
-    expect($property->getAttributes(Locked::class))->not->toBeEmpty();
-})->with([
-    'root permission flag' => 'canUseRootPermissions',
-    'write permission flag' => 'canUseWritePermissions',
-    'token search index' => 'tokenSearchIndex',
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)->set($property, $value);
+})->throws(CannotUpdateLockedPropertyException::class)->with([
+    'root permission flag' => ['canUseRootPermissions', true],
+    'write permission flag' => ['canUseWritePermissions', true],
+    'token search index' => ['tokenSearchIndex', []],
 ]);
 
 test('token search index follows created and revoked tokens', function () {
@@ -52,17 +55,6 @@ test('token search index follows created and revoked tokens', function () {
 
     expect($component->get('tokenSearchIndex'))->toBe([]);
 });
-
-test('member cannot tamper with root permission flag', function () {
-    $member = User::factory()->create();
-    $this->team->members()->attach($member->id, ['role' => 'member']);
-
-    $this->actingAs($member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ApiTokens::class)
-        ->set('canUseRootPermissions', true);
-})->throws(CannotUpdateLockedPropertyException::class);
 
 test('member cannot create root token through tampered permissions payload', function () {
     $member = User::factory()->create();

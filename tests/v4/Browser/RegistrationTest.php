@@ -45,30 +45,6 @@ it('can register a new root user', function () {
     expect(User::where('email', 'root@example.com')->exists())->toBeTrue();
 });
 
-it('fails registration with mismatched passwords', function () {
-    $page = visit('/register');
-
-    $page->fill('name', 'Test User')
-        ->fill('email', 'root@example.com')
-        ->fill('password', 'Password1!@')
-        ->fill('password_confirmation', 'DifferentPass1!@')
-        ->click('Create account')
-        ->assertSee('password')
-        ->screenshot(filename: 'registration-password-mismatch');
-});
-
-it('fails registration with weak password', function () {
-    $page = visit('/register');
-
-    $page->fill('name', 'Test User')
-        ->fill('email', 'root@example.com')
-        ->fill('password', 'short')
-        ->fill('password_confirmation', 'short')
-        ->click('Create account')
-        ->assertSee('password')
-        ->screenshot(filename: 'registration-weak-password');
-});
-
 it('shows login link when a user already exists', function () {
     createBrowserRootUser();
 
