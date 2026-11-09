@@ -37,9 +37,6 @@ class StartService
         // Compose recreates the containers, so a status check can find them stopped for a moment.
         $service->applications()->get()->concat($service->databases()->get())
             ->each(fn (ServiceApplication|ServiceDatabase $part) => NotifyResourceStoppedJob::expectStop($part));
-        if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
-            StopService::run(service: $service, dockerCleanup: false);
-        }
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
         $service->applications()->get()->each->resetRestartLimit();
@@ -68,7 +65,12 @@ class StartService
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         }
-        $commands = array_merge($commands, self::removeContainersWithRemovedVolumesCommands($service));
+        if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
+            // The stop removes every container, so no container keeps a deleted volume.
+            $commands = array_merge($commands, self::stopAfterImageCheckCommands($service, $compose));
+        } else {
+            $commands = array_merge($commands, self::removeContainersWithRemovedVolumesCommands($service));
+        }
         $commands[] = 'echo Starting service.';
         if (data_get($service, 'connect_to_docker_network')) {
             // Connect the created containers to the predefined network before they start. A container
@@ -117,6 +119,33 @@ class StartService
         $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
 
         return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
+    }
+
+    /**
+     * Stops and removes the containers of the service, but only after Compose has every image on the
+     * server. `up --no-start --no-recreate` pulls (or builds) only the missing images and does not touch
+     * the running containers. If an image cannot be fetched, the script stops there and the service
+     * keeps running.
+     *
+     * @return list<string>
+     */
+    public static function stopAfterImageCheckCommands(Service $service, string $compose): array
+    {
+        $containers = $service->applications()->pluck('name')
+            ->concat($service->databases()->pluck('name'))
+            ->map(fn (string $name): string => "{$name}-{$service->uuid}")
+            ->values()
+            ->all();
+        if ($containers === []) {
+            return [];
+        }
+
+        return [
+            "echo 'Checking that all images are on the server.'",
+            "{$compose} up --no-start --no-recreate < /dev/null",
+            "echo 'Stopping service.'",
+            ...array_map(fn (string $command): string => "{$command} || true", StopService::stopContainersCommands($containers, $service->server)),
+        ];
     }
 
     /**
