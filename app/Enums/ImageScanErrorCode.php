@@ -35,7 +35,7 @@ enum ImageScanErrorCode: string
             self::DbTooOld => "The vulnerability database is {$n} days old. {$server} cannot reach grype.anchore.io.",
             self::DbMissing => "The vulnerability database is not on {$server} yet. Wait for the first update to finish or check that {$server} can reach grype.anchore.io.",
             self::Timeout => 'The scan took too long and was stopped.',
-            self::OutOfMemory => 'The scanner ran out of memory and was stopped. It can use up to 1 GB, and the server must have that much free memory.',
+            self::OutOfMemory => "The scanner ran out of memory and was stopped. Raise the scanner memory limit on the Vulnerabilities page of {$server}, and make sure that {$server} has that much free memory.",
             self::LockBusy => "Another scan is still running on {$server}.",
             self::RegistryAuth => "Coolify cannot read this image from its registry. Log in to the registry on {$server}.",
             self::BuildServerOff => 'Image scanning is off on the build server.',

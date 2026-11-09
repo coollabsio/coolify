@@ -3,6 +3,7 @@
 namespace App\Services\ImageScan;
 
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Support\ValidationPatterns;
 use InvalidArgumentException;
 
@@ -574,11 +575,14 @@ class ScannerCommands
         $env = array_merge([
             'SYFT_CHECK_FOR_APP_UPDATE' => 'false',
             // By default Syft runs NumCPU × 4 workers (`--cpus` does not lower NumCPU) and records metadata of every
-            // file a package owns. Together they need more than the 1 GB limit for an app image with many files
+            // file a package owns. Together they need more than the default 1 GB limit for an app image with many files
             // (Laravel with vendor and node_modules). Grype and the SBOM use only the packages, which stay the same.
             'SYFT_PARALLELISM' => '1',
             'SYFT_FILE_METADATA_SELECTION' => 'none',
             'GRYPE_CHECK_FOR_APP_UPDATE' => 'false',
+            // Go collects garbage only when the heap doubles, so RSS can pass the container limit while the live
+            // data still fits. A soft limit below the container limit makes Go collect sooner instead of being killed.
+            'GOMEMLIMIT' => intdiv($this->memoryMb() * 85, 100).'MiB',
             'TMPDIR' => '/scratch',
             'XDG_CACHE_HOME' => '/scratch/cache',
         ], $env);
@@ -588,7 +592,7 @@ class ScannerCommands
             "timeout -k 10 {$timeout} docker run",
             '--name '.$this->containerName(),
             '--cap-drop ALL --security-opt no-new-privileges --read-only --pids-limit 256',
-            '--user '.self::SCANNER_USER.' --cpus 1 --memory 1g --memory-swap 1g --log-driver none',
+            '--user '.self::SCANNER_USER.' --cpus 1 --memory '.$this->memoryMb().'m --memory-swap '.$this->memoryMb().'m --log-driver none',
         ];
         if (! $network) {
             $parts[] = '--network none';
@@ -777,6 +781,11 @@ class ScannerCommands
         ]);
 
         return $this->shell($this->step('db-volume', 'docker volume create '.self::DB_VOLUME." >/dev/null && {$run} >/dev/null 2>&1"));
+    }
+
+    private function memoryMb(): int
+    {
+        return (int) ($this->server->settings?->image_scan_memory_mb ?? ServerSetting::DEFAULT_IMAGE_SCAN_MEMORY_MB);
     }
 
     /**

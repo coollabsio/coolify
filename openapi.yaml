@@ -12421,6 +12421,7 @@ paths:
               schema:
                 properties:
                   is_image_scan_enabled: { description: 'Whether the server scans the images of its resources.', type: boolean }
+                  image_scan_memory_mb: { description: 'Memory limit of each scanner step, in MB.', type: integer, enum: [1024, 2048, 4096, 8192] }
                   scanner_state: { description: 'State of the scanner on the server. Null when unknown.', type: [string, 'null'], enum: [pulling, updating_database, ready, failed] }
                   scanner_failed_step: { description: 'The step that failed when scanner_state is failed.', type: [string, 'null'] }
                   scanner_built_at: { description: 'Time of the vulnerability database on the server.', type: [string, 'null'], format: date-time }
@@ -12441,7 +12442,7 @@ paths:
       tags:
         - Servers
       summary: 'Update image scanning settings'
-      description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off. Turning it on gets the scanner on the server in the background.'
+      description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the memory limit of the scanner. Send at least one field. Turning it on gets the scanner on the server in the background. A new memory limit applies to the next scan.'
       operationId: update-server-image-scanning
       parameters:
         -
@@ -12456,11 +12457,13 @@ paths:
         content:
           application/json:
             schema:
-              required:
-                - is_image_scan_enabled
               properties:
                 is_image_scan_enabled:
                   type: boolean
+                image_scan_memory_mb:
+                  description: 'Memory limit of each scanner step, in MB.'
+                  type: integer
+                  enum: [1024, 2048, 4096, 8192]
               type: object
       responses:
         '200':
@@ -18962,6 +18965,9 @@ components:
           description: 'Host key that the server sent when it did not match the pinned key.'
         is_ssh_host_key_check_disabled:
           type: boolean
+        is_ssh_host_key_check_enforced:
+          type: boolean
+          description: 'Refuse a changed host key on this server, also when the instance only warns.'
         ssh_host_key_fingerprints:
           type: array
           items:

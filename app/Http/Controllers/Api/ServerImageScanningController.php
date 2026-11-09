@@ -6,19 +6,21 @@ use App\Actions\ImageScan\SetServerImageScanning;
 use App\Http\Controllers\Controller;
 use App\Jobs\PrepareImageScannerJob;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Services\ImageScan\ImageScanningRefused;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 
 class ServerImageScanningController extends Controller
 {
-    private const ALLOWED_FIELDS = ['is_image_scan_enabled'];
+    private const ALLOWED_FIELDS = ['is_image_scan_enabled', 'image_scan_memory_mb'];
 
     /**
-     * @return array{is_image_scan_enabled: bool, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
+     * @return array{is_image_scan_enabled: bool, image_scan_memory_mb: int, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
      */
     private function transform(Server $server): array
     {
@@ -29,6 +31,7 @@ class ServerImageScanningController extends Controller
 
         return [
             'is_image_scan_enabled' => (bool) $server->settings->is_image_scan_enabled,
+            'image_scan_memory_mb' => (int) $server->settings->image_scan_memory_mb,
             'scanner_state' => is_string($state) ? $state : null,
             'scanner_failed_step' => is_string($failedStep) ? $failedStep : null,
             'scanner_built_at' => is_string($builtAt) ? CarbonImmutable::parse($builtAt)->toIso8601String() : null,
@@ -60,6 +63,7 @@ class ServerImageScanningController extends Controller
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'is_image_scan_enabled', type: 'boolean', description: 'Whether the server scans the images of its resources.'),
+                        new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB.'),
                         new OA\Property(property: 'scanner_state', type: 'string', nullable: true, enum: ['pulling', 'updating_database', 'ready', 'failed'], description: 'State of the scanner on the server. Null when unknown.'),
                         new OA\Property(property: 'scanner_failed_step', type: 'string', nullable: true, description: 'The step that failed when scanner_state is failed.'),
                         new OA\Property(property: 'scanner_built_at', type: 'string', format: 'date-time', nullable: true, description: 'Time of the vulnerability database on the server.'),
@@ -92,7 +96,7 @@ class ServerImageScanningController extends Controller
 
     #[OA\Patch(
         summary: 'Update image scanning settings',
-        description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off. Turning it on gets the scanner on the server in the background.',
+        description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the memory limit of the scanner. Send at least one field. Turning it on gets the scanner on the server in the background. A new memory limit applies to the next scan.',
         path: '/servers/{uuid}/image-scanning',
         operationId: 'update-server-image-scanning',
         security: [['bearerAuth' => []]],
@@ -103,9 +107,9 @@ class ServerImageScanningController extends Controller
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['is_image_scan_enabled'],
                 properties: [
                     new OA\Property(property: 'is_image_scan_enabled', type: 'boolean'),
+                    new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB.'),
                 ],
                 type: 'object',
             ),
@@ -140,7 +144,8 @@ class ServerImageScanningController extends Controller
         $this->authorize('update', $server);
 
         $validator = customApiValidator($request->all(), [
-            'is_image_scan_enabled' => 'required|boolean',
+            'is_image_scan_enabled' => 'required_without:image_scan_memory_mb|boolean',
+            'image_scan_memory_mb' => ['required_without:is_image_scan_enabled', 'integer', Rule::in(ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB)],
         ]);
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -155,18 +160,25 @@ class ServerImageScanningController extends Controller
             ], 422);
         }
 
-        $enabled = $request->boolean('is_image_scan_enabled');
-        try {
-            SetServerImageScanning::run($server, $enabled);
-        } catch (ImageScanningRefused $e) {
-            return response()->json(['message' => $e->getMessage()], 409);
-        }
-
-        auditLog($enabled ? 'api.server.image_scanning_enabled' : 'api.server.image_scanning_disabled', [
+        $audit = [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
-        ]);
+        ];
+        try {
+            if ($request->has('image_scan_memory_mb')) {
+                SetServerImageScanning::ensureManagedHere($server);
+                $server->settings->update(['image_scan_memory_mb' => $request->integer('image_scan_memory_mb')]);
+                auditLog('api.server.image_scanner_memory_changed', $audit);
+            }
+            if ($request->has('is_image_scan_enabled')) {
+                $enabled = $request->boolean('is_image_scan_enabled');
+                SetServerImageScanning::run($server, $enabled);
+                auditLog($enabled ? 'api.server.image_scanning_enabled' : 'api.server.image_scanning_disabled', $audit);
+            }
+        } catch (ImageScanningRefused $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
 
         return response()->json($this->transform($server->refresh()));
     }

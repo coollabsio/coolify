@@ -6,6 +6,7 @@ use App\Actions\ImageScan\ScanImage;
 use App\Actions\ImageScan\SetServerImageScanning;
 use App\Jobs\PrepareImageScannerJob;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Services\ImageScan\ImageRef;
 use App\Services\ImageScan\ImageScanningRefused;
 use App\Services\ImageScan\ScannerCommands;
@@ -14,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class ServerImageScanning extends Component
@@ -22,6 +24,8 @@ class ServerImageScanning extends Component
     use ListensToTeamChannel;
 
     public Server $server;
+
+    public string $scannerMemoryMb = '';
 
     public function getListeners()
     {
@@ -34,6 +38,25 @@ class ServerImageScanning extends Component
     {
         $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
         $this->authorize('viewSecurity', $this->server);
+        $this->scannerMemoryMb = (string) $this->server->settings->image_scan_memory_mb;
+    }
+
+    public function updatedScannerMemoryMb()
+    {
+        $this->authorize('update', $this->server);
+
+        $this->validate(['scannerMemoryMb' => ['required', Rule::in(array_map('strval', ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB))]]);
+
+        try {
+            SetServerImageScanning::ensureManagedHere($this->server);
+            $this->server->settings->update(['image_scan_memory_mb' => (int) $this->scannerMemoryMb]);
+            $this->auditImageScanning('image_scanner_memory_changed');
+            $this->dispatch('success', 'Scanner memory limit saved. It applies to the next scan.');
+        } catch (\Throwable $e) {
+            $this->scannerMemoryMb = (string) $this->server->settings->refresh()->image_scan_memory_mb;
+
+            return handleError($e, $this);
+        }
     }
 
     public function scanUpdated(array $event = []): void
@@ -135,6 +158,11 @@ class ServerImageScanning extends Component
 
         return view('livewire.image-scan.server-image-scanning', [
             'enabled' => (bool) $this->server->settings->is_image_scan_enabled,
+            'memoryLimit' => formatBytes($this->server->settings->image_scan_memory_mb * 1024 * 1024, 0),
+            'memoryOptions' => array_map(
+                fn (int $mb) => ['value' => (string) $mb, 'label' => formatBytes($mb * 1024 * 1024, 0)],
+                ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB,
+            ),
             'prepareState' => is_string($state) ? $state : null,
             'failedStep' => is_string($failedStep) ? $failedStep : null,
             'registries' => collect(config('constants.image_scan.images'))

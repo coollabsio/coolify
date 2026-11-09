@@ -108,9 +108,16 @@ class ServerSetting extends Model
      */
     public const string DEFAULT_AXIOM_DOMAIN = 'us-east-1.aws.edge.axiom.co';
 
+    /** Memory limit of each scanner container (Syft, Grype, regctl), in MB. */
+    public const int DEFAULT_IMAGE_SCAN_MEMORY_MB = 1024;
+
+    /** @var list<int> */
+    public const array IMAGE_SCAN_MEMORY_OPTIONS_MB = [1024, 2048, 4096, 8192];
+
     protected $fillable = [
         'server_id',
         'is_image_scan_enabled',
+        'image_scan_memory_mb',
         'image_candidate_scans_today',
         'image_candidate_scans_date',
         'is_swarm_manager',
@@ -196,6 +203,7 @@ class ServerSetting extends Model
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
         'is_image_scan_enabled' => false,
+        'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
         'image_candidate_scans_today' => 0,
     ];
 
@@ -230,6 +238,7 @@ class ServerSetting extends Model
         'is_auto_security_updates_enabled' => 'boolean',
         'is_logdrain_cloudwatch_enabled' => 'boolean',
         'is_image_scan_enabled' => 'boolean',
+        'image_scan_memory_mb' => 'integer',
         'image_candidate_scans_today' => 'integer',
         'image_candidate_scans_date' => 'date',
         'ssh_host_key_trusted_at' => 'datetime',

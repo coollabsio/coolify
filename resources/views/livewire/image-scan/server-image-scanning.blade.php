@@ -6,7 +6,7 @@
     <livewire:server.navbar :server="$server" />
 
     @php
-        $costText = 'Scans use up to 1 CPU and 1 GB of memory while they run, and about 1.2 GB of disk, plus temporary space for one image.';
+        $costText = 'Scans use up to 1 CPU and ' . $memoryLimit . ' of memory while they run, and about 1.2 GB of disk, plus temporary space for one image.';
         $pullState = match ($prepareState) {
             'pulling' => 'running',
             'updating_database', 'ready' => 'success',
@@ -105,6 +105,12 @@
                 <div @class([
                     'mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]' => ! $enabled || $prepareState !== 'ready',
                 ])>
+                    <div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <x-forms.listbox id="scannerMemoryMb" label="Scanner memory limit" onChange="$commit"
+                            :disabled="auth()->user()->cannot('update', $server)"
+                            helper="Memory that each scanner step can use. Raise it when a scan stops because it ran out of memory. The server must have this much free memory."
+                            :options="$memoryOptions" />
+                    </div>
                     <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid" :embedded="true"
                         :key="'server-image-scan-settings-'.$server->uuid" />
                 </div>

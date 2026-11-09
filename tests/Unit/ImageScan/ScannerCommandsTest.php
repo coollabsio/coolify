@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Services\ImageScan\ScannerCommands;
 use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
@@ -14,6 +15,7 @@ const SCANNER_TEST_HEX = 'aaaabbbbccccddddeeeeffff000011112222333344445555666677
 beforeEach(function () {
     $this->server = Mockery::mock(Server::class)->makePartial();
     $this->server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
+    $this->server->shouldReceive('getAttribute')->with('settings')->andReturn(new ServerSetting);
     $this->server->shouldReceive('setAttribute')->andReturnSelf();
     $this->server->user = 'ubuntu';
     $this->commands = new ScannerCommands($this->server, SCANNER_TEST_RUN_ID);
@@ -87,7 +89,19 @@ it('runs syft with one worker and without file metadata, so a large image fits i
 
     expect($syft)->toContain("-e 'SYFT_PARALLELISM=1' ")
         ->and($syft)->toContain("-e 'SYFT_FILE_METADATA_SELECTION=none' ")
-        ->and($syft)->toContain('--memory 1g --memory-swap 1g');
+        ->and($syft)->toContain('--memory 1024m --memory-swap 1024m');
+});
+
+it('runs every scanner container with the memory limit of the server', function () {
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('root');
+    $server->shouldReceive('getAttribute')->with('settings')->andReturn(new ServerSetting(['image_scan_memory_mb' => 4096]));
+    $commands = new ScannerCommands($server, SCANNER_TEST_RUN_ID);
+
+    $runs = collect(scannerCommandLists($commands))->flatMap(fn (array $list) => scannerDockerRuns($list));
+
+    expect($runs)->not->toBeEmpty()
+        ->and($runs->every(fn (string $line) => str_contains($line, '--memory 4096m --memory-swap 4096m ')))->toBeTrue();
 });
 
 it('asks Docker whether the memory limit stopped a scanner, then removes its container in the same script', function () {
@@ -128,7 +142,7 @@ it('starts every command list by removing a leftover scan container', function (
 
 it('runs every scanner container with each hardening flag exactly once', function () {
     $flags = ['--name coolify-scan-'.SCANNER_TEST_RUN_ID.' ', '--cap-drop ALL ', '--security-opt no-new-privileges ', '--read-only ',
-        '--pids-limit 256 ', '--user 65534:65534 ', '--cpus 1 ', '--memory 1g ', '--memory-swap 1g ',
+        '--pids-limit 256 ', '--user 65534:65534 ', '--cpus 1 ', '--memory 1024m ', '--memory-swap 1024m ',
         "-e 'SYFT_CHECK_FOR_APP_UPDATE=false' ", "-e 'GRYPE_CHECK_FOR_APP_UPDATE=false' ", "-e 'XDG_CACHE_HOME=/scratch/cache' "];
     $runs = 0;
 

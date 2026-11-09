@@ -215,6 +215,34 @@ describe('server image scanning page', function () {
     });
 });
 
+describe('scanner memory limit', function () {
+    it('saves the scanner memory limit of the server and shows it in the cost text', function () {
+        imageScanningPage()
+            ->assertSet('scannerMemoryMb', '1024')
+            ->assertSee('1 CPU and 1 GB of memory')
+            ->set('scannerMemoryMb', '4096')
+            ->assertHasNoErrors()
+            ->assertDispatched('success')
+            ->assertSee('1 CPU and 4 GB of memory');
+
+        expect($this->server->settings->fresh()->image_scan_memory_mb)->toBe(4096);
+    });
+
+    it('refuses a memory limit that is not one of the options', function () {
+        imageScanningPage()->set('scannerMemoryMb', '100')->assertHasErrors('scannerMemoryMb');
+
+        expect($this->server->settings->fresh()->image_scan_memory_mb)->toBe(1024);
+    });
+
+    it('does not change the memory limit of a server that another instance manages', function () {
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+
+        imageScanningPage()->set('scannerMemoryMb', '2048')->assertNotDispatched('success');
+
+        expect($this->server->settings->fresh()->image_scan_memory_mb)->toBe(1024);
+    });
+});
+
 describe('server image scanning authorization', function () {
     beforeEach(function () {
         Queue::fake();
@@ -238,6 +266,7 @@ describe('server image scanning authorization', function () {
 
         $components = collect(['enable', 'disable', 'deleteScannerData'])
             ->mapWithKeys(fn (string $action) => [$action => Livewire::test(ServerImageScanning::class, ['server_uuid' => $this->server->uuid])]);
+        $memoryComponent = Livewire::test(ServerImageScanning::class, ['server_uuid' => $this->server->uuid]);
 
         $this->member->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
         $this->member->unsetRelation('teams');
@@ -246,8 +275,10 @@ describe('server image scanning authorization', function () {
         foreach ($components as $action => $component) {
             $component->call($action)->assertForbidden();
         }
+        $memoryComponent->set('scannerMemoryMb', '8192')->assertForbidden();
 
-        expect($this->server->settings->fresh()->is_image_scan_enabled)->toBeFalse();
+        expect($this->server->settings->fresh()->is_image_scan_enabled)->toBeFalse()
+            ->and($this->server->settings->fresh()->image_scan_memory_mb)->toBe(1024);
         Queue::assertNothingPushed();
     });
 
