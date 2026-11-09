@@ -2675,3 +2675,21 @@ test('redactLogText redacts JSON secret fields in log lines', function () {
         ->and($mixed)->not->toContain('redactme03')
         ->and($mixed)->toContain(REDACTED);
 });
+
+test('get_service does not return the server of the service', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+    $data = mcpReadJson($response)['data'];
+
+    expect($data['uuid'])->toBe($service->uuid)
+        ->and($data)->toHaveKey('server_status')
+        ->and($data)->not->toHaveKey('server')
+        ->and(json_encode($data))->not->toContain($this->server->ip);
+});
